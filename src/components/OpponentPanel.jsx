@@ -1,5 +1,6 @@
 import '../styles/opponentPanel.css'
 import BalanceDisplay from './BalanceDisplay'
+import { DECK_ANCHORS } from '../config/seatLayouts'
 
 // Panel compacto de rival (mesas 3-5). Diseñado conforme a docs/AJILEI_Sistema_Diseno_v1.2.md.
 // Muestra solo: nombre, saldo, 5 cartas pequeñas con solape, estado breve, badge Mano.
@@ -34,10 +35,12 @@ export default function OpponentPanel({
             {renderCard(i)}
           </div>
         ))}
-        <div className="opp-deck-wrapper deck-shuffle-wrapper">
-          <div ref={deckRef} className={`deck-pile opp-deck${showDeck ? '' : ' deck-hidden'}`} />
-          {shuffleChildren}
-        </div>
+      </div>
+
+      {/* Mazo anclado según la posición del asiento (nunca en línea con los slots) */}
+      <div className={`opp-deck-wrapper deck-shuffle-wrapper opp-deck-anchor-${DECK_ANCHORS[seatPos]}`}>
+        <div ref={deckRef} className={`deck-pile opp-deck${showDeck ? '' : ' deck-hidden'}`} />
+        {shuffleChildren}
       </div>
 
       <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}`}>

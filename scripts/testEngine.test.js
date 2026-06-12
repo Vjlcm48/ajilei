@@ -27,6 +27,7 @@ import {
 } from '../src/engine/gameEngine.js'
 import { getBestSuitScore, isAjilei, getComodinValue } from '../src/engine/handEvaluator.js'
 import { createDeck } from '../src/engine/deck.js'
+import { SEAT_LAYOUTS, DECK_ANCHORS } from '../src/config/seatLayouts.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -526,5 +527,29 @@ describe('Bonus: empate — seat más cercano a Mano gana', () => {
   it('N=5, Mano=2: empate seat 0 vs seat 4 → gana seat 4 (offset 2 vs offset 3)', () => {
     // desde mano=2: offset 0=seat2, 1=seat3, 2=seat4, 3=seat0
     expect(breakTie(2, 5, [0, 4])).toBe(4)
+  })
+})
+
+// ── Tanda C2: anclaje del mazo por posición de asiento ───────────────────────
+describe('Tanda C2: DECK_ANCHORS cubre todas las posiciones', () => {
+  it('toda posición de SEAT_LAYOUTS tiene un anclaje de mazo definido', () => {
+    Object.values(SEAT_LAYOUTS).forEach(layout => {
+      layout.forEach(pos => {
+        expect(DECK_ANCHORS[pos], `posición sin anclaje: ${pos}`).toBeDefined()
+      })
+    })
+  })
+
+  it('N=5: en 5 manos seguidas el mazo (Pie) visita los 5 asientos, cada uno con anclaje', () => {
+    let s = createInitialState(10, 5)
+    const visited = new Set()
+    for (let hand = 0; hand < 5; hand++) {
+      s = startHand(s)
+      visited.add(s.pieIndex)
+      const pos = SEAT_LAYOUTS[5][s.pieIndex]
+      expect(DECK_ANCHORS[pos]).toBeDefined()
+      s = playHandToEnd(s)
+    }
+    expect(visited.size).toBe(5)
   })
 })

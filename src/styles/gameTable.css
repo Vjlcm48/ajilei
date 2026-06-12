@@ -475,6 +475,49 @@
   margin-left: 32px;
 }
 
+/* ── Mesas 4-5: grid con paneles laterales ── */
+.game-table.table-wide {
+  width: min(1100px, 100%);
+}
+
+.table-mid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.mid-center {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.side-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.side-col .opp-panel {
+  flex: 0 0 auto;
+}
+
+/* ── Indicador de comodín (mesas 4-5) — nota discreta y permanente ── */
+.comodin-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.25);
+  background: var(--surface-area);
+  border-radius: 999px;
+  padding: 4px 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* ── Showdown winner emphasis ── */
 /* Winning AI cards (N=2 zone): scale ~20% in place — transform only, no reflow.
    Adjacent winner slots gain margin so the scaled cards spread without overlap. */

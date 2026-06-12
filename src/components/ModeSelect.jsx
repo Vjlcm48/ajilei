@@ -4,8 +4,8 @@ import { SoundButton } from './SoundButton'
 const TABLE_MODES = [
   { players: 2, title: 'Mesa de 2 jugadores', subtitle: 'Tú vs 1 IA',                   enabled: true  },
   { players: 3, title: 'Mesa de 3 jugadores', subtitle: 'Tú vs 2 IAs',                  enabled: true  },
-  { players: 4, title: 'Mesa de 4 jugadores', subtitle: 'Tú vs 3 IAs · Comodín activo', enabled: false },
-  { players: 5, title: 'Mesa de 5 jugadores', subtitle: 'Tú vs 4 IAs · Comodín activo', enabled: false },
+  { players: 4, title: 'Mesa de 4 jugadores', subtitle: 'Tú vs 3 IAs · Comodín activo', enabled: true  },
+  { players: 5, title: 'Mesa de 5 jugadores', subtitle: 'Tú vs 4 IAs · Comodín activo', enabled: true  },
 ]
 
 export default function ModeSelect({ onSelectMode, onBack }) {

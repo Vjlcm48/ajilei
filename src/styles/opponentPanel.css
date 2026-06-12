@@ -19,6 +19,7 @@
   min-height: 150px;
   flex: 1;
   min-width: 0;
+  position: relative;   /* ancla del mazo */
 }
 
 .opp-folded { opacity: 0.55; }
@@ -56,8 +57,32 @@
   height: 100%;
 }
 
-/* Mazo compacto anclado al asiento (visible solo si es Pie) */
-.opp-deck-wrapper { margin-left: 10px; }
+/* Mazo compacto anclado al asiento (visible solo si es Pie).
+   El punto de anclaje lo define DECK_ANCHORS por posición — fuera del flujo
+   del panel (position: absolute), nunca en línea con los slots. */
+.opp-deck-wrapper {
+  position: absolute;
+}
+
+/* Asientos superiores: mazo en la franja reservada ENCIMA del panel */
+.opp-deck-anchor-above {
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Asientos laterales: mazo hacia el interior de la mesa */
+.opp-deck-anchor-inner-right {
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.opp-deck-anchor-inner-left {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
 
 .deck-pile.opp-deck {
   width: var(--opp-card-w);
@@ -72,6 +97,13 @@
 .opp-deck-wrapper .shuffle-fan-card {
   width: var(--opp-card-w);
   height: var(--opp-card-h);
+}
+
+/* Mesa de 5: mazo ~15% más pequeño */
+.table-five .deck-pile.opp-deck,
+.table-five .opp-deck-wrapper .shuffle-fan-card {
+  width: calc(var(--opp-card-w) * 0.85);
+  height: calc(var(--opp-card-h) * 0.85);
 }
 
 /* Panel ganador del showdown: cartas reveladas escalan ~20% (transform, sin reflow)
@@ -108,10 +140,17 @@
 
 .opp-score strong { color: var(--gold-brand); }
 
-/* Zona de rivales: fila parametrizada por posiciones */
+/* Zona de rivales: fila parametrizada por posiciones.
+   El padding superior reserva la franja del mazo de los asientos superiores
+   (ocultamiento sin colapso — ley de anclaje). */
 .rivals-zone {
   display: flex;
   gap: 10px;
   align-items: stretch;
   min-height: 170px;
+  padding-top: calc(var(--card-h) * 0.55 + 12px);
 }
+
+/* Columnas laterales (mesas 4-5): espacio interior reservado para el mazo */
+.side-col-left  { padding-right: calc(var(--card-w) * 0.55 + 14px); }
+.side-col-right { padding-left:  calc(var(--card-w) * 0.55 + 14px); }

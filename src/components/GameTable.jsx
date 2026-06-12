@@ -557,28 +557,59 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     )
   }
 
-  function renderRivalsZone() {
+  function renderPanel(seat) {
     const layout = SEAT_LAYOUTS[numPlayers]
     return (
+      <OpponentPanel
+        key={seat}
+        player={game.players[seat]}
+        seatPos={layout[seat]}
+        isMano={manoSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
+        isTurn={isBetPhase && game.activePlayerIndex === seat}
+        isWinner={showdownWinnerSeat === seat}
+        lastAction={lastActions[seat]}
+        renderCard={i => renderOpponentCard(seat, i)}
+        score={game.players[seat].score}
+        showScore={isPayoutPhase && !isClearing}
+        slotRefs={slotRefs.current[seat]}
+        deckRef={deckRefs.current[seat]}
+        showDeck={deckSeat === seat && !isClearing}
+        shuffleChildren={isShuffling && deckSeat === seat ? <ShuffleDeck /> : null}
+      />
+    )
+  }
+
+  // Asientos rivales en una franja de posiciones (orden visual izq→der)
+  function seatsAt(...positions) {
+    const layout = SEAT_LAYOUTS[numPlayers]
+    return rivalSeatsInDisplayOrder(numPlayers).filter(s => positions.includes(layout[s]))
+  }
+
+  function renderRivalsTopRow() {
+    return (
       <section className="rivals-zone">
-        {rivalSeatsInDisplayOrder(numPlayers).map(seat => (
-          <OpponentPanel
-            key={seat}
-            player={game.players[seat]}
-            seatPos={layout[seat]}
-            isMano={manoSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
-            isTurn={isBetPhase && game.activePlayerIndex === seat}
-            isWinner={showdownWinnerSeat === seat}
-            lastAction={lastActions[seat]}
-            renderCard={i => renderOpponentCard(seat, i)}
-            score={game.players[seat].score}
-            showScore={isPayoutPhase && !isClearing}
-            slotRefs={slotRefs.current[seat]}
-            deckRef={deckRefs.current[seat]}
-            showDeck={deckSeat === seat && !isClearing}
-            shuffleChildren={isShuffling && deckSeat === seat ? <ShuffleDeck /> : null}
-          />
-        ))}
+        {seatsAt('top-left', 'top-center', 'top-right').map(renderPanel)}
+      </section>
+    )
+  }
+
+  function renderCenterZone() {
+    return (
+      <section className="center-zone">
+        <div className="pot-box">
+          <span className="pot-label">Pozo</span>
+          <strong className="pot-value">{game.pot}</strong>
+        </div>
+        <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
+          <span className="pot-label">A igualar</span>
+          <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
+        </div>
+        <p className={`game-message${game.winner === 0 ? ' msg-win' : game.winner !== null ? ' msg-lose' : ''}`}>
+          {discardMsg ?? game.message}
+        </p>
+        {numPlayers >= 4 && (
+          <span className="comodin-note">Comodín activo · vale {numPlayers === 5 ? 11 : 10}</span>
+        )}
       </section>
     )
   }
@@ -586,7 +617,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="game-table-screen">
-      <section className="game-table">
+      <section className={`game-table${numPlayers >= 4 ? ' table-wide' : ''}${numPlayers === 5 ? ' table-five' : ''}`}>
 
         <header className="table-header">
           <h1 className="table-title">AJILEI</h1>
@@ -602,23 +633,29 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           </div>
         </header>
 
-        {/* Rivals */}
-        {numPlayers === 2 ? renderLegacyAIZone() : renderRivalsZone()}
-
-        {/* Center Zone */}
-        <section className="center-zone">
-          <div className="pot-box">
-            <span className="pot-label">Pozo</span>
-            <strong className="pot-value">{game.pot}</strong>
+        {/* Rivals + Center — mesas 4-5 usan grid con paneles laterales */}
+        {numPlayers === 2 && (
+          <>
+            {renderLegacyAIZone()}
+            {renderCenterZone()}
+          </>
+        )}
+        {numPlayers === 3 && (
+          <>
+            {renderRivalsTopRow()}
+            {renderCenterZone()}
+          </>
+        )}
+        {numPlayers >= 4 && (
+          <div className="table-mid">
+            <div className="side-col side-col-left">{seatsAt('side-left').map(renderPanel)}</div>
+            <div className="mid-center">
+              {renderRivalsTopRow()}
+              {renderCenterZone()}
+            </div>
+            <div className="side-col side-col-right">{seatsAt('side-right').map(renderPanel)}</div>
           </div>
-          <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
-            <span className="pot-label">A igualar</span>
-            <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
-          </div>
-          <p className={`game-message${game.winner === 0 ? ' msg-win' : game.winner !== null ? ' msg-lose' : ''}`}>
-            {discardMsg ?? game.message}
-          </p>
-        </section>
+        )}
 
         {/* Player Zone */}
         <section className="player-zone">
@@ -706,7 +743,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
               <p className="discard-hint">
                 {game.selectedDiscards.length === 0
                   ? `Pulsa las cartas a descartar (máx. ${maxDiscard(numPlayers)}) o continúa sin descartar.`
-                  : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
+                  : numPlayers === 5
+                    ? `${game.selectedDiscards.length} de ${maxDiscard(5)} seleccionada(s).`
+                    : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
               </p>
               <SoundButton className="btn btn-primary" onClick={handleDiscard}>
                 {game.selectedDiscards.length > 0 ? `Descartar ${game.selectedDiscards.length}` : 'Sin descartar'}
