@@ -1,0 +1,117 @@
+/* Panel compacto de rival — mesas 3-5.
+   Conforme a docs/AJILEI_Sistema_Diseno_v1.2.md:
+   tokens de theme.css, anclaje absoluto (alturas fijas), bordes solo cambian de color. */
+
+/* Escala reducida de cartas rivales (≈55% de --card-w/h) */
+.opp-panel {
+  --opp-card-w: calc(var(--card-w) * 0.55);
+  --opp-card-h: calc(var(--card-h) * 0.55);
+
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.2);
+  background: var(--surface-area-light);
+  border-radius: 18px;
+  padding: 10px 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 150px;
+  flex: 1;
+  min-width: 0;
+}
+
+.opp-folded { opacity: 0.55; }
+
+.opp-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.opp-name  { color: rgba(var(--text-primary-rgb), 0.65); }
+.opp-chips { color: var(--gold-brand); font-weight: 700; font-size: 12px; }
+
+/* Cartas en reverso con solape suave */
+.opp-cards {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+  flex-shrink: 0;
+}
+
+.opp-card-slot {
+  width: var(--opp-card-w);
+  height: var(--opp-card-h);
+  flex-shrink: 0;
+}
+
+.opp-card-slot:not(:first-child) {
+  margin-left: calc(var(--opp-card-w) * -0.35);
+}
+
+.opp-card-slot .playing-card {
+  width: 100%;
+  height: 100%;
+}
+
+/* Mazo compacto anclado al asiento (visible solo si es Pie) */
+.opp-deck-wrapper { margin-left: 10px; }
+
+.deck-pile.opp-deck {
+  width: var(--opp-card-w);
+  height: var(--opp-card-h);
+  box-shadow:
+    1px 1px 0px 0px #7a0000,
+    2px 2px 0px 0px #8B0000,
+    3px 3px 0px 0px #6b0000,
+    4px 4px 4px rgba(0, 0, 0, 0.4);
+}
+
+.opp-deck-wrapper .shuffle-fan-card {
+  width: var(--opp-card-w);
+  height: var(--opp-card-h);
+}
+
+/* Panel ganador del showdown: cartas reveladas escalan ~20% (transform, sin reflow)
+   y se despliegan SIN solape para verificar la suma carta por carta */
+.opp-winner .opp-card-slot {
+  transform: scale(1.2);
+  position: relative;
+  z-index: 5;
+}
+
+.opp-winner .opp-card-slot:not(:first-child) {
+  margin-left: calc(var(--opp-card-w) * 0.3);
+}
+
+/* Estado breve de la mano (altura fija — sin colapso) */
+.opp-status {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+  height: 14px;
+  line-height: 14px;
+  overflow: hidden;
+}
+
+.opp-status-turn { color: var(--gold-brand); }
+
+.opp-score {
+  font-size: 11px;
+  line-height: 1;
+  height: 13px;
+  overflow: hidden;
+  color: var(--text-secondary);
+}
+
+.opp-score strong { color: var(--gold-brand); }
+
+/* Zona de rivales: fila parametrizada por posiciones */
+.rivals-zone {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 170px;
+}

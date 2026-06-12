@@ -10,7 +10,7 @@ function App() {
   const [playerCount, setPlayerCount] = useState(2)
 
   if (screen === 'table') {
-    return <GameTable stake={stake} onLeave={() => setScreen('table-select')} />
+    return <GameTable stake={stake} numPlayers={playerCount} onLeave={() => setScreen('table-select')} />
   }
 
   if (screen === 'table-select') {

@@ -28,46 +28,7 @@ function makePlayer(id, name, isHuman, chips) {
   return { id, name, isHuman, chips, cards: [], contrib: 0, acted: false, folded: false, score: null }
 }
 
-// ── N=2 backward-compat shim ───────────────────────────────────────────────────
-// GameTable reads flat fields (playerCards, aiCards, betTurn, pieIsAI, winner…).
-// This function keeps those fields in sync when numPlayers === 2.
-// Removed in Phase C once GameTable reads players[] directly.
-function shimState(state) {
-  if (state.numPlayers !== 2) return state
-  const p0 = state.players[0]   // human — always seat 0
-  const p1 = state.players[1]   // AI   — always seat 1
-  return {
-    ...state,
-    // card arrays used by render + discard animation
-    playerCards:   p0.cards,
-    aiCards:       p1.cards,
-    // economy
-    playerChips:   p0.chips,
-    aiChips:       p1.chips,
-    // betting round tracking
-    playerContrib: p0.contrib,
-    aiContrib:     p1.contrib,
-    playerActed:   p0.acted,
-    aiActed:       p1.acted,
-    playerFolded:  p0.folded,
-    aiFolded:      p1.folded,
-    // turn / role indicators
-    betTurn:  state.activePlayerIndex === 0 ? 'player' : 'ai',
-    pieIsAI:  state.pieIndex !== 0,
-    // scores shown in payout
-    playerScore: p0.score,
-    aiScore:     p1.score,
-    // winner: index → string
-    winner:
-      state.winner === 0 ? 'player' :
-      state.winner === 1 ? 'ai'    :
-      state.winner,   // null
-  }
-}
-
 // ── State factory ──────────────────────────────────────────────────────────────
-// Signature preserved: createInitialState(unit) — GameTable calls it with one arg.
-// numPlayers defaults to 2 for full backward compatibility.
 export function createInitialState(unit = DEFAULT_UNIT, numPlayers = 2) {
   const chips = AJILEI_CONFIG.economy.saldoInicial
   const players = [
@@ -95,7 +56,7 @@ export function createInitialState(unit = DEFAULT_UNIT, numPlayers = 2) {
     message:           '¡Bienvenido a Ajilei!',
     handCount:         0,
   }
-  return shimState(base)
+  return base
 }
 
 // ── Round helpers ──────────────────────────────────────────────────────────────
@@ -125,7 +86,7 @@ function resolveWinner(state) {
   const newPlayers = players.map((p, i) =>
     i === winner ? { ...p, chips: p.chips + pot } : p
   )
-  return shimState({ ...state, phase: PHASES.PAYOUT, pot: 0, players: newPlayers })
+  return { ...state, phase: PHASES.PAYOUT, pot: 0, players: newPlayers }
 }
 
 // ── Showdown with N players ────────────────────────────────────────────────────
@@ -217,22 +178,22 @@ function advanceBettingPhase(state) {
     const players = base.players.map((p, i) =>
       deal[i] ? { ...p, cards: [...p.cards, ...deal[i]] } : p
     )
-    return shimState({ ...base, phase: PHASES.DEAL_3, deck: deckArr.slice(deckPtr), players, message: 'Repartiendo...' })
+    return { ...base, phase: PHASES.DEAL_3, deck: deckArr.slice(deckPtr), players, message: 'Repartiendo...' }
   }
 
   if (state.phase === PHASES.BET_2) {
-    return shimState({
+    return {
       ...base,
       phase:   PHASES.DISCARD,
       message: `Selecciona hasta ${maxDiscard(N)} cartas a descartar.`,
-    })
+    }
   }
 
   if (state.phase === PHASES.BET_3) {
     return doShowdown(base)
   }
 
-  return shimState(base)
+  return base
 }
 
 // ── Generic bet-action dispatcher ──────────────────────────────────────────────
@@ -337,7 +298,7 @@ function applyBetAction(state, playerIndex, action, betAmount) {
 
   if (isRoundOver(newPlayers, newCurrentBet)) return advanceBettingPhase(next)
 
-  return shimState({ ...next, activePlayerIndex: nextActiveIndex(newPlayers, playerIndex) })
+  return { ...next, activePlayerIndex: nextActiveIndex(newPlayers, playerIndex) }
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -375,7 +336,7 @@ export function startHand(state) {
   }
   players = players.map((p, i) => deal[i] ? { ...p, cards: deal[i] } : p)
 
-  return shimState({
+  return {
     ...state,
     phase:             PHASES.DEAL_2,
     deck:              deck.slice(deckPtr),
@@ -389,7 +350,7 @@ export function startHand(state) {
     winner:            null,
     message:           'Repartiendo...',
     handCount:         state.handCount + 1,
-  })
+  }
 }
 
 // Called by GameTable after deal animation completes.
@@ -399,13 +360,13 @@ export function advanceFromDeal(state) {
     const msg = state.numPlayers === 2
       ? (manoIsHuman ? 'A las 2 — Tu turno.' : 'A las 2 — IA pensando...')
       : `A las 2 — ${state.players[state.manoIndex].name} abre.`
-    return shimState({ ...state, phase: PHASES.BET_1, message: msg })
+    return { ...state, phase: PHASES.BET_1, message: msg }
   }
   if (state.phase === PHASES.DEAL_3) {
     const msg = state.numPlayers === 2
       ? (manoIsHuman ? 'A las 3 — Tu turno.' : 'A las 3 — IA pensando...')
       : `A las 3 — ${state.players[state.manoIndex].name} abre.`
-    return shimState({ ...state, phase: PHASES.BET_2, message: msg })
+    return { ...state, phase: PHASES.BET_2, message: msg }
   }
   return state
 }
@@ -461,7 +422,7 @@ export function applyDiscard(state, humanDiscardIndices) {
     message = 'Descarte completado. Al descarte.'
   }
 
-  return shimState({
+  return {
     ...state,
     phase:             PHASES.BET_3,
     deck:              deckCopy,
@@ -470,7 +431,7 @@ export function applyDiscard(state, humanDiscardIndices) {
     currentBet:        0,
     activePlayerIndex: manoIndex,
     message,
-  })
+  }
 }
 
 // Toggle a card in/out of the discard selection (respects per-table limit).
@@ -483,5 +444,5 @@ export function toggleDiscard(state, cardIndex) {
   } else if (selected.length < limit) {
     selected.push(cardIndex)
   }
-  return shimState({ ...state, selectedDiscards: selected })
+  return { ...state, selectedDiscards: selected }
 }

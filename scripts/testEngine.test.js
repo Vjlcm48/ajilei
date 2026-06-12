@@ -6,7 +6,7 @@
  * deterministas y evita bucles infinitos en los tests estructurales.
  * Los tests de comodín y handEvaluator llaman directamente a las funciones.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // Mock aiPlayer: AI siempre pasa y nunca descarta (tests deterministas de motor)
 vi.mock('../src/engine/aiPlayer.js', () => ({
@@ -185,19 +185,19 @@ describe('3. Orden de reparto y turno', () => {
     })
   })
 
-  it('N=2 mano 1: betTurn="player" (humano es Mano)', () => {
+  it('N=2 mano 1: abre el humano (asiento 0 es Mano)', () => {
     let s = createInitialState(10, 2)
     s = startHand(s)
     s = advanceFromDeal(s)
-    expect(s.betTurn).toBe('player')
+    expect(s.activePlayerIndex).toBe(0)
   })
 
-  it('N=2 mano 2: betTurn="ai" (AI es Mano)', () => {
+  it('N=2 mano 2: abre la IA (asiento 1 es Mano)', () => {
     let s = createInitialState(10, 2)
     s = playHandAllPass(s)
     s = startHand(s)
     s = advanceFromDeal(s)
-    expect(s.betTurn).toBe('ai')
+    expect(s.activePlayerIndex).toBe(1)
     expect(s.manoIndex).toBe(1)
   })
 })
@@ -219,8 +219,6 @@ describe('4. Límite de descarte', () => {
     expect(s.phase).toBe(PHASES.DISCARD)
     for (let i = 0; i < 5; i++) s = toggleDiscard(s, i)
     expect(s.selectedDiscards.length).toBe(5)
-    // la 6ª se rechaza (no hay 6ª carta de todas formas, pero índice inventado debe fallar)
-    const sizeBefore = s.selectedDiscards.length
     // deseleccionar y volver a añadir para comprobar que el límite se respeta
     s = toggleDiscard(s, 0)   // quitar
     expect(s.selectedDiscards.length).toBe(4)
@@ -334,9 +332,7 @@ describe('6. Fondos insuficientes → retiro forzoso', () => {
     s = {
       ...s,
       players: s.players.map((p, i) => i === 0 ? { ...p, chips: 0 } : p),
-      playerChips: 0,
       activePlayerIndex: 1,       // turno de IA
-      betTurn: 'ai',
     }
     // IA apuesta (pero está mockeada a 'pasar' — sin currentBet no fuerza retiro)
     // Para este test necesitamos que haya una apuesta y el humano no pueda pagarla.
@@ -348,16 +344,12 @@ describe('6. Fondos insuficientes → retiro forzoso', () => {
         i === 1 ? { ...p, contrib: 10, acted: true }
                 : { ...p, acted: false }
       ),
-      aiContrib:     10,
-      aiActed:       true,
-      playerActed:   false,
       activePlayerIndex: 0,
-      betTurn: 'player',
     }
     // Player intenta igualar — no tiene fichas, debe retirarse automáticamente
     s = applyPlayerBetAction(s, 'igualar')
     expect(s.phase).toBe(PHASES.PAYOUT)
-    expect(s.winner).toBe('ai')
+    expect(s.winner).toBe(1)
   })
 
   it('N=3: jugador con 0 chips ante → auto-folded en startHand', () => {
@@ -380,38 +372,39 @@ describe('6. Fondos insuficientes → retiro forzoso', () => {
 })
 
 // ── 7. Regresión N=2: comportamiento idéntico al motor original ───────────────
+// (Fase C: el shim fue eliminado — los checks leen players[] e índices directamente)
 describe('7. Regresión N=2', () => {
-  it('createInitialState(10) produce todos los campos shim correctos', () => {
+  it('createInitialState(10) produce el estado inicial correcto', () => {
     const s = createInitialState(10)
     expect(s.numPlayers).toBe(2)
-    expect(s.playerChips).toBe(5000)
-    expect(s.aiChips).toBe(5000)
-    expect(Array.isArray(s.playerCards)).toBe(true)
-    expect(Array.isArray(s.aiCards)).toBe(true)
-    expect(s.betTurn).toBe('player')
-    expect(s.pieIsAI).toBe(true)    // mano 1: AI es Pie
+    expect(s.players[0].chips).toBe(5000)
+    expect(s.players[1].chips).toBe(5000)
+    expect(Array.isArray(s.players[0].cards)).toBe(true)
+    expect(Array.isArray(s.players[1].cards)).toBe(true)
+    expect(s.activePlayerIndex).toBe(0)
+    expect(s.pieIndex).toBe(1)      // mano 1: AI es Pie
     expect(s.pot).toBe(0)
     expect(s.phase).toBe(PHASES.WAITING)
     expect(s.winner).toBe(null)
   })
 
-  it('startHand: pot = unit×2, 2 cartas cada uno, pieIsAI=true en mano 1', () => {
+  it('startHand: pot = unit×2, 2 cartas cada uno, AI es Pie en mano 1', () => {
     let s = createInitialState(10)
     s = startHand(s)
     expect(s.pot).toBe(20)
-    expect(s.playerCards.length).toBe(2)
-    expect(s.aiCards.length).toBe(2)
-    expect(s.pieIsAI).toBe(true)
-    expect(s.playerChips).toBe(4990)
-    expect(s.aiChips).toBe(4990)
+    expect(s.players[0].cards.length).toBe(2)
+    expect(s.players[1].cards.length).toBe(2)
+    expect(s.pieIndex).toBe(1)
+    expect(s.players[0].chips).toBe(4990)
+    expect(s.players[1].chips).toBe(4990)
   })
 
-  it('advanceFromDeal DEAL_2→BET_1: betTurn=player, message original', () => {
+  it('advanceFromDeal DEAL_2→BET_1: abre el humano, message original', () => {
     let s = createInitialState(10)
     s = startHand(s)
     s = advanceFromDeal(s)
     expect(s.phase).toBe(PHASES.BET_1)
-    expect(s.betTurn).toBe('player')
+    expect(s.activePlayerIndex).toBe(0)
     expect(s.message).toBe('A las 2 — Tu turno.')
   })
 
@@ -420,23 +413,23 @@ describe('7. Regresión N=2', () => {
     s = startHand(s)
     s = advanceFromDeal(s)
     s = applyPlayerBetAction(s, 'pasar')
-    expect(s.betTurn).toBe('ai')
+    expect(s.activePlayerIndex).toBe(1)
     s = applyAIBetAction(s)
     expect(s.phase).toBe(PHASES.DEAL_3)
   })
 
-  it('player se retira → AI gana, PAYOUT, winner="ai", pot=0', () => {
+  it('player se retira → AI gana, PAYOUT, winner=1, pot=0', () => {
     let s = createInitialState(10)
     s = startHand(s)
     s = advanceFromDeal(s)
     s = applyPlayerBetAction(s, 'retirarse')
     expect(s.phase).toBe(PHASES.PAYOUT)
-    expect(s.winner).toBe('ai')
+    expect(s.winner).toBe(1)
     expect(s.pot).toBe(0)
     expect(s.message).toBe('Te retiras. La IA gana el pozo.')
   })
 
-  it('AI se retira → player gana, PAYOUT, winner="player"', () => {
+  it('AI se retira → player gana, PAYOUT, winner=0', () => {
     // Para que AI "se retire" necesitamos que esté ante una apuesta que no puede pagar
     let s = createInitialState(10)
     s = startHand(s)
@@ -449,18 +442,12 @@ describe('7. Regresión N=2', () => {
         i === 0 ? { ...p, contrib: 10, acted: true, chips: p.chips - 10 }
                 : { ...p, chips: 0, acted: false }
       ),
-      playerChips:   s.playerChips - 10,
-      aiChips:       0,
-      playerContrib: 10,
-      playerActed:   true,
-      aiActed:       false,
       activePlayerIndex: 1,
-      betTurn: 'ai',
       pot: s.pot + 10,
     }
     s = applyAIBetAction(s)
     expect(s.phase).toBe(PHASES.PAYOUT)
-    expect(s.winner).toBe('player')
+    expect(s.winner).toBe(0)
     expect(s.message).toBe('¡La IA se retira! Ganaste el pozo.')
   })
 
@@ -475,8 +462,8 @@ describe('7. Regresión N=2', () => {
     s = applyDiscard(s, [0, 1])
     expect(s.phase).toBe(PHASES.BET_3)
     expect(s.message).toMatch(/Descartaste 2/)
-    expect(s.playerCards.length).toBe(5)
-    expect(s.aiCards.length).toBe(5)
+    expect(s.players[0].cards.length).toBe(5)
+    expect(s.players[1].cards.length).toBe(5)
   })
 
   it('toggleDiscard usa límite 5 (corrección del bug hardcodeado)', () => {
@@ -495,19 +482,18 @@ describe('7. Regresión N=2', () => {
     s = playHandAllPass(s)
     expect(s.phase).toBe(PHASES.PAYOUT)
     expect(s.pot).toBe(0)
-    expect(s.winner === 'player' || s.winner === 'ai').toBe(true)
-    expect(s.playerCards.length).toBe(5)
-    expect(s.aiCards.length).toBe(5)
+    expect(s.winner === 0 || s.winner === 1).toBe(true)
+    expect(s.players[0].cards.length).toBe(5)
+    expect(s.players[1].cards.length).toBe(5)
   })
 
-  it('rotación mano 2: pieIsAI=false (humano es Pie), AI es Mano', () => {
+  it('rotación mano 2: humano es Pie, AI es Mano', () => {
     let s = createInitialState(10)
     s = playHandAllPass(s)
     s = startHand(s)     // mano 2: Pie rota al humano
-    expect(s.pieIsAI).toBe(false)
     expect(s.pieIndex).toBe(0)
     expect(s.manoIndex).toBe(1)
-    expect(s.betTurn).toBe('ai')
+    expect(s.activePlayerIndex).toBe(1)
   })
 })
 

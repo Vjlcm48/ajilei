@@ -475,6 +475,31 @@
   margin-left: 32px;
 }
 
+/* ── Showdown winner emphasis ── */
+/* Winning AI cards (N=2 zone): scale ~20% in place — transform only, no reflow.
+   Adjacent winner slots gain margin so the scaled cards spread without overlap. */
+.card-slot-wrapper.card-slot-winner {
+  transform: scale(1.2);
+  position: relative;
+  z-index: 5;
+}
+
+.card-slot-wrapper.card-slot-winner + .card-slot-wrapper.card-slot-winner {
+  margin-left: 18px;
+}
+
+/* Winner score chip — one shared class for all players (badge law) */
+.win-score-chip {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-dark);
+  background: var(--gold-brand);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 /* ── Mano badge ── */
 span.mano-badge {
   font-size: 10px;

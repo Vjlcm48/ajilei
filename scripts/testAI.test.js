@@ -416,22 +416,19 @@ describe('5. Simulación completa (IA real, sin mock)', () => {
 
 // ── 6. Regresión N=2 ──────────────────────────────────────────────────────────
 describe('6. Regresión N=2 (con IA real)', () => {
-  it('hand completa N=2 → PAYOUT con todos los campos shim presentes', () => {
+  it('hand completa N=2 → PAYOUT con estructura players[] íntegra', () => {
     let s = createInitialState(10, 2)
     s = startHand(s)
     s = simHand(s)
 
     expect(s.phase).toBe(PHASES.PAYOUT)
-    expect(s).toHaveProperty('playerCards')
-    expect(s).toHaveProperty('aiCards')
-    expect(s).toHaveProperty('playerChips')
-    expect(s).toHaveProperty('aiChips')
-    expect(s).toHaveProperty('pieIsAI')
-    expect(s).toHaveProperty('betTurn')
-    expect(typeof s.playerChips).toBe('number')
-    expect(typeof s.aiChips).toBe('number')
+    expect(s.players).toHaveLength(2)
+    expect(Array.isArray(s.players[0].cards)).toBe(true)
+    expect(Array.isArray(s.players[1].cards)).toBe(true)
+    expect(typeof s.players[0].chips).toBe('number')
+    expect(typeof s.players[1].chips).toBe('number')
     if (s.winner !== null) {
-      expect(['player', 'ai']).toContain(s.winner)
+      expect([0, 1]).toContain(s.winner)
     }
   })
 

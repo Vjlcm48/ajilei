@@ -2,7 +2,7 @@ import '../styles/playingCard.css'
 import CardImage from './CardImage'
 import reversoUrl from '../assets/cards/reverso_carta.png?url'
 
-function PlayingCard({ card, selected, onClick, faceDown, animClass }) {
+function PlayingCard({ card, selected, onClick, faceDown, animClass, highlight }) {
   if (faceDown) {
     return (
       <div className={`playing-card card-back${animClass ? ` ${animClass}` : ''}`} onClick={onClick}>
@@ -15,7 +15,7 @@ function PlayingCard({ card, selected, onClick, faceDown, animClass }) {
   }
   return (
     <div
-      className={`playing-card${selected ? ' card-selected' : ''}${onClick ? ' card-clickable' : ''}${animClass ? ` ${animClass}` : ''}`}
+      className={`playing-card${selected ? ' card-selected' : ''}${onClick ? ' card-clickable' : ''}${highlight ? ' card-winner' : ''}${animClass ? ` ${animClass}` : ''}`}
       onClick={onClick}
     >
       <CardImage card={card} />

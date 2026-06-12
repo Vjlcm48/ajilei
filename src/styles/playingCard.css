@@ -26,6 +26,12 @@
   box-shadow: 0 14px 26px rgba(var(--gold-brand-rgb), 0.6) !important;
 }
 
+/* Winning-suit highlight at showdown (border color + golden halo, no reflow) */
+.card-winner {
+  border-color: var(--gold-brand);
+  box-shadow: 0 0 14px rgba(var(--gold-brand-rgb), 0.6);
+}
+
 /* Empty placeholder */
 .card-empty {
   background: rgba(var(--text-primary-rgb), 0.1);

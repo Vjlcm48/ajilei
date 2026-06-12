@@ -1,0 +1,166 @@
+# AJILEI — Sistema de Diseño Unificado
+
+**Versión:** 1.2
+**Fecha:** 2026-06-12
+**Naturaleza:** Documento maestro de referencia permanente. Toda pantalla actual o futura de AJILEI debe diseñarse citando este documento.
+**Changelog v1.2:** Tandas 1, 2 y 3 completadas y verificadas — identidad visual unificada en toda la app. Deuda del dorado único SALDADA. Nuevos patrones registrados (secciones 3 y 9). Lección de contraste incorporada como regla (sección 5).
+
+---
+
+## ⚠️ RESTRICCIÓN GENERAL
+
+**NO modificar `gameEngine.js` ni `aiPlayer.js` bajo ninguna circunstancia.** Este sistema es 100% capa visual.
+
+---
+
+## 1. ESENCIA DE LA MARCA
+
+> **"Elegancia criolla premium": la tradición venezolana del Ajilei llevada a lo digital con sobriedad, calidez y carácter.**
+
+Tres sensaciones: **tradición** (baraja española, identidad venezolana con finura), **premium** (acabados refinados, dorado fino, sombras trabajadas) y **juego** (vida sutil, recompensa visual).
+
+Patrón de referencia: la pantalla principal (`WelcomeScreen`).
+
+## 2. MOTIVOS DE IDENTIDAD
+
+1. **Arco de 8 estrellas** — LA firma. Estrellas blancas/crema sobre trazo `--flag-blue`. Versión completa (~200px, welcome) y mini (~140px, selección de mesa).
+2. **Filigrana de fondo** — token `--filigrana` (reticulado dorado 1px a ~0.05). Presente en TODOS los fondos: se compone como `var(--filigrana), radial-gradient(...)`.
+3. **Cartas propias decorativas** — Rey de Oros (`doce_oro.png`) y Caballo de Oros (`once_oro.png`), opacidad ~0.22, ocultas <680px.
+4. **Separador dorado fino** — línea 60px × 1px, `rgba(--gold-brand-rgb, 0.3)` (selección de sala). Para pantallas de paso donde el arco se repetiría.
+5. **Acento tricolor** — solo abstracto y solo si no hay otro guiño en la vista.
+
+**Regla de distribución de guiños:** un guiño por pantalla máximo; pantallas consecutivas no repiten el mismo motivo; en pantallas funcionales intensas (tablero), "ninguno" es válido y preferible — la filigrana de fondo ya es firma suficiente.
+
+## 3. COMPONENTES
+
+### Panel premium
+Bordes redondeados generosos (~32px en navegación); borde dorado fino `--gold-brand` (en el tablero: grosor heredado, solo color); sombra trabajada + brillo interno leve (`inset 0 1px 0 rgba(--gold-brand-rgb, 0.10)`); fondo más oscuro que el fondo de pantalla.
+
+### Botones
+- **Principal:** fondo `--gold-brand`, texto `--text-dark`. Uno por pantalla.
+- **Secundario:** apagado, borde sutil. **Deshabilitado:** atenuado, "Próximamente" como texto externo (`--text-faint`).
+- Semánticos del juego (raise naranja, fold rojo): conservan su lógica con tokens.
+
+### Patrón "texto oscuro sobre dorado" (REGISTRADO)
+Todo elemento con fondo `--gold-brand` lleva `color: var(--text-dark)`: botón principal, badge MANO (clase unificada para todos los jugadores), `.btn-primary`. Sin excepciones.
+
+### Etiquetas y badges
+Estilo contenido y fino; dorado solo para lo positivo/protagónico. Badges equivalentes entre jugadores (ej. MANO) comparten UNA clase — prohibido duplicar estilos por jugador.
+
+### Tarjetas de opción (selección de mesa/sala)
+`--surface-card` + borde fino dorado; hover con realce dorado y elevación leve (`transform`); título grande + subtítulo secundario; stagger de entrada ~70ms.
+
+## 4. TIPOGRAFÍA Y ESPACIADO
+
+- Tipografía actual (`--font-base`). Títulos: letter-spacing amplio, `--gold-brand`, **tono cálido** ("Elige tu mesa", "Elige tu sala" — nunca formas técnicas tipo "SELECCIONAR X").
+- Narrativa de navegación coherente: cada título continúa la frase del anterior.
+- Aire generoso siempre.
+
+## 5. REGLAS DE ANIMACIÓN Y COLOR (ley del proyecto)
+
+1. **Solo `transform` y `opacity`** (más `box-shadow` para halos). Nada que dispare reflow.
+2. **Nunca bloquear la interacción.**
+3. Entradas: fade + leve subida, una vez, <1s.
+4. **Asimetría emocional:** lo positivo se celebra; lo negativo es breve y discreto.
+5. Liviandad: PWA, público móvil de gama media.
+6. **REGLA DE CONTRASTE (lección Tanda 3):** todo cambio de `background` exige verificar el contraste de TODO texto/ícono que viva encima, en TODAS las instancias del elemento (ej. badge del jugador Y de la IA). La legibilidad es parte del cambio, no un efecto colateral.
+7. **Compensación de opacidad:** al migrar a un color más brillante, reducir levemente la opacidad para conservar la intensidad percibida.
+
+## 6. REGLAS DE LAYOUT (ley del proyecto)
+
+1. **Anclaje absoluto** en áreas de juego: alturas fijas, franjas reservadas, ocultamiento sin colapso.
+2. Decorativos: `position: absolute`, fuera del flujo.
+3. **En el tablero, los bordes solo cambian de color, jamás de grosor.**
+4. Responsive en tres niveles: desktop alto (≥768px y ≥900px: cartas +20%), estándar, móvil (<768px; decoraciones <680px ocultas).
+
+## 7. ARQUITECTURA DE TOKENS
+
+Todo valor vive en `src/styles/theme.css` (primer import de `main.jsx`). Nada nuevo se hardcodea: variable existente, o se agrega a `theme.css` Y a la tabla de la sección 8.
+
+## 8. TABLA DE TOKENS (implementada y verificada)
+
+### GOLD
+| Token | Valor |
+|---|---|
+| `--gold-brand` | `#e8b84b` |
+| `--gold-brand-rgb` | `232, 184, 75` |
+| `--gold-hover` | `#f5cc6a` |
+| `--gold-dim` | `#c9973a` — **uso restringido: solo halos Saldo Vivo y filigrana** |
+| `--gold-dim-rgb` | `201, 151, 58` |
+
+### GREENS
+| Token | Valor |
+|---|---|
+| `--green-abyss` | `#0a1e10` |
+| `--green-darkest` | `#0d2416` |
+| `--green-deep` | `#1a4a2e` |
+| `--green-base` | `#235c38` |
+| `--green-bright` | `#2e7548` |
+
+### SURFACES
+| Token | Valor |
+|---|---|
+| `--surface-panel` | `rgba(10, 28, 14, 0.75)` |
+| `--surface-game` | `rgba(35, 92, 56, 0.88)` |
+| `--surface-card` | `rgba(10, 30, 15, 0.55)` |
+| `--surface-area` | `rgba(10, 30, 15, 0.45)` |
+| `--surface-area-light` | `rgba(10, 30, 15, 0.30)` |
+| `--surface-modal` | `#0e2518` |
+
+### TEXT
+| Token | Valor |
+|---|---|
+| `--text-primary` | `#f5edd8` |
+| `--text-primary-rgb` | `245, 237, 216` |
+| `--text-secondary` | `rgba(245, 237, 216, 0.72)` |
+| `--text-muted` | `rgba(245, 237, 216, 0.55)` |
+| `--text-faint` | `rgba(245, 237, 216, 0.25)` |
+| `--text-dark` | `#1a1a0e` |
+
+### IDENTITY
+| Token | Valor |
+|---|---|
+| `--flag-yellow` | `#ffcc00` |
+| `--flag-blue` | `#003893` |
+| `--flag-red` | `#cf142b` |
+
+### SEMANTIC
+| Token | Valor |
+|---|---|
+| `--loss-red` | `#b71c1c` |
+| `--loss-red-rgb` | `183, 28, 28` |
+| `--win-green` | `#66bb6a` |
+| `--lose-red` | `#ef5350` |
+| `--bet-orange` | `#ff8a65` |
+| `--raise-orange` | `#e65100` |
+| `--raise-orange-rgb` | `230, 81, 0` |
+
+### OTROS
+| Token | Valor |
+|---|---|
+| `--font-base` | `Arial, sans-serif` |
+| `--filigrana` | dos `repeating-linear-gradient` de diamante dorado |
+| `--card-w` / `--card-h` | `76px` / `118px` → `91px` / `142px` @ `(min-width:768px) and (min-height:900px)` |
+
+## 9. DEUDAS Y EXCEPCIONES
+
+1. ~~**Doble dorado visible**~~ — ✅ **SALDADA (Tandas 1-3).** `--gold-dim` vive solo en su definición, la filigrana y los halos de Saldo Vivo.
+2. **Dos rgba sin token** (`--lose-red-rgb`, `--text-dark-rgb` pendientes): hover `.btn-leave` y subtítulo botón activo en modeSelect. Visualmente exactos.
+3. **Nombres `--loss-red` vs `--lose-red`:** renombre semántico pendiente.
+4. **Tipografía Arial:** candidata a sustitución por una fuente con más carácter en una tanda futura.
+
+## 10. HOJA DE RUTA
+
+| Tanda | Pantalla | Estado |
+|---|---|---|
+| 0 | Tokenización (`theme.css`) | ✅ COMPLETADA |
+| 1 | Selección de mesa | ✅ COMPLETADA |
+| 2 | Selección de sala | ✅ COMPLETADA |
+| 3 | Tablero (quirúrgica) | ✅ COMPLETADA |
+| Futuras | Mesas multi-IA, lobby multijugador, tienda, ranking, perfil | Nacen citando este documento |
+
+## 11. MANTENIMIENTO
+
+- Decisiones estéticas nuevas → se incorporan aquí (v1.3...).
+- Conflicto entre instrucción puntual y este sistema → preguntar antes de implementar.
+- Toda pantalla nueva comienza con: *"Diseñar conforme a `AJILEI_Sistema_Diseno.md`"*.
