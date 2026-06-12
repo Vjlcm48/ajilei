@@ -30,11 +30,31 @@ export function getBestSuitScore(cards, numPlayers = 2, comodinEnabled = false) 
   return { palo: bestSuit, points: bestScore, suitScores }
 }
 
-export function isAjilei(cards) {
+// Natural Ajilei: all 5 same suit, sum = 51.
+// Comodín Ajilei (numPlayers=5 only): 4 same suit + 7 de Oros, where 4-card sum + 11 = 52.
+export function isAjilei(cards, numPlayers = 2) {
   if (cards.length !== 5) return false
+
+  // Natural: all same suit, total = 51
   const firstSuit = cards[0].palo
-  if (!cards.every((c) => c.palo === firstSuit)) return false
-  return cards.reduce((sum, c) => sum + c.points, 0) === 51
+  if (cards.every(c => c.palo === firstSuit)) {
+    if (cards.reduce((sum, c) => sum + c.points, 0) === 51) return true
+  }
+
+  // Comodín Ajilei — strictly N=5 with 7 de Oros present
+  if (numPlayers === 5) {
+    const comodinIdx = cards.findIndex(c => c.palo === 'Oros' && c.value === 7)
+    if (comodinIdx !== -1) {
+      const rest = cards.filter((_, i) => i !== comodinIdx)
+      const suit  = rest[0].palo
+      if (rest.every(c => c.palo === suit)) {
+        const restSum = rest.reduce((sum, c) => sum + c.points, 0)
+        if (restSum + 11 === 52) return true
+      }
+    }
+  }
+
+  return false
 }
 
 export function compareHands(playerA, playerB) {

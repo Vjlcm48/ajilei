@@ -18,11 +18,6 @@ export const AJILEI_CONFIG = {
     allInEnabled: false,
   },
 
-  discard: {
-    minCards: 0,
-    maxCards: 3,
-  },
-
   economy: {
     saldoInicial: 5000,
     bonoDiario: 50,
