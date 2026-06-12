@@ -8,10 +8,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock aiPlayer: AI siempre pasa y nunca descarta
+// Mock aiPlayer: AI siempre pasa y nunca descarta (tests deterministas de motor)
 vi.mock('../src/engine/aiPlayer.js', () => ({
-  aiBettingDecision: () => ({ action: 'pasar' }),
-  aiSelectDiscards:  () => [],
+  decideBetAction: () => ({ action: 'pasar' }),
+  decideDiscard:   () => [],
 }))
 
 import {

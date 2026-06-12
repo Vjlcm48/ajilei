@@ -1,6 +1,6 @@
 import { createDeck, shuffleDeck } from './deck'
 import { getBestSuitScore, isAjilei } from './handEvaluator'
-import { aiBettingDecision, aiSelectDiscards } from './aiPlayer'
+import { decideBetAction, decideDiscard } from './aiPlayer'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
 
 export const PHASES = {
@@ -417,9 +417,8 @@ export function applyPlayerBetAction(state, action, betAmount) {
 
 // Called by GameTable to auto-advance AI turn(s).
 export function applyAIBetAction(state) {
-  const aiIndex = state.activePlayerIndex
-  const ai      = state.players[aiIndex]
-  const decision = aiBettingDecision(ai.cards, state.currentBet, ai.contrib, ai.chips, state.phase)
+  const aiIndex  = state.activePlayerIndex
+  const decision = decideBetAction(state, aiIndex)
   return applyBetAction(state, aiIndex, decision.action, state.unit)
 }
 
@@ -439,7 +438,7 @@ export function applyDiscard(state, humanDiscardIndices) {
 
     let indices = player.isHuman
       ? humanDiscardIndices
-      : aiSelectDiscards(player.cards, numPlayers)
+      : decideDiscard(state, seat)
 
     indices = indices.slice(0, maxDiscard(numPlayers))
     discardCounts[seat] = indices.length

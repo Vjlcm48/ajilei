@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run scripts/testEngine.test.js"
+    "test": "vitest run scripts/testEngine.test.js scripts/testAI.test.js"
   },
   "dependencies": {
     "howler": "^2.2.4",
