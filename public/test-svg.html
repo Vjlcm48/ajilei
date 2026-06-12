@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SVG Card Map Test</title>
+<style>
+body { background:#333; color:#fff; font:12px monospace; }
+canvas { border: 1px solid red; display:block; margin:10px; }
+pre { font-size:11px; }
+</style>
+</head>
+<body>
+<h2>Baraja SVG Layout Analysis</h2>
+<canvas id="c" width="2496" height="1595"></canvas>
+<pre id="out"></pre>
+
+<script>
+const img = new Image();
+img.src = '/baraja.svg';
+img.onload = () => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+
+  // Show a miniature
+  canvas.style.width = '800px';
+  canvas.style.height = 'auto';
+
+  // Now use inline SVG to find element positions
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', '/baraja.svg', true);
+  xhr.onload = () => {
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(xhr.responseText, 'image/svg+xml');
+
+    // Temporarily attach to DOM to get bounding boxes
+    const svgEl = svgDoc.documentElement;
+    svgEl.style.position = 'absolute';
+    svgEl.style.left = '-9999px';
+    svgEl.style.width = '2496px';
+    svgEl.style.height = '1595px';
+    document.body.appendChild(svgEl);
+
+    const cardMap = {};
+    // Check the 4 suits × figures
+    const cards = [
+      // [svgId, ourValue, ourSuit]
+      ['1_diamond', 1, 'Oros'], ['2_diamond', 2, 'Oros'], ['3_diamond', 3, 'Oros'],
+      ['4_diamond', 4, 'Oros'], ['5_diamond', 5, 'Oros'], ['6_diamond', 6, 'Oros'],
+      ['7_diamond', 7, 'Oros'], ['jack_diamond', 10, 'Oros'],
+      ['queen_diamond', 11, 'Oros'], ['king_diamond', 12, 'Oros'],
+      ['1_heart', 1, 'Copas'], ['2_heart', 2, 'Copas'], ['3_heart', 3, 'Copas'],
+      ['4_heart', 4, 'Copas'], ['5_heart', 5, 'Copas'], ['6_heart', 6, 'Copas'],
+      ['7_heart', 7, 'Copas'], ['jack_heart', 10, 'Copas'],
+      ['queen_heart', 11, 'Copas'],
+      ['1_club', 1, 'Bastos'], ['2_club', 2, 'Bastos'], ['3_club', 3, 'Bastos'],
+      ['4_club', 4, 'Bastos'], ['5_club', 5, 'Bastos'], ['6_club', 6, 'Bastos'],
+      ['7_club', 7, 'Bastos'], ['jack_club', 10, 'Bastos'],
+      ['queen_club', 11, 'Bastos'], ['king_club', 12, 'Bastos'],
+      ['1_spade', 1, 'Espadas'], ['2_spade', 2, 'Espadas'], ['3_spade', 3, 'Espadas'],
+      ['4_spade', 4, 'Espadas'], ['5_spade', 5, 'Espadas'], ['6_spade', 6, 'Espadas'],
+      ['7_spade', 7, 'Espadas'], ['jack_spade', 10, 'Espadas'],
+      ['queen_spade', 11, 'Espadas'], ['king_spade', 12, 'Espadas'],
+    ];
+
+    let results = [];
+    for (const [svgId, val, suit] of cards) {
+      const el = svgEl.getElementById(svgId);
+      if (el) {
+        try {
+          const bbox = el.getBBox();
+          results.push(`${val}_${suit}: id=${svgId} x=${bbox.x.toFixed(1)} y=${bbox.y.toFixed(1)} w=${bbox.width.toFixed(1)} h=${bbox.height.toFixed(1)}`);
+
+          // Draw a colored rect on canvas
+          const scale = 800/2496;
+          ctx.strokeStyle = suit==='Oros'?'gold':suit==='Copas'?'red':suit==='Espadas'?'blue':'brown';
+          ctx.strokeRect(bbox.x * scale, bbox.y * scale, bbox.width * scale, bbox.height * scale);
+          ctx.fillStyle = 'rgba(255,255,0,0.2)';
+          ctx.font = '8px sans-serif';
+          ctx.fillStyle = 'white';
+          ctx.fillText(`${val}${suit[0]}`, bbox.x * scale + 2, bbox.y * scale + 10);
+        } catch(e) {
+          results.push(`${val}_${suit}: ERROR ${e.message}`);
+        }
+      } else {
+        results.push(`${val}_${suit}: NOT FOUND (${svgId})`);
+      }
+    }
+    document.getElementById('out').textContent = results.join('\n');
+    document.body.removeChild(svgEl);
+  };
+  xhr.send();
+};
+</script>
+</body>
+</html>

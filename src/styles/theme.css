@@ -1,0 +1,75 @@
+/* ── AJILEI Design System — Token Layer ────────────────────────────────────
+   Single source of truth. Imported once in main.jsx; :root custom
+   properties cascade globally so every component file can consume them.     */
+:root {
+  /* GOLD ── brand gold and dim variant */
+  --gold-brand:     #e8b84b;
+  --gold-brand-rgb: 232, 184, 75;
+  --gold-hover:     #f5cc6a;
+  --gold-dim:       #c9973a;
+  --gold-dim-rgb:   201, 151, 58;
+
+  /* GREENS ── five stops covering all background gradients */
+  --green-abyss:   #0a1e10;
+  --green-darkest: #0d2416;
+  --green-deep:    #1a4a2e;
+  --green-base:    #235c38;
+  --green-bright:  #2e7548;
+
+  /* SURFACES */
+  --surface-panel:      rgba(10, 28, 14, 0.75);
+  --surface-game:       rgba(35, 92, 56, 0.88);
+  --surface-card:       rgba(10, 30, 15, 0.55);
+  --surface-area:       rgba(10, 30, 15, 0.45);
+  --surface-area-light: rgba(10, 30, 15, 0.30);
+  --surface-modal:      #0e2518;
+
+  /* TEXT */
+  --text-primary:     #f5edd8;
+  --text-primary-rgb: 245, 237, 216;
+  --text-secondary:   rgba(245, 237, 216, 0.72);
+  --text-muted:       rgba(245, 237, 216, 0.55);
+  --text-faint:       rgba(245, 237, 216, 0.25);
+  --text-dark:        #1a1a0e;
+
+  /* IDENTITY ── Venezuelan flag, guiños only */
+  --flag-yellow: #ffcc00;
+  --flag-blue:   #003893;
+  --flag-red:    #cf142b;
+
+  /* SEMANTIC */
+  --loss-red:         #b71c1c;
+  --loss-red-rgb:     183, 28, 28;
+  --win-green:        #66bb6a;
+  --lose-red:         #ef5350;
+  --bet-orange:       #ff8a65;
+  --raise-orange:     #e65100;
+  --raise-orange-rgb: 230, 81, 0;
+
+  /* TYPOGRAPHY */
+  --font-base: Arial, sans-serif;
+
+  /* CARD DIMENSIONS */
+  --card-w: 76px;
+  --card-h: 118px;
+
+  /* BACKGROUNDS ── reusable layers, compose with screen-specific gradient */
+  --filigrana:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0px, transparent 28px,
+      rgba(var(--gold-dim-rgb), 0.05) 28px, rgba(var(--gold-dim-rgb), 0.05) 29px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0px, transparent 28px,
+      rgba(var(--gold-dim-rgb), 0.05) 28px, rgba(var(--gold-dim-rgb), 0.05) 29px
+    );
+}
+
+@media (min-width: 768px) and (min-height: 900px) {
+  :root {
+    --card-w: 91px;
+    --card-h: 142px;
+  }
+}
