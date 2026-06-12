@@ -9,7 +9,9 @@ export default function OpponentPanel({
   player,           // players[seat] del motor
   seatPos,          // 'top-left' | 'top-center' | 'top-right' | 'side-left' | 'side-right'
   isMano,
-  isTurn,
+  isPie,
+  isTurn,           // señal triple: borde+halo, badge TURNO, los demás atenuados
+  isDimmed,         // otro jugador tiene el turno → ~85% de intensidad
   isWinner,         // ganó el showdown (cartas reveladas escalan + chip de puntaje)
   lastAction,       // 'Apostó' | 'Igualó' | 'Subió' | 'Pasó' | 'Descartó N' | null
   renderCard,       // (i) => JSX de la carta del slot i
@@ -20,11 +22,16 @@ export default function OpponentPanel({
   showDeck,         // este asiento es el Pie → mazo visible
   shuffleChildren,  // <ShuffleDeck/> cuando baraja este asiento
 }) {
+  const stateClasses =
+    `${player.folded ? ' opp-folded' : ''}${isWinner ? ' opp-winner' : ''}` +
+    `${isTurn ? ' turn-active' : ''}${isDimmed && !player.folded ? ' turn-dimmed' : ''}`
   return (
-    <div className={`opp-panel opp-${seatPos}${player.folded ? ' opp-folded' : ''}${isWinner ? ' opp-winner' : ''}`}>
+    <div className={`opp-panel opp-${seatPos}${stateClasses}`}>
       <div className="opp-header">
         <span className="opp-name">{player.name}</span>
-        {isMano && <span className="mano-badge">Mano</span>}
+        {isMano && <span className="seat-badge seat-badge-gold">Mano</span>}
+        {isPie  && <span className="seat-badge seat-badge-neutral">Pie</span>}
+        {isTurn && <span className="seat-badge seat-badge-gold">Turno</span>}
         {isWinner && score && <span className="win-score-chip">{score.points}</span>}
       </div>
       <span className="opp-chips"><BalanceDisplay chips={player.chips} /> fichas</span>

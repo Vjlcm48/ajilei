@@ -22,6 +22,12 @@ import {
 const TURN_TIME  = 20
 const WARNING_AT = 5
 
+// Tanda C3.1: factor único de ritmo de las IAs (+25%) — multiplica TODAS las
+// pausas asociadas a acciones de IA (pensar antes de actuar, gaps entre
+// acciones/turnos consecutivos y pausas del descarte secuencial)
+const AI_SPEED_FACTOR = 1.25
+const AI_ACTION_MS    = 900 * AI_SPEED_FACTOR
+
 // ── Deal helpers ─────────────────────────────────────────────────────────────
 // Replays the engine's deal visually: active seats in Mano→Pie order, one card
 // per seat per round. Returns [{ seat, cardIndex }] in deal order.
@@ -88,13 +94,16 @@ function discardNarration(seat, n, g) {
 }
 
 // Sequential discard pacing (ms) — tempo ×3 (ajuste Tanda 1.2: el ritmo
-// original se sentía "disparado"); la secuencia Mano→Pie no cambia
+// original se sentía "disparado"); la secuencia Mano→Pie no cambia.
+// Tanda C3.1: las PAUSAS escalan con AI_SPEED_FACTOR; los vuelos (D_OUT/D_IN)
+// no, porque deben coincidir con la duración real de FlyingCard (0.75s)
 const D_OUT      = 750   // vuelo carta→mazo
-const D_OUT_STAG = 150
-const D_PAUSE    = 300   // slots vacíos un instante
+const D_OUT_STAG = 150 * AI_SPEED_FACTOR
+const D_PAUSE    = 300 * AI_SPEED_FACTOR   // slots vacíos un instante
 const D_IN       = 750   // vuelo mazo→slot
-const D_IN_STAG  = 180
-const D_SEAT_GAP = 240   // respiro entre jugadores
+const D_IN_STAG  = 180 * AI_SPEED_FACTOR
+const D_SEAT_GAP = 240 * AI_SPEED_FACTOR   // respiro entre jugadores
+const D_SKIP     = 600 * AI_SPEED_FACTOR   // pausa del "no descarta"
 
 // ── ShuffleDeck ───────────────────────────────────────────────────────────────
 function ShuffleDeck() {
@@ -286,7 +295,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         if (next.pot > prev.pot) play('coinBet')
         setLastActions(la => ({ ...la, [seat]: inferAction(prev, next, seat) }))
         setGame(next)
-      }, 900)
+      }, AI_ACTION_MS)
       return () => clearTimeout(t)
     }
   }, [phase, game.activePlayerIndex])
@@ -294,7 +303,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // Human folded during DISCARD (N≥3): rivals discard on their own
   useEffect(() => {
     if (phase === PHASES.DISCARD && human.folded && !discardAnim) {
-      const t = setTimeout(() => startDiscardAnim(gameRef.current, []), 900)
+      const t = setTimeout(() => startDiscardAnim(gameRef.current, []), AI_ACTION_MS)
       return () => clearTimeout(t)
     }
   }, [phase]) // eslint-disable-line
@@ -374,7 +383,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         if (seat !== 0) setLastActions(la => ({ ...la, [seat]: `Descartó ${n}` }))
         setDiscardMsg(discardNarration(seat, n, g))
       }, t))
-      if (n === 0) { t += 600; return }
+      if (n === 0) { t += D_SKIP; return }
       indices.forEach((idx, k) =>
         timers.push(setTimeout(() => launchDiscardOut(seat, idx), t + k * D_OUT_STAG)))
       const outEnd = t + (n - 1) * D_OUT_STAG + D_OUT
@@ -422,6 +431,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const nextPieSeat = game.handCount === 0 ? game.pieIndex : (game.pieIndex + 1) % numPlayers
   const deckSeat    = isShuffling ? nextPieSeat : pieSeat
   const manoSeat    = isShuffling ? (nextPieSeat + 1) % numPlayers : game.manoIndex
+
+  // ── Señal de turno (solo fases de apuesta) ────────────────────────────────
+  const turnSeat = isBetPhaseEarly ? game.activePlayerIndex : null
 
   // ── Card visibility during deal ───────────────────────────────────────────
   const visFor = isDealPhase ? dealVisibility(dealSeq, dealStep, dealOffset) : () => 5
@@ -528,10 +540,13 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     const ai = game.players[1]
     const aiWon = showdownWinnerSeat === 1
     return (
-      <section className="ai-zone">
+      <section className={`ai-zone${turnSeat === 1 ? ' turn-active' : ''}${turnSeat === 0 ? ' turn-dimmed' : ''}`}>
         <div className="ai-info">
           <span className="ai-label">
-            IA<span className="mano-badge" style={{ visibility: manoSeat === 1 ? 'visible' : 'hidden' }}>Mano</span>
+            IA
+            {manoSeat === 1 && <span className="seat-badge seat-badge-gold">Mano</span>}
+            {deckSeat === 1 && <span className="seat-badge seat-badge-neutral">Pie</span>}
+            {turnSeat === 1 && <span className="seat-badge seat-badge-gold">Turno</span>}
             {aiWon && <span className="win-score-chip">{ai.score.points}</span>}
           </span>
           <span className="ai-chips"><BalanceDisplay chips={ai.chips} /> fichas</span>
@@ -565,7 +580,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         player={game.players[seat]}
         seatPos={layout[seat]}
         isMano={manoSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
-        isTurn={isBetPhase && game.activePlayerIndex === seat}
+        isPie={deckSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
+        isTurn={turnSeat === seat}
+        isDimmed={turnSeat !== null && turnSeat !== seat}
         isWinner={showdownWinnerSeat === seat}
         lastAction={lastActions[seat]}
         renderCard={i => renderOpponentCard(seat, i)}
@@ -658,7 +675,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         )}
 
         {/* Player Zone */}
-        <section className="player-zone">
+        <section className={`player-zone${turnSeat === 0 ? ' turn-active' : ''}${turnSeat !== null && turnSeat !== 0 ? ' turn-dimmed' : ''}`}>
           <div className="score-tag score-tag-player" style={{ visibility: isPayoutPhase && !isClearing && human.score ? 'visible' : 'hidden' }}>
             {human.score && <>Tu mejor palo: <strong>{human.score.palo}</strong> ({human.score.points} pts)</>}
           </div>
@@ -786,7 +803,10 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
           <div className="player-info">
             <strong>
-              Tú<span className="mano-badge" style={{ visibility: manoSeat === 0 ? 'visible' : 'hidden' }}>Mano</span>
+              Tú
+              {manoSeat === 0 && <span className="seat-badge seat-badge-gold">Mano</span>}
+              {deckSeat === 0 && <span className="seat-badge seat-badge-neutral">Pie</span>}
+              {turnSeat === 0 && <span className="seat-badge seat-badge-gold">Turno</span>}
               {showdownWinnerSeat === 0 && <span className="win-score-chip">{human.score.points}</span>}
             </strong>
             <span><BalanceDisplay chips={human.chips} /> fichas · Mesa {unit}</span>

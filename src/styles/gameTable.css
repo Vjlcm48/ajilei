@@ -170,7 +170,9 @@
   white-space: nowrap;
   min-width: 0;
 }
-.player-info span { color: var(--gold-brand); }
+/* Hijo directo (línea de fichas) — los badges anidados conservan la clase
+   unificada .seat-badge (texto oscuro sobre dorado, patrón registrado) */
+.player-info > span { color: var(--gold-brand); }
 
 /* ── Actions ── */
 .action-area {
@@ -543,18 +545,62 @@
   vertical-align: middle;
 }
 
-/* ── Mano badge ── */
-span.mano-badge {
+/* ── Badges unificados MANO / PIE / TURNO (una clase base + modificadores) ── */
+.seat-badge {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--text-dark);
-  background: var(--gold-brand);
   border-radius: 999px;
   padding: 2px 8px;
   margin-left: 6px;
   vertical-align: middle;
+}
+
+/* MANO y TURNO: texto oscuro sobre dorado (patrón registrado) */
+.seat-badge-gold {
+  color: var(--text-dark);
+  background: var(--gold-brand);
+}
+
+/* PIE: variante neutra — texto claro sobre verde de panel */
+.seat-badge-neutral {
+  color: var(--text-secondary);
+  background: var(--green-deep);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.18);
+}
+
+/* ── Señal triple de turno (reforzada en Tanda C3.1) ── */
+/* 1. Borde dorado un nivel más grueso + halo respirante amplio. El grosor
+   extra es un anillo de box-shadow con spread 1px: el border-width jamás
+   cambia (ley de layout) y todo anima por box-shadow/color — sin reflow.
+   Especificidad doble para ganar a las reglas de borde de cada zona. */
+.opp-panel.turn-active,
+.ai-zone.turn-active,
+.player-zone.turn-active {
+  border-color: var(--gold-brand);
+  animation: turnBreath 2.4s ease-in-out infinite;
+}
+
+@keyframes turnBreath {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px var(--gold-brand),
+      0 0 10px rgba(var(--gold-brand-rgb), 0.30);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--gold-brand),
+      0 0 26px rgba(var(--gold-brand-rgb), 0.70);
+  }
+}
+
+/* 3. Los demás jugadores bajan a ~80% de intensidad (compensación de opacidad:
+   los textos internos ya parten de tonos claros con contraste de sobra) */
+.opp-panel.turn-dimmed,
+.ai-zone.turn-dimmed,
+.player-zone.turn-dimmed {
+  opacity: 0.80;
 }
 
 /* ── Shuffle fan animation ── */
