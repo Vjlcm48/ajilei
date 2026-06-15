@@ -19,6 +19,7 @@
   min-height: 150px;
   flex: 1;
   min-width: 0;
+  max-width: 360px;     /* deja aire lateral para el mazo de asientos superiores */
   position: relative;   /* ancla del mazo */
 }
 
@@ -59,19 +60,14 @@
 
 /* Mazo compacto anclado al asiento (visible solo si es Pie).
    El punto de anclaje lo define DECK_ANCHORS por posición — fuera del flujo
-   del panel (position: absolute), nunca en línea con los slots. */
+   del panel (position: absolute). Tanda C3.2: los asientos superiores ya no
+   usan la franja sobre el panel (banda muerta bajo el header) — su mazo va
+   al costado, en el hueco central reservado por el gap de .rivals-zone. */
 .opp-deck-wrapper {
   position: absolute;
 }
 
-/* Asientos superiores: mazo en la franja reservada ENCIMA del panel */
-.opp-deck-anchor-above {
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-/* Asientos laterales: mazo hacia el interior de la mesa */
+/* Mazo al costado del panel (asientos laterales y superiores) */
 .opp-deck-anchor-inner-right {
   left: calc(100% + 8px);
   top: 50%;
@@ -141,14 +137,16 @@
 .opp-score strong { color: var(--gold-brand); }
 
 /* Zona de rivales: fila parametrizada por posiciones.
-   El padding superior reserva la franja del mazo de los asientos superiores
-   (ocultamiento sin colapso — ley de anclaje). */
+   El gap central reserva el hueco del mazo de los asientos superiores
+   (franja reservada sin colapso — ley de anclaje), en lugar de la antigua
+   banda sobre los paneles. padding-top mínimo: el halo de turno es sombra
+   y no necesita espacio de layout. */
 .rivals-zone {
   display: flex;
-  gap: 10px;
+  gap: calc(var(--card-w) * 0.55 + 16px);
   align-items: stretch;
-  min-height: 170px;
-  padding-top: calc(var(--card-h) * 0.55 + 12px);
+  justify-content: center;
+  padding-top: 4px;
 }
 
 /* Columnas laterales (mesas 4-5): espacio interior reservado para el mazo */

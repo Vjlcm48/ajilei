@@ -674,7 +674,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           </div>
         )}
 
-        {/* Player Zone */}
+        {/* Player Zone — dos pisos (Tanda C3.2): cartas + barra única */}
         <section className={`player-zone${turnSeat === 0 ? ' turn-active' : ''}${turnSeat !== null && turnSeat !== 0 ? ' turn-dimmed' : ''}`}>
           <div className="score-tag score-tag-player" style={{ visibility: isPayoutPhase && !isClearing && human.score ? 'visible' : 'hidden' }}>
             {human.score && <>Tu mejor palo: <strong>{human.score.palo}</strong> ({human.score.points} pts)</>}
@@ -691,125 +691,131 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             {renderPlayerCards()}
           </div>
 
-          {phase === PHASES.WAITING && !isShuffling && (
-            <div className="action-area">
-              <SoundButton className="btn btn-primary" onClick={beginHand}>
-                Iniciar mano
-              </SoundButton>
-            </div>
-          )}
-
-          {phase === PHASES.WAITING && isShuffling && (
-            <div className="action-area thinking">Barajando…</div>
-          )}
-
-          {isDealPhase && (
-            <div className="action-area thinking">Repartiendo cartas…</div>
-          )}
-
-          {isBetPhase && !humanIsTurn && (
-            <div className="action-area thinking">
-              {numPlayers === 2
-                ? 'La IA está pensando…'
-                : `${game.players[game.activePlayerIndex].name} está pensando…`}
-            </div>
-          )}
-
-          {isPlayerTurn && (
-            <div className="action-area action-col">
-              <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
-                {timeLeft}s
-              </div>
-              <div className="mult-row">
-                {[1, 2, 5, 10].map((mult) => {
-                  const val = unit * mult
-                  return (
-                    <SoundButton
-                      key={mult}
-                      className={`btn btn-mult${betAmount === val ? ' btn-mult-active' : ''}`}
-                      onClick={() => setBetAmount(val)}
-                      disabled={val > playerChips}
-                    >
-                      ×{mult}
-                    </SoundButton>
-                  )
-                })}
-                <span className="bet-total">
-                  {currentBet === 0 ? betAmount : raiseTo} fic.
-                </span>
-              </div>
-              <div className="action-buttons">
-                {canPass  && <SoundButton className="btn btn-pass"  onClick={() => act('pasar')}>Pasar</SoundButton>}
-                {canBet   && <SoundButton className="btn btn-bet"   onClick={() => act('apostar')}>Apostar {betAmount}</SoundButton>}
-                {canCall  && <SoundButton className="btn btn-call"  onClick={() => act('igualar')}>Igualar ({toCall})</SoundButton>}
-                {canRaise && <SoundButton className="btn btn-raise" onClick={() => act('subir')}>Subir a {raiseTo}</SoundButton>}
-                <SoundButton className="btn btn-fold" onClick={() => act('retirarse')}>Retirarse</SoundButton>
-              </div>
-            </div>
-          )}
-
-          {isBetPhase && human.folded && (
-            <div className="action-area thinking">Te retiraste — los rivales siguen jugando…</div>
-          )}
-
-          {isDiscardPhase && !discardAnim && !human.folded && (
-            <div className="action-area discard-area">
-              <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
-                {timeLeft}s
-              </div>
-              <p className="discard-hint">
-                {game.selectedDiscards.length === 0
-                  ? `Pulsa las cartas a descartar (máx. ${maxDiscard(numPlayers)}) o continúa sin descartar.`
-                  : numPlayers === 5
-                    ? `${game.selectedDiscards.length} de ${maxDiscard(5)} seleccionada(s).`
-                    : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
-              </p>
-              <SoundButton className="btn btn-primary" onClick={handleDiscard}>
-                {game.selectedDiscards.length > 0 ? `Descartar ${game.selectedDiscards.length}` : 'Sin descartar'}
-              </SoundButton>
-            </div>
-          )}
-
-          {isDiscardPhase && !discardAnim && human.folded && (
-            <div className="action-area thinking">Los rivales descartan…</div>
-          )}
-
-          {isDiscardPhase && discardAnim && (
-            <div className="action-area thinking">Reponiendo…</div>
-          )}
-
-          {isPayoutPhase && !isClearing && !isShuffling && (
-            <div className="action-area">
-              <SoundButton className="btn btn-primary" onClick={() => {
-                setIsClearing(true)
-                setGame(prev => ({ ...prev, message: '', winner: null }))
-                setTimeout(() => {
-                  setIsClearing(false)
-                  beginHand()
-                }, 300)
-              }}>
-                Siguiente mano
-              </SoundButton>
-            </div>
-          )}
-
-          {isPayoutPhase && isShuffling && (
-            <div className="action-area thinking">Barajando…</div>
-          )}
-
-          {isPayoutPhase && isClearing && (
-            <div className="action-area" />
-          )}
-
-          <div className="player-info">
-            <strong>
+          {/* Barra única: Tú+badges (izq) · acciones del turno (centro) · saldo (der) */}
+          <div className="player-bar">
+            <strong className="player-bar-left">
               Tú
               {manoSeat === 0 && <span className="seat-badge seat-badge-gold">Mano</span>}
               {deckSeat === 0 && <span className="seat-badge seat-badge-neutral">Pie</span>}
               {turnSeat === 0 && <span className="seat-badge seat-badge-gold">Turno</span>}
               {showdownWinnerSeat === 0 && <span className="win-score-chip">{human.score.points}</span>}
             </strong>
-            <span><BalanceDisplay chips={human.chips} /> fichas · Mesa {unit}</span>
+
+            <div className="player-bar-center">
+              {phase === PHASES.WAITING && !isShuffling && (
+                <div className="action-area">
+                  <SoundButton className="btn btn-primary" onClick={beginHand}>
+                    Iniciar mano
+                  </SoundButton>
+                </div>
+              )}
+
+              {phase === PHASES.WAITING && isShuffling && (
+                <div className="action-area thinking">Barajando…</div>
+              )}
+
+              {isDealPhase && (
+                <div className="action-area thinking">Repartiendo cartas…</div>
+              )}
+
+              {isBetPhase && !humanIsTurn && (
+                <div className="action-area thinking">
+                  {numPlayers === 2
+                    ? 'La IA está pensando…'
+                    : `${game.players[game.activePlayerIndex].name} está pensando…`}
+                </div>
+              )}
+
+              {isPlayerTurn && (
+                <div className="action-area action-col">
+                  <div className="mult-row">
+                    <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
+                      {timeLeft}s
+                    </div>
+                    {[1, 2, 5, 10].map((mult) => {
+                      const val = unit * mult
+                      return (
+                        <SoundButton
+                          key={mult}
+                          className={`btn btn-mult${betAmount === val ? ' btn-mult-active' : ''}`}
+                          onClick={() => setBetAmount(val)}
+                          disabled={val > playerChips}
+                        >
+                          ×{mult}
+                        </SoundButton>
+                      )
+                    })}
+                    <span className="bet-total">
+                      {currentBet === 0 ? betAmount : raiseTo} fic.
+                    </span>
+                  </div>
+                  <div className="action-buttons">
+                    {canPass  && <SoundButton className="btn btn-pass"  onClick={() => act('pasar')}>Pasar</SoundButton>}
+                    {canBet   && <SoundButton className="btn btn-bet"   onClick={() => act('apostar')}>Apostar {betAmount}</SoundButton>}
+                    {canCall  && <SoundButton className="btn btn-call"  onClick={() => act('igualar')}>Igualar ({toCall})</SoundButton>}
+                    {canRaise && <SoundButton className="btn btn-raise" onClick={() => act('subir')}>Subir a {raiseTo}</SoundButton>}
+                    <SoundButton className="btn btn-fold" onClick={() => act('retirarse')}>Retirarse</SoundButton>
+                  </div>
+                </div>
+              )}
+
+              {isBetPhase && human.folded && (
+                <div className="action-area thinking">Te retiraste — los rivales siguen jugando…</div>
+              )}
+
+              {isDiscardPhase && !discardAnim && !human.folded && (
+                <div className="action-area discard-area">
+                  <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
+                    {timeLeft}s
+                  </div>
+                  <p className="discard-hint">
+                    {game.selectedDiscards.length === 0
+                      ? `Pulsa las cartas a descartar (máx. ${maxDiscard(numPlayers)}) o continúa sin descartar.`
+                      : numPlayers === 5
+                        ? `${game.selectedDiscards.length} de ${maxDiscard(5)} seleccionada(s).`
+                        : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
+                  </p>
+                  <SoundButton className="btn btn-primary" onClick={handleDiscard}>
+                    {game.selectedDiscards.length > 0 ? `Descartar ${game.selectedDiscards.length}` : 'Sin descartar'}
+                  </SoundButton>
+                </div>
+              )}
+
+              {isDiscardPhase && !discardAnim && human.folded && (
+                <div className="action-area thinking">Los rivales descartan…</div>
+              )}
+
+              {isDiscardPhase && discardAnim && (
+                <div className="action-area thinking">Reponiendo…</div>
+              )}
+
+              {isPayoutPhase && !isClearing && !isShuffling && (
+                <div className="action-area">
+                  <SoundButton className="btn btn-primary" onClick={() => {
+                    setIsClearing(true)
+                    setGame(prev => ({ ...prev, message: '', winner: null }))
+                    setTimeout(() => {
+                      setIsClearing(false)
+                      beginHand()
+                    }, 300)
+                  }}>
+                    Siguiente mano
+                  </SoundButton>
+                </div>
+              )}
+
+              {isPayoutPhase && isShuffling && (
+                <div className="action-area thinking">Barajando…</div>
+              )}
+
+              {isPayoutPhase && isClearing && (
+                <div className="action-area" />
+              )}
+            </div>
+
+            <span className="player-bar-right">
+              <BalanceDisplay chips={human.chips} /> fichas · Mesa {unit}
+            </span>
           </div>
         </section>
 

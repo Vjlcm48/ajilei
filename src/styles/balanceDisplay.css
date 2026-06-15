@@ -57,7 +57,7 @@
 /* ── Float text ─────────────────────────────────────────────────────────────
    position: absolute → completely out of flow, cannot push any element.
    Centered horizontally over the number via left:50% + translateX(-50%).
-   No ancestor in .ai-info / .ai-zone / .player-info / .player-zone has
+   No ancestor in .ai-info / .ai-zone / .player-bar-right / .player-zone has
    overflow:hidden (verified), so the text is never clipped.                  */
 .bd-float {
   position: absolute;

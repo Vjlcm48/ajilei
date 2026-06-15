@@ -9,16 +9,18 @@ export const SEAT_LAYOUTS = {
   5: ['bottom', 'side-right', 'top-right', 'top-left', 'side-left'],
 }
 
-// Punto de anclaje del mazo por posición de asiento (Tanda C2):
-// - asientos superiores: mazo ENCIMA del panel (franja reservada entre panel
-//   y borde superior de la mesa — nunca en línea con los slots)
+// Punto de anclaje del mazo por posición de asiento (Tanda C2, revisado en
+// Tanda C3.2 — la franja sobre los paneles superiores creaba una banda muerta
+// bajo el header que impedía que la mesa cupiera en el viewport):
+// - asientos superiores: mazo al costado del panel, hacia el centro de la
+//   fila (hueco reservado por el gap de .rivals-zone)
 // - asientos laterales: mazo hacia el lado interior (centro de mesa)
 // - asiento humano: posición actual, en línea con sus cartas
 export const DECK_ANCHORS = {
   'bottom':     'inline',
-  'top-left':   'above',
-  'top-center': 'above',
-  'top-right':  'above',
+  'top-left':   'inner-right',   // panel izquierdo de la fila → mazo a su derecha
+  'top-center': 'inner-right',
+  'top-right':  'inner-left',    // panel derecho de la fila → mazo a su izquierda
   'side-left':  'inner-right',   // panel a la izquierda → mazo a su derecha
   'side-right': 'inner-left',    // panel a la derecha  → mazo a su izquierda
 }
