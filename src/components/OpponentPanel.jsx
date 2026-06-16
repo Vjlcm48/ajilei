@@ -17,6 +17,7 @@ export default function OpponentPanel({
   renderCard,       // (i) => JSX de la carta del slot i
   score,            // score del showdown (o null)
   showScore,
+  resetting,        // mano nueva en transición (clearing/shuffle) → rótulos en blanco
   slotRefs,         // array de 5 refs para las animaciones de vuelo
   deckRef,          // ref del mazo anclado a este asiento
   showDeck,         // este asiento es el Pie → mazo visible
@@ -50,11 +51,14 @@ export default function OpponentPanel({
         {shuffleChildren}
       </div>
 
+      {/* Rótulo de estado (doblado en C4.3.1). En la transición a la mano
+          siguiente (resetting) se limpia para no arrastrar "Se retiró" ni la
+          última acción de la mano previa durante el barajado. */}
       <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}`}>
-        {player.folded ? 'Se retiró' : (isTurn ? 'Pensando…' : (lastAction ?? ' '))}
+        {resetting ? ' ' : (player.folded ? 'Se retiró' : (isTurn ? 'Pensando…' : (lastAction ?? ' ')))}
       </span>
 
-      <span className="opp-score" style={{ visibility: showScore && score ? 'visible' : 'hidden' }}>
+      <span className="opp-score" style={{ visibility: showScore && score && !resetting ? 'visible' : 'hidden' }}>
         {score && <>Mejor palo: <strong>{score.palo}</strong> ({score.points} pts)</>}
       </span>
     </div>

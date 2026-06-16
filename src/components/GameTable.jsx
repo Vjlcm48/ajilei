@@ -70,6 +70,18 @@ function inferAction(prev, next, seat) {
   return 'Pasó'
 }
 
+// Clasifica el mensaje del centro por tipo de acción para estilarlo (Tanda C4.3).
+// Lee el verbo del texto realmente visible (humano e IA, N=2 y N>2). Devuelve
+// 'fold' | 'bet' | 'neutral' para acciones de apuesta, o null si no es una acción
+// (reparto, fases, descarte, resultado → conservan su estilo actual).
+function messageActionKind(msg) {
+  if (!msg) return null
+  if (/se retira|Te retiras/.test(msg))            return 'fold'
+  if (/apuesta|Apuestas|sube|Subes/.test(msg))     return 'bet'
+  if (/pasa|Pasas|iguala|Igualas/.test(msg))       return 'neutral'
+  return null
+}
+
 // Diff prev/next hands per active seat (Mano→Pie order) → per-player discard plan
 function buildDiscardPlan(prevGame, nextGame) {
   const { numPlayers: N, manoIndex, players } = prevGame
@@ -158,6 +170,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const [isShuffling,  setIsShuffling]  = useState(false)
   const [isClearing,   setIsClearing]   = useState(false)
   const [deal3FaceUp,  setDeal3FaceUp]  = useState(new Set())
+  const [potAnim,      setPotAnim]      = useState(null)   // Tanda C4.3: pulso + "+N" del pozo
   const { play } = useSounds()
 
   // Position refs: one 5-slot row + one deck anchor per seat
@@ -173,9 +186,25 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }
   const discardTimersRef = useRef([])
   const gameRef = useRef(game)
+  const prevPotRef = useRef(game.pot)
 
   // Clear pending discard timers if the table unmounts mid-animation
   useEffect(() => () => discardTimersRef.current.forEach(clearTimeout), [])
+
+  // ── Pozo: pulso + "+N" flotante al aumentar (Tanda C4.3) ──────────────────
+  // Cualquier incremento del pozo (apuesta/igualada/subida de humano o IA, y
+  // el cobro de antes al iniciar mano) dispara el efecto. El "+N" es overlay
+  // absoluto y el pulso es transform/text-shadow → no altera caja ni layout.
+  useEffect(() => {
+    const prev = prevPotRef.current
+    prevPotRef.current = game.pot
+    if (game.pot > prev) {
+      const id = Date.now() + Math.random()
+      setPotAnim({ id, delta: game.pot - prev })
+      const t = setTimeout(() => setPotAnim(a => (a && a.id === id ? null : a)), 600)
+      return () => clearTimeout(t)
+    }
+  }, [game.pot])
 
   const { phase, currentBet } = game
   const human        = game.players[0]
@@ -186,6 +215,16 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const dealSeq      = isDealPhase ? buildDealSeq(game) : []
   const dealTotal    = dealSeq.length
   const dealOffset   = phase === PHASES.DEAL_3 ? 2 : 0
+
+  // ── Comodín (7 de Oros) ───────────────────────────────────────────────────
+  // Suena SOLO en mesas 4-5 (donde es comodín) y SOLO cuando llega a la mano
+  // del humano, en el instante del volteo. Nunca para una IA — delataría su
+  // mano. discardNextRef guarda la mano post-descarte para leer la carta
+  // repuesta en el momento del flip sin depender del estado (evita doble
+  // disparo de StrictMode al no vivir dentro de un updater).
+  const comodinActive = numPlayers >= 4
+  const isComodin = card => !!card && card.value === 7 && card.palo === 'Oros'
+  const discardNextRef = useRef(null)
 
   useEffect(() => { gameRef.current = game })
 
@@ -200,6 +239,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
     if (!deckEl || !slotEl) {          // fallback: skip animation
       play('cardDeal')
+      // DEAL_2 muestra la carta del humano boca arriba al instante (sin flip):
+      // su volteo es el aterrizaje, así que el comodín suena aquí.
+      if (phase === PHASES.DEAL_2 && seat === 0 && comodinActive && isComodin(game.players[0].cards[cardIndex])) play('comodin')
       setDealStep(s => s + 1)
       return
     }
@@ -211,6 +253,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       id: `fly-${phase}-${step}`,
       fromX: dr.left, fromY: dr.top,
       toX:   sr.left, toY:   sr.top,
+      dealSeat: seat, dealCardIndex: cardIndex,
     }])
   }
 
@@ -218,9 +261,14 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     if (!isDealPhase) { setFlyingCards([]); return }
     if (dealStep >= dealTotal) {
       if (phase === PHASES.DEAL_3) {
-        const t0 = setTimeout(() => setDeal3FaceUp(prev => new Set(prev).add(2)), 300)
-        const t1 = setTimeout(() => setDeal3FaceUp(prev => new Set(prev).add(3)), 600)
-        const t2 = setTimeout(() => setDeal3FaceUp(prev => new Set(prev).add(4)), 900)
+        // El flip de cada carta (2,3,4) es el volteo del humano: comodín ahí.
+        const revealDeal3 = i => {
+          setDeal3FaceUp(prev => new Set(prev).add(i))
+          if (comodinActive && isComodin(game.players[0].cards[i])) play('comodin')
+        }
+        const t0 = setTimeout(() => revealDeal3(2), 300)
+        const t1 = setTimeout(() => revealDeal3(3), 600)
+        const t2 = setTimeout(() => revealDeal3(4), 900)
         const t3 = setTimeout(() => {
           setDeal3FaceUp(new Set())
           setDealStep(0)
@@ -270,6 +318,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       if (next > 0 && next <= WARNING_AT) play('timerWarning')
       if (next === 0) {
         if (isPlayerTurnEarly) {
+          if (gameRef.current.currentBet > 0) play('cardFold')   // timeout → se retira
           setGame(prev => applyPlayerBetAction(prev, prev.currentBet === 0 ? 'pasar' : 'retirarse', prev.unit))
         } else {
           startDiscardAnim(gameRef.current, [])
@@ -279,9 +328,21 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     return () => clearTimeout(t)
   }, [isPlayerTurnEarly, isDiscardTimerActive, timeLeft]) // eslint-disable-line
 
-  // ── Win sound ─────────────────────────────────────────────────────────────
+  // ── Sonidos de cierre de mano: showdown + victoria ────────────────────────
+  // showdown: la mano llegó a comparación (el ganador tiene score → cartas
+  //   reveladas); en una mano ganada por retiros no hay volteo, no suena.
+  // win: SOLO cuando gana el humano (asiento 0). Antes sonaba en cada payout,
+  //   también al perder (corrección Tanda C4.1). Si hubo showdown, la fanfarria
+  //   entra un instante después del sonido de revelado.
   useEffect(() => {
-    if (phase === PHASES.PAYOUT) play('win')
+    if (phase !== PHASES.PAYOUT) return
+    const w = game.winner
+    const isShowdown = w !== null && game.players[w].score
+    if (isShowdown) play('showdown')
+    if (w === 0) {
+      const t = setTimeout(() => play('win'), isShowdown ? 450 : 0)
+      return () => clearTimeout(t)
+    }
   }, [phase]) // eslint-disable-line
 
   // ── AI auto-action ────────────────────────────────────────────────────────
@@ -292,8 +353,10 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         const prev = gameRef.current
         const seat = prev.activePlayerIndex
         const next = applyAIBetAction(prev)
+        const action = inferAction(prev, next, seat)
         if (next.pot > prev.pot) play('coinBet')
-        setLastActions(la => ({ ...la, [seat]: inferAction(prev, next, seat) }))
+        if (action === 'Se retiró') play('cardFold')
+        setLastActions(la => ({ ...la, [seat]: action }))
         setGame(next)
       }, AI_ACTION_MS)
       return () => clearTimeout(t)
@@ -321,6 +384,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
   function act(action) {
     if (['apostar', 'igualar', 'subir'].includes(action)) play('coinBet')
+    if (action === 'retirarse') play('cardFold')
     setGame(prev => applyPlayerBetAction(prev, action, betAmount))
   }
 
@@ -365,12 +429,16 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     if (seat === 0) {
       setTimeout(() => {
         setDiscardAnim(prev => prev && ({ ...prev, revealed: new Set(prev.revealed).add(key) }))
+        // El flip de la reposición es el volteo: si la carta repuesta del
+        // humano es el comodín, suena (leído del ref, no del updater).
+        if (comodinActive && isComodin(discardNextRef.current?.players[0].cards[idx])) play('comodin')
       }, 350)
     }
   }
 
   function startDiscardAnim(g, humanDiscardIndices) {
     const nextGame = applyDiscard(g, humanDiscardIndices)
+    discardNextRef.current = nextGame
     const plan     = buildDiscardPlan(g, nextGame)
     const allKeys  = new Set(plan.flatMap(p => p.indices.map(i => `${p.seat}:${i}`)))
     setDiscardAnim({ nextGame, allKeys, emptied: new Set(), refilled: new Set(), revealed: new Set() })
@@ -565,7 +633,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             {isShuffling && deckSeat === 1 && <ShuffleDeck />}
           </div>
         </div>
-        <div className="score-tag" style={{ visibility: isPayoutPhase && !isClearing && ai.score ? 'visible' : 'hidden' }}>
+        <div className="score-tag" style={{ visibility: isPayoutPhase && !isClearing && !isShuffling && ai.score ? 'visible' : 'hidden' }}>
           {ai.score && <>Mejor palo: <strong>{ai.score.palo}</strong> ({ai.score.points} pts)</>}
         </div>
       </section>
@@ -587,7 +655,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         lastAction={lastActions[seat]}
         renderCard={i => renderOpponentCard(seat, i)}
         score={game.players[seat].score}
-        showScore={isPayoutPhase && !isClearing}
+        showScore={isPayoutPhase && !isClearing && !isShuffling}
+        resetting={isClearing || isShuffling}
         slotRefs={slotRefs.current[seat]}
         deckRef={deckRefs.current[seat]}
         showDeck={deckSeat === seat && !isClearing}
@@ -611,18 +680,29 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }
 
   function renderCenterZone() {
+    const centerMsg  = discardMsg ?? game.message
+    // El resultado (winner) conserva su estilo win/lose; solo fuera de él
+    // estilamos por tipo de acción (Tanda C4.3).
+    const actionKind = game.winner !== null ? null : messageActionKind(centerMsg)
+    const msgClass = game.winner === 0 ? ' msg-win'
+                   : game.winner !== null ? ' msg-lose'
+                   : actionKind ? ` msg-action msg-action-${actionKind}` : ''
     return (
       <section className="center-zone">
         <div className="pot-box">
           <span className="pot-label">Pozo</span>
-          <strong className="pot-value">{game.pot}</strong>
+          <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
+            {game.pot}
+          </strong>
+          {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
         </div>
         <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
           <span className="pot-label">A igualar</span>
           <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
         </div>
-        <p className={`game-message${game.winner === 0 ? ' msg-win' : game.winner !== null ? ' msg-lose' : ''}`}>
-          {discardMsg ?? game.message}
+        {/* key cambia solo en acciones → reproduce el pop sin animar mensajes neutros de fase/reparto */}
+        <p className={`game-message${msgClass}`} key={actionKind ? centerMsg : 'msg'}>
+          {centerMsg}
         </p>
         {numPlayers >= 4 && (
           <span className="comodin-note">Comodín activo · vale {numPlayers === 5 ? 11 : 10}</span>
@@ -676,7 +756,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
         {/* Player Zone — dos pisos (Tanda C3.2): cartas + barra única */}
         <section className={`player-zone${turnSeat === 0 ? ' turn-active' : ''}${turnSeat !== null && turnSeat !== 0 ? ' turn-dimmed' : ''}`}>
-          <div className="score-tag score-tag-player" style={{ visibility: isPayoutPhase && !isClearing && human.score ? 'visible' : 'hidden' }}>
+          <div className="score-tag score-tag-player" style={{ visibility: isPayoutPhase && !isClearing && !isShuffling && human.score ? 'visible' : 'hidden' }}>
             {human.score && <>Tu mejor palo: <strong>{human.score.palo}</strong> ({human.score.points} pts)</>}
           </div>
 
@@ -831,7 +911,11 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           onDone={() => {
             setFlyingCards(prev => prev.filter(c => c.id !== fc.id))
             if (fc.isDiscardIn) markRefilled(fc.seat, fc.slotIdx)
-            else if (!fc.isDiscardOut) setDealStep(s => s + 1)
+            else if (!fc.isDiscardOut) {
+              // DEAL_2: la carta del humano se revela boca arriba al aterrizar
+              if (phase === PHASES.DEAL_2 && fc.dealSeat === 0 && comodinActive && isComodin(game.players[0].cards[fc.dealCardIndex])) play('comodin')
+              setDealStep(s => s + 1)
+            }
           }}
         />
       ))}

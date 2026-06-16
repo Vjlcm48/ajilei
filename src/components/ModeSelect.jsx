@@ -1,18 +1,33 @@
 import '../styles/modeSelect.css'
 import { SoundButton } from './SoundButton'
+import BalanceDisplay from './BalanceDisplay'
+import { STAKE_OPTIONS, AJILEI_CONFIG } from '../config/ajileiConfig'
 
+// Diseñar conforme a docs/AJILEI_Sistema_Diseno_v1.2.md.
+// El comodín (7 de Oros) está activo solo en mesas de 4 y 5 jugadores.
 const TABLE_MODES = [
-  { players: 2, title: 'Mesa de 2 jugadores', subtitle: 'Tú vs 1 IA',                   enabled: true  },
-  { players: 3, title: 'Mesa de 3 jugadores', subtitle: 'Tú vs 2 IAs',                  enabled: true  },
-  { players: 4, title: 'Mesa de 4 jugadores', subtitle: 'Tú vs 3 IAs · Comodín activo', enabled: true  },
-  { players: 5, title: 'Mesa de 5 jugadores', subtitle: 'Tú vs 4 IAs · Comodín activo', enabled: true  },
+  { players: 2, opponents: '1 IA',  comodin: false },
+  { players: 3, opponents: '2 IAs', comodin: false },
+  { players: 4, opponents: '3 IAs', comodin: true  },
+  { players: 5, opponents: '4 IAs', comodin: true  },
 ]
+
+const STAKE_MIN = STAKE_OPTIONS[0]
+const STAKE_MAX = STAKE_OPTIONS[STAKE_OPTIONS.length - 1]
 
 export default function ModeSelect({ onSelectMode, onBack }) {
   return (
     <main className="mode-select-screen">
       <section className="mode-select-card">
+        <div className="mode-balance" title="Tu saldo">
+          <span className="mode-balance-label">Saldo</span>
+          <span className="mode-balance-value">
+            <BalanceDisplay chips={AJILEI_CONFIG.economy.saldoInicial} /> fichas
+          </span>
+        </div>
+
         <h2 className="mode-select-title">Elige tu mesa</h2>
+        <p className="mode-select-sub">Entrada de {STAKE_MIN} a {STAKE_MAX} fichas · la eliges en el siguiente paso</p>
 
         <svg className="mode-star-arc" viewBox="0 0 200 65" aria-hidden="true">
           <defs>
@@ -25,21 +40,24 @@ export default function ModeSelect({ onSelectMode, onBack }) {
         </svg>
 
         <div className="mode-grid">
-          {TABLE_MODES.map(({ players, title, subtitle, enabled }, idx) => (
+          {TABLE_MODES.map(({ players, opponents, comodin }, idx) => (
             <div
               key={players}
               className="mode-option"
               style={{ animationDelay: `${100 + idx * 70}ms` }}
             >
               <SoundButton
-                className={`mode-btn ${enabled ? 'mode-btn-enabled' : 'mode-btn-disabled'}`}
-                onClick={enabled ? () => onSelectMode(players) : undefined}
-                disabled={!enabled}
+                className="mode-btn mode-btn-enabled"
+                onClick={() => onSelectMode(players)}
               >
-                <span className="mode-btn-title">{title}</span>
-                <span className="mode-btn-subtitle">{subtitle}</span>
+                <span className="mode-btn-title">Mesa de {players} jugadores</span>
+                <span className="mode-btn-row">
+                  <span className="mode-btn-subtitle">Tú vs {opponents}</span>
+                  <span className={`comodin-chip${comodin ? ' comodin-chip-on' : ' comodin-chip-off'}`}>
+                    {comodin ? 'Comodín activo' : 'Sin comodín'}
+                  </span>
+                </span>
               </SoundButton>
-              {!enabled && <span className="soon-tag">Próximamente</span>}
             </div>
           ))}
         </div>
