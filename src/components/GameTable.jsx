@@ -22,16 +22,6 @@ import {
 const TURN_TIME  = 20
 const WARNING_AT = 5
 
-// C4.4: siguiente asiento NO eliminado (rotación UI de badges durante el barajado)
-function nextAliveSeat(players, from) {
-  const N = players.length
-  for (let i = 1; i <= N; i++) {
-    const idx = (from + i) % N
-    if (!players[idx].eliminated) return idx
-  }
-  return from
-}
-
 // Tanda C3.1: factor único de ritmo de las IAs (+25%) — multiplica TODAS las
 // pausas asociadas a acciones de IA (pensar antes de actuar, gaps entre
 // acciones/turnos consecutivos y pausas del descarte secuencial)
@@ -274,6 +264,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
   useEffect(() => {
     if (!isDealPhase) { setFlyingCards([]); return }
+    if (isShuffling) return   // C4.4.1: ante ya descontado; repartir solo al terminar el barajado
     if (dealStep >= dealTotal) {
       if (phase === PHASES.DEAL_3) {
         // El flip de cada carta (2,3,4) es el volteo del humano: comodín ahí.
@@ -299,7 +290,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     }
     const t = setTimeout(() => launchFlyingCard(dealStep), dealStep === 0 ? 120 : 0)
     return () => clearTimeout(t)
-  }, [isDealPhase, dealStep, dealTotal]) // eslint-disable-line
+  }, [isDealPhase, dealStep, dealTotal, isShuffling]) // eslint-disable-line
 
   // Reset deal step on entering a deal phase
   useEffect(() => {
@@ -361,9 +352,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }, [phase]) // eslint-disable-line
 
   // ── AI auto-action ────────────────────────────────────────────────────────
+  // C4.4.1: una IA RETIRADA (folded) no recibe turno de "pensar" — se excluye
+  // aquí y se salta en silencio en el efecto siguiente.
   useEffect(() => {
     const isBet = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
-    if (isBet && game.activePlayerIndex !== 0) {
+    const active = game.players[game.activePlayerIndex]
+    if (isBet && game.activePlayerIndex !== 0 && !active.folded) {
       const t = setTimeout(() => {
         const prev = gameRef.current
         const seat = prev.activePlayerIndex
@@ -376,7 +370,25 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       }, AI_ACTION_MS)
       return () => clearTimeout(t)
     }
-  }, [phase, game.activePlayerIndex])
+  }, [phase, game.activePlayerIndex]) // eslint-disable-line
+
+  // ── Saltar en silencio a un jugador activo RETIRADO (C4.4.1) ──────────────
+  // Puede ocurrir al iniciar BET_2/BET_3 si la Mano se retiró en una ronda
+  // previa (el motor reinicia activePlayerIndex = manoIndex). Sin "pensando" ni
+  // retardo: se avanza el turno de inmediato vía la API del motor (sin tocarlo).
+  useEffect(() => {
+    const isBet = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
+    if (!isBet) return
+    const active = game.players[game.activePlayerIndex]
+    if (!active || !active.folded) return
+    const t = setTimeout(() => {
+      const prev = gameRef.current
+      const cur  = prev.players[prev.activePlayerIndex]
+      if (!cur || !cur.folded) return
+      setGame(prev.activePlayerIndex === 0 ? applyPlayerBetAction(prev, 'pasar') : applyAIBetAction(prev))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [phase, game.activePlayerIndex]) // eslint-disable-line
 
   // Human folded during DISCARD (N≥3): rivals discard on their own
   useEffect(() => {
@@ -508,12 +520,11 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }
 
   // ── Position-derived anchors (deck, MANO badge) ───────────────────────────
-  // During the shuffle the engine has NOT rotated yet (startHand runs after).
-  // ALL position-derived UI reads the NEXT hand's indices (same rotation rule
-  // as the engine) so deck and badges sit at their final position — no jump.
-  const nextPieSeat = game.handCount === 0 ? game.pieIndex : nextAliveSeat(game.players, game.pieIndex)
-  const deckSeat    = isShuffling ? nextPieSeat : pieSeat
-  const manoSeat    = isShuffling ? nextAliveSeat(game.players, nextPieSeat) : game.manoIndex
+  // C4.4.1: startHand se aplica ANTES de barajar (cobro del ante visible), así
+  // que durante el barajado `game` ya tiene los índices de la nueva mano. El
+  // mazo y los badges leen game directamente — ya están en su posición final.
+  const deckSeat = pieSeat
+  const manoSeat = game.manoIndex
 
   // ── Señal de turno (solo fases de apuesta) ────────────────────────────────
   const turnSeat = isBetPhaseEarly ? game.activePlayerIndex : null
@@ -521,18 +532,18 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // ── Card visibility during deal ───────────────────────────────────────────
   const visFor = isDealPhase ? dealVisibility(dealSeq, dealStep, dealOffset) : () => 5
 
-  // ── New-hand dispatcher (shuffle → startHand) ─────────────────────────────
-  // C4.4: precalculamos la próxima mano; si la mesa terminó (GAME_OVER) no
-  // barajamos — saltamos directo al fin de mesa.
+  // ── New-hand dispatcher (cobro de ante → barajar → repartir) ──────────────
+  // C4.4: si la mesa terminó (GAME_OVER) no barajamos, vamos al fin de mesa.
+  // C4.4.1: el ante se cobra ANTES de barajar — committeamos startHand de
+  // inmediato (el descuento de saldos se ve), luego corre el barajado y, al
+  // terminar, el efecto de reparto reparte las cartas.
   function beginHand() {
     setLastActions({})
     const next = startHand(gameRef.current)
     if (next.phase === PHASES.GAME_OVER) { setGame(next); return }
-    setIsShuffling(true)
-    setTimeout(() => {
-      setIsShuffling(false)
-      setGame(next)
-    }, 1950)
+    setGame(next)            // cobro del ante visible (saldos descontados, pozo armado)
+    setIsShuffling(true)     // baraja sobre el estado ya cobrado
+    setTimeout(() => setIsShuffling(false), 1950)
   }
 
   // ── Phase label ───────────────────────────────────────────────────────────
@@ -829,15 +840,15 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                 </div>
               )}
 
-              {phase === PHASES.WAITING && isShuffling && (
+              {isShuffling && (
                 <div className="action-area thinking">Barajando…</div>
               )}
 
-              {isDealPhase && (
+              {isDealPhase && !isShuffling && (
                 <div className="action-area thinking">Repartiendo cartas…</div>
               )}
 
-              {isBetPhase && !humanIsTurn && (
+              {isBetPhase && !humanIsTurn && !game.players[game.activePlayerIndex].folded && (
                 <div className="action-area thinking">
                   {numPlayers === 2
                     ? 'La IA está pensando…'
@@ -921,10 +932,6 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                     Siguiente mano
                   </SoundButton>
                 </div>
-              )}
-
-              {isPayoutPhase && isShuffling && (
-                <div className="action-area thinking">Barajando…</div>
               )}
 
               {isPayoutPhase && isClearing && (
