@@ -34,3 +34,26 @@ export function rivalSeatsInDisplayOrder(numPlayers) {
   return Array.from({ length: numPlayers - 1 }, (_, i) => i + 1)
     .sort((a, b) => DISPLAY_ORDER.indexOf(layout[a]) - DISPLAY_ORDER.indexOf(layout[b]))
 }
+
+// ── C4.4: layout efectivo según jugadores VIVOS ──────────────────────────────
+// Los vivos (humano siempre seat 0 → 'bottom') se reparten en el layout del
+// tamaño = nº de vivos; los eliminados desaparecen del tablero. Los índices de
+// asiento permanecen estables (el array NO se compacta): devolvemos un mapa
+// seat → posición solo para los asientos vivos.
+export function effectiveLayout(players) {
+  const living = players.map((_, i) => i).filter(i => !players[i].eliminated)
+  const aliveN = living.length
+  const layout = SEAT_LAYOUTS[aliveN] ?? SEAT_LAYOUTS[2]
+  const rivals = living.filter(i => i !== 0)
+  const eff = { 0: 'bottom' }
+  rivals.forEach((seat, k) => { eff[seat] = layout[k + 1] })
+  return eff
+}
+
+// Rivales vivos ordenados para render visual (izquierda → derecha)
+export function livingRivalsInDisplayOrder(players) {
+  const eff = effectiveLayout(players)
+  return players.map((_, i) => i)
+    .filter(i => i !== 0 && !players[i].eliminated)
+    .sort((a, b) => DISPLAY_ORDER.indexOf(eff[a]) - DISPLAY_ORDER.indexOf(eff[b]))
+}

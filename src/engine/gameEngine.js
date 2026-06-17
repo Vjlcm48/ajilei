@@ -4,15 +4,16 @@ import { decideBetAction, decideDiscard } from './aiPlayer'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
 
 export const PHASES = {
-  WAITING:  'WAITING',
-  DEAL_2:   'DEAL_2',   // reserved for deal animation
-  BET_1:    'BET_1',    // "a las 2"
-  DEAL_3:   'DEAL_3',   // reserved for deal animation
-  BET_2:    'BET_2',    // "a las 3"
-  DISCARD:  'DISCARD',
-  BET_3:    'BET_3',    // "al descarte"
-  SHOWDOWN: 'SHOWDOWN',
-  PAYOUT:   'PAYOUT',
+  WAITING:   'WAITING',
+  DEAL_2:    'DEAL_2',   // reserved for deal animation
+  BET_1:     'BET_1',    // "a las 2"
+  DEAL_3:    'DEAL_3',   // reserved for deal animation
+  BET_2:     'BET_2',    // "a las 3"
+  DISCARD:   'DISCARD',
+  BET_3:     'BET_3',    // "al descarte"
+  SHOWDOWN:  'SHOWDOWN',
+  PAYOUT:    'PAYOUT',
+  GAME_OVER: 'GAME_OVER', // C4.4: fin de mesa (1 vivo) o humano sin fichas
 }
 
 export const MIN_BET = AJILEI_CONFIG.betting.apuestaMinima
@@ -24,8 +25,10 @@ export function maxDiscard(numPlayers) {
 }
 
 // ── Player factory ─────────────────────────────────────────────────────────────
+// `eliminated` (C4.4): bancarrota PERMANENTE — a diferencia de `folded`, NO se
+// resetea entre manos. Un jugador eliminado nunca vuelve a entrar en la sesión.
 function makePlayer(id, name, isHuman, chips) {
-  return { id, name, isHuman, chips, cards: [], contrib: 0, acted: false, folded: false, score: null }
+  return { id, name, isHuman, chips, cards: [], contrib: 0, acted: false, folded: false, score: null, eliminated: false }
 }
 
 // ── State factory ──────────────────────────────────────────────────────────────
@@ -43,7 +46,9 @@ export function createInitialState(unit = DEFAULT_UNIT, numPlayers = 2) {
   const manoIndex = 0
   const base = {
     phase:             PHASES.WAITING,
-    numPlayers,
+    numPlayers,                 // tamaño físico fijo de la mesa (asientos, índices)
+    aliveCount:        numPlayers, // C4.4: jugadores vivos (con fichas) → reglas
+    eliminatedNames:   [],       // nombres eliminados en la última mano (UI)
     unit,
     players,
     pieIndex,
@@ -62,6 +67,23 @@ export function createInitialState(unit = DEFAULT_UNIT, numPlayers = 2) {
 // ── Round helpers ──────────────────────────────────────────────────────────────
 function activePlayers(players) {
   return players.filter(p => !p.folded)
+}
+
+// C4.4: jugadores vivos = no eliminados (permanente). Distinto de activePlayers,
+// que filtra `folded` DENTRO de una mano. El conteo vivo enruta las reglas.
+function countAlive(players) {
+  return players.reduce((n, p) => n + (p.eliminated ? 0 : 1), 0)
+}
+
+// Siguiente asiento NO eliminado tras fromIndex (envuelve). Para rotación
+// Mano/Pie entre vivos conservando índices estables (no se compacta el array).
+function nextAliveIndex(players, fromIndex) {
+  const N = players.length
+  for (let i = 1; i <= N; i++) {
+    const idx = (fromIndex + i) % N
+    if (!players[idx].eliminated) return idx
+  }
+  return fromIndex
 }
 
 function isRoundOver(players, currentBet) {
@@ -92,14 +114,17 @@ function resolveWinner(state) {
 // ── Showdown with N players ────────────────────────────────────────────────────
 function doShowdown(state) {
   const { numPlayers, players, manoIndex } = state
-  const comodinEnabled = numPlayers >= 4
+  // C4.4: las reglas (comodín, valor, ajilei N=5) leen el conteo VIVO, no el
+  // tamaño fijo. La matemática de evaluación en handEvaluator no se toca.
+  const ruleN = state.aliveCount ?? numPlayers
+  const comodinEnabled = ruleN >= 4
   const active = activePlayers(players)
   const N      = players.length
 
   const withScores = active.map(p => ({
     ...p,
-    score:  getBestSuitScore(p.cards, numPlayers, comodinEnabled),
-    ajilei: isAjilei(p.cards, numPlayers),
+    score:  getBestSuitScore(p.cards, ruleN, comodinEnabled),
+    ajilei: isAjilei(p.cards, ruleN),
   }))
 
   const maxScore = Math.max(...withScores.map(p => p.score.points))
@@ -185,7 +210,7 @@ function advanceBettingPhase(state) {
     return {
       ...base,
       phase:   PHASES.DISCARD,
-      message: `Selecciona hasta ${maxDiscard(N)} cartas a descartar.`,
+      message: `Selecciona hasta ${maxDiscard(state.aliveCount ?? N)} cartas a descartar.`,
     }
   }
 
@@ -306,23 +331,57 @@ function applyBetAction(state, playerIndex, action, betAmount) {
 // Deal 2 cards, collect antes, advance to DEAL_2.
 // Rotation: hand 0 keeps initial indices; subsequent hands rotate pieIndex by +1.
 export function startHand(state) {
-  const N    = state.numPlayers
   const unit = state.unit
+  const N    = state.numPlayers   // tamaño físico (recorrido de asientos)
 
-  const newPieIndex  = state.handCount === 0 ? state.pieIndex : (state.pieIndex + 1) % N
-  const newManoIndex = (newPieIndex + 1) % N
-
-  // Collect antes; auto-fold players who can't afford it
-  let pot = 0
+  // ── PASO 1+2: eliminación permanente y conteo de vivos ──────────────────────
+  // Quien ya estaba eliminado, o no puede pagar el ante, queda `eliminated`
+  // (permanente) y `folded` (out de la mano). Los vivos se resetean normalmente.
+  const prevElim = state.players.map(p => p.eliminated)
   let players = state.players.map(p => {
-    if (p.chips >= unit) {
-      pot += unit
-      return { ...p, cards: [], contrib: 0, acted: false, folded: false, score: null, chips: p.chips - unit }
+    const elim = p.eliminated || p.chips < unit
+    return elim
+      ? { ...p, cards: [], contrib: 0, acted: false, folded: true,  score: null, eliminated: true }
+      : { ...p, cards: [], contrib: 0, acted: false, folded: false, score: null }
+  })
+  const alive = countAlive(players)
+  const eliminatedNames = players.filter((p, i) => p.eliminated && !prevElim[i]).map(p => p.name)
+
+  // ── PASO 4: condiciones terminales (antes de repartir) ──────────────────────
+  if (alive <= 1) {
+    const winnerSeat = players.findIndex(p => !p.eliminated)
+    const humanWon   = winnerSeat === 0
+    return {
+      ...state, players, aliveCount: alive, eliminatedNames,
+      phase: PHASES.GAME_OVER, pot: 0, currentBet: 0, winner: winnerSeat >= 0 ? winnerSeat : null,
+      message: winnerSeat < 0
+        ? 'Mesa terminada.'
+        : humanWon
+          ? '¡Ganaste la mesa! Eres el último con fichas.'
+          : `${players[winnerSeat].name} gana la mesa. Te quedaste sin fichas.`,
     }
-    return { ...p, cards: [], contrib: 0, acted: false, folded: true, score: null }
+  }
+  if (players[0].eliminated) {   // humano sin fichas con ≥2 vivos → stop básico
+    return {
+      ...state, players, aliveCount: alive, eliminatedNames,
+      phase: PHASES.GAME_OVER, pot: 0, currentBet: 0, winner: null,
+      message: 'Te quedaste sin fichas.',
+    }
+  }
+
+  // ── PASO 3: rotación Mano/Pie entre vivos (índices estables) ────────────────
+  const newPieIndex  = state.handCount === 0 ? state.pieIndex : nextAliveIndex(players, state.pieIndex)
+  const newManoIndex = nextAliveIndex(players, newPieIndex)
+
+  // Cobro de antes (todos los vivos pueden pagar; eliminados no participan)
+  let pot = 0
+  players = players.map(p => {
+    if (p.eliminated) return p
+    pot += unit
+    return { ...p, chips: p.chips - unit }
   })
 
-  // Deal 2 cards each, Mano→Pie order (one card per player per round)
+  // Deal 2 cards each, Mano→Pie order (skip eliminated, que están folded)
   const deck    = shuffleDeck(createDeck())
   let   deckPtr = 0
   const deal    = {}
@@ -341,6 +400,8 @@ export function startHand(state) {
     phase:             PHASES.DEAL_2,
     deck:              deck.slice(deckPtr),
     players,
+    aliveCount:        alive,
+    eliminatedNames,
     pot,
     currentBet:        0,
     activePlayerIndex: newManoIndex,
@@ -387,6 +448,7 @@ export function applyAIBetAction(state) {
 export function applyDiscard(state, humanDiscardIndices) {
   const { players, manoIndex, numPlayers } = state
   const N = players.length
+  const ruleN = state.aliveCount ?? numPlayers   // C4.4: límite de descarte según vivos
 
   let deckCopy     = [...state.deck]
   let newPlayers   = players.map(p => ({ ...p }))
@@ -401,7 +463,7 @@ export function applyDiscard(state, humanDiscardIndices) {
       ? humanDiscardIndices
       : decideDiscard(state, seat)
 
-    indices = indices.slice(0, maxDiscard(numPlayers))
+    indices = indices.slice(0, maxDiscard(ruleN))
     discardCounts[seat] = indices.length
 
     newPlayers[seat] = {
@@ -438,7 +500,7 @@ export function applyDiscard(state, humanDiscardIndices) {
 export function toggleDiscard(state, cardIndex) {
   const selected = [...state.selectedDiscards]
   const pos      = selected.indexOf(cardIndex)
-  const limit    = maxDiscard(state.numPlayers)   // fixed: was hardcoded to maxDiscard(2)
+  const limit    = maxDiscard(state.aliveCount ?? state.numPlayers)   // C4.4: según vivos
   if (pos >= 0) {
     selected.splice(pos, 1)
   } else if (selected.length < limit) {

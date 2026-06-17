@@ -82,15 +82,18 @@ export function decideBetAction(state, aiIndex) {
 
   if (ai.folded) return { action: 'pasar' }
 
-  const comodinEnabled = numPlayers >= 4
-  const { points: score } = getBestSuitScore(ai.cards, numPlayers, comodinEnabled)
+  // C4.4: el comodín/valor/ajilei dependen de los jugadores VIVOS, no del tamaño
+  // fijo. Solo se reconecta el conteo; la estrategia (umbrales) no cambia.
+  const ruleN = state.aliveCount ?? numPlayers
+  const comodinEnabled = ruleN >= 4
+  const { points: score } = getBestSuitScore(ai.cards, ruleN, comodinEnabled)
   const toCall = currentBet - ai.contrib
 
   // Engine will force-fold if chips < toCall, but we mirror it here for safety
   if (toCall > 0 && ai.chips < toCall) return { action: 'retirarse' }
 
   // Ajilei always plays aggressively regardless of profile
-  if (isAjilei(ai.cards, numPlayers)) {
+  if (isAjilei(ai.cards, ruleN)) {
     return { action: currentBet > 0 ? 'subir' : 'apostar' }
   }
 
@@ -146,16 +149,18 @@ export function decideBetAction(state, aiIndex) {
 export function decideDiscard(state, aiIndex) {
   const { players, numPlayers } = state
   const ai = players[aiIndex]
-  const comodinEnabled = numPlayers >= 4
+  // C4.4: comodín y límite de descarte según jugadores vivos (no el tamaño fijo)
+  const ruleN = state.aliveCount ?? numPlayers
+  const comodinEnabled = ruleN >= 4
 
-  const { palo: bestSuit } = getBestSuitScore(ai.cards, numPlayers, comodinEnabled)
+  const { palo: bestSuit } = getBestSuitScore(ai.cards, ruleN, comodinEnabled)
 
   const indices = []
   ai.cards.forEach((card, i) => {
     // In N=5 the comodín (7 de Oros) is worth 11 pts and enables the 52-Ajilei — keep it
-    if (numPlayers === 5 && card.palo === 'Oros' && card.value === 7) return
+    if (ruleN === 5 && card.palo === 'Oros' && card.value === 7) return
     if (card.palo !== bestSuit) indices.push(i)
   })
 
-  return indices.slice(0, _maxDiscard(numPlayers))
+  return indices.slice(0, _maxDiscard(ruleN))
 }

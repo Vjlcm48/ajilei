@@ -6,7 +6,7 @@ import { SoundButton } from './SoundButton'
 import { MuteButton } from './MuteButton'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
-import { SEAT_LAYOUTS, rivalSeatsInDisplayOrder } from '../config/seatLayouts'
+import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
 import {
   PHASES,
   createInitialState,
@@ -21,6 +21,16 @@ import {
 
 const TURN_TIME  = 20
 const WARNING_AT = 5
+
+// C4.4: siguiente asiento NO eliminado (rotación UI de badges durante el barajado)
+function nextAliveSeat(players, from) {
+  const N = players.length
+  for (let i = 1; i <= N; i++) {
+    const idx = (from + i) % N
+    if (!players[idx].eliminated) return idx
+  }
+  return from
+}
 
 // Tanda C3.1: factor único de ritmo de las IAs (+25%) — multiplica TODAS las
 // pausas asociadas a acciones de IA (pensar antes de actuar, gaps entre
@@ -211,6 +221,11 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const unit         = game.unit
   const humanIsTurn  = game.activePlayerIndex === 0
   const pieSeat      = game.pieIndex
+  // C4.4: el tablero sigue a los jugadores VIVOS (no al tamaño inicial)
+  const aliveN       = game.aliveCount
+  const effLayout    = effectiveLayout(game.players)
+  const useLegacy    = numPlayers === 2          // mesa que ARRANCÓ en 2 → zona legacy pixel-exacta
+  const isGameOver   = phase === PHASES.GAME_OVER
   const isDealPhase  = phase === PHASES.DEAL_2 || phase === PHASES.DEAL_3
   const dealSeq      = isDealPhase ? buildDealSeq(game) : []
   const dealTotal    = dealSeq.length
@@ -222,7 +237,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // mano. discardNextRef guarda la mano post-descarte para leer la carta
   // repuesta en el momento del flip sin depender del estado (evita doble
   // disparo de StrictMode al no vivir dentro de un updater).
-  const comodinActive = numPlayers >= 4
+  const comodinActive = (game.aliveCount ?? numPlayers) >= 4   // C4.4: sigue a los vivos
   const isComodin = card => !!card && card.value === 7 && card.palo === 'Oros'
   const discardNextRef = useRef(null)
 
@@ -488,17 +503,17 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     if (showdownWinnerSeat === null) return false
     const score = game.players[showdownWinnerSeat].score
     if (card.palo === score.palo) return true
-    // comodín (7 de Oros) cuenta para el palo ganador en mesas 4-5
-    return numPlayers >= 4 && card.palo === 'Oros' && card.value === 7
+    // comodín (7 de Oros) cuenta para el palo ganador solo si está activo (vivos≥4)
+    return aliveN >= 4 && card.palo === 'Oros' && card.value === 7
   }
 
   // ── Position-derived anchors (deck, MANO badge) ───────────────────────────
   // During the shuffle the engine has NOT rotated yet (startHand runs after).
   // ALL position-derived UI reads the NEXT hand's indices (same rotation rule
   // as the engine) so deck and badges sit at their final position — no jump.
-  const nextPieSeat = game.handCount === 0 ? game.pieIndex : (game.pieIndex + 1) % numPlayers
+  const nextPieSeat = game.handCount === 0 ? game.pieIndex : nextAliveSeat(game.players, game.pieIndex)
   const deckSeat    = isShuffling ? nextPieSeat : pieSeat
-  const manoSeat    = isShuffling ? (nextPieSeat + 1) % numPlayers : game.manoIndex
+  const manoSeat    = isShuffling ? nextAliveSeat(game.players, nextPieSeat) : game.manoIndex
 
   // ── Señal de turno (solo fases de apuesta) ────────────────────────────────
   const turnSeat = isBetPhaseEarly ? game.activePlayerIndex : null
@@ -507,12 +522,16 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const visFor = isDealPhase ? dealVisibility(dealSeq, dealStep, dealOffset) : () => 5
 
   // ── New-hand dispatcher (shuffle → startHand) ─────────────────────────────
+  // C4.4: precalculamos la próxima mano; si la mesa terminó (GAME_OVER) no
+  // barajamos — saltamos directo al fin de mesa.
   function beginHand() {
     setLastActions({})
+    const next = startHand(gameRef.current)
+    if (next.phase === PHASES.GAME_OVER) { setGame(next); return }
     setIsShuffling(true)
     setTimeout(() => {
       setIsShuffling(false)
-      setGame(prev => startHand(prev))
+      setGame(next)
     }, 1950)
   }
 
@@ -526,6 +545,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     [PHASES.BET_3]:   'Al descarte',
     [PHASES.PAYOUT]:  'Resultado',
     [PHASES.WAITING]: '—',
+    [PHASES.GAME_OVER]: 'Fin de mesa',
   }[phase] ?? phase
 
   // ── Card render helpers ───────────────────────────────────────────────────
@@ -641,12 +661,11 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }
 
   function renderPanel(seat) {
-    const layout = SEAT_LAYOUTS[numPlayers]
     return (
       <OpponentPanel
         key={seat}
         player={game.players[seat]}
-        seatPos={layout[seat]}
+        seatPos={effLayout[seat]}
         isMano={manoSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
         isPie={deckSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
         isTurn={turnSeat === seat}
@@ -665,10 +684,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     )
   }
 
-  // Asientos rivales en una franja de posiciones (orden visual izq→der)
+  // Asientos rivales VIVOS en una franja de posiciones (orden visual izq→der)
   function seatsAt(...positions) {
-    const layout = SEAT_LAYOUTS[numPlayers]
-    return rivalSeatsInDisplayOrder(numPlayers).filter(s => positions.includes(layout[s]))
+    return livingRivalsInDisplayOrder(game.players).filter(s => positions.includes(effLayout[s]))
   }
 
   function renderRivalsTopRow() {
@@ -680,7 +698,13 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }
 
   function renderCenterZone() {
-    const centerMsg  = discardMsg ?? game.message
+    // C4.4: aviso de eliminación derivado del estado (sin setState) — visible
+    // durante el reparto inicial de la mano nueva; desaparece solo al avanzar.
+    const en = game.eliminatedNames
+    const elimMsg = en && en.length > 0
+      ? `${en.join(', ')} ${en.length === 1 ? 'se quedó' : 'se quedaron'} sin fichas · la mesa ahora es de ${aliveN}`
+      : null
+    const centerMsg  = (phase === PHASES.DEAL_2 && elimMsg) ? elimMsg : (discardMsg ?? game.message)
     // El resultado (winner) conserva su estilo win/lose; solo fuera de él
     // estilamos por tipo de acción (Tanda C4.3).
     const actionKind = game.winner !== null ? null : messageActionKind(centerMsg)
@@ -704,8 +728,13 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         <p className={`game-message${msgClass}`} key={actionKind ? centerMsg : 'msg'}>
           {centerMsg}
         </p>
+        {/* C4.4: el chip refleja el estado real según jugadores vivos. Solo en
+            mesas que pudieron tener comodín (arrancaron en 4+); las de 2-3 no
+            muestran nota (regresión preservada). */}
         {numPlayers >= 4 && (
-          <span className="comodin-note">Comodín activo · vale {numPlayers === 5 ? 11 : 10}</span>
+          <span className="comodin-note">
+            {aliveN >= 4 ? `Comodín activo · vale ${aliveN === 5 ? 11 : 10}` : 'Sin comodín'}
+          </span>
         )}
       </section>
     )
@@ -714,7 +743,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="game-table-screen">
-      <section className={`game-table${numPlayers >= 4 ? ' table-wide' : ''}${numPlayers === 5 ? ' table-five' : ''}`}>
+      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}`}>
 
         <header className="table-header">
           <h1 className="table-title">AJILEI</h1>
@@ -730,20 +759,30 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           </div>
         </header>
 
-        {/* Rivals + Center — mesas 4-5 usan grid con paneles laterales */}
-        {numPlayers === 2 && (
+        {/* C4.4: GAME_OVER → vista terminal simple (mensaje + salir). Evita
+            reconstruir el tablero cuando el propio humano queda eliminado. */}
+        {isGameOver ? (
+          <div className="game-over-screen">
+            <p className="game-over-msg">{game.message}</p>
+            <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
+          </div>
+        ) : (
+        <>
+        {/* Rivals + Center — el layout sigue al nº de jugadores VIVOS (aliveN);
+            la mesa que arrancó en 2 conserva su zona legacy (regresión cero). */}
+        {useLegacy && (
           <>
             {renderLegacyAIZone()}
             {renderCenterZone()}
           </>
         )}
-        {numPlayers === 3 && (
+        {!useLegacy && aliveN <= 3 && (
           <>
             {renderRivalsTopRow()}
             {renderCenterZone()}
           </>
         )}
-        {numPlayers >= 4 && (
+        {!useLegacy && aliveN >= 4 && (
           <div className="table-mid">
             <div className="side-col side-col-left">{seatsAt('side-left').map(renderPanel)}</div>
             <div className="mid-center">
@@ -850,8 +889,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                   </div>
                   <p className="discard-hint">
                     {game.selectedDiscards.length === 0
-                      ? `Pulsa las cartas a descartar (máx. ${maxDiscard(numPlayers)}) o continúa sin descartar.`
-                      : numPlayers === 5
+                      ? `Pulsa las cartas a descartar (máx. ${maxDiscard(aliveN)}) o continúa sin descartar.`
+                      : aliveN === 5
                         ? `${game.selectedDiscards.length} de ${maxDiscard(5)} seleccionada(s).`
                         : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
                   </p>
@@ -898,6 +937,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             </span>
           </div>
         </section>
+        </>
+        )}
 
       </section>
 
