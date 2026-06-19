@@ -25,6 +25,30 @@
 
 .opp-folded { opacity: 0.55; }
 
+/* ── Salida digna por bancarrota (C4.5) ──
+   El panel se dessatura y atenúa, muestra "Sin fichas" y se desvanece en ~1 s.
+   Solo filter/opacity/transform: no colapsa el ancho → los vecinos NO saltan
+   durante la salida (el reacomodo ocurre después, al comprometer la mano). */
+.opp-panel.opp-eliminating {
+  animation: oppEliminate 1s ease-in forwards;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes oppEliminate {
+  0%   { filter: none;                         opacity: 1; transform: scale(1); }
+  28%  { filter: grayscale(0.9) brightness(0.82); opacity: 1; transform: scale(1); }
+  100% { filter: grayscale(1) brightness(0.7);    opacity: 0; transform: scale(0.93); }
+}
+
+/* "Sin fichas": rótulo más apagado que el estado normal, acorde a la salida */
+.opp-status.opp-status-elim {
+  color: var(--lose-red);
+  font-style: normal;
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .opp-header {
   display: flex;
   align-items: center;

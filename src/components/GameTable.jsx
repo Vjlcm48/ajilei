@@ -28,6 +28,13 @@ const WARNING_AT = 5
 const AI_SPEED_FACTOR = 1.25
 const AI_ACTION_MS    = 900 * AI_SPEED_FACTOR
 
+// Tanda C4.5: coreografía del encogimiento (entre manos)
+// C4.5.1: el aviso se muestra antes del reacomodo (secuencia ordenada).
+// C4.5.2: duración −25% (5000 → 3750) — debe ir en sync con la animación CSS
+// `elimNotice` de gameTable.css (misma duración).
+const CEREMONY_MS     = 1000   // salida digna del panel eliminado (desatura → fade)
+const ELIM_NOTICE_MS  = 3750   // aviso central no bloqueante (aparece y se va solo)
+
 // ── Deal helpers ─────────────────────────────────────────────────────────────
 // Replays the engine's deal visually: active seats in Mano→Pie order, one card
 // per seat per round. Returns [{ seat, cardIndex }] in deal order.
@@ -171,6 +178,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const [isClearing,   setIsClearing]   = useState(false)
   const [deal3FaceUp,  setDeal3FaceUp]  = useState(new Set())
   const [potAnim,      setPotAnim]      = useState(null)   // Tanda C4.3: pulso + "+N" del pozo
+  // ── C4.5: coreografía del encogimiento ────────────────────────────────────
+  const [ceremony,     setCeremony]     = useState(null)   // {seats:number[]} — IA(s) en salida digna
+  const [elimNotice,   setElimNotice]   = useState(null)   // {id,text} — aviso central no bloqueante
+  const [reflowing,    setReflowing]    = useState(false)  // asentado suave del nuevo layout
+  const [noteFlash,    setNoteFlash]    = useState(0)      // destello del chip de comodín
+  const [bankruptModal, setBankruptModal] = useState(false)// Caso B: humano sin fichas (≥2 vivos)
   const { play } = useSounds()
 
   // Position refs: one 5-slot row + one deck anchor per seat
@@ -185,11 +198,15 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     deckRefs.current = Array.from({ length: numPlayers }, () => createRef())
   }
   const discardTimersRef = useRef([])
+  const ceremonyTimersRef = useRef([])
   const gameRef = useRef(game)
   const prevPotRef = useRef(game.pot)
 
-  // Clear pending discard timers if the table unmounts mid-animation
-  useEffect(() => () => discardTimersRef.current.forEach(clearTimeout), [])
+  // Clear pending discard / ceremony timers if the table unmounts mid-animation
+  useEffect(() => () => {
+    discardTimersRef.current.forEach(clearTimeout)
+    ceremonyTimersRef.current.forEach(clearTimeout)
+  }, [])
 
   // ── Pozo: pulso + "+N" flotante al aumentar (Tanda C4.3) ──────────────────
   // Cualquier incremento del pozo (apuesta/igualada/subida de humano o IA, y
@@ -230,6 +247,23 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const comodinActive = (game.aliveCount ?? numPlayers) >= 4   // C4.4: sigue a los vivos
   const isComodin = card => !!card && card.value === 7 && card.palo === 'Oros'
   const discardNextRef = useRef(null)
+
+  // C4.5: texto del chip de comodín (hogar visual del estado de reglas). Cuando
+  // cambia al encoger (5→4 cambia el valor; 4→3 se apaga) el chip destella para
+  // señalar que cambiaron las reglas, no solo el nº de sillas.
+  const comodinNote = aliveN >= 4 ? `Comodín activo · vale ${aliveN === 5 ? 11 : 10}` : 'Sin comodín'
+  const prevNoteRef = useRef(comodinNote)
+  useEffect(() => {
+    if (numPlayers < 4) return
+    if (prevNoteRef.current !== comodinNote) {
+      prevNoteRef.current = comodinNote
+      setNoteFlash(n => n + 1)
+    }
+  }, [comodinNote, numPlayers])
+
+  // Estado de transición entre manos: cartas/rótulos en blanco (incluye la
+  // salida digna de la ceremonia C4.5, no solo clearing/shuffle de C4.4).
+  const inReset = isClearing || isShuffling || !!ceremony
 
   useEffect(() => { gameRef.current = game })
 
@@ -537,10 +571,58 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // C4.4.1: el ante se cobra ANTES de barajar — committeamos startHand de
   // inmediato (el descuento de saldos se ve), luego corre el barajado y, al
   // terminar, el efecto de reparto reparte las cartas.
+  // C4.5: si una IA cae en bancarrota, primero corre la salida digna del panel
+  // (ceremonia) y LUEGO se compromete la mano nueva con aviso + asentado suave.
+  // Si el humano cae en bancarrota con ≥2 vivos, en vez del GAME_OVER básico se
+  // congela la mesa (no se compromete next) y se abre el modal bloqueante.
   function beginHand() {
     setLastActions({})
-    const next = startHand(gameRef.current)
-    if (next.phase === PHASES.GAME_OVER) { setGame(next); return }
+    const prev = gameRef.current
+    const next = startHand(prev)
+    if (next.phase === PHASES.GAME_OVER) {
+      if (next.players[0].eliminated && next.aliveCount >= 2) setBankruptModal(true)
+      else setGame(next)
+      return
+    }
+    const elimSeats = next.players
+      .map((_, i) => i)
+      .filter(i => i !== 0 && next.players[i].eliminated && !prev.players[i].eliminated)
+    if (elimSeats.length > 0) { runEliminationCeremony(next, elimSeats); return }
+    commitNewHand(next)
+  }
+
+  // C4.5.1 — ceremonia en etapas que NO se pisan (mesa congelada en `prev`
+  // durante todas las etapas previas al reacomodo):
+  //   1) salida digna del panel (CEREMONY_MS)
+  //   2) aviso central en área limpia, legible (~5 s)
+  //   3) el aviso se desvanece
+  //   4) ENTONCES el tablero se reacomoda (settle + destello del comodín al
+  //      cambiar `game` → aliveN). El reflujo ya no coincide con el aviso.
+  function runEliminationCeremony(next, elimSeats) {
+    setCeremony({ seats: elimSeats })   // mesa = prev; el panel eliminado se desvanece
+    const t1 = setTimeout(() => {
+      const text = `${next.eliminatedNames.join(', ')} ${next.eliminatedNames.length === 1 ? 'se quedó' : 'se quedaron'} sin fichas · la mesa ahora es de ${next.aliveCount}`
+      const id = Date.now()
+      setElimNotice({ id, text })       // etapa 2: aviso (mesa aún en prev)
+      const t2 = setTimeout(() => {
+        setElimNotice(n => (n && n.id === id ? null : n))  // etapa 3: fade terminó
+        setCeremony(null)
+        commitReflow(next)              // etapa 4: recién ahora se reacomoda
+      }, ELIM_NOTICE_MS)
+      ceremonyTimersRef.current.push(t2)
+    }, CEREMONY_MS)
+    ceremonyTimersRef.current.push(t1)
+  }
+
+  // Reacomodo al nuevo tamaño: asentado suave + commit (el cambio de aliveN
+  // dispara el destello del chip de comodín). Mismo manejo aprobado en C4.5.
+  function commitReflow(next) {
+    setReflowing(true)
+    setTimeout(() => setReflowing(false), 600)
+    commitNewHand(next)
+  }
+
+  function commitNewHand(next) {
     setGame(next)            // cobro del ante visible (saldos descontados, pozo armado)
     setIsShuffling(true)     // baraja sobre el estado ya cobrado
     setTimeout(() => setIsShuffling(false), 1950)
@@ -571,7 +653,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       if (discardAnim.emptied.has(key))  return <PlayingCard />
       return <PlayingCard card={card} faceDown />   // aún en mano, no ha volado
     }
-    if (isClearing || isShuffling) return <PlayingCard />
+    if (inReset) return <PlayingCard />
     const card    = game.players[seat].cards[i]
     const visible = i < visFor(seat)
     if (!visible || !card) return <PlayingCard />
@@ -607,7 +689,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         }
         return <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper">{content}</div>
       }
-      if (isClearing || isShuffling) return <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper"><PlayingCard /></div>
+      if (inReset) return <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper"><PlayingCard /></div>
       const card    = game.players[0].cards[i]
       const visible = i < visFor(0)
       if (phase === PHASES.DEAL_3 && i >= 2 && visible && card) {
@@ -682,11 +764,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         isTurn={turnSeat === seat}
         isDimmed={turnSeat !== null && turnSeat !== seat}
         isWinner={showdownWinnerSeat === seat}
+        isEliminating={!!ceremony && ceremony.seats.includes(seat)}
         lastAction={lastActions[seat]}
         renderCard={i => renderOpponentCard(seat, i)}
         score={game.players[seat].score}
-        showScore={isPayoutPhase && !isClearing && !isShuffling}
-        resetting={isClearing || isShuffling}
+        showScore={isPayoutPhase && !inReset}
+        resetting={inReset}
         slotRefs={slotRefs.current[seat]}
         deckRef={deckRefs.current[seat]}
         showDeck={deckSeat === seat && !isClearing}
@@ -702,20 +785,14 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
   function renderRivalsTopRow() {
     return (
-      <section className="rivals-zone">
+      <section className={`rivals-zone${reflowing ? ' reflow-settle' : ''}`}>
         {seatsAt('top-left', 'top-center', 'top-right').map(renderPanel)}
       </section>
     )
   }
 
   function renderCenterZone() {
-    // C4.4: aviso de eliminación derivado del estado (sin setState) — visible
-    // durante el reparto inicial de la mano nueva; desaparece solo al avanzar.
-    const en = game.eliminatedNames
-    const elimMsg = en && en.length > 0
-      ? `${en.join(', ')} ${en.length === 1 ? 'se quedó' : 'se quedaron'} sin fichas · la mesa ahora es de ${aliveN}`
-      : null
-    const centerMsg  = (phase === PHASES.DEAL_2 && elimMsg) ? elimMsg : (discardMsg ?? game.message)
+    const centerMsg  = discardMsg ?? game.message
     // El resultado (winner) conserva su estilo win/lose; solo fuera de él
     // estilamos por tipo de acción (Tanda C4.3).
     const actionKind = game.winner !== null ? null : messageActionKind(centerMsg)
@@ -741,11 +818,24 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         </p>
         {/* C4.4: el chip refleja el estado real según jugadores vivos. Solo en
             mesas que pudieron tener comodín (arrancaron en 4+); las de 2-3 no
-            muestran nota (regresión preservada). */}
+            muestran nota (regresión preservada). C4.5: destella al cambiar las
+            reglas (key=noteFlash remonta → corre la animación una sola vez). */}
         {numPlayers >= 4 && (
-          <span className="comodin-note">
-            {aliveN >= 4 ? `Comodín activo · vale ${aliveN === 5 ? 11 : 10}` : 'Sin comodín'}
+          <span
+            key={noteFlash}
+            className={`comodin-note${noteFlash > 0 ? ' comodin-note-flash' : ''}`}
+          >
+            {comodinNote}
           </span>
+        )}
+
+        {/* C4.5.2: aviso de eliminación — overlay absoluto en una banda HORIZONTAL
+            limpia, un poco por debajo de la fila pozo/comodín (espacio libre del
+            felt). Así sale horizontal en una sola línea y legible en TODAS las
+            reducciones (5→4, 4→3, 3→2), sin apretarse entre pozo y comodín.
+            No ocupa flujo ni empuja nada (ley de anclaje). */}
+        {elimNotice && (
+          <div className="elim-notice" key={elimNotice.id}>{elimNotice.text}</div>
         )}
       </section>
     )
@@ -794,7 +884,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           </>
         )}
         {!useLegacy && aliveN >= 4 && (
-          <div className="table-mid">
+          <div className={`table-mid${reflowing ? ' reflow-settle' : ''}`}>
             <div className="side-col side-col-left">{seatsAt('side-left').map(renderPanel)}</div>
             <div className="mid-center">
               {renderRivalsTopRow()}
@@ -806,7 +896,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
         {/* Player Zone — dos pisos (Tanda C3.2): cartas + barra única */}
         <section className={`player-zone${turnSeat === 0 ? ' turn-active' : ''}${turnSeat !== null && turnSeat !== 0 ? ' turn-dimmed' : ''}`}>
-          <div className="score-tag score-tag-player" style={{ visibility: isPayoutPhase && !isClearing && !isShuffling && human.score ? 'visible' : 'hidden' }}>
+          <div className="score-tag score-tag-player" style={{ visibility: isPayoutPhase && !inReset && human.score ? 'visible' : 'hidden' }}>
             {human.score && <>Tu mejor palo: <strong>{human.score.palo}</strong> ({human.score.points} pts)</>}
           </div>
 
@@ -919,7 +1009,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                 <div className="action-area thinking">Reponiendo…</div>
               )}
 
-              {isPayoutPhase && !isClearing && !isShuffling && (
+              {/* C4.5: durante la salida digna (ceremony) o el modal de bancarrota
+                  no se ofrece "Siguiente mano" — la mesa no continúa. */}
+              {isPayoutPhase && !isClearing && !isShuffling && !ceremony && !bankruptModal && (
                 <div className="action-area">
                   <SoundButton className="btn btn-primary" onClick={() => {
                     setIsClearing(true)
@@ -934,7 +1026,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                 </div>
               )}
 
-              {isPayoutPhase && isClearing && (
+              {((isPayoutPhase && isClearing) || ceremony) && (
                 <div className="action-area" />
               )}
             </div>
@@ -988,6 +1080,30 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
               >
                 Abandonar mesa
               </SoundButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* C4.5 · Caso B — humano sin fichas (≥2 vivos): modal bloqueante y educado.
+          La mesa permanece congelada detrás (no se compromete la mano nueva). */}
+      {bankruptModal && (
+        <div className="bankrupt-overlay">
+          <div className="bankrupt-modal">
+            <p className="bankrupt-title">Te quedaste sin fichas</p>
+            <p className="bankrupt-sub">Necesitas más fichas para seguir jugando.</p>
+            <div className="bankrupt-actions">
+              <SoundButton className="btn btn-primary" onClick={onLeave}>
+                Volver al lobby
+              </SoundButton>
+              <button className="btn btn-soon" disabled>
+                Ver video por fichas
+                <span className="soon-tag">Próximamente</span>
+              </button>
+              <button className="btn btn-soon" disabled>
+                Comprar fichas
+                <span className="soon-tag">Próximamente</span>
+              </button>
             </div>
           </div>
         </div>

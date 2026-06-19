@@ -13,6 +13,7 @@ export default function OpponentPanel({
   isTurn,           // señal triple: borde+halo, badge TURNO, los demás atenuados
   isDimmed,         // otro jugador tiene el turno → ~85% de intensidad
   isWinner,         // ganó el showdown (cartas reveladas escalan + chip de puntaje)
+  isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
   lastAction,       // 'Apostó' | 'Igualó' | 'Subió' | 'Pasó' | 'Descartó N' | null
   renderCard,       // (i) => JSX de la carta del slot i
   score,            // score del showdown (o null)
@@ -25,7 +26,8 @@ export default function OpponentPanel({
 }) {
   const stateClasses =
     `${player.folded ? ' opp-folded' : ''}${isWinner ? ' opp-winner' : ''}` +
-    `${isTurn ? ' turn-active' : ''}${isDimmed && !player.folded ? ' turn-dimmed' : ''}`
+    `${isTurn ? ' turn-active' : ''}${isDimmed && !player.folded ? ' turn-dimmed' : ''}` +
+    `${isEliminating ? ' opp-eliminating' : ''}`
   return (
     <div className={`opp-panel opp-${seatPos}${stateClasses}`}>
       <div className="opp-header">
@@ -54,8 +56,10 @@ export default function OpponentPanel({
       {/* Rótulo de estado (doblado en C4.3.1). En la transición a la mano
           siguiente (resetting) se limpia para no arrastrar "Se retiró" ni la
           última acción de la mano previa durante el barajado. */}
-      <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}`}>
-        {resetting ? ' ' : (player.folded ? 'Se retiró' : (isTurn ? 'Pensando…' : (lastAction ?? ' ')))}
+      <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}${isEliminating ? ' opp-status-elim' : ''}`}>
+        {isEliminating
+          ? 'Sin fichas'
+          : resetting ? ' ' : (player.folded ? 'Se retiró' : (isTurn ? 'Pensando…' : (lastAction ?? ' ')))}
       </span>
 
       <span className="opp-score" style={{ visibility: showScore && score && !resetting ? 'visible' : 'hidden' }}>

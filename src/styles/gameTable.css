@@ -107,6 +107,7 @@
   gap: 18px;
   padding: 6px 18px;
   flex: 1;
+  position: relative;   /* ancla de la banda del aviso de eliminación (C4.5.2) */
 }
 
 .pot-box {
@@ -535,6 +536,96 @@
   justify-content: center;
 }
 
+/* ── Caso B (C4.5): modal de bancarrota del humano — premium, bloqueante ── */
+.bankrupt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  animation: bankruptFade 0.3s ease-out;
+}
+
+@keyframes bankruptFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.bankrupt-modal {
+  background: var(--surface-modal);
+  border: 2px solid rgba(var(--gold-brand-rgb), 0.55);
+  border-radius: 24px;
+  padding: 38px 42px 34px;
+  text-align: center;
+  max-width: 380px;
+  width: 90%;
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(var(--gold-brand-rgb), 0.10),
+    inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.16);
+  color: var(--text-primary);
+  animation: bankruptRise 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes bankruptRise {
+  from { transform: translateY(12px) scale(0.96); opacity: 0; }
+  to   { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+
+.bankrupt-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gold-brand);
+  margin: 0 0 10px;
+}
+
+.bankrupt-sub {
+  font-size: 14px;
+  color: rgba(var(--text-primary-rgb), 0.62);
+  margin: 0 0 26px;
+  line-height: 1.4;
+}
+
+.bankrupt-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bankrupt-actions .btn-primary { padding: 11px 18px; }
+
+/* Caminos futuros — visibles pero deshabilitados (no inventar flujos hoy).
+   Sin oro: el único acento dorado del modal es el botón primario (regla del
+   oro único del sistema de diseño v1.2). */
+.btn-soon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(var(--text-primary-rgb), 0.06);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.16);
+  color: rgba(var(--text-primary-rgb), 0.45);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: not-allowed;
+}
+
+.soon-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(var(--text-primary-rgb), 0.4);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.2);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
 /* ── Turn timer ── */
 .timer-display {
   font-size: 20px;
@@ -627,6 +718,60 @@
   padding: 4px 12px;
   flex-shrink: 0;
   white-space: nowrap;
+  transform-origin: center;
+}
+
+/* Destello al cambiar las reglas al encoger (C4.5) — misma familia que el pulso
+   del pozo (transform + glow dorado, sin alterar la caja ni el layout). */
+.comodin-note-flash { animation: comodinFlash 0.6s ease-out; }
+
+@keyframes comodinFlash {
+  0%   { transform: scale(1);    box-shadow: none; border-color: rgba(var(--gold-brand-rgb), 0.25); color: var(--text-secondary); }
+  40%  { transform: scale(1.14); box-shadow: 0 0 14px rgba(var(--gold-brand-rgb), 0.80); border-color: var(--gold-brand); color: var(--gold-brand); }
+  100% { transform: scale(1);    box-shadow: none; border-color: rgba(var(--gold-brand-rgb), 0.25); color: var(--text-secondary); }
+}
+
+/* Aviso de eliminación (C4.5.2) — overlay ABSOLUTO en una banda horizontal
+   limpia, un poco por debajo de la fila pozo/comodín (que están centrados
+   verticalmente en el felt). Ahí tiene ancho de sobra → una sola línea
+   horizontal y legible en TODAS las reducciones. No ocupa flujo (no empuja
+   nada). Solo anima opacidad (fade) → sin transform que altere la posición ni
+   parpadeos de layout (ley de anclaje). Visible ~3.75 s. */
+.elim-notice {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, 46px);   /* banda un poco por debajo de pozo/comodín */
+  white-space: nowrap;                 /* horizontal, una sola línea */
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: rgba(var(--gold-brand-rgb), 0.14);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.55);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35), 0 0 16px rgba(var(--gold-brand-rgb), 0.22);
+  color: var(--gold-brand);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+  z-index: 15;
+  animation: elimNotice 3.75s ease-out forwards;
+}
+
+@keyframes elimNotice {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  86%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Asentado suave del nuevo layout tras el encogimiento (C4.5): el contenedor
+   de rivales (fila superior o grid lateral) entra con un ease sutil en lugar de
+   saltar. transform/opacity → no toca anchos de borde ni provoca reflow real. */
+.reflow-settle { animation: reflowSettle 0.5s ease-out; }
+
+@keyframes reflowSettle {
+  0%   { opacity: 0.35; transform: translateY(-4px) scale(0.985); }
+  100% { opacity: 1;    transform: translateY(0)    scale(1); }
 }
 
 /* ── Showdown winner emphasis ── */
