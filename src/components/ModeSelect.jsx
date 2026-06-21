@@ -20,7 +20,7 @@ export default function ModeSelect({ onSelectMode, onBack }) {
     <main className="mode-select-screen">
       <section className="mode-select-card">
         <div className="mode-balance" title="Tu saldo">
-          <span className="mode-balance-label">Saldo</span>
+          <span className="mode-balance-label">SALDO:</span>
           <span className="mode-balance-value">
             <BalanceDisplay chips={AJILEI_CONFIG.economy.saldoInicial} /> fichas
           </span>

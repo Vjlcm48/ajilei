@@ -231,7 +231,6 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // C4.4: el tablero sigue a los jugadores VIVOS (no al tamaño inicial)
   const aliveN       = game.aliveCount
   const effLayout    = effectiveLayout(game.players)
-  const useLegacy    = numPlayers === 2          // mesa que ARRANCÓ en 2 → zona legacy pixel-exacta
   const isGameOver   = phase === PHASES.GAME_OVER
   const isDealPhase  = phase === PHASES.DEAL_2 || phase === PHASES.DEAL_3
   const dealSeq      = isDealPhase ? buildDealSeq(game) : []
@@ -716,38 +715,42 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     })
   }
 
-  // N=2 keeps the original full-width AI zone for pixel-exact regression
-  function renderLegacyAIZone() {
-    const ai = game.players[1]
-    const aiWon = showdownWinnerSeat === 1
+  // Layout dinámico de 2 vivos (C4.2.14): el ÚNICO rival superviviente —cualquier
+  // asiento (IA1 en mesa nueva, o IA3/IA4 tras quiebras)— se renderiza como espejo
+  // del humano en la zona ancha. TODAS las referencias (slotRefs/deckRefs) y los
+  // estados (turno/Mano/Pie/ganador) usan el asiento REAL, no el 1 fijo. Sirve por
+  // igual a una mesa que arranca en 2 y a una reducida a 2 por bancarrota.
+  function renderTwoPlayerRival(seat) {
+    const rival = game.players[seat]
+    const rivalWon = showdownWinnerSeat === seat
     return (
-      <section className={`ai-zone${turnSeat === 1 ? ' turn-active' : ''}${turnSeat === 0 ? ' turn-dimmed' : ''}`}>
+      <section className={`ai-zone${turnSeat === seat ? ' turn-active' : ''}${turnSeat === 0 ? ' turn-dimmed' : ''}`}>
         <div className="ai-info">
           <span className="ai-label">
-            IA
-            {manoSeat === 1 && <span className="seat-badge seat-badge-gold">Mano</span>}
-            {deckSeat === 1 && <span className="seat-badge seat-badge-neutral">Pie</span>}
-            {turnSeat === 1 && <span className="seat-badge seat-badge-gold">Turno</span>}
-            {aiWon && <span className="win-score-chip">{ai.score.points}</span>}
+            {rival.name}
+            {manoSeat === seat && <span className="seat-badge seat-badge-gold">Mano</span>}
+            {deckSeat === seat && <span className="seat-badge seat-badge-neutral">Pie</span>}
+            {turnSeat === seat && <span className="seat-badge seat-badge-gold">Turno</span>}
+            {rivalWon && <span className="win-score-chip">{rival.score.points}</span>}
           </span>
-          <span className="ai-chips"><BalanceDisplay chips={ai.chips} /> fichas</span>
+          <span className="ai-chips"><BalanceDisplay chips={rival.chips} /> fichas</span>
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
-            <div key={`as-${i}`} ref={slotRefs.current[1][i]} className={`card-slot-wrapper${aiWon ? ' card-slot-winner' : ''}`}>
-              {renderOpponentCard(1, i)}
+            <div key={`as-${i}`} ref={slotRefs.current[seat][i]} className={`card-slot-wrapper${rivalWon ? ' card-slot-winner' : ''}`}>
+              {renderOpponentCard(seat, i)}
             </div>
           ))}
           <div className="deck-shuffle-wrapper">
             <div
-              ref={deckRefs.current[1]}
-              className={`deck-pile${deckSeat !== 1 || isClearing ? ' deck-hidden' : ''}`}
+              ref={deckRefs.current[seat]}
+              className={`deck-pile${deckSeat !== seat || isClearing ? ' deck-hidden' : ''}`}
             />
-            {isShuffling && deckSeat === 1 && <ShuffleDeck />}
+            {isShuffling && deckSeat === seat && <ShuffleDeck />}
           </div>
         </div>
-        <div className="score-tag" style={{ visibility: isPayoutPhase && !isClearing && !isShuffling && ai.score ? 'visible' : 'hidden' }}>
-          {ai.score && <>Mejor palo: <strong>{ai.score.palo}</strong> ({ai.score.points} pts)</>}
+        <div className="score-tag" style={{ visibility: isPayoutPhase && !isClearing && !isShuffling && rival.score ? 'visible' : 'hidden' }}>
+          {rival.score && <>Mejor palo: <strong>{rival.score.palo}</strong> ({rival.score.points} pts)</>}
         </div>
       </section>
     )
@@ -844,7 +847,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="game-table-screen">
-      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}`}>
+      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 3 ? ' table-three' : ''}`}>
 
         <header className="table-header">
           <h1 className="table-title">AJILEI</h1>
@@ -869,21 +872,23 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           </div>
         ) : (
         <>
-        {/* Rivals + Center — el layout sigue al nº de jugadores VIVOS (aliveN);
-            la mesa que arrancó en 2 conserva su zona legacy (regresión cero). */}
-        {useLegacy && (
+        {/* Rivals + Center — el layout sigue SIEMPRE al nº de jugadores VIVOS
+            (aliveN), sin importar el tamaño inicial (C4.2.14). La mesa de 2 (sea
+            de arranque o reducida por quiebra) usa el espejo dinámico con el
+            asiento real del superviviente. */}
+        {aliveN === 2 && (
           <>
-            {renderLegacyAIZone()}
+            {renderTwoPlayerRival(livingRivalsInDisplayOrder(game.players)[0])}
             {renderCenterZone()}
           </>
         )}
-        {!useLegacy && aliveN <= 3 && (
+        {aliveN === 3 && (
           <>
             {renderRivalsTopRow()}
             {renderCenterZone()}
           </>
         )}
-        {!useLegacy && aliveN >= 4 && (
+        {aliveN >= 4 && (
           <div className={`table-mid${reflowing ? ' reflow-settle' : ''}`}>
             <div className="side-col side-col-left">{seatsAt('side-left').map(renderPanel)}</div>
             <div className="mid-center">
@@ -990,7 +995,19 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                   </div>
                   <p className="discard-hint">
                     {game.selectedDiscards.length === 0
-                      ? `Pulsa las cartas a descartar (máx. ${maxDiscard(aliveN)}) o continúa sin descartar.`
+                      ? (
+                        <>
+                          {/* C4.2.6: desktop conserva 1 línea (regresión cero); móvil
+                              muestra 2 líneas con salto FIJO para que el mazo horizontal
+                              no tape el mensaje. CSS alterna ambas por media query. */}
+                          <span className="discard-hint-1l">
+                            Pulsa las cartas a descartar (máx. {maxDiscard(aliveN)}) o continúa sin descartar.
+                          </span>
+                          <span className="discard-hint-2l">
+                            Pulsa las cartas a descartar.<br />(máx. {maxDiscard(aliveN)}). Continúa sin descartar.
+                          </span>
+                        </>
+                      )
                       : aliveN === 5
                         ? `${game.selectedDiscards.length} de ${maxDiscard(5)} seleccionada(s).`
                         : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}

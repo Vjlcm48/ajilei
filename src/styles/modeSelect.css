@@ -36,15 +36,15 @@
   top: 16px;
   right: 20px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 5px;
 }
 
 .mode-balance-label {
-  font-size: 9px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 1px;
   color: var(--text-muted);
 }
 
@@ -209,9 +209,22 @@
 }
 
 /* ── Responsive ── */
+/* En móvil, el SALDO (arriba a la derecha) y el título "Elige tu mesa"
+   compartían franja y se solapaban. Damos aire extra arriba para que el
+   título baje y libere la línea del saldo. (Tanda C4.2.8) */
+@media (max-width: 767px) {
+  .mode-select-card {
+    padding-top: 52px;
+  }
+
+  .mode-select-title {
+    margin-top: 4px;
+  }
+}
+
 @media (max-width: 420px) {
   .mode-select-card {
-    padding: 36px 20px 28px;
+    padding: 52px 20px 28px;
   }
 
   .mode-select-title {
