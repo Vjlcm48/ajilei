@@ -1275,44 +1275,35 @@
   .table-badge { padding: 3px 9px; font-size: 10px; }
 
   /* ── Franjas 1 y 2 (IAs + mesa) dentro de .table-mid ──
-     flex:6 → ocupa el 60% del alto libre. Grid de dos filas (4fr/6fr) que sobre
-     ese 60% rinde ~24% (IAs) y ~36% (mesa). mid-center se aplana para promover
-     rivals-zone y center-zone a celdas directas. Fila 1: side-left | IAs | side-right.
-     Fila 2: pozo a ancho completo. */
+     flex:6 → ocupa el 60% del alto libre. Grid de DOS filas (4fr/6fr) que sobre
+     ese 60% rinde ~24% (IAs) y ~36% (mesa).
+     C5.2 · FILA DE IAs a ANCHO COMPLETO, grupo centrado, orden IA4·IA3·IA2·IA1:
+     el esqueleto C5.1 repartía las IAs en columnas auto|1fr|auto (side-left | IAs
+     centrales | side-right) → no quedaban parejas. Ahora aplanamos con
+     `display: contents` los TRES contenedores del esqueleto (side-col-left,
+     rivals-zone, side-col-right) + mid-center: los 4 paneles de IA quedan como
+     celdas directas de un grid de CUATRO columnas iguales, una IA por columna →
+     espaciado parejo y grupo centrado a ancho completo, sin columnas laterales que
+     estrujen. El orden del DOM ya es IA4·IA3·IA2·IA1 (side-left, top-left,
+     top-right, side-right según DISPLAY_ORDER de seatLayouts) → auto-fluyen a la
+     fila 1 en ese orden sin reordenar. El pozo se ancla explícito a la fila 2 a
+     ancho completo (las 4 columnas) y las IAs llenan la fila 1. Los rails del
+     humano NO van aquí (doc 1 §5) — son C5.4. */
   .table-wide .table-mid {
     flex: 6 1 0;
     min-height: 0;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: repeat(4, 1fr);
     grid-template-rows: 4fr 6fr;
-    grid-template-areas:
-      "sl rivals sr"
-      "cen cen cen";
-    gap: 4px;
-    align-items: stretch;
-  }
-  .table-wide .mid-center     { display: contents; }
-  .table-wide .side-col-left  { grid-area: sl; }
-  .table-wide .side-col-right { grid-area: sr; }
-  .table-wide .rivals-zone    { grid-area: rivals; }
-  .table-wide .center-zone    { grid-area: cen; }
-
-  /* Franja de IAs: fila horizontal centrada (orden/centrado fino → C5.2) */
-  .table-wide .rivals-zone {
-    display: flex;
-    justify-content: center;
+    gap: 4px 6px;
     align-items: center;
-    gap: 8px;
-    min-height: 0;
-    padding: 0;
+    justify-items: center;
   }
-  .table-wide .side-col {
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    min-height: 0;
-    padding: 0;
-  }
+  .table-wide .side-col-left,
+  .table-wide .side-col-right,
+  .table-wide .rivals-zone,
+  .table-wide .mid-center { display: contents; }
+  .table-wide .center-zone { grid-column: 1 / -1; grid-row: 2; }
 
   /* Paneles de rival compactos (tamaño/forma definitivos → C5.2) */
   .game-table-screen .opp-panel {
