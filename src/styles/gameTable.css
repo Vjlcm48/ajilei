@@ -1294,7 +1294,12 @@
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: 4fr 6fr;
+    /* C5.3 refit: la mesa (POZO + comodín) es de poco alto y el óvalo sobraba de
+       altura mientras los slots de IA quedaban chatos. Pasamos de 4fr/6fr a
+       5fr/4fr → la fila de IAs gana respiro (slots menos chatos) y el óvalo baja
+       de alto. (Si los slots siguen chatos, el siguiente paso es subir la carta
+       de IA; primero probamos solo con el reparto de filas.) */
+    grid-template-rows: 5fr 4fr;
     gap: 4px 6px;
     align-items: center;
     justify-items: center;
@@ -1316,16 +1321,40 @@
   }
   .game-table-screen .opp-score { display: none; }
 
-  /* ── Franja de mesa / pozo ──
-     ALTURA FIJA MÍNIMA: el pozo no se aplasta al rotar el turno (ley de anclaje).
-     Contenido centrado y con wrap; el felt en forma de estadio llega en C5.3. */
+  /* ── Franja de mesa / pozo — FELT EN FORMA DE ESTADIO (C5.3) ──
+     ALTURA FIJA MÍNIMA (de C5.1): el pozo no se aplasta al rotar el turno (ley de
+     anclaje). El felt es un racetrack/estadio a ancho completo: border-radius 999px
+     (los extremos cortos quedan totalmente redondeados sobre los ~92px de alto) +
+     un radial de verdes de marca (--green-bright→base→deep) que da sensación de
+     mesa iluminada, distinto del fondo de pantalla. Borde dorado fino y brillo
+     interno leve = "panel premium" del sistema de diseño v1.2 §3. Solo color/forma
+     y sombras (box-shadow) → no altera la caja ni el layout (cero scroll/saltos).
+     El pozo y el mensaje van centrados (justify/align-content center) dentro del
+     felt; el padding lateral respeta la curva del estadio. */
   .center-zone {
     flex-wrap: wrap;
     justify-content: center;
+    align-items: center;
     align-content: center;
-    gap: 6px 12px;
-    padding: 4px 10px;
-    min-height: 92px;
+    gap: 6px 14px;
+    padding: 6px 40px;
+    /* C5.3 refit: min-height ↓ a 70 (≈12% más bajo que los 80 previos). El POZO/
+       comodín (contenido real ≈50–60px) siguen sin aplastarse, y como el grid usa
+       align-items:center el óvalo se centra en su fila (4fr ≈82px) → el alto
+       liberado queda como aire arriba/abajo. La fila de mesa (4fr) no cambia, así
+       que IAs y humano quedan intactos. */
+    min-height: 70px;
+    border-radius: 999px;
+    background: radial-gradient(
+      ellipse at center,
+      var(--green-bright) 0%,
+      var(--green-base) 48%,
+      var(--green-deep) 100%
+    );
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+    box-shadow:
+      inset 0 0 44px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10);
   }
   .pot-box      { min-width: 64px; padding: 5px 12px; }
   .pot-value    { font-size: 20px; }
@@ -1361,4 +1390,73 @@
   .action-area   { height: 84px; gap: 6px; }
   .btn           { padding: 7px 13px; font-size: 12px; }
   .timer-display { font-size: 18px; min-width: 40px; }
+
+  /* ── C5.3 refit (SOLO 5 jug landscape) · cabecera + logo ──────────────────────
+     Acotado a .table-five: 4/3/2 conservan nombre y botones intactos; portrait y
+     escritorio están fuera de este media query. */
+
+  /* Contexto de posicionamiento para el logo y los botones reubicados. Seguro: no
+     hay descendientes que dependan de un ancestro estático aquí (las flying-card
+     son position:fixed y viven fuera de .game-table; pot-float y elim-notice ya
+     tienen su propio ancestro relativo). */
+  .game-table.table-five { position: relative; }
+
+  /* (C5.3 cierre · 1) La ✕ (cerrar) queda SOLA en la esquina superior derecha y la
+     bocina (sonido) baja al margen derecho del óvalo — espejo de AJILEI. Para que
+     ambos se posicionen respecto a .game-table.table-five (relative), header-right
+     deja de ser caja posicionada (vuelve a static) y sus dos hijos se posicionan
+     de forma absoluta e independiente. No crece la cabecera (hijos fuera de flujo). */
+  .table-five .header-right { position: static; }
+
+  /* ✕ sola, esquina superior derecha (donde estaba). Tap target sin cambios. */
+  .table-five .btn-leave {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    z-index: 20;
+  }
+
+  /* Bocina al margen derecho de la franja central, a la derecha del óvalo y
+     alineada verticalmente con el POZO/comodín (top:50% = centro del óvalo) →
+     espejo exacto de AJILEI (left:12 / top:50%). Tamaño base, sin sobredimensionar. */
+  .table-five .mute-button {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+  }
+  /* Con title y header-right fuera del flujo, el badge de fase queda solo en la
+     cabecera → centrado arriba. */
+  .table-five .table-header { justify-content: center; }
+
+  /* (3) Logo AJILEI: sale de la esquina superior izquierda (donde rozaba IA4) y
+     baja al margen izquierdo de la franja central, a la izquierda del POZO y
+     alineado verticalmente con él (el centro del óvalo ≈ el centro vertical de la
+     mesa, de ahí top:50%). Absoluto → no se duplica ni deja rastro en la esquina,
+     y el solape con IA4 desaparece (IA4 vive en la fila superior, este queda en la
+     central). */
+  .table-five .table-title {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    white-space: nowrap;
+    z-index: 20;
+  }
+  /* El óvalo se estrecha con canaletas simétricas para dejar holgura al logo a su
+     izquierda (y seguir centrado, con el POZO al medio). Sigue siendo estadio a
+     buen ancho. */
+  /* (C5.3 cierre · 2) Solape del óvalo IDÉNTICO en ambos extremos. El óvalo y los
+     paneles de IA son todos position:relative con z-index auto → el orden de
+     PINTADO sigue el DOM (IA4·IA3·IA2·ÓVALO·IA1): por eso el óvalo se pintaba sobre
+     IA4 (izq sólido) pero IA1 se pintaba sobre el óvalo (der "transparente"). Con
+     z-index explícito el óvalo queda por encima de TODOS los paneles (z auto = 0)
+     → ambos extremos sólidos por igual. El solape se mantiene; solo se iguala. */
+  .table-five .center-zone {
+    margin-left: 100px;
+    margin-right: 100px;
+    z-index: 2;
+  }
 }
