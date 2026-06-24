@@ -659,6 +659,11 @@
   50%       { transform: scale(1.15); opacity: 0.75; }
 }
 
+/* C5.4 · cronómetro "espejo" del rail izquierdo (landscape). Oculto por defecto;
+   solo el grid landscape de la banda del humano (.table-wide .player-zone) lo
+   muestra → portrait y escritorio no se ven afectados. */
+.ls-timer { display: none; }
+
 /* ── Card deal animation ── */
 @keyframes cardDealIn {
   0% {
@@ -1290,7 +1295,7 @@
      ancho completo (las 4 columnas) y las IAs llenan la fila 1. Los rails del
      humano NO van aquí (doc 1 §5) — son C5.4. */
   .table-wide .table-mid {
-    flex: 6 1 0;
+    flex: 5.5 1 0;   /* C5.4: cede algo de alto a la banda del humano (4.5) */
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -1308,7 +1313,13 @@
   .table-wide .side-col-right,
   .table-wide .rivals-zone,
   .table-wide .mid-center { display: contents; }
-  .table-wide .center-zone { grid-column: 1 / -1; grid-row: 2; }
+  /* (C5.4 cierre · 1) El óvalo se ancla al FONDO de su fila (align-self: end) en vez
+     de centrarse. Como los paneles de IA (más altos que su fila) se desbordan un
+     poco hacia abajo, centrar el óvalo hacía que sus líneas se mezclaran con las de
+     los paneles. Al caer al fondo queda un hueco vacío claro (~12px) entre el estado
+     de las IAs ("Pasó/Igualó") y el tope del óvalo → se lee como elemento propio, en
+     juego y en resultado. Mantiene min-height (POZO/comodín legibles). */
+  .table-wide .center-zone { grid-column: 1 / -1; grid-row: 2; align-self: end; }
 
   /* Paneles de rival compactos (tamaño/forma definitivos → C5.2) */
   .game-table-screen .opp-panel {
@@ -1321,6 +1332,14 @@
   }
   .game-table-screen .opp-score { display: none; }
 
+  /* (C5.4 cierre 2) Recorta el desborde de los paneles de IA en .table-wide para que
+     el hueco con el óvalo venga de AMBOS lados (panel más bajo → menos desborde hacia
+     la fila de mesa). Padding y rótulo de estado más compactos; el estado ("Pasó/
+     Igualó/Pensando…") sigue legible. Panel ~122px → ~108px. */
+  .table-wide .opp-panel  { padding: 3px 6px 3px; }
+  .table-wide .opp-status { font-size: 15px; height: 18px; line-height: 18px; }
+  .table-wide .opp-cards  { padding: 2px 0 1px; }
+
   /* ── Franja de mesa / pozo — FELT EN FORMA DE ESTADIO (C5.3) ──
      ALTURA FIJA MÍNIMA (de C5.1): el pozo no se aplasta al rotar el turno (ley de
      anclaje). El felt es un racetrack/estadio a ancho completo: border-radius 999px
@@ -1332,18 +1351,22 @@
      El pozo y el mensaje van centrados (justify/align-content center) dentro del
      felt; el padding lateral respeta la curva del estadio. */
   .center-zone {
-    flex-wrap: wrap;
+    /* C5.4 fix: NOWRAP. Al estrechar el óvalo (−10%) el contenido (POZO + mensaje +
+       comodín) ya no cabía en una fila y se envolvía en 3 líneas → el óvalo crecía a
+       lo alto. En una sola fila el óvalo vuelve a su altura corta; el mensaje (flex:1)
+       absorbe el ancho sobrante, POZO y comodín no encogen. */
+    flex-wrap: nowrap;
     justify-content: center;
     align-items: center;
     align-content: center;
-    gap: 6px 14px;
-    padding: 6px 40px;
-    /* C5.3 refit: min-height ↓ a 70 (≈12% más bajo que los 80 previos). El POZO/
-       comodín (contenido real ≈50–60px) siguen sin aplastarse, y como el grid usa
-       align-items:center el óvalo se centra en su fila (4fr ≈82px) → el alto
-       liberado queda como aire arriba/abajo. La fila de mesa (4fr) no cambia, así
-       que IAs y humano quedan intactos. */
-    min-height: 70px;
+    gap: 4px 12px;
+    /* C5.4 cierre 2: padding vertical reducido (6→4) para BAJAR LA ALTURA REAL del
+       óvalo (no solo reposicionarlo). Junto con pot-box/pot-value/mensaje más bajos
+       y min-height como simple PISO (42, sin clipear POZO/comodín), el óvalo pasa de
+       ~57px a ~46px. Anclado al fondo (align-self: end), su borde superior sube el
+       hueco respecto a las IAs (~25px con el recorte de panel de abajo). */
+    padding: 3px 28px;   /* C5.4: alto ~5% menos (vert 4→3); padding lateral 40→28 para que el contenido quepa en una fila en el óvalo más estrecho */
+    min-height: 42px;
     border-radius: 999px;
     background: radial-gradient(
       ellipse at center,
@@ -1356,11 +1379,11 @@
       inset 0 0 44px rgba(0, 0, 0, 0.35),
       inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10);
   }
-  .pot-box      { min-width: 64px; padding: 5px 12px; }
-  .pot-value    { font-size: 20px; }
-  .call-box     { min-width: 56px; padding: 5px 10px; }
+  .pot-box      { min-width: 64px; padding: 3px 12px; }   /* C5.4 cierre 2: más bajo */
+  .pot-value    { font-size: 18px; }
+  .call-box     { min-width: 56px; padding: 3px 10px; }
   .call-value   { font-size: 18px; }
-  .game-message { height: 26px; font-size: 12px; }
+  .game-message { height: 22px; font-size: 12px; }
   .msg-action   { font-size: 20px; }
   .comodin-note { font-size: 10px; padding: 3px 10px; }
 
@@ -1390,6 +1413,145 @@
   .action-area   { height: 84px; gap: 6px; }
   .btn           { padding: 7px 13px; font-size: 12px; }
   .timer-display { font-size: 18px; min-width: 40px; }
+
+  /* ── C5.4 · BANDA DEL HUMANO en 3 columnas (rail-izq | mano | rail-der) ───────
+     Acotado a .table-wide (4-5 jug). La banda sigue siendo el 40% inferior (flex:4
+     de C5.1); aquí solo cambia su layout INTERNO de fila simple a un grid de tres
+     columnas. Los rails flanquean SOLO esta banda (IAs y óvalo siguen a ancho
+     completo, C5.2/C5.3). CSS-only: `display: contents` en .player-bar promueve
+     saldo/identidad/acciones a celdas del grid sin tocar el JSX → portrait y
+     escritorio (fuera de este query) quedan idénticos. */
+  /* (C5.4 · 3) Cartas del humano más grandes en landscape (token LOCAL, acotado a
+     .table-wide → 3/2 jug conservan su token). 6 slots de 60px caben de sobra en la
+     columna central (~448px) y 93px de alto entran en la banda (~116px), incluso con
+     el resalte ×1.2 del ganador. */
+  .game-table-screen .game-table.table-wide {
+    --card-w: 63px;    /* C5.4 encuadre: cartas del humano +5% (60→63 / 93→98) */
+    --card-h: 98px;
+  }
+
+  .table-wide .player-zone {
+    flex: 4.5 1 0;   /* C5.4: banda del humano más alta (más cargada) */
+    display: grid;
+    grid-template-columns: 142px 1fr 150px;   /* rail izq más ancho: saldo 2 líneas + badges + cronómetro */
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "saldo mano acciones"
+      "ident mano acciones"
+      "timer mano acciones";
+    align-content: center;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 3px;
+    overflow: hidden;
+  }
+  .table-wide .player-zone .player-bar { display: contents; }
+
+  /* Rail IZQUIERDO (solo lectura): saldo arriba; debajo, espacio reservado para el
+     descarte. NOTA: hoy el saldo es .player-bar-right y la identidad/​badges es
+     .player-bar-left; el MENSAJE de descarte vive anidado en el área de acciones
+     (.player-bar-center) → traerlo aquí requiere una extracción en JSX (reportada).
+     Mientras tanto: saldo arriba-izquierda e identidad en la fila inferior
+     izquierda, dejando el rail estructurado para el descarte. Sin botones aquí. */
+  /* (C5.4 · 6) Saldo en DOS líneas: "N fichas" prominente + "Mesa N" secundaria. Los
+     spans existen en las tres orientaciones; en portrait/escritorio siguen inline
+     (mismo texto "N fichas · Mesa N", idéntico) y aquí se apilan. */
+  .table-wide .player-bar-right {
+    grid-area: saldo;
+    justify-self: start;
+    align-self: start;
+    text-align: left;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .table-wide .pbr-chips { display: block; font-size: 14px; font-weight: 700; }
+  .table-wide .pbr-sep   { display: none; }
+  .table-wide .pbr-mesa  { display: block; font-size: 11px; color: var(--text-secondary); }
+
+  /* Identidad/badges del humano, debajo del saldo */
+  .table-wide .player-bar-left {
+    grid-area: ident;
+    justify-self: start;
+    align-self: start;
+    font-size: 11px;
+  }
+
+  /* (C5.4 · 1) Cronómetro al rail IZQUIERDO, prominente. El del área de acción (rail
+     derecho) se oculta en landscape para que solo haya uno. */
+  .table-wide .action-area .timer-display { display: none; }
+  .table-wide .ls-timer {
+    display: flex;
+    align-items: center;
+    grid-area: timer;
+    justify-self: start;
+  }
+  .table-wide .player-zone .ls-timer { font-size: 22px; min-width: 0; }
+
+  /* MANO (centro): 6 slots en fila (mazo + 5 cartas), mazo al extremo izquierdo
+     (1er hijo de .cards-row), pegado al rail izquierdo (justify-content: flex-start),
+     sin solape (gap positivo). El slot del mazo siempre reserva su caja
+     (visibility:hidden cuando el humano no es Pie). */
+  .table-wide .player-zone .cards-row {
+    grid-area: mano;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .table-wide .player-zone .deck-pile { margin-right: 10px; }
+
+  /* Rail DERECHO (acciones): botones en columna vertical; el principal arriba
+     (al alcance del pulgar). El área de acción deja el alto fijo de fila simple
+     para apilar y se centra/compacta para caber en la banda sin scroll. La altura
+     del rail la fija el grid (celda), así que variar el contenido por fase no
+     mueve nada fuera (cero saltos). */
+  /* (C5.4 · 2) Rail derecho COMPACTO para que nada se corte arriba ni abajo:
+     · botones de acción apilados, bajos (≈22px) y de fuente reducida;
+     · multiplicadores (×1 ×2 ×5 ×10) + timer + monto en UNA sola fila (nowrap);
+     · espaciado apretado.
+     Confirmar (apostar/igualar/subir) sube con order:-1 → "principal arriba"; los
+     mults/timer quedan debajo (column-reverse). La altura del rail la fija la celda
+     del grid → variar el contenido por fase no mueve nada (cero saltos). */
+  .table-wide .player-bar-center { grid-area: acciones; align-self: center; min-width: 0; }
+  .table-wide .action-area {
+    height: auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 4px;
+  }
+  .table-wide .action-col { flex-direction: column-reverse; gap: 4px; }
+  /* (C5.4 · 2) Botones de acción con MÁS separación vertical (el cronómetro liberó
+     espacio). "Retirarse" (destructiva) con holgura extra respecto a Apostar/Pasar. */
+  .table-wide .action-buttons { flex-direction: column; align-items: stretch; gap: 8px; }
+  .table-wide .action-buttons .btn-fold { margin-top: 8px; }
+  .table-wide .action-buttons .btn { width: 100%; }
+  .table-wide .action-buttons .btn-bet,
+  .table-wide .action-buttons .btn-call,
+  .table-wide .action-buttons .btn-raise { order: -1; }
+  .table-wide .action-area .btn { padding: 3px 8px; font-size: 11px; }
+  /* Multiplicadores + timer + monto en una sola fila compacta */
+  /* (C5.4 cierre · 2) "N fichas" (la apuesta actual) en su PROPIA línea, encima de
+     los multiplicadores. order:-1 + flex 0 0 100% la saca de la fila de ×n y la lleva
+     arriba; mult-row en wrap → los ×n caen en la línea de abajo. Con action-col en
+     column-reverse el orden final es: Apostar / Pasar / Retirarse / N fichas / ×n.
+     Estilizada como INFO (texto centrado, sin caja ni borde — no es pulsable). */
+  .table-wide .mult-row { flex-wrap: wrap; gap: 3px; justify-content: center; }
+  .table-wide .btn-mult { padding: 3px 5px; font-size: 10px; }
+  .table-wide .timer-display { font-size: 14px; min-width: 24px; }
+  .table-wide .bet-total {
+    order: -1;
+    flex: 0 0 100%;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold-brand);
+    min-width: 0;
+    margin: 0;
+  }
+  .table-wide .discard-area { align-items: center; }
+  .table-wide .discard-hint { max-width: 100%; font-size: 11px; }
 
   /* ── C5.3 refit (SOLO 5 jug landscape) · cabecera + logo ──────────────────────
      Acotado a .table-five: 4/3/2 conservan nombre y botones intactos; portrait y
@@ -1439,24 +1601,45 @@
   .table-five .table-title {
     position: absolute;
     left: 12px;
-    top: 50%;
+    top: calc(50% - 9px);   /* C5.4: sube un poco para dejar "Mano #N" justo debajo */
     transform: translateY(-50%);
     margin: 0;
     white-space: nowrap;
     z-index: 20;
   }
+
+  /* (C5.4 · 3) "Mano #N" debajo del logo AJILEI (mismo margen izquierdo), no en el
+     tope-centro. Absoluto, alineado a la izquierda con AJILEI. */
+  .table-five .hand-badge {
+    position: absolute;
+    left: 12px;
+    top: calc(50% + 12px);
+    transform: translateY(-50%);
+    z-index: 20;
+  }
+
+  /* (C5.4 · 4) Indicador de etapa ("A las 2"/"Descarte"): tras salir "Mano #N",
+     queda solo en header-center y se centra arriba (header justify-content:center,
+     C5.3); un punto más legible. */
+  .table-five .table-badge { font-size: 12px; padding: 4px 12px; }
   /* El óvalo se estrecha con canaletas simétricas para dejar holgura al logo a su
      izquierda (y seguir centrado, con el POZO al medio). Sigue siendo estadio a
      buen ancho. */
-  /* (C5.3 cierre · 2) Solape del óvalo IDÉNTICO en ambos extremos. El óvalo y los
-     paneles de IA son todos position:relative con z-index auto → el orden de
-     PINTADO sigue el DOM (IA4·IA3·IA2·ÓVALO·IA1): por eso el óvalo se pintaba sobre
-     IA4 (izq sólido) pero IA1 se pintaba sobre el óvalo (der "transparente"). Con
-     z-index explícito el óvalo queda por encima de TODOS los paneles (z auto = 0)
-     → ambos extremos sólidos por igual. El solape se mantiene; solo se iguala. */
+  /* (C5.4 · 1) El óvalo se estrecha con canaletas simétricas (holgura para AJILEI a
+     la izquierda y la bocina a la derecha). Ya NO lleva z-index: en C5.3 era para
+     que el óvalo se pintara por encima de las IAs en la zona de solape; ahora el
+     óvalo está contenido en su franja (min-height 60 + más aire arriba) y NO sube a
+     la fila de IAs, así que no hay solape vertical que igualar. El estado de las IAs
+     queda por encima por el z-index de .opp-panel (abajo). */
+  /* C5.4 encuadre: óvalo ~10% más estrecho (márgenes 100→128) → extremos más
+     adentro, despejando del todo IA4/IA1; sigue centrado (márgenes simétricos). */
   .table-five .center-zone {
-    margin-left: 100px;
-    margin-right: 100px;
-    z-index: 2;
+    margin-left: 128px;
+    margin-right: 128px;
   }
+
+  /* (C5.4 · 1) Garantía: los paneles de IA (position:relative) se pintan por encima
+     del óvalo (z auto = 0), así que sus mensajes de estado ("Pasó", "Igualó"…), aun
+     si se desbordan un poco por debajo del panel, NUNCA quedan tapados por el óvalo. */
+  .table-wide .opp-panel { z-index: 1; }
 }

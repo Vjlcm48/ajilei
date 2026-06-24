@@ -1049,8 +1049,20 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             </div>
 
             <span className="player-bar-right">
-              <BalanceDisplay chips={human.chips} /> fichas · Mesa {unit}
+              <span className="pbr-chips"><BalanceDisplay chips={human.chips} /> fichas</span>
+              <span className="pbr-sep"> · </span>
+              <span className="pbr-mesa">Mesa {unit}</span>
             </span>
+
+            {/* C5.4 landscape: cronómetro "espejo" en el rail izquierdo del humano.
+                Oculto por defecto (.ls-timer { display:none }) → portrait/escritorio
+                sin cambios; visible solo en el grid landscape .table-wide. Misma
+                fuente (timeLeft); el cronómetro del área de acción se oculta por CSS. */}
+            {(isPlayerTurn || isDiscardTimerActive) && (
+              <div className={`ls-timer timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
+                {timeLeft}s
+              </div>
+            )}
           </div>
         </section>
         </>
