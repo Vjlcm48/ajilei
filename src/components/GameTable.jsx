@@ -882,13 +882,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             {renderCenterZone()}
           </>
         )}
-        {aliveN === 3 && (
-          <>
-            {renderRivalsTopRow()}
-            {renderCenterZone()}
-          </>
-        )}
-        {aliveN >= 4 && (
+        {aliveN >= 3 && (
           <div className={`table-mid${reflowing ? ' reflow-settle' : ''}`}>
             <div className="side-col side-col-left">{seatsAt('side-left').map(renderPanel)}</div>
             <div className="mid-center">
