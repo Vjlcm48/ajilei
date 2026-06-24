@@ -1654,4 +1654,77 @@
      del óvalo (z auto = 0), así que sus mensajes de estado ("Pasó", "Igualó"…), aun
      si se desbordan un poco por debajo del panel, NUNCA quedan tapados por el óvalo. */
   .table-wide .opp-panel { z-index: 1; }
+
+  /* ── 4 jugadores landscape · reglas propias (referencia .table-five) ───────────
+     El 4 jug heredaba el grid de 4 columnas de .table-wide → las 3 IAs caían en las
+     columnas 1-2-3 y dejaban la 4 vacía (desbalance a la izquierda). Aquí se le dan
+     reglas propias .table-four. Diferencia clave con el 5 jug: AJILEI va a la esquina
+     superior IZQUIERDA (no junto al óvalo), así que el óvalo NO lleva canaletas. */
+
+  /* TAREA 1 · Centrar las 3 IAs: grid de 3 columnas iguales → reparto simétrico a
+     ancho completo. grid-template-rows y el óvalo (grid-column: 1 / -1) se heredan
+     intactos de .table-wide → el óvalo sigue ocupando el ancho completo. */
+  .table-four .table-mid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* TAREA 2 · Cabecera. Contexto de posicionamiento para AJILEI/Mano absolutos. */
+  .game-table.table-four { position: relative; }
+
+  /* "A las 2" (indicador de etapa) centrado arriba: con title, hand-badge y
+     header-right fuera de flujo, header-center queda solo y se centra. */
+  /* Repone la altura que aportaba el badge en flujo (en .table-five): con title,
+     hand-badge, badge y header-right absolutos, la cabecera colapsaba a ~0 y las IAs
+     quedaban pegadas arriba. min-height baja .table-mid (y la fila de IAs) hasta
+     alinearla con el 5 jug. ~30px estimado; afinar en pasos de 2px (rango 26-34). */
+  .table-four .table-header { justify-content: center; min-height: 30px; }
+  /* "A las 2" corrido a la DERECHA del centro (hueco entre IA2 e IA1): centrado
+     arriba se solapaba con IA2 y no había alto para subirlo. left: 68% es el punto
+     de partida parametrizado (afínalo si roza en validación visual); transform
+     -50% lo centra sobre ese punto y z-index 20 lo deja por encima de bordes. */
+  .table-four .table-badge {
+    position: absolute;
+    top: 6px;
+    left: 68%;
+    transform: translateX(-50%);
+    z-index: 20;
+    font-size: 12px;
+    padding: 4px 12px;
+  }
+
+  /* AJILEI: esquina superior IZQUIERDA (NO junto al óvalo como en .table-five). */
+  .table-four .table-title {
+    position: absolute;
+    left: 12px;
+    top: 6px;
+    margin: 0;
+    white-space: nowrap;
+    z-index: 20;
+  }
+
+  /* "Mano #XX" apilado justo debajo de AJILEI, mismo margen izquierdo. */
+  .table-four .hand-badge {
+    position: absolute;
+    left: 12px;
+    top: 28px;
+    z-index: 20;
+  }
+
+  /* Bocina + ✕ arriba a la derecha como grupo (header-right ya es flex con gap);
+     fuera de flujo para no descentrar el badge de etapa. */
+  .table-four .header-right {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  /* En el JSX la bocina (.mute-button) va ANTES que la ✕ (.btn-leave); en columna
+     eso pondría la bocina arriba. order fuerza ✕ arriba / bocina debajo sin tocar
+     el JSX. */
+  .table-four .btn-leave   { order: 1; }
+  .table-four .mute-button { order: 2; }
 }

@@ -847,7 +847,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="game-table-screen">
-      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 3 ? ' table-three' : ''}`}>
+      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}`}>
 
         <header className="table-header">
           <h1 className="table-title">AJILEI</h1>
