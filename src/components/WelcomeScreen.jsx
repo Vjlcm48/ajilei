@@ -39,6 +39,17 @@ function WelcomeScreen({ onSelectMode }) {
             <p className="soon-label">Próximamente</p>
           </div>
         </div>
+
+        <p style={{
+          textAlign: 'center',
+          fontSize: '0.65rem',
+          color: 'rgba(232, 184, 75, 0.6)',
+          letterSpacing: '0.08em',
+          fontWeight: 400,
+          marginTop: '0.75rem'
+        }}>
+          by HEPTACREATION
+        </p>
       </section>
     </main>
   )
