@@ -104,10 +104,26 @@
 .center-zone {
   display: flex;
   align-items: center;
+  justify-content: center;   /* centra el contenido en la pastilla */
   gap: 18px;
-  padding: 6px 18px;
+  padding: 6px 28px;         /* horizontal mayor: el contenido no toca los extremos curvos */
   flex: 1;
   position: relative;   /* ancla de la banda del aviso de eliminación (C4.5.2) */
+  /* PIEL DE ÓVALO (idéntica a la de los bloques móviles portrait/landscape): así la
+     línea visual del felt aparece también en escritorio, laptop landscape >600px y
+     tablets, que usan esta regla base. NOTA Fase 1: con flex:1 el óvalo se ve más
+     alto en escritorio (caja muy redondeada); la proporción tipo pastilla es Fase 2. */
+  border-radius: 999px;
+  background: radial-gradient(
+    ellipse at center,
+    var(--green-bright) 0%,
+    var(--green-base) 48%,
+    var(--green-deep) 100%
+  );
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  box-shadow:
+    inset 0 0 44px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10);
 }
 
 .pot-box {
@@ -748,30 +764,22 @@
   100% { transform: scale(1);    box-shadow: none; border-color: rgba(var(--gold-brand-rgb), 0.25); color: var(--text-secondary); }
 }
 
-/* Aviso de eliminación (C4.5.2) — overlay ABSOLUTO en una banda horizontal
-   limpia, un poco por debajo de la fila pozo/comodín (que están centrados
-   verticalmente en el felt). Ahí tiene ancho de sobra → una sola línea
-   horizontal y legible en TODAS las reducciones. No ocupa flujo (no empuja
-   nada). Solo anima opacidad (fade) → sin transform que altere la posición ni
-   parpadeos de layout (ley de anclaje). Visible ~3.75 s. */
-.elim-notice {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, 46px);   /* banda un poco por debajo de pozo/comodín */
-  white-space: nowrap;                 /* horizontal, una sola línea */
-  padding: 8px 20px;
-  border-radius: 999px;
-  background: rgba(var(--gold-brand-rgb), 0.14);
-  border: 1px solid rgba(var(--gold-brand-rgb), 0.55);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35), 0 0 16px rgba(var(--gold-brand-rgb), 0.22);
-  color: var(--gold-brand);
-  font-size: 15px;
-  font-weight: 700;
+/* Aviso de reducción de mesa (C4.5.2) — EN FLUJO dentro del óvalo (center-zone):
+   reemplaza temporalmente el contenido (pozo/estado/comodín) mientras está activo y
+   desaparece con fade. Centrado, envuelve (white-space: normal) y se adapta al ancho
+   del óvalo → no desborda ni se sale como el overlay absoluto anterior. Visible
+   ~3.75 s (animación de opacidad sincronizada con ELIM_NOTICE_MS). */
+.elim-notice-inline {
   text-align: center;
+  white-space: normal;          /* envuelve en varias líneas, ya no una sola */
+  max-width: 100%;
+  line-height: 1.25;
+  font-size: 12px;              /* reducido para caber en el óvalo */
+  font-weight: 700;
+  color: var(--gold-brand);
+  padding: 2px 8px;
   pointer-events: none;
-  z-index: 15;
-  animation: elimNotice 3.75s ease-out forwards;
+  animation: elimNotice 3.75s ease-out forwards;   /* conserva el fade existente */
 }
 
 @keyframes elimNotice {
@@ -913,6 +921,40 @@
 @media (min-width: 768px) and (min-height: 900px) {
   .ai-zone    { min-height: 234px; }
   .game-table { min-height: min(830px, 100%); }
+}
+
+/* ── Escritorio/tablet (NO teléfono) · 4-5 jug: contenido del óvalo en rejilla 2×2 ──
+   En escritorio el center-zone es flex row y en 4/5 el contenido (pozo + "A igualar"
+   + mensaje + comodín) no cabía en una línea → el comodín se montaba sobre el borde.
+   Aquí pasamos SOLO 4/5 a un grid 2×2 que CONTIENE todo dentro del óvalo:
+       [POZO]       [mensaje de etapa]
+       [A igualar]  [comodín]
+   El pozo queda a la izquierda; mensaje y comodín se apilan a la derecha. No se toca
+   la forma/tamaño/piel del óvalo (eso lo da .center-zone base).
+   Scope: (min-width:768) and (min-height:601) → cubre escritorio, laptop landscape
+   >600px y tablets, y NO solapa con los bloques móviles (portrait max-width:767 /
+   landscape max-height:600). 2 y 3 jug no se tocan. */
+@media (min-width: 768px) and (min-height: 601px) {
+  .table-four .center-zone,
+  .table-five .center-zone {
+    display: grid;
+    grid-template-columns: auto minmax(0, 360px);
+    grid-template-rows: auto auto;
+    justify-content: center;   /* centra el cluster pozo+bloque en el óvalo ancho */
+    align-content: center;
+    align-items: center;
+    justify-items: center;
+    gap: 4px 18px;
+    overflow: hidden;          /* nada escapa del perímetro del óvalo */
+  }
+  .table-four .center-zone .pot-box,
+  .table-five .center-zone .pot-box      { grid-column: 1; grid-row: 1; }
+  .table-four .center-zone .call-box,
+  .table-five .center-zone .call-box     { grid-column: 1; grid-row: 2; }
+  .table-four .center-zone .game-message,
+  .table-five .center-zone .game-message { grid-column: 2; grid-row: 1; }
+  .table-four .center-zone .comodin-note,
+  .table-five .center-zone .comodin-note { grid-column: 2; grid-row: 2; }
 }
 
 /* ── Móvil vertical (<768px) — Tanda C4.2 ────────────────────────────────────
@@ -1307,7 +1349,8 @@
      ancho completo (las 4 columnas) y las IAs llenan la fila 1. Los rails del
      humano NO van aquí (doc 1 §5) — son C5.4. */
   .table-wide .table-mid,
-  .table-three .table-mid {
+  .table-three .table-mid,
+  .table-two .table-mid {
     flex: 5.5 1 0;   /* C5.4: cede algo de alto a la banda del humano (4.5) */
     min-height: 0;
     display: grid;
@@ -1329,7 +1372,11 @@
   .table-three .side-col-left,
   .table-three .side-col-right,
   .table-three .rivals-zone,
-  .table-three .mid-center { display: contents; }
+  .table-three .mid-center,
+  .table-two .side-col-left,
+  .table-two .side-col-right,
+  .table-two .rivals-zone,
+  .table-two .mid-center { display: contents; }
   /* (C5.4 cierre · 1) El óvalo se ancla al FONDO de su fila (align-self: end) en vez
      de centrarse. Como los paneles de IA (más altos que su fila) se desbordan un
      poco hacia abajo, centrar el óvalo hacía que sus líneas se mezclaran con las de
@@ -1337,7 +1384,8 @@
      de las IAs ("Pasó/Igualó") y el tope del óvalo → se lee como elemento propio, en
      juego y en resultado. Mantiene min-height (POZO/comodín legibles). */
   .table-wide .center-zone,
-  .table-three .center-zone { grid-column: 1 / -1; grid-row: 2; align-self: end; }
+  .table-three .center-zone,
+  .table-two .center-zone { grid-column: 1 / -1; grid-row: 2; align-self: end; }
 
   /* Paneles de rival compactos (tamaño/forma definitivos → C5.2) */
   .game-table-screen .opp-panel {
@@ -1355,11 +1403,14 @@
      la fila de mesa). Padding y rótulo de estado más compactos; el estado ("Pasó/
      Igualó/Pensando…") sigue legible. Panel ~122px → ~108px. */
   .table-wide .opp-panel,
-  .table-three .opp-panel  { padding: 3px 6px 3px; }
+  .table-three .opp-panel,
+  .table-two .opp-panel    { padding: 3px 6px 3px; }
   .table-wide .opp-status,
-  .table-three .opp-status { font-size: 15px; height: 18px; line-height: 18px; }
+  .table-three .opp-status,
+  .table-two .opp-status   { font-size: 15px; height: 18px; line-height: 18px; }
   .table-wide .opp-cards,
-  .table-three .opp-cards  { padding: 2px 0 1px; }
+  .table-three .opp-cards,
+  .table-two .opp-cards    { padding: 2px 0 1px; }
 
   /* ── Franja de mesa / pozo — FELT EN FORMA DE ESTADIO (C5.3) ──
      ALTURA FIJA MÍNIMA (de C5.1): el pozo no se aplasta al rotar el turno (ley de
@@ -1447,13 +1498,15 @@
      columna central (~448px) y 93px de alto entran en la banda (~116px), incluso con
      el resalte ×1.2 del ganador. */
   .game-table-screen .game-table.table-wide,
-  .game-table-screen .game-table.table-three {
+  .game-table-screen .game-table.table-three,
+  .game-table-screen .game-table.table-two {
     --card-w: 63px;    /* C5.4 encuadre: cartas del humano +5% (60→63 / 93→98) */
     --card-h: 98px;
   }
 
   .table-wide .player-zone,
-  .table-three .player-zone {
+  .table-three .player-zone,
+  .table-two .player-zone {
     flex: 4.5 1 0;   /* C5.4: banda del humano más alta (más cargada) */
     display: grid;
     grid-template-columns: 142px 1fr 150px;   /* rail izq más ancho: saldo 2 líneas + badges + cronómetro */
@@ -1469,7 +1522,8 @@
     overflow: hidden;
   }
   .table-wide .player-zone .player-bar,
-  .table-three .player-zone .player-bar { display: contents; }
+  .table-three .player-zone .player-bar,
+  .table-two .player-zone .player-bar { display: contents; }
 
   /* Rail IZQUIERDO (solo lectura): saldo arriba; debajo, espacio reservado para el
      descarte. NOTA: hoy el saldo es .player-bar-right y la identidad/​badges es
@@ -1481,7 +1535,8 @@
      spans existen en las tres orientaciones; en portrait/escritorio siguen inline
      (mismo texto "N fichas · Mesa N", idéntico) y aquí se apilan. */
   .table-wide .player-bar-right,
-  .table-three .player-bar-right {
+  .table-three .player-bar-right,
+  .table-two .player-bar-right {
     grid-area: saldo;
     justify-self: start;
     align-self: start;
@@ -1490,15 +1545,19 @@
     line-height: 1.2;
   }
   .table-wide .pbr-chips,
-  .table-three .pbr-chips { display: block; font-size: 14px; font-weight: 700; }
+  .table-three .pbr-chips,
+  .table-two .pbr-chips { display: block; font-size: 14px; font-weight: 700; }
   .table-wide .pbr-sep,
-  .table-three .pbr-sep   { display: none; }
+  .table-three .pbr-sep,
+  .table-two .pbr-sep   { display: none; }
   .table-wide .pbr-mesa,
-  .table-three .pbr-mesa  { display: block; font-size: 11px; color: var(--text-secondary); }
+  .table-three .pbr-mesa,
+  .table-two .pbr-mesa  { display: block; font-size: 11px; color: var(--text-secondary); }
 
   /* Identidad/badges del humano, debajo del saldo */
   .table-wide .player-bar-left,
-  .table-three .player-bar-left {
+  .table-three .player-bar-left,
+  .table-two .player-bar-left {
     grid-area: ident;
     justify-self: start;
     align-self: start;
@@ -1508,23 +1567,27 @@
   /* (C5.4 · 1) Cronómetro al rail IZQUIERDO, prominente. El del área de acción (rail
      derecho) se oculta en landscape para que solo haya uno. */
   .table-wide .action-area .timer-display,
-  .table-three .action-area .timer-display { display: none; }
+  .table-three .action-area .timer-display,
+  .table-two .action-area .timer-display { display: none; }
   .table-wide .ls-timer,
-  .table-three .ls-timer {
+  .table-three .ls-timer,
+  .table-two .ls-timer {
     display: flex;
     align-items: center;
     grid-area: timer;
     justify-self: start;
   }
   .table-wide .player-zone .ls-timer,
-  .table-three .player-zone .ls-timer { font-size: 22px; min-width: 0; }
+  .table-three .player-zone .ls-timer,
+  .table-two .player-zone .ls-timer { font-size: 22px; min-width: 0; }
 
   /* MANO (centro): 6 slots en fila (mazo + 5 cartas), mazo al extremo izquierdo
      (1er hijo de .cards-row), pegado al rail izquierdo (justify-content: flex-start),
      sin solape (gap positivo). El slot del mazo siempre reserva su caja
      (visibility:hidden cuando el humano no es Pie). */
   .table-wide .player-zone .cards-row,
-  .table-three .player-zone .cards-row {
+  .table-three .player-zone .cards-row,
+  .table-two .player-zone .cards-row {
     grid-area: mano;
     justify-content: flex-start;
     align-items: center;
@@ -1532,7 +1595,8 @@
     gap: 6px;
   }
   .table-wide .player-zone .deck-pile,
-  .table-three .player-zone .deck-pile { margin-right: 10px; }
+  .table-three .player-zone .deck-pile,
+  .table-two .player-zone .deck-pile { margin-right: 10px; }
 
   /* Rail DERECHO (acciones): botones en columna vertical; el principal arriba
      (al alcance del pulgar). El área de acción deja el alto fijo de fila simple
@@ -1547,9 +1611,11 @@
      mults/timer quedan debajo (column-reverse). La altura del rail la fija la celda
      del grid → variar el contenido por fase no mueve nada (cero saltos). */
   .table-wide .player-bar-center,
-  .table-three .player-bar-center { grid-area: acciones; align-self: center; min-width: 0; }
+  .table-three .player-bar-center,
+  .table-two .player-bar-center { grid-area: acciones; align-self: center; min-width: 0; }
   .table-wide .action-area,
-  .table-three .action-area {
+  .table-three .action-area,
+  .table-two .action-area {
     height: auto;
     flex-direction: column;
     flex-wrap: nowrap;
@@ -1558,23 +1624,31 @@
     gap: 4px;
   }
   .table-wide .action-col,
-  .table-three .action-col { flex-direction: column-reverse; gap: 4px; }
+  .table-three .action-col,
+  .table-two .action-col { flex-direction: column-reverse; gap: 4px; }
   /* (C5.4 · 2) Botones de acción con MÁS separación vertical (el cronómetro liberó
      espacio). "Retirarse" (destructiva) con holgura extra respecto a Apostar/Pasar. */
   .table-wide .action-buttons,
-  .table-three .action-buttons { flex-direction: column; align-items: stretch; gap: 8px; }
+  .table-three .action-buttons,
+  .table-two .action-buttons { flex-direction: column; align-items: stretch; gap: 8px; }
   .table-wide .action-buttons .btn-fold,
-  .table-three .action-buttons .btn-fold { margin-top: 8px; }
+  .table-three .action-buttons .btn-fold,
+  .table-two .action-buttons .btn-fold { margin-top: 8px; }
   .table-wide .action-buttons .btn,
-  .table-three .action-buttons .btn { width: 100%; }
+  .table-three .action-buttons .btn,
+  .table-two .action-buttons .btn { width: 100%; }
   .table-wide .action-buttons .btn-bet,
   .table-wide .action-buttons .btn-call,
   .table-wide .action-buttons .btn-raise,
   .table-three .action-buttons .btn-bet,
   .table-three .action-buttons .btn-call,
-  .table-three .action-buttons .btn-raise { order: -1; }
+  .table-three .action-buttons .btn-raise,
+  .table-two .action-buttons .btn-bet,
+  .table-two .action-buttons .btn-call,
+  .table-two .action-buttons .btn-raise { order: -1; }
   .table-wide .action-area .btn,
-  .table-three .action-area .btn { padding: 3px 8px; font-size: 11px; }
+  .table-three .action-area .btn,
+  .table-two .action-area .btn { padding: 3px 8px; font-size: 11px; }
   /* Multiplicadores + timer + monto en una sola fila compacta */
   /* (C5.4 cierre · 2) "N fichas" (la apuesta actual) en su PROPIA línea, encima de
      los multiplicadores. order:-1 + flex 0 0 100% la saca de la fila de ×n y la lleva
@@ -1582,13 +1656,17 @@
      column-reverse el orden final es: Apostar / Pasar / Retirarse / N fichas / ×n.
      Estilizada como INFO (texto centrado, sin caja ni borde — no es pulsable). */
   .table-wide .mult-row,
-  .table-three .mult-row { flex-wrap: wrap; gap: 3px; justify-content: center; }
+  .table-three .mult-row,
+  .table-two .mult-row { flex-wrap: wrap; gap: 3px; justify-content: center; }
   .table-wide .btn-mult,
-  .table-three .btn-mult { padding: 3px 5px; font-size: 10px; }
+  .table-three .btn-mult,
+  .table-two .btn-mult { padding: 3px 5px; font-size: 10px; }
   .table-wide .timer-display,
-  .table-three .timer-display { font-size: 14px; min-width: 24px; }
+  .table-three .timer-display,
+  .table-two .timer-display { font-size: 14px; min-width: 24px; }
   .table-wide .bet-total,
-  .table-three .bet-total {
+  .table-three .bet-total,
+  .table-two .bet-total {
     order: -1;
     flex: 0 0 100%;
     text-align: center;
@@ -1599,9 +1677,11 @@
     margin: 0;
   }
   .table-wide .discard-area,
-  .table-three .discard-area { align-items: center; }
+  .table-three .discard-area,
+  .table-two .discard-area { align-items: center; }
   .table-wide .discard-hint,
-  .table-three .discard-hint { max-width: 100%; font-size: 11px; }
+  .table-three .discard-hint,
+  .table-two .discard-hint { max-width: 100%; font-size: 11px; }
 
   /* ── C5.3 refit (SOLO 5 jug landscape) · cabecera + logo ──────────────────────
      Acotado a .table-five: 4/3/2 conservan nombre y botones intactos; portrait y
@@ -1692,7 +1772,8 @@
      del óvalo (z auto = 0), así que sus mensajes de estado ("Pasó", "Igualó"…), aun
      si se desbordan un poco por debajo del panel, NUNCA quedan tapados por el óvalo. */
   .table-wide .opp-panel,
-  .table-three .opp-panel { z-index: 1; }
+  .table-three .opp-panel,
+  .table-two .opp-panel { z-index: 1; }
 
   /* ── 4 jugadores landscape · reglas propias (referencia .table-five) ───────────
      El 4 jug heredaba el grid de 4 columnas de .table-wide → las 3 IAs caían en las
@@ -1834,5 +1915,205 @@
   .table-three .center-zone {
     margin-left: 180px;
     margin-right: 180px;
+  }
+
+  /* ── 2 jugadores landscape · esqueleto compartido + override de 1 IA ──────────
+     El 2 (aliveN===2) usa el MISMO esqueleto .table-mid (flex 5.5/4.5, grid
+     5fr/4fr) que 3/4/5 — el JSX monta renderRivalsTopRow (.opp-panel) en landscape
+     vía el hook de orientación, y .table-two se sumó arriba a los selectores del
+     esqueleto y del player-zone. Aquí solo quedan los overrides propios: 1 sola
+     columna de IA y cabecera con el indicador a la DERECHA (armonía adaptativa:
+     5/3 centro · 4 especial · 2 derecha). El PORTRAIT del 2 (.ai-zone espejo)
+     NO entra en este media query y queda intacto. */
+  .game-table.table-two { position: relative; }
+
+  /* Override del 2 sobre el esqueleto: TRES columnas en UNA fila → los dos óvalos
+     FLANQUEAN al panel del rival: [O1 pozo] [IA centro, ancho generoso] [O2 mensaje].
+     La IA (col central 'auto') es la protagonista; los óvalos toman 1fr a cada lado.
+     align-items: end → los tres alineados a su parte BAJA (sobre el player-zone). */
+  .table-two .table-mid {
+    grid-template-columns: 0.7fr auto 0.7fr;   /* laterales más estrechos → aire para mazo IA y O1 */
+    grid-template-rows: 1fr;
+    align-items: end;
+  }
+
+  /* Cabecera del 2: AJILEI izq, "Mano #" debajo, bocina·✕ a la derecha y el
+     indicador de etapa a la DERECHA (no centrado como 3/5). right:64px lo deja a
+     la izquierda de bocina/✕ — punto de partida, a afinar en validación. */
+  .table-two .table-title  { position: absolute; left: 12px; top: 6px; margin: 0; white-space: nowrap; z-index: 20; }
+  .table-two .hand-badge   { position: absolute; left: 12px; top: 28px; z-index: 20; }
+  /* Fila superior derecha: indicador de etapa · bocina · ✕ en UNA línea, alineados
+     arriba y sin solape. .table-badge vive en .header-center (no es hermano de
+     .header-right) y el JSX del header es compartido por 2/3/4/5 → no se puede
+     mover por flex sin afectar a las otras mesas. Vía determinista (no offset
+     adivinado): se fija bocina y ✕ a tamaño cuadrado uniforme (32×28) → el ancho
+     del grupo es conocido = 32 + 8(gap) + 32 = 72px, anclado a right:8px (ocupa
+     right 8→80px). El indicador se ancla EXACTAMENTE a su izquierda con el MISMO
+     gap: right = 8(anclaje) + 72(grupo) + 8(gap) = 88px. Cero solape, gap uniforme. */
+  .table-two .header-right { position: absolute; top: 6px; right: 8px; z-index: 20; display: flex; flex-direction: row; align-items: center; gap: 8px; }
+  .table-two .header-right .mute-button,
+  .table-two .header-right .btn-leave {
+    width: 32px; height: 28px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .table-two .table-badge  { position: absolute; top: 6px; right: 88px; z-index: 20; font-size: 12px; padding: 4px 12px; }
+  .table-two .table-header { min-height: 30px; }
+
+  /* ── 2 jug landscape · DOS óvalos FLANQUEANDO al panel de la IA ────────────────
+     El JSX del 2-landscape monta renderTwoOvalsZone(): un contenedor .two-ovals con
+     dos secciones .felt-oval (izq=pozo, der=mensaje). Lo APLANAMOS con
+     display:contents → oval-left y oval-right se vuelven celdas directas del grid
+     table-mid (junto al .opp-panel, que ya es celda directa vía el flatten de
+     mid-center/rivals-zone). Así O1 · IA · O2 son tres celdas en la misma fila.
+     (Vía CSS-only: NO se tocó el JSX; .two-ovals sigue existiendo como wrapper
+     transparente.) center-zone NO se usa aquí. */
+  .table-two .two-ovals { display: contents; }
+
+  /* Asignación a columnas: O1→1 (pegado a la izq), IA→2 (centro), O2→3 (pegado a la
+     der); los tres a su parte baja. */
+  .table-two .opp-panel  { grid-column: 2; grid-row: 1; align-self: end; }
+
+  /* Piel de óvalo (racetrack) — misma que el center-zone landscape: radial verde de
+     marca, borde dorado fino y brillo interno. Aplicada por separado a cada sección. */
+  .table-two .felt-oval {
+    border-radius: 999px;
+    background: radial-gradient(
+      ellipse at center,
+      var(--green-bright) 0%,
+      var(--green-base) 48%,
+      var(--green-deep) 100%
+    );
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+    box-shadow:
+      inset 0 0 44px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 20px;
+    min-width: 0;
+  }
+  /* Pozo (O1): pastilla pequeña CEÑIDA a su contenido (POZO + número), pegada a la
+     izquierda. width/height auto + min-* a 0 → no se estira ni hereda holgura. El
+     min-height alto NO está en .felt-oval (es exclusivo de .oval-right), así que O1
+     ya no lo arrastra; aquí lo dejamos explícito a 0 por claridad. gap menor que el
+     felt-oval (12→8) para juntar pozo y "A igualar". (PUNTO 2) */
+  .table-two .oval-left {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    justify-self: start;
+    flex: 0 0 auto;
+    width: auto;
+    height: auto;
+    /* +50% de ancho SOLO del perímetro del óvalo: min-width mayor que el contenido.
+       El recuadro POZO (.pot-box) NO cambia; el justify-content:center heredado de
+       .felt-oval lo deja centrado, dejando aire a ambos lados para futuras fichas. */
+    min-width: 100px;
+    min-height: 0;
+    padding: 5px 10px;
+    gap: 8px;
+    margin-left: 8px;
+  }
+  /* Contenido del pozo vertical y ceñido: "Pozo" sobre el número, sin aire muerto.
+     Anula el min-width:64px del .pot-box landscape (global de 3/4/5) SOLO dentro de
+     O1, que era el principal inflador de ancho. */
+  .table-two .oval-left .pot-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    line-height: 1.1;
+    min-width: 0;
+    padding: 2px 6px;
+  }
+  /* "A igualar": iba visibility:hidden pero su caja seguía ocupando la MITAD derecha
+     del óvalo (espacio verde vacío). La sacamos del flujo de O1 con display:none →
+     el óvalo se cine solo al recuadro POZO (≈mitad del ancho previo). El recuadro de
+     POZO no se toca. (El toCall sigue disponible en el botón "Igualar" del humano.) */
+  .table-two .oval-left .call-box { display: none; }
+  .table-two .oval-left .pot-label { font-size: 10px; }
+  .table-two .oval-left .pot-value { font-size: 18px; }
+  /* Mensaje (O2): pegado a la DERECHA y MÁS ALTO que O1 (no son simétricos: O2 debe
+     albergar frases largas de showdown envueltas). (PUNTO 3) */
+  .table-two .oval-right {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: end;
+    justify-self: end;
+    flex: 0 0 auto;
+    margin-right: 8px;
+    min-height: 64px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  /* Mensaje adaptado VERTICAL dentro del óvalo derecho: texto centrado que envuelve
+     en varias líneas (no una sola línea ancha). Anula la altura fija / nowrap que el
+     .game-message hereda del layout de center-zone. Afinar font-size/line-height en
+     validación para frases largas (p.ej. "¡Ganas! Tu Espadas (41) supera…"). */
+  .table-two .oval-right .game-message {
+    height: auto;
+    text-align: center;
+    line-height: 1.3;
+    font-size: 12px;
+    white-space: normal;
+    max-width: 100%;
+  }
+
+  /* CARTAS DE LA IA = MAZO (PASO 4). El bloque landscape fija --opp-card-w/h a 32×50
+     en .opp-panel, y TANTO las cartas (.opp-card-slot) COMO el mazo (.deck-pile.opp-deck
+     y .shuffle-fan-card) derivan de ese token. Para igualarlos —y a la vez hacer al
+     rival protagonista, simétrico al humano— subimos el token del 2 a la carta
+     completa (var(--card-w)×var(--card-h) = 63×98). Una sola fuente → cartas y mazo
+     quedan idénticos automáticamente, sin override de tamaño aparte.
+     Mayor especificidad (.game-table.table-two) para ganar al 32×50 del bloque. */
+  .game-table.table-two .opp-panel {
+    --opp-card-w: var(--card-w);
+    --opp-card-h: var(--card-h);
+    /* PUNTO 4 · El max-width: 116px del bloque landscape (pensado para cartas de
+       32px) ahogaba las de 63px → las cartas desbordaban el marco. Liberado para el
+       2: la columna central 'auto' del grid se expande al ancho real (~360px = 5
+       cartas + gaps + padding) y el panel envuelve nombre+fichas+5 cartas+mazo. */
+    max-width: none;
+  }
+
+  /* PUNTO 1 · Cartas de la IA en FILA SEPARADA (como el humano). El .opp-card-slot
+     hereda margin-left negativo (look "abanico" de 3/4/5) que las solapa; se anula
+     SOLO en .table-two y se da gap positivo. 3/4/5 conservan su abanico intacto. */
+  .table-two .opp-cards {
+    gap: 6px;
+    justify-content: center;
+  }
+  .table-two .opp-card-slot:not(:first-child) {
+    margin-left: 0;
+  }
+  /* Realce del ganador en showdown: el .opp-winner escala 1.2 + margin extra y, con
+     cartas ya a 63px, volvería a ensanchar/solapar de más. Se reduce a un scale 1.05
+     suave (mantiene un realce sutil) y sin margin extra. */
+  .table-two .opp-winner .opp-card-slot {
+    transform: scale(1.05);
+    margin-left: 0;
+  }
+  .table-two .opp-winner .opp-card-slot:not(:first-child) {
+    margin-left: 6px;
+  }
+
+  /* Mazo de la IA en ESPEJO al del humano (PASO 5). El deck humano va al extremo
+     IZQUIERDO de su fila de cartas. El del rival, anclado por defecto a 'inner-right'
+     (costado derecho del panel), lo reflejamos al costado IZQUIERDO
+     (right:calc(100%+8px)). El tamaño ya lo iguala el token de arriba (63×98 = deck
+     humano). Tras pasar a 3 columnas el panel está en la col central → el mazo cae
+     en el hueco entre O1 y el panel. PUNTO A AFINAR: si el deck (63px) invade O1,
+     reducir el gap o el token. */
+  .table-two .opp-deck-wrapper {
+    left: auto;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
   }
 }

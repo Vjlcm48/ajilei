@@ -35,6 +35,27 @@ const AI_ACTION_MS    = 900 * AI_SPEED_FACTOR
 const CEREMONY_MS     = 1000   // salida digna del panel eliminado (desatura → fade)
 const ELIM_NOTICE_MS  = 3750   // aviso central no bloqueante (aparece y se va solo)
 
+// ── Hook de orientación del tablero (Opción A, mesa de 2) ────────────────────
+// El CSS no puede elegir QUÉ componente monta React; para el 2 jugadores el rival
+// es panel compacto (.opp-panel) en landscape y espejo (.ai-zone) en portrait.
+// Este hook decide cuál montar usando EXACTAMENTE la misma media query que el
+// bloque landscape de gameTable.css (orientation: landscape) and (max-height:600px)
+// → JSX y CSS nunca se desincronizan. Solo un componente se monta por orientación,
+// así que las refs (slotRefs/deckRefs) del asiento del rival no se duplican.
+const LANDSCAPE_TABLE_MQ = '(orientation: landscape) and (max-height: 600px)'
+function useIsLandscapeTable() {
+  const [isLandscape, setIsLandscape] = useState(
+    () => window.matchMedia(LANDSCAPE_TABLE_MQ).matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(LANDSCAPE_TABLE_MQ)
+    const handler = (e) => setIsLandscape(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return isLandscape
+}
+
 // ── Deal helpers ─────────────────────────────────────────────────────────────
 // Replays the engine's deal visually: active seats in Mano→Pie order, one card
 // per seat per round. Returns [{ seat, cardIndex }] in deal order.
@@ -141,7 +162,7 @@ function ShuffleDeck() {
 }
 
 // ── FlyingCard ────────────────────────────────────────────────────────────────
-function FlyingCard({ fromX, fromY, toX, toY, duration = 0.595, onDone }) {
+function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) {
   const [moved, setMoved] = useState(false)
 
   useEffect(() => {
@@ -155,6 +176,12 @@ function FlyingCard({ fromX, fromY, toX, toY, duration = 0.595, onDone }) {
       style={{
         left: fromX,
         top:  fromY,
+        // w/h opcionales: solo se pasan en 2-landscape (slots 63×98). Si vienen,
+        // sobreescriben el tamaño CSS por defecto (var(--card-w), que aquí resuelve
+        // al token base por estar la carta fuera de .table-two). En 3/4/5 llegan
+        // undefined → la carta conserva su tamaño compacto de CSS.
+        ...(w != null && { width: w }),
+        ...(h != null && { height: h }),
         transform: moved ? `translate(${toX - fromX}px,${toY - fromY}px)` : 'translate(0,0)',
         transition: moved ? `transform ${duration}s ease-out` : 'none',
       }}
@@ -230,6 +257,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const pieSeat      = game.pieIndex
   // C4.4: el tablero sigue a los jugadores VIVOS (no al tamaño inicial)
   const aliveN       = game.aliveCount
+  const isLandscapeTable = useIsLandscapeTable()
   const effLayout    = effectiveLayout(game.players)
   const isGameOver   = phase === PHASES.GAME_OVER
   const isDealPhase  = phase === PHASES.DEAL_2 || phase === PHASES.DEAL_3
@@ -291,6 +319,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       id: `fly-${phase}-${step}`,
       fromX: dr.left, fromY: dr.top,
       toX:   sr.left, toY:   sr.top,
+      // 2-landscape: carta en vuelo al tamaño REAL del slot (63×98); resto undefined.
+      ...(aliveN === 2 && isLandscapeTable && { w: sr.width, h: sr.height }),
       dealSeat: seat, dealCardIndex: cardIndex,
     }])
   }
@@ -464,6 +494,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       id: `dout-${seat}-${idx}`,
       fromX: sr.left, fromY: sr.top,
       toX:   dr.left, toY:   dr.top,
+      // 2-landscape: carta en vuelo al tamaño REAL del slot (63×98); resto undefined.
+      ...(aliveN === 2 && isLandscapeTable && { w: sr.width, h: sr.height }),
       fast: true, isDiscardOut: true,
     }])
   }
@@ -479,6 +511,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       id: `din-${seat}-${idx}`,
       fromX: dr.left, fromY: dr.top,
       toX:   sr.left, toY:   sr.top,
+      // 2-landscape: carta en vuelo al tamaño REAL del slot (63×98); resto undefined.
+      ...(aliveN === 2 && isLandscapeTable && { w: sr.width, h: sr.height }),
       fast: true, isDiscardIn: true, seat, slotIdx: idx,
     }])
   }
@@ -804,50 +838,93 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                    : actionKind ? ` msg-action msg-action-${actionKind}` : ''
     return (
       <section className="center-zone">
-        <div className="pot-box">
-          <span className="pot-label">Pozo</span>
-          <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
-            {game.pot}
-          </strong>
-          {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
-        </div>
-        <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
-          <span className="pot-label">A igualar</span>
-          <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
-        </div>
-        {/* key cambia solo en acciones → reproduce el pop sin animar mensajes neutros de fase/reparto */}
-        <p className={`game-message${msgClass}`} key={actionKind ? centerMsg : 'msg'}>
-          {centerMsg}
-        </p>
-        {/* C4.4: el chip refleja el estado real según jugadores vivos. Solo en
-            mesas que pudieron tener comodín (arrancaron en 4+); las de 2-3 no
-            muestran nota (regresión preservada). C4.5: destella al cambiar las
-            reglas (key=noteFlash remonta → corre la animación una sola vez). */}
-        {numPlayers >= 4 && (
-          <span
-            key={noteFlash}
-            className={`comodin-note${noteFlash > 0 ? ' comodin-note-flash' : ''}`}
-          >
-            {comodinNote}
-          </span>
+        {/* C4.5.2: mientras hay aviso de reducción, REEMPLAZA el contenido del óvalo
+            (pozo/estado/comodín) por el aviso EN FLUJO, centrado y con wrap. Al
+            limpiarse elimNotice (lo hace runEliminationCeremony tras ELIM_NOTICE_MS),
+            el contenido normal reaparece solo. */}
+        {!elimNotice && (
+          <>
+            <div className="pot-box">
+              <span className="pot-label">Pozo</span>
+              <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
+                {game.pot}
+              </strong>
+              {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
+            </div>
+            <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
+              <span className="pot-label">A igualar</span>
+              <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
+            </div>
+            {/* key cambia solo en acciones → reproduce el pop sin animar mensajes neutros de fase/reparto */}
+            <p className={`game-message${msgClass}`} key={actionKind ? centerMsg : 'msg'}>
+              {centerMsg}
+            </p>
+            {/* C4.4: el chip refleja el estado real según jugadores vivos. Solo en
+                mesas que pudieron tener comodín (arrancaron en 4+); las de 2-3 no
+                muestran nota (regresión preservada). C4.5: destella al cambiar las
+                reglas (key=noteFlash remonta → corre la animación una sola vez). */}
+            {numPlayers >= 4 && (
+              <span
+                key={noteFlash}
+                className={`comodin-note${noteFlash > 0 ? ' comodin-note-flash' : ''}`}
+              >
+                {comodinNote}
+              </span>
+            )}
+          </>
         )}
 
-        {/* C4.5.2: aviso de eliminación — overlay absoluto en una banda HORIZONTAL
-            limpia, un poco por debajo de la fila pozo/comodín (espacio libre del
-            felt). Así sale horizontal en una sola línea y legible en TODAS las
-            reducciones (5→4, 4→3, 3→2), sin apretarse entre pozo y comodín.
-            No ocupa flujo ni empuja nada (ley de anclaje). */}
+        {/* Aviso de reducción EN FLUJO dentro del óvalo (variante .elim-notice-inline,
+            sin position:absolute): centrado, envuelve y se adapta al ancho. Reemplaza
+            el contenido de arriba mientras está activo. */}
         {elimNotice && (
-          <div className="elim-notice" key={elimNotice.id}>{elimNotice.text}</div>
+          <div className="elim-notice-inline" key={elimNotice.id}>{elimNotice.text}</div>
         )}
       </section>
+    )
+  }
+
+  // Mesa de 2 · LANDSCAPE — el óvalo único se parte en DOS óvalos anclados en la
+  // franja baja del área de la IA: IZQUIERDO = POZO (+ "A igualar"), DERECHO =
+  // mensaje de estado adaptado en vertical. Reutiliza las MISMAS clases internas
+  // (.pot-box/.pot-label/.pot-value/.pot-float/.call-box/.game-message + sus
+  // modificadores) para heredar el estilo existente; solo cambia el contenedor.
+  // No incluye .comodin-note (no aplica al 2: guardado por numPlayers>=4) ni
+  // .elim-notice (no se renderiza en el 2). Portrait y 3/4/5 siguen en center-zone.
+  function renderTwoOvalsZone() {
+    const centerMsg  = discardMsg ?? game.message
+    const actionKind = game.winner !== null ? null : messageActionKind(centerMsg)
+    const msgClass = game.winner === 0 ? ' msg-win'
+                   : game.winner !== null ? ' msg-lose'
+                   : actionKind ? ` msg-action msg-action-${actionKind}` : ''
+    return (
+      <div className="two-ovals">
+        <section className="felt-oval oval-left">
+          <div className="pot-box">
+            <span className="pot-label">Pozo</span>
+            <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
+              {game.pot}
+            </strong>
+            {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
+          </div>
+          <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
+            <span className="pot-label">A igualar</span>
+            <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
+          </div>
+        </section>
+        <section className="felt-oval oval-right">
+          <p className={`game-message${msgClass}`} key={actionKind ? centerMsg : 'msg'}>
+            {centerMsg}
+          </p>
+        </section>
+      </div>
     )
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="game-table-screen">
-      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}`}>
+      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}${aliveN === 2 ? ' table-two' : ''}`}>
 
         <header className="table-header">
           <h1 className="table-title">AJILEI</h1>
@@ -876,11 +953,27 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             (aliveN), sin importar el tamaño inicial (C4.2.14). La mesa de 2 (sea
             de arranque o reducida por quiebra) usa el espejo dinámico con el
             asiento real del superviviente. */}
-        {aliveN === 2 && (
+        {/* Mesa de 2 · PORTRAIT — espejo legacy (.ai-zone), INTACTO. El hook de
+            orientación garantiza que solo este branch monte en vertical → las refs
+            del rival no se duplican con el panel compacto de landscape. */}
+        {aliveN === 2 && !isLandscapeTable && (
           <>
             {renderTwoPlayerRival(livingRivalsInDisplayOrder(game.players)[0])}
             {renderCenterZone()}
           </>
+        )}
+        {/* Mesa de 2 · LANDSCAPE — panel compacto (.opp-panel) dentro del esqueleto
+            .table-mid, igual que 3/4/5. El rival único cae en 'top-center'
+            (seatLayouts) → renderRivalsTopRow lo pinta. Override de 1 IA en CSS. */}
+        {aliveN === 2 && isLandscapeTable && (
+          <div className={`table-mid${reflowing ? ' reflow-settle' : ''}`}>
+            <div className="side-col side-col-left">{seatsAt('side-left').map(renderPanel)}</div>
+            <div className="mid-center">
+              {renderRivalsTopRow()}
+              {renderTwoOvalsZone()}
+            </div>
+            <div className="side-col side-col-right">{seatsAt('side-right').map(renderPanel)}</div>
+          </div>
         )}
         {aliveN >= 3 && (
           <div className={`table-mid${reflowing ? ' reflow-settle' : ''}`}>
@@ -1070,6 +1163,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           key={fc.id}
           fromX={fc.fromX} fromY={fc.fromY}
           toX={fc.toX}     toY={fc.toY}
+          w={fc.w}         h={fc.h}
           duration={fc.fast ? 0.75 : 0.595}
           onDone={() => {
             setFlyingCards(prev => prev.filter(c => c.id !== fc.id))
