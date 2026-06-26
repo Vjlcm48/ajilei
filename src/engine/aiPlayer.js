@@ -92,6 +92,12 @@ export function decideBetAction(state, aiIndex) {
   // Engine will force-fold if chips < toCall, but we mirror it here for safety
   if (toCall > 0 && ai.chips < toCall) return { action: 'retirarse' }
 
+  // Saldo (defensa en profundidad): solo intentar 'subir' si alcanza para el
+  // monto TOTAL de la subida (toCall + unit). Si no, se degrada a 'igualar'
+  // (la igualada ya está garantizada por la guarda de arriba). No se intenta
+  // ninguna acción impagable; el motor es la garantía dura de saldo ≥ 0.
+  const canAffordRaise = ai.chips >= toCall + unit
+
   // Ajilei always plays aggressively regardless of profile
   if (isAjilei(ai.cards, ruleN)) {
     return { action: currentBet > 0 ? 'subir' : 'apostar' }
@@ -115,13 +121,14 @@ export function decideBetAction(state, aiIndex) {
 
   // ── No bet yet: open or pass ──────────────────────────────────────────────
   if (currentBet === 0) {
-    if (score >= openMin) return { action: 'apostar' }
+    // Saldo: no abrir si no se puede cubrir la apuesta de apertura (unit) → pasar.
+    if (score >= openMin && ai.chips >= unit) return { action: 'apostar' }
     return { action: 'pasar' }
   }
 
   // ── BET_1: only 2 cards — call liberally; fold only on big raise + weak hand
   if (phase === 'BET_1') {
-    if (score >= raiseMin)               return { action: 'subir' }
+    if (score >= raiseMin)               return canAffordRaise ? { action: 'subir' } : { action: 'igualar' }
     if (score >= callMin)                return { action: 'igualar' }
     if (toCall <= unit * 2)              return { action: 'igualar' }  // cheap-call safety
     return { action: 'retirarse' }
@@ -129,7 +136,7 @@ export function decideBetAction(state, aiIndex) {
 
   // ── BET_2: 5 cards — real hand evaluation ────────────────────────────────
   if (phase === 'BET_2') {
-    if (score >= raiseMin) return Math.random() < 0.6 ? { action: 'subir' } : { action: 'igualar' }
+    if (score >= raiseMin) return (canAffordRaise && Math.random() < 0.6) ? { action: 'subir' } : { action: 'igualar' }
     if (score >= callMin + 4)            return { action: 'igualar' }
     if (score >= callMin) return toCall <= unit * 2 ? { action: 'igualar' } : { action: 'retirarse' }
     return { action: 'retirarse' }
@@ -137,7 +144,7 @@ export function decideBetAction(state, aiIndex) {
 
   // ── BET_3: post-discard — highest bar ────────────────────────────────────
   if (phase === 'BET_3') {
-    if (score >= raiseMin) return Math.random() < 0.7 ? { action: 'subir' } : { action: 'igualar' }
+    if (score >= raiseMin) return (canAffordRaise && Math.random() < 0.7) ? { action: 'subir' } : { action: 'igualar' }
     if (score >= callMin + 4)            return { action: 'igualar' }
     if (score >= callMin) return toCall <= unit ? { action: 'igualar' } : { action: 'retirarse' }
     return { action: 'retirarse' }

@@ -228,8 +228,14 @@ function applyBetAction(state, playerIndex, action, betAmount) {
   const player  = state.players[playerIndex]
   const toCall  = currentBet - player.contrib
 
-  // Force fold if chips insufficient for call
+  // REGLA: saldo nunca negativo. Si no cubre el monto completo de la acción,
+  // retiro forzado (Opción A). No existe all-in parcial en esta fase.
+  // Guarda original — igualar (o cualquier acción con call pendiente impagable):
   if (toCall > 0 && player.chips < toCall && action !== 'retirarse') action = 'retirarse'
+  // apostar: monto de apertura impagable → retiro forzado.
+  if (action === 'apostar' && amount > player.chips) action = 'retirarse'
+  // subir: monto TOTAL a poner (newBet − contrib) impagable → retiro forzado.
+  if (action === 'subir' && ((currentBet + amount) - player.contrib) > player.chips) action = 'retirarse'
 
   let newPlayer     = { ...player, acted: true }
   let newCurrentBet = currentBet
@@ -265,6 +271,10 @@ function applyBetAction(state, playerIndex, action, betAmount) {
       newPlayer.folded = true
       break
   }
+
+  // CLAMP DURO: garantía matemática de que el saldo jamás sea < 0 por ninguna
+  // ruta (presente o futura). Con las guardas de arriba no debería activarse.
+  newPlayer.chips = Math.max(0, newPlayer.chips)
 
   pot += potDelta
   let newPlayers = state.players.map((p, i) => i === playerIndex ? newPlayer : p)
