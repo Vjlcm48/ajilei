@@ -319,8 +319,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       id: `fly-${phase}-${step}`,
       fromX: dr.left, fromY: dr.top,
       toX:   sr.left, toY:   sr.top,
-      // 2-landscape: carta en vuelo al tamaño REAL del slot (63×98); resto undefined.
-      ...(aliveN === 2 && isLandscapeTable && { w: sr.width, h: sr.height }),
+      // Regla universal: la carta viaja al tamaño del DESTINO. Reparto mazo→slot →
+      // destino = slot (sr).
+      w: sr.width, h: sr.height,
       dealSeat: seat, dealCardIndex: cardIndex,
     }])
   }
@@ -494,8 +495,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       id: `dout-${seat}-${idx}`,
       fromX: sr.left, fromY: sr.top,
       toX:   dr.left, toY:   dr.top,
-      // 2-landscape: carta en vuelo al tamaño REAL del slot (63×98); resto undefined.
-      ...(aliveN === 2 && isLandscapeTable && { w: sr.width, h: sr.height }),
+      // Regla universal: tamaño del DESTINO. Descarte saliente slot→mazo → destino
+      // = mazo (dr).
+      w: dr.width, h: dr.height,
       fast: true, isDiscardOut: true,
     }])
   }
@@ -511,8 +513,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       id: `din-${seat}-${idx}`,
       fromX: dr.left, fromY: dr.top,
       toX:   sr.left, toY:   sr.top,
-      // 2-landscape: carta en vuelo al tamaño REAL del slot (63×98); resto undefined.
-      ...(aliveN === 2 && isLandscapeTable && { w: sr.width, h: sr.height }),
+      // Regla universal: tamaño del DESTINO. Descarte entrante mazo→slot → destino
+      // = slot (sr).
+      w: sr.width, h: sr.height,
       fast: true, isDiscardIn: true, seat, slotIdx: idx,
     }])
   }
