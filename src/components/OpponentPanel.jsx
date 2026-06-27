@@ -37,7 +37,7 @@ export default function OpponentPanel({
         {isTurn && <span className="seat-badge seat-badge-gold">Turno</span>}
         {isWinner && score && <span className="win-score-chip">{score.points}</span>}
       </div>
-      <span className="opp-chips"><BalanceDisplay chips={player.chips} /> fichas</span>
+      <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>
 
       <div className="opp-cards">
         {Array.from({ length: 5 }, (_, i) => (

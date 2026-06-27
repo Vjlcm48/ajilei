@@ -1,95 +1,24 @@
-/* ── Root container ─────────────────────────────────────────────────────────
-   display: inline-block → box-shadow has a clean rectangular target;
-   position: relative    → containing block for the absolute float text.      */
+/* BalanceDisplay — token de ficha + número */
 .bd {
-  display: inline-block;
-  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-/* ── Number ─────────────────────────────────────────────────────────────────
-   display: inline-block required: transform does not apply to inline spans.
-   transform-origin centered so the scale pulse expands from the center.      */
-.bd-num {
-  display: inline-block;
-  transform-origin: center center;
-}
-
-/* ── Pulse keyframes ────────────────────────────────────────────────────────
-   Only transform is animated — no font-size, margin, padding, or any
-   property that triggers reflow.                                              */
-@keyframes bd-pulse-gain {
-  0%   { transform: scale(1)    translateY(0);    }
-  40%  { transform: scale(1.08) translateY(-3px); }
-  100% { transform: scale(1)    translateY(0);    }
-}
-
-@keyframes bd-pulse-loss {
-  0%   { transform: scale(1)    translateY(0);   }
-  40%  { transform: scale(1.04) translateY(2px); }
-  100% { transform: scale(1)    translateY(0);   }
-}
-
-.bd-pulse-gain { animation: bd-pulse-gain 350ms ease-out forwards; }
-.bd-pulse-loss { animation: bd-pulse-loss 250ms ease-out forwards; }
-
-/* ── Halo keyframes ─────────────────────────────────────────────────────────
-   Implemented via box-shadow only — does not affect layout.                  */
-@keyframes bd-halo-gain-anim {
-  0%   { box-shadow: 0 0 9px 2px rgba(var(--gold-dim-rgb), 0.38); }
-  100% { box-shadow: 0 0 0px 0px rgba(var(--gold-dim-rgb), 0);    }
-}
-
-@keyframes bd-halo-loss-anim {
-  0%   { box-shadow: 0 0 6px 1px rgba(var(--loss-red-rgb), 0.3); }
-  100% { box-shadow: 0 0 0px 0px rgba(var(--loss-red-rgb), 0);   }
-}
-
-.bd-halo-gain {
-  border-radius: 4px;
-  animation: bd-halo-gain-anim 500ms ease-out forwards;
-}
-
-.bd-halo-loss {
-  border-radius: 4px;
-  animation: bd-halo-loss-anim 350ms ease-out forwards;
-}
-
-/* ── Float text ─────────────────────────────────────────────────────────────
-   position: absolute → completely out of flow, cannot push any element.
-   Centered horizontally over the number via left:50% + translateX(-50%).
-   No ancestor in .ai-info / .ai-zone / .player-bar-right / .player-zone has
-   overflow:hidden (verified), so the text is never clipped.                  */
-.bd-float {
-  position: absolute;
-  left: 50%;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-@keyframes bd-float-gain-anim {
-  0%   { opacity: 1; transform: translateX(-50%) translateY(0);     }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-}
-
-@keyframes bd-float-loss-anim {
-  0%   { opacity: 1; transform: translateX(-50%) translateY(0);   }
-  100% { opacity: 0; transform: translateX(-50%) translateY(8px); }
-}
-
-/* Dorado — conecta con el palo de Oros y el color de fichas/moneda */
-.bd-float-gain {
+.bd--full .bd-num {
+  font-size: 18px;
+  font-weight: 700;
   color: var(--gold-brand);
-  top: -2px;
-  animation: bd-float-gain-anim 800ms ease-out forwards;
 }
 
-/* Rojo vino — pérdida, alerta suave */
-.bd-float-loss {
-  color: var(--loss-red);
-  top: 0;
-  animation: bd-float-loss-anim 650ms ease-out forwards;
+.bd--compact .bd-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-brand);
+}
+
+.bd--icon .bd-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-brand);
 }

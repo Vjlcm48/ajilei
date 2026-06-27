@@ -770,7 +770,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             {turnSeat === seat && <span className="seat-badge seat-badge-gold">Turno</span>}
             {rivalWon && <span className="win-score-chip">{rival.score.points}</span>}
           </span>
-          <span className="ai-chips"><BalanceDisplay chips={rival.chips} /> fichas</span>
+          <span className="ai-chips"><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
@@ -1139,7 +1139,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             </div>
 
             <span className="player-bar-right">
-              <span className="pbr-chips"><BalanceDisplay chips={human.chips} /> fichas</span>
+              <span className="pbr-chips"><BalanceDisplay chips={human.chips} size="full" /> fichas</span>
               <span className="pbr-sep"> · </span>
               <span className="pbr-mesa">Mesa {unit}</span>
             </span>
