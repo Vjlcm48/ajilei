@@ -37,8 +37,8 @@
   right: 20px;
   display: flex;
   flex-direction: row;
-  align-items: baseline;
-  gap: 5px;
+  align-items: center;   /* G#3 F8: "SALDO:" alineado con ficha+número+fichas (antes baseline) */
+  gap: 6px;
 }
 
 .mode-balance-label {
@@ -52,6 +52,9 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--gold-brand);
+  display: inline-flex;   /* token (.bd) + " fichas" alineados verticalmente (G#3 F6) */
+  align-items: center;
+  gap: 4px;
 }
 
 /* ── Title ── */
