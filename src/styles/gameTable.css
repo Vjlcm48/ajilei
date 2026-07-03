@@ -47,15 +47,6 @@
   font-size: 22px;
 }
 
-.table-badge {
-  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
-  color: var(--gold-brand);
-  border-radius: 999px;
-  padding: 5px 14px;
-  font-size: 12px;
-  background: var(--surface-area);
-}
-
 .header-chips {
   color: var(--gold-brand);
   font-size: 14px;
@@ -83,7 +74,10 @@
 }
 
 .ai-label { color: rgba(var(--text-primary-rgb), 0.65); }
-.ai-chips  { color: var(--gold-brand); font-weight: 700; }
+.ai-chips  { color: var(--gold-brand); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+
+/* Saldo del humano: token (.bd) + " fichas" alineados verticalmente (G#3 F5). */
+.pbr-chips { display: inline-flex; align-items: center; gap: 4px; }
 
 .score-tag {
   margin-top: 8px;
@@ -146,7 +140,9 @@
 }
 
 .pot-value {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 26px;
   color: var(--gold-brand);
   line-height: 1.1;
@@ -992,12 +988,15 @@
 
   /* ── Header compacto en una sola fila ── */
   .table-title { font-size: 18px; letter-spacing: 3px; }
-  .table-badge { padding: 4px 10px; font-size: 11px; }
 
   /* ── Zona central: pozo + mensaje, compacta y con wrap ── */
+  /* G#3 F15: el POZO se mantiene FIJO arriba-izquierda. Antes con justify-content:
+     center, al envolver el mensaje la 1ª línea (POZO + "A igualar") se recentraba y
+     al caber se iba a la izquierda → vaivén. Con flex-start el POZO queda anclado al
+     borde izquierdo del óvalo en TODAS las fases (no se mueve). */
   .center-zone {
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 8px 12px;
     border-radius: 999px;
     background: radial-gradient(
@@ -1012,6 +1011,35 @@
       inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10);
     padding: 6px 22px;     /* reemplaza el padding actual; el horizontal mayor evita que el contenido toque los extremos curvos */
     min-height: 42px;
+  }
+
+  /* G#3 · SOLO mesa de 3 portrait. mid-center llena la franja (flex:1) con las IAs
+     arriba y el óvalo abajo. El ÓVALO se dimensiona IGUAL que el de la mesa de 2:
+     en vez de una píldora fija de 76px centrada con margin:auto, CRECE y llena el
+     espacio restante bajo las IAs (flex:1 heredado del .center-zone base +
+     min-height:42px). El espacio humano↔IAs es prácticamente el mismo que en la
+     mesa de 2, así que el contorno verde queda muy parecido.
+     Los elementos internos NO se mueven: antes quedaban en el centro vertical de la
+     franja (píldora centrada con margin:auto); ahora el óvalo llena esa misma franja
+     y `align-items:center` los mantiene en el MISMO centro — solo se agranda el
+     contorno del óvalo. No afecta 2/4/5. */
+  .table-three .mid-center { flex: 1; }
+  /* G#3 · Mesa de 3 · PORTRAIT — POZO QUIETO toda la partida (mismo criterio que la
+     mesa de 2). El center-zone es flex-wrap; según el largo del mensaje variaban (a)
+     el nº de líneas (pozo+"A igualar" / mensaje) y (b) el alto del mensaje (height:
+     auto) → el recuadro POZO subía y bajaba al cambiar de fase. Fix CSS-only (solo
+     .table-three) que neutraliza AMBAS causas:
+       (1) el mensaje SIEMPRE ocupa su propia línea (flex-basis:100%) → 2 líneas
+           constantes en el óvalo;
+       (2) altura FIJA del mensaje (36px ≈ 2 líneas a 13px) → el bloque no cambia de
+           alto aunque el texto sea de 1 o 2 líneas.
+     Con align-content:center el bloque de 2 líneas se centra en el óvalo → el POZO
+     queda fijo en su posición de entrada. El mensaje y "A igualar" conservan su
+     dinámica (su texto sigue cambiando dentro de su caja). */
+  .table-three .center-zone { align-content: center; }
+  .table-three .center-zone .game-message {
+    flex-basis: 100%;   /* siempre en su propia línea → nº de líneas constante */
+    height: 36px;       /* alto fijo (hasta 2 líneas) → el bloque no cambia → POZO quieto */
   }
   .pot-box    { min-width: 64px; padding: 5px 12px; }
   .pot-value  { font-size: 20px; }
@@ -1257,6 +1285,56 @@
   .player-bar-left   { grid-area: who; }
   .player-bar-right  { grid-area: balance; }
 
+  /* ── G#3 · Ajustes del jugador humano (portrait, mesas 2/3/4/5) ───────────────
+     Solo afectan a portrait; el inline de escritorio y el grid de landscape (que
+     viven en otras media queries) quedan intactos. Ajuste netamente visual. */
+
+  /* (1)+(2) · player-bar-left en grid de 2 filas:
+       fila 1 → etiquetas MANO/PIE (.pbr-tags) ENCIMA del nombre, a la izquierda;
+       fila 2 → nombre (.pbr-name) con TURNO justo a su lado (a la derecha del
+                nombre, sea "Tú" o el futuro nombre de usuario).
+     El chip de ganador comparte la celda de TURNO (no coinciden en el tiempo). */
+  .player-bar-left {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    align-items: center;
+    justify-items: start;
+    column-gap: 6px;
+    row-gap: 8px;             /* G#3: separación TÚ ↔ MANO/PIE aumentada (4px → 8px) */
+    overflow: visible;        /* permitir la fila superior de etiquetas (no recortar) */
+  }
+  /* el wrapper .pbr-badges se aplana en portrait → .pbr-tags y .badge-turno vuelven
+     a ser celdas directas del grid de player-bar-left (colocación de abajo intacta) */
+  .player-bar-left .pbr-badges { display: contents; }
+  .player-bar-left .pbr-tags {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .player-bar-left .pbr-name       { grid-column: 1; grid-row: 2; }
+  .player-bar-left .badge-turno,
+  .player-bar-left .win-score-chip { grid-column: 2; grid-row: 2; }
+  /* en el grid el espaciado lo da el gap → se anula el margin-left inline de los badges */
+  .player-bar-left .pbr-tags .seat-badge,
+  .player-bar-left .badge-turno,
+  .player-bar-left .win-score-chip { margin-left: 0; }
+
+  /* (3) · saldo del humano en DOS líneas alineadas a la DERECHA: "🪙 N fichas"
+     arriba y "Mesa N" debajo, con los bordes derechos alineados → la "s" de
+     "fichas" cae sobre el último dígito de "Mesa N". Respecto a la línea única
+     anterior, el saldo sube (línea propia) y se va a la derecha (borde alineado). */
+  .player-bar-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.15;
+  }
+  .pbr-sep  { display: none; }
+  .pbr-mesa { display: block; font-size: 11px; color: var(--text-secondary); }
+
   /* La franja de acción puede crecer si hace falta, sin recortar (en móvil un
      leve ajuste de alto es preferible a clipping de botones) — min-height
      flexible obligatorio. */
@@ -1290,6 +1368,20 @@
 
   /* Comodín (mesas 4-5): nota compacta */
   .comodin-note { font-size: 10px; padding: 3px 10px; }
+
+  /* G#3 · Mesa de 2 · PORTRAIT — POZO QUIETO durante toda la partida.
+     Causa del vaivén: el center-zone es flex-wrap; según el largo del mensaje
+     el bloque pozo+"A igualar" y el mensaje caben en 1 línea (pozo centrado) o
+     el mensaje envuelve a una 2ª línea (pozo se sube). Al alternar fases, el nº
+     de líneas oscilaba 1↔2 → el recuadro POZO subía y bajaba.
+     Fix (CSS-only, solo .table-two): el mensaje SIEMPRE ocupa su propia línea
+     (flex-basis:100%), de modo que el óvalo tiene SIEMPRE 2 líneas — recuadro
+     POZO (+ "A igualar") arriba, mensaje abajo — sin importar el texto. El
+     bloque de 2 líneas se centra verticalmente (align-content:center) → el
+     POZO queda fijo en su posición de entrada toda la mano. El mensaje y "A
+     igualar" conservan su dinámica. NO afecta 3/4/5. */
+  .table-two .center-zone { align-content: center; }
+  .table-two .center-zone .game-message { flex-basis: 100%; }
 }
 
 /* ── Teléfono HORIZONTAL (landscape) — Tanda C5.1 ────────────────────────────
@@ -1331,7 +1423,6 @@
     gap: 4px;
   }
   .table-title { font-size: 16px; letter-spacing: 2px; }
-  .table-badge { padding: 3px 9px; font-size: 10px; }
 
   /* ── Franjas 1 y 2 (IAs + mesa) dentro de .table-mid ──
      flex:6 → ocupa el 60% del alto libre. Grid de DOS filas (4fr/6fr) que sobre
@@ -1455,6 +1546,83 @@
   .pot-value    { font-size: 18px; }
   .call-box     { min-width: 56px; padding: 3px 10px; }
   .call-value   { font-size: 18px; }
+
+  /* G#3 F10 · Óvalo de 5/4/3 un ~25% MÁS BAJO con BASE ANCLADA. El borde inferior no
+     se mueve (align-self:end lo fija más abajo) → toda la reducción se consume por
+     ARRIBA, abriendo aire respecto a las IAs. Caja Y contenido bajan en lockstep
+     (~×0.75) para que el pozo quede proporcionado. La mesa de 2 usa .two-ovals/
+     .felt-oval (no .center-zone) → NO se ve afectada. */
+  .table-wide .center-zone,
+  .table-four .center-zone,
+  .table-three .center-zone {
+    min-height: 20px;          /* F11: altura del óvalo −25% más (27→20), base fija */
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  /* F11: el alto lo manda el contenido + paddings, no el min-height. Para bajar el
+     óvalo otro 25% SIN tocar el tamaño del texto/token, se quita el padding vertical
+     del pozo y se compactan los line-height. La base no se mueve (align-self:end). */
+  /* F14: POZO en FILA (etiqueta a la IZQUIERDA de ficha+número), no apilado. El
+     .game-message (flex:1) mantiene el pot-box pegado al borde izquierdo del óvalo,
+     así que al ensanchar crece hacia la DERECHA sin mover su borde izquierdo ni el
+     óvalo. padding vertical 0 (F11). */
+  .table-wide .pot-box,
+  .table-four .pot-box,
+  .table-three .pot-box {
+    padding: 0 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .table-wide .pot-label,
+  .table-four .pot-label,
+  .table-three .pot-label { line-height: 1; }
+  .table-wide .pot-value,
+  .table-four .pot-value,
+  .table-three .pot-value { line-height: 1; }
+  .table-wide .pot-value .chip-token,
+  .table-four .pot-value .chip-token,
+  .table-three .pot-value .chip-token {
+    width: 11px;               /* 14 → ~11 */
+    height: 11px;
+  }
+  .table-wide .pot-label,
+  .table-four .pot-label,
+  .table-three .pot-label { font-size: 8px; }       /* 10 → ~8 */
+  .table-wide .pot-value,
+  .table-four .pot-value,
+  .table-three .pot-value { font-size: 14px; }      /* 18 → ~14 */
+  .table-wide .game-message,
+  .table-four .game-message,
+  .table-three .game-message { font-size: 9px; height: 16px; }   /* 12/22 → ~9/16 */
+  .table-wide .msg-action,
+  .table-four .msg-action,
+  .table-three .msg-action { font-size: 15px; }     /* 20 → 15 */
+  .table-wide .comodin-note,
+  .table-four .comodin-note,
+  .table-three .comodin-note { font-size: 8px; padding: 2px 8px; }  /* 10 → ~8 */
+
+  /* G#3 F8/F9 · Reparto vertical en landscape 5/4/3 (NO .table-two):
+     (1) los paneles de IA se anclan ARRIBA de la fila 1 (align-items:start) → no
+         rebosan hacia abajo y suben hacia la línea de la "X" (F9 obj 1, reforzado por
+         el min-height del header reducido más abajo);
+     (2) row-gap de 8px en el grid → buffer entre fila de IAs y fila del óvalo;
+     (3) el óvalo se ancla ABAJO de la fila 2 (align-self:end) → baja hacia el humano
+         cerrando el hueco inferior (F9 obj 2). Con las IAs ancladas arriba (no
+         centradas) ya no hay colisión, así que 'end' es seguro.
+     justify-items:center y grid-template-rows 5fr 4fr se heredan del esqueleto. */
+  .table-wide .table-mid,
+  .table-four .table-mid,
+  .table-three .table-mid {
+    align-items: start;
+    gap: 8px 6px;
+  }
+  .table-wide .center-zone,
+  .table-four .center-zone,
+  .table-three .center-zone {
+    align-self: end;
+  }
   .game-message { height: 22px; font-size: 12px; }
   .msg-action   { font-size: 20px; }
   .comodin-note { font-size: 10px; padding: 3px 10px; }
@@ -1500,8 +1668,33 @@
   .game-table-screen .game-table.table-wide,
   .game-table-screen .game-table.table-three,
   .game-table-screen .game-table.table-two {
-    --card-w: 63px;    /* C5.4 encuadre: cartas del humano +5% (60→63 / 93→98) */
-    --card-h: 98px;
+    /* G#3 · Columna izquierda del rail ENSANCHADA (saldo "9999999 fichas", 7 díg.,
+       en UNA línea). Se define aquí (en .game-table) para que el grid del .player-zone
+       la herede vía var() y el presupuesto de abajo la reste con el mismo valor. */
+    --hcol-left: 172px;
+
+    /* G#3 · CARTAS DEL HUMANO — TAMAÑO FLUIDO (aprovechan la columna central 1fr).
+       Manda lo que llegue primero: el ancho disponible repartido entre 5 cartas, o el
+       tope vertical de la banda. Proporción REAL de la carta = 1055 × 1491 (w×h).
+       --hcards-hbudget = px fijos que NO son carta dentro de 100vw: padding de pantalla
+       (10+10) + padding de la mesa (12+12) + col izq + col botones (150) + 2 column-gap
+       (10+10) + 4 gaps entre cartas (4·4). El mazo PIE ya NO reserva hueco en la fila
+       (vive en la col izq), por eso no se suma padding-left aquí.
+       --card-w se deriva de --card-h por la proporción → un solo origen, sin desfases. */
+    --hcards-hbudget: calc(20px + 24px + var(--hcol-left) + 150px + 20px + 16px);
+    --hcards-vspace: calc(45dvh - 40px);   /* tope vertical ≈ alto útil de la banda humana */
+    --card-h: min(
+      calc((100vw - var(--hcards-hbudget)) / 5 * 1491 / 1055),   /* limitado por ANCHO */
+      var(--hcards-vspace)                                        /* limitado por ALTO */
+    );
+    --card-w: calc(var(--card-h) * 1055 / 1491);
+
+    /* G#3 · TAMAÑO del mazo PIE — FUENTE ÚNICA (compartida humano + IA-mesa-2).
+       Vive aquí, en el ancestro común de .player-zone (mazo humano) y .opp-panel
+       (mazo IA), para que ambos lean la MISMA variable: si cambia, cambian los dos
+       (simetría). La POSICIÓN de cada mazo es propia (no se comparte). */
+    --pie-deck-w: 32px;
+    --pie-deck-h: 50px;
   }
 
   .table-wide .player-zone,
@@ -1509,17 +1702,40 @@
   .table-two .player-zone {
     flex: 4.5 1 0;   /* C5.4: banda del humano más alta (más cargada) */
     display: grid;
-    grid-template-columns: 142px 1fr 150px;   /* rail izq más ancho: saldo 2 líneas + badges + cronómetro */
-    grid-template-rows: auto auto auto;
+    grid-template-columns: var(--hcol-left) 1fr 150px;   /* G#3: col izq = var (saldo 7 díg. 1 línea); centro 1fr = cartas; der 150px = botones */
+    /* G#3: la fila del cronómetro (1ª) reserva SIEMPRE su alto (28px) aunque el
+       cronómetro solo se renderice en el turno del jugador. Así el bloque del rail
+       mantiene un alto constante y align-content:center no lo recentra al aparecer/
+       desaparecer el timer → los elementos no saltan (cero movimiento por turno). */
+    grid-template-rows: 28px auto auto auto;
     grid-template-areas:
-      "saldo mano acciones"
+      "timer mano acciones"
       "ident mano acciones"
-      "timer mano acciones";
+      "saldo mano acciones"
+      "tags  mano acciones";
     align-content: center;
     align-items: center;
     column-gap: 10px;
     row-gap: 3px;
-    overflow: hidden;
+    /* G#3 (Opción B): antes overflow:hidden recortaba la parte ALTA del barajado del
+       mazo PIE (fanOut sube ~16px sobre el borde del área). Se libera a visible para
+       ver la animación completa; el usuario confirmó que hay espacio arriba y acepta
+       el solape con la zona superior. Las cartas van con tamaño acotado (no desbordan). */
+    overflow: visible;
+    /* G#3 · PERÍMETRO que CONTIENE las 3 columnas (izq · cartas · botones). El grid
+       ya es de ancho completo, pero su ÁREA DE CONTENIDO se quedaba ~30px corta (el
+       chrome del contenedor: padding lateral propio 12+12, su borde 1+1 y el borde de
+       .game-table 2+2 que la fórmula fluida de --card-w no descontó) → los tracks
+       desbordaban ~15px por lado y justify-content:center los sacaba por ambos lados.
+       Se le da ese ancho EXTENDIENDO el perímetro hacia afuera (margen negativo que
+       recupera el padding lateral de .game-table) y reduciendo su padding propio.
+       Todo relativo (fluido, sin px de carta) y SOLO horizontal → el alto/vertical no
+       se toca. Con ~44px recuperados frente a ~30px de déficit, los tracks caben con
+       holgura y el recuadro verde envuelve las columnas. */
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 2px;
+    padding-right: 2px;
   }
   .table-wide .player-zone .player-bar,
   .table-three .player-zone .player-bar,
@@ -1546,7 +1762,7 @@
   }
   .table-wide .pbr-chips,
   .table-three .pbr-chips,
-  .table-two .pbr-chips { display: block; font-size: 14px; font-weight: 700; }
+  .table-two .pbr-chips { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; }
   .table-wide .pbr-sep,
   .table-three .pbr-sep,
   .table-two .pbr-sep   { display: none; }
@@ -1554,15 +1770,55 @@
   .table-three .pbr-mesa,
   .table-two .pbr-mesa  { display: block; font-size: 11px; color: var(--text-secondary); }
 
-  /* Identidad/badges del humano, debajo del saldo */
+  /* Identidad + badges del humano. G#3: player-bar-left se APLANA (display:contents)
+     para repartir sus hijos en celdas distintas del rail:
+       · el nombre (.pbr-name) queda en 'ident' (bajo el cronómetro);
+       · MANO/PIE/TURNO (.pbr-badges) bajan a 'tags', al FONDO del rail, JUSTO DEBAJO
+         de "Mesa N" (área 'saldo'). Pensado para nombres de usuario largos: los
+         badges ya no compiten por el espacio horizontal del nombre.
+     El chip de ganador se queda en 'ident', alineado al extremo derecho. */
   .table-wide .player-bar-left,
   .table-three .player-bar-left,
   .table-two .player-bar-left {
+    display: contents;
+    font-size: 11px;
+  }
+  .table-wide .player-bar-left .pbr-name,
+  .table-three .player-bar-left .pbr-name,
+  .table-two .player-bar-left .pbr-name {
     grid-area: ident;
     justify-self: start;
     align-self: start;
-    font-size: 11px;
   }
+  .table-wide .player-bar-left .win-score-chip,
+  .table-three .player-bar-left .win-score-chip,
+  .table-two .player-bar-left .win-score-chip {
+    grid-area: ident;
+    justify-self: end;
+    align-self: start;
+  }
+  .table-wide .player-bar-left .pbr-badges,
+  .table-three .player-bar-left .pbr-badges,
+  .table-two .player-bar-left .pbr-badges {
+    grid-area: tags;
+    justify-self: start;
+    align-self: start;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 4px;
+  }
+  /* dentro del grupo el espaciado lo dan los gaps → se anula el margin-left inline */
+  .table-wide .player-bar-left .pbr-tags,
+  .table-three .player-bar-left .pbr-tags,
+  .table-two .player-bar-left .pbr-tags {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .table-wide .player-bar-left .seat-badge,
+  .table-three .player-bar-left .seat-badge,
+  .table-two .player-bar-left .seat-badge { margin-left: 0; }
 
   /* (C5.4 · 1) Cronómetro al rail IZQUIERDO, prominente. El del área de acción (rail
      derecho) se oculta en landscape para que solo haya uno. */
@@ -1589,14 +1845,67 @@
   .table-three .player-zone .cards-row,
   .table-two .player-zone .cards-row {
     grid-area: mano;
-    justify-content: flex-start;
+    justify-content: center;   /* G#3: cuando el ALTO limita, el grupo queda centrado entre las dos anclas; cuando llena, va pegado */
     align-items: center;
     flex-wrap: nowrap;
-    gap: 6px;
+    gap: 4px;                  /* G#3: respiro mínimo entre cartas (6→4); coherente con --hcards-hbudget (4·4) */
+    padding: 0;                /* G#3: sin padding → las cartas usan todo el 1fr */
   }
+  /* G#3 · box-sizing:border-box SOLO en slots/cartas del humano en landscape → el
+     borde (1px normal / 2px en vacío o dorso) NO suma al ancho, así --card-w/h es
+     EXACTO y el cálculo fluido no desborda. Acotado a .player-zone + esta media query
+     → IA (.opp-card-slot), portrait y escritorio quedan intactos. */
+  .table-wide .player-zone .card-slot-wrapper,
+  .table-three .player-zone .card-slot-wrapper,
+  .table-two .player-zone .card-slot-wrapper,
+  .table-wide .player-zone .playing-card,
+  .table-three .player-zone .playing-card,
+  .table-two .player-zone .playing-card { box-sizing: border-box; }
   .table-wide .player-zone .deck-pile,
   .table-three .player-zone .deck-pile,
   .table-two .player-zone .deck-pile { margin-right: 10px; }
+
+  /* ── G#3 · MAZO del humano cuando es PIE (SOLO landscape) ─────────────────────
+     (1) TAMAÑO: 32×50, = mazo de las IAs de la mesa de 5 (--opp-card-w/h landscape).
+         NO SE TOCA. (2) UBICACIÓN: fuera de la fila de cartas, anclado (absolute) en el
+         rail izquierdo. Se MUEVE a la derecha (más lejos del cronómetro, cerca del borde
+         derecho de la col izq): en esta implementación --pie-deck-right es la X del borde
+         DERECHO, así que mover a la derecha = AUMENTARla (110 → 156), no reducirla.
+         Anclaje FIJO por px (no sigue al número del saldo). Sigue en vertical y conserva
+         el barajado a 32×50 (los .shuffle-fan-card llenan el wrapper por inset:0).
+     Portrait y escritorio NO se tocan. El mazo vive en la COLUMNA IZQUIERDA (rail); las
+     cartas viven en la columna central (mano) → columnas de grid distintas, NO se
+     solapan aunque .cards-row ya no reserve hueco (padding-left: 0 abajo).
+     · --pie-deck-right / --pie-deck-top: anclaje AFINABLE (validar en pantalla). */
+  .table-wide .player-zone,
+  .table-three .player-zone,
+  .table-two .player-zone {
+    position: relative;
+    /* --pie-deck-w/h (tamaño) ahora es FUENTE ÚNICA en .game-table (arriba) → se hereda
+       aquí idéntico (32×50). Solo la POSICIÓN del mazo humano vive en .player-zone: */
+    --pie-deck-right: 156px;   /* x del borde DERECHO del mazo, cerca del borde der. de la col izq (172px) · afinable */
+    --pie-deck-top: 6px;       /* alto: a la par del cronómetro, arriba del rail (afinable) */
+  }
+  .table-wide .player-zone .deck-shuffle-wrapper,
+  .table-three .player-zone .deck-shuffle-wrapper,
+  .table-two .player-zone .deck-shuffle-wrapper {
+    position: absolute;
+    top: var(--pie-deck-top);
+    left: calc(var(--pie-deck-right) - var(--pie-deck-w));
+    width: var(--pie-deck-w);
+    height: var(--pie-deck-h);
+    margin: 0;
+    z-index: 6;
+  }
+  .table-wide .player-zone .deck-pile,
+  .table-three .player-zone .deck-pile,
+  .table-two .player-zone .deck-pile {
+    width: var(--pie-deck-w);
+    height: var(--pie-deck-h);
+    margin: 0;                 /* anula el margin-right:10px de arriba (ya no separa cartas) */
+  }
+  /* G#3: el mazo PIE ya NO ocupa la fila de cartas (vive en la col izq), así que la
+     fila NO reserva hueco → las cartas usan todo el 1fr (padding-left:0, arriba). */
 
   /* Rail DERECHO (acciones): botones en columna vertical; el principal arriba
      (al alcance del pulgar). El área de acción deja el alto fijo de fila simple
@@ -1711,11 +2020,14 @@
   /* Bocina al margen derecho de la franja central, a la derecha del óvalo y
      alineada verticalmente con el POZO/comodín (top:50% = centro del óvalo) →
      espejo exacto de AJILEI (left:12 / top:50%). Tamaño base, sin sobredimensionar. */
+  /* F12: bocina anclada por su BORDE SUPERIOR a la línea del tope del óvalo (antes
+     centrada con translateY). El offset (50% − 24px) es el knob de calibración:
+     más negativo = más arriba. Su top debe coincidir con el de AJILEI y el tope del óvalo. */
   .table-five .mute-button {
     position: absolute;
     right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    top: calc(50% - 24px);
+    transform: none;
     z-index: 20;
   }
   /* Con title y header-right fuera del flujo, el badge de fase queda solo en la
@@ -1728,11 +2040,13 @@
      mesa, de ahí top:50%). Absoluto → no se duplica ni deja rastro en la esquina,
      y el solape con IA4 desaparece (IA4 vive en la fila superior, este queda en la
      central). */
+  /* F12: AJILEI anclado por su BORDE SUPERIOR a la línea del tope del óvalo (mismo
+     offset que la bocina → ambos topes alineados con el tope del óvalo). */
   .table-five .table-title {
     position: absolute;
     left: 12px;
-    top: calc(50% - 9px);   /* C5.4: sube un poco para dejar "Mano #N" justo debajo */
-    transform: translateY(-50%);
+    top: calc(50% - 24px);
+    transform: none;
     margin: 0;
     white-space: nowrap;
     z-index: 20;
@@ -1740,18 +2054,18 @@
 
   /* (C5.4 · 3) "Mano #N" debajo del logo AJILEI (mismo margen izquierdo), no en el
      tope-centro. Absoluto, alineado a la izquierda con AJILEI. */
+  /* F13: "Mano #N" a la DERECHA de AJILEI (misma línea), no debajo. left:88px lo
+     coloca tras el logo (≈12px + ancho de "AJILEI" + aire); top ligeramente por
+     debajo del de AJILEI para igualar la línea base (10px vs 16px). Ambos knobs
+     (left, top) afinables en validación. */
   .table-five .hand-badge {
     position: absolute;
-    left: 12px;
-    top: calc(50% + 12px);
-    transform: translateY(-50%);
+    left: 88px;
+    top: calc(50% - 19px);
+    transform: none;
     z-index: 20;
   }
 
-  /* (C5.4 · 4) Indicador de etapa ("A las 2"/"Descarte"): tras salir "Mano #N",
-     queda solo en header-center y se centra arriba (header justify-content:center,
-     C5.3); un punto más legible. */
-  .table-five .table-badge { font-size: 12px; padding: 4px 12px; }
   /* El óvalo se estrecha con canaletas simétricas para dejar holgura al logo a su
      izquierda (y seguir centrado, con el POZO al medio). Sigue siendo estadio a
      buen ancho. */
@@ -1797,21 +2111,9 @@
      hand-badge, badge y header-right absolutos, la cabecera colapsaba a ~0 y las IAs
      quedaban pegadas arriba. min-height baja .table-mid (y la fila de IAs) hasta
      alinearla con el 5 jug. ~30px estimado; afinar en pasos de 2px (rango 26-34). */
-  .table-four .table-header { justify-content: center; min-height: 30px; }
-  /* "A las 2" corrido a la DERECHA del centro (hueco entre IA2 e IA1): centrado
-     arriba se solapaba con IA2 y no había alto para subirlo. left: 68% es el punto
-     de partida parametrizado (afínalo si roza en validación visual); transform
-     -50% lo centra sobre ese punto y z-index 20 lo deja por encima de bordes. */
-  .table-four .table-badge {
-    position: absolute;
-    top: 6px;
-    left: 68%;
-    transform: translateX(-50%);
-    z-index: 20;
-    font-size: 12px;
-    padding: 4px 12px;
-  }
-
+  /* F9 obj 1: header sin alto reservado (sus hijos son absolutos) → la fila de IAs
+     sube hasta ~la línea de la X (top:6px). */
+  .table-four .table-header { justify-content: center; min-height: 0; }
   /* AJILEI: esquina superior IZQUIERDA (NO junto al óvalo como en .table-five). */
   .table-four .table-title {
     position: absolute;
@@ -1887,19 +2189,10 @@
     gap: 8px;
   }
 
-  .table-three .table-badge {        /* indicador CENTRADO arriba (consistente con 5) */
-    position: absolute;
-    top: 6px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 20;
-    font-size: 12px;
-    padding: 4px 12px;
-  }
-  /* Con el esqueleto .table-mid (flex 5.5/4.5) las IAs cuelgan del grid tras el
-     header, igual que en table-four → 30px da el respiro correcto. */
+  /* F9 obj 1: header sin alto reservado (hijos absolutos) → la fila de IAs sube
+     hasta ~la línea de la X. */
   .table-three .table-header {
-    min-height: 30px;
+    min-height: 0;
   }
 
   /* Override único del 3 sobre el esqueleto table-mid heredado: 2 columnas (no 4)
@@ -1937,26 +2230,16 @@
     align-items: end;
   }
 
-  /* Cabecera del 2: AJILEI izq, "Mano #" debajo, bocina·✕ a la derecha y el
-     indicador de etapa a la DERECHA (no centrado como 3/5). right:64px lo deja a
-     la izquierda de bocina/✕ — punto de partida, a afinar en validación. */
+  /* Cabecera del 2: AJILEI izq, "Mano #" debajo, bocina·✕ a la derecha. */
   .table-two .table-title  { position: absolute; left: 12px; top: 6px; margin: 0; white-space: nowrap; z-index: 20; }
   .table-two .hand-badge   { position: absolute; left: 12px; top: 28px; z-index: 20; }
-  /* Fila superior derecha: indicador de etapa · bocina · ✕ en UNA línea, alineados
-     arriba y sin solape. .table-badge vive en .header-center (no es hermano de
-     .header-right) y el JSX del header es compartido por 2/3/4/5 → no se puede
-     mover por flex sin afectar a las otras mesas. Vía determinista (no offset
-     adivinado): se fija bocina y ✕ a tamaño cuadrado uniforme (32×28) → el ancho
-     del grupo es conocido = 32 + 8(gap) + 32 = 72px, anclado a right:8px (ocupa
-     right 8→80px). El indicador se ancla EXACTAMENTE a su izquierda con el MISMO
-     gap: right = 8(anclaje) + 72(grupo) + 8(gap) = 88px. Cero solape, gap uniforme. */
+  /* Fila superior derecha: bocina · ✕ en una línea, cuadradas y uniformes (32×28). */
   .table-two .header-right { position: absolute; top: 6px; right: 8px; z-index: 20; display: flex; flex-direction: row; align-items: center; gap: 8px; }
   .table-two .header-right .mute-button,
   .table-two .header-right .btn-leave {
     width: 32px; height: 28px; padding: 0;
     display: inline-flex; align-items: center; justify-content: center;
   }
-  .table-two .table-badge  { position: absolute; top: 6px; right: 88px; z-index: 20; font-size: 12px; padding: 4px 12px; }
   .table-two .table-header { min-height: 30px; }
 
   /* ── 2 jug landscape · DOS óvalos FLANQUEANDO al panel de la IA ────────────────
@@ -1971,7 +2254,49 @@
 
   /* Asignación a columnas: O1→1 (pegado a la izq), IA→2 (centro), O2→3 (pegado a la
      der); los tres a su parte baja. */
-  .table-two .opp-panel  { grid-column: 2; grid-row: 1; align-self: end; }
+  /* G#3 · Reacomodo vertical del panel de la IA (AJUSTES 1 + 3):
+     · AJUSTE 1 (borde SUPERIOR fijo): antes align-self:end → el panel era
+       content-height y su tope flotaba con el contenido. Ahora align-self:stretch
+       llena la celda del grid y un margin-top negativo SUBE el borde superior hasta
+       la línea de "AJILEI" (top:6px). El offset ≈ distancia de la cima de .table-mid
+       a esa línea = header(~30) + gap(~4) − 6 ≈ 28px, todo px de layout FIJO (no
+       depende del viewport) → estable entre teléfonos. AFINABLE.
+     · AJUSTE 3 (borde INFERIOR fijo): stretch llega hasta el fondo de la celda, que
+       es el mismo fondo de los óvalos (align-items:end del grid) → el borde inferior
+       NO se mueve. margin-bottom queda en 0.
+     Resultado: alto FIJO (tope y base fijos) → el panel ya no crece/encoge con el
+     contenido (estático entre bienvenida y juego). justify-content:flex-start apila
+     cabecera + cartas ARRIBA (cartas pegadas a la cabecera). Solo .table-two landscape. */
+  .table-two .opp-panel {
+    grid-column: 2; grid-row: 1;
+    align-self: stretch;
+    margin-top: -28px;               /* AFINABLE: sube el tope a la línea de AJILEI */
+    justify-content: flex-start;
+  }
+  /* AJUSTE 3 · el texto de estado (pensando/pasó/igualó) baja al fondo del panel
+     (margin-top:auto) → queda MÁS AIRE entre las cartas y el estado, más legible. */
+  .table-two .opp-status { margin-top: auto; }
+
+  /* G#3 · CABECERA DE LA IA EN UNA SOLA LÍNEA (fusión). El wrapper .opp-topline es una
+     fila: identidad (nombre + badges) al EXTREMO IZQUIERDO y saldo (ficha + monto) al
+     EXTREMO DERECHO (space-between). El ancho lo aporta la fila de 5 cartas (panel con
+     max-width:none) → cabe "9999999 fichas" sin romper ni empujar la identidad.
+     AJUSTE 2 (reserva de badges): height FIJO de la fila = alto del caso máximo (fila
+     con badge; MANO/PIE/TURNO van en línea, así que 1 o 2 badges dan el MISMO alto que
+     0). Al ser altura fija, mostrar/ocultar badges NO cambia la geometría → las cartas
+     no se desplazan (cero "saltito") en ningún estado. No se toca la lógica de badges.
+     Solo .table-two landscape. AFINABLE (height). */
+  .table-two .opp-topline {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    height: 24px;        /* reserva del alto de la fila de badges (caso máximo) · AFINABLE */
+    flex-shrink: 0;
+  }
+  .table-two .opp-topline .opp-chips { white-space: nowrap; flex-shrink: 0; }
 
   /* Piel de óvalo (racetrack) — misma que el center-zone landscape: radial verde de
      marca, borde dorado fino y brillo interno. Aplicada por separado a cada sección. */
@@ -2115,5 +2440,18 @@
     right: calc(100% + 8px);
     top: 50%;
     transform: translateY(-50%);
+  }
+
+  /* G#3 · TAMAÑO del mazo IA-PIE (mesa de 2, landscape) = mazo del humano-PIE.
+     Se ata a --pie-deck-w/h (fuente única en .game-table) → simetría: si cambia el
+     mazo del humano, este cambia con él. SOLO el mazo (.deck-pile.opp-deck y su
+     .shuffle-fan-card); las cartas de juego de la IA (.opp-card-slot) siguen con
+     --opp-card-w/h (= --card-w), sin cambio. Mayor especificidad (.game-table.table-two,
+     0,4,0) para ganar al var(--opp-card-w) base (opponentPanel.css, 0,2,0). La POSICIÓN
+     del mazo (regla de arriba) NO se toca. */
+  .game-table.table-two .deck-pile.opp-deck,
+  .game-table.table-two .opp-deck-wrapper .shuffle-fan-card {
+    width: var(--pie-deck-w);
+    height: var(--pie-deck-h);
   }
 }

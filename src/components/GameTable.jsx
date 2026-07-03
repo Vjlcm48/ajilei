@@ -6,6 +6,7 @@ import { SoundButton } from './SoundButton'
 import { MuteButton } from './MuteButton'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
+import ChipToken from './ChipToken'
 import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
 import {
   PHASES,
@@ -664,19 +665,6 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     setTimeout(() => setIsShuffling(false), 1950)
   }
 
-  // ── Phase label ───────────────────────────────────────────────────────────
-  const phaseLabel = {
-    [PHASES.DEAL_2]:  'Repartiendo',
-    [PHASES.BET_1]:   'A las 2',
-    [PHASES.DEAL_3]:  'Repartiendo',
-    [PHASES.BET_2]:   'A las 3',
-    [PHASES.DISCARD]: 'Descarte',
-    [PHASES.BET_3]:   'Al descarte',
-    [PHASES.PAYOUT]:  'Resultado',
-    [PHASES.WAITING]: '—',
-    [PHASES.GAME_OVER]: 'Fin de mesa',
-  }[phase] ?? phase
-
   // ── Card render helpers ───────────────────────────────────────────────────
   function renderOpponentCard(seat, i) {
     if (discardAnim) {
@@ -850,6 +838,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             <div className="pot-box">
               <span className="pot-label">Pozo</span>
               <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
+                <ChipToken size="compact" />
                 {game.pot}
               </strong>
               {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
@@ -906,6 +895,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           <div className="pot-box">
             <span className="pot-label">Pozo</span>
             <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
+              <ChipToken size="compact" />
               {game.pot}
             </strong>
             {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
@@ -932,7 +922,6 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         <header className="table-header">
           <h1 className="table-title">AJILEI</h1>
           <div className="header-center">
-            <span className="table-badge">{phaseLabel}</span>
             <span className="hand-badge" style={{ visibility: game.handCount > 0 ? 'visible' : 'hidden' }}>
               Mano #{game.handCount > 0 ? game.handCount : '—'}
             </span>
@@ -1009,10 +998,20 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           {/* Barra única: Tú+badges (izq) · acciones del turno (centro) · saldo (der) */}
           <div className="player-bar">
             <strong className="player-bar-left">
-              Tú
-              {manoSeat === 0 && <span className="seat-badge seat-badge-gold">Mano</span>}
-              {deckSeat === 0 && <span className="seat-badge seat-badge-neutral">Pie</span>}
-              {turnSeat === 0 && <span className="seat-badge seat-badge-gold">Turno</span>}
+              {/* Orden DOM conservado → escritorio sigue en línea ("Tú Mano Pie
+                  Turno"). El grid de gameTable.css recoloca por orientación:
+                  · portrait  → .pbr-tags (Mano/Pie) ENCIMA del nombre, Turno al lado;
+                  · landscape → TODO el grupo .pbr-badges (Mano/Pie/Turno) debajo de
+                                "Mesa N", al fondo del rail izquierdo.
+                  Ambos aplanan los wrappers con display:contents (ver CSS). */}
+              <span className="pbr-name">Tú</span>
+              <span className="pbr-badges">
+                <span className="pbr-tags">
+                  {manoSeat === 0 && <span className="seat-badge seat-badge-gold">Mano</span>}
+                  {deckSeat === 0 && <span className="seat-badge seat-badge-neutral">Pie</span>}
+                </span>
+                {turnSeat === 0 && <span className="seat-badge seat-badge-gold badge-turno">Turno</span>}
+              </span>
               {showdownWinnerSeat === 0 && <span className="win-score-chip">{human.score.points}</span>}
             </strong>
 
@@ -1033,7 +1032,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                 <div className="action-area thinking">Repartiendo cartas…</div>
               )}
 
-              {isBetPhase && !humanIsTurn && !game.players[game.activePlayerIndex].folded && (
+              {isBetPhase && !humanIsTurn && !human.folded && !game.players[game.activePlayerIndex].folded && (
                 <div className="action-area thinking">
                   {numPlayers === 2
                     ? 'La IA está pensando…'

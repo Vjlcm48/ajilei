@@ -49,6 +49,11 @@
   font-weight: 700;
 }
 
+/* Wrapper de la cabecera (identidad + saldo). Por defecto TRANSPARENTE (display:
+   contents) → sus dos hijos siguen apilados en el flex-column del panel, exactamente
+   como antes. Solo la mesa de 2 landscape lo convierte en fila (ver gameTable.css). */
+.opp-topline { display: contents; }
+
 .opp-header {
   display: flex;
   align-items: center;
@@ -60,7 +65,7 @@
 /* line-height ajustado (heredaba 26.1px del root): recupera el espacio que
    consume el rótulo de estado al doblarse, manteniendo la altura del panel
    (anclaje Tanda C4.3.1). */
-.opp-chips { color: var(--gold-brand); font-weight: 700; font-size: 12px; line-height: 1.2; }
+.opp-chips { color: var(--gold-brand); font-weight: 700; font-size: 12px; line-height: 1.2; display: inline-flex; align-items: center; gap: 4px; }
 
 /* Cartas en reverso con solape suave */
 .opp-cards {

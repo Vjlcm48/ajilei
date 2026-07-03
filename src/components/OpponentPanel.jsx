@@ -30,14 +30,19 @@ export default function OpponentPanel({
     `${isEliminating ? ' opp-eliminating' : ''}`
   return (
     <div className={`opp-panel opp-${seatPos}${stateClasses}`}>
-      <div className="opp-header">
-        <span className="opp-name">{player.name}</span>
-        {isMano && <span className="seat-badge seat-badge-gold">Mano</span>}
-        {isPie  && <span className="seat-badge seat-badge-neutral">Pie</span>}
-        {isTurn && <span className="seat-badge seat-badge-gold">Turno</span>}
-        {isWinner && score && <span className="win-score-chip">{score.points}</span>}
+      {/* opp-topline: por defecto display:contents (transparente) → identidad y saldo
+          se apilan como siempre (3/4/5/portrait/escritorio sin cambios). Solo en la
+          mesa de 2 landscape se vuelve una fila space-between (fusión en una línea). */}
+      <div className="opp-topline">
+        <div className="opp-header">
+          <span className="opp-name">{player.name}</span>
+          {isMano && <span className="seat-badge seat-badge-gold">Mano</span>}
+          {isPie  && <span className="seat-badge seat-badge-neutral">Pie</span>}
+          {isTurn && <span className="seat-badge seat-badge-gold">Turno</span>}
+          {isWinner && score && <span className="win-score-chip">{score.points}</span>}
+        </div>
+        <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>
       </div>
-      <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>
 
       <div className="opp-cards">
         {Array.from({ length: 5 }, (_, i) => (
