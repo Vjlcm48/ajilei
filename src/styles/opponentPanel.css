@@ -146,6 +146,40 @@
   margin-left: calc(var(--opp-card-w) * 0.3);
 }
 
+/* Mesa de 5 · landscape: realce de la IA ganadora en showdown (scale 1.6).
+   La ESCALA va en la FILA (.opp-cards), no en cada slot: el espaciado interno
+   escala junto con las cartas → las 5 se ven completas, sin pisarse (el scale
+   por-slot hacía crecer cada carta sobre un gap fijo → leve solapamiento).
+   Esquineras ANCLADAS: IA1 (.opp-side-right) fija el borde derecho de su última
+   carta al borde derecho del panel y despliega hacia la IZQUIERDA; IA4
+   (.opp-side-left) lo inverso. Centrales (IA2/IA3) crecen desde el centro.
+   Invadir paneles vecinos es esperado: en showdown solo importan estas cartas.
+   Mesas 3 y 4 no se tocan (siguen con el scale(1.2) por-slot genérico). */
+@media (orientation: landscape) and (max-height: 600px) {
+  .table-five .opp-winner .opp-card-slot {
+    transform: none;    /* anula el scale por-slot genérico (1.2) */
+  }
+  .table-five .opp-winner .opp-card-slot:not(:first-child) {
+    margin-left: 3px;   /* separación fija pre-escala (~5px visuales a 1.6) */
+  }
+  .table-five .opp-winner .opp-cards {
+    width: 100%;        /* caja = ancho interno del panel → ancla previsible */
+    transform: scale(1.6);
+    position: relative;
+    z-index: 6;         /* la fila ganadora pinta sobre los paneles vecinos */
+  }
+  /* IA1 · esquinera derecha: ancla derecha, despliegue hacia la izquierda */
+  .table-five .opp-side-right.opp-winner .opp-cards {
+    justify-content: flex-end;
+    transform-origin: right center;
+  }
+  /* IA4 · esquinera izquierda: ancla izquierda, despliegue hacia la derecha */
+  .table-five .opp-side-left.opp-winner .opp-cards {
+    justify-content: flex-start;
+    transform-origin: left center;
+  }
+}
+
 /* Estado breve de la mano — fuente al doble (11→22px, Tanda C4.3.1) con altura
    fija dimensionada para el nuevo tamaño; el panel no cambia de altura porque
    el espacio extra se recupera del line-height de .opp-chips. */
