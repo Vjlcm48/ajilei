@@ -981,7 +981,43 @@
     --card-w: 61px;
     --card-h: 95px;
     padding: 8px;
+
+    /* ── O1 · Geometría FIJA del óvalo central (medida, no estimada) ──
+       El óvalo adopta desde WAITING el estado más comprimido de una mano y no
+       se mueve ni redimensiona jamás. Valores medidos a 375px de ancho:
+       · --o1-row-h: fila de paneles de IA en su estado MÁXIMO (nombre a 2
+         líneas cuando coinciden dos badges — p. ej. Pie+Turno — en un panel
+         de 140px): 167.4px medidos.
+       · --o1-oval-h: alto border-box del óvalo, estable en todas las fases
+         (118.6px medidos; el mensaje nunca crea línea propia: flex-basis 0).
+       · --o1-static-v: suma de TODO lo vertical fijo fuera del colchón
+         centrador, en estado comprimido: padding pantalla 16 + padding mesa
+         22 + header 32 + gaps 8 + zona del humano con badges 291 + filas
+         (2×168 + óvalo 119 + 2 gaps de fila 8) = 832.
+       · Mesa 3 (su óvalo era RESIDUO de flex): --o1-rivals3-h fija la fila
+         única de IAs — 168 + 4 de padding-top heredado = 172 efectivos, el
+         máximo medido (171.4). --o1-static3-v = todo lo fijo fuera del óvalo
+         en estado comprimido, gaps de columnas vacías incluidos (547 medidos)
+         → óvalo = calc(100svh − 547px): constante en sesión y adaptado por
+         dispositivo. A 667 da 120px: su interior mide 123.4 y asoma 3.4px que
+         son solo padding inferior (contenido intacto); así el scroll en el
+         estado más gordo queda en paridad con el actual (~9px), y en fases
+         calmadas no hay scroll, como hoy.
+       Los calc usan 100svh (no dvh): al colapsar la barra del navegador en
+       móvil, dvh crece en plena sesión y volvería a mover el óvalo. */
+    --o1-row-h: 168px;
+    --o1-oval-h: 119px;
+    --o1-static-v: 832px;
+    --o1-rivals3-h: 168px;
+    --o1-static3-v: 547px;
   }
+
+  /* O1 · En viewports más bajos que la mesa, el centrado de .game-table-screen
+     hacía respirar TODA la mesa al variar cualquier altura (y dejaba el borde
+     superior recortado e inalcanzable). `safe center`: centra cuando cabe,
+     ancla arriba cuando no (fallback automático al `center` base donde no haya
+     soporte). Con la mesa anclada, el óvalo queda inmóvil también aquí. */
+  .game-table-screen { align-items: safe center; }
   .game-table-screen .opp-panel {
     --opp-card-w: 45px;
     --opp-card-h: 70px;
@@ -1091,6 +1127,28 @@
   .table-five .opp-side-left  { order: 3; }   /* seat4 = IA4 → izq-abajo   */
   .table-five .opp-side-right { order: 4; }   /* seat1 = IA1 → der-abajo   */
 
+  /* ── O1 · Óvalo central FIJO (mesas 5 y 4 — .table-wide) ──────────────────
+     Causa del salto (diagnóstico O1): filas del grid en `auto` + align-content:
+     center → cualquier variación de altura (badge de IA que envuelve el nombre,
+     fila de tags del humano) recentraba el bloque y desplazaba el óvalo.
+     Fix: filas EXPLÍCITAS al estado más comprimido (los paneles se estiran a
+     la fila y dejan de latir) + anclaje superior con colchón calculado: el
+     mismo aire que hoy deja el centrado en el estado comprimido, pero CONSTANTE
+     (solo depende de 100dvh y de sumas fijas, nunca del contenido). El sobrante
+     que liberan la fila de tags del humano o los badges muere en el hueco bajo
+     el óvalo — nada se mueve. En viewports donde el colchón sería negativo,
+     max() lo colapsa a 0 (anclaje puro arriba). */
+  .table-wide .table-mid {
+    grid-template-rows: var(--o1-row-h) var(--o1-row-h) var(--o1-oval-h);
+    align-content: start;
+    padding-top: max(0px, calc((100svh - var(--o1-static-v)) / 2));
+  }
+  .table-wide .center-zone {
+    box-sizing: border-box;
+    height: var(--o1-oval-h);
+    min-height: 0;
+  }
+
   /* C4.2.10 · MESA DE 4 — pirámide sobre el MISMO grid 2×2: IA2 (top-center) en
      la cima, sola y centrada (abarca las dos columnas); IA3 (side-left) e IA1
      (side-right) forman la base en las MISMAS columnas/fila inferior que la mesa
@@ -1119,7 +1177,11 @@
        visibles para verificar la mano).
      · Rival retirado (folded): sin cartas — solo el panel con su rótulo.
      Mismo tamaño de panel en 3, 4 y 5 ⇒ estas reglas se comparten (C4.2.13 suma
-     .table-three a cada selector que antes era solo .table-wide). */
+     .table-three a cada selector que antes era solo .table-wide).
+     V1: la MESA 5 queda EXCLUIDA del modelo de ganador "panel ensanchado +
+     cartas encogidas sin solape" (:not(.table-five)) — su showdown portrait usa
+     el paquete de escala 1.5 anclada de opponentPanel.css. Mesas 4/3 conservan
+     este modelo hasta sus propias tandas; entonces el bloque se retira entero. */
   .table-wide .opp-card-slot:not(:first-child),
   .table-three .opp-card-slot:not(:first-child) {
     margin-left: calc(var(--opp-card-w) * -0.5);
@@ -1128,11 +1190,11 @@
      solape (las 5 visibles para verificar la mano). El panel llena su celda, los
      slots se reparten por igual (flex) manteniendo proporción, y el mazo del
      panel ganador se oculta para no taparlas. Las perdedoras conservan su solape. */
-  .game-table-screen .table-wide .opp-winner,
+  .game-table-screen .table-wide:not(.table-five) .opp-winner,
   .game-table-screen .table-three .opp-winner { max-width: none; }
-  .table-wide .opp-winner .opp-cards,
+  .table-wide:not(.table-five) .opp-winner .opp-cards,
   .table-three .opp-winner .opp-cards { gap: 3px; align-items: flex-start; }
-  .table-wide .opp-winner .opp-card-slot,
+  .table-wide:not(.table-five) .opp-winner .opp-card-slot,
   .table-three .opp-winner .opp-card-slot {
     flex: 1 1 0;
     min-width: 0;
@@ -1141,9 +1203,9 @@
     aspect-ratio: 40 / 63;
     transform: none;
   }
-  .table-wide .opp-winner .opp-card-slot:not(:first-child),
+  .table-wide:not(.table-five) .opp-winner .opp-card-slot:not(:first-child),
   .table-three .opp-winner .opp-card-slot:not(:first-child) { margin-left: 0; }
-  .table-wide .opp-winner .opp-deck-wrapper,
+  .table-wide:not(.table-five) .opp-winner .opp-deck-wrapper,
   .table-three .opp-winner .opp-deck-wrapper { display: none; }
   .table-wide .opp-folded .opp-cards,
   .table-three .opp-folded .opp-cards { display: none; }
@@ -1163,6 +1225,24 @@
     gap: 4px;
     justify-items: center;
     align-content: center;
+  }
+
+  /* ── O1 · Óvalo central FIJO (mesa 3) ─────────────────────────────────────
+     Su óvalo era un RESIDUO de flex (flex:1 bajo las IAs): absorbía cada
+     variación de altura (badge de IA → −4/−23, fila de tags del humano → −16)
+     moviéndose Y redimensionándose. Fix: (1) la fila de IAs se fija a su
+     máximo medido → los badges dejan de propagarse hacia abajo; (2) el óvalo
+     deja de ser flexible y toma su alto comprimido calculado por dispositivo
+     (100svh − todo lo fijo); el sobrante que libere la barra del humano muere
+     en el hueco bajo el óvalo (flex-start del mid-center). El suelo de 96px
+     replica el mínimo actual en viewports bajos (el interior puede asomar por
+     debajo, como hoy) sin introducir scroll donde hoy no lo hay. */
+  .table-three .rivals-zone { height: var(--o1-rivals3-h); }
+  .table-three .center-zone {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    height: max(96px, calc(100svh - var(--o1-static3-v)));
+    min-height: 0;
   }
 
   /* Paneles de rival compactos y centrados (deja aire lateral para el mazo) */

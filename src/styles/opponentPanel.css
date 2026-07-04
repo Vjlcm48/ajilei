@@ -177,6 +177,19 @@
   margin-left: calc(var(--opp-card-w) * 0.3);
 }
 
+/* R2.b · Tiempos de la coreografía de volteo del showdown — GLOBALES (V1: antes
+   vivían dentro de la media query landscape; el bloque portrait de mesa 5 los
+   reutiliza tal cual). Única fuente de verdad CSS, casada con REVEAL_CHOREO en
+   GameTable.jsx. */
+.table-five,
+.table-four,
+.table-three {
+  --reveal-flip-ms: 220ms;     /* medio giro cerrar/abrir (FLIP_MS) */
+  --reveal-stagger-ms: 25ms;   /* escalonado entre cartas (STAGGER_MS) */
+  --reveal-scale-ms: 200ms;    /* recogida y crecimiento (SCALE_MS) */
+  --reveal-settle-ms: 150ms;   /* asentado del dorso tras el canje a 90° */
+}
+
 /* Mesa de 5 · landscape: realce de la IA ganadora en showdown (scale 1.6).
    La ESCALA va en la FILA (.opp-cards), no en cada slot: el espaciado interno
    escala junto con las cartas → las 5 se ven completas, sin pisarse (el scale
@@ -258,16 +271,8 @@
   /* ── R2.b · Coreografía de volteo del intercambio de manos ─────────────────
      Clases propias que GameTable monta/desmonta por fase (revealAnim) — NUNCA
      sobre .opp-winner base: la revelación inicial de la ganadora al llegar el
-     showdown sigue instantánea. Tiempos en variables, casadas con
-     REVEAL_CHOREO en GameTable.jsx. */
-  .table-five,
-  .table-four,
-  .table-three {
-    --reveal-flip-ms: 220ms;     /* medio giro cerrar/abrir (FLIP_MS) */
-    --reveal-stagger-ms: 25ms;   /* escalonado entre cartas (STAGGER_MS) */
-    --reveal-scale-ms: 200ms;    /* recogida y crecimiento (SCALE_MS) */
-    --reveal-settle-ms: 150ms;   /* asentado del dorso tras el canje a 90° */
-  }
+     showdown sigue instantánea. Tiempos en las variables --reveal-* (declaradas
+     GLOBALES más arriba, V1), casadas con REVEAL_CHOREO en GameTable.jsx. */
 
   /* Fase 1 · la saliente cierra: cartas a canto, a tamaño grande. `both`
      sostiene el estado inicial durante el delay y el canto (90°) al terminar,
@@ -373,6 +378,135 @@
   .opp-reveal-collect .win-score-chip,
   .opp-reveal-grow .win-score-chip,
   .opp-reveal-open .win-score-chip {
+    visibility: hidden;
+  }
+}
+
+/* ── V1 · MESA 5 · MÓVIL VERTICAL — paquete showdown ─────────────────────────
+   Réplica del modelo landscape adaptada al grid 2×2 portrait (gameTable.css):
+   escala 1.5 (no 1.6 — el panel de 140px parte más ancho que el de landscape),
+   cartas JUNTAS (sin solape y sin espacio), y anclaje POR COLUMNA: en vertical las
+   CUATRO IAs son esquineras (no hay asiento de centro). Columna izquierda
+   (IA3 .opp-top-left arriba / IA4 .opp-side-left abajo) ancla al borde
+   izquierdo de pantalla y crece hacia la derecha; columna derecha
+   (IA2 .opp-top-right / IA1 .opp-side-right) lo inverso. El ÁREA del panel no
+   se mueve ni crece jamás (conserva max-width 140px — el ensanchamiento viejo
+   de gameTable.css quedó excluido de .table-five): solo las cartas escalan
+   desde el anclaje, e invadir paneles vecinos es esperado. Mesas 4/3 portrait
+   conservan el tratamiento viejo hasta sus propias tandas. */
+@media (max-width: 767px) and (orientation: portrait) {
+  /* Realce 1.5×: la ESCALA va en la FILA (.opp-cards), no en cada slot —
+     mismo criterio que landscape (el espaciado escala junto con las cartas) */
+  .table-five .opp-winner .opp-card-slot {
+    transform: none;    /* anula el scale por-slot genérico (1.2) */
+  }
+  .table-five .opp-winner .opp-card-slot:not(:first-child) {
+    margin-left: 0;   /* cartas juntas: sin solape y sin espacio entre ellas */
+  }
+  .table-five .opp-winner .opp-cards {
+    width: 100%;        /* caja = ancho interno del panel → ancla previsible */
+    transform: scale(1.5);
+    position: relative;
+    z-index: 6;
+  }
+  /* Columna derecha (IA2 arriba / IA1 abajo): ancla derecha, crece a la izquierda */
+  .table-five .opp-top-right.opp-winner .opp-cards,
+  .table-five .opp-side-right.opp-winner .opp-cards {
+    justify-content: flex-end;
+    transform-origin: right center;
+  }
+  /* Columna izquierda (IA3 arriba / IA4 abajo): ancla izquierda, crece a la derecha */
+  .table-five .opp-top-left.opp-winner .opp-cards,
+  .table-five .opp-side-left.opp-winner .opp-cards {
+    justify-content: flex-start;
+    transform-origin: left center;
+  }
+
+  /* Mazo (Pie) del panel revelado: oculto SIN remoción de DOM ni salto de
+     layout (el wrapper es position:absolute y las refs de vuelo persisten).
+     Reaparece solo al perder .opp-winner. */
+  .table-five .opp-winner .opp-deck-wrapper { visibility: hidden; }
+
+  /* R1.b (réplica portrait) · El panel revelado ENTERO sube sobre sus hermanos
+     — imprescindible aquí: el orden DOM del grid pinta IA1 (der-abajo) encima
+     de todas. Opacity forzada a 1 en panel y cartas: ninguna atenuación
+     (turn-dimmed, vecinas retiradas) debe traslucir bajo la mano revelada. */
+  .table-five .opp-panel.opp-winner {
+    z-index: 7;
+    opacity: 1;
+  }
+  .table-five .opp-winner .opp-cards,
+  .table-five .opp-winner .playing-card {
+    opacity: 1;
+  }
+
+  /* ── Coreografía de volteo (R2.b) en portrait — mismos tiempos (--reveal-*
+     globales) y mismo timeline JS; solo cambian la escala (1.5) y las anclas. ── */
+
+  /* Fase 1 · la saliente cierra: cartas a canto, a tamaño grande */
+  .table-five .opp-reveal-closing .opp-card-slot .playing-card {
+    animation: cardFlipClose var(--reveal-flip-ms) ease-in both;
+  }
+  /* Fase 4 · la entrante abre: de canto a cara, ya en posición y a 1.5 */
+  .table-five .opp-reveal-open .opp-card-slot .playing-card {
+    animation: cardFlipReveal var(--reveal-flip-ms) ease-out both;
+  }
+  /* Micro-escalonado compartido cerrar/abrir */
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card { animation-delay: var(--reveal-stagger-ms); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 2); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 3); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 4); }
+
+  /* Fase 2 · la saliente recoge — estado AUTOSUFICIENTE "era grande, encoge"
+     (el panel pierde .opp-winner a mitad de recogida). El solape vuelve al
+     base PORTRAIT (−0.5, gameTable.css) como corte seco: dorsos ya en mano. */
+  .table-five .opp-panel.opp-reveal-collect {
+    z-index: 7;
+    opacity: 1;
+  }
+  .table-five .opp-reveal-collect .opp-cards {
+    width: 100%;
+    position: relative;
+    z-index: 6;
+    transform: scale(1);
+    transition: transform var(--reveal-scale-ms) ease;
+  }
+  .table-five .opp-reveal-collect .opp-card-slot { transform: none; }
+  .table-five .opp-reveal-collect .opp-card-slot:not(:first-child) {
+    margin-left: calc(var(--opp-card-w) * -0.5);
+  }
+  /* El dorso asienta de canto a plano justo tras el canje (evita el pop) */
+  .table-five .opp-reveal-collect .opp-card-slot .playing-card {
+    animation: cardFlipReveal var(--reveal-settle-ms) ease-out both;
+  }
+  /* Ancla conservada durante la recogida (sin salto al perder .opp-winner) */
+  .table-five .opp-top-right.opp-reveal-collect .opp-cards,
+  .table-five .opp-side-right.opp-reveal-collect .opp-cards {
+    justify-content: flex-end;
+    transform-origin: right center;
+  }
+  .table-five .opp-top-left.opp-reveal-collect .opp-cards,
+  .table-five .opp-side-left.opp-reveal-collect .opp-cards {
+    justify-content: flex-start;
+    transform-origin: left center;
+  }
+
+  /* Fase 3 · la entrante crece en dorsos: .opp-winner (recién ganado) aporta
+     el 1.5 + ancla + separación; aquí solo viaja la escala 1→1.5 */
+  .table-five .opp-reveal-grow .opp-cards {
+    transition: transform var(--reveal-scale-ms) ease;
+  }
+
+  /* Chip de puntaje: oculto durante toda la coreografía (visibility, sin
+     remover DOM) — como en landscape, acotado a .table-five en esta tanda */
+  .table-five .opp-reveal-closing .win-score-chip,
+  .table-five .opp-reveal-collect .win-score-chip,
+  .table-five .opp-reveal-grow .win-score-chip,
+  .table-five .opp-reveal-open .win-score-chip {
     visibility: hidden;
   }
 }

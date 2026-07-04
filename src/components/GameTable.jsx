@@ -45,6 +45,12 @@ const ELIM_NOTICE_MS  = 3750   // aviso central no bloqueante (aparece y se va s
 // así que las refs (slotRefs/deckRefs) del asiento del rival no se duplican.
 const LANDSCAPE_TABLE_MQ = '(orientation: landscape) and (max-height: 600px)'
 
+// V1 · Espejo del anterior para MÓVIL VERTICAL: misma media query que el bloque
+// portrait de gameTable.css/opponentPanel.css. Distingue el teléfono en vertical
+// del ESCRITORIO (donde isLandscapeTable también es false pero el canje de manos
+// debe seguir instantáneo — su CSS de coreografía no existe).
+const PORTRAIT_TABLE_MQ = '(max-width: 767px) and (orientation: portrait)'
+
 // R2.b · Tiempos de la coreografía de volteo del intercambio de manos en el
 // showdown — casar con las variables --reveal-* de opponentPanel.css.
 // Timeline total ≈ 960ms: cerrar (320) → recoger (200, la entrante arranca
@@ -55,17 +61,25 @@ const REVEAL_CHOREO = {
   SCALE_MS: 200,    // recogida 1.6→1 y crecimiento 1→1.6 (solo transform)
   GROW_AT: 0.6,     // la entrante arranca al 60% de la recogida de la saliente
 }
-function useIsLandscapeTable() {
-  const [isLandscape, setIsLandscape] = useState(
-    () => window.matchMedia(LANDSCAPE_TABLE_MQ).matches
+function useMediaQueryMatch(query) {
+  const [matches, setMatches] = useState(
+    () => window.matchMedia(query).matches
   )
   useEffect(() => {
-    const mq = window.matchMedia(LANDSCAPE_TABLE_MQ)
-    const handler = (e) => setIsLandscape(e.matches)
+    const mq = window.matchMedia(query)
+    const handler = (e) => setMatches(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
-  }, [])
-  return isLandscape
+  }, [query])
+  return matches
+}
+
+function useIsLandscapeTable() {
+  return useMediaQueryMatch(LANDSCAPE_TABLE_MQ)
+}
+
+function useIsPortraitTable() {
+  return useMediaQueryMatch(PORTRAIT_TABLE_MQ)
 }
 
 // ── Deal helpers ─────────────────────────────────────────────────────────────
@@ -275,6 +289,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // C4.4: el tablero sigue a los jugadores VIVOS (no al tamaño inicial)
   const aliveN       = game.aliveCount
   const isLandscapeTable = useIsLandscapeTable()
+  const isPortraitTable  = useIsPortraitTable()
   const effLayout    = effectiveLayout(game.players)
   const isGameOver   = phase === PHASES.GAME_OVER
   const isDealPhase  = phase === PHASES.DEAL_2 || phase === PHASES.DEAL_3
@@ -627,12 +642,15 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // R1.c: tap sobre la ya revelada → no-op; sobre otra elegible → se revela esa
   // y la anterior vuelve boca abajo. displayedSeat nunca vuelve a null por tap —
   // el guard autolimpiante (fin del showdown) es el único reset.
-  // R2.b: en landscape el canje corre la coreografía de volteo con lock de taps;
-  // portrait/escritorio siguen instantáneos (pendientes de su propia pasada).
+  // R2.b: en landscape el canje corre la coreografía de volteo con lock de taps.
+  // V1: en móvil vertical la coreografía corre solo en mesa 5 (su CSS portrait
+  // ya existe en opponentPanel.css); mesas 4/3 portrait y escritorio siguen
+  // instantáneos (pendientes de sus propias tandas).
   function handleRevealTap(seat) {
     if (revealAnim !== null) return
     if (revealedSeat === seat) return
-    if (!isLandscapeTable) { setDisplayedSeat(seat); return }
+    const runsChoreo = isLandscapeTable || (isPortraitTable && aliveN === 5)
+    if (!runsChoreo) { setDisplayedSeat(seat); return }
     startRevealSwap(revealedSeat, seat)
   }
 
