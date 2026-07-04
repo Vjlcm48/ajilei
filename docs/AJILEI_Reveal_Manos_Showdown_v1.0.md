@@ -1,6 +1,10 @@
 # AJILEI — Revelar Manos en el Showdown v1.0
 
-**Estado:** Aprobado, pendiente de implementación
+**Estado:** IMPLEMENTADO en móvil horizontal, mesas 3/4/5 (commit 58d4127, con
+tandas R1 → R3: revelado por tap, apilamiento sólido, protocolo boca abajo,
+knob-shake y coreografía de volteo). Pendiente: tratamiento visual propio de
+portrait y escritorio — hoy el tap y el protocolo funcionan ahí con canje
+instantáneo y el estilo de ganadora preexistente de cada orientación.
 **Alcance:** Mesas de 3, 4 y 5 jugadores. Escritorio y móvil (horizontal y vertical).
 No aplica a mesa de 2 jugadores (solo hay una IA rival, no hay nada que comparar).
 
@@ -87,9 +91,12 @@ humano y panel IA"). Esta spec reutiliza ese mismo mecanismo para cualquier IA
 elegible que el usuario seleccione — no se diseña un tratamiento visual nuevo, se
 generaliza el existente para que pueda aplicarse a cualquier asiento bajo demanda.
 
-Pendiente (fuera de esta spec): replicar el mecanismo base de ancla+escala a las
-mesas 3 y 4, y a orientación portrait — necesario como prerequisito antes de que
-esta función de "revisar otras manos" pueda funcionar en esas configuraciones.
+~~Pendiente (fuera de esta spec): replicar el mecanismo base de ancla+escala a
+las mesas 3 y 4~~ — **CUMPLIDO** en móvil horizontal (tanda R3, commit 58d4127):
+anclas por posición según la regla de la spec — esquinas `side-left/side-right`
+en mesas 5 y 4, `top-left/top-right` en mesa 3; centros (top-left/right en 5,
+top-center en 4) con crecimiento simétrico. Sigue pendiente la orientación
+portrait, que tendrá su propio mecanismo de apreciación en una pasada separada.
 
 ## 8. Fuera de alcance
 
@@ -103,3 +110,9 @@ esta función de "revisar otras manos" pueda funcionar en esas configuraciones.
 ## 9. Historial de versiones
 
 - v1.0 — Spec inicial aprobada. Pendiente de implementación.
+- v1.0 + nota de estado (2026-07-04) — Implementado en móvil horizontal, mesas
+  3/4/5 (commit 58d4127). Incluye dos adiciones acordadas durante la
+  implementación que refinan la spec: protocolo boca abajo (solo la mano
+  revelada va boca arriba; el tap sobre la revelada es no-op y nunca vuelve a
+  null) y coreografía de volteo en el intercambio (~960ms, cerrar→recoger→
+  crecer→abrir). Pendiente: portrait y escritorio (canje instantáneo por ahora).
