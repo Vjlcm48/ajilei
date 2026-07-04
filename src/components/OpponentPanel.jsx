@@ -12,7 +12,12 @@ export default function OpponentPanel({
   isPie,
   isTurn,           // señal triple: borde+halo, badge TURNO, los demás atenuados
   isDimmed,         // otro jugador tiene el turno → ~85% de intensidad
-  isWinner,         // ganó el showdown (cartas reveladas escalan + chip de puntaje)
+  isWinner,         // mano mostrada en grande en el showdown (ganadora por defecto,
+                    // o la IA elegida por tap — Revelar Manos v1.0)
+  isRevealEligible, // llegó al showdown → su nombre es tappable para revisar su mano
+  onNameTap,        // tap en el nombre (GameTable decide qué mano desplegar)
+  isNameShaking,    // turno de esta IA en la rotación de sacudida (affordance R2)
+  revealAnimClass,  // fase de la coreografía de volteo (R2.b) — '' fuera de ella
   isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
   lastAction,       // 'Apostó' | 'Igualó' | 'Subió' | 'Pasó' | 'Descartó N' | null
   renderCard,       // (i) => JSX de la carta del slot i
@@ -29,13 +34,16 @@ export default function OpponentPanel({
     `${isTurn ? ' turn-active' : ''}${isDimmed && !player.folded ? ' turn-dimmed' : ''}` +
     `${isEliminating ? ' opp-eliminating' : ''}`
   return (
-    <div className={`opp-panel opp-${seatPos}${stateClasses}`}>
+    <div className={`opp-panel opp-${seatPos}${stateClasses}${revealAnimClass ? ` ${revealAnimClass}` : ''}`}>
       {/* opp-topline: por defecto display:contents (transparente) → identidad y saldo
           se apilan como siempre (3/4/5/portrait/escritorio sin cambios). Solo en la
           mesa de 2 landscape se vuelve una fila space-between (fusión en una línea). */}
       <div className="opp-topline">
         <div className="opp-header">
-          <span className="opp-name">{player.name}</span>
+          <span
+            className={`opp-name${isRevealEligible ? ' opp-name-tappable' : ''}${isNameShaking ? ' opp-name-shake' : ''}`}
+            onClick={isRevealEligible ? onNameTap : undefined}
+          >{player.name}</span>
           {isMano && <span className="seat-badge seat-badge-gold">Mano</span>}
           {isPie  && <span className="seat-badge seat-badge-neutral">Pie</span>}
           {isTurn && <span className="seat-badge seat-badge-gold">Turno</span>}

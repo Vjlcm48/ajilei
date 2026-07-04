@@ -62,6 +62,37 @@
 }
 
 .opp-name  { color: rgba(var(--text-primary-rgb), 0.65); }
+
+/* Revelar Manos: nombre tappable durante el showdown. El área táctil crece con
+   padding en em (fluido, relativo al font del nombre) y margen negativo
+   compensatorio en AMBOS ejes: .opp-name es flex item de .opp-header (no un
+   inline puro), así que sin compensar, el padding vertical engordaría el header
+   y empujaría las cartas justo al entrar al showdown. Caja externa intacta →
+   cero salto de layout; el padding solo amplía la zona de tap. */
+.opp-name-tappable {
+  cursor: pointer;
+  padding: 0.6em 0.45em;
+  margin: -0.6em -0.45em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* R2 · Affordance "perilla": oscilación breve y decreciente (±3.5° → 0) que
+   invita a tocar el nombre. La clase la pone/quita GameTable (una IA a la vez);
+   1s casa con SHAKE_MS de la coreografía. transform funciona porque el span es
+   flex item (blockificado). */
+.opp-name-shake {
+  animation: nameKnobShake 1s ease-in-out;
+}
+
+@keyframes nameKnobShake {
+  0%   { transform: rotate(0deg); }
+  12%  { transform: rotate(-3.5deg); }
+  30%  { transform: rotate(3deg); }
+  48%  { transform: rotate(-2deg); }
+  64%  { transform: rotate(1.2deg); }
+  80%  { transform: rotate(-0.6deg); }
+  100% { transform: rotate(0deg); }
+}
 /* line-height ajustado (heredaba 26.1px del root): recupera el espacio que
    consume el rótulo de estado al doblarse, manteniendo la altura del panel
    (anclaje Tanda C4.3.1). */
@@ -154,29 +185,195 @@
    carta al borde derecho del panel y despliega hacia la IZQUIERDA; IA4
    (.opp-side-left) lo inverso. Centrales (IA2/IA3) crecen desde el centro.
    Invadir paneles vecinos es esperado: en showdown solo importan estas cartas.
-   Mesas 3 y 4 no se tocan (siguen con el scale(1.2) por-slot genérico). */
+   R3: mesas 4 y 3 comparten el tratamiento. Regla por posición de la spec:
+   ancla lateral para asientos de ESQUINA, crecimiento simétrico para asientos
+   de CENTRO. Esquinas por mesa: 5 y 4 → side-left/side-right (mismas clases);
+   3 → top-left/top-right (sus dos únicas IAs, una por mitad). Centros: en 5,
+   top-left/top-right; en 4, top-center — sin regla de ancla, crecen del centro.
+   Por eso las anclas de top-left/top-right van acotadas a .table-three. */
 @media (orientation: landscape) and (max-height: 600px) {
-  .table-five .opp-winner .opp-card-slot {
+  .table-five .opp-winner .opp-card-slot,
+  .table-four .opp-winner .opp-card-slot,
+  .table-three .opp-winner .opp-card-slot {
     transform: none;    /* anula el scale por-slot genérico (1.2) */
   }
-  .table-five .opp-winner .opp-card-slot:not(:first-child) {
+  .table-five .opp-winner .opp-card-slot:not(:first-child),
+  .table-four .opp-winner .opp-card-slot:not(:first-child),
+  .table-three .opp-winner .opp-card-slot:not(:first-child) {
     margin-left: 3px;   /* separación fija pre-escala (~5px visuales a 1.6) */
   }
-  .table-five .opp-winner .opp-cards {
+  .table-five .opp-winner .opp-cards,
+  .table-four .opp-winner .opp-cards,
+  .table-three .opp-winner .opp-cards {
     width: 100%;        /* caja = ancho interno del panel → ancla previsible */
     transform: scale(1.6);
     position: relative;
     z-index: 6;         /* la fila ganadora pinta sobre los paneles vecinos */
   }
-  /* IA1 · esquinera derecha: ancla derecha, despliegue hacia la izquierda */
-  .table-five .opp-side-right.opp-winner .opp-cards {
+  /* Esquinera derecha (IA1 en mesas 5 y 4): ancla derecha, crece a la izquierda */
+  .table-five .opp-side-right.opp-winner .opp-cards,
+  .table-four .opp-side-right.opp-winner .opp-cards {
     justify-content: flex-end;
     transform-origin: right center;
   }
-  /* IA4 · esquinera izquierda: ancla izquierda, despliegue hacia la derecha */
-  .table-five .opp-side-left.opp-winner .opp-cards {
+  /* Esquinera izquierda (IA4 en mesa 5 / IA3 en mesa 4): ancla izquierda, crece a la derecha */
+  .table-five .opp-side-left.opp-winner .opp-cards,
+  .table-four .opp-side-left.opp-winner .opp-cards {
     justify-content: flex-start;
     transform-origin: left center;
+  }
+  /* Mesa 3 · IA1 esquinera derecha (top-right): ancla derecha, crece a la izquierda */
+  .table-three .opp-top-right.opp-winner .opp-cards {
+    justify-content: flex-end;
+    transform-origin: right center;
+  }
+  /* Mesa 3 · IA2 esquinera izquierda (top-left): ancla izquierda, crece a la derecha */
+  .table-three .opp-top-left.opp-winner .opp-cards {
+    justify-content: flex-start;
+    transform-origin: left center;
+  }
+
+  /* R1.b · Apilamiento sólido: el panel revelado ENTERO (fondo, borde, nombre,
+     chip) sube sobre sus hermanos — sin esto solo las cartas flotaban (z-index
+     de .opp-cards) y el resto del panel quedaba bajo los vecinos posteriores
+     del DOM. Al recibir z-index, el panel pasa a ser contexto de apilamiento y
+     el z-index interno de .opp-cards queda confinado a él. Opacity forzada a 1
+     en panel y cartas: ninguna regla de atenuación (turn-dimmed, herencias)
+     debe dejar traslucir lo que quede debajo de la mano revelada. */
+  .table-five .opp-panel.opp-winner,
+  .table-four .opp-panel.opp-winner,
+  .table-three .opp-panel.opp-winner {
+    z-index: 7;
+    opacity: 1;
+  }
+  .table-five .opp-winner .opp-cards,
+  .table-five .opp-winner .playing-card,
+  .table-four .opp-winner .opp-cards,
+  .table-four .opp-winner .playing-card,
+  .table-three .opp-winner .opp-cards,
+  .table-three .opp-winner .playing-card {
+    opacity: 1;
+  }
+
+  /* ── R2.b · Coreografía de volteo del intercambio de manos ─────────────────
+     Clases propias que GameTable monta/desmonta por fase (revealAnim) — NUNCA
+     sobre .opp-winner base: la revelación inicial de la ganadora al llegar el
+     showdown sigue instantánea. Tiempos en variables, casadas con
+     REVEAL_CHOREO en GameTable.jsx. */
+  .table-five,
+  .table-four,
+  .table-three {
+    --reveal-flip-ms: 220ms;     /* medio giro cerrar/abrir (FLIP_MS) */
+    --reveal-stagger-ms: 25ms;   /* escalonado entre cartas (STAGGER_MS) */
+    --reveal-scale-ms: 200ms;    /* recogida y crecimiento (SCALE_MS) */
+    --reveal-settle-ms: 150ms;   /* asentado del dorso tras el canje a 90° */
+  }
+
+  /* Fase 1 · la saliente cierra: cartas a canto, a tamaño grande. `both`
+     sostiene el estado inicial durante el delay y el canto (90°) al terminar,
+     hasta que la fase 2 canjea a dorso con la carta invisible de canto. */
+  .table-five .opp-reveal-closing .opp-card-slot .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot .playing-card {
+    animation: cardFlipClose var(--reveal-flip-ms) ease-in both;
+  }
+  /* Fase 4 · la entrante abre: de canto a cara, ya en posición y a 1.6 */
+  .table-five .opp-reveal-open .opp-card-slot .playing-card,
+  .table-four .opp-reveal-open .opp-card-slot .playing-card,
+  .table-three .opp-reveal-open .opp-card-slot .playing-card {
+    animation: cardFlipReveal var(--reveal-flip-ms) ease-out both;
+  }
+  /* Micro-escalonado compartido cerrar/abrir */
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card { animation-delay: var(--reveal-stagger-ms); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 2); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 3); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 4); }
+
+  /* Fase 2 · la saliente recoge — estado AUTOSUFICIENTE "era grande, encoge":
+     replica lo que necesita de .opp-winner (caja, z-index, ancla) porque el
+     panel pierde esa clase a mitad de recogida (cuando displayedSeat pasa a la
+     entrante) y la transición de escala debe continuar sin salto. El solape
+     vuelve al base como corte seco (las cartas ya van en dorso). */
+  .table-five .opp-panel.opp-reveal-collect,
+  .table-four .opp-panel.opp-reveal-collect,
+  .table-three .opp-panel.opp-reveal-collect {
+    z-index: 7;
+    opacity: 1;
+  }
+  .table-five .opp-reveal-collect .opp-cards,
+  .table-four .opp-reveal-collect .opp-cards,
+  .table-three .opp-reveal-collect .opp-cards {
+    width: 100%;
+    position: relative;
+    z-index: 6;
+    transform: scale(1);
+    transition: transform var(--reveal-scale-ms) ease;
+  }
+  .table-five .opp-reveal-collect .opp-card-slot,
+  .table-four .opp-reveal-collect .opp-card-slot,
+  .table-three .opp-reveal-collect .opp-card-slot { transform: none; }
+  .table-five .opp-reveal-collect .opp-card-slot:not(:first-child),
+  .table-four .opp-reveal-collect .opp-card-slot:not(:first-child),
+  .table-three .opp-reveal-collect .opp-card-slot:not(:first-child) {
+    margin-left: calc(var(--opp-card-w) * -0.35);
+  }
+  /* El dorso asienta de canto a plano justo tras el canje (evita el pop) */
+  .table-five .opp-reveal-collect .opp-card-slot .playing-card,
+  .table-four .opp-reveal-collect .opp-card-slot .playing-card,
+  .table-three .opp-reveal-collect .opp-card-slot .playing-card {
+    animation: cardFlipReveal var(--reveal-settle-ms) ease-out both;
+  }
+  /* Ancla conservada durante la recogida (sin salto al perder .opp-winner) */
+  .table-five .opp-side-right.opp-reveal-collect .opp-cards,
+  .table-four .opp-side-right.opp-reveal-collect .opp-cards,
+  .table-three .opp-top-right.opp-reveal-collect .opp-cards {
+    justify-content: flex-end;
+    transform-origin: right center;
+  }
+  .table-five .opp-side-left.opp-reveal-collect .opp-cards,
+  .table-four .opp-side-left.opp-reveal-collect .opp-cards,
+  .table-three .opp-top-left.opp-reveal-collect .opp-cards {
+    justify-content: flex-start;
+    transform-origin: left center;
+  }
+
+  /* Fase 3 · la entrante crece en dorsos: .opp-winner (recién ganado) ya
+     aporta el 1.6 + ancla + solape abierto; esta clase solo añade la
+     transición para que la escala VIAJE 1→1.6 (margins/ancla, corte seco). */
+  .table-five .opp-reveal-grow .opp-cards,
+  .table-four .opp-reveal-grow .opp-cards,
+  .table-three .opp-reveal-grow .opp-cards {
+    transition: transform var(--reveal-scale-ms) ease;
+  }
+
+  /* Chip de puntaje: oculto durante toda la coreografía (visibility, sin
+     remover DOM) — cae al iniciar la fase 1 en la saliente y reaparece al
+     terminar la fase 4 en la entrante, cuando estas clases se desmontan. */
+  .opp-reveal-closing .win-score-chip,
+  .opp-reveal-collect .win-score-chip,
+  .opp-reveal-grow .win-score-chip,
+  .opp-reveal-open .win-score-chip {
+    visibility: hidden;
   }
 }
 

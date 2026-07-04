@@ -44,6 +44,17 @@ const ELIM_NOTICE_MS  = 3750   // aviso central no bloqueante (aparece y se va s
 // → JSX y CSS nunca se desincronizan. Solo un componente se monta por orientación,
 // así que las refs (slotRefs/deckRefs) del asiento del rival no se duplican.
 const LANDSCAPE_TABLE_MQ = '(orientation: landscape) and (max-height: 600px)'
+
+// R2.b · Tiempos de la coreografía de volteo del intercambio de manos en el
+// showdown — casar con las variables --reveal-* de opponentPanel.css.
+// Timeline total ≈ 960ms: cerrar (320) → recoger (200, la entrante arranca
+// al 60%) → crecer (200) → abrir (320).
+const REVEAL_CHOREO = {
+  FLIP_MS: 220,     // medio giro de carta (cerrar y abrir)
+  STAGGER_MS: 25,   // escalonado entre cartas contiguas
+  SCALE_MS: 200,    // recogida 1.6→1 y crecimiento 1→1.6 (solo transform)
+  GROW_AT: 0.6,     // la entrante arranca al 60% de la recogida de la saliente
+}
 function useIsLandscapeTable() {
   const [isLandscape, setIsLandscape] = useState(
     () => window.matchMedia(LANDSCAPE_TABLE_MQ).matches
@@ -212,6 +223,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const [reflowing,    setReflowing]    = useState(false)  // asentado suave del nuevo layout
   const [noteFlash,    setNoteFlash]    = useState(0)      // destello del chip de comodín
   const [bankruptModal, setBankruptModal] = useState(false)// Caso B: humano sin fichas (≥2 vivos)
+  const [displayedSeat, setDisplayedSeat] = useState(null) // Reveal Manos: IA elegida por tap (null = ganadora)
+  const [shakeSeat,     setShakeSeat]     = useState(null) // Reveal Manos R2: IA cuyo nombre "sacude" ahora
+  const [revealAnim,    setRevealAnim]    = useState(null) // R2.b: {fase, from, to} — coreografía de volteo (lock de taps)
   const { play } = useSounds()
 
   // Position refs: one 5-slot row + one deck anchor per seat
@@ -227,13 +241,15 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }
   const discardTimersRef = useRef([])
   const ceremonyTimersRef = useRef([])
+  const revealTimersRef = useRef([])
   const gameRef = useRef(game)
   const prevPotRef = useRef(game.pot)
 
-  // Clear pending discard / ceremony timers if the table unmounts mid-animation
+  // Clear pending discard / ceremony / reveal timers if the table unmounts mid-animation
   useEffect(() => () => {
     discardTimersRef.current.forEach(clearTimeout)
     ceremonyTimersRef.current.forEach(clearTimeout)
+    revealTimersRef.current.forEach(clearTimeout)
   }, [])
 
   // ── Pozo: pulso + "+N" flotante al aumentar (Tanda C4.3) ──────────────────
@@ -582,6 +598,132 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       ? game.winner
       : null
 
+  // ── Revelar Manos (spec v1.0) · Tanda R1 ──────────────────────────────────
+  // revealedSeat decide qué mano se muestra en grande. Guard autolimpiante:
+  // fuera del showdown vale null y displayedSeat se ignora. El efecto de abajo
+  // borra el tap al terminar el showdown — sin él, el valor viejo reaparecería
+  // en la mano siguiente (spec §6: cada showdown arranca en su ganadora). No
+  // toca el onClick de "Siguiente mano".
+  const revealedSeat = showdownWinnerSeat === null ? null : (displayedSeat ?? showdownWinnerSeat)
+
+  useEffect(() => {
+    if (showdownWinnerSeat !== null) return
+    if (displayedSeat !== null) setDisplayedSeat(null)
+    if (revealAnim !== null) {   // R2.b: coreografía a medias al salir del showdown
+      revealTimersRef.current.forEach(clearTimeout)
+      revealTimersRef.current = []
+      setRevealAnim(null)
+    }
+  }, [showdownWinnerSeat, displayedSeat, revealAnim])
+
+  // Elegible al tap: rival vivo que llegó al showdown (la ganadora incluida,
+  // para poder volver a ella). R3: mesas 5, 4 y 3 (mesa 2 excluida por spec —
+  // solo hay una IA rival, no hay nada que comparar).
+  function isRevealEligible(seat) {
+    return showdownWinnerSeat !== null && aliveN >= 3 && seat !== 0 &&
+      !game.players[seat].folded && !game.players[seat].eliminated
+  }
+
+  // R1.c: tap sobre la ya revelada → no-op; sobre otra elegible → se revela esa
+  // y la anterior vuelve boca abajo. displayedSeat nunca vuelve a null por tap —
+  // el guard autolimpiante (fin del showdown) es el único reset.
+  // R2.b: en landscape el canje corre la coreografía de volteo con lock de taps;
+  // portrait/escritorio siguen instantáneos (pendientes de su propia pasada).
+  function handleRevealTap(seat) {
+    if (revealAnim !== null) return
+    if (revealedSeat === seat) return
+    if (!isLandscapeTable) { setDisplayedSeat(seat); return }
+    startRevealSwap(revealedSeat, seat)
+  }
+
+  // R2.b · Timeline del intercambio (patrón setTimeout de startDiscardAnim):
+  // cerrar saliente (escalonado) → recoger 1.6→1 → crecer entrante en dorsos
+  // (arranca al 60% de la recogida; AQUÍ cambia displayedSeat) → abrir
+  // (escalonado). Los canjes dorso/cara ocurren con las cartas de canto (90°).
+  // Si ganó el humano y no había rival revelada (from === 0), no hay saliente
+  // que cerrar: se entra directo al crecimiento.
+  function startRevealSwap(from, to) {
+    const { FLIP_MS, STAGGER_MS, SCALE_MS, GROW_AT } = REVEAL_CHOREO
+    const flipTotal = FLIP_MS + 4 * STAGGER_MS
+    const timers = []
+    let t = 0
+    if (from !== 0) {
+      setRevealAnim({ fase: 'closing', from, to })
+      t = flipTotal
+      timers.push(setTimeout(() => setRevealAnim({ fase: 'collect', from, to }), t))
+      t += Math.round(SCALE_MS * GROW_AT)
+      timers.push(setTimeout(() => {
+        setRevealAnim({ fase: 'grow', from, to })
+        setDisplayedSeat(to)
+      }, t))
+    } else {
+      setRevealAnim({ fase: 'grow', from, to })
+      setDisplayedSeat(to)
+    }
+    t += SCALE_MS
+    timers.push(setTimeout(() => setRevealAnim({ fase: 'open', from, to }), t))
+    t += flipTotal
+    timers.push(setTimeout(() => setRevealAnim(null), t))
+    revealTimersRef.current = timers
+  }
+
+  // Cara visible por asiento durante la coreografía: la saliente solo mientras
+  // cierra; la entrante solo al abrir. Fuera de coreografía manda el protocolo.
+  function seatShowsFace(seat) {
+    if (revealAnim) {
+      if (seat === revealAnim.from) return revealAnim.fase === 'closing'
+      if (seat === revealAnim.to)   return revealAnim.fase === 'open'
+    }
+    return !revealProtocolActive || seat === revealedSeat
+  }
+
+  // Clase de coreografía por asiento (nodo raíz del panel). La saliente
+  // conserva 'collect' hasta el final: es un estado autosuficiente que sostiene
+  // su transición de encogimiento cuando pierde .opp-winner a mitad de camino.
+  function revealChoreoClass(seat) {
+    if (!revealAnim) return ''
+    if (seat === revealAnim.from) return revealAnim.fase === 'closing' ? 'opp-reveal-closing' : 'opp-reveal-collect'
+    if (seat === revealAnim.to) {
+      if (revealAnim.fase === 'grow') return 'opp-reveal-grow'
+      if (revealAnim.fase === 'open') return 'opp-reveal-open'
+    }
+    return ''
+  }
+
+  // R1.c · Protocolo boca abajo: durante el showdown solo UNA mano (la
+  // revelada) está boca arriba; las demás finalistas muestran dorsos sólidos
+  // (retiradas: dorsos atenuados + "Se retiró", sin cambios). R3: mesas 5-4-3.
+  const revealProtocolActive = revealedSeat !== null && aliveN >= 3
+
+  // R2 · Affordance knob-shake: sacude UN nombre a la vez entre las elegibles
+  // no reveladas (la ganadora entra cuando no es la revelada; las retiradas
+  // nunca), en orden visual izq→der, ~1s de sacudida + ~1.5s de pausa. Se
+  // rearma solo al cambiar la revelada (tap) y se limpia al salir del showdown
+  // y al desmontar (cleanup del efecto).
+  useEffect(() => {
+    // revealAnim !== null pausa la rotación durante el volteo (R2.b); al caer
+    // a null el efecto se rearma y la sacudida se reanuda con la mano asentada.
+    if (showdownWinnerSeat === null || isClearing || aliveN < 3 || revealAnim !== null) return
+    const rotation = livingRivalsInDisplayOrder(game.players).filter(s =>
+      !game.players[s].folded && !game.players[s].eliminated && s !== revealedSeat)
+    if (rotation.length === 0) return
+    const SHAKE_MS = 1000, PAUSE_MS = 1500
+    const timers = []
+    let idx = 0
+    const step = () => {
+      setShakeSeat(rotation[idx])
+      timers.push(setTimeout(() => {
+        setShakeSeat(null)
+        timers.push(setTimeout(() => {
+          idx = (idx + 1) % rotation.length
+          step()
+        }, PAUSE_MS))
+      }, SHAKE_MS))
+    }
+    timers.push(setTimeout(step, PAUSE_MS))   // respiro inicial tras el reveal
+    return () => { timers.forEach(clearTimeout); setShakeSeat(null) }
+  }, [showdownWinnerSeat, isClearing, aliveN, revealedSeat, revealAnim, game.players])
+
   function isWinningCard(card) {
     if (showdownWinnerSeat === null) return false
     const score = game.players[showdownWinnerSeat].score
@@ -686,8 +828,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     return (
       <PlayingCard
         card={card}
-        faceDown={!isPayoutPhase || folded}
-        highlight={seat === showdownWinnerSeat && isWinningCard(card)}
+        faceDown={!isPayoutPhase || folded || !seatShowsFace(seat)}
+        highlight={seat === showdownWinnerSeat && revealedSeat === showdownWinnerSeat && isWinningCard(card)}
       />
     )
   }
@@ -791,7 +933,11 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         isPie={deckSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
         isTurn={turnSeat === seat}
         isDimmed={turnSeat !== null && turnSeat !== seat}
-        isWinner={showdownWinnerSeat === seat}
+        isWinner={revealedSeat === seat}
+        isRevealEligible={isRevealEligible(seat)}
+        onNameTap={() => handleRevealTap(seat)}
+        isNameShaking={shakeSeat === seat}
+        revealAnimClass={revealChoreoClass(seat)}
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
         lastAction={lastActions[seat]}
         renderCard={i => renderOpponentCard(seat, i)}
