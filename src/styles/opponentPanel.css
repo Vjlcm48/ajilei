@@ -371,6 +371,20 @@
     transition: transform var(--reveal-scale-ms) ease;
   }
 
+  /* Z1 · La mano que el jugador eligió revelar está POR ENCIMA de cualquier
+     elemento vecino desde el instante en que gana el protagonismo: durante
+     grow/open la saliente aún porta su z:7 residual (.opp-reveal-collect) y
+     el empate a 7 lo decidía el orden DOM. La entrante sube a 8 — aditivo,
+     nada se degrada. */
+  .table-five .opp-panel.opp-winner.opp-reveal-grow,
+  .table-five .opp-panel.opp-winner.opp-reveal-open,
+  .table-four .opp-panel.opp-winner.opp-reveal-grow,
+  .table-four .opp-panel.opp-winner.opp-reveal-open,
+  .table-three .opp-panel.opp-winner.opp-reveal-grow,
+  .table-three .opp-panel.opp-winner.opp-reveal-open {
+    z-index: 8;
+  }
+
   /* Chip de puntaje: oculto durante toda la coreografía (visibility, sin
      remover DOM) — cae al iniciar la fase 1 en la saliente y reaparece al
      terminar la fase 4 en la entrante, cuando estas clases se desmontan. */
@@ -499,6 +513,15 @@
      el 1.5 + ancla + separación; aquí solo viaja la escala 1→1.5 */
   .table-five .opp-reveal-grow .opp-cards {
     transition: transform var(--reveal-scale-ms) ease;
+  }
+
+  /* Z1 · La mano elegida por el jugador está POR ENCIMA de cualquier vecino
+     desde que gana el protagonismo (réplica del fix landscape): sin esto, el
+     empate a z:7 con la saliente en recogida lo decidía el orden DOM y los
+     dorsos de la vecina derecha tapaban la mano expuesta un instante. */
+  .table-five .opp-panel.opp-winner.opp-reveal-grow,
+  .table-five .opp-panel.opp-winner.opp-reveal-open {
+    z-index: 8;
   }
 
   /* Chip de puntaje: oculto durante toda la coreografía (visibility, sin
