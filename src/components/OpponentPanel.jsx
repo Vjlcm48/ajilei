@@ -19,6 +19,7 @@ export default function OpponentPanel({
   isNameShaking,    // turno de esta IA en la rotación de sacudida (affordance R2)
   revealAnimClass,  // fase de la coreografía de volteo (R2.b) — '' fuera de ella
   isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
+  letterBadges,     // H1: badges de una letra (M/P/T) — solo mesa 5 vertical
   lastAction,       // 'Apostó' | 'Igualó' | 'Subió' | 'Pasó' | 'Descartó N' | null
   renderCard,       // (i) => JSX de la carta del slot i
   score,            // score del showdown (o null)
@@ -44,9 +45,13 @@ export default function OpponentPanel({
             className={`opp-name${isRevealEligible ? ' opp-name-tappable' : ''}${isNameShaking ? ' opp-name-shake' : ''}`}
             onClick={isRevealEligible ? onNameTap : undefined}
           >{player.name}</span>
-          {isMano && <span className="seat-badge seat-badge-gold">Mano</span>}
-          {isPie  && <span className="seat-badge seat-badge-neutral">Pie</span>}
-          {isTurn && <span className="seat-badge seat-badge-gold">Turno</span>}
+          {/* H1: en mesa 5 vertical los badges muestran una letra (M/P/T) para
+              caber en el header compacto; misma pastilla, solo cambia el texto.
+              seat-badge-letter neutraliza el letter-spacing final que
+              descentraba la letra única. */}
+          {isMano && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'M' : 'Mano'}</span>}
+          {isPie  && <span className={`seat-badge seat-badge-neutral${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'P' : 'Pie'}</span>}
+          {isTurn && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'T' : 'Turno'}</span>}
           {isWinner && score && <span className="win-score-chip">{score.points}</span>}
         </div>
         <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>

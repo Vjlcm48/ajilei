@@ -845,6 +845,10 @@
   border: 1px solid rgba(var(--text-primary-rgb), 0.18);
 }
 
+/* H1 · Badge de UNA letra (M/P/T, mesa 5 vertical): misma pastilla; solo se
+   anula el letter-spacing, cuyo espacio final descentraba la letra única. */
+.seat-badge-letter { letter-spacing: 0; }
+
 /* ── Señal triple de turno (reforzada en Tanda C3.1) ── */
 /* 1. Borde dorado un nivel más grueso + halo respirante amplio. El grosor
    extra es un anillo de box-shadow con spread 1px: el border-width jamás
