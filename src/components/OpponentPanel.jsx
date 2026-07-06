@@ -20,6 +20,7 @@ export default function OpponentPanel({
   revealAnimClass,  // fase de la coreografía de volteo (R2.b) — '' fuera de ella
   isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
   letterBadges,     // H1: badges de una letra (M/P/T) — solo mesa 5 vertical
+  inShowdown,       // H2: hay mano revelada en la mesa (showdownWinnerSeat !== null)
   lastAction,       // 'Apostó' | 'Igualó' | 'Subió' | 'Pasó' | 'Descartó N' | null
   renderCard,       // (i) => JSX de la carta del slot i
   score,            // score del showdown (o null)
@@ -34,6 +35,11 @@ export default function OpponentPanel({
     `${player.folded ? ' opp-folded' : ''}${isWinner ? ' opp-winner' : ''}` +
     `${isTurn ? ' turn-active' : ''}${isDimmed && !player.folded ? ' turn-dimmed' : ''}` +
     `${isEliminating ? ' opp-eliminating' : ''}`
+  // H2 · Anclaje derecho compartido (solo modo letra = mesa 5 vertical): en
+  // showdown la letra se oculta y el chip de puntaje ocupa el MISMO anclaje —
+  // nunca coexisten, sin hueco vacío ni salto (alturas de pastilla parejas).
+  // Fuera del modo letra los badges siguen visibles en showdown, como siempre.
+  const lettersHidden = letterBadges && inShowdown
   return (
     <div className={`opp-panel opp-${seatPos}${stateClasses}${revealAnimClass ? ` ${revealAnimClass}` : ''}`}>
       {/* opp-topline: por defecto display:contents (transparente) → identidad y saldo
@@ -48,11 +54,17 @@ export default function OpponentPanel({
           {/* H1: en mesa 5 vertical los badges muestran una letra (M/P/T) para
               caber en el header compacto; misma pastilla, solo cambia el texto.
               seat-badge-letter neutraliza el letter-spacing final que
-              descentraba la letra única. */}
-          {isMano && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'M' : 'Mano'}</span>}
-          {isPie  && <span className={`seat-badge seat-badge-neutral${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'P' : 'Pie'}</span>}
-          {isTurn && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'T' : 'Turno'}</span>}
-          {isWinner && score && <span className="win-score-chip">{score.points}</span>}
+              descentraba la letra única.
+              H2: .opp-header-anchor es display:contents por defecto (patrón
+              .opp-topline → transparente en todos los escenarios); solo mesa 5
+              vertical lo vuelve el anclaje derecho único donde conviven —nunca
+              a la vez— la letra (juego) y el chip de puntaje (showdown). */}
+          <span className="opp-header-anchor">
+            {isMano && !lettersHidden && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'M' : 'Mano'}</span>}
+            {isPie  && !lettersHidden && <span className={`seat-badge seat-badge-neutral${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'P' : 'Pie'}</span>}
+            {isTurn && !lettersHidden && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'T' : 'Turno'}</span>}
+            {isWinner && score && <span className="win-score-chip">{score.points}</span>}
+          </span>
         </div>
         <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>
       </div>

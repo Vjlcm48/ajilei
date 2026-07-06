@@ -54,6 +54,13 @@
    como antes. Solo la mesa de 2 landscape lo convierte en fila (ver gameTable.css). */
 .opp-topline { display: contents; }
 
+/* H2 · Anclaje derecho del header (badges + chip de puntaje). Por defecto
+   TRANSPARENTE (display: contents) → sus hijos siguen siendo flex items de
+   .opp-header, idéntico a antes en todos los escenarios. Solo mesa 5 vertical
+   lo convierte en el anclaje derecho de su header a una línea (ver el bloque
+   portrait más abajo). */
+.opp-header-anchor { display: contents; }
+
 .opp-header {
   display: flex;
   align-items: center;
@@ -409,6 +416,32 @@
    desde el anclaje, e invadir paneles vecinos es esperado. Mesas 4/3 portrait
    conservan el tratamiento viejo hasta sus propias tandas. */
 @media (max-width: 767px) and (orientation: portrait) {
+  /* ── H2 · Header a UNA LÍNEA (rediseño de panel, solo mesa 5) ─────────────
+     Nombre anclado a la izquierda (con ellipsis de reserva para usernames
+     largos) y anclaje derecho único (letra M/P/T en juego ↔ chip de puntaje
+     en showdown — el JSX garantiza que nunca coexisten). min-height 30px: la
+     pastilla más alta es la neutral con borde (P de Pie, 29.2) → altura
+     constante, el header no late al montar/desmontar letra o chip (ningún
+     panel se mueve al entrar/salir del showdown). */
+  .table-five .opp-header {
+    width: 100%;
+    min-height: 30px;
+  }
+  .table-five .opp-header .opp-name {
+    min-width: 0;
+    max-width: 80px;      /* ~12 caracteres a 13px antes de truncar */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-five .opp-header .opp-header-anchor {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;    /* anclaje derecho; vacío colapsa a 0 sin hueco */
+    flex-shrink: 0;
+  }
+
   /* Realce 1.5×: la ESCALA va en la FILA (.opp-cards), no en cada slot —
      mismo criterio que landscape (el espaciado escala junto con las cartas) */
   .table-five .opp-winner .opp-card-slot {

@@ -958,6 +958,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         revealAnimClass={revealChoreoClass(seat)}
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
         letterBadges={isPortraitTable && aliveN === 5}
+        inShowdown={showdownWinnerSeat !== null}
         lastAction={lastActions[seat]}
         renderCard={i => renderOpponentCard(seat, i)}
         score={game.players[seat].score}
