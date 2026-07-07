@@ -1,5 +1,6 @@
 import '../styles/opponentPanel.css'
 import BalanceDisplay from './BalanceDisplay'
+import ChipToken from './ChipToken'
 import { DECK_ANCHORS } from '../config/seatLayouts'
 
 // Panel compacto de rival (mesas 3-5). Diseñado conforme a docs/AJILEI_Sistema_Diseno_v1.2.md.
@@ -21,6 +22,8 @@ export default function OpponentPanel({
   isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
   letterBadges,     // H1: badges de una letra (M/P/T) — solo mesa 5 vertical
   inShowdown,       // H2: hay mano revelada en la mesa (showdownWinnerSeat !== null)
+  isChipOpen,       // H4: el toggle de saldo de ESTE panel está desplegado
+  onChipTap,        // H4: tap en la ficha de esquina (GameTable decide/gatea)
   lastAction,       // 'Apostó' | 'Igualó' | 'Subió' | 'Pasó' | 'Descartó N' | null
   renderCard,       // (i) => JSX de la carta del slot i
   score,            // score del showdown (o null)
@@ -34,7 +37,7 @@ export default function OpponentPanel({
   const stateClasses =
     `${player.folded ? ' opp-folded' : ''}${isWinner ? ' opp-winner' : ''}` +
     `${isTurn ? ' turn-active' : ''}${isDimmed && !player.folded ? ' turn-dimmed' : ''}` +
-    `${isEliminating ? ' opp-eliminating' : ''}`
+    `${isEliminating ? ' opp-eliminating' : ''}${isChipOpen ? ' chip-open' : ''}`
   // H2 · Anclaje derecho compartido (solo modo letra = mesa 5 vertical): en
   // showdown la letra se oculta y el chip de puntaje ocupa el MISMO anclaje —
   // nunca coexisten, sin hueco vacío ni salto (alturas de pastilla parejas).
@@ -85,6 +88,22 @@ export default function OpponentPanel({
         <div ref={deckRef} className={`deck-pile opp-deck${showDeck ? '' : ' deck-hidden'}`} />
         {shuffleChildren}
       </div>
+
+      {/* H4 · Ficha de esquina (solo mesa 5 vertical): reemplazo consultable
+          del saldo retirado en H3. Absolute contra el panel (cero flujo),
+          target táctil ~28px con SVG de 16 (padding invisible, patrón del
+          nombre tappable). El tap lo gatea GameTable (no-op en showdown —
+          visible e inerte). El float despliega a la derecha sin empujar nada
+          (patrón pot-float): número + "fichas", el token no se repite porque
+          la ficha misma es el token. */}
+      {letterBadges && (
+        <span className="opp-corner-chip" onClick={onChipTap}>
+          <ChipToken size="icon" />
+          {isChipOpen && (
+            <span className="chip-balance-float"><strong>{player.chips}</strong> fichas</span>
+          )}
+        </span>
+      )}
 
       {/* Rótulo de estado (doblado en C4.3.1). En la transición a la mano
           siguiente (resetting) se limpia para no arrastrar "Se retiró" ni la

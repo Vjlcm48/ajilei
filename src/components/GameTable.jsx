@@ -240,6 +240,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const [displayedSeat, setDisplayedSeat] = useState(null) // Reveal Manos: IA elegida por tap (null = ganadora)
   const [shakeSeat,     setShakeSeat]     = useState(null) // Reveal Manos R2: IA cuyo nombre "sacude" ahora
   const [revealAnim,    setRevealAnim]    = useState(null) // R2.b: {fase, from, to} — coreografía de volteo (lock de taps)
+  const [openChipSeat,  setOpenChipSeat]  = useState(null) // H4: IA con el toggle de saldo abierto (uno a la vez)
   const { play } = useSounds()
 
   // Position refs: one 5-slot row + one deck anchor per seat
@@ -256,6 +257,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const discardTimersRef = useRef([])
   const ceremonyTimersRef = useRef([])
   const revealTimersRef = useRef([])
+  const chipTimerRef = useRef(null)   // H4: autocierre del toggle de saldo
   const gameRef = useRef(game)
   const prevPotRef = useRef(game.pot)
 
@@ -264,6 +266,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     discardTimersRef.current.forEach(clearTimeout)
     ceremonyTimersRef.current.forEach(clearTimeout)
     revealTimersRef.current.forEach(clearTimeout)
+    clearTimeout(chipTimerRef.current)
   }, [])
 
   // ── Pozo: pulso + "+N" flotante al aumentar (Tanda C4.3) ──────────────────
@@ -654,6 +657,44 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     startRevealSwap(revealedSeat, seat)
   }
 
+  // ── H4 · Toggle flotante del saldo (ficha de esquina, mesa 5 vertical) ─────
+  // Prop hermana de handleRevealTap, temporalmente excluyentes: la ficha es
+  // no-op en showdown (visible e inerte) y el nombre solo es tappable en
+  // showdown. Un toggle a la vez; tap sobre la misma ficha lo cierra; abrir
+  // (re)arma el autocierre de ~3s. Patrón de timers de shakeSeat.
+  const CHIP_TOGGLE_MS = 3000
+  function handleChipTap(seat) {
+    if (showdownWinnerSeat !== null) return   // gate: inerte durante el showdown
+    clearTimeout(chipTimerRef.current)
+    if (openChipSeat === seat) { setOpenChipSeat(null); return }
+    setOpenChipSeat(seat)
+    chipTimerRef.current = setTimeout(() => setOpenChipSeat(null), CHIP_TOGGLE_MS)
+  }
+
+  // Al entrar al showdown, un toggle abierto se cierra solo
+  useEffect(() => {
+    if (showdownWinnerSeat !== null && openChipSeat !== null) {
+      clearTimeout(chipTimerRef.current)
+      setOpenChipSeat(null)
+    }
+  }, [showdownWinnerSeat, openChipSeat])
+
+  // Cierre por tap fuera. Nota: listener no-bloqueante en vez del overlay del
+  // leave-overlay — un overlay tragaría el primer tap sobre los botones de
+  // acción en plena ronda (el toggle vive DURANTE el juego, no en un modal).
+  // El tap fuera cierra Y su acción procede; los taps sobre cualquier ficha
+  // los resuelve handleChipTap (por eso se excluyen aquí).
+  useEffect(() => {
+    if (openChipSeat === null) return
+    const onDocDown = (e) => {
+      if (e.target.closest && e.target.closest('.opp-corner-chip')) return
+      clearTimeout(chipTimerRef.current)
+      setOpenChipSeat(null)
+    }
+    document.addEventListener('pointerdown', onDocDown, true)
+    return () => document.removeEventListener('pointerdown', onDocDown, true)
+  }, [openChipSeat])
+
   // R2.b · Timeline del intercambio (patrón setTimeout de startDiscardAnim):
   // cerrar saliente (escalonado) → recoger 1.6→1 → crecer entrante en dorsos
   // (arranca al 60% de la recogida; AQUÍ cambia displayedSeat) → abrir
@@ -959,6 +1000,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
         letterBadges={isPortraitTable && aliveN === 5}
         inShowdown={showdownWinnerSeat !== null}
+        isChipOpen={openChipSeat === seat}
+        onChipTap={() => handleChipTap(seat)}
         lastAction={lastActions[seat]}
         renderCard={i => renderOpponentCard(seat, i)}
         score={game.players[seat].score}
