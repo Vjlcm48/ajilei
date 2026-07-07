@@ -100,7 +100,8 @@ export default function OpponentPanel({
         <span className="opp-corner-chip" onClick={onChipTap}>
           <ChipToken size="icon" />
           {isChipOpen && (
-            <span className="chip-balance-float"><strong>{player.chips}</strong> fichas</span>
+            /* H5: solo el número, desnudo (sin caja ni "fichas") */
+            <span className="chip-balance-float">{player.chips}</span>
           )}
         </span>
       )}

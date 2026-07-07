@@ -460,7 +460,8 @@
   }
   /* Toggle del saldo: overlay puro anclado a la ficha, desplegado a la
      derecha (patrón pot-float — no empuja nada, pointer-events none deja que
-     el tap-fuera cierre y actúe). Pastilla premium single-gold. */
+     el tap-fuera cierre y actúe). H5: NÚMERO DESNUDO, sin caja — dorado del
+     sistema con sombra de tinta para leerse sobre dorsos rojos y tapete. */
   .table-five .chip-balance-float {
     position: absolute;
     left: calc(100% - 2px);
@@ -468,23 +469,35 @@
     transform: translateY(-50%);
     white-space: nowrap;
     pointer-events: none;
-    background: var(--surface-modal);
-    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
-    border-radius: 999px;
-    padding: 4px 12px;
-    font-size: 12px;
+    font-size: 14px;
+    font-weight: 800;
     color: var(--gold-brand);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    text-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.85),
+      0 0 8px rgba(0, 0, 0, 0.55);
     animation: chipFloatIn 0.15s ease-out;
-  }
-  .table-five .chip-balance-float strong {
-    font-size: 13px;
-    font-weight: 700;
   }
   /* Lección Z1: mientras SU toggle está abierto, el panel entero sube sobre
      el vecino derecho (posterior en DOM). No coincide temporalmente con los
      z:7/8 del showdown (la ficha es inerte ahí y el toggle se autocierra). */
   .table-five .opp-panel.chip-open { z-index: 3; }
+
+  /* H5 · La palabra de acción baja al RENGLÓN DEL SALDO: fuera de flujo,
+     centrada en la franja baja del panel (bottom 2 → centro del renglón ≈
+     centro de la ficha y del número desplegado). left/right 28 despejan la
+     esquina de la ficha y el mazo del Pie. Nada más se mueve: el resto del
+     interior queda top-anclado y la fila sigue en 130 (O1 intacto). */
+  .table-five .opp-panel .opp-status {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    bottom: 2px;
+  }
+  /* H5 · Prioridad del saldo: mientras el toggle de ESTA IA está abierto, su
+     palabra de acción cede el renglón (visibility — sin salto ni remoción);
+     al cerrarse (mismo tap, tap fuera, autocierre, otra ficha) vuelve sola.
+     Comparten renglón visual: por eso se turnan. */
+  .table-five .opp-panel.chip-open .opp-status { visibility: hidden; }
 
   @keyframes chipFloatIn {
     from { opacity: 0; transform: translateY(-50%) scale(0.92); }
@@ -499,9 +512,16 @@
   .table-five .opp-winner .opp-card-slot:not(:first-child) {
     margin-left: 0;   /* cartas juntas: sin solape y sin espacio entre ellas */
   }
+  /* H5 · Cartas reveladas ASENTADAS AL FONDO del área: el origen en `bottom`
+     clava el borde inferior de la fila durante el escalado (crece hacia
+     arriba) y translateY(28px) lo lleva exactamente al borde del panel:
+     28 = 130 de fila − (1 borde + 5 padding + 30 header + 1 gap + 65 cartas).
+     Límite duro por construcción — la interpolación de la transición es
+     monótona, ningún frame cruza el borde. El nombre queda libre arriba
+     (tope de la carta escalada ≈ 35.5 = base del header). */
   .table-five .opp-winner .opp-cards {
     width: 100%;        /* caja = ancho interno del panel → ancla previsible */
-    transform: scale(1.5);
+    transform: translateY(28px) scale(1.5);
     position: relative;
     z-index: 6;
   }
@@ -509,13 +529,13 @@
   .table-five .opp-top-right.opp-winner .opp-cards,
   .table-five .opp-side-right.opp-winner .opp-cards {
     justify-content: flex-end;
-    transform-origin: right center;
+    transform-origin: right bottom;
   }
   /* Columna izquierda (IA3 arriba / IA4 abajo): ancla izquierda, crece a la derecha */
   .table-five .opp-top-left.opp-winner .opp-cards,
   .table-five .opp-side-left.opp-winner .opp-cards {
     justify-content: flex-start;
-    transform-origin: left center;
+    transform-origin: left bottom;
   }
 
   /* Mazo (Pie) del panel revelado: oculto SIN remoción de DOM ni salto de
@@ -568,7 +588,9 @@
     width: 100%;
     position: relative;
     z-index: 6;
-    transform: scale(1);
+    /* H5: lista de transform congruente con el estado grande asentado
+       (translateY + scale) → interpola por función, sin salto al arrancar */
+    transform: translateY(0) scale(1);
     transition: transform var(--reveal-scale-ms) ease;
   }
   .table-five .opp-reveal-collect .opp-card-slot { transform: none; }
@@ -579,16 +601,17 @@
   .table-five .opp-reveal-collect .opp-card-slot .playing-card {
     animation: cardFlipReveal var(--reveal-settle-ms) ease-out both;
   }
-  /* Ancla conservada durante la recogida (sin salto al perder .opp-winner) */
+  /* Ancla conservada durante la recogida (sin salto al perder .opp-winner);
+     H5: origen en bottom, espejo del estado grande asentado al fondo */
   .table-five .opp-top-right.opp-reveal-collect .opp-cards,
   .table-five .opp-side-right.opp-reveal-collect .opp-cards {
     justify-content: flex-end;
-    transform-origin: right center;
+    transform-origin: right bottom;
   }
   .table-five .opp-top-left.opp-reveal-collect .opp-cards,
   .table-five .opp-side-left.opp-reveal-collect .opp-cards {
     justify-content: flex-start;
-    transform-origin: left center;
+    transform-origin: left bottom;
   }
 
   /* Fase 3 · la entrante crece en dorsos: .opp-winner (recién ganado) aporta
