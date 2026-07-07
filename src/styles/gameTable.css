@@ -1142,6 +1142,18 @@
      que liberan la fila de tags del humano o los badges muere en el hueco bajo
      el óvalo — nada se mueve. En viewports donde el colchón sería negativo,
      max() lo colapsa a 0 (anclaje puro arriba). */
+  /* H3 · Retune de O1 SOLO para mesa 5 (rediseño de panel: header a una línea
+     + saldo retirado → contenido natural ~124px). Las variables se redefinen
+     sobre .game-table.table-five: por proximidad de herencia ganan a las de
+     .game-table-screen dentro de esta mesa, y la mesa 4 (mismos selectores
+     .table-wide) conserva 168/832 hasta su propia tanda de rediseño.
+     --o1-static-v = 832 − 2×38 de filas = 756. Fila 130 = 124 de contenido
+     + ~6px de aire bajo el estado (reserva de la ficha H4). */
+  .game-table.table-five {
+    --o1-row-h: 130px;
+    --o1-static-v: 756px;
+  }
+
   .table-wide .table-mid {
     grid-template-rows: var(--o1-row-h) var(--o1-row-h) var(--o1-oval-h);
     align-content: start;

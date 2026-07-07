@@ -66,7 +66,10 @@ export default function OpponentPanel({
             {isWinner && score && <span className="win-score-chip">{score.points}</span>}
           </span>
         </div>
-        <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>
+        {/* H3: en mesa 5 vertical (misma señal letterBadges) la línea del saldo
+            no se monta — su lugar lo toma la ficha con toggle de H4. El resto
+            de escenarios la conserva intacta. */}
+        {!letterBadges && <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>}
       </div>
 
       <div className="opp-cards">
