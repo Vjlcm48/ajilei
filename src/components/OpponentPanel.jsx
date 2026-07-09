@@ -20,8 +20,8 @@ export default function OpponentPanel({
   isNameShaking,    // turno de esta IA en la rotación de sacudida (affordance R2)
   revealAnimClass,  // fase de la coreografía de volteo (R2.b) — '' fuera de ella
   isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
-  letterBadges,     // H1/M4-1: header rediseñado (letra M/P/T, sin saldo) — mesas 5 y 4 vertical
-  cornerChip,       // H4/M4-1: monta la ficha de esquina (aún solo mesa 5; M4-2 la extiende)
+  letterBadges,     // H1/M4-1/M3-1: header rediseñado (letra M/P/T, sin saldo) — mesas 5, 4 y 3 vertical
+  cornerChip,       // H4/M4-2/M3-1: monta la ficha de esquina — mesas 5, 4 y 3 vertical
   inShowdown,       // H2: hay mano revelada en la mesa (showdownWinnerSeat !== null)
   isChipOpen,       // H4: el toggle de saldo de ESTE panel está desplegado
   onChipTap,        // H4: tap en la ficha de esquina (GameTable decide/gatea)

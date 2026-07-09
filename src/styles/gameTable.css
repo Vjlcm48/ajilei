@@ -999,21 +999,30 @@
          22 + header 32 + gaps 8 + zona del humano con badges 291 + filas
          (2×168 + óvalo 119 + 2 gaps de fila 8) = 832.
        · Mesa 3 (su óvalo era RESIDUO de flex): --o1-rivals3-h fija la fila
-         única de IAs — 168 + 4 de padding-top heredado = 172 efectivos, el
-         máximo medido (171.4). --o1-static3-v = todo lo fijo fuera del óvalo
-         en estado comprimido, gaps de columnas vacías incluidos (547 medidos)
-         → óvalo = calc(100svh − 547px): constante en sesión y adaptado por
-         dispositivo. A 667 da 120px: su interior mide 123.4 y asoma 3.4px que
-         son solo padding inferior (contenido intacto); así el scroll en el
-         estado más gordo queda en paridad con el actual (~9px), y en fases
-         calmadas no hay scroll, como hoy.
+         única de IAs. M3-5 (rediseño de panel): la fila baja de 168 (máximo
+         del formato viejo, badges a 2 líneas) a 164 = contenido hasta las
+         cartas 106 + respiro 8 + mazo 46 + respiro 4; el panel se ESTIRA a
+         la fila y el offset del borde superior (33.5) pasa a padding-top de
+         la zona → zona efectiva 197.5 (antes 172, +25.5). --o1-static3-v =
+         todo lo fijo fuera del óvalo en estado comprimido (547 medidos con
+         la fila vieja) + 25.5 del estiramiento = 572.5 → el ÓVALO financia
+         el crecimiento: calc(100svh − 572.5px), mismo modelo (gigante que
+         llena la banda), solo más bajo. Scroll neto sin cambios.
        Los calc usan 100svh (no dvh): al colapsar la barra del navegador en
        móvil, dvh crece en plena sesión y volvería a mover el óvalo. */
     --o1-row-h: 168px;
     --o1-oval-h: 119px;
     --o1-static-v: 832px;
-    --o1-rivals3-h: 168px;
-    --o1-static3-v: 547px;
+    --o1-rivals3-h: 164px;
+    --o1-static3-v: 572.5px;
+    /* M2-4 · Mesa 2 (área legacy .ai-zone): misma pareja de variables que
+       mesa 3. Área = top de contenido fijo + cartas (borde inferior a 134 del
+       top del área) + respiro 12 + mazo 46 + respiro 4 = 196 border-box.
+       Estático del óvalo = 844 medidos − óvalo (844 − 196 − resto fijo) →
+       567.5: el óvalo cede exactamente el estiramiento (+25) y queda inmune
+       al contenido (modelo O1 de mesa 3), gaps 4/4 y humano sin moverse. */
+    --o1-rivals2-h: 196px;
+    --o1-static2-v: 567.5px;
   }
 
   /* O1 · En viewports más bajos que la mesa, el centrado de .game-table-screen
@@ -1217,14 +1226,15 @@
   }
   .table-five .center-zone { align-self: center; }
 
-  /* ── HU-1 · Saldo del humano en mesas 4/5 portrait: solo ficha + número ────
-     Se oculta la palabra "fichas" (span propio en el JSX). El anclaje derecho
-     ya lo da .player-bar-right (flex columna, align-items: flex-end, columna
-     `auto` del grid del player-bar): el último dígito queda al ras del borde
-     derecho del área y el bloque ficha+número crece hacia la IZQUIERDA al
-     ganar dígitos (la ficha viaja con el número: son un inline-flex). Las
-     mesas 2/3, landscape y escritorio conservan "N fichas" intacto. */
-  .table-wide .pbr-fichas-word { display: none; }
+  /* ── HU-1/HU-2 · Saldo del humano en portrait: solo ficha + número ────────
+     En portrait la palabra "fichas" (span propio en el JSX) NUNCA se muestra:
+     el saldo queda anclado por la derecha con el último dígito al ras del
+     borde del área, y el bloque ficha+número crece hacia la IZQUIERDA al
+     ganar dígitos (la ficha viaja con el número: son un inline-flex). El
+     anclaje lo da .player-bar-right (flex columna, align-items: flex-end,
+     columna `auto` del grid del player-bar), común a todas las mesas.
+     Landscape y escritorio conservan "N fichas" (otros media queries). */
+  .pbr-fichas-word { display: none; }
 
   /* ── M4-9 · Header de mesa 4 en dos líneas apiladas (fuera de flujo) ──────
      "Mano #N" baja a la segunda línea, alineada a la izquierda con la A de
@@ -1293,7 +1303,11 @@
      M4-3: en mesa 4 el modelo queda acotado a IA2 (.opp-top-center) — LA
      EXCEPCIÓN: su panel a fila completa con carta grande in-flow se conserva;
      las esquineras IA3/IA1 migran al paquete transform de opponentPanel.css.
-     Mesa 3 conserva el modelo entero hasta su tanda; entonces se retira. */
+     M3-3: mesa 3 RETIRADA del modelo de ganador (sin ensanchamiento a celda,
+     sin cartas flex, sin display:none del mazo) — sus dos IAs migran al
+     paquete transform de opponentPanel.css con anclas top-left/top-right. El
+     solape −0.5 de ABAJO se conserva como base de juego (dorsos), igual que
+     en mesa 5: la ganadora lo anula con margin-left:0 en el paquete nuevo. */
   .table-wide .opp-card-slot:not(:first-child),
   .table-three .opp-card-slot:not(:first-child) {
     margin-left: calc(var(--opp-card-w) * -0.5);
@@ -1303,13 +1317,10 @@
      slots se reparten por igual (flex) manteniendo proporción, y el mazo del
      panel ganador se oculta para no taparlas. Las perdedoras conservan su solape. */
   /* M4-6: IA2 ganadora YA NO ensancha su panel (conserva el max-width base de
-     juego, ~158 border-box); solo .table-three mantiene el panel a celda
-     completa. Sus cartas grandes reciben el ancho de fila explícito abajo. */
-  .game-table-screen .table-three .opp-winner { max-width: none; }
-  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-cards,
-  .table-three .opp-winner .opp-cards { gap: 3px; align-items: flex-start; }
-  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-card-slot,
-  .table-three .opp-winner .opp-card-slot {
+     juego, ~158 border-box). M3-3: mesa 3 retirada también — el modelo de
+     ganador in-flow queda SOLO para IA2 de mesa 4 (.opp-top-center). */
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-cards { gap: 3px; align-items: flex-start; }
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-card-slot {
     flex: 1 1 0;
     min-width: 0;
     width: auto;
@@ -1317,10 +1328,8 @@
     aspect-ratio: 40 / 63;
     transform: none;
   }
-  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-card-slot:not(:first-child),
-  .table-three .opp-winner .opp-card-slot:not(:first-child) { margin-left: 0; }
-  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-deck-wrapper,
-  .table-three .opp-winner .opp-deck-wrapper { display: none; }
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-card-slot:not(:first-child) { margin-left: 0; }
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-deck-wrapper { display: none; }
   /* M4-3 · IA2 ganadora AL RAS por flujo (carta grande intacta): margin-top
      auto empuja la fila de cartas al fondo; el estado sale del flujo para
      cederle el fondo; el margen negativo cruza padding(6)+borde(1) hasta el
@@ -1369,7 +1378,16 @@
     grid-template-columns: 1fr 1fr;
     gap: 4px;
     justify-items: center;
-    align-content: center;
+    /* M3-5 · Los paneles se ESTIRAN a la fila (como en 4/5): la fila única
+       explícita (1fr) llena el alto de la zona y el stretch por defecto del
+       grid lleva el border-box del panel a esa altura → el .opp-status
+       absolute recupera su franja de reserva (fix estructural del recorte de
+       M3-4). El borde superior NO se mueve: el aire que antes dejaba el
+       centrado (33.5px desde el borde de zona, panel top a 97.5 medidos) se
+       vuelve reserva explícita arriba, y todo el crecimiento va hacia ABAJO. */
+    grid-template-rows: 1fr;
+    align-content: start;
+    padding-top: 33.5px;
   }
 
   /* ── O1 · Óvalo central FIJO (mesa 3) ─────────────────────────────────────
@@ -1428,6 +1446,72 @@
   /* ── Legacy AI zone (mesa de 2): compacta ── */
   .ai-zone { min-height: 0; padding: 6px; }
   .ai-info { font-size: 12px; margin-bottom: 6px; }
+  /* M2-1 · Header a una línea limpia (nombre + letra única; la línea de saldo
+     .ai-chips se desmonta en el JSX solo-portrait). El min-height fija la
+     línea a su alto medido con saldo (24) para que el header —y con él el
+     óvalo residuo-flex— no late al montar/desmontar la pastilla de letra. */
+  .table-two .ai-info { min-height: 24px; }
+  /* M2-5 · Réplica del H2 de mesa 5 en el header legacy: .ai-label pasa a
+     fila flex a todo el ancho — nombre a la IZQUIERDA con ellipsis de reserva
+     (para el futuro username; "IA" no la dispara) y grupo de badges anclado
+     al extremo DERECHO (margin-left: auto en .ai-header-anchor; vacío colapsa
+     a 0 sin hueco). Mismos knobs que .opp-header (max-width 80 ≈ 12 chars). */
+  .table-two .ai-info .ai-label {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+  .table-two .ai-name {
+    min-width: 0;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-two .ai-header-anchor {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  /* M2-2 · Ancla del chip de esquina: .ai-zone se vuelve caja posicionada.
+     El chip y su float usan las reglas H4 de opponentPanel.css con el
+     selector .table-two sumado.
+     M2-4 · El área se ESTIRA hacia abajo a su fila O1 (--o1-rivals2-h, 196
+     border-box): el top queda fijo (flujo tras el header) y el crecimiento
+     (+25) lo financia el óvalo (modelo O1 abajo). El interior en flujo no se
+     mueve; el sobrante crea la franja del mazo y del renglón de estado. */
+  .table-two .ai-zone {
+    position: relative;
+    box-sizing: border-box;
+    height: var(--o1-rivals2-h);
+  }
+  /* M2-4 · Mazo del PIE reanclado al borde inferior del ÁREA (antes bottom
+     −34 contra .cards-row: pellizcaba 8px la última carta y asomaba bajo el
+     borde). .cards-row cede su relative SOLO aquí (su único absoluto era el
+     propio mazo) → el wrapper ancla contra .ai-zone (relative de M2-2), con
+     bottom 3 (+1 de borde = 4 visuales al borde) y 12 de respiro a las
+     cartas, como mesa 3. */
+  .table-two .ai-zone .cards-row { position: static; }
+  .table-two .ai-zone .deck-shuffle-wrapper { bottom: 3px; }
+  /* M2-3 · Palabra de acción en la franja baja, CENTRADA horizontalmente (a
+     diferencia del anclaje por columna de 3/4/5: aquí el área ocupa todo el
+     ancho). bottom 2 la alinea con el renglón del chip/float (centros a ~10px
+     del borde); los insets de 28 despejan el chip (izquierda) y el mazo
+     (derecha). Fuera de flujo → cero salto de layout. */
+  .table-two .ai-zone .opp-status {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    bottom: 2px;
+    text-align: center;
+  }
+  /* M2-3 · Prioridad del saldo (turnado, filosofía H5): con el toggle abierto
+     la palabra cede el renglón (visibility, sin remoción); al cerrarse (tap
+     mismo, tap fuera, autocierre) vuelve sola. */
+  .table-two .ai-zone.chip-open .opp-status { visibility: hidden; }
 
   /* ── Cartas del humano y de la IA legacy: solapamiento leve para caber ──
      (la fila de 5 cartas a tamaño completo no entra en 375px de ancho). C4.2.2:
@@ -1615,6 +1699,17 @@
      igualar" conservan su dinámica. NO afecta 3/4/5. */
   .table-two .center-zone { align-content: center; }
   .table-two .center-zone .game-message { flex-basis: 100%; }
+  /* M2-4 · Óvalo de mesa 2 al modelo O1 de mesa 3: deja de ser residuo flex
+     (absorbía cada variación de contenido) y toma su alto calculado por
+     dispositivo (100svh − todo lo fijo). Mismo rol visual (llena la banda
+     entre área IA y humano, gaps 4/4 → equidistante por construcción); solo
+     cambia el mecanismo de alto. El suelo de 96px replica el de mesa 3. */
+  .table-two .center-zone {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    height: max(96px, calc(100svh - var(--o1-static2-v)));
+    min-height: 0;
+  }
 }
 
 /* ── Teléfono HORIZONTAL (landscape) — Tanda C5.1 ────────────────────────────

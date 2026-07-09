@@ -653,7 +653,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   function handleRevealTap(seat) {
     if (revealAnim !== null) return
     if (revealedSeat === seat) return
-    const runsChoreo = isLandscapeTable || (isPortraitTable && (aliveN === 5 || aliveN === 4))
+    const runsChoreo = isLandscapeTable || (isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3))
     if (!runsChoreo) { setDisplayedSeat(seat); return }
     startRevealSwap(revealedSeat, seat)
   }
@@ -951,16 +951,28 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     const rival = game.players[seat]
     const rivalWon = showdownWinnerSeat === seat
     return (
-      <section className={`ai-zone${turnSeat === seat ? ' turn-active' : ''}${turnSeat === 0 ? ' turn-dimmed' : ''}`}>
+      <section className={`ai-zone${turnSeat === seat ? ' turn-active' : ''}${turnSeat === 0 ? ' turn-dimmed' : ''}${openChipSeat === seat ? ' chip-open' : ''}`}>
+        {/* M2-1 · Header rediseñado SOLO portrait (este render legacy también
+            sirve al escritorio, que conserva palabra completa y línea de
+            saldo): badges a letra única (patrón seat-badge-letter de 3/4/5) y
+            la línea .ai-chips se desmonta — su reemplazo (ficha de esquina
+            con toggle) llega en M2-2. */}
         <div className="ai-info">
+          {/* M2-5 · Réplica del patrón H2: nombre y grupo de badges en spans
+              propios (.ai-name / .ai-header-anchor). Son inline transparentes
+              en escritorio (cero cambio); solo el CSS .table-two portrait los
+              vuelve fila flex con nombre-izquierda (ellipsis) y anclaje del
+              badge al extremo derecho. */}
           <span className="ai-label">
-            {rival.name}
-            {manoSeat === seat && <span className="seat-badge seat-badge-gold">Mano</span>}
-            {deckSeat === seat && <span className="seat-badge seat-badge-neutral">Pie</span>}
-            {turnSeat === seat && <span className="seat-badge seat-badge-gold">Turno</span>}
-            {rivalWon && <span className="win-score-chip">{rival.score.points}</span>}
+            <span className="ai-name">{rival.name}</span>
+            <span className="ai-header-anchor">
+              {manoSeat === seat && <span className={`seat-badge seat-badge-gold${isPortraitTable ? ' seat-badge-letter' : ''}`}>{isPortraitTable ? 'M' : 'Mano'}</span>}
+              {deckSeat === seat && <span className={`seat-badge seat-badge-neutral${isPortraitTable ? ' seat-badge-letter' : ''}`}>{isPortraitTable ? 'P' : 'Pie'}</span>}
+              {turnSeat === seat && <span className={`seat-badge seat-badge-gold${isPortraitTable ? ' seat-badge-letter' : ''}`}>{isPortraitTable ? 'T' : 'Turno'}</span>}
+              {rivalWon && <span className="win-score-chip">{rival.score.points}</span>}
+            </span>
           </span>
-          <span className="ai-chips"><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>
+          {!isPortraitTable && <span className="ai-chips"><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>}
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
@@ -979,6 +991,37 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         <div className="score-tag" style={{ visibility: isPayoutPhase && !isClearing && !isShuffling && rival.score ? 'visible' : 'hidden' }}>
           {rival.score && <>Mejor palo: <strong>{rival.score.palo}</strong> ({rival.score.points} pts)</>}
         </div>
+        {/* M2-3 · Renglón de palabras de acción — SOLO portrait (antes las
+            acciones de la IA solo se narraban en el .game-message del óvalo).
+            Mismas clases y lógica de contenido que el opp-status de 3/4/5
+            (Pensando…/acción/Se retiró; en blanco durante el reset Y durante
+            el payout, cuando el .score-tag ocupa la misma franja centrada).
+            Absoluto y centrado vía CSS .table-two; con el chip abierto cede
+            el renglón al saldo (clase chip-open en la sección). */}
+        {isPortraitTable && (
+          <span className={`opp-status${turnSeat === seat ? ' opp-status-turn' : ''}`}>
+            {inReset || (isPayoutPhase && rival.score)
+              ? ' '
+              : rival.folded
+                ? 'Se retiró'
+                : turnSeat === seat
+                  ? 'Pensando…'
+                  : (lastActions[seat] ?? ' ')}
+          </span>
+        )}
+        {/* M2-2 · Ficha de esquina (reemplazo consultable del saldo desmontado
+            en M2-1) — SOLO portrait; mismas clases y lógica agnóstica que
+            3/4/5 (handleChipTap/openChipSeat con el seat REAL del rival, el
+            tap-fuera ya excluye .opp-corner-chip). El CSS de posicionamiento
+            vive scopeado a .table-two (ancla a .ai-zone, relative en M2-2). */}
+        {isPortraitTable && (
+          <span className="opp-corner-chip" onClick={() => handleChipTap(seat)}>
+            <ChipToken size="icon" />
+            {openChipSeat === seat && (
+              <span className="chip-balance-float">{rival.chips}</span>
+            )}
+          </span>
+        )}
       </section>
     )
   }
@@ -999,8 +1042,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         isNameShaking={shakeSeat === seat}
         revealAnimClass={revealChoreoClass(seat)}
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
-        letterBadges={isPortraitTable && (aliveN === 5 || aliveN === 4)}
-        cornerChip={isPortraitTable && (aliveN === 5 || aliveN === 4)}
+        letterBadges={isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)}
+        cornerChip={isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)}
         inShowdown={showdownWinnerSeat !== null}
         isChipOpen={openChipSeat === seat}
         onChipTap={() => handleChipTap(seat)}
