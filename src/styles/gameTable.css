@@ -1233,7 +1233,8 @@
      ganar dígitos (la ficha viaja con el número: son un inline-flex). El
      anclaje lo da .player-bar-right (flex columna, align-items: flex-end,
      columna `auto` del grid del player-bar), común a todas las mesas.
-     Landscape y escritorio conservan "N fichas" (otros media queries). */
+     La palabra queda oculta en portrait (HU-1/HU-2) y en móvil landscape
+     (HU-3, bloque landscape); solo escritorio conserva "N fichas". */
   .pbr-fichas-word { display: none; }
 
   /* ── M4-9 · Header de mesa 4 en dos líneas apiladas (fuera de flujo) ──────
@@ -2097,6 +2098,12 @@
   .table-wide .pbr-mesa,
   .table-three .pbr-mesa,
   .table-two .pbr-mesa  { display: block; font-size: 11px; color: var(--text-secondary); }
+
+  /* HU-3 · La palabra "fichas" tampoco se muestra en móvil horizontal.
+     El span sigue en el DOM (GameTable.jsx) — solo se oculta por CSS.
+     Cubre las 4 mesas (5/4/3/2): span único, sin variantes por mesa.
+     Desktop queda fuera por el max-height: 600px del bloque. */
+  .pbr-fichas-word { display: none; }
 
   /* Identidad + badges del humano. G#3: player-bar-left se APLANA (display:contents)
      para repartir sus hijos en celdas distintas del rail:
