@@ -1154,10 +1154,69 @@
     --o1-static-v: 756px;
   }
 
+  /* M4-8 · Mesa 4: SOLO la fila inferior (IA3/IA1) baja a la altura compacta
+     de mesa 5 (130); la fila 1 (IA2, carta grande in-flow) conserva 168. Las
+     dos alturas se aíslan en variables propias y un template propio (el
+     compartido usa --o1-row-h para ambas filas). --o1-static-v = 832 − 38 de
+     la fila comprimida = 794 → a 812 de viewport el colchón queda en 9px y
+     el scroll desaparece; óvalo y zona del humano suben por el flujo del
+     grid, con su geometría O1 intacta. */
+  .game-table.table-four {
+    --o1-row4-top: 168px;
+    --o1-row4-bottom: 130px;
+    --o1-static-v: 794px;
+  }
+
   .table-wide .table-mid {
     grid-template-rows: var(--o1-row-h) var(--o1-row-h) var(--o1-oval-h);
     align-content: start;
     padding-top: max(0px, calc((100svh - var(--o1-static-v)) / 2));
+  }
+  /* (M4-8) template propio de mesa 4 — DESPUÉS del compartido para ganar la
+     cascada a igual especificidad.
+     M4-9: el colchón centrador se reemplaza por un padding fijo de 6px que
+     asienta el borde superior de IA2 sobre el tope de las letras de AJILEI
+     (glifos ≈ y30 con cap-height de la fuente del sistema; filas arrancan en
+     24 + 6). El bloque entero queda anclado ARRIBA y el sobrante muere entre
+     el óvalo y la zona del humano. */
+  .table-four .table-mid {
+    /* M4-10: la fila del óvalo pasa a ocupar TODA la banda restante entre la
+       fila inferior de IAs y la zona del humano (minmax conserva el mínimo
+       O1); el óvalo (alto fijo O1) se centra en ella con align-self →
+       equidistancia estructural y fluida, sin offsets en px: gap arriba =
+       gap abajo en cualquier viewport (ambos incluyen su gap de 4 + mitad
+       del sobrante). El mazo del PIE vive DENTRO del panel (bottom:3) y no
+       participa de la banda. */
+    grid-template-rows: var(--o1-row4-top) var(--o1-row4-bottom) minmax(var(--o1-oval-h), 1fr);
+    padding-top: 6px;
+  }
+  .table-four .center-zone { align-self: center; }
+
+  /* ── M4-9 · Header de mesa 4 en dos líneas apiladas (fuera de flujo) ──────
+     "Mano #N" baja a la segunda línea, alineada a la izquierda con la A de
+     AJILEI; los botones de sonido/cerrar se quedan EXACTAMENTE donde estaban
+     (medidos: top 10 / right 10 del padding-box). Con los tres elementos en
+     absoluto el header colapsa a 0 y la pirámide sube; IA2 (centrada,
+     x≈108-266) convive con el título (izquierda) y los botones (derecha) en
+     la misma franja sin tocarse. Patrón del header landscape de mesa 2. */
+  .game-table.table-four { position: relative; }
+  .table-four .table-title {
+    position: absolute;
+    left: 10px;
+    top: 14px;
+    z-index: 20;
+  }
+  .table-four .hand-badge {
+    position: absolute;
+    left: 10px;
+    top: 38px;
+    z-index: 20;
+  }
+  .table-four .header-right {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 20;
   }
   .table-wide .center-zone {
     box-sizing: border-box;
@@ -1196,8 +1255,11 @@
      .table-three a cada selector que antes era solo .table-wide).
      V1: la MESA 5 queda EXCLUIDA del modelo de ganador "panel ensanchado +
      cartas encogidas sin solape" (:not(.table-five)) — su showdown portrait usa
-     el paquete de escala 1.5 anclada de opponentPanel.css. Mesas 4/3 conservan
-     este modelo hasta sus propias tandas; entonces el bloque se retira entero. */
+     el paquete de escala 1.5 anclada de opponentPanel.css.
+     M4-3: en mesa 4 el modelo queda acotado a IA2 (.opp-top-center) — LA
+     EXCEPCIÓN: su panel a fila completa con carta grande in-flow se conserva;
+     las esquineras IA3/IA1 migran al paquete transform de opponentPanel.css.
+     Mesa 3 conserva el modelo entero hasta su tanda; entonces se retira. */
   .table-wide .opp-card-slot:not(:first-child),
   .table-three .opp-card-slot:not(:first-child) {
     margin-left: calc(var(--opp-card-w) * -0.5);
@@ -1206,11 +1268,13 @@
      solape (las 5 visibles para verificar la mano). El panel llena su celda, los
      slots se reparten por igual (flex) manteniendo proporción, y el mazo del
      panel ganador se oculta para no taparlas. Las perdedoras conservan su solape. */
-  .game-table-screen .table-wide:not(.table-five) .opp-winner,
+  /* M4-6: IA2 ganadora YA NO ensancha su panel (conserva el max-width base de
+     juego, ~158 border-box); solo .table-three mantiene el panel a celda
+     completa. Sus cartas grandes reciben el ancho de fila explícito abajo. */
   .game-table-screen .table-three .opp-winner { max-width: none; }
-  .table-wide:not(.table-five) .opp-winner .opp-cards,
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-cards,
   .table-three .opp-winner .opp-cards { gap: 3px; align-items: flex-start; }
-  .table-wide:not(.table-five) .opp-winner .opp-card-slot,
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-card-slot,
   .table-three .opp-winner .opp-card-slot {
     flex: 1 1 0;
     min-width: 0;
@@ -1219,10 +1283,41 @@
     aspect-ratio: 40 / 63;
     transform: none;
   }
-  .table-wide:not(.table-five) .opp-winner .opp-card-slot:not(:first-child),
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-card-slot:not(:first-child),
   .table-three .opp-winner .opp-card-slot:not(:first-child) { margin-left: 0; }
-  .table-wide:not(.table-five) .opp-winner .opp-deck-wrapper,
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-deck-wrapper,
   .table-three .opp-winner .opp-deck-wrapper { display: none; }
+  /* M4-3 · IA2 ganadora AL RAS por flujo (carta grande intacta): margin-top
+     auto empuja la fila de cartas al fondo; el estado sale del flujo para
+     cederle el fondo; el margen negativo cruza padding(6)+borde(1) hasta el
+     borde inferior del área, igual que el ras de las esquineras.
+     M4-4 · El estado se OCULTA (visibility — zona reservada, sin remoción ni
+     salto: ya está fuera de flujo) SOLO en este caso: .opp-winner sobre IA2 =
+     "IA2 revelada en showdown", el único estado donde la carta grande lo
+     pisa. Con la revelada en una esquinera, o fuera del showdown, el estado
+     de IA2 se muestra normal. Esquineras sin cambios (su estado convive,
+     tapado por sus cartas 1.5× solo mientras son la revelada — filosofía
+     mesa 5). */
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-cards {
+    margin-top: auto;
+    margin-bottom: -7px;
+    /* M4-6 · El panel ya no se ensancha: la fila de cartas toma EXPLÍCITO el
+       ancho de fila que antes heredaba del panel ensanchado (42 = padding de
+       pantalla 16 + de mesa 20 + bordes y ajuste medidos; 333px a 375 de
+       viewport → cartas píxel-idénticas, slots ~64×103 intactos). El panel
+       (align-items: center) la centra y desborda simétrica por los lados —
+       overflow visible en toda la cadena, sin recorte. Durante la recogida
+       (collect, al perder .opp-winner) vuelve al 100% del panel: corte seco,
+       doctrina M4-5. */
+    width: calc(100vw - 42px);
+  }
+  .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-status {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    bottom: 2px;
+    visibility: hidden;
+  }
   .table-wide .opp-folded .opp-cards,
   .table-three .opp-folded .opp-cards { display: none; }
 

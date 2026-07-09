@@ -20,7 +20,8 @@ export default function OpponentPanel({
   isNameShaking,    // turno de esta IA en la rotación de sacudida (affordance R2)
   revealAnimClass,  // fase de la coreografía de volteo (R2.b) — '' fuera de ella
   isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
-  letterBadges,     // H1: badges de una letra (M/P/T) — solo mesa 5 vertical
+  letterBadges,     // H1/M4-1: header rediseñado (letra M/P/T, sin saldo) — mesas 5 y 4 vertical
+  cornerChip,       // H4/M4-1: monta la ficha de esquina (aún solo mesa 5; M4-2 la extiende)
   inShowdown,       // H2: hay mano revelada en la mesa (showdownWinnerSeat !== null)
   isChipOpen,       // H4: el toggle de saldo de ESTE panel está desplegado
   onChipTap,        // H4: tap en la ficha de esquina (GameTable decide/gatea)
@@ -69,9 +70,9 @@ export default function OpponentPanel({
             {isWinner && score && <span className="win-score-chip">{score.points}</span>}
           </span>
         </div>
-        {/* H3: en mesa 5 vertical (misma señal letterBadges) la línea del saldo
-            no se monta — su lugar lo toma la ficha con toggle de H4. El resto
-            de escenarios la conserva intacta. */}
+        {/* H3/M4-1: en las mesas con header rediseñado (señal letterBadges:
+            5 y 4 vertical) la línea del saldo no se monta — su lugar lo toma
+            la ficha con toggle. El resto de escenarios la conserva intacta. */}
         {!letterBadges && <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>}
       </div>
 
@@ -89,14 +90,14 @@ export default function OpponentPanel({
         {shuffleChildren}
       </div>
 
-      {/* H4 · Ficha de esquina (solo mesa 5 vertical): reemplazo consultable
-          del saldo retirado en H3. Absolute contra el panel (cero flujo),
-          target táctil ~28px con SVG de 16 (padding invisible, patrón del
-          nombre tappable). El tap lo gatea GameTable (no-op en showdown —
-          visible e inerte). El float despliega a la derecha sin empujar nada
-          (patrón pot-float): número + "fichas", el token no se repite porque
-          la ficha misma es el token. */}
-      {letterBadges && (
+      {/* H4 · Ficha de esquina: reemplazo consultable del saldo retirado.
+          Absolute contra el panel (cero flujo), target táctil ~28px con SVG
+          de 16 (padding invisible, patrón del nombre tappable). El tap lo
+          gatea GameTable (no-op en showdown — visible e inerte). El float
+          despliega a la derecha sin empujar nada (patrón pot-float).
+          M4-1: gate propio (cornerChip) separado de letterBadges — su CSS
+          absolute está scopeado por mesa y sin él el span caería EN FLUJO. */}
+      {cornerChip && (
         <span className="opp-corner-chip" onClick={onChipTap}>
           <ChipToken size="icon" />
           {isChipOpen && (

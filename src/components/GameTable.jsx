@@ -646,13 +646,14 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // y la anterior vuelve boca abajo. displayedSeat nunca vuelve a null por tap —
   // el guard autolimpiante (fin del showdown) es el único reset.
   // R2.b: en landscape el canje corre la coreografía de volteo con lock de taps.
-  // V1: en móvil vertical la coreografía corre solo en mesa 5 (su CSS portrait
-  // ya existe en opponentPanel.css); mesas 4/3 portrait y escritorio siguen
-  // instantáneos (pendientes de sus propias tandas).
+  // V1: en móvil vertical la coreografía corre en las mesas con CSS portrait
+  // propio (5 desde V1; M4-5 suma la 4 — la carta grande in-flow de IA2 voltea
+  // igual y sus cambios de tamaño son corte seco). Mesa 3 portrait y
+  // escritorio siguen instantáneos (pendientes de sus propias tandas).
   function handleRevealTap(seat) {
     if (revealAnim !== null) return
     if (revealedSeat === seat) return
-    const runsChoreo = isLandscapeTable || (isPortraitTable && aliveN === 5)
+    const runsChoreo = isLandscapeTable || (isPortraitTable && (aliveN === 5 || aliveN === 4))
     if (!runsChoreo) { setDisplayedSeat(seat); return }
     startRevealSwap(revealedSeat, seat)
   }
@@ -998,7 +999,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         isNameShaking={shakeSeat === seat}
         revealAnimClass={revealChoreoClass(seat)}
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
-        letterBadges={isPortraitTable && aliveN === 5}
+        letterBadges={isPortraitTable && (aliveN === 5 || aliveN === 4)}
+        cornerChip={isPortraitTable && (aliveN === 5 || aliveN === 4)}
         inShowdown={showdownWinnerSeat !== null}
         isChipOpen={openChipSeat === seat}
         onChipTap={() => handleChipTap(seat)}

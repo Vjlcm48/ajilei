@@ -416,25 +416,30 @@
    desde el anclaje, e invadir paneles vecinos es esperado. Mesas 4/3 portrait
    conservan el tratamiento viejo hasta sus propias tandas. */
 @media (max-width: 767px) and (orientation: portrait) {
-  /* ── H2 · Header a UNA LÍNEA (rediseño de panel, solo mesa 5) ─────────────
+  /* ── H2 · Header a UNA LÍNEA (rediseño de panel; M4-1 suma mesa 4) ────────
      Nombre anclado a la izquierda (con ellipsis de reserva para usernames
      largos) y anclaje derecho único (letra M/P/T en juego ↔ chip de puntaje
      en showdown — el JSX garantiza que nunca coexisten). min-height 30px: la
      pastilla más alta es la neutral con borde (P de Pie, 29.2) → altura
      constante, el header no late al montar/desmontar letra o chip (ningún
-     panel se mueve al entrar/salir del showdown). */
-  .table-five .opp-header {
+     panel se mueve al entrar/salir del showdown). En mesa 4 aplica a los
+     tres paneles, IA2 (top-center) incluida — es ortogonal a su bloque de
+     ganadora (carta grande in-flow, gameTable.css), que no se toca. */
+  .table-five .opp-header,
+  .table-four .opp-header {
     width: 100%;
     min-height: 30px;
   }
-  .table-five .opp-header .opp-name {
+  .table-five .opp-header .opp-name,
+  .table-four .opp-header .opp-name {
     min-width: 0;
     max-width: 80px;      /* ~12 caracteres a 13px antes de truncar */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .table-five .opp-header .opp-header-anchor {
+  .table-five .opp-header .opp-header-anchor,
+  .table-four .opp-header .opp-header-anchor {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -447,7 +452,11 @@
      poco por debajo de la línea de estado, en la reserva de la fila de 130.
      El padding de 6px la hace tocable a 28×28 sin ocupar flujo (absolute
      contra el border-box del panel; el mazo del Pie va abajo-DERECHA, sin
-     colisión). z:2 flota sobre las cartas fuera del showdown. */
+     colisión). z:2 flota sobre las cartas fuera del showdown.
+     M4-2: mesa 4 replica ficha + float + elevación chip-open (misma esquina
+     inferior izquierda — en su fila de 168 el estado sigue en flujo arriba y
+     el float despliega en la franja libre, sin colisión). */
+  .table-four .opp-corner-chip,
   .table-five .opp-corner-chip {
     position: absolute;
     left: 0;
@@ -462,6 +471,7 @@
      derecha (patrón pot-float — no empuja nada, pointer-events none deja que
      el tap-fuera cierre y actúe). H5: NÚMERO DESNUDO, sin caja — dorado del
      sistema con sombra de tinta para leerse sobre dorsos rojos y tapete. */
+  .table-four .chip-balance-float,
   .table-five .chip-balance-float {
     position: absolute;
     left: calc(100% - 2px);
@@ -480,14 +490,17 @@
   /* Lección Z1: mientras SU toggle está abierto, el panel entero sube sobre
      el vecino derecho (posterior en DOM). No coincide temporalmente con los
      z:7/8 del showdown (la ficha es inerte ahí y el toggle se autocierra). */
+  .table-four .opp-panel.chip-open,
   .table-five .opp-panel.chip-open { z-index: 3; }
 
   /* H5 · La palabra de acción baja al RENGLÓN DEL SALDO: fuera de flujo,
-     centrada en la franja baja del panel (bottom 2 → centro del renglón ≈
-     centro de la ficha y del número desplegado). left/right 28 despejan la
-     esquina de la ficha y el mazo del Pie. Nada más se mueve: el resto del
-     interior queda top-anclado y la fila sigue en 130 (O1 intacto). */
-  .table-five .opp-panel .opp-status {
+     centrada en la franja baja del panel (bottom 2 ancla al borde inferior →
+     centro del renglón ≈ centro de la ficha y del número desplegado, en
+     cualquier alto de fila: 130 en mesa 5, 168 en mesa 4 — M4-7). left/right
+     28 despejan la esquina de la ficha y el mazo del Pie. Nada más se mueve:
+     el resto del interior queda top-anclado y las filas O1 intactas. */
+  .table-five .opp-panel .opp-status,
+  .table-four .opp-panel .opp-status {
     position: absolute;
     left: 28px;
     right: 28px;
@@ -496,8 +509,9 @@
   /* H5 · Prioridad del saldo: mientras el toggle de ESTA IA está abierto, su
      palabra de acción cede el renglón (visibility — sin salto ni remoción);
      al cerrarse (mismo tap, tap fuera, autocierre, otra ficha) vuelve sola.
-     Comparten renglón visual: por eso se turnan. */
-  .table-five .opp-panel.chip-open .opp-status { visibility: hidden; }
+     Comparten renglón visual: por eso se turnan. (M4-7 suma mesa 4.) */
+  .table-five .opp-panel.chip-open .opp-status,
+  .table-four .opp-panel.chip-open .opp-status { visibility: hidden; }
 
   @keyframes chipFloatIn {
     from { opacity: 0; transform: translateY(-50%) scale(0.92); }
@@ -538,9 +552,51 @@
     transform-origin: left bottom;
   }
 
+  /* ── M4-3 · MESA 4 · esquineras IA3/IA1 ganadoras: paquete V1+H5 ──────────
+     Mismo modelo transform de mesa 5 (1.5×, cartas juntas sin solape, ancla
+     por columna con origen en bottom, asiento al fondo). M4-8: su fila bajó
+     a 130 como en mesa 5 → la constante vuelve a ser la misma: 28 = 130 −
+     (1 borde + 5 padding + 30 header + 1 gap + 65 cartas). IA2
+     (.opp-top-center, fila de 168) queda FUERA: conserva su carta grande
+     in-flow (la excepción, gameTable.css). */
+  .table-four .opp-side-left.opp-winner .opp-card-slot,
+  .table-four .opp-side-right.opp-winner .opp-card-slot {
+    transform: none;    /* anula el scale por-slot genérico (1.2) */
+  }
+  .table-four .opp-side-left.opp-winner .opp-card-slot:not(:first-child),
+  .table-four .opp-side-right.opp-winner .opp-card-slot:not(:first-child) {
+    margin-left: 0;     /* cartas juntas: sin solape y sin espacio */
+  }
+  .table-four .opp-side-left.opp-winner .opp-cards,
+  .table-four .opp-side-right.opp-winner .opp-cards {
+    width: 100%;
+    transform: translateY(28px) scale(1.5);
+    position: relative;
+    z-index: 6;
+  }
+  .table-four .opp-side-right.opp-winner .opp-cards {
+    justify-content: flex-end;
+    transform-origin: right bottom;
+  }
+  .table-four .opp-side-left.opp-winner .opp-cards {
+    justify-content: flex-start;
+    transform-origin: left bottom;
+  }
+  /* R1.b para mesa 4: el panel revelado sobre sus hermanos, opacidad plena */
+  .table-four .opp-panel.opp-winner {
+    z-index: 7;
+    opacity: 1;
+  }
+  .table-four .opp-winner .opp-cards,
+  .table-four .opp-winner .playing-card {
+    opacity: 1;
+  }
+
   /* Mazo (Pie) del panel revelado: oculto SIN remoción de DOM ni salto de
      layout (el wrapper es position:absolute y las refs de vuelo persisten).
-     Reaparece solo al perder .opp-winner. */
+     Reaparece solo al perder .opp-winner. M4-3 suma mesa 4 (en IA2 convive
+     con el display:none del bloque viejo — inocuo). */
+  .table-four .opp-winner .opp-deck-wrapper,
   .table-five .opp-winner .opp-deck-wrapper { visibility: hidden; }
 
   /* R1.b (réplica portrait) · El panel revelado ENTERO sube sobre sus hermanos
@@ -557,66 +613,90 @@
   }
 
   /* ── Coreografía de volteo (R2.b) en portrait — mismos tiempos (--reveal-*
-     globales) y mismo timeline JS; solo cambian la escala (1.5) y las anclas. ── */
+     globales) y mismo timeline JS; solo cambian la escala (1.5) y las anclas.
+     M4-5 suma mesa 4: los volteos (rotateY por carta) sirven igual para el
+     modelo transform de las esquineras y para la carta grande in-flow de IA2
+     (cuyos cambios de tamaño son corte seco en los canjes de clase — su
+     tamaño grande nunca se anima ni se altera). ── */
 
   /* Fase 1 · la saliente cierra: cartas a canto, a tamaño grande */
-  .table-five .opp-reveal-closing .opp-card-slot .playing-card {
+  .table-five .opp-reveal-closing .opp-card-slot .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot .playing-card {
     animation: cardFlipClose var(--reveal-flip-ms) ease-in both;
   }
   /* Fase 4 · la entrante abre: de canto a cara, ya en posición y a 1.5 */
-  .table-five .opp-reveal-open .opp-card-slot .playing-card {
+  .table-five .opp-reveal-open .opp-card-slot .playing-card,
+  .table-four .opp-reveal-open .opp-card-slot .playing-card {
     animation: cardFlipReveal var(--reveal-flip-ms) ease-out both;
   }
   /* Micro-escalonado compartido cerrar/abrir */
   .table-five .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
-  .table-five .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card { animation-delay: var(--reveal-stagger-ms); }
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card { animation-delay: var(--reveal-stagger-ms); }
   .table-five .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
-  .table-five .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 2); }
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 2); }
   .table-five .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
-  .table-five .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 3); }
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 3); }
   .table-five .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
-  .table-five .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 4); }
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 4); }
 
   /* Fase 2 · la saliente recoge — estado AUTOSUFICIENTE "era grande, encoge"
      (el panel pierde .opp-winner a mitad de recogida). El solape vuelve al
      base PORTRAIT (−0.5, gameTable.css) como corte seco: dorsos ya en mano. */
-  .table-five .opp-panel.opp-reveal-collect {
+  .table-five .opp-panel.opp-reveal-collect,
+  .table-four .opp-panel.opp-reveal-collect {
     z-index: 7;
     opacity: 1;
   }
-  .table-five .opp-reveal-collect .opp-cards {
+  .table-five .opp-reveal-collect .opp-cards,
+  .table-four .opp-reveal-collect .opp-cards {
     width: 100%;
     position: relative;
     z-index: 6;
     /* H5: lista de transform congruente con el estado grande asentado
-       (translateY + scale) → interpola por función, sin salto al arrancar */
+       (translateY + scale) → interpola por función, sin salto al arrancar.
+       En IA2 (in-flow, sin transform de winner) es identidad: inocuo. */
     transform: translateY(0) scale(1);
     transition: transform var(--reveal-scale-ms) ease;
   }
-  .table-five .opp-reveal-collect .opp-card-slot { transform: none; }
-  .table-five .opp-reveal-collect .opp-card-slot:not(:first-child) {
+  .table-five .opp-reveal-collect .opp-card-slot,
+  .table-four .opp-reveal-collect .opp-card-slot { transform: none; }
+  .table-five .opp-reveal-collect .opp-card-slot:not(:first-child),
+  .table-four .opp-reveal-collect .opp-card-slot:not(:first-child) {
     margin-left: calc(var(--opp-card-w) * -0.5);
   }
   /* El dorso asienta de canto a plano justo tras el canje (evita el pop) */
-  .table-five .opp-reveal-collect .opp-card-slot .playing-card {
+  .table-five .opp-reveal-collect .opp-card-slot .playing-card,
+  .table-four .opp-reveal-collect .opp-card-slot .playing-card {
     animation: cardFlipReveal var(--reveal-settle-ms) ease-out both;
   }
   /* Ancla conservada durante la recogida (sin salto al perder .opp-winner);
      H5: origen en bottom, espejo del estado grande asentado al fondo */
   .table-five .opp-top-right.opp-reveal-collect .opp-cards,
-  .table-five .opp-side-right.opp-reveal-collect .opp-cards {
+  .table-five .opp-side-right.opp-reveal-collect .opp-cards,
+  .table-four .opp-side-right.opp-reveal-collect .opp-cards {
     justify-content: flex-end;
     transform-origin: right bottom;
   }
   .table-five .opp-top-left.opp-reveal-collect .opp-cards,
-  .table-five .opp-side-left.opp-reveal-collect .opp-cards {
+  .table-five .opp-side-left.opp-reveal-collect .opp-cards,
+  .table-four .opp-side-left.opp-reveal-collect .opp-cards {
     justify-content: flex-start;
     transform-origin: left bottom;
   }
 
   /* Fase 3 · la entrante crece en dorsos: .opp-winner (recién ganado) aporta
-     el 1.5 + ancla + separación; aquí solo viaja la escala 1→1.5 */
-  .table-five .opp-reveal-grow .opp-cards {
+     el 1.5 + ancla + separación; aquí solo viaja la escala 1→1.5 (en IA2 no
+     hay transform que viajar — su tamaño grande entra como corte seco) */
+  .table-five .opp-reveal-grow .opp-cards,
+  .table-four .opp-reveal-grow .opp-cards {
     transition: transform var(--reveal-scale-ms) ease;
   }
 
@@ -625,16 +705,22 @@
      empate a z:7 con la saliente en recogida lo decidía el orden DOM y los
      dorsos de la vecina derecha tapaban la mano expuesta un instante. */
   .table-five .opp-panel.opp-winner.opp-reveal-grow,
-  .table-five .opp-panel.opp-winner.opp-reveal-open {
+  .table-five .opp-panel.opp-winner.opp-reveal-open,
+  .table-four .opp-panel.opp-winner.opp-reveal-grow,
+  .table-four .opp-panel.opp-winner.opp-reveal-open {
     z-index: 8;
   }
 
   /* Chip de puntaje: oculto durante toda la coreografía (visibility, sin
-     remover DOM) — como en landscape, acotado a .table-five en esta tanda */
+     remover DOM) — como en landscape (M4-5 suma mesa 4) */
   .table-five .opp-reveal-closing .win-score-chip,
   .table-five .opp-reveal-collect .win-score-chip,
   .table-five .opp-reveal-grow .win-score-chip,
-  .table-five .opp-reveal-open .win-score-chip {
+  .table-five .opp-reveal-open .win-score-chip,
+  .table-four .opp-reveal-closing .win-score-chip,
+  .table-four .opp-reveal-collect .win-score-chip,
+  .table-four .opp-reveal-grow .win-score-chip,
+  .table-four .opp-reveal-open .win-score-chip {
     visibility: hidden;
   }
 }
