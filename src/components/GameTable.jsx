@@ -1349,7 +1349,10 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             </div>
 
             <span className="player-bar-right">
-              <span className="pbr-chips"><BalanceDisplay chips={human.chips} size="full" /> fichas</span>
+              {/* HU-1: la palabra va en un span propio SOLO para poder ocultarla por CSS
+                  en portrait 4/5 (.table-wide); el espaciado lo da el gap del inline-flex,
+                  así que el span no cambia nada en el resto de mesas/orientaciones. */}
+              <span className="pbr-chips"><BalanceDisplay chips={human.chips} size="full" /> <span className="pbr-fichas-word">fichas</span></span>
               <span className="pbr-sep"> · </span>
               <span className="pbr-mesa">Mesa {unit}</span>
             </span>

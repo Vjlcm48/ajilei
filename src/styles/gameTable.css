@@ -1192,6 +1192,40 @@
   }
   .table-four .center-zone { align-self: center; }
 
+  /* ── M5-A · Mesa 5: fila superior de IAs pegada (con respiro) a la cabecera ──
+     El colchón centrador compartido de .table-wide se reemplaza por un padding
+     fijo pequeño: la fila IA3/IA2 arranca a ~10px visuales del borde inferior
+     del recuadro de la ✕ (6px de padding + 4px del gap de columna de
+     .game-table), constante en cualquier alto de pantalla. El header de mesa 5
+     sigue EN FLUJO (AJILEI + Mano #N + botones en una línea), así que las filas
+     nunca pueden invadirlo: siempre nacen debajo de él. IAs y óvalo suben en
+     bloque (align-content: start + filas fijas O1 intactas) y TODO el sobrante
+     del viewport muere ahora en la banda entre el óvalo y la zona del humano
+     (que ya vivía anclada abajo) — esa banda es la que M5-B repartirá para el
+     óvalo equidistante. Después del bloque de mesa 4 para ganar la cascada a
+     igual especificidad sin tocar .table-four. */
+  /* M5-B · Óvalo equidistante (réplica de M4-10): la fila del óvalo pasa a
+     ocupar TODA la banda entre la fila inferior de IAs (IA4/IA1) y la zona del
+     humano (minmax conserva el mínimo O1; .table-mid ya es flex:1) y el óvalo
+     (alto fijo O1, height en .table-wide .center-zone) se centra en ella con
+     align-self → gap arriba = gap abajo en cualquier viewport (ambos = su gap
+     estructural de 4px + mitad del sobrante de la banda), sin px fijos. El
+     mazo del PIE es absoluto dentro del panel y no participa del cálculo. */
+  .table-five .table-mid {
+    grid-template-rows: var(--o1-row-h) var(--o1-row-h) minmax(var(--o1-oval-h), 1fr);
+    padding-top: 6px;
+  }
+  .table-five .center-zone { align-self: center; }
+
+  /* ── HU-1 · Saldo del humano en mesas 4/5 portrait: solo ficha + número ────
+     Se oculta la palabra "fichas" (span propio en el JSX). El anclaje derecho
+     ya lo da .player-bar-right (flex columna, align-items: flex-end, columna
+     `auto` del grid del player-bar): el último dígito queda al ras del borde
+     derecho del área y el bloque ficha+número crece hacia la IZQUIERDA al
+     ganar dígitos (la ficha viaja con el número: son un inline-flex). Las
+     mesas 2/3, landscape y escritorio conservan "N fichas" intacto. */
+  .table-wide .pbr-fichas-word { display: none; }
+
   /* ── M4-9 · Header de mesa 4 en dos líneas apiladas (fuera de flujo) ──────
      "Mano #N" baja a la segunda línea, alineada a la izquierda con la A de
      AJILEI; los botones de sonido/cerrar se quedan EXACTAMENTE donde estaban
