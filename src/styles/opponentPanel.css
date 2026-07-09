@@ -401,6 +401,115 @@
   .opp-reveal-open .win-score-chip {
     visibility: hidden;
   }
+
+  /* ── LH-1 · Header a UNA LÍNEA — mesa 5 landscape (réplica del H2 portrait) ──
+     La señal letterBadges (GameTable.jsx) muestra aquí la letra M/P/T y
+     desmonta la línea "N fichas". Nombre anclado a la izquierda con ellipsis;
+     anclaje derecho único (.opp-header-anchor) donde conviven —nunca a la
+     vez— la letra (juego) y el chip de puntaje (showdown). min-height 30px:
+     la pastilla más alta (P neutra con borde, 29.2) mide igual que en
+     portrait → header estable, sin latido al montar/desmontar letra o chip.
+     margin-bottom 15px: reserva ESTRUCTURAL de la línea de saldo retirada
+     (14.4px de texto a 12px/1.2 + el gap de 1px del panel) → cartas y mazo
+     conservan su distancia al borde del panel; ese aire bajo el header lo
+     ocuparán la ficha y la palabra de acción (LH-2/LH-3). */
+  .table-five .opp-header {
+    width: 100%;
+    min-height: 30px;
+    margin-bottom: 15px;
+  }
+  .table-five .opp-header .opp-name {
+    min-width: 0;
+    max-width: 72px;      /* ~11 caracteres a 13px (panel de 116 − letra); en
+                             showdown el flex-shrink del nombre cede ante el
+                             chip de puntaje (el anchor no se encoge) */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-five .opp-header .opp-header-anchor {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;    /* anclaje derecho; vacío colapsa a 0 sin hueco */
+    flex-shrink: 0;
+  }
+
+  /* ── LH-2 · Ficha de esquina + toggle flotante — mesa 5 landscape ──────────
+     Réplica del paquete H4/H5 portrait (mismos valores: SVG 16px proporcionado
+     al panel de 116, target táctil 28×28 por padding invisible). La lógica JS
+     (openChipSeat, autocierre 3s, tap fuera, inerte en showdown) es agnóstica
+     a la orientación y se reutiliza tal cual. Esquina inferior izquierda libre
+     en los 4 asientos: los mazos inner-left (IA2/IA1) viven FUERA del panel
+     (right: 100% + 8px) y centrados verticalmente. El float despliega a la
+     derecha dentro del ancho útil (~26+40px < 116) y el panel no recorta
+     (sin overflow hidden — sus mazos ya viven desbordados). */
+  .table-five .opp-corner-chip {
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    padding: 6px;
+    line-height: 0;
+    cursor: pointer;
+    z-index: 2;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .table-five .chip-balance-float {
+    position: absolute;
+    left: calc(100% - 2px);
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--gold-brand);
+    text-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.85),
+      0 0 8px rgba(0, 0, 0, 0.55);
+    animation: chipFloatIn 0.15s ease-out;
+  }
+  /* Lección Z1 (como portrait): con SU toggle abierto, el panel sube sobre el
+     vecino derecho. No coincide con los z:7/8 del showdown (ficha inerte ahí
+     y autocierre al entrar — JS). */
+  .table-five .opp-panel.chip-open { z-index: 3; }
+
+  /* Réplica landscape: los keyframes de portrait viven DENTRO de su media
+     query y aquí no existirían — sin esto el float aparecería sin animación. */
+  @keyframes chipFloatIn {
+    from { opacity: 0; transform: translateY(-50%) scale(0.92); }
+    to   { opacity: 1; transform: translateY(-50%) scale(1); }
+  }
+
+  /* ── LH-3 · Palabra de acción al renglón de la ficha — mesa 5 landscape ────
+     Réplica del H5 portrait: .opp-status sale de flujo y ancla a la franja
+     inferior, centrada en el renglón de la ficha (caja de 28px en bottom:-4 →
+     centro a 10px del borde; el estado mide 18px fijos —.table-wide,
+     gameTable.css— → bottom 1px lo centra en esa misma línea, que es también
+     la del float: top 50% de la ficha). Zona de altura fija SIEMPRE en el DOM
+     (el JSX renderiza ' ' cuando no hay jugada): las palabras aparecen y
+     desaparecen sin ningún salto de layout.
+     Horizontal: left 28 despeja el target táctil completo de la ficha (el
+     icono termina en 22); right 2 deja ~86px útiles — el texto más largo
+     ("Descartó 4" ~70px a 15px; "Sin fichas" ~72px a 16px) cabe sin roce ni
+     desborde, sin tocar tipografía. */
+  .table-five .opp-panel .opp-status {
+    position: absolute;
+    left: 28px;
+    right: 2px;
+    bottom: 1px;
+  }
+  /* Reserva ESTRUCTURAL del renglón extraído (precaución LH-1): el estado en
+     flujo aportaba gap 1 + alto 18 + padding-bottom 3 = 22px → el panel
+     conserva sus 124px exteriores validados en LH-2 y las cartas no se mueven.
+     Especificidad doble (.game-table.table-five) para ganar al padding
+     compacto de .table-wide (gameTable.css, C5.4 cierre 2) sin depender del
+     orden de los bundles. */
+  .game-table.table-five .opp-panel { padding-bottom: 22px; }
+  /* H5-p3 · Exclusión mutua saldo↔palabra: con SU toggle abierto, la palabra
+     de esa IA cede el renglón (visibility — sin salto ni remoción); al
+     cerrarse (tap, tap fuera, autocierre, otra ficha) vuelve sola. */
+  .table-five .opp-panel.chip-open .opp-status { visibility: hidden; }
 }
 
 /* ── V1 · MESA 5 · MÓVIL VERTICAL — paquete showdown ─────────────────────────
