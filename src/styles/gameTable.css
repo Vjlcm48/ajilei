@@ -2609,18 +2609,25 @@
     justify-content: flex-start;
   }
   /* AJUSTE 3 · el texto de estado (pensando/pasó/igualó) baja al fondo del panel
-     (margin-top:auto) → queda MÁS AIRE entre las cartas y el estado, más legible. */
+     (margin-top:auto) → queda MÁS AIRE entre las cartas y el estado, más legible.
+     LH2-1: el status pasó a ABSOLUTE (renglón de la ficha, opponentPanel.css) →
+     este margin-top:auto queda INERTE (con bottom fijado resuelve a 0). Se
+     conserva como red de seguridad: si el paquete LH2 se revirtiera, el estado
+     volvería solo al fondo del panel en flujo. */
   .table-two .opp-status { margin-top: auto; }
 
   /* G#3 · CABECERA DE LA IA EN UNA SOLA LÍNEA (fusión). El wrapper .opp-topline es una
-     fila: identidad (nombre + badges) al EXTREMO IZQUIERDO y saldo (ficha + monto) al
-     EXTREMO DERECHO (space-between). El ancho lo aporta la fila de 5 cartas (panel con
-     max-width:none) → cabe "9999999 fichas" sin romper ni empujar la identidad.
-     AJUSTE 2 (reserva de badges): height FIJO de la fila = alto del caso máximo (fila
-     con badge; MANO/PIE/TURNO van en línea, así que 1 o 2 badges dan el MISMO alto que
-     0). Al ser altura fija, mostrar/ocultar badges NO cambia la geometría → las cartas
-     no se desplazan (cero "saltito") en ningún estado. No se toca la lógica de badges.
-     Solo .table-two landscape. AFINABLE (height). */
+     fila: identidad (nombre + badges) al EXTREMO IZQUIERDO y saldo al EXTREMO DERECHO
+     (space-between). LH2-1: con letterBadges activo el saldo "N fichas" YA NO MONTA
+     (lo reemplaza la ficha de esquina) → la fila queda solo con el header LH; el
+     space-between se conserva por si el saldo volviera (rollback).
+     AJUSTE 2 (reserva de badges): height FIJO de la fila = alto del caso máximo. Al
+     ser altura fija, montar/desmontar letra o chip de puntaje NO cambia la geometría →
+     las cartas no se desplazan (cero "saltito") en ningún estado. LH2-1 la sube de
+     24 a 30 (la reserva LH del header: pastilla más alta 29.2 + par con el min-height
+     30 de opponentPanel.css) — corrige el desborde que la pastilla de 29.2 tenía en
+     la fila de 24. Consecuencia asumida (Decisión A): la fila de cartas baja 6px,
+     única vez, en la implantación. Solo .table-two landscape. AFINABLE (height). */
   .table-two .opp-topline {
     display: flex;
     width: 100%;
@@ -2628,7 +2635,7 @@
     align-items: center;
     gap: 8px;
     flex-wrap: nowrap;
-    height: 24px;        /* reserva del alto de la fila de badges (caso máximo) · AFINABLE */
+    height: 30px;        /* reserva LH de la fila del header (caso máximo) · AFINABLE */
     flex-shrink: 0;
   }
   .table-two .opp-topline .opp-chips { white-space: nowrap; flex-shrink: 0; }

@@ -437,7 +437,8 @@
   }
   .table-five .opp-header .opp-header-anchor,
   .table-four .opp-header .opp-header-anchor,
-  .table-three .opp-header .opp-header-anchor {
+  .table-three .opp-header .opp-header-anchor,
+  .table-two .opp-header .opp-header-anchor {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -456,7 +457,8 @@
      no recorta (sin overflow hidden — sus mazos ya viven desbordados). */
   .table-five .opp-corner-chip,
   .table-four .opp-corner-chip,
-  .table-three .opp-corner-chip {
+  .table-three .opp-corner-chip,
+  .table-two .opp-corner-chip {
     position: absolute;
     left: 0;
     bottom: -4px;
@@ -468,7 +470,8 @@
   }
   .table-five .chip-balance-float,
   .table-four .chip-balance-float,
-  .table-three .chip-balance-float {
+  .table-three .chip-balance-float,
+  .table-two .chip-balance-float {
     position: absolute;
     left: calc(100% - 2px);
     top: 50%;
@@ -488,7 +491,8 @@
      y autocierre al entrar — JS). */
   .table-five .opp-panel.chip-open,
   .table-four .opp-panel.chip-open,
-  .table-three .opp-panel.chip-open { z-index: 3; }
+  .table-three .opp-panel.chip-open,
+  .table-two .opp-panel.chip-open { z-index: 3; }
 
   /* Réplica landscape: los keyframes de portrait viven DENTRO de su media
      query y aquí no existirían — sin esto el float aparecería sin animación. */
@@ -531,7 +535,51 @@
      cerrarse (tap, tap fuera, autocierre, otra ficha) vuelve sola. */
   .table-five .opp-panel.chip-open .opp-status,
   .table-four .opp-panel.chip-open .opp-status,
-  .table-three .opp-panel.chip-open .opp-status { visibility: hidden; }
+  .table-three .opp-panel.chip-open .opp-status,
+  .table-two .opp-panel.chip-open .opp-status { visibility: hidden; }
+
+  /* ── LH2-1 · Estándar LH en mesa 2 landscape (de-escopado ADAPTADO) ────────
+     El rival de mesa 2 landscape es un OpponentPanel (ruteo por orientación en
+     GameTable.jsx) → letterBadges/cornerChip le llegan por las mismas props
+     que 3/4/5, y ficha/float/elevación/exclusión se sumaron por de-escopado
+     arriba. Aquí viven solo las ADAPTACIONES de su panel ancho (448px,
+     stretch con tope y base fijos, cabecera fusionada .opp-topline —
+     gameTable.css). SIN las reservas estructurales de sus hermanas
+     (margin-bottom 15px del header / padding-bottom 22px del panel): el alto
+     del panel no depende del contenido (stretch) → extraer el status del
+     flujo no mueve nada por construcción, y sumar esas reservas empujaría las
+     cartas. El relevo letra↔chip del fin de mano usa el mismo anclaje derecho
+     (sumado arriba); el paquete showdown sellado no escopa .table-two y no
+     participa. */
+  .table-two .opp-header {
+    width: 100%;
+    min-height: 30px;   /* reserva LH (pastilla más alta: P neutra, 29.2) — la
+                           fila .opp-topline la dobla con sus 30px fijos
+                           (gameTable.css): el header no late al montar/
+                           desmontar letra o chip */
+  }
+  .table-two .opp-header .opp-name {
+    min-width: 0;
+    max-width: 80px;    /* token del ESPEJO VERTICAL (M2): el panel de 448px
+                           no necesita el 72 de los paneles de 116 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Palabra de acción al renglón de la ficha — patrón del ESPEJO VERTICAL:
+     panel ancho → insets SIMÉTRICOS (28 despeja el target completo de la
+     ficha; el mazo del PIE vive FUERA del panel, a su izquierda) y centrado
+     por el text-align:center heredado del panel. bottom 1: el estado (18px
+     fijos, regla compartida de gameTable.css que lista .table-two) centra en
+     la línea de la ficha (caja de 28 en bottom −4 → centro a 10px del borde),
+     la misma del float (top 50%). El margin-top:auto de gameTable.css queda
+     inerte (absolute con bottom fijado). */
+  .table-two .opp-panel .opp-status {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    bottom: 1px;
+  }
 }
 
 /* ── V1 · MESA 5 · MÓVIL VERTICAL — paquete showdown ─────────────────────────

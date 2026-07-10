@@ -1042,8 +1042,8 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         isNameShaking={shakeSeat === seat}
         revealAnimClass={revealChoreoClass(seat)}
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
-        letterBadges={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3))}
-        cornerChip={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3))}
+        letterBadges={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3 || aliveN === 2))}
+        cornerChip={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3 || aliveN === 2))}
         inShowdown={showdownWinnerSeat !== null}
         isChipOpen={openChipSeat === seat}
         onChipTap={() => handleChipTap(seat)}
