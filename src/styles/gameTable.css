@@ -1005,16 +1005,19 @@
          la fila y el offset del borde superior (33.5) pasa a padding-top de
          la zona → zona efectiva 197.5 (antes 172, +25.5). --o1-static3-v =
          todo lo fijo fuera del óvalo en estado comprimido (547 medidos con
-         la fila vieja) + 25.5 del estiramiento = 572.5 → el ÓVALO financia
-         el crecimiento: calc(100svh − 572.5px), mismo modelo (gigante que
+         la fila vieja) + 25.5 del estiramiento → el ÓVALO financia
+         el crecimiento: calc(100svh − static3), mismo modelo (gigante que
          llena la banda), solo más bajo. Scroll neto sin cambios.
+         CV-1: el 572.5 original quedó 4px corto del estático real (576.5
+         re-medidos a viewport completo) → el óvalo excedía la banda y mesa 3
+         arrastraba 4px de scroll permanente a cualquier altura. Corregido.
        Los calc usan 100svh (no dvh): al colapsar la barra del navegador en
        móvil, dvh crece en plena sesión y volvería a mover el óvalo. */
     --o1-row-h: 168px;
     --o1-oval-h: 119px;
     --o1-static-v: 832px;
     --o1-rivals3-h: 164px;
-    --o1-static3-v: 572.5px;
+    --o1-static3-v: 576.5px;
     /* M2-4 · Mesa 2 (área legacy .ai-zone): misma pareja de variables que
        mesa 3. Área = top de contenido fijo + cartas (borde inferior a 134 del
        top del área) + respiro 12 + mazo 46 + respiro 4 = 196 border-box.
