@@ -1714,6 +1714,132 @@
     height: max(96px, calc(100svh - var(--o1-static2-v)));
     min-height: 0;
   }
+
+  /* ══ CV-2 · BLOQUE DE COMPRESIÓN VERTICAL (viewports de poca altura) ═══════
+     Gate: max-height 767px — umbral MEDIDO del peor caso (mesa 4: 766.4px de
+     presupuesto mínimo; mesa 5: 760.4). Calibrado para cerrar el scroll a
+     640px de alto: CV-2 aporta las palancas COMPARTIDAS (~60px) y CV-3
+     cerrará rivales/óvalo/header de mesa 5. Principio: redefinir VARIABLES
+     como vía principal (los consumidores siguen a su token solos) y reglas
+     propias únicamente para lo no-varializado (paddings, gaps, barra de
+     acciones). En alturas intermedias (641–766) la compresión deja aire de
+     más: muere en las bandas flexibles del modelo O1 (minmax/1fr), nada se
+     mueve. MÍNIMOS DUROS que este bloque NO toca: target táctil de la ficha
+     (28×28) y su renglón, reserva de header de panel (30px), status 16px,
+     min-height 42 del óvalo, mensaje de 2 líneas de mesa 3, y los BOTONES de
+     acción (28px de alto sellados — ya bajo el ideal táctil de 40px: no se
+     reducen ni un px; la barra encoge solo por aire). */
+  @media (max-height: 767px) {
+    /* Cartas del humano: 61×95 → 51×80 (ratio 0.642 conservado, −15 en la
+       fila). La var alimenta también las cartas legacy de la IA de mesa 2
+       (su área --o1-rivals2-h es fija: ganan aire interior, nada se mueve) y
+       el mazo espejo de esa IA. El mazo del humano (27×42 fijos) no cambia. */
+    .game-table-screen {
+      --card-w: 51px;
+      --card-h: 80px;
+      padding: 4px 8px;      /* pantalla: −8 vertical; horizontal intacto (el
+                                42 de la carta grande M4-6 sigue válido) */
+    }
+    /* Mesa: −4 vertical (10/12 → 8/10; horizontal intacto) y gaps apilados
+       header↔mid↔humano 4→2 (−4). */
+    .game-table { padding: 8px 10px 10px; gap: 2px; }
+    /* Gaps internos del tablero central 4→2: en mesas 5/4 (grid) las dos
+       juntas fila↔fila y fila↔óvalo (−4); en mesa 3 (flex) los dos gaps
+       muertos de las side-col vacías (−4). Mesa 2 no monta table-mid. */
+    .table-mid { gap: 2px; }
+    .table-wide .table-mid { gap: 2px; }
+    /* Zona del humano: aires −8, estructural — padding vertical 18→12 (−6) y
+       respiro de la barra 6→4 (−2). El rótulo de puntaje ya estaba
+       display:none en portrait (C4.2), no hay nada que esconder. */
+    .player-zone { padding: 5px 10px 7px; }
+    .player-bar { margin-top: 4px; }
+    /* Barra de acciones: 94→76 (−18). Composición medida: mult-row 26 +
+       gap 4 + botones 28 + holgura ~3 + "N fic." ~15 = 76. Los botones NO se
+       tocan (mínimo duro); "N fic." (absoluto al fondo, .bet-total) compacta
+       su línea (heredaba 145% → 1.2) para no rozar la fila de botones. */
+    .action-area { height: 76px; gap: 4px; }
+    .bet-total { line-height: 1.2; }
+
+    /* ── CV-3 · Rivales, óvalo y header de mesa 5 ─────────────────────────────
+       Cierra el scroll de mesas 5/4 a 640 (CV-2 dejó −59/−65 pendientes). */
+    /* Cartas rivales 40×63 → 30×47. El token sellado REAL de portrait es el
+       de C4.2.13 (40×63 en .table-wide/.table-three, no el 45×70 base) y las
+       filas O1 bajan −16 → la carta debe ceder exactamente esos 16 de alto
+       (63−16 = 47; ancho a ratio 0.635 → 30). Mismo selector 0-3-0 del
+       sellado para ganar la cascada dentro del gate. */
+    .game-table-screen .table-wide .opp-panel,
+    .game-table-screen .table-three .opp-panel {
+      --opp-card-w: 30px;
+      --opp-card-h: 47px;
+    }
+    /* Mazo rival: constante propia 27×42 (C4.2.13, NO deriva de --opp-card) →
+       21×32, la misma escala 0.77 de la carta, para no desbordar la fila
+       comprimida ni quedar desproporcionado. Mismo selector 0-4-0 del sellado. */
+    .game-table.table-wide .deck-pile.opp-deck,
+    .game-table.table-wide .opp-deck-wrapper .shuffle-fan-card,
+    .game-table.table-three .deck-pile.opp-deck,
+    .game-table.table-three .opp-deck-wrapper .shuffle-fan-card {
+      width: 21px; height: 32px;
+    }
+    /* Filas O1 recalculadas. Delta base = −16 (carta). En mesa 4 la fila de
+       IA2 baja además a lo que su carta grande EXIGE medida (el estado
+       showdown M4-6 usa 100vw−42, no escala con tokens: slots ~61×95 a 360 →
+       header 30 + fila grande ≈ 96 con su voladizo −7 → 142 la contiene con
+       holgura; verificado en el pase). El óvalo baja al piso 96 ya validado
+       en mesas 3/2. */
+    .game-table.table-five { --o1-row-h: 114px; }
+    .game-table.table-four { --o1-row4-top: 142px; --o1-row4-bottom: 114px; }
+    .game-table-screen {
+      --o1-rivals3-h: 148px;
+      --o1-oval-h: 96px;
+    }
+    .table-four .table-mid { padding-top: 2px; }
+    /* Header de mesa 5 FUERA DE FLUJO (adaptación del patrón M4-9): mesa 4
+       apila "Mano #N" bajo AJILEI porque su cima es UN panel centrado con los
+       flancos libres; en mesa 5 la fila superior son DOS paneles a todo lo
+       ancho y esa pila (y38–56) los pisaría. Aquí el strip conserva la ÚNICA
+       LÍNEA que mesa 5 ya tiene sellada (título izq · badge centrado ·
+       botones der), solo que absoluto (header en flujo → 0), y las filas
+       arrancan justo bajo el strip (padding-top 30 → filas en y40, 2px bajo
+       el título): neto −8. Fuera del gate, mesa 5 conserva su header en
+       flujo sellado. */
+    .game-table.table-five { position: relative; }
+    .table-five .table-title {
+      position: absolute;
+      left: 10px;
+      top: 10px;      /* strip 4px más alto que M4-9: las filas de mesa 5
+                         arrancan en y46 (padding-top 30) y los botones deben
+                         quedar por encima con holgura (bottom 44) */
+      z-index: 20;
+    }
+    .table-five .hand-badge {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 13px;
+      z-index: 20;
+    }
+    .table-five .header-right {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      z-index: 20;
+    }
+    .table-five .table-mid { padding-top: 30px; }
+    /* Estáticas del óvalo flexible de mesas 3/2 re-medidas BAJO COMPRESIÓN
+       (los valores globales de pantalla grande quedan intactos fuera del
+       gate): sin esto el óvalo se quedaría en su piso de 96 y todo el aire
+       ganado moriría como banda muerta bajo la zona del humano. El área
+       legacy de mesa 2 también refleja la compresión de sus cartas (--card-h
+       −15 dentro de un alto que era fijo): 196 → 181 (cartas hasta 119 del
+       top + respiro 12 + mazo 46 + respiro 4). Valores afinados contra
+       medición en el pase CV-3. */
+    .game-table-screen {
+      --o1-rivals2-h: 181px;
+      --o1-static3-v: 499.5px;
+      --o1-static2-v: 493.5px;
+    }
+  }
 }
 
 /* ── Teléfono HORIZONTAL (landscape) — Tanda C5.1 ────────────────────────────
