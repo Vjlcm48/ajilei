@@ -402,9 +402,11 @@
     visibility: hidden;
   }
 
-  /* ── LH-1 · Header a UNA LÍNEA — mesas 5 y 4 landscape (réplica del H2
-     portrait; LH4-1 suma mesa 4 por de-escopado puro — paneles idénticos de
-     116px, mismos tokens). La señal letterBadges (GameTable.jsx) muestra aquí
+  /* ── LH-1 · Header a UNA LÍNEA — mesas 5, 4 y 3 landscape (réplica del H2
+     portrait; LH4-1/LH3-1 suman mesas 4 y 3 por de-escopado puro — paneles
+     idénticos de 116px, mismos tokens: padding 3/6/3, status 15/18/18 y gap
+     1px son reglas COMPARTIDAS que listan las tres mesas en gameTable.css).
+     La señal letterBadges (GameTable.jsx) muestra aquí
      la letra M/P/T y desmonta la línea "N fichas". Nombre anclado a la
      izquierda con ellipsis; anclaje derecho único (.opp-header-anchor) donde
      conviven —nunca a la vez— la letra (juego) y el chip de puntaje
@@ -416,13 +418,15 @@
      panel; ese aire bajo el header lo ocupan la ficha y la palabra de
      acción (LH-2/LH-3). */
   .table-five .opp-header,
-  .table-four .opp-header {
+  .table-four .opp-header,
+  .table-three .opp-header {
     width: 100%;
     min-height: 30px;
     margin-bottom: 15px;
   }
   .table-five .opp-header .opp-name,
-  .table-four .opp-header .opp-name {
+  .table-four .opp-header .opp-name,
+  .table-three .opp-header .opp-name {
     min-width: 0;
     max-width: 72px;      /* ~11 caracteres a 13px (panel de 116 − letra); en
                              showdown el flex-shrink del nombre cede ante el
@@ -432,7 +436,8 @@
     white-space: nowrap;
   }
   .table-five .opp-header .opp-header-anchor,
-  .table-four .opp-header .opp-header-anchor {
+  .table-four .opp-header .opp-header-anchor,
+  .table-three .opp-header .opp-header-anchor {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -450,7 +455,8 @@
      despliega a la derecha dentro del ancho útil (~26+40px < 116) y el panel
      no recorta (sin overflow hidden — sus mazos ya viven desbordados). */
   .table-five .opp-corner-chip,
-  .table-four .opp-corner-chip {
+  .table-four .opp-corner-chip,
+  .table-three .opp-corner-chip {
     position: absolute;
     left: 0;
     bottom: -4px;
@@ -461,7 +467,8 @@
     -webkit-tap-highlight-color: transparent;
   }
   .table-five .chip-balance-float,
-  .table-four .chip-balance-float {
+  .table-four .chip-balance-float,
+  .table-three .chip-balance-float {
     position: absolute;
     left: calc(100% - 2px);
     top: 50%;
@@ -480,7 +487,8 @@
      vecino derecho. No coincide con los z:7/8 del showdown (ficha inerte ahí
      y autocierre al entrar — JS). */
   .table-five .opp-panel.chip-open,
-  .table-four .opp-panel.chip-open { z-index: 3; }
+  .table-four .opp-panel.chip-open,
+  .table-three .opp-panel.chip-open { z-index: 3; }
 
   /* Réplica landscape: los keyframes de portrait viven DENTRO de su media
      query y aquí no existirían — sin esto el float aparecería sin animación. */
@@ -502,7 +510,8 @@
      ("Descartó 4" ~70px a 15px; "Sin fichas" ~72px a 16px) cabe sin roce ni
      desborde, sin tocar tipografía. */
   .table-five .opp-panel .opp-status,
-  .table-four .opp-panel .opp-status {
+  .table-four .opp-panel .opp-status,
+  .table-three .opp-panel .opp-status {
     position: absolute;
     left: 28px;
     right: 2px;
@@ -515,12 +524,14 @@
      compacto de .table-wide (gameTable.css, C5.4 cierre 2) sin depender del
      orden de los bundles. */
   .game-table.table-five .opp-panel,
-  .game-table.table-four .opp-panel { padding-bottom: 22px; }
+  .game-table.table-four .opp-panel,
+  .game-table.table-three .opp-panel { padding-bottom: 22px; }
   /* H5-p3 · Exclusión mutua saldo↔palabra: con SU toggle abierto, la palabra
      de esa IA cede el renglón (visibility — sin salto ni remoción); al
      cerrarse (tap, tap fuera, autocierre, otra ficha) vuelve sola. */
   .table-five .opp-panel.chip-open .opp-status,
-  .table-four .opp-panel.chip-open .opp-status { visibility: hidden; }
+  .table-four .opp-panel.chip-open .opp-status,
+  .table-three .opp-panel.chip-open .opp-status { visibility: hidden; }
 }
 
 /* ── V1 · MESA 5 · MÓVIL VERTICAL — paquete showdown ─────────────────────────
