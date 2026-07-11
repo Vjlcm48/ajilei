@@ -1839,6 +1839,36 @@
       --o1-static3-v: 499.5px;
       --o1-static2-v: 493.5px;
     }
+
+    /* ── OV-1 · Contenido del óvalo comprimido (mesas 5/4) ────────────────────
+       El óvalo de .table-wide baja a 96 (interior 82) pero su contenido sellado
+       mide ~104.6: pozo 65.4 + fila baja mensaje/comodín 31.2 (el comodín hace
+       2 líneas a 360) → +15.6/+14.8 fuera del perímetro por abajo (OV-0).
+       Compresión SOLO 5/4: pozo compacto (valor a 16px — MÍNIMO DURO de
+       legibilidad: sigue siendo el número dominante del óvalo), comodín al
+       token landscape (8px, 1 línea, ya probado legible), palabra de acción
+       18 (deja de inflar la fila baja) y filas más juntas. Presupuesto: pozo
+       ~50 + gap 5 + fila baja max(28, ~17) = ~83 ≤ 86 de interior. Mesas 3/2
+       NO se tocan (sin comodín y con reglas de mensaje propias; sus óvalos
+       flexibles miden 140+ aquí). El .pot-float (overlay volador) es
+       preexistente en todos los modos — fuera de alcance, tanda propia. */
+    .table-wide .center-zone { padding: 4px 22px; gap: 5px 12px; }
+    .table-wide .pot-box     { padding: 3px 10px; }
+    .table-wide .pot-value   { font-size: 16px; }
+    /* OJO line-height: el root hereda 23.2px FIJOS (145% computado una vez) —
+       la etiqueta de 10px ocupaba 23.2 de alto y el comodín de 8px, 29.2 (una
+       sola línea inflada, no dos — corrige el diagnóstico OV-0). Compactar la
+       línea es la palanca real: pozo 61.4→~50, comodín 29.2→~16. */
+    .table-wide .pot-label   { font-size: 10px; line-height: 1.2; }
+    .table-wide .call-box    { padding: 3px 8px; }
+    .table-wide .call-value  { font-size: 15px; }
+    .table-wide .msg-action  { font-size: 18px; }
+    /* SIN prefijo de mesa: el comodín vive gateado por numPlayers>=4 (mesa de
+       ORIGEN), no por aliveN — al degradar 5/4→3 vivos sigue montado dentro
+       del óvalo de .table-three y debe conservar su línea única compacta. En
+       mesas que nacen 3/2 nunca monta (regla inerte). El landscape tiene su
+       propio 8px (fuera de este media query). */
+    .comodin-note { font-size: 8px; padding: 2px 8px; line-height: 1.2; }
   }
 }
 
