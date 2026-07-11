@@ -1688,11 +1688,20 @@
      la fase de descarte) → altura FIJA, sin auto-grow. Así el área del humano no
      crece/encoge al cambiar de fase (cero salto vertical). Es ≤ el pico que ya
      ocurría en descarte, así que no empeora el "sin scroll". */
-  .action-area   { height: 94px; gap: 6px; }
+  .action-area   { height: 94px; gap: 4px; }   /* BT-1: gap 6→4 financia los botones de 40 DENTRO de los 94 */
   .btn           { padding: 7px 13px; font-size: 12px; }   /* C4.2.1: ~5% más compactos */
+  /* BT-1 · Táctil 40 REAL en sellado, financiación INTERNA del área fija de
+     94 (mults 26 + gap 4 + botones 40 + holgura + "N fic." compacto = 94; el
+     área NO crece). min-height y no padding: estable ante las métricas del
+     font (el <button> centra su texto solo). :not(.btn-mult): los mults
+     también llevan .btn y quedan en 26 — su táctil es deuda aparte.
+     "Iniciar/Siguiente mano/Sin descartar" viven en .action-area y heredan
+     los 40, deseado. El sub-bloque comprimido lo revierte a 28 (allí el
+     táctil lo da la hit-área extendida). */
+  .action-area .btn:not(.btn-mult) { min-height: 40px; }
   .btn-mult      { padding: 5px 8px; }
   .mult-row      { flex-wrap: wrap; gap: 5px; }
-  .bet-total     { min-width: 0; margin-left: 2px; font-size: 12px; }
+  .bet-total     { min-width: 0; margin-left: 2px; font-size: 12px; line-height: 1.2; }  /* BT-1: línea compacta (patrón OV-1) también en sellado */
 
   /* C4.2.5 · punto 1: el valor de apuesta ("100 fic.") sale del flujo del
      mult-row (donde quedaba arriba-derecha, encima de "Retirarse") y se ancla
@@ -1788,6 +1797,25 @@
        su línea (heredaba 145% → 1.2) para no rozar la fila de botones. */
     .action-area { height: 76px; gap: 4px; }
     .bet-total { line-height: 1.2; }
+    /* BT-1 · Comprimido: la caja VISUAL vuelve a 28 (BT-0: aquí no hay
+       presupuesto para 40 reales — mesas 5/4 al ras) y el TÁCTIL se extiende
+       a 40 con pseudo-elemento transparente (el patrón padding+margen
+       negativo pintaría el fondo): +3 arriba — tope duro MEDIDO: la fila de
+       mults interactiva queda a ~3.6px reales (subpíxel del layout, no los 4
+       del gap nominal) y con −4 el pseudo pisaba 1px del borde de los chips;
+       con −3 muere antes de su caja — y +9 abajo, sobre "N fic." (no
+       interactivo, sigue visible bajo el pseudo sin fondo; el pseudo queda
+       dentro del área). 28+3+9 = 40. Horizontal 0: el ancho no es el
+       problema y el gap de 8 entre botones se respeta. */
+    .action-area .btn:not(.btn-mult) { min-height: 0; position: relative; }
+    .action-area .btn:not(.btn-mult)::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      bottom: -9px;
+      left: 0;
+      right: 0;
+    }
 
     /* ── CV-3 · Rivales, óvalo y header de mesa 5 ─────────────────────────────
        Cierra el scroll de mesas 5/4 a 640 (CV-2 dejó −59/−65 pendientes). */
