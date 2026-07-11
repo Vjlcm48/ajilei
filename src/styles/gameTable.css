@@ -1017,7 +1017,11 @@
     --o1-oval-h: 119px;
     --o1-static-v: 832px;
     --o1-rivals3-h: 164px;
-    --o1-static3-v: 576.5px;
+    --o1-static3-v: 582.5px;   /* PT-1: +6 por las reservas de la barra humana (fila
+                                  tags 29.2 + fila nombre 27.2 → barra CONSTANTE en
+                                  todos los estados, turno incluido). Verificado al
+                                  ras a 800: mesa en 792 = 800 − padding 8 del screen
+                                  (el scrollHeight suma ese padding tras el contenido) */
     /* M2-4 · Mesa 2 (área legacy .ai-zone): misma pareja de variables que
        mesa 3. Área = top de contenido fijo + cartas (borde inferior a 134 del
        top del área) + respiro 12 + mazo 46 + respiro 4 = 196 border-box.
@@ -1025,7 +1029,8 @@
        567.5: el óvalo cede exactamente el estiramiento (+25) y queda inmune
        al contenido (modelo O1 de mesa 3), gaps 4/4 y humano sin moverse. */
     --o1-rivals2-h: 196px;
-    --o1-static2-v: 567.5px;
+    --o1-static2-v: 573.5px;   /* PT-1: +6 por las reservas de la barra humana
+                                  (constante en todos los estados; ver --o1-static3-v) */
   }
 
   /* O1 · En viewports más bajos que la mesa, el centrado de .game-table-screen
@@ -1634,8 +1639,28 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    /* PT-1 · Reserva al máximo real (patrón headers de IA): la pastilla Pie
+       (neutral con borde) mide 29.2 vs 27.2 de Mano — al rotar los roles la
+       fila crecía +2 y metía 2px de scroll en los óvalos calculados (mesa 2 a
+       cualquier altura; detectado en CV-4). Con la reserva la fila es
+       CONSTANTE en todos los estados — incluido "humano sin pastillas"
+       (mesas 5/4/3), que antes colapsaba a 0 y hacía respirar la banda.
+       Las estáticas de mesas 3/2 suben +2 en consecuencia. */
+    min-height: 29.2px;
   }
-  .player-bar-left .pbr-name       { grid-column: 1; grid-row: 2; }
+  .player-bar-left .pbr-name       {
+    grid-column: 1;
+    grid-row: 2;
+    /* PT-1 (fila 2, mismo patrón que .pbr-tags): la pastilla TURNO (27.2)
+       contra el nombre (23.2) inflaba la fila +4 en cada turno del humano →
+       scroll de 4px en los óvalos calculados (mesas 3/2) durante el turno,
+       hermano del bug de la fila 1. La reserva vive en el nombre (siempre
+       presente) → fila 2 constante haya o no pastilla; inline-flex centra
+       "Tú" en la celda alta. */
+    min-height: 27.2px;
+    display: inline-flex;
+    align-items: center;
+  }
   .player-bar-left .badge-turno,
   .player-bar-left .win-score-chip { grid-column: 2; grid-row: 2; }
   /* en el grid el espaciado lo da el gap → se anula el margin-left inline de los badges */
@@ -1716,8 +1741,9 @@
   }
 
   /* ══ CV-2 · BLOQUE DE COMPRESIÓN VERTICAL (viewports de poca altura) ═══════
-     Gate: max-height 767px — umbral MEDIDO del peor caso (mesa 4: 766.4px de
-     presupuesto mínimo; mesa 5: 760.4). Calibrado para cerrar el scroll a
+     Gate: max-height 772px — umbral MEDIDO del peor caso (mesa 4: 766.4px de
+     presupuesto mínimo + 6 de las reservas PT-1 de la barra humana = 772.4;
+     mesa 5: 766.4). Calibrado para cerrar el scroll a
      640px de alto: CV-2 aporta las palancas COMPARTIDAS (~60px) y CV-3
      cerrará rivales/óvalo/header de mesa 5. Principio: redefinir VARIABLES
      como vía principal (los consumidores siguen a su token solos) y reglas
@@ -1729,7 +1755,7 @@
      min-height 42 del óvalo, mensaje de 2 líneas de mesa 3, y los BOTONES de
      acción (28px de alto sellados — ya bajo el ideal táctil de 40px: no se
      reducen ni un px; la barra encoge solo por aire). */
-  @media (max-height: 767px) {
+  @media (max-height: 772px) {
     /* Cartas del humano: 61×95 → 51×80 (ratio 0.642 conservado, −15 en la
        fila). La var alimenta también las cartas legacy de la IA de mesa 2
        (su área --o1-rivals2-h es fija: ganan aire interior, nada se mueve) y
@@ -1747,7 +1773,10 @@
        juntas fila↔fila y fila↔óvalo (−4); en mesa 3 (flex) los dos gaps
        muertos de las side-col vacías (−4). Mesa 2 no monta table-mid. */
     .table-mid { gap: 2px; }
-    .table-wide .table-mid { gap: 2px; }
+    /* PT-1: 2→1 en el grid de 5/4 — financia (junto al padTop −2 de cada
+       mesa) los +6 de las reservas de la barra humana, cuya banda flexible
+       solo tenía ~3.6 de holgura a 640. Mesa 3 (flex) conserva su gap 2. */
+    .table-wide .table-mid { gap: 1px; }
     /* Zona del humano: aires −8, estructural — padding vertical 18→12 (−6) y
        respiro de la barra 6→4 (−2). El rótulo de puntaje ya estaba
        display:none en portrait (C4.2), no hay nada que esconder. */
@@ -1793,7 +1822,7 @@
       --o1-rivals3-h: 148px;
       --o1-oval-h: 96px;
     }
-    .table-four .table-mid { padding-top: 2px; }
+    .table-four .table-mid { padding-top: 0; }   /* PT-1: −2 (reservas barra humana) */
     /* Header de mesa 5 FUERA DE FLUJO (adaptación del patrón M4-9): mesa 4
        apila "Mano #N" bajo AJILEI porque su cima es UN panel centrado con los
        flancos libres; en mesa 5 la fila superior son DOS paneles a todo lo
@@ -1825,7 +1854,9 @@
       right: 10px;
       z-index: 20;
     }
-    .table-five .table-mid { padding-top: 30px; }
+    .table-five .table-mid { padding-top: 28px; }   /* PT-1: −2 (reservas barra humana);
+                                                       filas en y44 = fondo exacto de los
+                                                       botones del strip, sin solape */
     /* Estáticas del óvalo flexible de mesas 3/2 re-medidas BAJO COMPRESIÓN
        (los valores globales de pantalla grande quedan intactos fuera del
        gate): sin esto el óvalo se quedaría en su piso de 96 y todo el aire
@@ -1836,8 +1867,8 @@
        medición en el pase CV-3. */
     .game-table-screen {
       --o1-rivals2-h: 181px;
-      --o1-static3-v: 499.5px;
-      --o1-static2-v: 493.5px;
+      --o1-static3-v: 505.5px;   /* PT-1: +2 (.pbr-tags) +4 (fila del nombre) */
+      --o1-static2-v: 499.5px;   /* PT-1: +2 (.pbr-tags) +4 (fila del nombre) */
     }
 
     /* ── OV-1 · Contenido del óvalo comprimido (mesas 5/4) ────────────────────
