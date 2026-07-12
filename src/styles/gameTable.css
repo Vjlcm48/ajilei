@@ -310,6 +310,12 @@
   margin: 0;
   max-width: 340px;
   text-align: center;
+  /* CH-1: sin esto hereda los 23.2px FIJOS del root (145% computado una vez) —
+     las 2 líneas de móvil median 46.4 (infladas) y en landscape cada línea de
+     wrap igual. Regla base a propósito: el inflado existe en los 4 escenarios;
+     en desktop (1 línea, centrada en la franja fija de 84) es visualmente
+     inerte. 2 líneas a 11px pasan de 46.4 → ~27.6. */
+  line-height: 1.25;
 }
 
 /* C4.2.6 · variante de 2 líneas del hint de descarte: oculta por defecto
@@ -395,13 +401,10 @@
   color: var(--gold-brand);
 }
 
-.bet-total {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--gold-brand);
-  margin-left: 4px;
-  min-width: 60px;
-}
+/* CH-1: .bet-total ("N fic.") eliminado — decisión de producto: la cifra vive
+   en el botón de apostar (se actualiza con los multiplicadores) y la mesa en
+   "Mesa N". Purgadas sus 5 reglas (base, portrait sellado/absoluta/comprimido
+   y landscape) junto con el span del JSX. */
 
 /* Call indicator */
 .call-box {
@@ -984,6 +987,26 @@
   .game-table-screen {
     --card-w: 61px;
     --card-h: 95px;
+    /* ── CH-2 · Carta del humano FLUIDA (--hcard-*) ──
+       Consumidores SOLO del humano: slot/carta de .player-zone y .flying-card.
+       Mazos (27×42 fijos), espejo legacy de la IA de mesa 2, hueco de rivales
+       y reservas laterales siguen en --card-* — separar consumidores era el
+       requisito para crecer solo al humano.
+       Fórmula: ancho interior del área = 100vw − 64 (laterales constantes
+       medidos: pantalla 8+8 + mesa 10+10 + zona 10+10 + bordes 4) − 16 de
+       gaps mínimos (4×4) → (100vw − 80)/5 por carta. En el tramo fluido los
+       gaps quedan clavados en 4px por construcción (interior − 5·carta = 16)
+       y space-between solo reparte el residuo sub-píxel; sobre el techo
+       crecen simétricos. Piso = token vigente (61): a 360 la fila es píxel-
+       idéntica a hoy (desborde de −9 preexistente incluido). Techo 75
+       (h 116.8): el máximo que el área de acción fluida puede financiar sin
+       que el descarte (hint 27.5 + gap 4 + botón 40) se quede sin franja
+       (ver .action-area). Alto por ratio vigente 95/61 (decisión CH-0: a 360
+       píxel-idéntico; el ratio "real" 1055/1491 queda para otra tanda si se
+       decide). Sin svh/dvh (doctrina O1: nada respira con la barra del
+       navegador). */
+    --hcard-w: clamp(61px, calc((100vw - 80px) / 5), 75px);
+    --hcard-h: calc(var(--hcard-w) * 95 / 61);
     padding: 8px;
 
     /* ── O1 · Geometría FIJA del óvalo central (medida, no estimada) ──
@@ -1031,6 +1054,13 @@
     --o1-rivals2-h: 196px;
     --o1-static2-v: 573.5px;   /* PT-1: +6 por las reservas de la barra humana
                                   (constante en todos los estados; ver --o1-static3-v) */
+    /* CH-2 · Las estáticas (globales y comprimidas) NO se parametrizan con
+       --hcard-h: con área de acción = (189/156 − carta), el sobre del humano
+       es CONSTANTE por construcción a cualquier ancho → los óvalos calculados
+       de mesas 3/2 siguen al ras con sus valores vigentes y las bandas de 5/4
+       no tienen nada que absorber. Una estática calc(X + var(--hcard-h))
+       descontaría el crecimiento DOS veces (óvalo corto y hueco creciente
+       bajo él: −14 a 430). Al ras verificado en el pase CH-2. */
   }
 
   /* O1 · En viewports más bajos que la mesa, el centrado de .game-table-screen
@@ -1565,6 +1595,21 @@
      de margen derecho para que el barajado no se corte (punto 4). ── */
   .player-zone .cards-row { justify-content: space-between; position: relative; }
   .player-zone .card-slot-wrapper + .card-slot-wrapper { margin-left: 0; }
+  /* CH-2 · Slot y carta del humano al token FLUIDO (--hcard-*, definido junto
+     a --card-* arriba). El espejo de la IA de mesa 2 (.ai-zone) se queda a
+     propósito en --card-* (61×95 fijos): solo crece el humano. */
+  .player-zone .card-slot-wrapper,
+  .player-zone .playing-card {
+    width: var(--hcard-w);
+    height: var(--hcard-h);
+  }
+  /* CH-2 · El vuelo (reparto/descarte) aterriza en la mano crecida sin salto
+     de tamaño: .flying-card monta dentro de .game-table-screen y ve el token.
+     El mismatch con los slots de rivales (40×63) preexiste — no se toca. */
+  .flying-card {
+    width: var(--hcard-w);
+    height: var(--hcard-h);
+  }
   .player-zone .deck-pile { width: 27px; height: 42px; }
   /* C4.2.16 · mazo del humano (Pie) VERTICAL (27×42, sin rotar) — unifica el
      criterio con las IAs (todas verticales). Va ENCIMA de la carta más a la
@@ -1593,7 +1638,7 @@
   .score-tag-player { display: none; }   /* detalle de palo oculto en móvil */
 
   /* C4.2.1 · barra del jugador: las acciones ocupan una fila completa propia
-     (los botones nunca se cortan y "100 fic." no flota fuera del área); debajo,
+     (los botones nunca se cortan); debajo,
      identidad (izq) y saldo (der) en su propia fila. La columna del saldo es
      `auto` → toma su ancho de contenido y "… · Mesa N" se ve completo, sin
      corte. La identidad (1fr) cede espacio y trunca con elipsis si hiciera
@@ -1688,11 +1733,24 @@
      la fase de descarte) → altura FIJA, sin auto-grow. Así el área del humano no
      crece/encoge al cambiar de fase (cero salto vertical). Es ≤ el pico que ya
      ocurría en descarte, así que no empeora el "sin scroll". */
-  .action-area   { height: 94px; gap: 4px; }   /* BT-1: gap 6→4 financia los botones de 40 DENTRO de los 94 */
+  /* CH-2 · Área de acción FLUIDA: carta + área = 189 constantes (95 + 94
+     vigentes) → el SOBRE del humano no cambia de altura en ningún ancho, por
+     construcción (las estáticas O1 y los peores casos 773/640 quedan intactos
+     solos). A 360 (piso, h 95) el área queda en 94: píxel-idéntico a hoy, con
+     el aire muerto de CH-1 aún al fondo; al crecer la carta ese aire se
+     CONVIERTE en carta y los elementos de fase bajan con ella (el top del
+     área baja; su fondo queda fijo respecto a la franja anclada): a 430
+     (h 109) área 80, en el techo (h 116.8, desde ~455px) área 72.2 — donde el
+     pico de contenido (descarte: hint 27.5 + gap 4 + botón 40 = 71.5) cabe
+     con 0.7 de holgura; ese ajuste es el que fija el techo de 75. Sigue
+     siendo altura DETERMINISTA (no auto-grow): a ancho fijo no cambia entre
+     fases (C4.2.4/O1). */
+  .action-area   { height: calc(189px - var(--hcard-h)); gap: 4px; }   /* BT-1: gap 6→4 financia los botones de 40 */
   .btn           { padding: 7px 13px; font-size: 12px; }   /* C4.2.1: ~5% más compactos */
-  /* BT-1 · Táctil 40 REAL en sellado, financiación INTERNA del área fija de
-     94 (mults 26 + gap 4 + botones 40 + holgura + "N fic." compacto = 94; el
-     área NO crece). min-height y no padding: estable ante las métricas del
+  /* BT-1 · Táctil 40 REAL en sellado, financiación INTERNA del área
+     (mults 26 + gap 4 + botones 40 + aire al fondo — CH-1 eliminó la línea
+     "N fic." que lo ocupaba; CH-2 convierte ese aire en carta: área =
+     189 − carta). min-height y no padding: estable ante las métricas del
      font (el <button> centra su texto solo). :not(.btn-mult): los mults
      también llevan .btn y quedan en 26 — su táctil es deuda aparte.
      "Iniciar/Siguiente mano/Sin descartar" viven en .action-area y heredan
@@ -1701,21 +1759,14 @@
   .action-area .btn:not(.btn-mult) { min-height: 40px; }
   .btn-mult      { padding: 5px 8px; }
   .mult-row      { flex-wrap: wrap; gap: 5px; }
-  .bet-total     { min-width: 0; margin-left: 2px; font-size: 12px; line-height: 1.2; }  /* BT-1: línea compacta (patrón OV-1) también en sellado */
 
-  /* C4.2.5 · punto 1: el valor de apuesta ("100 fic.") sale del flujo del
-     mult-row (donde quedaba arriba-derecha, encima de "Retirarse") y se ancla
-     centrado DEBAJO de la fila de botones → cae bajo "Apostar" (botón central
-     cuando aparece) y libera el extremo derecho del área. El contenido de la
-     columna se alinea arriba para dejarle sitio limpio abajo. */
+  /* C4.2.5/CH-2: la columna sigue alineada ARRIBA (flex-start): el "bajar" de
+     los elementos de fase lo produce la carta crecida empujando el TOP del
+     área (carta + área = constante → el fondo del área no se mueve respecto
+     a la franja anclada). flex-end sería incorrecto: en comprimido pegaría el
+     pseudo táctil de BT-1 a la franja. El position:relative queda como ancla
+     de posicionamiento de la columna. */
   .action-col    { justify-content: flex-start; position: relative; }
-  .action-col .bet-total {
-    position: absolute;
-    left: 50%;
-    bottom: 0;
-    transform: translateX(-50%);
-    margin: 0;
-  }
   .timer-display { font-size: 18px; min-width: 40px; }
   .discard-hint  { font-size: 11px; max-width: 250px; }   /* C4.2.4: compacto para caber en la altura fija */
   .discard-hint-1l { display: none; }                     /* C4.2.6: móvil → 2 líneas fijas (el mazo horizontal no tapa el mensaje) */
@@ -1772,6 +1823,13 @@
     .game-table-screen {
       --card-w: 51px;
       --card-h: 80px;
+      /* CH-2 · Techo comprimido 58 (h 91.0) y NO 60: manda la reserva anti-
+         pseudo. El táctil extendido de BT-1 baja 9px del botón y la franja
+         anclada empieza a row-gap 6 del fondo del área → margen pseudo↔franja
+         = (área − 58 de contenido) + 6 − 9 = 95 − hcard-h. Con h 91 quedan
+         4.0px (≥3 exigidos); con w 60 (h 94.1) quedaría 0.9: invasión. */
+      --hcard-w: clamp(51px, calc((100vw - 80px) / 5), 58px);
+      --hcard-h: calc(var(--hcard-w) * 80 / 51);
       padding: 4px 8px;      /* pantalla: −8 vertical; horizontal intacto (el
                                 42 de la carta grande M4-6 sigue válido) */
     }
@@ -1791,22 +1849,26 @@
        display:none en portrait (C4.2), no hay nada que esconder. */
     .player-zone { padding: 5px 10px 7px; }
     .player-bar { margin-top: 4px; }
-    /* Barra de acciones: 94→76 (−18). Composición medida: mult-row 26 +
-       gap 4 + botones 28 + holgura ~3 + "N fic." ~15 = 76. Los botones NO se
-       tocan (mínimo duro); "N fic." (absoluto al fondo, .bet-total) compacta
-       su línea (heredaba 145% → 1.2) para no rozar la fila de botones. */
-    .action-area { height: 76px; gap: 4px; }
-    .bet-total { line-height: 1.2; }
+    /* Barra de acciones comprimida FLUIDA (CH-2): carta + área = 156
+       constantes (80 + 76 vigentes) → sobre intacto en cualquier ancho. A 360
+       (piso, h 80) queda en 76: píxel-idéntico (mult-row 26 + gap 4 + botones
+       28 + holgura ~3 + ~15 de aire); en el techo (w 58, h 91.0) queda en
+       65.0: contenido 58 + 7 de aire — la reserva anti-pseudo (el margen
+       pseudo↔franja es 95 − hcard-h = 4.0 en el techo; ver --hcard-w arriba).
+       Los botones NO se tocan (mínimo duro). */
+    .action-area { height: calc(156px - var(--hcard-h)); gap: 4px; }
     /* BT-1 · Comprimido: la caja VISUAL vuelve a 28 (BT-0: aquí no hay
        presupuesto para 40 reales — mesas 5/4 al ras) y el TÁCTIL se extiende
        a 40 con pseudo-elemento transparente (el patrón padding+margen
        negativo pintaría el fondo): +3 arriba — tope duro MEDIDO: la fila de
        mults interactiva queda a ~3.6px reales (subpíxel del layout, no los 4
        del gap nominal) y con −4 el pseudo pisaba 1px del borde de los chips;
-       con −3 muere antes de su caja — y +9 abajo, sobre "N fic." (no
-       interactivo, sigue visible bajo el pseudo sin fondo; el pseudo queda
-       dentro del área). 28+3+9 = 40. Horizontal 0: el ancho no es el
-       problema y el gap de 8 entre botones se respeta. */
+       con −3 muere antes de su caja — y +9 abajo, sobre el aire del fondo
+       del área (CH-2: ese aire baja de ~15 a 7 en el techo de la carta
+       fluida; el pseudo sigue muriendo dentro del área, a ≥4 de la franja —
+       el techo de 58 se eligió justo para garantizarlo). 28+3+9 = 40.
+       Horizontal 0: el ancho no es el problema y el gap de 8 entre botones
+       se respeta. */
     .action-area .btn:not(.btn-mult) { min-height: 0; position: relative; }
     .action-area .btn:not(.btn-mult)::after {
       content: '';
@@ -2511,12 +2573,11 @@
   .table-wide .action-area .btn,
   .table-three .action-area .btn,
   .table-two .action-area .btn { padding: 3px 8px; font-size: 11px; }
-  /* Multiplicadores + timer + monto en una sola fila compacta */
-  /* (C5.4 cierre · 2) "N fichas" (la apuesta actual) en su PROPIA línea, encima de
-     los multiplicadores. order:-1 + flex 0 0 100% la saca de la fila de ×n y la lleva
-     arriba; mult-row en wrap → los ×n caen en la línea de abajo. Con action-col en
-     column-reverse el orden final es: Apostar / Pasar / Retirarse / N fichas / ×n.
-     Estilizada como INFO (texto centrado, sin caja ni borde — no es pulsable). */
+  /* Multiplicadores + timer en una sola fila compacta */
+  /* (C5.4 cierre · 2 → CH-1) La línea "N fichas" que vivía encima de los
+     multiplicadores fue eliminada (producto: la cifra vive en el botón de
+     apostar). Con action-col en column-reverse el orden final queda:
+     Apostar / Pasar / Retirarse / ×n — los mults suben una línea. */
   .table-wide .mult-row,
   .table-three .mult-row,
   .table-two .mult-row { flex-wrap: wrap; gap: 3px; justify-content: center; }
@@ -2526,18 +2587,6 @@
   .table-wide .timer-display,
   .table-three .timer-display,
   .table-two .timer-display { font-size: 14px; min-width: 24px; }
-  .table-wide .bet-total,
-  .table-three .bet-total,
-  .table-two .bet-total {
-    order: -1;
-    flex: 0 0 100%;
-    text-align: center;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--gold-brand);
-    min-width: 0;
-    margin: 0;
-  }
   .table-wide .discard-area,
   .table-three .discard-area,
   .table-two .discard-area { align-items: center; }

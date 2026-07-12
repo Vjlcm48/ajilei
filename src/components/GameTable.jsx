@@ -1313,9 +1313,6 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                         </SoundButton>
                       )
                     })}
-                    <span className="bet-total">
-                      {currentBet === 0 ? betAmount : raiseTo} fic.
-                    </span>
                   </div>
                   <div className="action-buttons">
                     {canPass  && <SoundButton className="btn btn-pass"  onClick={() => act('pasar')}>Pasar</SoundButton>}
