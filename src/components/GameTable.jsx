@@ -983,7 +983,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           <div className="deck-shuffle-wrapper">
             <div
               ref={deckRefs.current[seat]}
-              className={`deck-pile${deckSeat !== seat || isClearing ? ' deck-hidden' : ''}`}
+              className={`deck-pile${deckSeat !== seat || isClearing || isPayoutPhase ? ' deck-hidden' : ''}`}
             />
             {isShuffling && deckSeat === seat && <ShuffleDeck />}
           </div>
@@ -1054,7 +1054,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         resetting={inReset}
         slotRefs={slotRefs.current[seat]}
         deckRef={deckRefs.current[seat]}
-        showDeck={deckSeat === seat && !isClearing}
+        showDeck={deckSeat === seat && !isClearing && !isPayoutPhase}
         shuffleChildren={isShuffling && deckSeat === seat ? <ShuffleDeck /> : null}
       />
     )
@@ -1242,7 +1242,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             <div className="deck-shuffle-wrapper">
               <div
                 ref={deckRefs.current[0]}
-                className={`deck-pile${deckSeat !== 0 || isClearing ? ' deck-hidden' : ''}`}
+                className={`deck-pile${deckSeat !== 0 || isClearing || isPayoutPhase ? ' deck-hidden' : ''}`}
               />
               {isShuffling && deckSeat === 0 && <ShuffleDeck />}
             </div>
