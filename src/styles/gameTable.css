@@ -2604,12 +2604,51 @@
      multiplicadores fue eliminada (producto: la cifra vive en el botón de
      apostar). Con action-col en column-reverse el orden final queda:
      Apostar / Pasar / Retirarse / ×n — los mults suben una línea. */
+  /* MT-1 · gap 3→10: el ½gap (5px) es la extensión del ::after → táctil H = visual+gap = 40. */
   .table-wide .mult-row,
   .table-three .mult-row,
-  .table-two .mult-row { flex-wrap: wrap; gap: 3px; justify-content: center; }
-  .table-wide .btn-mult,
-  .table-three .btn-mult,
-  .table-two .btn-mult { padding: 3px 5px; font-size: 10px; }
+  .table-two .mult-row { flex-wrap: wrap; gap: 10px; justify-content: center; }
+  /* MT-1 · multiplicadores a táctil ampliado. Especificidad (0,3,0) vía .mult-row
+     para GANAR a `.action-area .btn` (padding 3px 8px / 11px) que si no sobrescribe
+     estos valores. EJE HORIZONTAL: flex:1 iguala el ancho a (150−3·10)/4 = 30px (el
+     ×10, más ancho por contenido, obligaría a wrap con gap 10 si no se iguala) → 4 en
+     una línea; ::after left/right −6 (½gap 5 + 1px del borde, ver nota abajo) embaldosa
+     a táctil interior 40 sin muerto ni solape. EJE VERTICAL:
+     min-height 23 = visual +3 (holgura medida 5.1 en el piso → stack 137 ≤ banda 139,
+     reserva 2.1). El ::after NO extiende vertical: top PROHIBIDO (el ::after del fold
+     llega justo al borde superior de los mults — extender arriba solaparía y haría
+     taps ambiguos); abajo no hay espacio muerto seguro en el piso tras subir el visual
+     (el centrado del rail reparte la holgura a ambos lados). Táctil V resultante ≈23. */
+  .table-wide .mult-row .btn-mult,
+  .table-three .mult-row .btn-mult,
+  .table-two .mult-row .btn-mult {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 3px 4px;
+    font-size: 10px;
+    min-height: 23px;
+    position: relative;
+  }
+  .table-wide .mult-row .btn-mult::after,
+  .table-three .mult-row .btn-mult::after,
+  .table-two .mult-row .btn-mult::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -6px;
+    right: -6px;
+  }
+  /* El ::after se posiciona respecto al PADDING-box (1px dentro del borde de .btn-mult),
+     así que −6 = 1px del borde + 5px de ½gap → el borde del ::after cae en el centro
+     exacto del gap de 10 y embaldosa con el vecino sin muerto ni solape. Extremos de la
+     fila: −1 alcanza el border-box exterior (= borde de la celda de acciones) sin salir. */
+  .table-wide .mult-row .btn-mult:first-child::after,
+  .table-three .mult-row .btn-mult:first-child::after,
+  .table-two .mult-row .btn-mult:first-child::after { left: -1px; }
+  .table-wide .mult-row .btn-mult:last-child::after,
+  .table-three .mult-row .btn-mult:last-child::after,
+  .table-two .mult-row .btn-mult:last-child::after { right: -1px; }
   .table-wide .timer-display,
   .table-three .timer-display,
   .table-two .timer-display { font-size: 14px; min-width: 24px; }
