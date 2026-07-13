@@ -2547,20 +2547,37 @@
     justify-content: center;
     gap: 4px;
   }
+  /* BT-L: gap action-buttons↔mults = 6 → el ½gap (6px) del pseudo del fold llega
+     JUSTO al borde de los mults (embaldosa) sin invadir su hit-área. */
   .table-wide .action-col,
   .table-three .action-col,
-  .table-two .action-col { flex-direction: column-reverse; gap: 4px; }
-  /* (C5.4 · 2) Botones de acción con MÁS separación vertical (el cronómetro liberó
-     espacio). "Retirarse" (destructiva) con holgura extra respecto a Apostar/Pasar. */
+  .table-two .action-col { flex-direction: column-reverse; gap: 6px; }
+  /* BT-L · Caso B (fase de apuesta, 3 botones apilados) — patrón "visual + gap = 40":
+     visual 28 (min-height) + gap 12 (= 40 − 28) → hit-áreas de ½gap (6px) por lado
+     que embaldosan sin solape. Se ELIMINA el margin-top:8px del fold (financiación 1):
+     Retirarse es un ítem más del stack con el mismo gap uniforme. Presupuesto medido:
+     3×28 + 2×12 + gap-col 6 + mult-row 20 = 134px ≤ banda 139px (piso 640×360). */
   .table-wide .action-buttons,
   .table-three .action-buttons,
-  .table-two .action-buttons { flex-direction: column; align-items: stretch; gap: 8px; }
-  .table-wide .action-buttons .btn-fold,
-  .table-three .action-buttons .btn-fold,
-  .table-two .action-buttons .btn-fold { margin-top: 8px; }
+  .table-two .action-buttons { flex-direction: column; align-items: stretch; gap: 12px; }
   .table-wide .action-buttons .btn,
   .table-three .action-buttons .btn,
-  .table-two .action-buttons .btn { width: 100%; }
+  .table-two .action-buttons .btn { width: 100%; min-height: 28px; position: relative; }
+  /* Hit-área táctil: pseudo transparente que extiende ½gap (6px) arriba y abajo →
+     táctil = 28 + 6 + 6 = 40. Interior: los pseudos de botones contiguos se tocan en
+     el punto medio del gap de 12 (sin solape). Extremos: arriba entra en el espacio
+     muerto del centrado del rail; abajo el fold llega al borde de los mults (gap-col 6)
+     sin invadirlos. */
+  .table-wide .action-buttons .btn::after,
+  .table-three .action-buttons .btn::after,
+  .table-two .action-buttons .btn::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    bottom: -6px;
+    left: 0;
+    right: 0;
+  }
   .table-wide .action-buttons .btn-bet,
   .table-wide .action-buttons .btn-call,
   .table-wide .action-buttons .btn-raise,
@@ -2573,6 +2590,15 @@
   .table-wide .action-area .btn,
   .table-three .action-area .btn,
   .table-two .action-area .btn { padding: 3px 8px; font-size: 11px; }
+  /* BT-L · Caso A (botón único: "Descartar N / Sin descartar", "Iniciar mano",
+     "Siguiente mano") — 40px REAL (patrón BT-1 sellado). Hijo DIRECTO de .action-area:
+     estos botones cuelgan directos del área (o de .discard-area, que también es
+     .action-area); los 3 de apuesta viven anidados en .action-buttons → el `>` no los
+     alcanza (esos van por el Caso B, visual 28 + hit-área). Hay holgura de sobra en
+     estos estados (un solo botón). */
+  .table-wide .action-area > .btn,
+  .table-three .action-area > .btn,
+  .table-two .action-area > .btn { min-height: 40px; }
   /* Multiplicadores + timer en una sola fila compacta */
   /* (C5.4 cierre · 2 → CH-1) La línea "N fichas" que vivía encima de los
      multiplicadores fue eliminada (producto: la cifra vive en el botón de
