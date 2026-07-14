@@ -2693,12 +2693,31 @@
      de forma absoluta e independiente. No crece la cabecera (hijos fuera de flujo). */
   .table-five .header-right { position: static; }
 
-  /* ✕ sola, esquina superior derecha (donde estaba). Tap target sin cambios. */
+  /* SX-1 · ✕ compactada y arrinconada. A 640 los 4 paneles se estrujan y el borde
+     derecho de IA1 llega a ~x608 (a 32px del borde); la ✕ (31×29 en top:6/right:8)
+     caía sobre su esquina sup-der (~20×25px). No se puede despejar en VERTICAL (los
+     paneles arrancan en y18 y la ✕ con su offset no cabe encima), así que se despeja
+     en HORIZONTAL: al encoger el ancho (right ancla el borde derecho) el borde IZQ de
+     la ✕ se corre a la derecha del panel. Bonus (Parte C): también abre aire hacia IA1
+     a 844/932 (la ✕ más angosta deja su izquierda más a la derecha). */
   .table-five .btn-leave {
     position: absolute;
-    top: 6px;
-    right: 8px;
+    top: 4px;
+    right: 2px;
     z-index: 20;
+    padding: 1px 2px;      /* de 5px 9px → visual ~15 de ancho: borde izq a la derecha del panel (608) */
+    font-size: 11px;
+  }
+  /* Hit-área táctil (visual <40): se extiende SOLO sobre espacio muerto de la esquina
+     — arriba, derecha (hacia el borde) y abajo (la franja x>608 a la derecha del panel
+     está vacía a 640). NUNCA a la izquierda (left:0) para no volver a pisar el panel. */
+  .table-five .btn-leave::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: -10px;
+    bottom: -20px;
+    left: 0;
   }
 
   /* Bocina al margen derecho de la franja central, a la derecha del óvalo y
@@ -2742,10 +2761,17 @@
      coloca tras el logo (≈12px + ancho de "AJILEI" + aire); top ligeramente por
      debajo del de AJILEI para igualar la línea base (10px vs 16px). Ambos knobs
      (left, top) afinables en validación. */
+  /* SX-1 · "Mano #N" BAJO el logo AJILEI (left:12 = mismo margen), no a su derecha.
+     En F13 vivía a la derecha de AJILEI (left:88) y a 640 caía sobre el óvalo/POZO
+     (x100+) invadiendo ~15px de la pot-box — porque el óvalo, centrado, tiene su borde
+     izquierdo en x100 a 640 (se corre a la derecha al ensanchar, por eso 844/932 no
+     colisionaban). Alineado a la izq con AJILEI (x25-65) queda SIEMPRE a la izquierda
+     del óvalo y, bajo el logo, sobre las cartas del humano — despeja en los 3 tamaños.
+     top:50%+1 lo pone justo debajo de AJILEI (top:50%−24, alto ~23 → fondo ~50%−1). */
   .table-five .hand-badge {
     position: absolute;
-    left: 88px;
-    top: calc(50% - 19px);
+    left: 12px;
+    top: calc(50% + 1px);
     transform: none;
     z-index: 20;
   }
