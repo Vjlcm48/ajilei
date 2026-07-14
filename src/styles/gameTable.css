@@ -2017,9 +2017,18 @@
     --card-h: 69px;
     padding: 6px 10px;
   }
+  /* FL-1 · carta IA FLUIDA (desbloqueado por SX-1). Ratio 50/32 = 1.5625 = el ACTUAL
+     (piso 32→50 mantiene 640 intacto; NO el 1491/1055 de la imagen, que encogería el
+     piso y cambiaría 640). TECHO 46 es BINDING por la ✕ (SX-1 dejó aire 27px@844 /
+     38px@932): a 932 el panel crece +30 visual (±15 centrado en su columna) → card 46
+     deja ≥8px contra la ✕; a 844 la fluida da ~40 (aire ~12). El slack vertical
+     (panel↔óvalo 22/44 a 844/932) admite más → no es binding. PISO 32 = 640 sin cambio.
+     Fuentes/iconos (badge, opp-status, ficha, toggle) CONSTANTES (no derivan de --opp-card).
+     Mesa 2 se excluye sola: .game-table.table-two .opp-panel (0,3,0) fija --opp-card a
+     var(--card-w) → su IA sigue en espejo la carta humana (ya CH-L). */
   .game-table-screen .opp-panel {
-    --opp-card-w: 32px;
-    --opp-card-h: 50px;
+    --opp-card-w: clamp(32px, calc(6.8vw - 17px), 46px);
+    --opp-card-h: calc(var(--opp-card-w) * 50 / 32);
   }
 
   /* La mesa llena la pantalla y reparte su alto: header (auto) + 60% (IAs+mesa)
@@ -2090,7 +2099,10 @@
   /* Paneles de rival compactos (tamaño/forma definitivos → C5.2) */
   .game-table-screen .opp-panel {
     width: auto;
-    max-width: 116px;
+    /* FL-1 · el panel acompaña la carta: = --opp-card-w × 116/32 (116 a card 32; ~167 a
+       card 46). Deriva del mismo eje fluido → carta y panel crecen juntos. Mesa 2 lo
+       anula (max-width:none, espejo). */
+    max-width: calc(var(--opp-card-w) * 3.625);
     min-height: 0;
     padding: 4px 6px 5px;
     gap: 1px;
