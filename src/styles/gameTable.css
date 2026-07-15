@@ -2025,10 +2025,17 @@
      (panel↔óvalo 22/44 a 844/932) admite más → no es binding. PISO 32 = 640 sin cambio.
      Fuentes/iconos (badge, opp-status, ficha, toggle) CONSTANTES (no derivan de --opp-card).
      Mesa 2 se excluye sola: .game-table.table-two .opp-panel (0,3,0) fija --opp-card a
-     var(--card-w) → su IA sigue en espejo la carta humana (ya CH-L). */
+     var(--card-w) → su IA sigue en espejo la carta humana (ya CH-L).
+     CH-L2a · la DEFINICIÓN del clamp se subió a .game-table (bloque de --card-h, más
+     abajo) para que el techo dinámico de la carta humana pueda LEERLA. OJO: la herencia
+     hacia .opp-panel NO basta, porque opponentPanel.css:6-8 fija en el panel una regla
+     BASE --opp-card = var(--card-w)*0.55 (0,1,0) que gana a la herencia (una regla que
+     casa el elemento siempre vence al valor heredado). Por eso el panel toma el valor de
+     .game-table con `inherit` explícito (0,2,0 > 0,1,0) → paneles/mazo/deck IA idénticos
+     a FL-1. Mesa 2 (.table-two .opp-panel, 0,4,0) sigue ganando su espejo var(--card-w). */
   .game-table-screen .opp-panel {
-    --opp-card-w: clamp(32px, calc(6.8vw - 17px), 46px);
-    --opp-card-h: calc(var(--opp-card-w) * 50 / 32);
+    --opp-card-w: inherit;   /* toma el clamp fluido definido en .game-table (vence a opponentPanel.css:6-8) */
+    --opp-card-h: inherit;
   }
 
   /* La mesa llena la pantalla y reparte su alto: header (auto) + 60% (IAs+mesa)
@@ -2304,14 +2311,27 @@
        --card-w se deriva de --card-h por la proporción → un solo origen, sin desfases. */
     --hcards-hbudget: calc(20px + 24px + var(--hcol-left) + 150px + 20px + 16px);
     --hcards-vspace: calc(45dvh - 40px);   /* tope vertical ≈ alto útil de la banda humana */
+
+    /* CH-L2a · DEFINICIÓN de la carta IA fluida (FL-1), subida aquí desde .opp-panel
+       para que el techo dinámico de --card-h (abajo) la lea. Mismo clamp que FL-1 →
+       .opp-panel y descendientes (mazo/deck IA) heredan el MISMO valor (paneles IA
+       byte-idénticos). Mesa 2 NO se afecta: su override .table-two .opp-panel (0,3,0)
+       fija --opp-card=var(--card-w) SOLO en el panel; aquí (.game-table) mesa 2 mantiene
+       el valor fluido → el techo de --card-h lee el fluido, no el espejo (sin ciclo). */
+    --opp-card-w: clamp(32px, calc(6.8vw - 17px), 46px);
+    --opp-card-h: calc(var(--opp-card-w) * 50 / 32);
     /* CH-L · clamp sobre la fórmula fluida G#3 (misma idea que --hcard-* de portrait,
        que aquí NO aplica). Sin clamp la carta crecía sin tope con el ancho (medido:
        88×125 a 844, 106×150 a 932 → 2.8×/3.3× la carta de IA de 32×50). Se acota
        --card-h (la dimensión que gobierna el min()); --card-w deriva y CONSERVA el
        ratio 1491/1055 (sin deformación).
-       · TECHO 99px → ancho 70 = 2.19× la carta IA: restaura proporción a 844/932 y
-         queda por debajo del techo vertical 45dvh−40 (122/135/153 a 640/844/932), así
-         que el techo manda antes que el alto. Se activa a partir de ~752px de ancho.
+       · TECHO DINÁMICO (CH-L2a) = --opp-card-w × 2.2 (en ancho), expresado en ALTO vía
+         el ratio 1491/1055 → calc(var(--opp-card-w) * 2.2 * 1491 / 1055). Acopla la carta
+         humana a la IA fluida: mantiene ~2.2× en TODO el rango (antes el techo fijo 99 la
+         clavaba en 70 mientras la IA crecía → caía a 1.73×/1.52× a 844/932). Da alto
+         99.5/125.7/143.1 a 640/844/932, SIEMPRE bajo el techo vertical 45dvh−40
+         (122/135.5/153.5) → el vspace sigue protegiendo el alto. A 640 no es binding
+         (70.4 < ancho natural 47.6 → manda la fórmula por ancho; CH-L2b lo abordará).
        · PISO 62px → ancho 44 (token base landscape): protege teléfonos <640. En ≥640 el
          natural es ≥67 (mide 67.3 a 640, con 12px de slack en la fila de 5), así que el
          piso NUNCA activa en el rango soportado; no agranda ni desborda a 640.
@@ -2323,7 +2343,7 @@
         calc((100vw - var(--hcards-hbudget)) / 5 * 1491 / 1055),   /* limitado por ANCHO */
         var(--hcards-vspace)                                        /* limitado por ALTO */
       ),
-      99px
+      calc(var(--opp-card-w) * 2.2 * 1491 / 1055)   /* CH-L2a · techo dinámico ≈ 2.2× la carta IA */
     );
     --card-w: calc(var(--card-h) * 1055 / 1491);
 
