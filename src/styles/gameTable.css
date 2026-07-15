@@ -2131,6 +2131,36 @@
   .table-three .opp-cards,
   .table-two .opp-cards    { padding: 2px 0 1px; }
 
+  /* ── MZ-2 · MAZO de la IA (Pie) REDUCIDO y FLUIDO en landscape (mesas 5/4/3) ──────
+     El mazo IA seguía a --opp-card 1:1 (mesa 5 a ×0.85) → dominaba el panel al crecer
+     con FL-1/CH-L2a. Lo bajamos a ×0.45 de --opp-card. Escala fluida: ~14.4×22.5 a 640
+     → ~20.7×32.4 a 932, proporcional a los paneles. La BARAJA (.shuffle-fan-card) se
+     acopla al mismo tamaño para que el barajado no se salga del mazo.
+     MESA 2 EXCLUIDA (:not(.table-two)): su mazo IA está sellado a --pie-deck (32×50) en
+     ESPEJO del mazo del humano-Pie (simetría G#3, más abajo) — no es un mazo de panel y
+     su token es var(--card-w) (espejo), así que ×0.45 ni uniformaría ni respetaría la
+     simetría. Se deja intacto por decisión del usuario.
+     Especificidad 0,5,0 (game-table-screen + game-table + :not(.table-two) + deck-pile +
+     opp-deck) para VENCER a .table-five .deck-pile.opp-deck (0,3,0) de opponentPanel.css
+     sin tocar ese archivo. SOLO .opp-deck → el mazo del humano (Pie, .player-zone
+     .deck-pile) NO se toca. Portrait/escritorio fuera de este @media → tokens intactos. */
+  .game-table-screen .game-table:not(.table-two) .deck-pile.opp-deck,
+  .game-table-screen .game-table:not(.table-two) .opp-deck-wrapper .shuffle-fan-card {
+    width: calc(var(--opp-card-w) * 0.45);
+    height: calc(var(--opp-card-h) * 0.45);
+  }
+  /* Estética del propio mazo, escalada al tamaño reducido (a 18px, el borde 2px / radio
+     8px / sombra en escalera 1-4px de opponentPanel.css se veían toscos). SOLO el mazo:
+     borde 1px, radio 4px y una sombra apilada más leve (mantiene el guiño de "varias
+     cartas" sin goterón). No toca la baraja en vuelo ni la geometría del ancla. */
+  .game-table-screen .game-table:not(.table-two) .deck-pile.opp-deck {
+    border-width: 1px;
+    border-radius: 4px;
+    box-shadow:
+      1px 1px 0 0 #8B0000,
+      2px 2px 2px rgba(0, 0, 0, 0.35);
+  }
+
   /* ── Franja de mesa / pozo — FELT EN FORMA DE ESTADIO (C5.3) ──
      ALTURA FIJA MÍNIMA (de C5.1): el pozo no se aplasta al rotar el turno (ley de
      anclaje). El felt es un racetrack/estadio a ancho completo: border-radius 999px
