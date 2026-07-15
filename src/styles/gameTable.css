@@ -2296,10 +2296,16 @@
   .game-table-screen .game-table.table-wide,
   .game-table-screen .game-table.table-three,
   .game-table-screen .game-table.table-two {
-    /* G#3 · Columna izquierda del rail ENSANCHADA (saldo "9999999 fichas", 7 díg.,
-       en UNA línea). Se define aquí (en .game-table) para que el grid del .player-zone
-       la herede vía var() y el presupuesto de abajo la reste con el mismo valor. */
-    --hcol-left: 172px;
+    /* G#3 · Columna izquierda del rail (saldo "9999999 fichas", 7 díg., en UNA línea).
+       Se define aquí (en .game-table) para que el grid del .player-zone la herede vía
+       var() y el presupuesto de abajo la reste con el mismo valor.
+       CH-L2b · RECORTE por peor caso MEDIDO a 640 (arnés, inyección DOM): el contenido
+       más ancho de la columna es el saldo de 7 díg. = 114.3px (Mesa 10000 = 84, badge
+       Mano = 59, timer "20s" = 52, "Tú" = 17 → todos holgados). 172 → 122 (114.3 + ~8px
+       de margen) libera 50px del hbudget → la carta a 640 crece por la fórmula fluida
+       (no hay techo que la limite ahí). A 844/932 el techo dinámico de CH-L2a sigue
+       gobernando (natural > techo) → esas pantallas NO se mueven. */
+    --hcol-left: 122px;
 
     /* G#3 · CARTAS DEL HUMANO — TAMAÑO FLUIDO (aprovechan la columna central 1fr).
        Manda lo que llegue primero: el ancho disponible repartido entre 5 cartas, o el
@@ -2331,12 +2337,12 @@
          clavaba en 70 mientras la IA crecía → caía a 1.73×/1.52× a 844/932). Da alto
          99.5/125.7/143.1 a 640/844/932, SIEMPRE bajo el techo vertical 45dvh−40
          (122/135.5/153.5) → el vspace sigue protegiendo el alto. A 640 no es binding
-         (70.4 < ancho natural 47.6 → manda la fórmula por ancho; CH-L2b lo abordará).
+         (70.4 < ancho natural → manda la fórmula por ancho: es lo que CH-L2b aprovecha).
        · PISO 62px → ancho 44 (token base landscape): protege teléfonos <640. En ≥640 el
-         natural es ≥67 (mide 67.3 a 640, con 12px de slack en la fila de 5), así que el
-         piso NUNCA activa en el rango soportado; no agranda ni desborda a 640.
-       · CENTRO: la fórmula G#3 intacta. hbudget NO se toca (la reserva de --hcol-left
-         para saldo de 7 díg. se respeta; no se agranda la carta a 640). */
+         natural es ≥67, así que el piso NUNCA activa en el rango soportado; no desborda.
+       · CENTRO: la fórmula G#3 intacta. CH-L2b RECORTA hbudget (--hcol-left 172→122, por
+         peor caso medido) → a 640 la carta crece a ~57.6×81.4 (antes 47.6×67.3); a 844/932
+         el techo dinámico manda igual (sin cambio). */
     --card-h: clamp(
       62px,
       min(
@@ -2547,7 +2553,10 @@
     position: relative;
     /* --pie-deck-w/h (tamaño) ahora es FUENTE ÚNICA en .game-table (arriba) → se hereda
        aquí idéntico (32×50). Solo la POSICIÓN del mazo humano vive en .player-zone: */
-    --pie-deck-right: 156px;   /* x del borde DERECHO del mazo, cerca del borde der. de la col izq (172px) · afinable */
+    /* x del borde DERECHO del mazo, anclado al borde der. de la col izq. CH-L2b · se
+       ACOPLA a --hcol-left (antes 156 hardcodeado = 172−16): así el mazo Pie sigue a la
+       columna cuando se recorta (122−16 = 106) y NO invade la fila de cartas. · afinable */
+    --pie-deck-right: calc(var(--hcol-left) - 16px);
     --pie-deck-top: 6px;       /* alto: a la par del cronómetro, arriba del rail (afinable) */
   }
   .table-wide .player-zone .deck-shuffle-wrapper,
