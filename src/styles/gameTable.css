@@ -2333,13 +2333,19 @@
     /* G#3 · Columna izquierda del rail (saldo "9999999 fichas", 7 díg., en UNA línea).
        Se define aquí (en .game-table) para que el grid del .player-zone la herede vía
        var() y el presupuesto de abajo la reste con el mismo valor.
-       CH-L2b · RECORTE por peor caso MEDIDO a 640 (arnés, inyección DOM): el contenido
-       más ancho de la columna es el saldo de 7 díg. = 114.3px (Mesa 10000 = 84, badge
-       Mano = 59, timer "20s" = 52, "Tú" = 17 → todos holgados). 172 → 122 (114.3 + ~8px
-       de margen) libera 50px del hbudget → la carta a 640 crece por la fórmula fluida
-       (no hay techo que la limite ahí). A 844/932 el techo dinámico de CH-L2a sigue
-       gobernando (natural > techo) → esas pantallas NO se mueven. */
-    --hcol-left: 122px;
+       CH-L2b · RECORTE por peor caso MEDIDO a 640 (arnés, inyección DOM): saldo de
+       7 díg. = 114.3px (Mesa 10000 = 84, timer "20s" = 52, "Tú" = 17 → holgados).
+       TU-1 · CORRIGE el peor caso de CH-L2b: aquel midió la fila de badges SIN el badge
+       TURNO (solo se renderiza en el turno del humano) y se quedó en 122. El peor caso
+       REAL de la columna no es el saldo sino la FILA DE BADGES en el turno:
+         MANO (55.9) + gap (4) + TURNO (63.5) = 123.4  → con 122 envolvía a 2 líneas y
+         empujaba el rail 15.1px al llegar el turno (contra doctrina O1).
+       128 = 123.4 + 4.6 de margen (mínimo sin wrap medido: 124). Coste: la carta a 640
+       baja 57.6 → 56.4 de ancho. A 844/932 el techo dinámico de CH-L2a sigue gobernando
+       (natural 137.4/162.3 > techo 125.6/143.0) → esas pantallas NO se mueven.
+       --pie-deck-right (abajo) va acoplado por calc(var(--hcol-left) − 16px) → el mazo
+       Pie se reancla solo con este cambio. */
+    --hcol-left: 128px;
 
     /* G#3 · CARTAS DEL HUMANO — TAMAÑO FLUIDO (aprovechan la columna central 1fr).
        Manda lo que llegue primero: el ancho disponible repartido entre 5 cartas, o el
@@ -2511,6 +2517,15 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 3px 4px;
+    /* TU-1 · RESERVA O1 (equivalente de PT-1 para landscape; portrait la tiene en
+       .pbr-tags/.pbr-name, gameTable.css:1694/1705). Sin ella la fila COLAPSA a 0 cuando
+       el humano no es Mano ni Pie (mesas 5/4/3), y al llegarle el turno nacía de cero
+       (0 → 27.2) empujando el rail 13.6px — el hermano del bug del wrap, independiente
+       del ancho. Reservando el máximo real (29.2 = pastilla PIE, la más alta por su
+       borde de 1px; MANO/TURNO miden 27.2) la fila es CONSTANTE en los tres casos de rol
+       (MANO+TURNO / PIE+TURNO / sin rol+TURNO) → cero movimiento al aparecer TURNO.
+       Doctrina O1: se reserva la caja, no se remueve. */
+    min-height: 29.2px;
   }
   /* dentro del grupo el espaciado lo dan los gaps → se anula el margin-left inline */
   .table-wide .player-bar-left .pbr-tags,
