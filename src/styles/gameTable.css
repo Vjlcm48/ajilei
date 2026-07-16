@@ -2393,10 +2393,16 @@
     );
     --card-w: calc(var(--card-h) * 1055 / 1491);
 
-    /* G#3 · TAMAÑO del mazo PIE — FUENTE ÚNICA (compartida humano + IA-mesa-2).
-       Vive aquí, en el ancestro común de .player-zone (mazo humano) y .opp-panel
-       (mazo IA), para que ambos lean la MISMA variable: si cambia, cambian los dos
-       (simetría). La POSICIÓN de cada mazo es propia (no se comparte). */
+    /* G#3 · TAMAÑO del mazo PIE. Era FUENTE ÚNICA (humano + IA-mesa-2): ambos leían
+       esta variable para ir siempre iguales (simetría).
+       MZ-4 · DESACOPLADO. Esta variable se queda SOLO para el mazo IA de mesa 2
+       (.game-table.table-two .deck-pile.opp-deck, al final del bloque) → ese mazo NO se
+       toca y sigue byte-idéntico en 32×50, como quedó excluido en MZ-2b. El mazo del
+       HUMANO pasa a --hpie-deck-w/h (definido en .player-zone, junto a su posición).
+       Se ABANDONA DELIBERADAMENTE la simetría G#3 humano↔IA de mesa 2 (decisión de
+       Victor, coherente con MZ-2b): el rival del 2 conserva su mazo grande y el humano
+       se unifica con los mazos de IA de 5/4/3. Es el precio consciente de esa
+       coherencia, no un efecto colateral. */
     --pie-deck-w: 32px;
     --pie-deck-h: 50px;
   }
@@ -2600,32 +2606,71 @@
   .table-three .player-zone,
   .table-two .player-zone {
     position: relative;
-    /* --pie-deck-w/h (tamaño) ahora es FUENTE ÚNICA en .game-table (arriba) → se hereda
-       aquí idéntico (32×50). Solo la POSICIÓN del mazo humano vive en .player-zone: */
-    /* x del borde DERECHO del mazo, anclado al borde der. de la col izq. CH-L2b · se
-       ACOPLA a --hcol-left (antes 156 hardcodeado = 172−16): así el mazo Pie sigue a la
-       columna cuando se recorta (122−16 = 106) y NO invade la fila de cartas. · afinable */
-    --pie-deck-right: calc(var(--hcol-left) - 16px);
+    /* MZ-4 · TAMAÑO del mazo del HUMANO — propio (ya no lee --pie-deck-w/h, que quedó
+       para el mazo IA de mesa 2). Toma los valores del mazo de IA de MZ-2b CON SU MISMO
+       BREAKPOINT ESPEJO (27×42; 21×32 en ≤772 de ancho, ver @media anidado abajo) → el
+       mazo del humano y los de IA miden lo mismo, y rotar el teléfono no lo cambia.
+       Aplica a las 4 mesas (incluida la 2, cuyo mazo IA queda aparte en 32×50). */
+    --hpie-deck-w: 27px;
+    --hpie-deck-h: 42px;
     --pie-deck-top: 6px;       /* alto: a la par del cronómetro, arriba del rail (afinable) */
+    /* MZ-4 · --pie-deck-right RETIRADO: anclaba por el borde DERECHO (left se derivaba
+       como right − w), así que al encoger el mazo la esquina sup-izq se habría corrido
+       +11px. Ahora la x se fija por IZQUIERDA (ver .deck-shuffle-wrapper), conservando
+       el acople a --hcol-left de CH-L2b en la nueva fórmula. */
+  }
+  @media (max-width: 772px) {
+    .table-wide .player-zone,
+    .table-three .player-zone,
+    .table-two .player-zone {
+      --hpie-deck-w: 21px;
+      --hpie-deck-h: 32px;
+    }
   }
   .table-wide .player-zone .deck-shuffle-wrapper,
   .table-three .player-zone .deck-shuffle-wrapper,
   .table-two .player-zone .deck-shuffle-wrapper {
     position: absolute;
     top: var(--pie-deck-top);
-    left: calc(var(--pie-deck-right) - var(--pie-deck-w));
-    width: var(--pie-deck-w);
-    height: var(--pie-deck-h);
+    /* MZ-4 · ANCLAJE POR ESQUINA SUPERIOR IZQUIERDA. Antes: left = --pie-deck-right −
+       --pie-deck-w (se derivaba del borde derecho) → encoger el mazo movía la esquina.
+       Ahora la x es fija y conserva EXACTO el valor de hoy: --hcol-left − 48 = 128 − 48
+       = 80 (48 = los 16 de margen contra el borde de la columna + los 32 del mazo
+       anterior). Mantiene el acople a --hcol-left de CH-L2b: si la columna cambia, el
+       mazo la sigue. La `y` ya se anclaba por top → se preserva sola.
+       Los vuelos (launchDiscardOut/In) leen dr.left/dr.top — esta misma esquina — así
+       que su origen/destino queda byte-idéntico al encoger. */
+    left: calc(var(--hcol-left) - 48px);
+    width: var(--hpie-deck-w);
+    height: var(--hpie-deck-h);
     margin: 0;
     z-index: 6;
   }
   .table-wide .player-zone .deck-pile,
   .table-three .player-zone .deck-pile,
   .table-two .player-zone .deck-pile {
-    width: var(--pie-deck-w);
-    height: var(--pie-deck-h);
+    width: var(--hpie-deck-w);
+    height: var(--hpie-deck-h);
     margin: 0;                 /* anula el margin-right:10px de arriba (ya no separa cartas) */
   }
+  /* MZ-4 · ABANICO del humano proporcional al mazo nuevo. El fanOut global (:905) sube
+     translateY(-16px) FIJO: era el 32% del alto de 50, pero a 32 sería el 50% → el
+     abanico saltaría desproporcionado. Se clona el keyframe SOLO para el humano en
+     landscape con la subida expresada como ese mismo 32% del alto (−13.4 a 42, −10.2 a
+     32) → mismo carácter a cualquier tamaño. No se toca el fanOut global (lo usan las
+     IAs, portrait y escritorio) ni MZ-2b.
+     Borde/radio del abanico NO se tocan: a 21-27px la referencia es portrait, que usa
+     exactamente los 2px/8px que .shuffle-fan-card ya tiene (verificado en MZ-2b, donde
+     el ajuste cosmético se revirtió justo al volver a este tamaño).
+     El tamaño del abanico lo da inset:0 → llena el wrapper y encoge solo. */
+  @keyframes fanOutPieLs {
+    0%        { transform: rotate(0deg) translateY(0); }
+    30%, 70%  { transform: rotate(var(--fan-angle)) translateY(calc(var(--hpie-deck-h) * -0.32)); }
+    100%      { transform: rotate(0deg) translateY(0); }
+  }
+  .table-wide .player-zone .shuffle-fan-card,
+  .table-three .player-zone .shuffle-fan-card,
+  .table-two .player-zone .shuffle-fan-card { animation-name: fanOutPieLs; }
   /* G#3: el mazo PIE ya NO ocupa la fila de cartas (vive en la col izq), así que la
      fila NO reserva hueco → las cartas usan todo el 1fr (padding-left:0, arriba). */
 
