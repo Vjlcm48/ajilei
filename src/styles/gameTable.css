@@ -2015,7 +2015,12 @@
   .game-table-screen {
     --card-w: 44px;
     --card-h: 69px;
-    padding: 6px 10px;
+    /* CH-L5 · el padding LATERAL sale a variable porque --hcards-hbudget lo resta: así
+       el presupuesto y el layout leen el MISMO valor y no pueden desfasarse (lección de
+       --pie-deck-right en CH-L2b). 10 → 6: aire puro contra el borde de pantalla; el
+       marco dorado de .game-table sigue separado y legible como marco. Libera 8px. */
+    --ls-screen-padx: 6px;
+    padding: 6px var(--ls-screen-padx);
   }
   /* FL-1 · carta IA FLUIDA (desbloqueado por SX-1). Ratio 50/32 = 1.5625 = el ACTUAL
      (piso 32→50 mantiene 640 intacto; NO el 1491/1055 de la imagen, que encogería el
@@ -2347,15 +2352,52 @@
        Pie se reancla solo con este cambio. */
     --hcol-left: 128px;
 
+    /* CH-L5 · las otras tres piezas del presupuesto, a variable por el mismo motivo que
+       --hcol-left: las lee TANTO el layout como --hcards-hbudget (abajo).
+       · --hcol-right: la columna de acciones. 150 CLAVADO por MT-1 (4 mults × 30 + 3
+         gaps × 10 = el táctil de 40 por embaldosado). No se toca; sale a variable solo
+         para que el presupuesto no la hardcodee.
+       · --hcol-gap: separa rail↔cartas y cartas↔mults. 10 → 6: siguen leyéndose como
+         bloques distintos. Libera 8px.
+       · --hcards-gap: aire entre las 5 cartas. 4 → 3 (NO 2): las cartas del humano SE
+         TOCAN para descartar, así que este gap es la frontera táctil entre objetivos
+         contiguos; 3px la mantiene cómoda. Libera 4px. */
+    --hcol-right: 150px;
+    --hcol-gap: 6px;
+    --hcards-gap: 3px;
+
     /* G#3 · CARTAS DEL HUMANO — TAMAÑO FLUIDO (aprovechan la columna central 1fr).
        Manda lo que llegue primero: el ancho disponible repartido entre 5 cartas, o el
        tope vertical de la banda. Proporción REAL de la carta = 1055 × 1491 (w×h).
-       --hcards-hbudget = px fijos que NO son carta dentro de 100vw: padding de pantalla
-       (10+10) + padding de la mesa (12+12) + col izq + col botones (150) + 2 column-gap
-       (10+10) + 4 gaps entre cartas (4·4). El mazo PIE ya NO reserva hueco en la fila
-       (vive en la col izq), por eso no se suma padding-left aquí.
-       --card-w se deriva de --card-h por la proporción → un solo origen, sin desfases. */
-    --hcards-hbudget: calc(20px + 24px + var(--hcol-left) + 150px + 20px + 16px);
+       --hcards-hbudget = los px que NO son carta dentro de 100vw. El mazo PIE no reserva
+       hueco en la fila (vive en la col izq, absoluto), por eso no se suma aquí.
+       --card-w se deriva de --card-h por la proporción → un solo origen, sin desfases.
+
+       CH-L5 · CORREGIDO a la CADENA REAL de cajas (medida en CH-L4). Antes decía
+       calc(20 + 24 + hcol + 150 + 20 + 16) = 358, y estaba mal por DOS motivos:
+        · Cobraba los 24 del padding lateral de .game-table, que el margin −12/−12 de
+          .player-zone REEMBOLSA. Probado forzando el padding a 4/12/20px: el grid queda
+          invariante ("128px 310px 150px") porque zone = table − 2·borde, y el padding se
+          cancela. Era un peaje que nadie pagaba. (Ese padding SÍ importa para las otras
+          filas —paneles de IA y óvalo—, que no llevan margen negativo: por eso no se toca.)
+        · Omitía 12px que sí se pagan: el borde de .game-table (2+2), el borde y padding
+          propios de .player-zone (1+1 + 2+2) y 2px fuera de .game-table-screen.
+       Neto: sobrestimaba en 12 → las cartas dejaban 12px MUERTOS en la pista 1fr
+       (medido: pista 310, cartas+gaps 298). Corregirlo no recorta nada visual: solo deja
+       de regalar esos 12px.
+       Cada término deriva de la VARIABLE que gobierna su regla de layout → presupuesto y
+       layout no pueden desfasarse (lección de --pie-deck-right en CH-L2b). Los px sueltos
+       son bordes de reglas base, fuera de este bloque. */
+    --hcards-hbudget: calc(
+      2px                              /* fuera de .game-table-screen */
+      + var(--ls-screen-padx) * 2      /* padding lateral de .game-table-screen */
+      + 4px                            /* borde de .game-table (2+2) = el marco dorado */
+      + 6px                            /* .player-zone: borde (1+1) + padding (2+2) */
+      + var(--hcol-left)               /* columna izq: rail (saldo/badges/timer) */
+      + var(--hcol-gap) * 2            /* los 2 column-gap del grid del rail */
+      + var(--hcol-right)              /* columna der: acciones + mults (MT-1) */
+      + var(--hcards-gap) * 4          /* los 4 gaps entre las 5 cartas */
+    );
     --hcards-vspace: calc(45dvh - 40px);   /* tope vertical ≈ alto útil de la banda humana */
 
     /* CH-L2a · DEFINICIÓN de la carta IA fluida (FL-1), subida aquí desde .opp-panel
@@ -2412,7 +2454,7 @@
   .table-two .player-zone {
     flex: 4.5 1 0;   /* C5.4: banda del humano más alta (más cargada) */
     display: grid;
-    grid-template-columns: var(--hcol-left) 1fr 150px;   /* G#3: col izq = var (saldo 7 díg. 1 línea); centro 1fr = cartas; der 150px = botones */
+    grid-template-columns: var(--hcol-left) 1fr var(--hcol-right);   /* G#3: col izq = rail; centro 1fr = cartas; der = acciones/mults. CH-L5: ambas por variable → --hcards-hbudget lee los MISMOS valores */
     /* G#3: la fila del cronómetro (1ª) reserva SIEMPRE su alto (28px) aunque el
        cronómetro solo se renderice en el turno del jugador. Así el bloque del rail
        mantiene un alto constante y align-content:center no lo recentra al aparecer/
@@ -2425,7 +2467,7 @@
       "tags  mano acciones";
     align-content: center;
     align-items: center;
-    column-gap: 10px;
+    column-gap: var(--hcol-gap);   /* CH-L5: mismo valor que resta --hcards-hbudget */
     row-gap: 3px;
     /* G#3 (Opción B): antes overflow:hidden recortaba la parte ALTA del barajado del
        mazo PIE (fanOut sube ~16px sobre el borde del área). Se libera a visible para
@@ -2573,7 +2615,7 @@
     justify-content: center;   /* G#3: cuando el ALTO limita, el grupo queda centrado entre las dos anclas; cuando llena, va pegado */
     align-items: center;
     flex-wrap: nowrap;
-    gap: 4px;                  /* G#3: respiro mínimo entre cartas (6→4); coherente con --hcards-hbudget (4·4) */
+    gap: var(--hcards-gap);    /* CH-L5: mismo valor que resta --hcards-hbudget (×4) → no pueden desfasarse */
     padding: 0;                /* G#3: sin padding → las cartas usan todo el 1fr */
   }
   /* G#3 · box-sizing:border-box SOLO en slots/cartas del humano en landscape → el
