@@ -2131,34 +2131,38 @@
   .table-three .opp-cards,
   .table-two .opp-cards    { padding: 2px 0 1px; }
 
-  /* ── MZ-2 · MAZO de la IA (Pie) REDUCIDO y FLUIDO en landscape (mesas 5/4/3) ──────
-     El mazo IA seguía a --opp-card 1:1 (mesa 5 a ×0.85) → dominaba el panel al crecer
-     con FL-1/CH-L2a. Lo bajamos a ×0.45 de --opp-card. Escala fluida: ~14.4×22.5 a 640
-     → ~20.7×32.4 a 932, proporcional a los paneles. La BARAJA (.shuffle-fan-card) se
-     acopla al mismo tamaño para que el barajado no se salga del mazo.
+  /* ── MZ-2b · MAZO de la IA (Pie) en landscape = MAZO DE PORTRAIT (mesas 5/4/3) ─────
+     = mazo portrait, unificación de vistas (MZ-2b). El mazo seguía a --opp-card (mesa 5
+     a ×0.85) y crecía con FL-1/CH-L2a hasta dominar el panel. DECISIÓN: deja de escalar
+     con FL-1 — toma el TAMAÑO FIJO de portrait, para que el mismo teléfono vea el mismo
+     mazo al rotar. Valores MEDIDOS en portrait (arnés, mesas 5/4/3 — allí son iguales
+     entre mesas, así que basta una regla):
+       · 27×42  → portrait de pantalla alta (regla base de portrait, gameTable.css:1478)
+       · 21×32  → portrait de pantalla corta (@media max-height:772, gameTable.css:1897)
+     ESPEJO DEL BREAKPOINT: en portrait el corte lo marca la dimensión LARGA (su alto);
+     rotado, esa dimensión es el ANCHO → @media (max-width:772px) reproduce el mismo
+     corte. Así 640×360 ↔ portrait 360×640 = 21×32, y 844/932 ↔ 390×844 / 430×932 = 27×42.
+     La BARAJA (.shuffle-fan-card) toma los mismos valores (portrait también los iguala).
+     Borde/radio/sombra NO se tocan → heredan los de siempre (2px / 8px / sombra en
+     escalera), idénticos a portrait.
      MESA 2 EXCLUIDA (:not(.table-two)): su mazo IA está sellado a --pie-deck (32×50) en
-     ESPEJO del mazo del humano-Pie (simetría G#3, más abajo) — no es un mazo de panel y
-     su token es var(--card-w) (espejo), así que ×0.45 ni uniformaría ni respetaría la
-     simetría. Se deja intacto por decisión del usuario.
+     ESPEJO del mazo del humano-Pie (simetría G#3, más abajo). Se deja intacto por
+     decisión de Victor.
      Especificidad 0,5,0 (game-table-screen + game-table + :not(.table-two) + deck-pile +
      opp-deck) para VENCER a .table-five .deck-pile.opp-deck (0,3,0) de opponentPanel.css
      sin tocar ese archivo. SOLO .opp-deck → el mazo del humano (Pie, .player-zone
      .deck-pile) NO se toca. Portrait/escritorio fuera de este @media → tokens intactos. */
   .game-table-screen .game-table:not(.table-two) .deck-pile.opp-deck,
   .game-table-screen .game-table:not(.table-two) .opp-deck-wrapper .shuffle-fan-card {
-    width: calc(var(--opp-card-w) * 0.45);
-    height: calc(var(--opp-card-h) * 0.45);
+    width: 27px;
+    height: 42px;
   }
-  /* Estética del propio mazo, escalada al tamaño reducido (a 18px, el borde 2px / radio
-     8px / sombra en escalera 1-4px de opponentPanel.css se veían toscos). SOLO el mazo:
-     borde 1px, radio 4px y una sombra apilada más leve (mantiene el guiño de "varias
-     cartas" sin goterón). No toca la baraja en vuelo ni la geometría del ancla. */
-  .game-table-screen .game-table:not(.table-two) .deck-pile.opp-deck {
-    border-width: 1px;
-    border-radius: 4px;
-    box-shadow:
-      1px 1px 0 0 #8B0000,
-      2px 2px 2px rgba(0, 0, 0, 0.35);
+  @media (max-width: 772px) {
+    .game-table-screen .game-table:not(.table-two) .deck-pile.opp-deck,
+    .game-table-screen .game-table:not(.table-two) .opp-deck-wrapper .shuffle-fan-card {
+      width: 21px;
+      height: 32px;
+    }
   }
 
   /* ── Franja de mesa / pozo — FELT EN FORMA DE ESTADIO (C5.3) ──
