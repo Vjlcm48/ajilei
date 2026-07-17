@@ -293,6 +293,14 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const aliveN       = game.aliveCount
   const isLandscapeTable = useIsLandscapeTable()
   const isPortraitTable  = useIsPortraitTable()
+  // AJ-1 · SOLO landscape mesa 5: AJILEI + "Mano #N" bajan de la cabecera a
+  // .table-mid. El bloque debe centrarse en la franja IA↔humano, y esa franja se
+  // define DENTRO de .table-mid: colgando de ahí, su 50% ya es el de la franja y
+  // el centrado sale de la caja, sin constantes de viewport. Desde la cabecera
+  // (hermana de .table-mid) era imposible: un absoluto solo resuelve contra un
+  // ANCESTRO posicionado. Condicionado porque el <header> es común a las 4 mesas
+  // y a las 3 orientaciones — y en mesa 2 portrait no existe .table-mid.
+  const brandInMid = isLandscapeTable && aliveN === 5
   const effLayout    = effectiveLayout(game.players)
   const isGameOver   = phase === PHASES.GAME_OVER
   const isDealPhase  = phase === PHASES.DEAL_2 || phase === PHASES.DEAL_3
@@ -1073,6 +1081,22 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     )
   }
 
+  // AJ-1 · AJILEI + "Mano #N" — fuente ÚNICA, montada en la cabecera o dentro de
+  // .table-mid según brandInMid. El markup es idéntico en ambos sitios: solo cambia
+  // el padre, que es lo que decide contra qué caja se centran.
+  function renderBrand() {
+    return (
+      <>
+        <h1 className="table-title">AJILEI</h1>
+        <div className="header-center">
+          <span className="hand-badge" style={{ visibility: game.handCount > 0 ? 'visible' : 'hidden' }}>
+            Mano #{game.handCount > 0 ? game.handCount : '—'}
+          </span>
+        </div>
+      </>
+    )
+  }
+
   function renderCenterZone() {
     const centerMsg  = discardMsg ?? game.message
     // El resultado (winner) conserva su estilo win/lose; solo fuera de él
@@ -1174,12 +1198,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}${aliveN === 2 ? ' table-two' : ''}`}>
 
         <header className="table-header">
-          <h1 className="table-title">AJILEI</h1>
-          <div className="header-center">
-            <span className="hand-badge" style={{ visibility: game.handCount > 0 ? 'visible' : 'hidden' }}>
-              Mano #{game.handCount > 0 ? game.handCount : '—'}
-            </span>
-          </div>
+          {/* AJ-1 · en landscape mesa 5 este bloque se monta dentro de .table-mid
+              (ver brandInMid); en cualquier otro caso vive aquí, como siempre. */}
+          {!brandInMid && renderBrand()}
           <div className="header-right">
             <MuteButton />
             <SoundButton className="btn-leave" onClick={() => setConfirmLeave(true)} title="Abandonar mesa">✕</SoundButton>
@@ -1223,6 +1244,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         )}
         {aliveN >= 3 && (
           <div className={`table-mid${reflowing ? ' reflow-settle' : ''}`}>
+            {/* AJ-1 · absoluto (lo saca .table-brand en CSS) → NO es ítem del grid
+                y no desplaza a ninguna IA. Solo monta en landscape mesa 5. */}
+            {brandInMid && <div className="table-brand">{renderBrand()}</div>}
             <div className="side-col side-col-left">{seatsAt('side-left').map(renderPanel)}</div>
             <div className="mid-center">
               {renderRivalsTopRow()}

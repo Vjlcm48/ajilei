@@ -2910,48 +2910,70 @@
     transform: none;
     z-index: 20;
   }
-  /* Con title y header-right fuera del flujo, el badge de fase queda solo en la
-     cabecera → centrado arriba. */
+  /* AJ-1 · regla INERTE desde que AJILEI/"Mano #N" bajaron a .table-mid: en mesa 5 la
+     cabecera ya solo contiene .header-right, cuyos hijos (bocina y ✕) son absolutos →
+     no queda nada en flujo que centrar. Se conserva por si alguna pieza vuelve al flujo. */
   .table-five .table-header { justify-content: center; }
 
-  /* (3) Logo AJILEI: sale de la esquina superior izquierda (donde rozaba IA4) y
-     baja al margen izquierdo de la franja central, a la izquierda del POZO y
-     alineado verticalmente con él (el centro del óvalo ≈ el centro vertical de la
-     mesa, de ahí top:50%). Absoluto → no se duplica ni deja rastro en la esquina,
-     y el solape con IA4 desaparece (IA4 vive en la fila superior, este queda en la
-     central). */
-  /* F12: AJILEI anclado por su BORDE SUPERIOR a la línea del tope del óvalo (mismo
-     offset que la bocina → ambos topes alineados con el tope del óvalo). */
+  /* (C5.3 · 3) AJILEI vive en la franja central y NO en la esquina superior izquierda:
+     allí rozaba a IA4, que ocupa la fila de arriba. Ese motivo sigue vigente y es lo
+     que AJ-1 conserva — solo cambia CÓMO se coloca dentro de la franja. */
+  /* AJ-1 · AJILEI y "Mano #N" dejan de posicionarse por separado: bajan a .table-mid
+     dentro de .table-brand (GameTable.jsx · brandInMid) y FLUYEN dentro de él. Lo que
+     se centra es el bloque, no cada pieza → ya no pueden desfasarse entre sí.
+     Historia: F12 los ancló a 50%−24 / 50%+1 de .game-table "alineados con el tope del
+     óvalo". Medido, ese anclaje derivaba 6.4 / 4.9 / 2.9px según el viewport: el tope
+     del óvalo se mueve con la altura de los paneles de IA y un 50% fijo no lo sigue. */
   .table-five .table-title {
-    position: absolute;
-    left: 12px;
-    top: calc(50% - 24px);
-    transform: none;
+    position: static;
     margin: 0;
     white-space: nowrap;
+  }
+
+  /* AJ-1 · CAJA DE REFERENCIA. .table-mid abarca exactamente el contexto de la franja:
+     su tope es el de la fila de IAs y su pie el del óvalo. Colgar de aquí es lo que
+     evita cualquier constante de viewport (dvh). Verificado: no re-ancla a nadie — los
+     12 descendientes absolutos de .table-mid ya resuelven contra .opp-panel (relative). */
+  .table-five .table-mid { position: relative; }
+
+  /* AJ-1 · el bloque se centra en la franja POR LA CAJA, no por una fórmula de posición:
+       top    = pie de la fila de IAs = altura del panel = var(--opp-card-h) + 76
+       bottom = -4px  → el pie de la franja (.player-zone) cae 4px por DEBAJO de .table-mid
+       margin-block:auto + height:fit-content → el navegador reparte el sobrante a partes
+     iguales. Sin alto de bloque hardcodeado: si el texto o su line-height cambian, sigue
+     centrado solo. `absolute` lo saca del grid de .table-mid → no desplaza ninguna IA.
+
+     DEUDA DECLARADA · el 76 es el CROMO del panel de IA (nombre + saldo + paddings):
+     altura del panel = var(--opp-card-h) + 76, medido por perturbación (12/12 — 4 tamaños
+     de carta × 3 viewports, constante e independiente del viewport). Ese cromo vive en
+     opponentPanel.css, archivo que NO tocamos y del que esta fórmula depende: si cambia
+     allí, ESTO SE DESFASA EN SILENCIO y hay que recalibrar el 76 aquí. No es derivable de
+     ninguna variable nuestra. Misma lección que --pie-deck-right en CH-L2b. */
+  .table-five .table-brand {
+    position: absolute;
+    left: 0;               /* .table-mid ya está 12px dentro de .game-table → x=21, el de hoy */
+    top: calc(var(--opp-card-h) + 76px);
+    bottom: -4px;
+    margin-block: auto;
+    height: fit-content;
+    /* AJ-1 · CAJA ≠ TINTA. margin-block:auto centra la CAJA, pero la caja NO es simétrica
+       respecto al texto que se ve: el h1 deja 1px de half-leading arriba y el badge 6.2px
+       abajo (font 10px con line-height heredado de 23.2px). Centrar la caja dejaría la
+       tinta 5.2px descentrada (medido: 1.5 arriba / 6.7 abajo). Este translate corrige
+       justo la mitad de esa diferencia — (6.2 − 1)/2 — y deja la TINTA equidistante.
+       Se corrige aquí y no tocando el line-height del badge para no alterar la métrica
+       del texto, de la que dependen portrait y escritorio (misma clase, mismo elemento). */
+    transform: translateY(2.6px);
     z-index: 20;
   }
 
-  /* (C5.4 · 3) "Mano #N" debajo del logo AJILEI (mismo margen izquierdo), no en el
-     tope-centro. Absoluto, alineado a la izquierda con AJILEI. */
-  /* F13: "Mano #N" a la DERECHA de AJILEI (misma línea), no debajo. left:88px lo
-     coloca tras el logo (≈12px + ancho de "AJILEI" + aire); top ligeramente por
-     debajo del de AJILEI para igualar la línea base (10px vs 16px). Ambos knobs
-     (left, top) afinables en validación. */
-  /* SX-1 · "Mano #N" BAJO el logo AJILEI (left:12 = mismo margen), no a su derecha.
-     En F13 vivía a la derecha de AJILEI (left:88) y a 640 caía sobre el óvalo/POZO
-     (x100+) invadiendo ~15px de la pot-box — porque el óvalo, centrado, tiene su borde
-     izquierdo en x100 a 640 (se corre a la derecha al ensanchar, por eso 844/932 no
-     colisionaban). Alineado a la izq con AJILEI (x25-65) queda SIEMPRE a la izquierda
-     del óvalo y, bajo el logo, sobre las cartas del humano — despeja en los 3 tamaños.
-     top:50%+1 lo pone justo debajo de AJILEI (top:50%−24, alto ~23 → fondo ~50%−1). */
-  .table-five .hand-badge {
-    position: absolute;
-    left: 12px;
-    top: calc(50% + 1px);
-    transform: none;
-    z-index: 20;
-  }
+  /* SX-1 · "Mano #N" va BAJO AJILEI y alineado a su izquierda, NUNCA a su derecha: en
+     F13 vivía en left:88 y a 640 caía sobre el óvalo/POZO invadiendo ~15px de la pot-box
+     (el óvalo, centrado, tiene su borde izquierdo en x100 a 640; se corre a la derecha al
+     ensanchar, por eso 844/932 no colisionaban). La restricción sigue viva y ahora la
+     garantiza la ESTRUCTURA: comparte caja con AJILEI, así que hereda su x por construcción. */
+  /* AJ-1 · estático: fluye bajo AJILEI dentro de .table-brand, que es quien se centra. */
+  .table-five .hand-badge { position: static; }
 
   /* El óvalo se estrecha con canaletas simétricas para dejar holgura al logo a su
      izquierda (y seguir centrado, con el POZO al medio). Sigue siendo estadio a
