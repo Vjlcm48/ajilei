@@ -2986,9 +2986,27 @@
      queda por encima por el z-index de .opp-panel (abajo). */
   /* C5.4 encuadre: óvalo ~10% más estrecho (márgenes 100→128) → extremos más
      adentro, despejando del todo IA4/IA1; sigue centrado (márgenes simétricos). */
+  /* OVL-5 · ANCHO CONSTANTE Y MÁXIMO. Antes el óvalo se dimensionaba POR CONTENIDO:
+     como ítem de grid heredaba justify-self:center de .table-mid (justify-items:center)
+     → shrink-to-fit, y con flex-wrap:nowrap + .game-message flex:1 su ancho seguía a la
+     frase (salto medido ~12px @640, ~125px @844). justify-self:stretch anula ese center
+     → el óvalo LLENA su celda (grid-column 1/-1) menos los márgenes, ancho ya
+     independiente del texto.
+     Márgenes CALIBRADOS por medición (arnés, 640×360, mesa 5) al flanco REAL + 8px de
+     respiro — asimétricos entre sí porque los flancos lo son:
+       left  = (borde der. AJILEI 76.2 + 8) − borde izq. área de grid 21   = 63
+       right = borde der. área de grid 619 − (borde izq. bocina 578.4 − 8) = 49
+     El área de grid está a 21px CONSTANTES de cada borde de pantalla y los flancos a
+     offset fijo (AJILEI a 76 del izq., bocina a ~62 del der.), así que estos px fijos
+     rinden 8±1 de respiro tanto a 640 como a 844 (GATE de invarianza verificado). El
+     centro del óvalo queda ~7px a la derecha del centro del viewport: es consecuencia
+     directa de la asimetría de los flancos (respiros simétricos = óvalo no centrado al
+     viewport), no un defecto. El centrado del CONTENIDO lo sigue haciendo solo el
+     flex:1 del .game-message. Alto/padding/line-height del óvalo SIN cambios. */
   .table-five .center-zone {
-    margin-left: 128px;
-    margin-right: 128px;
+    justify-self: stretch;
+    margin-left: 63px;
+    margin-right: 49px;
   }
 
   /* (C5.4 · 1) Garantía: los paneles de IA (position:relative) se pintan por encima
