@@ -2861,7 +2861,25 @@
      hay descendientes que dependan de un ancestro estático aquí (las flying-card
      son position:fixed y viven fuera de .game-table; pot-float y elim-notice ya
      tienen su propio ancestro relativo). */
-  .game-table.table-five { position: relative; }
+  /* OVL-5b · ancho VISIBLE constante del óvalo, TOPADO en 486px y CENTRADO EN EL HUECO
+     (entre AJILEI y la bocina), MEDIDO en el piso 640×360 (arnés). NO se centra al
+     viewport: los flancos están a offset fijo pero ASIMÉTRICO desde los bordes de
+     pantalla (AJILEI ~76 del izq., bocina ~62 del der.), así que "centrado al viewport"
+     obligaría un ancho de 472 que hace derramar el texto (umbral de derrame medido = 482;
+     el mensaje de descarte más largo pasa a 4 líneas y sobresale). Centrar en el HUECO
+     mantiene 486 (≥ umbral, sin derrame) y equidistante de ambos flancos.
+     Márgenes RELATIVOS AL ÁREA DE GRID (inset constante 21px/lado, GATE verificado a 640
+     y 844), = flanco + 8 de respiro:
+       --ovl5-ml = AJILEI.r 76.2 + 8 − G0 21 = 63
+       --ovl5-mr = G1 619 − (bocina.x 578.4 − 8)= 49
+     El óvalo queda +7.3px del centro geométrico del viewport, CONSTANTE en todo tamaño
+     (es el centrado correcto respecto a lo que enmarca el óvalo, no un defecto). */
+  .game-table.table-five {
+    position: relative;
+    --ovl5-w: 486px;      /* ancho VISIBLE (border-box); umbral de derrame de texto = 482 */
+    --ovl5-ml: 63px;      /* flanco AJILEI + respiro 8, relativo al área de grid */
+    --ovl5-mr: 49px;      /* flanco bocina + respiro 8, relativo al área de grid */
+  }
 
   /* (C5.3 cierre · 1) La ✕ (cerrar) queda SOLA en la esquina superior derecha y la
      bocina (sonido) baja al margen derecho del óvalo — espejo de AJILEI. Para que
@@ -2986,27 +3004,30 @@
      queda por encima por el z-index de .opp-panel (abajo). */
   /* C5.4 encuadre: óvalo ~10% más estrecho (márgenes 100→128) → extremos más
      adentro, despejando del todo IA4/IA1; sigue centrado (márgenes simétricos). */
-  /* OVL-5 · ANCHO CONSTANTE Y MÁXIMO. Antes el óvalo se dimensionaba POR CONTENIDO:
-     como ítem de grid heredaba justify-self:center de .table-mid (justify-items:center)
-     → shrink-to-fit, y con flex-wrap:nowrap + .game-message flex:1 su ancho seguía a la
-     frase (salto medido ~12px @640, ~125px @844). justify-self:stretch anula ese center
-     → el óvalo LLENA su celda (grid-column 1/-1) menos los márgenes, ancho ya
-     independiente del texto.
-     Márgenes CALIBRADOS por medición (arnés, 640×360, mesa 5) al flanco REAL + 8px de
-     respiro — asimétricos entre sí porque los flancos lo son:
-       left  = (borde der. AJILEI 76.2 + 8) − borde izq. área de grid 21   = 63
-       right = borde der. área de grid 619 − (borde izq. bocina 578.4 − 8) = 49
-     El área de grid está a 21px CONSTANTES de cada borde de pantalla y los flancos a
-     offset fijo (AJILEI a 76 del izq., bocina a ~62 del der.), así que estos px fijos
-     rinden 8±1 de respiro tanto a 640 como a 844 (GATE de invarianza verificado). El
-     centro del óvalo queda ~7px a la derecha del centro del viewport: es consecuencia
-     directa de la asimetría de los flancos (respiros simétricos = óvalo no centrado al
-     viewport), no un defecto. El centrado del CONTENIDO lo sigue haciendo solo el
-     flex:1 del .game-message. Alto/padding/line-height del óvalo SIN cambios. */
+  /* OVL-5b · ANCHO VISIBLE CONSTANTE (486), TOPADO y CENTRADO EN EL HUECO AJILEI↔bocina.
+     Continuación de OVL-5: el width EXPLÍCITO anula el shrink-to-fit (causa raíz del
+     dimensionamiento por contenido: grid item con justify-self:center + flex-wrap:nowrap
+     + .game-message flex:1). box-sizing:border-box → width = ancho VISIBLE directo (486);
+     es inocuo en el eje vertical porque el padding-vertical de esta center-zone es 0
+     (.table-wide .center-zone padding-top/bottom:0) y el min-height (20/42) no es
+     vinculante → alto medido 37.8 idéntico, sin cambio.
+       width = min(--ovl5-w, 100% − --ovl5-ml − --ovl5-mr)   [border-box; 100% = área grid]
+     La alineación de un ítem de grid opera sobre su MARGIN-BOX: con márgenes ASIMÉTRICOS
+     (63≠49) y justify-self:center, el border-box se desplaza (ml−mr)/2 = +7px respecto al
+     centro del área de grid → cae en el centro del HUECO (equidistante de ambos flancos:
+     7.8/8.4 en el piso, 110/110 a 844), no del viewport.
+     PISO (640×360): ambos términos del min() = 486 por construcción → respiro 8/8 sin
+     derrame (486 ≥ umbral 482). POR ENCIMA del piso manda --ovl5-w (486 visible fijo →
+     respiros crecen equidistantes, el óvalo ya no se estira). POR DEBAJO del piso (no
+     soportado) el 2º término degrada fluido en vez de desbordar.
+     Centrado del CONTENIDO: lo sigue haciendo solo el flex:1 del .game-message.
+     Alto/padding/line-height del óvalo SIN cambios. */
   .table-five .center-zone {
-    justify-self: stretch;
-    margin-left: 63px;
-    margin-right: 49px;
+    box-sizing: border-box;
+    justify-self: center;
+    width: min(var(--ovl5-w), calc(100% - var(--ovl5-ml) - var(--ovl5-mr)));
+    margin-left: var(--ovl5-ml);
+    margin-right: var(--ovl5-mr);
   }
 
   /* (C5.4 · 1) Garantía: los paneles de IA (position:relative) se pintan por encima
