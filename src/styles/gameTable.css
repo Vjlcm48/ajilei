@@ -2170,6 +2170,40 @@
     }
   }
 
+  /* ── MZL-5 · MAZO de la IA REANCLADO a la IZQUIERDA de su panel (solo mesa 5 ls) ─────
+     MOVIMIENTO PURO: el mazo conserva tamaño (MZ-2b, arriba) y todas sus dinámicas.
+     Antes lo colocaba DECK_ANCHORS por asiento: .opp-deck-anchor-inner-right (mazo a la
+     DERECHA: side-left/top-left) o -inner-left (a la IZQUIERDA: top-right/side-right),
+     ambos con 8px de separación y centrado vertical. Aquí se unifica: SIEMPRE a la
+     izquierda, en contacto, y con el tope alineado al header del panel.
+     Esta regla (0,2,0) VENCE por especificidad a las globales .opp-deck-anchor-* (0,1,0)
+     de opponentPanel.css:141-151, que NO se tocan (las comparten mesas 2/3/4 y portrait).
+     Hay que resetear las CUATRO propiedades para neutralizar ambos anchors.
+     El absoluto resuelve contra el PADDING-BOX del panel (.opp-panel es position:relative):
+       · right: calc(100% + 1px) → 100% deja el borde derecho del mazo en el borde IZQ del
+         padding-box; el +1px (borde del panel, .opp-panel border:1px) lo lleva al borde
+         IZQ del BORDER-BOX → contacto exacto, bordes besándose sin taparse.
+       · top: 3px → el padding-box ya absorbe el borde, así que basta el padding-top del
+         panel (declarado en .table-wide/.table-three/.table-two .opp-panel, más arriba en
+         este mismo @media) para alinear el tope del mazo con el del HEADER del panel.
+     ALINEA AL HEADER, NO AL NOMBRE (decisión MZL-5): el tope del NOMBRE está además
+     desplazado por el centrado vertical del header — (header.h − name.h)/2 — donde name.h
+     es el LEADING HEREDADO del root (`font: 18px/145%` en index.css, con font-size:16px
+     bajo 1024px). Ese término NO es declarado y NO es constante: vale 3.4px hasta 1024px
+     de ancho pero 1.95px por encima (leading 23.2 → 26.1), y ahí el badge supera el
+     min-height:30 del header y lo estira solo en el panel CON badge (= el del Pie), dando
+     un offset distinto al de sus hermanos. Alinear al header usa solo valores declarados y
+     queda idéntico en los 4 asientos y en TODO el espectro landscape (verificado a
+     640/844/1000/1280). El mazo queda ~2–3.4px por encima del tope del nombre.
+     Alcanza los 4 wrappers, pero solo el del Pie es visible y los vuelos leen únicamente
+     deckRefs[pieIndex] (rect en runtime) → inocuo. */
+  .table-five .opp-deck-wrapper {
+    right: calc(100% + 1px);
+    left: auto;
+    top: 3px;
+    transform: none;
+  }
+
   /* ── Franja de mesa / pozo — FELT EN FORMA DE ESTADIO (C5.3) ──
      ALTURA FIJA MÍNIMA (de C5.1): el pozo no se aplasta al rotar el turno (ley de
      anclaje). El felt es un racetrack/estadio a ancho completo: border-radius 999px
