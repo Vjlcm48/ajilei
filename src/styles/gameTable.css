@@ -1991,6 +1991,82 @@
        propio 8px (fuera de este media query). */
     .comodin-note { font-size: 8px; padding: 2px 8px; line-height: 1.2; }
   }
+
+  /* ══ PV-5 · ESCALA AFÍN de los paneles IA — mesa 5 PORTRAIT ════════════════
+     Sustituye las constantes por breakpoint (carta 40/30, mazo 27/21, fila
+     130/114) por un motor indexado al ANCHO REAL DE COLUMNA: panel, carta,
+     mazo y fila escalan con un ÚNICO factor k. Ningún valor derivado se
+     hardcodea por breakpoint.
+
+     POR QUÉ. El diagnóstico PV-5 midió que el disparador del crecimiento no
+     era el ancho de pantalla sino el gate @media (max-height: 772px): al
+     cruzarlo, carta y mazo saltaban (30→40, 21→27) mientras el panel seguía
+     clavado en 140 de contenido → el mazo invadía 16px del abanico en TODA
+     pantalla alta (medido idéntico en 344×882, 360×773, 390×844, 412×915 y
+     430×932; el ancho era irrelevante).
+
+     GEOMETRÍA DE REFERENCIA (360×640, el piso). Con C = ancho de CONTENIDO del
+     panel, mazoBB = mazo + 4 de borde y abanico = 3·carta (solape −0.5 de
+     :1350), la holgura entre el extremo del abanico y el mazo es:
+         aire = C/2 + 5 − mazoBB − 1.5·carta
+     En el piso: 70 + 5 − 25 − 45 = 5px. El equilibrio C/2 = mazoBB + 1.5·carta
+     es EXACTO, así que si C, carta y mazo escalan juntos el término en k se
+     anula y la composición se conserva a cualquier tamaño: aire = 4k + 1.
+     Esa es la invariante que este bloque preserva.
+
+     k SE DERIVA DE LA COLUMNA, no de un umbral:
+         .game-table = 100vw − 18        (padding 9 por flanco)
+         .table-mid  = .game-table − 24  (padding 12 por flanco)
+         columna     = (.table-mid − gap) / 2
+         C           = columna − 18      (padding 16 + borde 2 del panel)
+     Calibrado para que 360 dé k = 1 EXACTO (piso intacto):
+         k = (50vw − 40) / 140   →   360: 1.000 · 390: 1.107 · 430: 1.250
+
+     UNIDAD. CSS no sabe dividir longitud entre longitud para dar un número, así
+     que --pv5-k es una LONGITUD en px cuyo VALOR NUMÉRICO es k, y todo lo
+     demás es calc(N * var(--pv5-k)). Techo 1.25 (se alcanza justo en 430);
+     piso 0.85 para teléfonos de <318px, donde manda la columna real.
+
+     EL GATE 772 QUEDA OBSOLETO SOLO PARA MESA 5: este bloque va DESPUÉS del
+     bloque CV y con especificidad igual o mayor, así que gana a ambos lados
+     del umbral y la transición se vuelve continua. CV no se toca y sigue
+     gobernando mesas 4/3/2.
+
+     DEUDA PV-5: el mazo portrait de mesa 5 pasa a ser dinámico; la promesa de
+     MZ-2b (mismo mazo al rotar el teléfono, :2162-2171) queda temporalmente
+     rota. Desvío MEDIDO del ancho del mazo al rotar el mismo teléfono:
+         360×640 ↔ 640×360 → 21.0 vs 21   = 0px (el piso no tiene deuda)
+         430×932 ↔ 932×430 → 26.3 vs 27   = 0.7px
+         390×844 ↔ 844×390 → 23.3 vs 27   = 3.7px  ← peor caso
+     Unificar landscape con esta misma fórmula es tanda futura, tras cerrar
+     mesas 4/3. El bloque MZ-2b NO se ha tocado.
+
+     Fuentes, labels, ficha de esquina y anclaje del mazo (right/bottom 3px)
+     son CONSTANTES por doctrina FL-1: solo escala la geometría de las cajas. */
+  .game-table.table-five {
+    --pv5-k: clamp(0.85px, calc((50vw - 40px) / 140), 1.25px);
+    --o1-row-h: calc(114 * var(--pv5-k));
+  }
+  /* 0-3-0 + orden de fuente posterior → vence a :1325 (base) y a :1891 (CV),
+     ambos `.game-table-screen .table-wide .opp-panel`. Ninguno de los dos se
+     edita: mesas 4 y 3 los conservan intactos. */
+  .game-table.table-five .opp-panel {
+    --opp-card-w: calc(30 * var(--pv5-k));
+    --opp-card-h: calc(47 * var(--pv5-k));
+    /* min() contra la columna real: el panel nunca desborda su celda aunque la
+       referencia pida más. Resuelve el desbordamiento preexistente de los
+       teléfonos estrechos y altos (344×882 se salía 9px). El −18 descuenta
+       padding 16 + borde 2 porque .opp-panel es content-box. */
+    max-width: min(calc(140 * var(--pv5-k)), calc(100% - 18px));
+  }
+  /* 0-4-0 + orden posterior → vence a :1478 (base) y a :1897 (CV), y por
+     especificidad a `.table-five .deck-pile.opp-deck` de opponentPanel.css
+     (0-3-0). El abanico del barajado escala solidario con el mazo. */
+  .game-table.table-five .deck-pile.opp-deck,
+  .game-table.table-five .opp-deck-wrapper .shuffle-fan-card {
+    width: calc(21 * var(--pv5-k));
+    height: calc(32 * var(--pv5-k));
+  }
 }
 
 /* ── Teléfono HORIZONTAL (landscape) — Tanda C5.1 ────────────────────────────
