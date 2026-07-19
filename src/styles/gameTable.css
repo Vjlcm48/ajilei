@@ -2204,6 +2204,45 @@
     transform: none;
   }
 
+  /* ── MZL-5b · SOLO IA4 (side-left): mazo a la esquina INFERIOR-DERECHA del panel ─────
+     En MZL-5 el mazo de IA4 quedó a la IZQUIERDA, en el canalón del borde del viewport,
+     y el fan-out del barajado se ahogaba contra ese borde (recorte ~15px a 640). Se mueve
+     SOLO IA4 a la esquina inferior-derecha para que el fan abra hacia el interior.
+     Especificidad 0,3,0 (.table-five + .opp-side-left + .opp-deck-wrapper) → VENCE a la
+     regla MZL-5 (.table-five .opp-deck-wrapper, 0,2,0) SOLO en IA4; los otros 3 asientos
+     la conservan. .opp-side-left existe también en mesa 4, pero .table-five la excluye.
+     Resetea las 4 propiedades que MZL-5 fijó:
+       · left: calc(100% + 1px) → contacto border-box a la DERECHA del panel (el +1px = su
+         borde; espejo del right:calc(100%+1px) de MZL-5). right:auto anula el de MZL-5.
+       · bottom: -1px → ras border-box EXACTO al fondo del panel. El absoluto resuelve
+         contra el padding-box; bottom:0 dejaría el mazo 1px dentro del border-box, -1px lo
+         enrasa (verificado deck.bottom == panel.bottom, Δ0). top:auto anula el top:3px. */
+  .table-five .opp-side-left .opp-deck-wrapper {
+    left: calc(100% + 1px);
+    right: auto;
+    bottom: -1px;
+    top: auto;
+    /* transform:none se hereda de la regla MZL-5 de arriba (misma cascada) */
+  }
+
+  /* MZL-5b · Z-INDEX TEMPORAL — el fan-out del barajado de IA4 se pinta SOBRE IA3.
+     El mazo/fan de IA4 solapa el panel de IA3 (~3.3px en reposo, ~21.8px el fan a 640),
+     y como IA4 (side-left) va ANTES que IA3 (top-left) en el DOM y ambos son z-index:1,
+     IA3 lo ocluía (medido: fan visible 0%). El z-index NO puede ir en el wrapper: el panel
+     .opp-panel es position:relative+z-index:1 = contexto de apilamiento, que atrapa el
+     z-index de sus hijos (medido: wrapper z → 0% igual). Hay que subir el PANEL de IA4
+     por encima de IA3, y SOLO durante el barajado — gated por :has(.shuffle-fan-card)
+     (esos nodos solo existen mientras ShuffleDeck está montado; el barajado ocurre con el
+     tablero VACÍO y es secuencial → subir el panel no oculta nada útil). z:2 queda entre
+     IA3 (1) y las capas superiores (header/AJILEI/bocina = 20). En reposo (sin la clase de
+     shuffle) IA4 vuelve a z:1 → apilamiento IDÉNTICO a MZL-5 (el sliver quieto sigue tras
+     IA3). Al arrancar el reparto ShuffleDeck se desmonta → el z-index se retira solo.
+     Especificidad 0,4,0 (:has aporta la de .shuffle-fan-card) > .table-wide .opp-panel
+     (0,2,0). Solo IA4 mesa 5 landscape. Verificado: fan visible 100%. */
+  .table-five .opp-side-left.opp-panel:has(.shuffle-fan-card) {
+    z-index: 2;
+  }
+
   /* ── Franja de mesa / pozo — FELT EN FORMA DE ESTADIO (C5.3) ──
      ALTURA FIJA MÍNIMA (de C5.1): el pozo no se aplasta al rotar el turno (ley de
      anclaje). El felt es un racetrack/estadio a ancho completo: border-radius 999px
