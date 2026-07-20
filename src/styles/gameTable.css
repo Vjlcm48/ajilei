@@ -2067,6 +2067,65 @@
     width: calc(21 * var(--pv5-k));
     height: calc(32 * var(--pv5-k));
   }
+
+  /* ══ PV-4 · ESCALA AFÍN de los paneles IA — mesa 4 PORTRAIT ════════════════
+     Trasplante del motor PV-5 a mesa 4. El diagnóstico PV-4 midió que mesa 4
+     reproduce el síntoma de mesa 5 EXACTAMENTE: mismo gate @media
+     (max-height: 772px), mismo salto de carta/mazo (30→40, 21→27) con el panel
+     clavado en 140 de contenido, y el mismo solape de −16px invariante al ancho
+     en 360×773, 344×882, 390×844, 412×915 y 430×932 (−17.5 en 320×800).
+
+     MISMA CALIBRACIÓN, TOKEN PROPIO. Las columnas de mesa 4 son idénticas a las
+     de mesa 5 (ambas `.table-wide`, grid 1fr 1fr, mismo padding y gap), y su
+     piso 360×640 satisface el MISMO equilibrio exacto C/2 = mazoBB + 1.5·carta
+     (70 = 25 + 45 → aire 5px, medido). Por eso la constante es la misma −40 y
+     el techo el mismo 1.25. Aun así se usa --pv4-k y no --pv5-k: son tandas
+     separadas y sus calibraciones deben poder divergir sin arrastrarse.
+
+     DOS FILAS, NO UNA. Aquí está la única adaptación estructural frente a
+     PV-5: mesa 4 no usa --o1-row-h sino el par --o1-row4-top / --o1-row4-bottom
+     (M4-8, :1211; CV :1910). Ambas escalan, ancladas a sus valores CV de piso
+     (142 y 114) para que k = 1 en 360 los reproduzca exactos. El gate 772 queda
+     obsoleto SOLO para mesa 4: por encima del umbral las filas pasan a ser
+     142k/114k en vez de las 168/130 de hoy, que es la misma continuidad que
+     PV-5 aceptó a cambio de eliminar el salto.
+
+     IA2 (`.opp-top-center`) NO necesita trato especial. Vive en celda doble
+     (`grid-column: 1 / -1`, C4.2.10 :1315), pero su panel sigue topado a 140k y
+     centrado, así que su geometría abanico↔mazo es idéntica a la de IA3/IA1: un
+     k único por mesa sigue siendo válido porque k modela el PANEL, no la celda.
+     La celda ancha solo añade felpa transparente a los flancos.
+
+     DEUDA PV-4: mazo portrait mesa 4 ahora dinámico; promesa MZ-2b temporalmente
+     rota. Unificación landscape: tanda futura tras cerrar mesa 3.
+
+     Fuentes, labels, ficha y anclaje del mazo (right/bottom 3px): constantes
+     por doctrina FL-1. El margen del abanico ya deriva de --opp-card-w (:1350,
+     `.table-wide` alcanza a mesa 4), así que escala solo. */
+  .game-table.table-four {
+    --pv4-k: clamp(0.85px, calc((50vw - 40px) / 140), 1.25px);
+    --o1-row4-top: calc(142 * var(--pv4-k));
+    --o1-row4-bottom: calc(114 * var(--pv4-k));
+  }
+  /* 0-3-0 + orden de fuente posterior → vence a :1325 (base) y a :1891 (CV),
+     ambos `.game-table-screen .table-wide .opp-panel`. Ninguno se edita: mesas
+     5 y 3 los conservan intactos (mesa 5 ya tiene su propio bloque PV-5). */
+  .game-table.table-four .opp-panel {
+    --opp-card-w: calc(30 * var(--pv4-k));
+    --opp-card-h: calc(47 * var(--pv4-k));
+    /* min() contra la celda real: resuelve además el desbordamiento preexistente
+       de los teléfonos estrechos y altos (344×882 se salía 9px, 320×800 18px).
+       El −18 descuenta padding 16 + borde 2 porque .opp-panel es content-box. */
+    max-width: min(calc(140 * var(--pv4-k)), calc(100% - 18px));
+  }
+  /* 0-4-0 + orden posterior → vence a :1478 (base) y a :1897 (CV). A diferencia
+     de mesa 5, opponentPanel.css no tiene ninguna regla `.table-four` para el
+     mazo, así que aquí no hay nada más que batir. */
+  .game-table.table-four .deck-pile.opp-deck,
+  .game-table.table-four .opp-deck-wrapper .shuffle-fan-card {
+    width: calc(21 * var(--pv4-k));
+    height: calc(32 * var(--pv4-k));
+  }
 }
 
 /* ── Teléfono HORIZONTAL (landscape) — Tanda C5.1 ────────────────────────────
