@@ -2126,6 +2126,74 @@
     width: calc(21 * var(--pv4-k));
     height: calc(32 * var(--pv4-k));
   }
+
+  /* ══ PV-3 · ESCALA AFÍN de los paneles IA — mesa 3 PORTRAIT (VARIANTE A) ═══
+     Cierra la serie PV. Mesa 3 reproduce el mismo síntoma que 5 y 4 (gate
+     max-height:772 → carta 30→40 y mazo 21→27 con el panel clavado en 140 de
+     contenido → mazo invadiendo 16px del abanico en toda pantalla alta), y su
+     piso 360×640 satisface el MISMO equilibrio exacto C/2 = mazoBB + 1.5·carta
+     (70 = 25 + 45 → aire 5px). Por eso la fórmula de k no se recalibra.
+
+     VARIANTE A · SOLO EL EJE HORIZONTAL. Aquí está la diferencia estructural
+     que impide copiar el motor entero. Mesas 5 y 4 mandan el sobrante vertical
+     a `minmax(var(--o1-oval-h), 1fr)` en la fila 3: un sumidero elástico, así
+     que crecer las filas encoge el óvalo solo. Mesa 3 NO lo tiene — su óvalo es
+     `max(96px, 100svh − var(--o1-static3-v))` (:1443), una altura rígida que
+     solo depende del alto de pantalla, y la banda muerta bajo él mide 4px
+     MEDIDOS en toda la matriz. Escalar --o1-rivals3-h a 148k metería +21px a
+     430×932 que nadie absorbe → scroll donde hoy no hay ninguno.
+     Por eso --o1-rivals3-h NO se toca y la fila se queda en 148/164 con su
+     gate CV actual. Es seguro por construcción: a k = 1.25 la carta mide 37.5
+     y el mazo 40, AMBOS menores que los 40/42 de hoy, así que el contenido del
+     panel nunca crece dentro de los 164 existentes.
+     Coste aceptado: la homotecia se rompe en el eje Y — a 430 el panel se ve
+     algo más achatado que sus equivalentes de mesas 5/4. Escalar también la
+     fila exigiría compensar --o1-static3-v (la variable que CV-1 ya tuvo que
+     corregir por 4px de scroll permanente): es la Variante B, tanda futura.
+
+     COLUMNA PROPIA, MISMA CONSTANTE. Mesa 3 no lleva .table-wide: su grid vive
+     en .rivals-zone (C4.2.11, :1415), con gap 4px HARDCODEADO que CV no
+     comprime. Medido: rivals-zone = 100vw − 42 → columna = 50vw − 23, idéntica
+     a la de .table-wide POR ENCIMA del gate. Solo el piso difiere: 157 aquí
+     contra 158.5 en mesas 5/4, porque allí CV baja el gap a 1px.
+     Consecuencia aprobada: el min() muerde 1px en el piso y el panel pasa de
+     158 a 157 (aire 5 → 4.5). No es una regresión sino la resolución del
+     desborde latente de −1px que mesa 3 arrastraba en 360×640 — el panel de
+     158 nunca cupo en su columna de 157. Todo lo demás del piso queda
+     píxel-idéntico. A cambio, mesa 3 es la única de las tres con transición
+     772→773 TOTALMENTE continua: al no compartir el gap CV, tampoco hereda su
+     salto residual de 1px.
+
+     DEUDA PV-3: mazo portrait mesa 3 ahora dinámico; promesa MZ-2b
+     temporalmente rota. Con esto, las 3 mesas portrait quedan dinámicas: la
+     unificación landscape (deuda MZ-2b) queda desbloqueada como tanda futura.
+
+     Fuentes, labels, ficha y anclaje del mazo (right/bottom 3px): constantes
+     por doctrina FL-1. El solape del abanico ya deriva de --opp-card-w (:1351,
+     rama .table-three explícita), así que escala solo. */
+  .game-table.table-three {
+    --pv3-k: clamp(0.85px, calc((50vw - 40px) / 140), 1.25px);
+  }
+  /* 0-3-0 + orden de fuente posterior → vence a :1324 (C4.2.13) y a :1890 (CV),
+     ambos con rama `.game-table-screen .table-three .opp-panel`. Ninguno se
+     edita: mesas 5 y 4 los conservan intactos y ya tienen sus propios bloques. */
+  .game-table.table-three .opp-panel {
+    --opp-card-w: calc(30 * var(--pv3-k));
+    --opp-card-h: calc(47 * var(--pv3-k));
+    /* min() contra la columna real: además del piso, resuelve el desborde
+       preexistente de los teléfonos estrechos (344×882 se salía 9px; 320×800,
+       18px). El −18 descuenta padding 16 + borde 2 porque .opp-panel es
+       content-box. */
+    max-width: min(calc(140 * var(--pv3-k)), calc(100% - 18px));
+  }
+  /* 0-4-0 + orden posterior → vence a :1480 (base) y a :1899 (CV).
+     opponentPanel.css no tiene ninguna regla `.table-three` de tamaño de mazo
+     (solo `.table-five` en :169), así que aquí no hay nada más que batir. */
+  .game-table.table-three .deck-pile.opp-deck,
+  .game-table.table-three .opp-deck-wrapper .shuffle-fan-card {
+    width: calc(21 * var(--pv3-k));
+    height: calc(32 * var(--pv3-k));
+  }
 }
 
 /* ── Teléfono HORIZONTAL (landscape) — Tanda C5.1 ────────────────────────────
