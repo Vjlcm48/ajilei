@@ -1,5 +1,5 @@
 import { createDeck, shuffleDeck } from './deck'
-import { getBestSuitScore, isAjilei } from './handEvaluator'
+import { getBestSuitScore, isAjilei, getComodinValue } from './handEvaluator'
 import { decideBetAction, decideDiscard } from './aiPlayer'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
 
@@ -22,6 +22,27 @@ const DEFAULT_UNIT   = AJILEI_CONFIG.betting.entrada
 // Single source of truth for discard limit (≤4 players: 5 cards; 5 players: 3 cards)
 export function maxDiscard(numPlayers) {
   return numPlayers <= 4 ? 5 : 3
+}
+
+// HR-1 · REGLAS CONGELADAS DE LA MANO.
+// Los parámetros de una mano (valor del comodín, ruleN de puntuación, tope de
+// descarte) se fijan en el BARAJADO DEL PIE según los jugadores vivos EN LA MESA
+// en ese instante, y no vuelven a moverse: los retiros (`folded`) durante la mano
+// jamás los alteran, y la bancarrota (`eliminated`) los altera recién en el
+// barajado de la mano siguiente.
+//
+// Antes de HR-1 esto se cumplía por ACCIDENTE: cinco puntos del código
+// recalculaban `state.aliveCount ?? numPlayers` por su cuenta, y la invariante
+// dependía de que nadie escribiera `aliveCount` a mitad de mano. Ahora hay un
+// único origen —este snapshot— y los lectores solo lo consultan. La UI lee el
+// MISMO objeto, así que la regla mostrada y la regla aplicada no pueden
+// divergir (era la contradicción del caso CM-1/2/3).
+export function makeHandRules(ruleN) {
+  return {
+    ruleN,
+    comodinValue: getComodinValue(ruleN),   // null = comodín inactivo (<4 vivos)
+    maxDiscard:   maxDiscard(ruleN),
+  }
 }
 
 // ── Player factory ─────────────────────────────────────────────────────────────
@@ -47,7 +68,10 @@ export function createInitialState(unit = DEFAULT_UNIT, numPlayers = 2) {
   const base = {
     phase:             PHASES.WAITING,
     numPlayers,                 // tamaño físico fijo de la mesa (asientos, índices)
-    aliveCount:        numPlayers, // C4.4: jugadores vivos (con fichas) → reglas
+    aliveCount:        numPlayers, // C4.4: jugadores vivos (con fichas) en la mesa
+    // HR-1: semilla de reglas para la pantalla previa al primer barajado (WAITING).
+    // startHand la recalcula en cada mano; aquí solo evita que la UI lea undefined.
+    handRules:         makeHandRules(numPlayers),
     eliminatedNames:   [],       // nombres eliminados en la última mano (UI)
     unit,
     players,
@@ -114,10 +138,10 @@ function resolveWinner(state) {
 // ── Showdown with N players ────────────────────────────────────────────────────
 function doShowdown(state) {
   const { numPlayers, players, manoIndex } = state
-  // C4.4: las reglas (comodín, valor, ajilei N=5) leen el conteo VIVO, no el
-  // tamaño fijo. La matemática de evaluación en handEvaluator no se toca.
-  const ruleN = state.aliveCount ?? numPlayers
-  const comodinEnabled = ruleN >= 4
+  // HR-1: las reglas se leen del snapshot congelado en el barajado, no se
+  // recalculan aquí. La matemática de evaluación en handEvaluator no se toca.
+  const { ruleN } = state.handRules
+  const comodinEnabled = state.handRules.comodinValue !== null
   const active = activePlayers(players)
   const N      = players.length
 
@@ -210,7 +234,7 @@ function advanceBettingPhase(state) {
     return {
       ...base,
       phase:   PHASES.DISCARD,
-      message: `Selecciona hasta ${maxDiscard(state.aliveCount ?? N)} cartas a descartar.`,
+      message: `Selecciona hasta ${state.handRules.maxDiscard} cartas a descartar.`,
     }
   }
 
@@ -363,6 +387,7 @@ export function startHand(state) {
     const humanWon   = winnerSeat === 0
     return {
       ...state, players, aliveCount: alive, eliminatedNames,
+      handRules: makeHandRules(alive),
       phase: PHASES.GAME_OVER, pot: 0, currentBet: 0, winner: winnerSeat >= 0 ? winnerSeat : null,
       message: winnerSeat < 0
         ? 'Mesa terminada.'
@@ -374,6 +399,7 @@ export function startHand(state) {
   if (players[0].eliminated) {   // humano sin fichas con ≥2 vivos → stop básico
     return {
       ...state, players, aliveCount: alive, eliminatedNames,
+      handRules: makeHandRules(alive),
       phase: PHASES.GAME_OVER, pot: 0, currentBet: 0, winner: null,
       message: 'Te quedaste sin fichas.',
     }
@@ -411,6 +437,8 @@ export function startHand(state) {
     deck:              deck.slice(deckPtr),
     players,
     aliveCount:        alive,
+    // HR-1: AQUÍ se congelan las reglas de esta mano — en el barajado del Pie.
+    handRules:         makeHandRules(alive),
     eliminatedNames,
     pot,
     currentBet:        0,
@@ -458,7 +486,7 @@ export function applyAIBetAction(state) {
 export function applyDiscard(state, humanDiscardIndices) {
   const { players, manoIndex, numPlayers } = state
   const N = players.length
-  const ruleN = state.aliveCount ?? numPlayers   // C4.4: límite de descarte según vivos
+  const topeDescarte = state.handRules.maxDiscard   // HR-1: congelado en el barajado
 
   let deckCopy     = [...state.deck]
   let newPlayers   = players.map(p => ({ ...p }))
@@ -473,7 +501,7 @@ export function applyDiscard(state, humanDiscardIndices) {
       ? humanDiscardIndices
       : decideDiscard(state, seat)
 
-    indices = indices.slice(0, maxDiscard(ruleN))
+    indices = indices.slice(0, topeDescarte)
     discardCounts[seat] = indices.length
 
     newPlayers[seat] = {
@@ -510,7 +538,7 @@ export function applyDiscard(state, humanDiscardIndices) {
 export function toggleDiscard(state, cardIndex) {
   const selected = [...state.selectedDiscards]
   const pos      = selected.indexOf(cardIndex)
-  const limit    = maxDiscard(state.aliveCount ?? state.numPlayers)   // C4.4: según vivos
+  const limit    = state.handRules.maxDiscard   // HR-1: congelado en el barajado
   if (pos >= 0) {
     selected.splice(pos, 1)
   } else if (selected.length < limit) {

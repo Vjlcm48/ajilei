@@ -314,14 +314,19 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // mano. discardNextRef guarda la mano post-descarte para leer la carta
   // repuesta en el momento del flip sin depender del estado (evita doble
   // disparo de StrictMode al no vivir dentro de un updater).
-  const comodinActive = (game.aliveCount ?? numPlayers) >= 4   // C4.4: sigue a los vivos
+  // HR-1: MISMA fuente de verdad que el motor. El comodín está activo si y solo
+  // si las reglas congeladas de ESTA mano le dieron valor. Antes se derivaba de
+  // aliveCount por separado, y regla mostrada y regla aplicada podían divergir.
+  const comodinActive = game.handRules.comodinValue !== null
   const isComodin = card => !!card && card.value === 7 && card.palo === 'Oros'
   const discardNextRef = useRef(null)
 
   // C4.5: texto del chip de comodín (hogar visual del estado de reglas). Cuando
   // cambia al encoger (5→4 cambia el valor; 4→3 se apaga) el chip destella para
   // señalar que cambiaron las reglas, no solo el nº de sillas.
-  const comodinNote = aliveN >= 4 ? `Comodín activo · vale ${aliveN === 5 ? 11 : 10}` : 'Sin comodín'
+  const comodinNote = game.handRules.comodinValue !== null
+    ? `Comodín activo · vale ${game.handRules.comodinValue}`
+    : 'Sin comodín'
   const prevNoteRef = useRef(comodinNote)
   useEffect(() => {
     if (numPlayers < 4) return
@@ -796,8 +801,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     if (showdownWinnerSeat === null) return false
     const score = game.players[showdownWinnerSeat].score
     if (card.palo === score.palo) return true
-    // comodín (7 de Oros) cuenta para el palo ganador solo si está activo (vivos≥4)
-    return aliveN >= 4 && card.palo === 'Oros' && card.value === 7
+    // HR-1: el comodín cuenta para el palo ganador si y solo si las reglas
+    // congeladas de esta mano lo activaron (misma fuente que el motor).
+    return game.handRules.comodinValue !== null && card.palo === 'Oros' && card.value === 7
   }
 
   // ── Position-derived anchors (deck, MANO badge) ───────────────────────────

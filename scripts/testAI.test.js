@@ -20,6 +20,7 @@ import {
   applyPlayerBetAction,
   applyAIBetAction,
   applyDiscard,
+  makeHandRules,
   PHASES,
 } from '../src/engine/gameEngine.js'
 
@@ -38,8 +39,11 @@ const STRONG_HAND = [
   makeCard(4,'Oros'), makeCard(6,'Oros'),
 ]
 
+// HR-1: las fixtures sintéticas también llevan el snapshot de reglas de la mano.
+// Se construye con `makeHandRules` del motor —no con literales a mano— para que
+// estos estados no puedan divergir de lo que produce el barajado real.
 function makeState(overrides = {}) {
-  return {
+  const base = {
     players: [
       { isHuman: true,  cards: [], chips: 1000, contrib: 0, folded: false },
       { isHuman: false, cards: STRONG_HAND, chips: 1000, contrib: 0, folded: false },
@@ -54,6 +58,7 @@ function makeState(overrides = {}) {
     pot: 0,
     ...overrides,
   }
+  return { ...base, handRules: base.handRules ?? makeHandRules(base.numPlayers) }
 }
 
 // Play a betting phase with real AI; human always matches or passes
@@ -141,7 +146,7 @@ describe('1. Asignación de personalidades', () => {
         { isHuman: false, cards: cards2, chips: 500, contrib: 0, folded: false },
       ],
       currentBet: 0, phase: 'BET_1', manoIndex: 0, pieIndex: 2,
-      numPlayers: 3, unit: 10, handCount: 3, pot: 0,
+      numPlayers: 3, unit: 10, handCount: 3, pot: 0, handRules: makeHandRules(3),
     }
     decideBetAction(stateH3, 1)  // _lastHandCount → 3
 
@@ -188,7 +193,7 @@ describe('2. Aislamiento de información', () => {
         { isHuman: false, cards: STRONG_HAND, chips: 500, contrib: 0, folded: false },
       ],
       currentBet: 10, phase: 'BET_3', manoIndex: 0, pieIndex: 1,
-      numPlayers: 2, unit: 10, handCount: 1, pot: 0,
+      numPlayers: 2, unit: 10, handCount: 1, pot: 0, handRules: makeHandRules(2),
     }
     decideBetAction(state, 1)
     expect(trap.__cardsAccessed ?? false).toBe(false)
@@ -202,7 +207,7 @@ describe('2. Aislamiento de información', () => {
         { isHuman: false, cards: STRONG_HAND, chips: 500, contrib: 0, folded: false },
       ],
       currentBet: 0, phase: 'DISCARD', manoIndex: 0, pieIndex: 1,
-      numPlayers: 2, unit: 10, handCount: 1, pot: 0,
+      numPlayers: 2, unit: 10, handCount: 1, pot: 0, handRules: makeHandRules(2),
     }
     decideDiscard(state, 1)
     expect(trap.__cardsAccessed ?? false).toBe(false)
@@ -220,7 +225,7 @@ describe('2. Aislamiento de información', () => {
     ]
     const state = {
       players, currentBet: 10, phase: 'BET_3', manoIndex: 0, pieIndex: 4,
-      numPlayers: 5, unit: 10, handCount: 1, pot: 0,
+      numPlayers: 5, unit: 10, handCount: 1, pot: 0, handRules: makeHandRules(5),
     }
     decideBetAction(state, 1)
     traps.forEach(({ p }) => expect(p.__cardsAccessed ?? false).toBe(false))
@@ -319,7 +324,7 @@ describe('4. Comodín', () => {
         { isHuman: false, cards: hand, chips: 500, contrib: 0, folded: false },
       ],
       currentBet: 0, phase: 'DISCARD', manoIndex: 0, pieIndex: 1,
-      numPlayers: 5, unit: 10, handCount: 1, pot: 0,
+      numPlayers: 5, unit: 10, handCount: 1, pot: 0, handRules: makeHandRules(5),
     }
     const idx = decideDiscard(state, 1)
     const comodinPos = hand.findIndex(c => c.palo === 'Oros' && c.value === 7)
@@ -338,7 +343,7 @@ describe('4. Comodín', () => {
         { isHuman: false, cards: hand, chips: 500, contrib: 0, folded: false },
       ],
       currentBet: 0, phase: 'DISCARD', manoIndex: 0, pieIndex: 1,
-      numPlayers: 5, unit: 10, handCount: 1, pot: 0,
+      numPlayers: 5, unit: 10, handCount: 1, pot: 0, handRules: makeHandRules(5),
     }
     expect(decideDiscard(state, 1).length).toBeLessThanOrEqual(3)
   })
@@ -354,7 +359,7 @@ describe('4. Comodín', () => {
         { isHuman: false, cards: hand, chips: 500, contrib: 0, folded: false },
       ],
       currentBet: 0, phase: 'DISCARD', manoIndex: 0, pieIndex: 1,
-      numPlayers: 4, unit: 10, handCount: 1, pot: 0,
+      numPlayers: 4, unit: 10, handCount: 1, pot: 0, handRules: makeHandRules(4),
     }
     expect(decideDiscard(state, 1).length).toBeLessThanOrEqual(5)
   })
@@ -371,7 +376,7 @@ describe('4. Comodín', () => {
         { isHuman: false, cards: hand, chips: 500, contrib: 0, folded: false },
       ],
       currentBet: 0, phase: 'DISCARD', manoIndex: 0, pieIndex: 1,
-      numPlayers: 4, unit: 10, handCount: 1, pot: 0,
+      numPlayers: 4, unit: 10, handCount: 1, pot: 0, handRules: makeHandRules(4),
     }
     const idx = decideDiscard(state, 1)
     // 7-Oros DEBERÍA ser descartado (no es del mejor palo Copas y N≠5)

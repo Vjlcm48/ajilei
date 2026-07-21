@@ -32,7 +32,10 @@ export function getBestSuitScore(cards, numPlayers = 2, comodinEnabled = false) 
 
 // Natural Ajilei: all 5 same suit, sum = 51.
 // Comodín Ajilei (numPlayers=5 only): 4 same suit + 7 de Oros, where 4-card sum + 11 = 52.
-export function isAjilei(cards, numPlayers = 2) {
+// HR-1 (limpieza CM-1): `numPlayers` es OBLIGATORIO. Antes tenía default 2, que
+// apaga el comodín en silencio — un olvido en la llamada degradaba la regla sin
+// hacer ruido. Mejor un fallo evidente que un comodín desaparecido.
+export function isAjilei(cards, numPlayers) {
   if (cards.length !== 5) return false
 
   // Natural: all same suit, total = 51
@@ -57,12 +60,8 @@ export function isAjilei(cards, numPlayers = 2) {
   return false
 }
 
-export function compareHands(playerA, playerB) {
-  const handA = getBestSuitScore(playerA.cards)
-  const handB = getBestSuitScore(playerB.cards)
-  if (handA.points > handB.points) return playerA
-  if (handB.points > handA.points) return playerB
-  if (playerA.isMano) return playerA
-  if (playerB.isMano) return playerB
-  return playerA
-}
+// HR-1 (limpieza CM-1): aquí vivía `compareHands`, código muerto sin una sola
+// llamada en todo el árbol. Invocaba getBestSuitScore SIN parámetros, así que
+// caía en los defaults (numPlayers=2, comodinEnabled=false) y habría desactivado
+// el comodín en silencio si alguien la hubiera cableado. El desempate real vive
+// en doShowdown (orden de asiento desde la Mano).

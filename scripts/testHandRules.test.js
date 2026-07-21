@@ -179,6 +179,49 @@ describe('TB-1 · abandono', () => {
   })
 })
 
+// ── 6 · el snapshot en sí (HR-1) ────────────────────────────────────────────
+describe('HR-1 · snapshot de reglas congelado', () => {
+  it('handRules existe desde el barajado y sus tres valores no cambian en ninguna fase', () => {
+    let s = createInitialState(10, 5)
+    s = startHand(s)
+
+    // Congelado en el barajado, con los vivos EN LA MESA (5).
+    expect(s.handRules).toEqual({ ruleN: 5, comodinValue: 11, maxDiscard: 3 })
+    const congelado = JSON.stringify(s.handRules)
+
+    // Se anota el snapshot en cada hito para que un fallo diga EN QUÉ FASE se movió.
+    const hitos = []
+    const anota = etiqueta => hitos.push([etiqueta, JSON.stringify(s.handRules)])
+
+    anota('tras el barajado')
+    ctl.foldSeats = new Set([3, 4])
+    s = advanceFromDeal(s);                 anota('BET_1 abierta')
+    s = playBettingPhase(s, PHASES.BET_1);  anota('BET_1 cerrada (con 2 folds)')
+    s = advanceFromDeal(s);                 anota('BET_2 abierta')
+    s = playBettingPhase(s, PHASES.BET_2);  anota('DISCARD')
+    s = applyDiscard(s, []);                anota('BET_3 abierta')
+    s = playBettingPhase(s, PHASES.BET_3);  anota('PAYOUT')
+
+    expect(s.phase).toBe(PHASES.PAYOUT)
+    expect(s.players.filter(p => p.folded).length).toBe(2)   // los folds ocurrieron de verdad
+    for (const [etiqueta, valor] of hitos) {
+      expect([etiqueta, valor]).toEqual([etiqueta, congelado])
+    }
+  })
+
+  it('el barajado siguiente SÍ recalcula el snapshot cuando la mesa se reduce', () => {
+    let s = createInitialState(10, 5)
+    s = startHand(s)
+    expect(s.handRules).toEqual({ ruleN: 5, comodinValue: 11, maxDiscard: 3 })
+
+    s = setChips(s, 3, 0)
+    s = setChips(s, 4, 0)
+    const siguiente = startHand(s)
+    // 3 vivos → comodín apagado y tope de descarte de mesa chica.
+    expect(siguiente.handRules).toEqual({ ruleN: 3, comodinValue: null, maxDiscard: 5 })
+  })
+})
+
 // ── 5 · la bancarrota difiere un barajado ───────────────────────────────────
 describe('TB-1 · bancarrota diferida', () => {
   it('quien queda a 0 en la mano N sigue vivo hasta el startHand de N+1', () => {

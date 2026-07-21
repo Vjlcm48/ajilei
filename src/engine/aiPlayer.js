@@ -1,10 +1,6 @@
 import { getBestSuitScore, isAjilei } from './handEvaluator.js'
 
 // Local copy to avoid circular import with gameEngine.js (which also exports maxDiscard)
-function _maxDiscard(numPlayers) {
-  return numPlayers <= 4 ? 5 : 3
-}
-
 // ── Personality profiles ──────────────────────────────────────────────────────
 // openMin: minimum score to open betting (no bet yet)
 // callMin: minimum score to call/stay in
@@ -77,15 +73,15 @@ function _jitter(value, noise) {
 // ── Core decision functions ───────────────────────────────────────────────────
 
 export function decideBetAction(state, aiIndex) {
-  const { players, currentBet, phase, manoIndex, pieIndex, numPlayers, unit } = state
+  const { players, currentBet, phase, manoIndex, pieIndex, unit } = state
   const ai = players[aiIndex]
 
   if (ai.folded) return { action: 'pasar' }
 
-  // C4.4: el comodín/valor/ajilei dependen de los jugadores VIVOS, no del tamaño
-  // fijo. Solo se reconecta el conteo; la estrategia (umbrales) no cambia.
-  const ruleN = state.aliveCount ?? numPlayers
-  const comodinEnabled = ruleN >= 4
+  // HR-1: las reglas vienen del snapshot congelado en el barajado. Solo cambia
+  // de dónde se leen; la estrategia (umbrales, perfiles) no se toca.
+  const { ruleN } = state.handRules
+  const comodinEnabled = state.handRules.comodinValue !== null
   const { points: score } = getBestSuitScore(ai.cards, ruleN, comodinEnabled)
   const toCall = currentBet - ai.contrib
 
@@ -154,11 +150,11 @@ export function decideBetAction(state, aiIndex) {
 }
 
 export function decideDiscard(state, aiIndex) {
-  const { players, numPlayers } = state
+  const { players } = state
   const ai = players[aiIndex]
-  // C4.4: comodín y límite de descarte según jugadores vivos (no el tamaño fijo)
-  const ruleN = state.aliveCount ?? numPlayers
-  const comodinEnabled = ruleN >= 4
+  // HR-1: comodín y tope de descarte salen del snapshot congelado en el barajado
+  const { ruleN, maxDiscard: topeDescarte } = state.handRules
+  const comodinEnabled = state.handRules.comodinValue !== null
 
   const { palo: bestSuit } = getBestSuitScore(ai.cards, ruleN, comodinEnabled)
 
@@ -169,5 +165,5 @@ export function decideDiscard(state, aiIndex) {
     if (card.palo !== bestSuit) indices.push(i)
   })
 
-  return indices.slice(0, _maxDiscard(ruleN))
+  return indices.slice(0, topeDescarte)
 }
