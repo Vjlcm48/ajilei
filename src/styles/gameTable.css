@@ -3378,23 +3378,50 @@
   .table-four .table-title { position: static; margin: 0; white-space: nowrap; }
   .table-four .hand-badge  { position: static; }
 
-  /* Bocina + ✕ arriba a la derecha como grupo (header-right ya es flex con gap);
-     fuera de flujo para no descentrar el badge de etapa. */
-  .table-four .header-right {
+  /* ── U4L-SX · ✕ sola en esquina + bocina al nivel del óvalo (espejo SX-1 de mesa 5) ──
+     Réplica EXACTA de .table-five (:3165-3206), selector .table-four. Antes la bocina y
+     la ✕ iban AGRUPADAS en la esquina sup-der (header-right absoluto en columna); ahora
+     header-right vuelve a static y sus dos hijos se posicionan absolutos e independientes,
+     respecto a .game-table.table-four (position:relative, ya declarado en :3330). */
+  .table-four .header-right { position: static; }
+
+  /* U4L-SX · ✕ a TAMAÑO ESTÁNDAR (decisión de Victor). La compactación SX-1
+     (padding:1px 2px; font-size:11px) es EXCLUSIVA de mesa 5, donde IA1 se estruja hasta
+     ~x608 a 640; en mesa 4 IA1 llega solo a ~x585.9 (U4L·M3/SX), así que la ✕ natural
+     (~30.6×29) cabe en la esquina con aire. Conserva su esquina previa (top:6/right:8),
+     ahora SOLA porque la bocina bajó al nivel del óvalo. Sin overrides de padding/font. */
+  .table-four .btn-leave {
     position: absolute;
     top: 6px;
     right: 8px;
     z-index: 20;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
   }
-  /* En el JSX la bocina (.mute-button) va ANTES que la ✕ (.btn-leave); en columna
-     eso pondría la bocina arriba. order fuerza ✕ arriba / bocina debajo sin tocar
-     el JSX. */
-  .table-four .btn-leave   { order: 1; }
-  .table-four .mute-button { order: 2; }
+  /* Hit-área táctil ≥40: la ✕ natural ya da ~30.6 de ancho → right:-10 la lleva a ~40.6.
+     En vertical (~29) se extiende ARRIBA (hueco muerto del header) + un pelo abajo para
+     alcanzar 40. NUNCA a la izquierda (left:0): toda la columna x>601 está a la derecha
+     de IA1 (r≈585.9) → no roba toques al panel. */
+  .table-four .btn-leave::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: -10px;
+    bottom: -4px;
+    left: 0;
+  }
+
+  /* Bocina al margen derecho de la franja central, a la derecha del óvalo y alineada
+     verticalmente con el POZO/comodín (top:50% = centro del óvalo) → espejo exacto de
+     AJILEI (flanco izq). El offset (50% − 24px) ancla su BORDE SUPERIOR a la línea del
+     tope del óvalo. Verbatim de mesa 5. NOTA U4L: hoy el óvalo de mesa 4 aún va a ancho
+     completo (heredado de .table-wide); las canaletas que le dan sitio a la bocina llegan
+     en U4L-OV. Si a 640 hubiera roce bocina↔óvalo, es dato para esa tanda, no de esta. */
+  .table-four .mute-button {
+    position: absolute;
+    right: 12px;
+    top: calc(50% - 24px);
+    transform: none;
+    z-index: 20;
+  }
 
   /* ── 3 jugadores landscape · cabecera + override del esqueleto ────────────────
      El 3 ahora USA el mismo esqueleto .table-mid (flex 5.5/4.5, grid 5fr/4fr) que
