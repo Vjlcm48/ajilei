@@ -3451,6 +3451,26 @@
     margin-right: var(--ovl4-mr);
   }
 
+  /* ── U4L-MZ · MAZO de la IA-Pie a la IZQUIERDA del panel (espejo MZL-5, SIN MZL-5b) ──
+     POSICIÓN ÚNICA para las 3 IAs (IA1/IA2/IA3) cuando sean Pie: mazo a la izquierda de
+     la caja completa del panel, contacto borde-con-borde, tope alineado al header. Réplica
+     EXACTA de MZL-5 de mesa 5 (:2403-2408), selector .table-four. MOVIMIENTO PURO: el
+     tamaño lo conserva MZ-2b (:2363, :not(.table-two) → ya cubre mesa 4) — aquí NO se toca.
+     Vence (0,2,0) a los anchors globales .opp-deck-anchor-* (0,1,0) de opponentPanel.css
+     SIN tocarlos. right:calc(100%+1px) → borde derecho del mazo al ras del borde IZQ del
+     border-box del panel (+1px = su borde); top:3px → tope al header vía el padding-top
+     declarado del panel; left/transform reseteados para neutralizar ambos anchors.
+     SIN excepción tipo MZL-5b: U4L·M2 lo respalda a 640 (IA3, el asiento más a la izq) —
+     canalón 54px, mazo en reposo [32,54] (holgura +32), abanico overhang 18.6 → punto
+     mínimo 13.4px ≥ 0 (no recorta el viewport); y no hay vecino a la izquierda que ocluir.
+     Alcanza los 4… (3) wrappers, pero solo el del Pie es visible. */
+  .table-four .opp-deck-wrapper {
+    right: calc(100% + 1px);
+    left: auto;
+    top: 3px;
+    transform: none;
+  }
+
   /* ── 3 jugadores landscape · cabecera + override del esqueleto ────────────────
      El 3 ahora USA el mismo esqueleto .table-mid (flex 5.5/4.5, grid 5fr/4fr) que
      4/5 — sus selectores se extendieron con .table-three (arriba) y el JSX envuelve
