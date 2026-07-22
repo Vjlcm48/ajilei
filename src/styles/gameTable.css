@@ -3423,6 +3423,34 @@
     z-index: 20;
   }
 
+  /* ── U4L-OV · ÓVALO 486 border-box con CANALETAS asimétricas (espejo OVL-5/5b m5) ──
+     Réplica EXACTA de mesa 5 (:3153-3158 tokens, :3301-3307 regla), selector .table-four,
+     tokens propios --ovl4-*. El width EXPLÍCITO anula el shrink-to-fit (grid item con
+     justify-self:center + flex-wrap:nowrap + .game-message flex:1). box-sizing:border-box
+     → width = ancho VISIBLE directo (486). Inocuo en vertical (padding-vert 0 en
+     .table-four .center-zone, min-height no vinculante).
+       width = min(--ovl4-w, 100% − --ovl4-ml − --ovl4-mr)   [border-box; 100% = área grid]
+     Con márgenes ASIMÉTRICOS (63≠49) + justify-self:center el border-box se desplaza
+     (ml−mr)/2 = +7px respecto al centro del área → cae en el centro del HUECO AJILEI↔bocina,
+     no del viewport. Canaletas MEDIDAS en U4L-OV·Paso1 (arnés): G0/G1=21/619 (=m5),
+     AJILEI.r=76.2, bocina.x=578.4 → ml=76.2+8−21=63.2≈63, mr=619−(578.4−8)=48.6≈49,
+     máximo-que-cabe=486.2 (≥486, respiro ~8/8) en los 3 viewports. Reglas ADITIVAS:
+     .table-wide .center-zone (compartida) y .table-five NO se tocan.
+     El umbral de derrame de texto (482) se hereda de las reglas compartidas .table-wide
+     (game-message font-size:9px) → 486 ≥ 482, sin derrame, idéntico a mesa 5. */
+  .game-table.table-four {
+    --ovl4-w: 486px;      /* ancho VISIBLE (border-box); umbral de derrame de texto = 482 */
+    --ovl4-ml: 63px;      /* flanco AJILEI + respiro 8, relativo al área de grid (medido 63.2) */
+    --ovl4-mr: 49px;      /* flanco bocina + respiro 8, relativo al área de grid (medido 48.6) */
+  }
+  .table-four .center-zone {
+    box-sizing: border-box;
+    justify-self: center;
+    width: min(var(--ovl4-w), calc(100% - var(--ovl4-ml) - var(--ovl4-mr)));
+    margin-left: var(--ovl4-ml);
+    margin-right: var(--ovl4-mr);
+  }
+
   /* ── 3 jugadores landscape · cabecera + override del esqueleto ────────────────
      El 3 ahora USA el mismo esqueleto .table-mid (flex 5.5/4.5, grid 5fr/4fr) que
      4/5 — sus selectores se extendieron con .table-three (arriba) y el JSX envuelve
