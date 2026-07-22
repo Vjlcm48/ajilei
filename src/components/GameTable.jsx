@@ -293,14 +293,16 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const aliveN       = game.aliveCount
   const isLandscapeTable = useIsLandscapeTable()
   const isPortraitTable  = useIsPortraitTable()
-  // AJ-1 · SOLO landscape mesa 5: AJILEI + "Mano #N" bajan de la cabecera a
+  // AJ-1 · landscape mesas 5 y 4: AJILEI + "Mano #N" bajan de la cabecera a
   // .table-mid. El bloque debe centrarse en la franja IA↔humano, y esa franja se
   // define DENTRO de .table-mid: colgando de ahí, su 50% ya es el de la franja y
   // el centrado sale de la caja, sin constantes de viewport. Desde la cabecera
   // (hermana de .table-mid) era imposible: un absoluto solo resuelve contra un
   // ANCESTRO posicionado. Condicionado porque el <header> es común a las 4 mesas
   // y a las 3 orientaciones — y en mesa 2 portrait no existe .table-mid.
-  const brandInMid = isLandscapeTable && aliveN === 5
+  // U4L-AJ · mesa 4 se suma al espejo (su bloque .table-four .table-brand replica
+  // el de .table-five); mesas 3/2 landscape siguen en la rama !brandInMid (header).
+  const brandInMid = isLandscapeTable && (aliveN === 5 || aliveN === 4)
   const effLayout    = effectiveLayout(game.players)
   const isGameOver   = phase === PHASES.GAME_OVER
   const isDealPhase  = phase === PHASES.DEAL_2 || phase === PHASES.DEAL_3

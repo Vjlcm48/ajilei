@@ -3316,8 +3316,12 @@
   /* ── 4 jugadores landscape · reglas propias (referencia .table-five) ───────────
      El 4 jug heredaba el grid de 4 columnas de .table-wide → las 3 IAs caían en las
      columnas 1-2-3 y dejaban la 4 vacía (desbalance a la izquierda). Aquí se le dan
-     reglas propias .table-four. Diferencia clave con el 5 jug: AJILEI va a la esquina
-     superior IZQUIERDA (no junto al óvalo), así que el óvalo NO lleva canaletas. */
+     reglas propias .table-four.
+     U4L-AJ · el bloque AJILEI+"Mano #N" pasó de la esquina superior IZQUIERDA al
+     CENTRO DE LA FRANJA IA↔humano, espejo de AJ-1 de mesa 5 (bajó a .table-mid vía
+     brandInMid, ver GameTable.jsx). Las canaletas del óvalo (para dejarle sitio al
+     bloque a la izquierda) llegan en la tanda U4L-OV; hoy el óvalo sigue a ancho
+     completo (heredado de .table-wide). */
 
   /* TAREA 1 · Centrar las 3 IAs: grid de 3 columnas iguales → reparto simétrico a
      ancho completo. grid-template-rows y el óvalo (grid-column: 1 / -1) se heredan
@@ -3338,23 +3342,41 @@
   /* F9 obj 1: header sin alto reservado (sus hijos son absolutos) → la fila de IAs
      sube hasta ~la línea de la X (top:6px). */
   .table-four .table-header { justify-content: center; min-height: 0; }
-  /* AJILEI: esquina superior IZQUIERDA (NO junto al óvalo como en .table-five). */
-  .table-four .table-title {
+
+  /* ── U4L-AJ · AJILEI + "Mano #N" centrados en la franja (espejo AJ-1 de mesa 5) ──
+     Réplica EXACTA del mecanismo de .table-five (:3231-3270): el bloque baja a
+     .table-mid (brandInMid en JSX) y fluye dentro de .table-brand; lo que se centra
+     es la CAJA, no cada pieza → title y badge no pueden desfasarse entre sí. Selector
+     .table-four (0,2,0), misma especificidad que las reglas corner que sustituye; sin
+     !important. Mesa 5 no se toca (su bloque sigue idéntico más arriba). */
+  .table-four .table-mid { position: relative; }   /* caja de referencia: tope = fila IAs, pie = óvalo */
+
+  /* El bloque se centra en la franja POR LA CAJA:
+       top    = pie de la fila de IAs = altura del panel = var(--opp-card-h) + 76
+       bottom = -4px  → el pie de la franja cae 4px por DEBAJO de .table-mid
+       margin-block:auto + height:fit-content → el navegador reparte el sobrante igual.
+     `absolute` lo saca del grid de .table-mid → no desplaza ninguna IA.
+     DEUDA DECLARADA (misma que en mesa 5) · el 76 es el CROMO del panel de IA (nombre +
+     saldo + paddings), MEDIDO por perturbación; vive en opponentPanel.css, archivo que NO
+     tocamos: si cambia allí, ESTO SE DESFASA EN SILENCIO y hay que recalibrar el 76.
+     No derivable de ninguna variable nuestra. U4L·M1 confirmó cromo = 76.0 EXACTO en los
+     3 viewports (640/844/932), idéntico al de mesa 5 → se copia VERBATIM.
+     translateY(2.6px): corrige (badge_half-leading − h1_half-leading)/2 para dejar la
+     TINTA equidistante (la caja no es simétrica respecto al texto visible). */
+  .table-four .table-brand {
     position: absolute;
-    left: 12px;
-    top: 6px;
-    margin: 0;
-    white-space: nowrap;
+    left: 0;               /* .table-mid ya está 12px dentro de .game-table → x=21 */
+    top: calc(var(--opp-card-h) + 76px);
+    bottom: -4px;
+    margin-block: auto;
+    height: fit-content;
+    transform: translateY(2.6px);
     z-index: 20;
   }
 
-  /* "Mano #XX" apilado justo debajo de AJILEI, mismo margen izquierdo. */
-  .table-four .hand-badge {
-    position: absolute;
-    left: 12px;
-    top: 28px;
-    z-index: 20;
-  }
+  /* AJILEI y "Mano #N" fluyen dentro de .table-brand (que es quien se centra). */
+  .table-four .table-title { position: static; margin: 0; white-space: nowrap; }
+  .table-four .hand-badge  { position: static; }
 
   /* Bocina + ✕ arriba a la derecha como grupo (header-right ya es flex con gap);
      fuera de flujo para no descentrar el badge de etapa. */
