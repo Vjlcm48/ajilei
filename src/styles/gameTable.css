@@ -3596,6 +3596,35 @@
     margin-left: calc((var(--ia3-gap) - var(--ia3-colgap)) / 2 + var(--ia3-shift));
   }
 
+  /* ── U3L-MZ · MAZO de la IA-Pie a la IZQUIERDA del panel (espejo MZL-5, SIN MZL-5b) ──
+     POSICIÓN ÚNICA para las 2 IAs (IA2 = top-left, IA1 = top-right) cuando sean Pie:
+     mazo a la izquierda de la caja completa del panel, contacto borde-con-borde, tope
+     alineado al header. Réplica EXACTA de MZL-5 de mesa 5 (:2403-2408) y de U4L-MZ de
+     mesa 4 (:3467-3472), con selector .table-three.
+     MOVIMIENTO PURO: el tamaño lo conserva MZ-2b (:2363, :not(.table-two) → ya cubre
+     mesa 3; medido 21×32 a 640 y 27×42 a 844/932) — aquí NO se toca.
+     Vence (0,2,0) a los anchors globales .opp-deck-anchor-* (0,1,0) de opponentPanel.css
+     SIN tocarlos; en mesa 3 los dos asientos usan anclas OPUESTAS (top-left → inner-right,
+     top-right → inner-left), así que hay que resetear las cuatro propiedades para
+     neutralizar ambas. El absoluto resuelve contra el PADDING-BOX del panel:
+       · right: calc(100% + 1px) → el +1px es el border:1px del panel, que lleva el borde
+         derecho del mazo al ras del borde IZQ de su BORDER-BOX (contacto exacto).
+       · top: 3px → el padding-top del panel mesa 3 (:2333) es 3px, idéntico al de mesa 5,
+         así que alinea el tope del mazo con el del HEADER (no con el del nombre: mismo
+         razonamiento de MZL-5, evita el leading heredado que varía con el ancho).
+     SIN excepción tipo MZL-5b: la reserva --ia3-lr de U3L-IA (44 a 640 / 54 arriba de 772
+     = mazo border-box + overhang del abanico) ya dejó libre el flanco izquierdo de IA2 y
+     el gap entre paneles ≥ lr+8, así que ni el abanico de IA2 alcanza a AJILEI ni el de
+     IA1 alcanza a IA2 → ningún borde recorta y ningún panel ocluye (no hace falta el
+     parche de z-index que sí necesitó IA4 en mesa 5).
+     Alcanza a los 2 wrappers, pero solo el del Pie es visible. */
+  .table-three .opp-deck-wrapper {
+    right: calc(100% + 1px);
+    left: auto;
+    top: 3px;
+    transform: none;
+  }
+
   /* Canaletas del óvalo: más estrecho que en 4/5 (el 3 tiene más espacio libre).
      El alto/anclaje los gobierna ahora el esqueleto table-mid (grid-row 2,
      align-self:end), no un flex propio. */
