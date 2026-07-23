@@ -3890,30 +3890,54 @@
     margin-left: 6px;
   }
 
-  /* Mazo de la IA en ESPEJO al del humano (PASO 5). El deck humano va al extremo
-     IZQUIERDO de su fila de cartas. El del rival, anclado por defecto a 'inner-right'
-     (costado derecho del panel), lo reflejamos al costado IZQUIERDO
-     (right:calc(100%+8px)). El tamaño ya lo iguala el token de arriba (63×98 = deck
-     humano). Tras pasar a 3 columnas el panel está en la col central → el mazo cae
-     en el hueco entre O1 y el panel. PUNTO A AFINAR: si el deck (63px) invade O1,
-     reducir el gap o el token. */
+  /* ── U2L-MZ · MAZO de la IA-Pie a la IZQUIERDA del área, TOPE AL HEADER (espejo MZL-5) ──
+     Antes: `right: calc(100% + 8px)` (separado 7px del border-box) + `top:50%` con
+     `translateY(-50%)` (centrado vertical, medido 59.5/67.7/78.7px por DEBAJO del tope
+     del header). Ahora replica EXACTAMENTE el patrón de MZL-5 (mesa 5, :2403), U4L-MZ
+     (mesa 4, :3467) y U3L-MZ (mesa 3, :3607):
+       · right: calc(100% + 1px) → el +1px es el border:1px del área IA, que lleva el
+         borde derecho del mazo al ras de su borde IZQUIERDO de border-box (contacto).
+       · top: 3px → el padding-top del área IA de mesa 2 es 3px, idéntico al de las
+         hermanas (verificado en U2L·FASE 1·M2) → alinea el tope del mazo con el del
+         header, donde viven el nombre "IA" y el badge P.
+       · left/transform reseteados para neutralizar el ancla global inner-right.
+     Sigue siendo regla PROPIA de .table-two (0,2,0), vence a .opp-deck-anchor-* (0,1,0)
+     de opponentPanel.css sin tocarlo. */
   .table-two .opp-deck-wrapper {
     left: auto;
-    right: calc(100% + 8px);
-    top: 50%;
-    transform: translateY(-50%);
+    right: calc(100% + 1px);
+    top: 3px;
+    transform: none;
   }
 
-  /* G#3 · TAMAÑO del mazo IA-PIE (mesa de 2, landscape) = mazo del humano-PIE.
-     Se ata a --pie-deck-w/h (fuente única en .game-table) → simetría: si cambia el
-     mazo del humano, este cambia con él. SOLO el mazo (.deck-pile.opp-deck y su
-     .shuffle-fan-card); las cartas de juego de la IA (.opp-card-slot) siguen con
-     --opp-card-w/h (= --card-w), sin cambio. Mayor especificidad (.game-table.table-two,
-     0,4,0) para ganar al var(--opp-card-w) base (opponentPanel.css, 0,2,0). La POSICIÓN
-     del mazo (regla de arriba) NO se toca. */
+  /* ── U2L-MZ · TAMAÑO del mazo IA-PIE (mesa 2, landscape) = el de las HERMANAS ────────
+     Antes: 32×50 vía var(--pie-deck-w/h), heredado de la simetría G#3 con el mazo del
+     humano; MZ-4 rompió esa simetría (el humano pasó a --hpie-deck-w/h) y MZ-2b excluyó
+     a mesa 2 con :not(.table-two), dejando este mazo como el ÚNICO fuera del criterio
+     común. U2L-MZ lo trae al redil: mismos valores y MISMO BREAKPOINT que MZ-2b (:2363)
+     y que el mazo del humano (--hpie-deck-w/h, :2932-2946).
+     Se escriben LITERALES aquí en vez de seguir leyendo var(--pie-deck-w/h) porque ese
+     token se define en un bloque COMPARTIDO (.table-wide/.table-three/.table-two, :2611)
+     que no se toca; con el literal la fuente del valor queda ÚNICA y al lado de la regla
+     de posición, igual que en MZ-2b.
+     DEUDA DECLARADA: --pie-deck-w/h (32/50, :2724) se queda SIN CONSUMIDOR. No se borra
+     porque vive en ese bloque compartido; queda como código muerto a limpiar aparte.
+     SOLO el mazo (.deck-pile.opp-deck) y su baraja (.shuffle-fan-card); las cartas de
+     juego de la IA (.opp-card-slot) siguen con --opp-card-w/h (= --card-w), sin cambio.
+     Especificidad 0,4,0 para ganar al var(--opp-card-w) base de opponentPanel.css (0,2,0);
+     la exclusión :not(.table-two) de MZ-2b NO se modifica. */
   .game-table.table-two .deck-pile.opp-deck,
   .game-table.table-two .opp-deck-wrapper .shuffle-fan-card {
-    width: var(--pie-deck-w);
-    height: var(--pie-deck-h);
+    width: 27px;
+    height: 42px;
+  }
+  @media (max-width: 772px) {
+    /* Espejo del breakpoint de MZ-2b: la dimensión LARGA del teléfono en portrait es el
+       ANCHO al rotar → mismo corte, mismo mazo en ambas orientaciones. */
+    .game-table.table-two .deck-pile.opp-deck,
+    .game-table.table-two .opp-deck-wrapper .shuffle-fan-card {
+      width: 21px;
+      height: 32px;
+    }
   }
 }
