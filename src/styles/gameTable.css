@@ -3479,8 +3479,48 @@
      propios: cabecera (AJILEI izq, badge CENTRADO, bocina en fila) y 2 columnas de
      IAs. El player-zone lo hereda del bloque compartido (.table-wide, .table-three). */
 
-  /* Contexto de posicionamiento para AJILEI/Mano/badge absolutos. */
-  .game-table.table-three { position: relative; }
+  /* Contexto de posicionamiento para AJILEI/Mano/badge absolutos.
+     U3L-IA · aquí viven además los tokens del encuadre de la fila de IAs (abajo). */
+  .game-table.table-three {
+    position: relative;
+
+    /* ── U3L-IA · tokens del encuadre de la fila de IAs (mesa 3 landscape) ────────
+       --ia3-lr · RESERVA IZQUIERDA del mazo, en el peor caso IA2-Pie (con el espejo
+         MZL-5 el mazo va a la IZQUIERDA de su panel). NO es el token de tamaño del
+         mazo: es su BORDER-BOX (el .deck-pile lleva border:2px por lado → 21→25 y
+         27→31) MÁS el overhang del abanico de barajado, medido en mesa 3 en los tres
+         viewports (18.6 con mazo 21, 22.1 con mazo 27; el fan-out traslada, no solo
+         rota). 31+22.1 = 53.1 → 54; 25+18.6 = 43.6 → 44, redondeados hacia arriba.
+         El corte 772 ESPEJA el de MZ-2b (:2368), que es quien cambia el mazo 27→21.
+       --ia3-colgap · el column-gap del grid se declara LOCAL (no se lee como literal
+         el `gap: 8px 6px` de la regla compartida :2558) para que la fórmula de los
+         márgenes y el layout lean el MISMO valor y no puedan desfasarse.
+       --ia3-gap · piso + tramo fluido + techo:
+         · PISO = lr + 8. Cuando el Pie es IA1 su mazo cae DENTRO del gap ocupando
+           [IA1.x − mazo, IA1.x] y el abanico se abre `overhang` más a la izquierda;
+           el piso cubre ambos y deja 8px de respiro contra el borde de IA2 → cero
+           solape entre paneles, sin necesitar el parche de z-index de MZL-5b.
+         · FLUIDO = --opp-card-w × 1.6, el MISMO eje de FL-1 que dimensiona carta y
+           panel → gap/panel ≈ 0.40 constante, la composición no se deforma al crecer.
+           A 640 el piso muerde (51.2 < 52), como debe.
+         · TECHO 74px: guarda explícita. Hoy no muerde — el techo real ya lo pone el
+           clamp de FL-1 (carta capa en 46px → el fluido congela en 73.6).
+       --ia3-shift · el ENCUADRE es ESTÁTICO: el grupo [reserva + panel + gap + panel]
+         se centra UNA sola vez en el presupuesto [AJILEI.right → bocina.left], no en
+         el área de grid, y no se re-centra cuando rota el Pie. Medido invariante en
+         los 3 viewports: AJILEI.r − G0 = 55.2 y G1 − bocina.x = 75.2, así que el
+         centro del presupuesto está SIEMPRE 10px a la izquierda del centro del área
+         → el desplazamiento del par respecto de ese centro es lr/2 − 10. */
+    --ia3-lr: 54px;
+    --ia3-colgap: 6px;
+    --ia3-gap: clamp(calc(var(--ia3-lr) + 8px), calc(var(--opp-card-w) * 1.6), 74px);
+    --ia3-shift: calc(var(--ia3-lr) / 2 - 10px);
+  }
+  @media (max-width: 772px) {
+    /* Espejo del breakpoint de MZ-2b: ahí el mazo pasa a 21×32 (border-box 25×36) y
+       el abanico a 18.6 de overhang → la reserva baja a 43.6 → 44. */
+    .game-table.table-three { --ia3-lr: 44px; }
+  }
 
   /* TAREA 2 · Cabecera (plantilla .table-four, badge centrado) */
   .table-three .table-title {        /* AJILEI esquina sup. izquierda */
@@ -3521,6 +3561,39 @@
      sigue a ancho completo. */
   .table-three .table-mid {
     grid-template-columns: repeat(2, 1fr);
+    /* U3L-IA · el column-gap pasa a token local (mismo valor 6px que la regla
+       compartida :2558; el row-gap 8px NO se toca). La fórmula de los márgenes de
+       abajo lo resta, así que ambos deben leer la MISMA fuente. */
+    column-gap: var(--ia3-colgap);
+  }
+
+  /* ── U3L-IA · PANELES DE IA JUNTOS + ENCUADRE ESTÁTICO (mesa 3 landscape) ────────
+     Las DOS columnas 1fr se conservan intactas (el óvalo, con grid-column: 1 / -1,
+     sigue viendo exactamente el mismo grid). Lo único que cambia es dónde se ancla
+     cada panel DENTRO de su columna: en vez de centrarse (justify-items:center del
+     esqueleto compartido, que dejaba un gap de 172.8/244.6/239.4px), IA2 se ancla al
+     FINAL de su columna e IA1 al PRINCIPIO de la suya, y un margen los separa la
+     distancia exacta pedida.
+       gap real = colgap + margin-right(IA2) + margin-left(IA1)
+       centro del par − centro del área = (margin-left − margin-right) / 2
+     Despejando gap = --ia3-gap y ese desplazamiento = --ia3-shift salen los dos
+     márgenes de abajo. Resultado medido: gap 52 / 64.7 / 73.6 y holguras SIMÉTRICAS
+     dentro del presupuesto [AJILEI → bocina] (56.5 / 117.0 / 107.4 a cada lado).
+     ESTÁTICO por construcción: los márgenes son tokens fijos, no dependen de quién
+     sea Pie ni de si el panel lleva badge (ambos paneles miden igual, con y sin él),
+     así que la composición no salta nunca al rotar la mano.
+     La reserva de --ia3-lr queda como flanco izquierdo VACÍO mientras el Pie no sea
+     IA2 (o sea el humano): es el precio declarado del encuadre estático — el grupo no
+     se mueve jamás. Especificidad 0,2,0, igual que `.table-three .opp-panel` (:2333),
+     y estas reglas van DESPUÉS en el archivo; además ninguna de las dos propiedades
+     (justify-self / margen lateral) está declarada allí. Solo mesa 3 landscape. */
+  .table-three .opp-top-left {
+    justify-self: end;
+    margin-right: calc((var(--ia3-gap) - var(--ia3-colgap)) / 2 - var(--ia3-shift));
+  }
+  .table-three .opp-top-right {
+    justify-self: start;
+    margin-left: calc((var(--ia3-gap) - var(--ia3-colgap)) / 2 + var(--ia3-shift));
   }
 
   /* Canaletas del óvalo: más estrecho que en 4/5 (el 3 tiene más espacio libre).
