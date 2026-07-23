@@ -3625,12 +3625,44 @@
     transform: none;
   }
 
-  /* Canaletas del óvalo: más estrecho que en 4/5 (el 3 tiene más espacio libre).
-     El alto/anclaje los gobierna ahora el esqueleto table-mid (grid-row 2,
-     align-self:end), no un flex propio. */
+  /* ── U3L-OV · ÓVALO 486 BORDER-BOX con canaletas (espejo OVL-5 / U4L-OV) ─────────
+     ANTES: `margin: 0 180px` y sin `width` → la canaleta era INERTE. Medido en fase 1:
+     el hueco que dejaban esos márgenes es 238 a 640, pero el óvalo medía 318.6 porque
+     lo gobernaba el MIN-CONTENT del contenido (flex-wrap:nowrap: POZO + mensaje +
+     comodín), desbordando su caja de márgenes 40.3px por lado. Consecuencia visible:
+     el óvalo RESPIRABA con el mensaje (medido 295.5 ↔ 318.6 en una misma mano, con los
+     mazos inmóviles). El `width` explícito lo congela.
+     El alto/anclaje siguen a cargo del esqueleto table-mid (grid-row 2, align-self:end).
+       · box-sizing: border-box → los 486 son el ancho VISIBLE (con borde y padding),
+         no el content-box; así el número es el mismo que se ve y el mismo de 5/4.
+       · width: min(486, 100% − ml − mr) → 486 fijo mientras quepa; si el área se
+         estrechara, degrada al máximo disponible en vez de desbordar.
+       · justify-self: center → dentro del hueco que dejan las canaletas el óvalo se
+         centra (el esqueleto ya trae justify-items:center; se declara explícito para
+         que la regla se lea completa y no dependa del padre).
+     ml:63 · misma derivación que en 5/4: AJILEI.right + 8 de respiro, relativo al área
+       de grid. Medido 63.2 en los TRES viewports (AJILEI está en left:12px del mismo
+       .game-table que define el área, así que el término es invariante).
+     mr:49 · ACTA: en mesa 3 esto es SIMETRÍA con las mesas hermanas 5/4, NO despeje de
+       un obstáculo. Aquí la bocina vive en la CABECERA (y 14-46) y el óvalo está en la
+       fila de abajo (y ≈150-226): no se cruzan. El mr que pediría la bocina si estuviera
+       a su nivel sería 83.2, así que 49 deja 34.2px de holgura extra — se elige el valor
+       de las hermanas a propósito, para que las tres mesas den el mismo óvalo.
+     Resultado: a 640 el óvalo queda BYTE-IDÉNTICO al de mesas 5 y 4 (x=84, r=570, w=486)
+     y el offset respecto del centro del viewport es +7 en los tres viewports, igual que
+     ellas. El umbral de derrame del texto (482) se hereda de las métricas compartidas
+     .game-message 9px/16px, que ya incluyen .table-three (:2539) → 486 ≥ 482. */
+  .game-table.table-three {
+    --ovl3-w: 486px;      /* ancho VISIBLE (border-box); umbral de derrame de texto = 482 */
+    --ovl3-ml: 63px;      /* flanco AJILEI + respiro 8, relativo al área de grid (medido 63.2) */
+    --ovl3-mr: 49px;      /* simetría con 5/4 (no despeje: la bocina no está a este nivel) */
+  }
   .table-three .center-zone {
-    margin-left: 180px;
-    margin-right: 180px;
+    box-sizing: border-box;
+    justify-self: center;
+    width: min(var(--ovl3-w), calc(100% - var(--ovl3-ml) - var(--ovl3-mr)));
+    margin-left: var(--ovl3-ml);
+    margin-right: var(--ovl3-mr);
   }
 
   /* ── 2 jugadores landscape · esqueleto compartido + override de 1 IA ──────────
