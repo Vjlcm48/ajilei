@@ -91,12 +91,8 @@ function useIsPortraitTable() {
   return useMediaQueryMatch(PORTRAIT_TABLE_MQ)
 }
 
-// DSK-G1 · Gate de escritorio (aún sin consumidores — se creará su primer uso en
-// tandas DSK posteriores). Sin export por ahora: espeja el patrón de sus hooks
-// hermanos, sin abrir el warning de react-refresh que traería exportarlo desde un
-// archivo de componentes. Directiva de dormancia hasta que la tanda que lo use lo
-// consuma (el propio consumo retira esta línea).
-// eslint-disable-next-line no-unused-vars
+// DSK-G1 · Gate de escritorio. Primer consumidor en DSK-P1 (header estático del
+// panel IA) → dormancia retirada. Espeja el patrón de sus hooks hermanos.
 function useIsDesktopTable() {
   return useMediaQueryMatch(DESKTOP_TABLE_MQ)
 }
@@ -312,6 +308,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const aliveN       = game.aliveCount
   const isLandscapeTable = useIsLandscapeTable()
   const isPortraitTable  = useIsPortraitTable()
+  const isDesktopTable   = useIsDesktopTable()   // DSK-P1: header estático del panel IA
   // AJ-1 · landscape mesas 5 y 4: AJILEI + "Mano #N" bajan de la cabecera a
   // .table-mid. El bloque debe centrarse en la franja IA↔humano, y esa franja se
   // define DENTRO de .table-mid: colgando de ahí, su 50% ya es el de la franja y
@@ -1001,9 +998,15 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           <span className="ai-label">
             <span className="ai-name">{rival.name}</span>
             <span className="ai-header-anchor">
-              {manoSeat === seat && <span className={`seat-badge seat-badge-gold${isPortraitTable ? ' seat-badge-letter' : ''}`}>{isPortraitTable ? 'M' : 'Mano'}</span>}
-              {deckSeat === seat && <span className={`seat-badge seat-badge-neutral${isPortraitTable ? ' seat-badge-letter' : ''}`}>{isPortraitTable ? 'P' : 'Pie'}</span>}
-              {turnSeat === seat && <span className={`seat-badge seat-badge-gold${isPortraitTable ? ' seat-badge-letter' : ''}`}>{isPortraitTable ? 'T' : 'Turno'}</span>}
+              {/* DSK-P1 (cierre mesa 2): la vía legacy .ai-zone también va a inicial
+                  en escritorio. rivalLetter = portrait || desktop → móvil intacto
+                  (portrait ya usaba letra; desktop pasa de palabra a inicial). */}
+              {manoSeat === seat && <span className={`seat-badge seat-badge-gold${(isPortraitTable || isDesktopTable) ? ' seat-badge-letter' : ''}`}>{(isPortraitTable || isDesktopTable) ? 'M' : 'Mano'}</span>}
+              {deckSeat === seat && <span className={`seat-badge seat-badge-neutral${(isPortraitTable || isDesktopTable) ? ' seat-badge-letter' : ''}`}>{(isPortraitTable || isDesktopTable) ? 'P' : 'Pie'}</span>}
+              {/* TURNO: móvil conserva render condicional; escritorio reserva el slot
+                  (visibility) para que su toggle no mueva nombre ni badges (O1). */}
+              {!isDesktopTable && turnSeat === seat && <span className={`seat-badge seat-badge-gold${isPortraitTable ? ' seat-badge-letter' : ''}`}>{isPortraitTable ? 'T' : 'Turno'}</span>}
+              {isDesktopTable && <span className="seat-badge seat-badge-gold seat-badge-letter" style={{ visibility: turnSeat === seat ? 'visible' : 'hidden' }}>T</span>}
               {rivalWon && <span className="win-score-chip">{rival.score.points}</span>}
             </span>
           </span>
@@ -1079,6 +1082,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
         letterBadges={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3 || aliveN === 2))}
         cornerChip={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3 || aliveN === 2))}
+        desktopHeader={isDesktopTable}
         inShowdown={showdownWinnerSeat !== null}
         isChipOpen={openChipSeat === seat}
         onChipTap={() => handleChipTap(seat)}

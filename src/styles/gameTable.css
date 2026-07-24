@@ -4153,5 +4153,87 @@
       top: -4px; bottom: -4px;
       left: -4px; right: -4px;
     }
+    /* DSK-P1 · el nombre lleva overflow:hidden (para el ellipsis del reserve 12ch),
+       que RECORTARÍA el ::after táctil de B2. En showdown el nombre es tappable y
+       corto (nunca desborda) → se re-habilita overflow:visible (0,3,0 gana al 0,2,0
+       del reserve) y el ::after vuelve a extender el hit a ≥40, como antes de P1. */
+    .opp-panel .opp-name.opp-name-tappable { overflow: visible; }
   }
+
+  /* ── DSK-P1 · Panel IA estático (header recompuesto) ───────────────────────
+     Aplica a TODO el gate desktop (fuera del sub-media ≤800). El JSX espeja este
+     scope con useIsDesktopTable (badges a inicial + slot TURNO reservado). Sin
+     !important: los selectores .opp-panel X (0,2,0) ganan a las bases (0,1,0).
+     NOTA (heredada de B2): el ::after táctil del nombre viaja con .opp-name-tappable;
+     este re-anclado del nombre (izq, 12ch) mantiene su hit ≥40 — re-verificado. */
+
+  /* Header a lo ancho del panel: nombre pegado a la izquierda, pastillas a la
+     derecha. Deja de estar centrado (base .opp-panel align-items:center). */
+  .opp-panel .opp-header {
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  /* Nombre en la esquina sup. izq. con RESERVA FIJA de 12ch: "IA 1" ocupa lo
+     mismo que un nombre de 12 caracteres; si algún día se excede → ellipsis.
+     El ancho constante evita que la longitud del nombre mueva las pastillas. */
+  .opp-panel .opp-name {
+    min-width: 12ch;
+    max-width: 12ch;
+    flex: 0 0 auto;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Anclaje derecho REAL: el default es display:contents (transparente); aquí se
+     vuelve un grupo flex fijo a la derecha, donde viven las pastillas de rol/turno
+     (y el chip de puntaje en showdown). El slot TURNO reservado (JSX) mantiene su
+     caja aunque esté oculto → nada se desplaza al activarse/desactivarse el turno. */
+  .opp-panel .opp-header-anchor {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+
+  /* "Mejor palo: X (N pts)" fuera en escritorio (vuelve en su tanda si aplica). */
+  .opp-panel .opp-score { display: none; }
+
+  /* ── Cierre mesa 2 · vía legacy .ai-zone (renderTwoPlayerRival) ─────────────
+     Mesa 2 en escritorio NO usa OpponentPanel sino .ai-zone, así que su header no
+     recibió el tratamiento. Mismo criterio: nombre 12ch arriba-izq, pastillas a
+     inicial (JSX), mejor-palo fuera. El saldo (.ai-chips) queda (muere en P2).
+     Espeja los knobs del portrait M2-5 (gameTable.css:1504) pero con reserva FIJA
+     (min=max 12ch, como .opp-name) para cero divergencia con mesas 3/4/5. */
+  /* .ai-label a fila flex que llena el ancho (como el portrait M2-5) → nombre a la
+     izquierda (12ch), grupo de badges empujado a la DERECHA (margin-left:auto),
+     justo antes del saldo. Así el ancla queda arriba-derecha como en 3/4/5. */
+  .table-two .ai-info .ai-label {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+  .table-two .ai-name {
+    min-width: 12ch;
+    max-width: 12ch;
+    flex: 0 0 auto;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .table-two .ai-header-anchor {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  /* "Mejor palo" del rival (score-tag dentro de .ai-zone; el humano es
+     .score-tag-player en .player-zone, intacto). */
+  .ai-zone .score-tag { display: none; }
 }

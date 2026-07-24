@@ -21,6 +21,7 @@ export default function OpponentPanel({
   revealAnimClass,  // fase de la coreografía de volteo (R2.b) — '' fuera de ella
   isEliminating,    // C4.5: bancarrota — salida digna (desatura + "Sin fichas" + fade)
   letterBadges,     // H1/M4-1/M3-1: header rediseñado (letra M/P/T, sin saldo) — mesas 5, 4 y 3 vertical
+  desktopHeader,    // DSK-P1: header estático de escritorio (nombre izq + inicial M/P/T der)
   cornerChip,       // H4/M4-2/M3-1: monta la ficha de esquina — mesas 5, 4 y 3 vertical
   inShowdown,       // H2: hay mano revelada en la mesa (showdownWinnerSeat !== null)
   isChipOpen,       // H4: el toggle de saldo de ESTE panel está desplegado
@@ -44,6 +45,9 @@ export default function OpponentPanel({
   // nunca coexisten, sin hueco vacío ni salto (alturas de pastilla parejas).
   // Fuera del modo letra los badges siguen visibles en showdown, como siempre.
   const lettersHidden = letterBadges && inShowdown
+  // DSK-P1: en escritorio los badges también van a inicial (M/P/T). Móvil intacto
+  // (desktopHeader es false fuera del gate → headerLetter === letterBadges).
+  const headerLetter = letterBadges || desktopHeader
   return (
     <div className={`opp-panel opp-${seatPos}${stateClasses}${revealAnimClass ? ` ${revealAnimClass}` : ''}`}>
       {/* opp-topline: por defecto display:contents (transparente) → identidad y saldo
@@ -64,9 +68,13 @@ export default function OpponentPanel({
               vertical lo vuelve el anclaje derecho único donde conviven —nunca
               a la vez— la letra (juego) y el chip de puntaje (showdown). */}
           <span className="opp-header-anchor">
-            {isMano && !lettersHidden && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'M' : 'Mano'}</span>}
-            {isPie  && !lettersHidden && <span className={`seat-badge seat-badge-neutral${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'P' : 'Pie'}</span>}
-            {isTurn && !lettersHidden && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'T' : 'Turno'}</span>}
+            {isMano && !lettersHidden && <span className={`seat-badge seat-badge-gold${headerLetter ? ' seat-badge-letter' : ''}`}>{headerLetter ? 'M' : 'Mano'}</span>}
+            {isPie  && !lettersHidden && <span className={`seat-badge seat-badge-neutral${headerLetter ? ' seat-badge-letter' : ''}`}>{headerLetter ? 'P' : 'Pie'}</span>}
+            {/* TURNO — móvil: render condicional intacto (gateado por !desktopHeader).
+                DSK-P1 · escritorio: el slot se RESERVA siempre (visibility) para que su
+                aparición/desaparición no mueva el badge de rol ni el nombre (doctrina O1). */}
+            {!desktopHeader && isTurn && !lettersHidden && <span className={`seat-badge seat-badge-gold${letterBadges ? ' seat-badge-letter' : ''}`}>{letterBadges ? 'T' : 'Turno'}</span>}
+            {desktopHeader && <span className="seat-badge seat-badge-gold seat-badge-letter" style={{ visibility: isTurn && !lettersHidden ? 'visible' : 'hidden' }}>T</span>}
             {isWinner && score && <span className="win-score-chip">{score.points}</span>}
           </span>
         </div>
