@@ -4092,4 +4092,66 @@
     .player-zone { padding-block: 8px; }
     .cards-row   { padding: 2px 0; }
   }
+
+  /* ── DSK-B2 · Hit-areas táctiles ≥40px (SOLO punteros coarse) ──────────────
+     Porta el embaldosado de BT-L/MT-1 al gate desktop, adaptado a su geometría
+     (visual mayor que en móvil, layout NO se reestructura): tamaño visual
+     INTACTO + pseudo transparente que expande el hit a ≥40 por eje. Estándar de
+     campaña táctil = 40px (doctrina BT-L/MT-1), no el mínimo WCAG.
+     pointer:fine (ratón) no recibe NI UNA regla → diff cero por construcción en
+     escritorio con mouse (y en móvil, fuera del gate landscape/min-height:601).
+     El pseudo es hijo generado del control → los taps sobre el área ampliada
+     disparan el onClick del propio control (no hay nodo intermedio).
+     NOTA FUTURA (DSK-P1): P1 moverá el nombre de la IA a la esquina superior
+     izquierda; el ::after viaja con su nodo (.opp-name-tappable), pero al cambiar
+     la geometría del contenedor el checkpoint de P1 DEBE re-verificar los hits. */
+  @media (pointer: coarse) {
+    /* Ancla común: el ::after es absolute → el control debe ser positioned. Sin
+       offsets → no desplaza nada visualmente. */
+    .action-area .btn { position: relative; }
+
+    /* Botones de acción (Iniciar / Pasar / Apostar / Retirarse / Sin descartar /
+       Descartar N / Siguiente) → alto 40 (visual 33 intacto). :not(.btn-mult)
+       excluye los multiplicadores, que llevan su propio embaldosado abajo. */
+    .action-area .btn:not(.btn-mult)::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: -3.5px; bottom: -3.5px;   /* 33 + 3.5·2 = 40 */
+    }
+
+    /* Separa la fila de mults de los botones de acción para que sus hit-áreas
+       ampliadas no se solapen en la fase de apuesta: ½mult 6 + ½botón 3.5 = 9.5 >
+       8 (gap base). A 12 quedan ~2.5px de aire entre ambos grupos (sin solape). */
+    .action-col { gap: 12px; }
+
+    /* Multiplicadores ×1..×10 → alto 40 + embaldosado horizontal. gap-row 6 (base)
+       → el ::after a −4 (½gap 3 + 1px de borde, el ::after ancla al padding-box)
+       lleva su borde al centro EXACTO del gap: vecinos SE TOCAN, jamás se
+       superponen. El extremo derecho (×10 = último hijo) se ancla al border-box
+       (−1) para no salir de la celda. El izquierdo (×1) NO es primer hijo del
+       .mult-row (lo es el timer, no tappable) → conserva −4 y embaldosa contra el
+       hueco del timer sin ambigüedad. */
+    .mult-row .btn-mult::after {
+      content: '';
+      position: absolute;
+      /* .btn-mult SÍ tiene borde 1px → el ::after ancla al padding-box (1px dentro):
+         −7 = 1px borde + 6px → 6px MÁS ALLÁ del border-box por lado → 28 + 12 = 40. */
+      top: -7px; bottom: -7px;
+      left: -4px; right: -4px;
+    }
+    .mult-row .btn-mult:last-child::after { right: -1px; }
+
+    /* Nombre de IA tappable (curiosear, showdown) → ≥40 en ambos ejes. Visual
+       ~34.8×38.8 (padding em de .opp-name-tappable) → ::after a ~40.8×40.8. */
+    .opp-name-tappable { position: relative; }
+    .opp-name-tappable::after {
+      content: '';
+      position: absolute;
+      /* Holgura extra (−4/−3) para clarar 40 aun con 1-2px de bloqueo por vecinos
+         del header en el sondeo elementFromPoint. Visual ~34.8×38.8 → ~42.8×46.8. */
+      top: -4px; bottom: -4px;
+      left: -4px; right: -4px;
+    }
+  }
 }
