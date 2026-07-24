@@ -4059,3 +4059,13 @@
     }
   }
 }
+
+/* ============================================================
+   CAMPAÑA DSK — Escritorio / laptop / tablet landscape
+   Gate: (orientation: landscape) and (min-height: 601px)
+   Espejo JSX: useIsDesktopTable
+   Regla: todo cambio desktop vive scoped aquí. Nada fuera.
+   ============================================================ */
+@media (orientation: landscape) and (min-height: 601px) {
+  /* DSK-B1+ se construye aquí */
+}

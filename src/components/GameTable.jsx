@@ -51,6 +51,15 @@ const LANDSCAPE_TABLE_MQ = '(orientation: landscape) and (max-height: 600px)'
 // debe seguir instantáneo — su CSS de coreografía no existe).
 const PORTRAIT_TABLE_MQ = '(max-width: 767px) and (orientation: portrait)'
 
+// DSK-G1 · Espejo POSITIVO del landscape móvil para ESCRITORIO / laptop / tablet
+// landscape: misma orientación horizontal, pero altura amplia (min-height:601px)
+// que el teléfono horizontal (max-height:600px) nunca alcanza. Gate único sobre
+// el que se scopea toda la campaña DSK (bloque homónimo al final de gameTable.css).
+// Riesgo aceptado: entre max-height:600px (móvil) y min-height:601px (desktop) hay
+// un hueco teórico para alturas fraccionales (600 < h < 601), posible solo con
+// zoom del navegador. Caso borde extremo, aceptado por simplicidad del corte.
+const DESKTOP_TABLE_MQ = '(orientation: landscape) and (min-height: 601px)'
+
 // R2.b · Tiempos de la coreografía de volteo del intercambio de manos en el
 // showdown — casar con las variables --reveal-* de opponentPanel.css.
 // Timeline total ≈ 960ms: cerrar (320) → recoger (200, la entrante arranca
@@ -80,6 +89,16 @@ function useIsLandscapeTable() {
 
 function useIsPortraitTable() {
   return useMediaQueryMatch(PORTRAIT_TABLE_MQ)
+}
+
+// DSK-G1 · Gate de escritorio (aún sin consumidores — se creará su primer uso en
+// tandas DSK posteriores). Sin export por ahora: espeja el patrón de sus hooks
+// hermanos, sin abrir el warning de react-refresh que traería exportarlo desde un
+// archivo de componentes. Directiva de dormancia hasta que la tanda que lo use lo
+// consuma (el propio consumo retira esta línea).
+// eslint-disable-next-line no-unused-vars
+function useIsDesktopTable() {
+  return useMediaQueryMatch(DESKTOP_TABLE_MQ)
 }
 
 // ── Deal helpers ─────────────────────────────────────────────────────────────
