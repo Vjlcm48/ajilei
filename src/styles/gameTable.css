@@ -3753,7 +3753,21 @@
     width: 32px; height: 28px; padding: 0;
     display: inline-flex; align-items: center; justify-content: center;
   }
-  .table-two .table-header { min-height: 30px; }
+  /* ── U2L-PH · CABECERA SIN ALTO RESERVADO (espejo de F9 en mesa 3) ──────────────
+     Los TRES hijos de la cabecera de mesa 2 son position:absolute contra .game-table
+     (.table-title left:12/top:6 · .hand-badge left:12/top:28 · .header-right top:6/
+     right:8, arriba en este mismo bloque), así que la caja del <header> estaba VACÍA
+     y aun así reservaba 30px de alto. Mesa 3 ya lo había resuelto igual (F9:
+     `.table-three .table-header { min-height: 0 }`) — por eso su cabecera medía 0 y
+     la de mesa 2, treinta.
+     Esos 30px eran justo lo que faltaba abajo: el reparto flex 5.5/4.5 los devuelve
+     como +16.5 a la banda media y +13.5 a la banda humana, que pasa de 139.1 a 152.6
+     a 640 y deja de estar comprimida (desborde real scrollHeight−clientHeight: 3 → 0).
+     La mordida del badge "Mano"/"Turno" (−0.6px fuera del marco) se convierte en
+     +6.1px de respiro, el MISMO valor que mesa 3. Los multiplicadores pasan de 1 a
+     7.8px. Nada de la cabecera se mueve: sus hijos son absolutos y siguen anclados a
+     .game-table, no al <header>. */
+  .table-two .table-header { min-height: 0; }
 
   /* ── 2 jug landscape · DOS óvalos FLANQUEANDO al panel de la IA ────────────────
      El JSX del 2-landscape monta renderTwoOvalsZone(): un contenedor .two-ovals con
@@ -3788,7 +3802,19 @@
        (ceñida al contenido), esto pone el borde izquierdo del área IA en CONTACTO
        border-box con el borde derecho del óvalo del POZO. */
     justify-self: start;
-    margin-top: -28px;               /* AFINABLE: sube el tope a la línea de AJILEI */
+    /* U2L-PH · RECALIBRADO −28 → +2. El valor viejo compensaba una cabecera de 30px:
+       su comentario lo derivaba como `header(30) + gap(4) − 6`. Al pasar la cabecera a
+       min-height:0 (abajo), .table-mid arranca 30px más arriba y el mismo −28 habría
+       arrastrado el área IA a y=−10, FUERA del viewport, con el mazo en −6 y su
+       abanico recortado en −23.4 (medido en la simulación del arnés).
+       Nueva derivación con la misma fórmula: el tope de .table-mid es ahora
+       `contenido de .game-table (14) + cabecera (0) + gap (4) = 18`, y el área IA debe
+       seguir empezando en 20 (6px bajo el borde del padding-box, donde está hoy):
+       20 − 18 = +2. Verificado: tope del área IA, header de la IA (24…54), cartas
+       (57…145.8) y mazo (24…60) quedan BYTE-IDÉNTICOS a antes en los 3 viewports; el
+       área solo pierde 13.5px por ABAJO, que es exactamente lo que cede a la banda
+       humana. AFINABLE (mismo carácter que el valor anterior). */
+    margin-top: 2px;
     justify-content: flex-start;
   }
   /* AJUSTE 3 · el texto de estado (pensando/pasó/igualó) baja al fondo del panel
