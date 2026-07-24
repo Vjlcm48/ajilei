@@ -3673,16 +3673,74 @@
      columna de IA y cabecera con el indicador a la DERECHA (armonía adaptativa:
      5/3 centro · 4 especial · 2 derecha). El PORTRAIT del 2 (.ai-zone espejo)
      NO entra en este media query y queda intacto. */
-  .game-table.table-two { position: relative; }
+  /* U2L-RD · tokens de la banda media reestructurada (ver el bloque grande abajo). */
+  .game-table.table-two {
+    position: relative;
+
+    /* --rd2-out · cuánto se ASOMA la banda media fuera del área de contenido de
+       .game-table para alcanzar el marco del área humana. .player-zone consigue su
+       ancho con `margin: 0 -12px` (:2763), que reembolsa el padding lateral de
+       .game-table (`padding: 6px 12px 8px`, :2254). La banda media usa el MISMO
+       valor para que el borde izquierdo del POZO y el derecho del RECT caigan en la
+       VERTICAL EXACTA del marco humano.
+       DEUDA DECLARADA: los −12px de .player-zone son un literal en un bloque
+       compartido con 5/4/3 que no se puede leer desde aquí → este token es una
+       SEGUNDA fuente del mismo número. Si allá cambia el padding de .game-table,
+       hay que mover los dos.
+       --pozo2-w · ancho border-box del óvalo del POZO. También es la RESERVA que
+       separa el área IA de la cabecera: el mazo (border-box) y su abanico viven a la
+       izquierda del área IA, así que el despeje contra AJILEI vale
+       `--pozo2-w − (mazo + overhang) − (AJILEI.right − marco.left)`, y ese último
+       término mide 67.2 en los tres viewports. A 640 (mazo 25, overhang 18.6) los
+       122 heredados dan +11.2 de despeje; a ≥773 el mazo crece a 31 y el overhang a
+       22.1, así que 122 dejaría solo +1.7 → se reserva a 129 para volver al estándar
+       de ≥8px (medido +8.7). El coste (7px del hueco central) lo absorben de sobra
+       las holguras de 80.7/49.1px que hay ahí arriba.
+       --rect2-w / --rect2-h · caja CONSTANTE del rectángulo de mensajes. 157 = 135
+       netos (ancho mínimo MEDIDO para que el peor mensaje del motor —64 chars,
+       gameEngine.js:186/188— entre en 3 líneas a 12px/15.6) + 20 de padding + 2 de
+       borde. 69 = 3 × 15.6 + 20 + 2. Ambos son constantes de MEDICIÓN, no derivables:
+       si cambia la tipografía del mensaje o aparece un mensaje más largo en el motor,
+       hay que volver a medirlos. */
+    --rd2-out: 12px;
+    --pozo2-w: 122px;
+    --rect2-w: 157px;
+    --rect2-h: 69px;
+  }
+  @media (min-width: 773px) {
+    /* Espejo del breakpoint del mazo (MZ-2b / U2L-MZ): arriba de 772 el mazo pasa a
+       31 de border-box y su abanico a 22.1 de overhang → la reserva sube 7px. */
+    .game-table.table-two { --pozo2-w: 129px; }
+  }
 
   /* Override del 2 sobre el esqueleto: TRES columnas en UNA fila → los dos óvalos
      FLANQUEAN al panel del rival: [O1 pozo] [IA centro, ancho generoso] [O2 mensaje].
      La IA (col central 'auto') es la protagonista; los óvalos toman 1fr a cada lado.
      align-items: end → los tres alineados a su parte BAJA (sobre el player-zone). */
+  /* ── U2L-RD · GRID de la banda media ────────────────────────────────────────────
+     ANTES: `0.7fr auto 0.7fr`. Los `0.7fr` son en realidad `minmax(auto, 0.7fr)`: su
+     mínimo es el min-content del item, y la columna 2 (`auto`, el área IA con cartas
+     de 63px) se servía primero. A 640 eso dejaba la columna 3 en 72.8px — MENOS que
+     el óvalo del mensaje (103.4) → el óvalo, con `justify-self:end`, DESBORDABA su
+     pista hacia la izquierda y se montaba sobre el área IA (medido en fase 1: solape
+     de 17px; es el defecto del capture).
+     AHORA cuatro columnas con anchos DEFINIDOS y un único `1fr` que absorbe todo el
+     sobrante, siempre en el mismo sitio (entre el área IA y el rectángulo):
+        [1] POZO  = --pozo2-w   (fijo)
+        [2] IA    = auto        (ceñido a su contenido: 5 cartas + gaps + cromo)
+        [3] hueco = 1fr         (el sobrante; 7px a 640, 73.7 a 844, 42.1 a 932)
+        [4] RECT  = --rect2-w   (fijo)
+     column-gap 0 → POZO e IA quedan en CONTACTO border-box sin restar nada.
+     Los márgenes negativos llevan el área de grid a la vertical del marco humano,
+     así que la columna 1 arranca exactamente en marco.left y la 4 termina en
+     marco.right (las alineaciones pedidas salen del GRID, no de offsets por item). */
   .table-two .table-mid {
-    grid-template-columns: 0.7fr auto 0.7fr;   /* laterales más estrechos → aire para mazo IA y O1 */
+    grid-template-columns: var(--pozo2-w) auto 1fr var(--rect2-w);
     grid-template-rows: 1fr;
     align-items: end;
+    column-gap: 0;
+    margin-left: calc(var(--rd2-out) * -1);
+    margin-right: calc(var(--rd2-out) * -1);
   }
 
   /* Cabecera del 2: AJILEI izq, "Mano #" debajo, bocina·✕ a la derecha. */
@@ -3725,6 +3783,11 @@
   .table-two .opp-panel {
     grid-column: 2; grid-row: 1;
     align-self: stretch;
+    /* U2L-RD · pegado al INICIO de su columna (antes lo centraba el justify-items:center
+       del esqueleto). Como la columna 2 arranca donde termina el POZO y es `auto`
+       (ceñida al contenido), esto pone el borde izquierdo del área IA en CONTACTO
+       border-box con el borde derecho del óvalo del POZO. */
+    justify-self: start;
     margin-top: -28px;               /* AFINABLE: sube el tope a la línea de AJILEI */
     justify-content: flex-start;
   }
@@ -3792,16 +3855,21 @@
     align-self: end;
     justify-self: start;
     flex: 0 0 auto;
-    width: auto;
+    /* U2L-RD · el ancho pasa a TOKEN border-box y el margen izquierdo muere: la
+       columna 1 ya arranca en la vertical del marco humano, así que el óvalo se
+       alinea con él sin offsets. Con border-box, 122 − 20 de padding − 2 de borde
+       = 100 de contenido = exactamente el min-width:100px que tenía antes → a 640 el
+       render es IDÉNTICO; a ≥773 la reserva sube a 129 (despeje del abanico) y esos
+       7px extra son más aire alrededor de la pastilla, en la línea del "+50% de
+       perímetro" con que nació este óvalo. */
+    box-sizing: border-box;
+    width: var(--pozo2-w);
     height: auto;
-    /* +50% de ancho SOLO del perímetro del óvalo: min-width mayor que el contenido.
-       El recuadro POZO (.pot-box) NO cambia; el justify-content:center heredado de
-       .felt-oval lo deja centrado, dejando aire a ambos lados para futuras fichas. */
-    min-width: 100px;
+    min-width: 0;
     min-height: 0;
     padding: 5px 10px;
     gap: 8px;
-    margin-left: 8px;
+    margin-left: 0;
   }
   /* Contenido del pozo vertical y ceñido: "Pozo" sobre el número, sin aire muerto.
      Anula el min-width:64px del .pot-box landscape (global de 3/4/5) SOLO dentro de
@@ -3822,21 +3890,42 @@
   .table-two .oval-left .call-box { display: none; }
   .table-two .oval-left .pot-label { font-size: 10px; }
   .table-two .oval-left .pot-value { font-size: 18px; }
-  /* Mensaje (O2): pegado a la DERECHA y MÁS ALTO que O1 (no son simétricos: O2 debe
-     albergar frases largas de showdown envueltas). (PUNTO 3) */
+  /* ── U2L-RD · RECTÁNGULO DE MENSAJES (muere el óvalo elástico) ───────────────────
+     El .oval-right era content-sized (sin width, `flex:0 0 auto`, `min-width:0`): su
+     ancho lo dictaba el mensaje. Medido en fase 1: 12 anchos distintos a 640 (76.1 …
+     115.9) y hasta 9 líneas de derrame en el peor mensaje. Dos defectos en uno —
+     violaba O1 y no cabía.
+     Ahora es una CAJA CONSTANTE: --rect2-w × --rect2-h, border-box, reservada desde
+     el arranque. Existe con su tamaño final aunque el mensaje sea corto o no haya
+     mensaje; el texto se centra dentro (align/justify-content:center heredados de
+     .felt-oval) y nunca mueve la caja.
+     PIEL HERMANA: conserva la clase .felt-oval → mismo radial de marca, mismo borde
+     dorado de 1px y el mismo brillo interno que los óvalos. Solo cambia la GEOMETRÍA:
+     el border-radius:999px (racetrack) baja a un radio suave de rectángulo. La
+     tipografía del mensaje NO se toca (12px/1.3): la palanca de fuente quedó sin usar.
+     grid-column: 4 → última columna, de ancho fijo, cuyo borde derecho cae en la
+     vertical del marco humano (el margen negativo del grid lo lleva hasta ahí), así
+     que el `margin-right:8px` que lo separaba ya no hace falta.
+     align-self: end → comparte LÍNEA DE BASE con el óvalo del POZO, que es como
+     estaban ambos (la propuesta de "centrarlo" no coincidía con el mecanismo real,
+     corregido tras la medición de fase 1). */
   .table-two .oval-right {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
     align-self: end;
     justify-self: end;
     flex: 0 0 auto;
-    margin-right: 8px;
-    min-height: 64px;
-    padding: 10px 18px;
+    box-sizing: border-box;
+    width: var(--rect2-w);
+    height: var(--rect2-h);
+    min-width: 0;
+    min-height: 0;
+    margin-right: 0;
+    padding: 10px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 0;
   }
 
   /* Mensaje adaptado VERTICAL dentro del óvalo derecho: texto centrado que envuelve
@@ -3873,7 +3962,10 @@
      hereda margin-left negativo (look "abanico" de 3/4/5) que las solapa; se anula
      SOLO en .table-two y se da gap positivo. 3/4/5 conservan su abanico intacto. */
   .table-two .opp-cards {
-    gap: 6px;
+    /* U2L-RD · 6 → 2. Es una de las tres palancas que cierran la ecuación de la banda
+       media a 640 (libera 4 gaps × 4px = 16px, área IA 352 → 336). Las CARTAS no se
+       tocan (62.8 a 640): solo se juntan. */
+    gap: 2px;
     justify-content: center;
   }
   .table-two .opp-card-slot:not(:first-child) {
