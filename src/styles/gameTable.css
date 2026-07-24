@@ -4067,5 +4067,29 @@
    Regla: todo cambio desktop vive scoped aquí. Nada fuera.
    ============================================================ */
 @media (orientation: landscape) and (min-height: 601px) {
-  /* DSK-B1+ se construye aquí */
+
+  /* ── DSK-B1 · Saneamiento de overflow vertical (desktops de poca altura) ──
+     Sub-media max-height:800 → 1920×937 (937>800) queda fuera por construcción
+     (diff cero garantizado). Cubre 1280×720 (exceso real ~54px) y 1366×768
+     (~5.75px). Estrategia 1: neutralizar la inflación de line-height de plantilla
+     + recortar el cromo del contenedor. NO toca las bandas ancla
+     (.action-area / .game-message). Sin !important; gana por orden de fuente
+     (este bloque es el último de gameTable.css, importado tras index.css). */
+  @media (max-height: 800px) {
+    /* La line-height 145% se COMPUTA en :root (26.1px a 18px); heredarla ya
+       resuelta impide desinflarla desde un descendiente. Se baja el font AQUÍ
+       —espejo exacto de index.css:29— para recalcularla 26.1→23.2px y encoger
+       todas las filas de texto (rivals-zone + óvalo ≈ −5.75px). */
+    :root { font-size: 16px; }
+
+    /* safe center: cualquier sobrante residual pasa a scroll ALCANZABLE en vez
+       de recorte superior inaccesible (espejo del fix ya aprobado en portrait). */
+    .game-table-screen { padding-block: 8px; align-items: safe center; }
+
+    /* Recorte de cromo (paddings/gaps), sin tocar cartas ni acciones. */
+    .game-table  { padding-block: 12px; gap: 6px; }
+    .table-mid   { gap: 6px; }
+    .player-zone { padding-block: 8px; }
+    .cards-row   { padding: 2px 0; }
+  }
 }
