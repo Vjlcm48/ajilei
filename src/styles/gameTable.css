@@ -4144,13 +4144,15 @@
 
     /* Nombre de IA tappable (curiosear, showdown) → ≥40 en ambos ejes. Visual
        ~34.8×38.8 (padding em de .opp-name-tappable) → ::after a ~40.8×40.8. */
-    .opp-name-tappable { position: relative; }
+    /* z-index: el ::after se extiende hacia .opp-cards (abajo), que como hermano
+       posterior lo PINTA ENCIMA → elementFromPoint devolvía la carta y el hit caía
+       a ~38. Elevando el nombre (posicionado) sobre las cartas, su ::after gana el
+       hit-test en el solape → ≥40 estable. Transparente: sin cambio visual. */
+    .opp-name-tappable { position: relative; z-index: 6; }
     .opp-name-tappable::after {
       content: '';
       position: absolute;
-      /* Holgura extra (−4/−3) para clarar 40 aun con 1-2px de bloqueo por vecinos
-         del header en el sondeo elementFromPoint. Visual ~34.8×38.8 → ~42.8×46.8. */
-      top: -4px; bottom: -4px;
+      top: -5px; bottom: -5px;   /* 38.8 + 10 ≈ 48.8, margen sobre 40 */
       left: -4px; right: -4px;
     }
     /* DSK-P1 · el nombre lleva overflow:hidden (para el ellipsis del reserve 12ch),
@@ -4236,4 +4238,106 @@
   /* "Mejor palo" del rival (score-tag dentro de .ai-zone; el humano es
      .score-tag-player en .player-zone, intacto). */
   .ai-zone .score-tag { display: none; }
+
+  /* ── DSK-P2 · Panel IA interactivo (ficha de esquina) ──────────────────────
+     Porta el mecanismo móvil COMPLETO al gate: ficha inferior-izquierda + saldo
+     oculto que se revela al tap (float absoluto) + palabra de estado en la misma
+     franja (cede el renglón al saldo por visibility) + autocierre 3000ms (mismo
+     handler JS handleChipTap/CHIP_TOGGLE_MS, no reimplementado). El saldo inline
+     "N fichas" se desmontó en el JSX → cumple DSK-1 en las IAs.
+     TODO absoluto (ficha, float, estado) → abrir/cerrar no mueve NADA (O1). El
+     peor caso 7 dígitos cabe en el ancho del panel sin recorte (float absoluto,
+     pointer-events:none → nunca empuja). Espeja opponentPanel.css:458-582. */
+
+  /* Keyframes propio del gate (los de móvil viven dentro de sus media queries). */
+  @keyframes chipFloatInDSK {
+    from { opacity: 0; transform: translateY(-50%) scale(0.92); }
+    to   { opacity: 1; transform: translateY(-50%) scale(1); }
+  }
+
+  /* Mesas 3/4/5 (.opp-panel, position:relative de base). */
+  .opp-panel .opp-corner-chip {
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    padding: 6px;
+    line-height: 0;
+    cursor: pointer;
+    z-index: 2;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .opp-panel .chip-balance-float {
+    position: absolute;
+    left: calc(100% - 2px);
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--gold-brand);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.55);
+    animation: chipFloatInDSK 0.15s ease-out;
+  }
+  .opp-panel.chip-open { z-index: 3; }
+  /* Palabra de estado extraída a la franja inferior, a nivel de la ficha (bottom
+     centra su alto de 26px en la línea de la ficha) y del float. Reserva del
+     renglón vía padding-bottom para que las cartas no se muevan al extraerlo. */
+  .opp-panel .opp-status {
+    position: absolute;
+    left: 30px;
+    right: 4px;
+    bottom: -2px;
+  }
+  .opp-panel.chip-open .opp-status { visibility: hidden; }
+  .game-table .opp-panel { padding-bottom: 30px; }
+
+  /* Mesa 2 (.ai-zone) — mismo mecanismo, insets simétricos (panel ancho, estado
+     centrado por el text-align:center heredado). .ai-zone se vuelve caja
+     posicionada para anclar la ficha. */
+  .ai-zone { position: relative; }
+  .ai-zone .opp-corner-chip {
+    position: absolute;
+    left: 8px;
+    bottom: 4px;
+    padding: 6px;
+    line-height: 0;
+    cursor: pointer;
+    z-index: 2;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ai-zone .chip-balance-float {
+    position: absolute;
+    left: calc(100% - 2px);
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--gold-brand);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.55);
+    animation: chipFloatInDSK 0.15s ease-out;
+  }
+  .ai-zone.chip-open { z-index: 3; }
+  .ai-zone .opp-status {
+    position: absolute;
+    left: 40px;
+    right: 40px;
+    bottom: 5px;
+  }
+  .ai-zone.chip-open .opp-status { visibility: hidden; }
+
+  /* DSK-P2 · deuda táctil de B2: la ficha (visual ~28px) → hit ≥40 en coarse vía
+     pseudo transparente (fine no recibe nada). Cubre .opp-panel y .ai-zone. La
+     palabra de estado (no interactiva) empieza en left:30/40 → sin conflicto de
+     tap; el nombre vive en el header (arriba) → sin solape vertical. */
+  @media (pointer: coarse) {
+    .opp-corner-chip::after {
+      content: '';
+      position: absolute;
+      top: -6px; bottom: -6px;   /* 28 + 6·2 = 40 */
+      left: -6px; right: -6px;
+    }
+  }
 }

@@ -81,7 +81,11 @@ export default function OpponentPanel({
         {/* H3/M4-1: en las mesas con header rediseñado (señal letterBadges:
             5 y 4 vertical) la línea del saldo no se monta — su lugar lo toma
             la ficha con toggle. El resto de escenarios la conserva intacta. */}
-        {!letterBadges && <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>}
+        {/* DSK-P2: en escritorio cornerChip=true → el saldo inline "N fichas" se
+            desmonta (lo sustituye la ficha de esquina), cumpliendo DSK-1 en las IAs.
+            Móvil intacto: donde cornerChip=true, letterBadges ya era true → !letterBadges
+            ya lo desmontaba (la condición extra es no-op fuera del gate desktop). */}
+        {!letterBadges && !cornerChip && <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>}
       </div>
 
       <div className="opp-cards">

@@ -1010,7 +1010,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
               {rivalWon && <span className="win-score-chip">{rival.score.points}</span>}
             </span>
           </span>
-          {!isPortraitTable && <span className="ai-chips"><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>}
+          {/* DSK-P2: escritorio también desmonta el saldo inline (lo sustituye la
+              ficha). Móvil intacto (portrait ya lo desmontaba; landscape usa opp-panel). */}
+          {!isPortraitTable && !isDesktopTable && <span className="ai-chips"><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>}
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
@@ -1036,7 +1038,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             el payout, cuando el .score-tag ocupa la misma franja centrada).
             Absoluto y centrado vía CSS .table-two; con el chip abierto cede
             el renglón al saldo (clase chip-open en la sección). */}
-        {isPortraitTable && (
+        {(isPortraitTable || isDesktopTable) && (
           <span className={`opp-status${turnSeat === seat ? ' opp-status-turn' : ''}`}>
             {inReset || (isPayoutPhase && rival.score)
               ? ' '
@@ -1052,7 +1054,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             3/4/5 (handleChipTap/openChipSeat con el seat REAL del rival, el
             tap-fuera ya excluye .opp-corner-chip). El CSS de posicionamiento
             vive scopeado a .table-two (ancla a .ai-zone, relative en M2-2). */}
-        {isPortraitTable && (
+        {(isPortraitTable || isDesktopTable) && (
           <span className="opp-corner-chip" onClick={() => handleChipTap(seat)}>
             <ChipToken size="icon" />
             {openChipSeat === seat && (
@@ -1081,7 +1083,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         revealAnimClass={revealChoreoClass(seat)}
         isEliminating={!!ceremony && ceremony.seats.includes(seat)}
         letterBadges={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3 || aliveN === 2))}
-        cornerChip={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3 || aliveN === 2))}
+        cornerChip={(isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3)) || (isLandscapeTable && (aliveN === 5 || aliveN === 4 || aliveN === 3 || aliveN === 2)) || isDesktopTable}
         desktopHeader={isDesktopTable}
         inShowdown={showdownWinnerSeat !== null}
         isChipOpen={openChipSeat === seat}
