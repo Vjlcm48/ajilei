@@ -4340,4 +4340,72 @@
       left: -6px; right: -6px;
     }
   }
+
+  /* ── DSK-R1 · Revelación de finalistas sin layout shift ─────────────────────
+     Bug Fase 0: la regla GLOBAL opponentPanel.css:183-185 pasa el margin-left del
+     slot revelado de −0.35 (solape de flujo) a +0.3 (separación) → .opp-cards infla
+     180→310px → la columna `auto` del grid .table-mid roba ancho al óvalo (464→334)
+     y a los paneles superiores (199→134). El scale(1.2) por-slot es transform (no
+     refluye) y se CONSERVA: crece visualmente sin mover caja.
+     Doctrina O1: NADA se mueve. Tratamiento espejo del móvil landscape
+     (opponentPanel.css:214-276) adaptado a escritorio, PERO aquí el solape es
+     aceptado y necesario (no se despliegan las cartas sin pisarse): el ancho de
+     FLUJO de .opp-cards NO cambia entre reposo y revelado, y la visibilidad se
+     resuelve en la CAPA DE APILAMIENTO. Mesa 2 fuera de alcance (usa .ai-zone, no
+     .opp-winner → estos selectores no la tocan).
+
+     1 · Ancho de flujo intacto: el slot revelado conserva el solape de reposo
+     (−0.35), anulando la separación +0.3 de la base. Especificidad 0,4,0 > 0,3,0
+     → gana por especificidad + orden de fuente, sin !important (patrón P1). */
+  .table-five .opp-winner .opp-card-slot:not(:first-child),
+  .table-four .opp-winner .opp-card-slot:not(:first-child),
+  .table-three .opp-winner .opp-card-slot:not(:first-child) {
+    margin-left: calc(var(--opp-card-w) * -0.35);
+  }
+
+  /* 2 · Apilamiento sólido: el panel revelado ENTERO sube sobre el óvalo, los
+     paneles vecinos y cualquier adyacente. .opp-panel es position:relative de base
+     → al recibir z-index se vuelve contexto de apilamiento y confina el z-index
+     interno de sus cartas (los slots ya son z-index:5 por la base GLOBAL). Su
+     ancestro .table-mid es position:relative SIN z-index → no crea contexto que
+     encierre al panel por debajo del óvalo (hermano sin z-index). opacity:1 anula
+     cualquier atenuación (opp-folded 0.55 al espiar una mano retirada) que dejara
+     traslucir lo de abajo. */
+  .table-five .opp-panel.opp-winner,
+  .table-four .opp-panel.opp-winner,
+  .table-three .opp-panel.opp-winner {
+    z-index: 7;
+    opacity: 1;
+  }
+  .table-five .opp-winner .opp-cards,
+  .table-five .opp-winner .playing-card,
+  .table-four .opp-winner .opp-cards,
+  .table-four .opp-winner .playing-card,
+  .table-three .opp-winner .opp-cards,
+  .table-three .opp-winner .playing-card {
+    opacity: 1;
+  }
+
+  /* 3 · La pastilla de puntaje (win-score-chip) fuera de flujo. Es el ÚNICO
+     elemento del header que aparece al revelar: los badges de rol (M/P) son
+     estáticos por asiento y el slot T está reservado por visibility (P1), así que
+     ninguno cambia el ancho al tocar otro nombre. La pastilla, EN FLUJO, ensancha
+     el anchor → header → panel; y como las columnas del grid son minmax(auto,1fr),
+     el panel revelado (más ancho) sube el piso de su columna y arrastra el óvalo
+     centrado (medido: óvalo +44px, panel 187→231). Sacándola a absolute su
+     aparición no cambia el ancho de NINGÚN panel → Δ=0 real (doctrina O1, mismo
+     recurso que la ficha/estado de P2). Se ancla al borde derecho del panel, sobre
+     el slot T reservado (invisible en showdown: sin turno); solape aceptado ~5px
+     con el badge Pie (la pastilla pinta encima, z-index). Scopeada a 5/4/3 → mesa 2
+     (.ai-zone, sin .opp-panel) intacta; el saldo del humano (.player-bar-left
+     .win-score-chip) tampoco se toca. */
+  .table-five .opp-panel .win-score-chip,
+  .table-four .opp-panel .win-score-chip,
+  .table-three .opp-panel .win-score-chip {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    margin-left: 0;
+    z-index: 4;
+  }
 }
