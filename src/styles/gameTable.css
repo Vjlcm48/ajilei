@@ -4341,6 +4341,61 @@
     }
   }
 
+  /* ── DSK-O1 · Óvalo central CONGELADO (mesa 5) ──────────────────────────────
+     Punto 8: el óvalo queda fijo con el tamaño que tiene, para que ningún
+     contenido presente ni futuro lo mueva. La tanda esperó a R1/R2: el reflow que
+     lo encogía 464→334 al revelar murió en R1.
+
+     MEDIDO (16 celdas, 3 manos por celda, 16 familias de mensaje inyectadas):
+     · El MENSAJE no lo mueve — Δ=0 en las 4 celdas para todas las familias
+       reales del motor, incluidas las que envuelven a 2 líneas (resultado con
+       AJILEI, empate, aviso de eliminación de 63 ch). La columna del texto es
+       `minmax(0, 360px)` con `overflow: hidden` en el óvalo: ni siquiera una
+       cadena continua sin espacios lo infla.
+     · Lo que SÍ lo movía: 6,74px de la columna lateral. El panel pasa de 180,48
+       a 187,22 cuando aparece su pastilla de rol (la cabecera va de 29,23 a
+       64,47 y supera a la fila de cartas, 150,48), y como el grid base es
+       `auto 1fr auto` la columna `auto` se lo cobra al óvalo (1fr) — que además
+       se DESPLAZA, porque sólo crece la columna del asiento con pastilla.
+       A 1920 no ocurría: ahí manda la fila de cartas (180,17 > cabecera 64,47).
+       Peor caso real: Mano y Pie en los dos asientos laterales → −13,48px.
+
+     ANCHO · se fija la columna lateral en su estado ANCHO (decisión de Victor:
+     el óvalo adopta el estado más comprimido y no se mueve jamás — misma
+     doctrina que el O1 de portrait). La fórmula no estima, reproduce lo medido:
+       columna = reserva del mazo + panel en su peor caso
+       · reserva del mazo = calc(--card-w * 0.55 + 14px) — espeja el padding de
+         .side-col-left/right (opponentPanel.css) para que ambos no se separen;
+       · panel = max(cabecera con pastilla, fila de cartas) + 30px de cromo
+         (padding 14+14 + borde 1+1). La cabecera es px pura: mide 187,22 tanto
+         con :root a 16px (sub-media B1 ≤800) como a 18px — verificado en
+         1366×768, 1440×850 y 1920×937 → la constante NO lleva rem.
+       · La fila de cartas es 3,6 · --opp-card-w (5 slots con solape −0,35) + 30.
+     Resultado: 243,02px con carta 76 y 274,22px con carta 91 — exactamente los
+     máximos medidos, así que a 1920 el óvalo no cambia ni un píxel.
+     `minmax(0, 1fr)` en la columna central: el óvalo nunca podrá ser inflado
+     tampoco desde dentro (el `1fr` base es minmax(auto,1fr)).
+
+     ALTO · el alto del óvalo es SOBRANTE (flex:1 dentro de .mid-center), y hoy
+     mide Δ=0 en todos los estados; lo que podría robárselo es la fila de
+     rivales. Se sella en sus 196px actuales (idénticos en las 4 celdas) →
+     borde-caja, incluido su padding-top de 4 (el proyecto es content-box). El
+     alto sigue al VIEWPORT (212/164/212/234), como en portrait, pero ya no al
+     contenido. Espeja .table-three .rivals-zone { height: var(--o1-rivals3-h) }.
+     Alcance sellado: mesa 5. Mesas 4/3/2 quedan intactas (medidas y reportadas
+     como insumo: la 4 comparte la elasticidad de 6,74; la 3 y la 2 tienen Δ=0). */
+  .table-five .table-mid {
+    --o1-side-col: calc(
+      var(--card-w) * 0.55 + 14px
+      + max(187.22px, var(--card-w) * 0.55 * 3.6 + 30px)
+    );
+    grid-template-columns: var(--o1-side-col) minmax(0, 1fr) var(--o1-side-col);
+  }
+  .table-five .rivals-zone {
+    box-sizing: border-box;   /* 196 = 192 de paneles + su padding-top de 4 */
+    height: 196px;
+  }
+
   /* ── DSK-R1 · Revelación de finalistas sin layout shift ─────────────────────
      Bug Fase 0: la regla GLOBAL opponentPanel.css:183-185 pasa el margin-left del
      slot revelado de −0.35 (solape de flujo) a +0.3 (separación) → .opp-cards infla
