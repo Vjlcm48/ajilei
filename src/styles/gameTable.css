@@ -4363,6 +4363,89 @@
     margin-left: calc(var(--opp-card-w) * -0.35);
   }
 
+  /* ── DSK-R2b · Despliegue de las cartas reveladas (sin solape entre ellas) ────
+     Remate de la revelación: en reposo revelado las cartas se ven DESPLEGADAS,
+     una al lado de otra, espejo del móvil. El móvil lo logra pasando el margin de
+     flujo a +3px (→ ancho de fila cambia); aquí NO se puede (inflaría la columna
+     auto del grid y arrastraría el óvalo — el bug que R1 resolvió). Solución sin
+     tocar el flujo: translateX POR SLOT (screen-space: va ANTES de scale en la
+     lista → no se re-escala), manteniendo el margin de solape −0.35 fijo →
+     ancho de FLUJO idéntico a reposo (Δ=0 de R1 sobrevive cada frame; el bbox de
+     .opp-cards no cambia porque los transforms de los hijos no inflan la caja del
+     padre). Medido: móvil deja 1.6px borde a borde con carta de 54.4px; escritorio
+     tiene carta de 52.56px (≈ igual) → mismo gap absoluto. El paso de flujo es
+     0.65·card_w (solape) y el objetivo 52.56+1.6≈54.2px → translateX extra de
+     0.646·card_w por índice. Centrado simétrico respecto al centro del pilote
+     (i−2 para 5 cartas, que .opp-cards ya centra con justify-content:center) →
+     el abanico sobresale por igual a ambos lados, y de ahí lo mete en cintura el
+     confinamiento DSK-R2c (--dsk-fan-dx, justo abajo). Especificidad 0,4,0 gana a
+     la base GLOBAL .opp-winner .opp-card-slot (0,2,0) sin !important. */
+
+  /* ── DSK-R2c · Confinamiento al perímetro del área de juego ──────────────────
+     MEDIDO (12 celdas, barras de scroll REALES): el abanico simétrico sobresale
+     del borde de .game-table en los asientos LATERALES — 13.8..19.4px con carta
+     76 y 28.7px con carta 91 — porque el panel lateral está clavado a 26px del
+     borde del área y el abanico se extiende 1.41·card_w más allá del panel.
+     Dos consecuencias, UNA causa:
+       · cartas pintadas fuera del tapete (sobre el felt de la pantalla);
+       · el SALTITO: los transforms SÍ inflan el overflow desplazable del
+         scroller (.game-table-screen). Cuando el desborde derecho se come los
+         20px de padding de la pantalla aparece la barra horizontal → el cliente
+         encoge 15px → el área centrada salta 15px (7.5 los paneles) en UN frame,
+         y al plegarse el abanico (fase collect) la barra se va y salta de vuelta.
+         Medido en T5 1366×768 y T4 1280×720 (ahí encadena barra vertical: −15
+         también en x). El desborde IZQUIERDO no crea barra (en LTR el overflow
+         inline-start no es desplazable) pero pinta igual de fuera.
+     Regla: el conjunto se desplaza HACIA DENTRO lo justo para que la carta
+     extrema aterrice en el borde interior del perímetro. Offset asimétrico por
+     asiento, en TRANSFORM (cero flujo → el Δ=0 de R1/R2 se conserva) y sumado
+     dentro del mismo translateX del despliegue → la coreografía lo anima gratis
+     (collect lo colapsa con la escala, grow lo hace viajar; sin corte seco).
+     Geometría del peor caso (panel MÍNIMO = el que mide justo la fila, 3.6·w):
+       sobresale = 1.41·w + 1.2px(borde de carta escalado) − 15px(borde+padding
+       del panel) − 26px(borde+padding del área) → dx = 1.41·w − 37.8px, donde
+       los +2px de vuelta dejan la carta en el padding-box (dentro del filo
+       dorado, no encima). Con panel más ancho el abanico cae aún MÁS adentro
+       (nunca fuera: el margen sólo crece). max()/min() blindan el signo: si un
+       token de carta futuro fuese pequeño (w < 26.8) el offset se anula en vez
+       de empujar hacia fuera. Asientos NO laterales heredan 0 (var por defecto):
+       mesa 5 top-left/top-right, mesa 4 top-center y mesa 3 top-*, medidos con
+       88..111px de margen sobrante, siguen centrados. */
+  .table-five .opp-side-left,
+  .table-four .opp-side-left {
+    --dsk-fan-dx: max(0px, calc(var(--opp-card-w) * 1.41 - 37.8px));
+  }
+  .table-five .opp-side-right,
+  .table-four .opp-side-right {
+    --dsk-fan-dx: min(0px, calc(37.8px - var(--opp-card-w) * 1.41));
+  }
+
+  .table-five .opp-winner .opp-card-slot:nth-child(1),
+  .table-four .opp-winner .opp-card-slot:nth-child(1),
+  .table-three .opp-winner .opp-card-slot:nth-child(1) {
+    transform: translateX(calc(var(--opp-card-w) * -1.292 + var(--dsk-fan-dx, 0px))) scale(1.2);
+  }
+  .table-five .opp-winner .opp-card-slot:nth-child(2),
+  .table-four .opp-winner .opp-card-slot:nth-child(2),
+  .table-three .opp-winner .opp-card-slot:nth-child(2) {
+    transform: translateX(calc(var(--opp-card-w) * -0.646 + var(--dsk-fan-dx, 0px))) scale(1.2);
+  }
+  .table-five .opp-winner .opp-card-slot:nth-child(3),
+  .table-four .opp-winner .opp-card-slot:nth-child(3),
+  .table-three .opp-winner .opp-card-slot:nth-child(3) {
+    transform: translateX(var(--dsk-fan-dx, 0px)) scale(1.2);   /* central: ancla del abanico */
+  }
+  .table-five .opp-winner .opp-card-slot:nth-child(4),
+  .table-four .opp-winner .opp-card-slot:nth-child(4),
+  .table-three .opp-winner .opp-card-slot:nth-child(4) {
+    transform: translateX(calc(var(--opp-card-w) * 0.646 + var(--dsk-fan-dx, 0px))) scale(1.2);
+  }
+  .table-five .opp-winner .opp-card-slot:nth-child(5),
+  .table-four .opp-winner .opp-card-slot:nth-child(5),
+  .table-three .opp-winner .opp-card-slot:nth-child(5) {
+    transform: translateX(calc(var(--opp-card-w) * 1.292 + var(--dsk-fan-dx, 0px))) scale(1.2);
+  }
+
   /* 2 · Apilamiento sólido: el panel revelado ENTERO sube sobre el óvalo, los
      paneles vecinos y cualquier adyacente. .opp-panel es position:relative de base
      → al recibir z-index se vuelve contexto de apilamiento y confina el z-index
@@ -4407,5 +4490,124 @@
     right: 14px;
     margin-left: 0;
     z-index: 4;
+  }
+
+  /* ── DSK-R2 · Coreografía del curiosear (volteo espejo de móvil) ────────────
+     El canje de manos en showdown deja de ser instantáneo (Fase 0 · D2). El
+     driver JS es el MISMO (startRevealSwap/REVEAL_CHOREO); sólo se abrió el gate
+     runsChoreo a isDesktopTable (GameTable.jsx, aliveN 3/4/5 → mesa 2 fuera). Aquí
+     se portan las 4 fases que en móvil viven en las media landscape/portrait
+     (opponentPanel.css) — keyframes cardFlipClose/cardFlipReveal (gameTable.css
+     :912/924) y vars --reveal-* (opponentPanel.css:191) YA son globales; sólo
+     faltaban las reglas de fase. ADAPTADO al modelo de solape de R1: la escala va
+     POR SLOT (1.2, no 1.6 en la fila) y NUNCA se anima width/margin en flujo →
+     todo es transform+opacity → el Δ=0 de R1 sobrevive cada frame (el margin-left
+     de solape queda fijo en −0.35 toda la coreografía). Fases: 1 cerrar (cara
+     0°→90°) · 2 recoger (slot 1.2→1, dorso asienta) · 3 crecer (slot 1→1.2) ·
+     4 abrir (dorso 90°→cara 0°). Los canjes cara/dorso ocurren de canto (90°). */
+
+  /* Fase 1 · la saliente cierra: cada carta gira de cara a canto (0°→90°),
+     escalonada. El slot conserva su escala 1.2 (.opp-winner aún vigente). */
+  .table-five .opp-reveal-closing .opp-card-slot .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot .playing-card {
+    animation: cardFlipClose var(--reveal-flip-ms) ease-in both;
+  }
+  /* Micro-escalonado compartido cerrar/abrir (cartas 2ª→5ª) */
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(2) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(2) .playing-card { animation-delay: var(--reveal-stagger-ms); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(3) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(3) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 2); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(4) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(4) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 3); }
+  .table-five .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-five .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card,
+  .table-four .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-four .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card,
+  .table-three .opp-reveal-closing .opp-card-slot:nth-child(5) .playing-card,
+  .table-three .opp-reveal-open    .opp-card-slot:nth-child(5) .playing-card { animation-delay: calc(var(--reveal-stagger-ms) * 4); }
+
+  /* Fase 2 · la saliente recoge — estado AUTOSUFICIENTE: el panel pierde
+     .opp-winner a mitad (displayedSeat pasa a la entrante en 'grow'), así que la
+     clase sostiene z-index/opacity y ESCALA el slot 1.2→1 con transición (0,3,0 >
+     0,2,0 de .opp-winner → gana sin depender del orden). El solape ya está en el
+     base (−0.35), no se toca. El dorso asienta de canto (90°) a plano tras el
+     canje cara→dorso (cardFlipReveal breve). */
+  .table-five .opp-panel.opp-reveal-collect,
+  .table-four .opp-panel.opp-reveal-collect,
+  .table-three .opp-panel.opp-reveal-collect {
+    z-index: 7;
+    opacity: 1;
+  }
+  .table-five .opp-panel.opp-reveal-collect .opp-card-slot,
+  .table-four .opp-panel.opp-reveal-collect .opp-card-slot,
+  .table-three .opp-panel.opp-reveal-collect .opp-card-slot {
+    /* colapsa a la vez la escala (1.2→1) y el despliegue (translateX→0): un solo
+       transform anima ambos. .opp-panel sube la especificidad a 0,4,0 para ganar
+       al despliegue DSK-R2b (mismo peso, gana por orden de fuente). */
+    transform: scale(1);
+    transition: transform var(--reveal-scale-ms) ease;
+  }
+  .table-five .opp-reveal-collect .opp-card-slot .playing-card,
+  .table-four .opp-reveal-collect .opp-card-slot .playing-card,
+  .table-three .opp-reveal-collect .opp-card-slot .playing-card {
+    animation: cardFlipReveal var(--reveal-settle-ms) ease-out both;
+  }
+
+  /* Fase 3 · la entrante crece: ya porta .opp-winner (scale 1.2 por slot); la
+     transición hace VIAJAR la escala 1→1.2 (parte de non-winner scale 1). */
+  .table-five .opp-reveal-grow .opp-card-slot,
+  .table-four .opp-reveal-grow .opp-card-slot,
+  .table-three .opp-reveal-grow .opp-card-slot {
+    transition: transform var(--reveal-scale-ms) ease;
+  }
+
+  /* Fase 4 · la entrante abre: de canto (90°) a cara (0°), escalonada, ya a 1.2. */
+  .table-five .opp-reveal-open .opp-card-slot .playing-card,
+  .table-four .opp-reveal-open .opp-card-slot .playing-card,
+  .table-three .opp-reveal-open .opp-card-slot .playing-card {
+    animation: cardFlipReveal var(--reveal-flip-ms) ease-out both;
+  }
+
+  /* Z · la entrante (grow/open) manda sobre la z:7 residual de la saliente
+     (collect) — aditivo, el empate a 7 lo decidía el orden DOM (espeja
+     opponentPanel.css:386-393). */
+  .table-five .opp-panel.opp-winner.opp-reveal-grow,
+  .table-five .opp-panel.opp-winner.opp-reveal-open,
+  .table-four .opp-panel.opp-winner.opp-reveal-grow,
+  .table-four .opp-panel.opp-winner.opp-reveal-open,
+  .table-three .opp-panel.opp-winner.opp-reveal-grow,
+  .table-three .opp-panel.opp-winner.opp-reveal-open {
+    z-index: 8;
+  }
+
+  /* La pastilla de puntaje (flotada, R2 arriba) se oculta durante toda la
+     coreografía y reaparece al desmontar las clases — visibility, sin remover
+     DOM (espeja opponentPanel.css:398-403). */
+  .table-five .opp-reveal-closing .win-score-chip,
+  .table-five .opp-reveal-collect .win-score-chip,
+  .table-five .opp-reveal-grow .win-score-chip,
+  .table-five .opp-reveal-open .win-score-chip,
+  .table-four .opp-reveal-closing .win-score-chip,
+  .table-four .opp-reveal-collect .win-score-chip,
+  .table-four .opp-reveal-grow .win-score-chip,
+  .table-four .opp-reveal-open .win-score-chip,
+  .table-three .opp-reveal-closing .win-score-chip,
+  .table-three .opp-reveal-collect .win-score-chip,
+  .table-three .opp-reveal-grow .win-score-chip,
+  .table-three .opp-reveal-open .win-score-chip {
+    visibility: hidden;
   }
 }

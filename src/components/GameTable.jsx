@@ -684,7 +684,11 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   function handleRevealTap(seat) {
     if (revealAnim !== null) return
     if (revealedSeat === seat) return
-    const runsChoreo = isLandscapeTable || (isPortraitTable && (aliveN === 5 || aliveN === 4 || aliveN === 3))
+    // DSK-R2: la coreografía de volteo también corre en escritorio (mesas 5/4/3;
+    // mesa 2 fuera por el gate aliveN). Móvil intacto (isDesktopTable=false ahí).
+    // El driver (startRevealSwap) es el mismo; el CSS de las 4 fases se porta al
+    // bloque DSK adaptado al modelo de solape de R1 (transforms → Δ=0 sobrevive).
+    const runsChoreo = isLandscapeTable || ((isPortraitTable || isDesktopTable) && (aliveN === 5 || aliveN === 4 || aliveN === 3))
     if (!runsChoreo) { setDisplayedSeat(seat); return }
     startRevealSwap(revealedSeat, seat)
   }
