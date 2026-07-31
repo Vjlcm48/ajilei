@@ -4341,6 +4341,94 @@
     }
   }
 
+  /* ── DSK-H1 · Área del jugador humano ───────────────────────────────────────
+     Puntos 1-humano, 10 y 11. VÍA DE RENDER ÚNICA (verificado en las 4 mesas del
+     gate × 4 viewports): .player-zone > .player-bar (grid) con los mismos hijos
+     — .player-bar-left [.pbr-name, .pbr-badges] y .player-bar-right [.pbr-chips,
+     .pbr-sep, .pbr-mesa]. Mesa 2 sólo añade .ai-zone para el rival, así que aquí
+     NO hay el desdoblamiento que obligó a P1 a cubrir dos caminos: un único
+     tratamiento cubre 5/4/3/2. Todas las medidas son px medidos: las fuentes de
+     la barra (nombre 14, pastillas 10, cifra 18) NO cambian con el escalón de
+     :root 16↔18 — comprobado en 1366×768 y 1920×937.
+
+     IDENTIDAD (izquierda) · el nombre sube a su propia fila con reserva fija de
+     12ch + ellipsis (mismo criterio que P1 usó en el nombre de la IA: hoy "Tú",
+     mañana hasta 12 caracteres, y la caja no se mueve ni con el nombre largo).
+     Las tres pastillas bajan a la fila de abajo con PALABRA COMPLETA (las
+     iniciales son sólo de oponentes, P1). Reservas O1 en la fila de pastillas:
+       · .pbr-tags con min-width de la pastilla MANO (55.89, la más ancha de las
+         dos de rol) → cambiar Mano↔Pie, o quedarse sin rol, no desplaza a TURNO;
+       · min-height 20px = alto de la pastilla PIE (neutral, con borde: 20 contra
+         18 de las doradas) → la fila no respira al rotar los roles ni cuando el
+         humano se queda sin pastillas;
+       · el slot de TURNO se reserva en JSX por visibility (ver GameTable.jsx) →
+         peor caso rol+TURNO simultáneos ya está pagado desde el primer frame.
+     El chip de puntaje del showdown toma columna propia (3) en vez de compartir
+     celda con TURNO: aquí TURNO está SIEMPRE en el DOM y compartir la celda los
+     solaparía (en portrait no pasa porque allí el badge se desmonta).
+
+     SALDO (derecha) · muere la palabra "fichas" y muere el separador "·" (ambos
+     por CSS, sin tocar el JSX: los spans siguen existiendo para el resto de
+     orientaciones). El bloque pasa a columna alineada a la derecha —espejo de
+     HU-1/HU-2 de portrait—: ficha+cifra arriba, "Mesa N" debajo, ambos al mismo
+     borde derecho, de modo que el último carácter de "Mesa N" cae en vertical
+     sobre el último dígito del saldo. La ficha viaja con la cifra (son un
+     inline-flex) → la cifra crece hacia la IZQUIERDA y el borde derecho no se
+     mueve jamás. La reserva de 7 dígitos sin separador (9999999, decisión
+     sellada) se paga en el contenedor, no en la cifra: así el bloque tiene ancho
+     CONSTANTE desde el primer frame y ningún saldo futuro puede empujar la
+     columna del grid (y con ella los botones de acción). 111.34 = ficha 36 +
+     gap 4 + "9999999" a 18px bold (71.34 medidos).
+     Nada más se toca: botones de acción, abanico y timer quedan intactos. */
+  .player-bar-left {
+    display: grid;
+    grid-template-columns: auto auto auto;   /* rol · turno · chip de puntaje */
+    grid-template-rows: auto auto;           /* nombre · pastillas */
+    justify-items: start;
+    align-items: center;
+    column-gap: 6px;
+    row-gap: 4px;
+    overflow: visible;    /* el ellipsis vive ahora en .pbr-name, no en el bloque */
+  }
+  .player-bar-left .pbr-name {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: block;
+    width: 12ch;          /* reserva sellada: la caja no depende del nombre */
+    text-align: left;     /* el área hereda centrado; el nombre va al filo izq (P1) */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* el wrapper se aplana → .pbr-tags y el badge de TURNO son celdas directas */
+  .player-bar-left .pbr-badges { display: contents; }
+  .player-bar-left .pbr-tags {
+    grid-column: 1;
+    grid-row: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 55.89px;   /* pastilla MANO: reserva del peor caso de rol */
+    min-height: 20px;     /* pastilla PIE (neutral con borde): fila constante */
+  }
+  .player-bar-left .badge-turno   { grid-column: 2; grid-row: 2; }
+  .player-bar-left .win-score-chip { grid-column: 3; grid-row: 2; }
+  /* en el grid el espaciado lo da el gap → se anula el margin-left inline */
+  .player-bar-left .pbr-tags .seat-badge,
+  .player-bar-left .badge-turno,
+  .player-bar-left .win-score-chip { margin-left: 0; }
+
+  .player-bar-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.15;
+    min-width: 111.34px;   /* reserva 7 dígitos: ficha 36 + gap 4 + 9999999 (71.34) */
+  }
+  .pbr-fichas-word { display: none; }
+  .pbr-sep         { display: none; }
+  .pbr-mesa        { display: block; }
+
   /* ── DSK-O1 · Óvalo central CONGELADO (mesa 5) ──────────────────────────────
      Punto 8: el óvalo queda fijo con el tamaño que tiene, para que ningún
      contenido presente ni futuro lo mueva. La tanda esperó a R1/R2: el reflow que

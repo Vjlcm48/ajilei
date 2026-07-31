@@ -1317,7 +1317,9 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                   Turno"). El grid de gameTable.css recoloca por orientación:
                   · portrait  → .pbr-tags (Mano/Pie) ENCIMA del nombre, Turno al lado;
                   · landscape → TODO el grupo .pbr-badges (Mano/Pie/Turno) debajo de
-                                "Mesa N", al fondo del rail izquierdo.
+                                "Mesa N", al fondo del rail izquierdo;
+                  · escritorio (DSK-H1) → nombre ARRIBA con reserva 12ch y las tres
+                                pastillas en la fila de abajo, palabra completa.
                   Ambos aplanan los wrappers con display:contents (ver CSS). */}
               <span className="pbr-name">Tú</span>
               <span className="pbr-badges">
@@ -1325,7 +1327,15 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                   {manoSeat === 0 && <span className="seat-badge seat-badge-gold">Mano</span>}
                   {deckSeat === 0 && <span className="seat-badge seat-badge-neutral">Pie</span>}
                 </span>
-                {turnSeat === 0 && <span className="seat-badge seat-badge-gold badge-turno">Turno</span>}
+                {/* DSK-H1 · doctrina O1: en escritorio el slot de TURNO se RESERVA
+                    siempre y solo cambia su visibility → entrar o salir del turno no
+                    mueve el nombre, la pastilla de rol ni nada del área. Espeja el
+                    patrón que P1 ya aplicó al header de la IA (línea ~1013). Fuera
+                    del gate el badge sigue montándose/desmontándose: móvil idéntico. */}
+                {!isDesktopTable && turnSeat === 0 && <span className="seat-badge seat-badge-gold badge-turno">Turno</span>}
+                {isDesktopTable && (
+                  <span className="seat-badge seat-badge-gold badge-turno" style={{ visibility: turnSeat === 0 ? 'visible' : 'hidden' }}>Turno</span>
+                )}
               </span>
               {showdownWinnerSeat === 0 && <span className="win-score-chip">{human.score.points}</span>}
             </strong>
