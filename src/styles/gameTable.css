@@ -4093,6 +4093,27 @@
     .cards-row   { padding: 2px 0; }
   }
 
+  /* ── DSK-H2 · Reserva al PEOR CASO de pastilla (rotación de rol) ───────────
+     Las pastillas no miden igual: la neutra (PIE) lleva borde 1px y mide 2px
+     MÁS que las doradas (MANO/TURNO/chip de puntaje). Medido: 27.2 vs 29.2 con
+     :root a 16px y 30.09 vs 32.09 con 18px. Como el rol rota CADA mano, la fila
+     que las aloja respiraba esos 2px al entrar en PIE — violación O1 en los tres
+     frentes que muestran rol: el área humana (H1), el header de las IAs (P1) y
+     su gemelo .ai-info de mesa 2 (vía legacy .ai-zone); en los dos últimos el
+     empujón bajaba además la fila de cartas del rival.
+     Doctrina O1 pura: se RESERVA el peor caso; NO se igualan las pastillas
+     (.seat-badge-* es estilo compartido con móvil y no se toca).
+     Alto de pastilla = line-height + padding vertical (2×2) + borde (2×1, sólo
+     la neutra) → la reserva es line-height + 6. La line-height se hereda ya
+     RESUELTA desde :root (font: 18px/145% de index.css, computada allí una sola
+     vez: 26.1px a 18 y 23.2px a 16) → 1.45rem la reproduce exacta en los DOS
+     escalones del gate, incluido el 16px que fuerza el sub-media de B1.
+     El 0.125 extra absorbe el redondeo a 1/64px del motor: con :root a 16 la
+     pastilla usa 23.203125 de line-height donde 1.45rem da 23.1875, y una
+     reserva UN pelo corta deja crecer la fila 0.0156px (medido). Pasarse es
+     inocuo —la fila queda constante en todos los estados—, quedarse corto no. */
+  .game-table-screen { --dsk-badge-row: calc(1.45rem + 6.125px); }
+
   /* ── DSK-B2 · Hit-areas táctiles ≥40px (SOLO punteros coarse) ──────────────
      Porta el embaldosado de BT-L/MT-1 al gate desktop, adaptado a su geometría
      (visual mayor que en móvil, layout NO se reestructura): tamaño visual
@@ -4175,6 +4196,10 @@
     width: 100%;
     justify-content: space-between;
     gap: 6px;
+    /* DSK-H2 · reserva del peor caso de pastilla: sin ella el header medía 27.2
+       sin rol o con MANO y 29.2 con PIE, y esos 2px bajaban .opp-cards al rotar
+       el Pie a este asiento. Ahora la fila es constante en todos los estados. */
+    min-height: var(--dsk-badge-row);
   }
 
   /* Nombre en la esquina sup. izq. con RESERVA FIJA de 12ch: "IA 1" ocupa lo
@@ -4210,6 +4235,10 @@
      inicial (JSX), mejor-palo fuera. El saldo (.ai-chips) queda (muere en P2).
      Espeja los knobs del portrait M2-5 (gameTable.css:1504) pero con reserva FIJA
      (min=max 12ch, como .opp-name) para cero divergencia con mesas 3/4/5. */
+  /* DSK-H2 · gemelo del header de P1 en la vía legacy: misma reserva del peor
+     caso de pastilla (aquí el crecimiento de 2px bajaba la fila .cards-row del
+     rival de mesa 2 al pasar su rol a PIE). */
+  .table-two .ai-info { min-height: var(--dsk-badge-row); }
   /* .ai-label a fila flex que llena el ancho (como el portrait M2-5) → nombre a la
      izquierda (12ch), grupo de badges empujado a la DERECHA (margin-left:auto),
      justo antes del saldo. Así el ancla queda arriba-derecha como en 3/4/5. */
@@ -4358,9 +4387,11 @@
      iniciales son sólo de oponentes, P1). Reservas O1 en la fila de pastillas:
        · .pbr-tags con min-width de la pastilla MANO (55.89, la más ancha de las
          dos de rol) → cambiar Mano↔Pie, o quedarse sin rol, no desplaza a TURNO;
-       · min-height 20px = alto de la pastilla PIE (neutral, con borde: 20 contra
-         18 de las doradas) → la fila no respira al rotar los roles ni cuando el
-         humano se queda sin pastillas;
+       · min-height = alto de la pastilla PIE (la neutra lleva borde y mide 2px
+         más que las doradas) → la fila no respira al rotar los roles ni cuando
+         el humano se queda sin pastillas. OJO: hasta DSK-H2 esta reserva era de
+         20px —por debajo de la pastilla real (29.2/32.09 medidos)— y la fila SÍ
+         crecía 2px al entrar en PIE; hoy la paga --dsk-badge-row (ver H2);
        · el slot de TURNO se reserva en JSX por visibility (ver GameTable.jsx) →
          peor caso rol+TURNO simultáneos ya está pagado desde el primer frame.
      El chip de puntaje del showdown toma columna propia (3) en vez de compartir
@@ -4409,7 +4440,9 @@
     align-items: center;
     gap: 4px;
     min-width: 55.89px;   /* pastilla MANO: reserva del peor caso de rol */
-    min-height: 20px;     /* pastilla PIE (neutral con borde): fila constante */
+    /* DSK-H2 · antes 20px: reservaba menos que la pastilla real (29.2/32.09) y
+       la fila crecía 2px al rotar MANO→PIE. Ahora reserva el peor caso medido. */
+    min-height: var(--dsk-badge-row);
   }
   .player-bar-left .badge-turno   { grid-column: 2; grid-row: 2; }
   .player-bar-left .win-score-chip { grid-column: 3; grid-row: 2; }
