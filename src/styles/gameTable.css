@@ -4462,6 +4462,78 @@
   .pbr-sep         { display: none; }
   .pbr-mesa        { display: block; }
 
+  /* ── DSK-M1 · Mazo del humano a la MITAD (y su gemelo de mesa 2) ───────────
+     Medido en M1(a): el mazo del humano es el único que está EN FLUJO (primer
+     ítem de .cards-row, que es flex centrada) y mide exactamente una carta
+     jugable — 80×122 border-box (95×146 a 1920), 2,02× el mazo de la IA en mesa
+     5 y 1,75× en 4/3. Decisión sellada por Victor: MITAD UNIFICADA en las cuatro
+     mesas → 40×61 y 47,5×73, y el mazo IA de mesa 2 (hoy gemelo del humano, 1×)
+     baja al mismo calibre.
+
+     ANCLAJE: la esquina superior IZQUIERDA de cada mazo no se mueve un píxel.
+     Por eso el encogimiento se paga SIEMPRE en el lado opuesto al anclaje —
+     margin-right—, nunca en el margen que fija el borde izquierdo:
+       · humano: margin-right 32 → 32 + hueco liberado (72 / 79,5);
+       · IA mesa 2: margin-left 32 INTACTO + margin-right nuevo = hueco liberado.
+     Así el ancho de flujo del wrapper se conserva (112 / 127 px) y la fila
+     centrada no recoloca a nadie: Δ=0 en abanico, barra, botones y timer.
+     El hueco mazo→cartas pasa de 40 a 80px (72 de margen + 8 de gap): estado
+     transitorio aceptado por Victor, lo consume F1.
+
+     ALTO: el mazo era el ítem MÁS ALTO de la fila (122 contra 118 de la carta),
+     así que encogerlo a secas restaría 4px a la fila y movería todo lo de abajo.
+     El wrapper reserva el alto anterior (--dsk-deck-reserve-h) → la fila no se
+     mueve y el mazo queda arrimado al borde SUPERIOR de esa reserva, que es su
+     anclaje. .deck-hidden sigue siendo visibility → la caja compensada se
+     reserva también cuando el humano no es Pie (rotación de PIE sin Δ, M1(a)).
+
+     SOMBRAS: se adopta la pila del mazo IA (1/2/3 + 4px en vez de 2/4/6 + 8).
+     Es continuidad literal con el rival y, sobre todo, el "grosor" de la pila
+     no escala con el tamaño: manteniendo el de antes pesaría el doble en un
+     mazo de la mitad.
+
+     ABANICO DE BARAJADO: .shuffle-fan-card es absoluto con inset:0, así que
+     seguía al WRAPPER — hoy son 112×122 sobre un mazo de 80×122 (desajuste
+     previo; los bloques móviles ya lo corrigen con tamaño explícito, el gate
+     nunca lo hizo). Con el mazo a la mitad quedaría grotesco, así que aquí se
+     ata al calibre del mazo, igual que hace opponentPanel.css con el de la IA.
+     Al fijar width/height contra inset:0 gana la dimensión (regla de caja
+     sobre-restringida) y el abanico queda anclado arriba-izquierda, sobre el
+     mazo. */
+  .game-table-screen {
+    /* mitad EXACTA del border-box actual: (card + 4 de borde) / 2, devuelta a
+       caja de contenido restándole sus 4 → card/2 − 2 (el proyecto es
+       content-box). 76 → 40×61 border-box; 91 → 47,5×73. */
+    --dsk-deck-w: calc(var(--card-w) / 2 - 2px);
+    --dsk-deck-h: calc(var(--card-h) / 2 - 2px);
+    /* ancho que el mazo deja libre = mitad de su border-box anterior */
+    --dsk-deck-gap: calc(var(--card-w) / 2 + 2px);
+    /* alto que el wrapper sigue reservando = border-box anterior del mazo */
+    --dsk-deck-reserve-h: calc(var(--card-h) + 4px);
+  }
+
+  .player-zone .deck-pile,
+  .ai-zone .deck-pile {
+    width: var(--dsk-deck-w);
+    height: var(--dsk-deck-h);
+    box-shadow:
+      1px 1px 0px 0px #7a0000,
+      2px 2px 0px 0px #8B0000,
+      3px 3px 0px 0px #6b0000,
+      4px 4px 4px rgba(0, 0, 0, 0.4);
+  }
+  .player-zone .deck-pile { margin-right: calc(32px + var(--dsk-deck-gap)); }
+  .ai-zone .deck-pile     { margin-right: var(--dsk-deck-gap); }
+
+  .player-zone .deck-shuffle-wrapper,
+  .ai-zone .deck-shuffle-wrapper { min-height: var(--dsk-deck-reserve-h); }
+
+  .player-zone .shuffle-fan-card,
+  .ai-zone .shuffle-fan-card {
+    width: var(--dsk-deck-w);
+    height: var(--dsk-deck-h);
+  }
+
   /* ── DSK-O1 · Óvalo central CONGELADO (mesa 5) ──────────────────────────────
      Punto 8: el óvalo queda fijo con el tamaño que tiene, para que ningún
      contenido presente ni futuro lo mueva. La tanda esperó a R1/R2: el reflow que
