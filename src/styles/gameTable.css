@@ -4478,7 +4478,9 @@
      Así el ancho de flujo del wrapper se conserva (112 / 127 px) y la fila
      centrada no recoloca a nadie: Δ=0 en abanico, barra, botones y timer.
      El hueco mazo→cartas pasa de 40 a 80px (72 de margen + 8 de gap): estado
-     transitorio aceptado por Victor, lo consume F1.
+     transitorio aceptado por Victor, lo consume F1. (DSK-A1 lo llevó a 88 / 95,5
+     al tokenizar esa separación en --dsk-fan-gap-left; el modo m1 del arnés lee
+     el token en vez de cablear el 80.)
 
      ALTO: el mazo era el ítem MÁS ALTO de la fila (122 contra 118 de la carta),
      así que encogerlo a secas restaría 4px a la fila y movería todo lo de abajo.
@@ -4532,6 +4534,135 @@
   .ai-zone .shuffle-fan-card {
     width: var(--dsk-deck-w);
     height: var(--dsk-deck-h);
+  }
+
+  /* ── DSK-A1 · Anclaje del abanico humano ARRIBA-IZQUIERDA ──────────────────
+     Preparación de F1. El abanico abandona el centrado y pasa a colgar de un
+     origen fijo, para que F1 pueda cambiar el ancho de la mano (solape, número
+     de cartas) sin arrastrar al mazo ni a nadie:
+       · eje X → borde izquierdo de la 1ª carta a --dsk-fan-gap-left del borde
+         DERECHO de la caja reservada del mazo (.deck-shuffle-wrapper, 112/127px,
+         que existe siempre por M1 — sea o no PIE el humano);
+       · eje Y → tope de slots/cartas a --dsk-fan-gap-top del borde SUPERIOR del
+         área humana.
+     Medido en A1(a), 16 celdas × 5-6 estados de mano. Los dos ejes son tokens:
+     Victor los calibra en vivo y las invariantes de abajo se sostienen con
+     CUALQUIER valor (no dependen del que tengan hoy).
+
+     EL HUECO DE ARRIBA (los ~37/43px de M1(a)) · desglose medido, idéntico en las
+     16 celdas: borde 1 + padding de zona (8/12) + "Tu mejor palo" (18 + 8 de
+     margen = 26) + padding de fila (2/4). O sea: 26 de los 37 eran UNA línea de
+     texto —.score-tag-player, reservada por visibility y VISIBLE en la fase de
+     pago con texto real (156,7-178,6px medidos, centrada, justo sobre el rango x
+     del abanico)—. Subir el abanico la habría tapado en cada mano.
+     Decisión de Victor: la línea se REUBICA fuera de flujo (mismo recurso que
+     R1 usó con .win-score-chip) al rincón superior izquierdo, alineada a la
+     izquierda, en la banda que M1 dejó libre sobre el mazo y el vacío a su
+     izquierda. No cambia su texto, ni su ciclo de visibility, ni cuándo aparece:
+     sólo dónde vive. Al salir del flujo libera los 26px y el eje Y queda
+     gobernado SÓLO por --dsk-fan-gap-top.
+
+     POR QUÉ NADA SE MUEVE (compensación, doctrina M1):
+       · El mazo conserva su y porque el wrapper recupera con margin-top la
+         subida exacta del abanico (--dsk-fan-rise = banda + stack − gap-top).
+         Como el wrapper es el ítem MÁS ALTO de la fila (su reserva 122/146 >
+         carta 118/142), su borde inferior —y con él el de la fila, el de la
+         barra y el alto del área— queda donde estaba: la reserva no desaparece,
+         se muda de encima del abanico a debajo. Δ=0 en barra, botones, timer y
+         saldo sale solo, sin pagar un segundo margen.
+       · El mazo conserva su x porque el inset que hoy da el centrado se
+         reproduce como padding-left EXACTO: (100% − --dsk-fan-row-w)/2, con
+         --dsk-fan-row-w = el ancho de fila PRE-tanda (532/622 medidos = wrapper
+         + gap + 5 slots + 4 gaps). Es una CONSTANTE de referencia, no el ancho
+         vivo: por eso el mazo no se mueve cuando gap-left (o, mañana, F1)
+         ensancha el abanico. Verificado contra los 5 insets medidos (180 / 231 /
+         119 / 186 / 74) en las 16 celdas.
+     Con esto la esquina superior izquierda de la 1ª carta es CONSTANTE: no
+     depende del centrado, ni del número de cartas, ni del rol (PIE o no), ni de
+     la fase — que era el encargo de la tanda. */
+
+  /* Primitivas: espejan el padding VIVO del área y de la fila (base :227/:233 y
+     sub-media B1 de arriba). NO las inventa esta tanda; el modo a1 del arnés las
+     contrasta contra getComputedStyle en las 16 celdas, así que si alguien mueve
+     el padding y olvida el token, la validación cae en vez de derivar en
+     silencio. */
+  .game-table-screen {
+    --dsk-zone-pad-top: 12px;
+    --dsk-zone-pad-left: 18px;
+    --dsk-row-pad-top: 4px;
+    /* banda que libera "Tu mejor palo" al salir de flujo: alto 18 + margen 8 */
+    --dsk-fan-band: 26px;
+    /* lo que queda por encima del tope de los slots una vez liberada la banda */
+    --dsk-fan-stack-top: calc(1px + var(--dsk-zone-pad-top) + var(--dsk-row-pad-top));
+
+    /* ── TOKENS DE CALIBRACIÓN (Victor) ────────────────────────────────────── */
+    --dsk-fan-gap-top: var(--dsk-zone-pad-top);   /* ritmo del padding de zona: 12 / 8 */
+    --dsk-fan-gap-left: 16px;
+
+    /* Ancho de fila PRE-tanda = referencia del anclaje del mazo, NO el ancho vivo:
+       wrapper (--card-w + 36) + gap 8 + 5 slots (--card-w) + 4 gaps 8 → 6·card + 76.
+       532 con carta 76 y 622 con carta 91: los dos anchos medidos en A1(a). */
+    --dsk-fan-row-w: calc(var(--card-w) * 6 + 76px);
+    /* subida efectiva del abanico = lo que el mazo debe recuperar para no moverse */
+    --dsk-fan-rise: calc(var(--dsk-fan-band) + var(--dsk-fan-stack-top) - var(--dsk-fan-gap-top));
+  }
+
+  /* Contexto de posicionamiento para la línea reubicada. Seguro: el único otro
+     absolute del área es .shuffle-fan-card, que ancla a .deck-shuffle-wrapper
+     (relative desde :889), y las .flying-card son position:fixed (z-index 200,
+     siguen pintando por encima de todo el área). */
+  .player-zone { position: relative; }
+
+  /* "Tu mejor palo: X (N pts)" · fuera de flujo, rincón superior izquierdo del
+     contenido del área (top/left = el propio padding → conserva EXACTAMENTE la
+     y que tenía) y alineada a la izquierda en vez de centrada. El max-width la
+     confina a la banda libre —desde el filo izquierdo del contenido hasta la 1ª
+     carta, menos 8px de aire—: con el `overflow: hidden` que ya trae de :87, un
+     texto futuro más largo se recorta, jamás invade el abanico. Medido: la banda
+     va de 217px (peor caso, mesas 3/2 a 1920) a 359px, contra 178,6px del texto
+     más largo del motor ("Tu mejor palo: Espadas (31 pts)"). Sin z-index: al ser
+     posicionada ya pinta sobre la fila, y son disjuntas en x de todos modos. */
+  .player-zone .score-tag-player {
+    position: absolute;
+    top: var(--dsk-zone-pad-top);
+    left: var(--dsk-zone-pad-left);
+    margin: 0;
+    text-align: left;
+    max-width: calc(
+      (100% - var(--dsk-zone-pad-left) * 2 - var(--dsk-fan-row-w)) / 2
+      + var(--card-w) + 36px + var(--dsk-fan-gap-left) - 8px);
+  }
+
+  /* La fila deja de centrarse: arranca en flex-start sobre un padding-left que
+     reproduce el inset del centrado PRE-tanda (ver arriba). El margin-top
+     negativo lleva el tope de los slots a --dsk-fan-gap-top del borde del área
+     (el stack que queda por delante es borde + padding de zona + padding de
+     fila). */
+  .player-zone .cards-row {
+    justify-content: flex-start;
+    padding-left: calc((100% - var(--dsk-fan-row-w)) / 2);
+    margin-top: calc(var(--dsk-fan-gap-top) - var(--dsk-fan-stack-top));
+  }
+
+  /* El mazo recupera la subida → su esquina superior izquierda queda en las
+     coordenadas M1 exactas, y su reserva (el ítem más alto) sostiene el borde
+     inferior de la fila. margin-right paga el gap-left descontando los 8px del
+     `gap` vivo de .cards-row (:236), que ya separan wrapper y 1ª carta.
+     Ninguno de los dos márgenes toca la caja de flujo del wrapper (112/127 ×
+     122/146), que es invariante de M1. */
+  .player-zone .deck-shuffle-wrapper {
+    margin-top: var(--dsk-fan-rise);
+    margin-right: calc(var(--dsk-fan-gap-left) - 8px);
+  }
+
+  /* Tier bajo (mismo gate que el sub-media B1: padding de zona 8 y de fila 2).
+     Va DESPUÉS de las primitivas a propósito: misma especificidad, gana el
+     orden de fuente. */
+  @media (max-height: 800px) {
+    .game-table-screen {
+      --dsk-zone-pad-top: 8px;
+      --dsk-row-pad-top: 2px;
+    }
   }
 
   /* ── DSK-O1 · Óvalo central CONGELADO (mesa 5) ──────────────────────────────
