@@ -4596,7 +4596,17 @@
     --dsk-fan-stack-top: calc(1px + var(--dsk-zone-pad-top) + var(--dsk-row-pad-top));
 
     /* ── TOKENS DE CALIBRACIÓN (Victor) ────────────────────────────────────── */
-    --dsk-fan-gap-top: var(--dsk-zone-pad-top);   /* ritmo del padding de zona: 12 / 8 */
+    /* DSK-F1 · 18px NO es el ritmo del padding (arrancó en 12/8): es exactamente
+       el translateY(-18px) que .card-selected aplica al elegir carta para
+       descartar (playingCard.css:23). Con gap-top = ese salto, la carta
+       seleccionada sube hasta el borde superior del área y ni un píxel más:
+       deja de asomarse fuera (medido -10 en tiers ≤800 y -4 DENTRO del óvalo) y
+       conserva el aire que haya entre área y óvalo (6 / 10px).
+       Precio consciente: el techo vertical libre del abanico es
+       rise + reserva del mazo, y rise mengua 1:1 con gap-top → 151→141 en ≤800
+       y 177→171 a 1920. Es el intercambio que F1 aceptó: carta algo menor a
+       cambio de que la selección no invada al vecino de arriba. */
+    --dsk-fan-gap-top: 18px;
     --dsk-fan-gap-left: 16px;
 
     /* Ancho de fila PRE-tanda = referencia del anclaje del mazo, NO el ancho vivo:
@@ -4663,6 +4673,92 @@
       --dsk-zone-pad-top: 8px;
       --dsk-row-pad-top: 2px;
     }
+  }
+
+  /* ── DSK-F1 · Crecimiento adaptativo de las cartas del humano ───────────────
+     Las cartas crecen desde el origen fijo que dejó A1 —hacia la DERECHA y hacia
+     ABAJO— hasta ocupar el espacio real de cada escenario. Candidata B medida en
+     A1(a)/F1(a): pista completa menos aire de respeto en los dos ejes.
+
+     PROPORCIÓN · los assets son 1055×1491 y CardImage usa `object-fit: contain`,
+     así que nunca deforman: LETTERBOXEAN. La caja de hoy (76×118, ratio 0,644
+     contra 0,708 del arte) desperdiciaba 10,59px de alto (13,39 a 1920): el arte
+     se dibujaba a 76×107,41 dentro de una caja más alta. Con `aspect-ratio` la
+     proporción deja de ser un cálculo que mantener y pasa a ser estructural — el
+     arte llena la caja y no sobra ni un píxel.
+
+     TECHOS (los dos son tokens que ya existían, no constantes nuevas):
+       · DERECHA → lo que queda de la fila desde el origen: su ancho de contenido
+         menos la caja reservada del mazo (--card-w + 36), el gap-left de A1, los
+         4 gaps de 8 y el aire; repartido entre las 5 cartas.
+       · ABAJO → el fondo de la reserva del mazo, que es
+         --dsk-fan-rise + --dsk-deck-reserve-h. NO es un límite estético: como el
+         wrapper del mazo es el ítem más alto de la fila, mientras la carta no lo
+         supere el alto de la fila NO cambia — y por tanto no se mueven barra,
+         botones, timer, saldo ni el alto del área. Cruzarlo empujaría todo eso y
+         en los tiers ≤800 la holgura del scroller medida es CERO: nacería
+         overflow en el acto. Por eso el techo libre es el techo.
+     PISO · `max()` con la proporción al alto de hoy: ninguna celda encoge jamás,
+     ni con la ventana más estrecha del gate.
+
+     RESULTADO medido (16 celdas): 94,11×133,0 en los tres perfiles de ≤800 —el
+     techo vertical manda en todos—, 115,34×163,0 en 1920 mesas 5/4 y
+     100,60×142,2 en 1920 mesas 3/2, donde manda la pista horizontal (la más
+     estrecha del gate, 66px).
+
+     LO QUE NO CRECE POR ARRASTRE (doctrina FL-1): esta tanda NO toca --card-w/h.
+     Estrena tokens propios, así que las cartas de la IA (--opp-card-w/h, ×0,55
+     en :root), las columnas laterales, el óvalo congelado de O1, el calibre del
+     mazo y su abanico de barajado (M1) y --dsk-fan-row-w (la constante de
+     referencia del anclaje de A1) siguen leyendo el token original. Está
+     garantizado por construcción, no por suerte: todos ellos se declaran aguas
+     ARRIBA (:root / .game-table-screen), donde sus var() ya quedaron sustituidos.
+     LO QUE SÍ SIGUE, y gratis: las cartas voladoras del reparto y del descarte,
+     porque GameTable.jsx ya aplica la "regla universal: la carta viaja al tamaño
+     del DESTINO", midiendo el slot con getBoundingClientRect(). */
+  .game-table-screen {
+    --dsk-hand-air-x: 18px;   /* respiro hasta el filo derecho del contenido */
+    --dsk-hand-air-y: 8px;    /* respiro hasta el fondo de la reserva del mazo */
+    --dsk-hand-w: max(
+      calc(var(--card-h) * 1055 / 1491),                    /* piso: nunca encoge */
+      min(
+        calc((100% - var(--card-w) - 36px - var(--dsk-fan-gap-left)
+              - 32px - var(--dsk-hand-air-x)) / 5),         /* pista a la derecha */
+        calc((var(--dsk-fan-rise) + var(--dsk-deck-reserve-h)
+              - var(--dsk-hand-air-y)) * 1055 / 1491)       /* techo libre abajo */
+      )
+    );
+  }
+
+  /* El 100% de --dsk-hand-w resuelve contra el ancho de contenido de .cards-row
+     (es donde se consume). Por eso el token se usa SÓLO en `width`: el alto sale
+     de aspect-ratio, que no arrastra porcentajes. */
+  .player-zone .cards-row .card-slot-wrapper {
+    width: var(--dsk-hand-w);
+    height: auto;
+    aspect-ratio: 1055 / 1491;
+    /* Sin esto el aspect-ratio NO gobierna: hasta ahora el slot llevaba alto
+       DEFINIDO (var(--card-h)) y el `stretch` por defecto de la fila no le
+       aplicaba; con `height:auto` sí, y el slot se estiraba al alto de línea que
+       fija la reserva del mazo (141/171 medidos) volviendo a letterboxear el
+       arte. flex-start devuelve el alto a la proporción y, de paso, deja el
+       borde superior de la carta pegado al origen de A1 — que es el anclaje. */
+    align-self: flex-start;
+  }
+  /* La carta llena su slot — mismo patrón que opponentPanel.css:126 ya usa para
+     el rival, así que hay una sola fuente de tamaño por lado de la mesa.
+     border-box NO es cosmético: el proyecto es content-box, así que el borde de
+     .playing-card se sumaba POR FUERA y la carta desbordaba su slot — 2px la
+     cara (borde 1px), 4px el hueco vacío y el dorso (borde 2px). Efectos
+     medidos: el slot crecía 2-4px sobre la proporción (su min-content lo
+     empujaba), el aire de abajo se quedaba en 4,03 en vez de los 8 del token, y
+     un slot vacío se veía 4px MÁS GRANDE que una carta con cara. Con border-box
+     el borde vive dentro: slot y carta son la misma caja, los tres estados
+     (cara, dorso, vacío) miden igual y los dos aires valen lo que dicen. */
+  .player-zone .cards-row .playing-card {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
   }
 
   /* ── DSK-O1 · Óvalo central CONGELADO (mesa 5) ──────────────────────────────
