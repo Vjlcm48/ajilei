@@ -5085,4 +5085,168 @@
   .table-three .opp-reveal-open .win-score-chip {
     visibility: hidden;
   }
+
+  /* ── DSK-Z1 · Zoom de hover en las cartas reveladas de la IA ────────────────
+     Lupa sobre la carta bajo el cursor: transform puro (escala + z-index), las
+     vecinas NO se mueven, y sólo con ratón (pointer: fine). Medido en Z1(a) en
+     las 16 celdas, 200 cartas.
+
+     DÓNDE VIVE · en el SLOT, nunca en la carta. El slot ya es contexto de
+     apilamiento propio (transform + z-index:5), así que un z-index puesto en
+     .playing-card quedaría encapsulado y no subiría sobre sus hermanas; y las
+     fases 1 y 4 de la coreografía R2 animan la carta con keyframes `fill: both`,
+     que ganan a cualquier transform declarado en ella y lo pisarían.
+
+     SOBREVOLAR · la carta interior de un abanico lateral ya descansa a 0px del
+     óvalo y del panel superior vecino —es lo que hizo R2c al meter el abanico
+     hacia dentro—, así que tratarlos como barrera dura dejaría la escala máxima
+     en 1,00× y no habría tanda. Se acepta que la lupa pinte por encima de ambos:
+     el apilamiento ya lo soporta sin tocar nada (el panel revelado es z-index 7 y
+     ni .rivals-zone ni .table-mid ni .game-table crean contexto, así que compite
+     en la raíz contra el óvalo, que va en z auto). Barreras que SÍ rigen:
+     perímetro del área (padding-box de .game-table) y zona humana. Con los
+     anclajes de abajo, la carta peor situada admite 2,36× → 1,5× conserva ×1,57
+     de margen.
+
+     ANCLAJE · heredando la doctrina R2, cada carta crece hacia donde hay sitio:
+     los abanicos laterales hacia el centro del tapete (izquierda ancla el borde
+     izquierdo, derecha el derecho) y los asientos superiores hacia abajo.
+     OJO — el anclaje NO se hace moviendo transform-origin: la escala base 1,2 de
+     R1 está anclada al centro, así que cambiar el origen en :hover reubica
+     también esa escala base y la carta PEGA UN SALTO de 0,1·ancho (4,18px
+     medidos) en el primer frame. Se hace con la traslación equivalente
+     —+/− ancho·k, con k = base·(escala−1)/2— que en escala 1 se reduce
+     exactamente al transform de reposo: la transición arranca continua y el
+     borde anclado no se mueve un píxel (lo verifica el modo z1 del arnés).
+
+     REVELADA · el gate es estructural (la carta muestra cara: ni .card-back ni
+     .card-empty) y no la clase del panel: .opp-winner marca "mano en pantalla",
+     pero un asiento RETIRADO puede estar en pantalla mostrando dorsos (R1.c), así
+     que por sí sola dejaría hacer zoom sobre un dorso. Son las clases de estado
+     que PlayingCard ya emite; no se inventa señal nueva.
+
+     COREOGRAFÍA · todo se apaga mientras R2 está en tránsito
+     (:not([class*="opp-reveal"]) cubre closing/collect/grow/open). No es sólo
+     estética: la fase `collect` declara transform: scale(1) a 0,4,0 sobre la
+     misma propiedad — una regla de hover que le ganara congelaría la coreografía
+     a media transición, y una que perdiera dejaría el zoom muerto en silencio. */
+  @media (pointer: fine) {
+    .game-table-screen {
+      --dsk-z1-scale: 1.5;
+      --dsk-z1-ms: 130ms;
+      /* escala de reposo sobre la que monta la lupa (R1 la fija en 1,2) */
+      --dsk-z1-base: 1.2;
+      /* dentro del panel basta con superar el z-index:5 de las slots hermanas */
+      --dsk-z1-slot-z: 6;
+      /* en la raíz hay que superar el 7 del panel revelado y el 8 que la fase
+         `grow` le da a la entrante → 9 */
+      --dsk-z1-panel-z: 9;
+    }
+
+    /* Corrección de anclaje: lo que hay que trasladar para que el borde elegido
+       no se mueva al escalar desde el centro. Se declara EN EL SLOT, no en la
+       pantalla: una custom property sustituye sus var() donde se declara, y
+       --dsk-z1-base no vale lo mismo en todos los slots (mesa 2 sin ganar parte
+       de 1, no de 1,2). Calculada arriba saldría 0,3 para todos y la corrección
+       de esos slots quedaría descuadrada. */
+    .opp-card-slot,
+    .ai-zone .card-slot-wrapper {
+      --dsk-z1-k: calc(var(--dsk-z1-base) * (var(--dsk-z1-scale) - 1) / 2);
+    }
+
+    /* Espejo de DSK-R2b/R2c: el MISMO desplazamiento del despliegue, expuesto
+       como token para que la regla de hover no tenga que duplicarlo cinco veces.
+       Si algún día cambian los coeficientes de R2b hay que traerlos aquí — el
+       modo z1 lo detecta, porque verifica que el borde anclado no se mueva. */
+    .opp-winner .opp-card-slot:nth-child(1) { --dsk-z1-tx: calc(var(--opp-card-w) * -1.292 + var(--dsk-fan-dx, 0px)); }
+    .opp-winner .opp-card-slot:nth-child(2) { --dsk-z1-tx: calc(var(--opp-card-w) * -0.646 + var(--dsk-fan-dx, 0px)); }
+    .opp-winner .opp-card-slot:nth-child(3) { --dsk-z1-tx: var(--dsk-fan-dx, 0px); }
+    .opp-winner .opp-card-slot:nth-child(4) { --dsk-z1-tx: calc(var(--opp-card-w) * 0.646 + var(--dsk-fan-dx, 0px)); }
+    .opp-winner .opp-card-slot:nth-child(5) { --dsk-z1-tx: calc(var(--opp-card-w) * 1.292 + var(--dsk-fan-dx, 0px)); }
+
+    /* Transición en el slot GATEADO, no sólo en :hover → hay ease de ida y de
+       vuelta. Es seguro: en cuanto entra una clase opp-reveal-* esta regla deja
+       de aplicar y mandan las de la coreografía (collect/grow traen su propia
+       transición de 200ms), y al terminar el valor de llegada coincide con el de
+       R2b, así que no hay salto al reengancharse. */
+    .opp-panel.opp-winner:not([class*="opp-reveal"]) .opp-card-slot {
+      transition: transform var(--dsk-z1-ms) ease-out;
+    }
+
+    /* Abanicos laterales · anclan el borde exterior y crecen hacia el centro.
+       Anclan TAMBIÉN el borde superior: con el eje y centrado la carta subía
+       0,3·alto (19,5px medidos) y, como en reposo su tope ya está 3,2px por
+       encima del pie del nombre, le tapaba el centro — y el nombre es el único
+       nodo con handler de toda la zona (el tap de curiosear). Crecer hacia
+       dentro y hacia abajo respeta la doctrina R2 igual y deja el nombre
+       siempre alcanzable; hacia abajo sobra sitio (167-189px hasta la zona
+       humana, medidos en Z1(a)). */
+    .opp-panel.opp-side-left.opp-winner:not([class*="opp-reveal"])
+      .opp-card-slot:has(> .playing-card:not(.card-back):not(.card-empty)):hover {
+      transform: translateX(calc(var(--dsk-z1-tx, 0px) + var(--opp-card-w) * var(--dsk-z1-k)))
+                 translateY(calc(var(--opp-card-h) * var(--dsk-z1-k)))
+                 scale(calc(var(--dsk-z1-base) * var(--dsk-z1-scale)));
+      z-index: var(--dsk-z1-slot-z);
+    }
+    .opp-panel.opp-side-right.opp-winner:not([class*="opp-reveal"])
+      .opp-card-slot:has(> .playing-card:not(.card-back):not(.card-empty)):hover {
+      transform: translateX(calc(var(--dsk-z1-tx, 0px) - var(--opp-card-w) * var(--dsk-z1-k)))
+                 translateY(calc(var(--opp-card-h) * var(--dsk-z1-k)))
+                 scale(calc(var(--dsk-z1-base) * var(--dsk-z1-scale)));
+      z-index: var(--dsk-z1-slot-z);
+    }
+
+    /* Asientos superiores · anclan el borde de arriba y crecen hacia abajo. */
+    .opp-panel.opp-top-left.opp-winner:not([class*="opp-reveal"])
+      .opp-card-slot:has(> .playing-card:not(.card-back):not(.card-empty)):hover,
+    .opp-panel.opp-top-right.opp-winner:not([class*="opp-reveal"])
+      .opp-card-slot:has(> .playing-card:not(.card-back):not(.card-empty)):hover,
+    .opp-panel.opp-top-center.opp-winner:not([class*="opp-reveal"])
+      .opp-card-slot:has(> .playing-card:not(.card-back):not(.card-empty)):hover {
+      transform: translateX(var(--dsk-z1-tx, 0px))
+                 translateY(calc(var(--opp-card-h) * var(--dsk-z1-k)))
+                 scale(calc(var(--dsk-z1-base) * var(--dsk-z1-scale)));
+      z-index: var(--dsk-z1-slot-z);
+    }
+
+    /* El panel entero sube en la RAÍZ mientras se sobrevuela una de sus cartas:
+       sin esto la lupa no podría pasar por encima de otro panel revelado (empate
+       a z:7 lo decidiría el orden del DOM). */
+    .opp-panel.opp-winner:not([class*="opp-reveal"]):has(.opp-card-slot:hover) {
+      z-index: var(--dsk-z1-panel-z);
+    }
+
+    /* ── Mesa 2 · camino propio ─────────────────────────────────────────────
+       Se pinta por la vía legacy .ai-zone (no hay .opp-panel, ni despliegue R2,
+       ni coreografía que gatear) y sus cartas son .card-slot-wrapper a tamaño de
+       carta completa. Cadena verificada: .ai-zone no crea contexto de
+       apilamiento propio, así que basta con posicionar la slot para que su
+       z-index cuente entre sus hermanas. Dos casos de escala de reposo: la
+       ganadora ya viene con scale(1.2) (.card-slot-winner, base global :803) y
+       el resto sin transform → --dsk-z1-base baja a 1 en ese segundo caso para
+       que la corrección de anclaje siga siendo exacta.
+       Orígenes medidos en Z1(a): crecen hacia abajo en ≤800 y hacia abajo y a la
+       derecha a 1920. Ahí la lupa ni siquiera se acerca al óvalo (57,9px de
+       holgura contra 2,36× de techo). */
+    .ai-zone .card-slot-wrapper {
+      transition: transform var(--dsk-z1-ms) ease-out;
+    }
+    .ai-zone .card-slot-wrapper:has(> .playing-card:not(.card-back):not(.card-empty)):hover {
+      position: relative;
+      z-index: var(--dsk-z1-slot-z);
+      transform: translateY(calc(var(--card-h) * var(--dsk-z1-k)))
+                 scale(calc(var(--dsk-z1-base) * var(--dsk-z1-scale)));
+    }
+    .ai-zone .card-slot-wrapper:not(.card-slot-winner) { --dsk-z1-base: 1; }
+
+    /* 1920 · además de bajar, crece hacia la derecha (medido: es donde tiene el
+       hueco). El eje x se ancla igual que los laterales de 5/4/3. */
+    @media (min-height: 801px) {
+      .ai-zone .card-slot-wrapper:has(> .playing-card:not(.card-back):not(.card-empty)):hover {
+        transform: translateX(calc(var(--card-w) * var(--dsk-z1-k)))
+                   translateY(calc(var(--card-h) * var(--dsk-z1-k)))
+                   scale(calc(var(--dsk-z1-base) * var(--dsk-z1-scale)));
+      }
+    }
+  }
 }
