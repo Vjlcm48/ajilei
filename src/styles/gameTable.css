@@ -5249,4 +5249,100 @@
       }
     }
   }
+
+  /* ── DSK-O2 · Óvalo CONGELADO en mesas 4, 3 y 2 ──────────────────────────────
+     Cierra la doctrina O1 (mesa 5, :4764) en las tres mesas restantes: la caja del
+     óvalo queda fija y el contenido cambia sólo por dentro. Lo que ajusta NO es
+     igual en las tres — el diagnóstico O2 midió 12 celdas de campaña + centinela
+     1440×850 (banda 801..900: root 18 pero carta 76, donde una constante por tier
+     se rompe sin que la matriz de 4 lo note).
+
+     MESA 4 · misma elasticidad que la 5, mismo remedio. El grid base `auto 1fr
+     auto` le cobra al óvalo los 6,74px que crece la columna cuando aparece la
+     pastilla de rol (cabecera 187,22 supera a la fila de cartas 180,48). Peor caso
+     REAL = pastilla en los DOS laterales (Mano en uno, Pie en el otro; nunca las
+     dos en la misma cabecera) → −13,47 de ancho. A 1920 no ocurre: ahí manda la
+     fila (210,17 > 187,22) y el óvalo ya está en su mínimo.
+     La fórmula es la de O1, sin un píxel nuevo cableado, y reproduce los máximos
+     medidos: 243,02 (carta 76) y 274,22 (carta 91). Bonus medido: con la columna
+     congelada el óvalo de mesa 4 queda IDÉNTICO al de mesa 5 en el mismo viewport
+     (431,97 / 533,97 / 525,97 / 463,56 en sus mismas x) → la caída 5→4 ya no lo
+     mueve tampoco.
+
+     MESA 3 · profiláctica. Sus columnas laterales están VACÍAS (los dos rivales
+     caen en top-left/top-right) y miden sólo su padding — el mismo espejo del mazo
+     que usa .side-col-left/right en opponentPanel.css:1036. Medido Δ=0 en 288
+     frames reales y con pastillas inyectadas en ambos paneles, porque los paneles
+     rellenan la fila (313,3 contra 180,48 de contenido: 132,8px de holgura propia
+     cada uno). Congelar no cambia un píxel — lo GARANTIZA.
+
+     ALTO (4 y 3) · .rivals-zone mide 196 en las 12 celdas (192 de panel + su
+     padding-top de 4) y el panel es px puro (192 con carta 76 y con 91). Se sella
+     igual que en mesa 5; el óvalo sigue al viewport, ya no al contenido.
+
+     MESA 2 · el eje es el VERTICAL y no hay columna que tocar: su óvalo ocupa el
+     ancho completo (no monta .table-mid; en escritorio va por .ai-zone, y los DOS
+     óvalos de .two-ovals son del branch landscape-móvil, no de aquí). Su alto es
+     el SOBRANTE (flex:1), así que lo que hay que fijar es el hermano de arriba.
+     Medido: .ai-zone ya descansa EXACTAMENTE sobre su min-height (210 base / 234
+     en el escalón @900) con 44,7px (carta 76) y 35,8px (carta 91) de holgura antes
+     de que el contenido lo empujara. Congelar = convertir ese piso en techo, con
+     los números que YA existen: el token toma el alto de CONTENIDO (la caja es
+     content-box) y los 236/260 finales los pone el padding vivo de 12+12 más el
+     borde. El min-height base queda intacto: esto es aditivo. */
+  .table-four .table-mid {
+    --o2-side-col: calc(
+      var(--card-w) * 0.55 + 14px
+      + max(187.22px, var(--card-w) * 0.55 * 3.6 + 30px)
+    );
+    grid-template-columns: var(--o2-side-col) minmax(0, 1fr) var(--o2-side-col);
+  }
+  .table-four .rivals-zone {
+    box-sizing: border-box;   /* 196 = 192 de paneles + su padding-top de 4 */
+    height: 196px;
+  }
+
+  .table-three .table-mid {
+    /* espeja el padding de .side-col-left/right → 55,8 (carta 76) y 64,05 (91) */
+    --o2-side-col-3: calc(var(--card-w) * 0.55 + 14px);
+    grid-template-columns: var(--o2-side-col-3) minmax(0, 1fr) var(--o2-side-col-3);
+  }
+  .table-three .rivals-zone {
+    box-sizing: border-box;
+    height: 196px;
+  }
+
+  /* Token único; su ÚNICO escalón es el mismo @900 donde cambia --card. */
+  .game-table-screen { --o2-ai-h: 210px; }
+  @media (min-width: 768px) and (min-height: 900px) {
+    .game-table-screen { --o2-ai-h: 234px; }
+  }
+  .table-two .ai-zone { height: var(--o2-ai-h); }
+
+  /* GUARDIA DE CONTENCIÓN (3 y 2) · homologa la postura de 4/5, que tienen
+     `overflow:hidden` + columna de texto `minmax(0, 360px)` desde el bloque
+     :948. Aquí el óvalo es flex, así que la traducción va por partes:
+       · overflow: hidden → el clip, que en 4/5 ya existe;
+       · min-width: 0 en el mensaje → es el `0` del minmax. Sin él, el mínimo
+         automático de un ítem flex es su min-content: una cadena continua sin
+         espacios (el estrés de 300ch medido) infla la fila a 3818px y se sale del
+         óvalo. Con él, el mensaje no puede pasar de su reparto.
+       · el `360px` de tope superior NO se traslada como literal: en 4/5 acota una
+         columna de grid que crece con el contenido, mientras que aquí el mensaje
+         es `flex: 1` con base 0 — nunca crece más allá del sobrante, así que el
+         tope ya es estructural. Cablear 360 sí movería lo que hay hoy (el mensaje
+         de mesa 3 usa 381,6 y el de la 2, 505,19: el pozo se correría 10,8 y 72,6
+         px respectivamente, y las líneas de la 2 pasarían a envolver).
+     Medido antes de ponerla: ninguna de las 15 familias reales roza el perímetro
+     (quedan 29..107px dentro), el aviso de eliminación tampoco, y el "+N" del pozo
+     vuela hacia arriba desde una caja que está muy por dentro. No se recorta nada
+     visible hoy: sólo se cierra la puerta a lo que pudiera venir. */
+  .table-three .center-zone,
+  .table-two .center-zone {
+    overflow: hidden;
+  }
+  .table-three .center-zone .game-message,
+  .table-two .center-zone .game-message {
+    min-width: 0;
+  }
 }
