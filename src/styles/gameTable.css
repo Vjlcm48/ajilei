@@ -5345,4 +5345,167 @@
   .table-two .center-zone .game-message {
     min-width: 0;
   }
+
+  /* ── DSK-A2 · Abanico del humano CENTRADO (variante A) ──────────────────────
+     Las 5 cartas quedan a la misma distancia de los dos filos útiles del área;
+     el mazo vive en el margen izquierdo resultante y "Tu mejor palo" se muda
+     debajo de las cartas. Reabre a propósito M1 (posición del mazo) y A1 (casa
+     de la línea), con la contabilidad completa en el arnés.
+
+     EL FILO ÚTIL, sin ambigüedad: .cards-row es hija flex en columna del área,
+     sin margen y con padding horizontal derecho 0 → su border-box COINCIDE con
+     la caja de contenido de .player-zone. Verificado en las 20 celdas contra
+     borde(1) + padding(18), que además es simétrico. Es el par de filos que usan
+     las tres fórmulas de abajo.
+
+     DE DÓNDE VENÍA LA ASIMETRÍA (medida: 226,47 a 272,64px). El padding-left de
+     la fila que A1 instaló reproduce el inset del centrado PRE-tanda, calculado
+     sobre --dsk-fan-row-w = 6·card + 76 (532/622), o sea el ancho de fila de las
+     cartas PEQUEÑAS. F1 ensanchó las cartas creciendo SÓLO hacia la derecha, así
+     que el bloque vivo mide hoy entre 55,97 y 129,64px más que esa constante:
+     todo el exceso salió del aire derecho y ninguno del izquierdo.
+
+     EL PISO DE F1 ES SAGRADO Y EL MECANISMO LO RESPETA POR CONSTRUCCIÓN. El
+     candidato "obvio" —recalibrar el padding-left de la fila (o --dsk-fan-row-w)—
+     está VETADO: ese padding fija el ancho de CONTENIDO de la fila, que es contra
+     lo que resuelve el 100% de --dsk-hand-w al sustituirse en el `width` del slot.
+     Medido en ensayo: mover el padding engorda la carta +3,75px en mesas 3/2 a
+     1440×850 y +5,60 a 1920 — las cuatro celdas donde la PISTA gana el min() de
+     F1. En las otras 16 manda el techo vertical y el resize no se ve: no es que
+     sea inocuo, es que está latente. Los márgenes, en cambio, no entran jamás en
+     la caja de contenido del bloque contenedor → ancho de carta invariante al
+     centésimo en las 20 celdas, antes y después. */
+  .game-table-screen {
+    /* Ancho VIVO del bloque mazo+abanico: reserva del mazo + su hueco + las 5
+       cartas de F1 + los 4 gaps de 8 de .cards-row. */
+    --dsk-fan-block-w: calc(
+      var(--card-w) + 36px + var(--dsk-fan-gap-left)
+      + var(--dsk-hand-w) * 5 + 32px
+    );
+    /* Δ del abanico. El ancho útil se CANCELA en la cuenta (leftGap lleva dentro
+       el propio padding-left que lo mide), así que el desplazamiento depende sólo
+       de la constante de A1, de la reserva del mazo y del ancho vivo de la mano:
+         centrar el BLOQUE      → (row-w − block-w) / 2
+         centrar sólo las 5     → …menos media reserva de mazo + hueco.
+       Reproduce los ΔA medidos: −113,23 (≤1366), −123,86 / −114,49 (1440×850),
+       −136,32 / −99,48 (1920), según perfil de mesa — con hasta 0,04px de
+       diferencia, que NO es de la fórmula: el motor cuantiza el ancho usado de la
+       carta a 1/64px (94,10798 del token → 94,09375 usado) y la medición heredó
+       el valor cuantizado. El resultado visible es que el grupo queda 0,07px
+       asimétrico en el peor perfil; el invariante que gatea es la simetría
+       (|izq − der| ≤ 0,5), no el dx. */
+    --dsk-fan-center-dx: calc(
+      (var(--dsk-fan-row-w) - var(--dsk-fan-block-w)) / 2
+      - (var(--card-w) + 36px + var(--dsk-fan-gap-left)) / 2
+    );
+    /* Δ del mazo (reapertura M1). Sin él las cartas centradas PISAN la pila
+       visible entre 3,97 y 40,81px en las 20 celdas — y como el wrapper es
+       `position:relative`, la pila pintaría ENCIMA de la carta 1 (verificado con
+       elementFromPoint). El destino no es un número: es el invariante
+       «respiro pila visible → carta 1 = --dsk-fan-gap-left», el mismo ritmo con
+       el que A1 separó la reserva del abanico. Despejando, el gap-left se cancela:
+         d = (reserva del mazo + su hueco) + Δabanico − border-box de la pila − hueco
+           =  card-w + 36 + Δabanico − (--dsk-deck-w + 4)
+       Reproduce los siete dx medidos: −41,22 (≤1366, las 4 mesas), −51,86 y
+       −56,81 (mesas 5/4 a 1440 y 1920), −42,47 y −19,97 (mesas 3/2). Peor
+       aterrizaje declarado: mesas 3/2 · 1920×937, la pila queda a 54,03px del
+       filo útil izquierdo — el 73% de su margen (74px) sin gastar. */
+    --dsk-deck-center-dx: calc(
+      var(--card-w) + 36px + var(--dsk-fan-center-dx)
+      - var(--dsk-deck-w) - 4px
+    );
+  }
+
+  /* Las 5 cartas se corren como grupo. El selector NO puede ser :first-of-type:
+     los seis hijos de la fila son <div> y el primero es el wrapper del mazo (la
+     misma trampa que m1Snap documenta). El margen no toca el ancho de contenido
+     de la fila → --dsk-hand-w lee lo mismo que antes. */
+  .player-zone .cards-row .deck-shuffle-wrapper + .card-slot-wrapper {
+    margin-left: var(--dsk-fan-center-dx);
+  }
+
+  /* El mazo se recoloca SIN salir del flujo ni cambiar su caja: `left` sobre el
+     relative que ya trae de :889 no reserva ni libera un píxel, así que la fila,
+     el abanico y la compensación de M1 (margin-top / margin-right) siguen
+     valiendo exactamente lo mismo. El gemelo IA de mesa 2 no se toca: sus reglas
+     son .ai-zone y esta es .player-zone (Δ=0 verificado en sus 9 anclas y sus 5
+     slots, en los cinco viewports). */
+  .player-zone .deck-shuffle-wrapper {
+    position: relative;
+    left: var(--dsk-deck-center-dx);
+  }
+
+  /* ── DSK-A2 · "Tu mejor palo" se muda DEBAJO de las cartas ──────────────────
+     A1 la había puesto en el rincón superior izquierdo, en la banda que M1 dejó
+     libre sobre el mazo, confinada por max-width para no invadir el abanico. Con
+     las cartas centradas esa banda se estrecha de 217..359 a 117,52..245,77px y
+     la línea —cuyo max-width se deriva de --dsk-fan-row-w y NO sabe nada del
+     desplazamiento— pasaría a solaparse con la carta 1 entre 42,11 y 58,36px en
+     las 10 celdas de mesas 3/2. Así que cambia de casa, no de ciclo: su
+     visibility (visible SÓLO en la fase de pago) es la de siempre — y no es un
+     detalle, es el sostén del offset (ver abajo).
+
+     CENSO DE LA FRANJA (una mano completa, 20 celdas): bajo las cartas hay
+     43,53..68,34px libres en la fase de pago. La franja es estable por
+     construcción, no por suerte: `.action-area` tiene `height: 84px` fijo (la ley
+     de anclaje de :296) y .player-bar mide 84 en TODAS las fases y celdas —
+     "Siguiente mano" tiene reserva, no empuja nada al montar. Los vuelos de
+     reparto y descarte, muestreados por rAF, no bajan de cartas+4,00px en ninguna
+     celda, y .card-selected sube 18px (despeja del todo).
+
+     OFFSET · --dsk-fan-band-dy = aire inferior de F1 + padding-bottom de la fila
+     + margin-top de la barra = 18px (tiers ≤800) y 22 (1440/1920). Esa cadena
+     arranca en el FONDO DE LA RESERVA DEL MAZO, que es de donde cuelga el `top`
+     de aquí: el eje vertical no admite --dsk-hand-w (lleva un 100% dentro y en
+     `top` los porcentajes resuelven contra el ALTO del bloque contenedor, no
+     contra el ancho). En las 16 celdas donde manda el techo de F1 la reserva
+     termina exactamente --dsk-hand-air-y bajo las cartas y el offset es el medido
+     al centésimo; en las 4 donde manda la pista (mesas 3/2 a 1440 y 1920) las
+     cartas acaban más arriba y la línea se apoya en el filo de la barra — 5,33 y
+     20,84px más abajo que el literal, con el mismo aire de 7,53px al botón que
+     tienen las otras 16.
+
+     RESERVA 186px, no 183: A1 midió su peor caso inyectando texto plano con
+     `textContent` y perdió la negrita del palo. Con el marcado real la línea mide
+     178,56px (texto de hoy) y 185,42 (peor caso de 3 dígitos) — a 183 el peor
+     caso se recortaba en las 20 celdas.
+
+     FUERA DE FLUJO ESTRICTO: montar la banda deja Δ=0,00 en 11 anclas + los 5
+     slots + scrollHeight + clientHeight, en 60 ensayos. Y legibilidad: cae
+     íntegra sobre el tapete del área (nunca sobre un botón), con contraste 6,01
+     del texto y 6,33 del dorado — muy por encima de AA. */
+  .game-table-screen {
+    /* Espejan padding y margen VIVOS (base :237 y :248); el modo a2 los contrasta
+       contra getComputedStyle, igual que hace a1 con los de A1. */
+    --dsk-row-pad-bottom: 6px;
+    --dsk-bar-margin-top: 8px;
+    --dsk-fan-band-dy: calc(
+      var(--dsk-hand-air-y) + var(--dsk-row-pad-bottom) + var(--dsk-bar-margin-top)
+    );
+    --dsk-fan-band-w: 186px;
+  }
+  /* Mismo gate que el sub-media B1 (padding de fila 2 en vez de 6). Va DESPUÉS
+     de la primitiva a propósito: misma especificidad, gana el orden de fuente. */
+  @media (max-height: 800px) {
+    .game-table-screen { --dsk-row-pad-bottom: 2px; }
+  }
+
+  .player-zone .score-tag-player {
+    /* fondo de la reserva del mazo (gap-top − borde + rise + reserva) + lo que
+       el offset añade por debajo de ese fondo */
+    top: calc(
+      var(--dsk-fan-gap-top) - 1px + var(--dsk-fan-rise) + var(--dsk-deck-reserve-h)
+      + var(--dsk-fan-band-dy) - var(--dsk-hand-air-y)
+    );
+    /* el 50% del padding-box del área ES el centro del ancho útil (padding
+       simétrico 18/18) y, con la variante A, también el centro del abanico */
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: var(--dsk-fan-band-w);
+    text-align: center;
+    /* sin esto un texto futuro más largo envolvería y la 1ª línea saldría
+       estrecha bajo el `overflow:hidden` de :87; con nowrap se recorta, que es
+       lo que la reserva promete */
+    white-space: nowrap;
+  }
 }
