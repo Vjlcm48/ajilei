@@ -1,3 +1,5 @@
+> Sustituido por v1.1 — 2026-08-04
+
 # AJILEI — Menú de Utilidades v1.0 (PRELIMINAR)
 
 **Estado:** Preliminar — reserva de decisiones ya tomadas, pendiente de diseño fino e implementación.
