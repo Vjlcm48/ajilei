@@ -37,11 +37,25 @@ El control de sonido **no desaparece**: se muda adentro como primera entrada del
 - **Flotante y fuera de flujo** — doctrina de la banda A2: superponerse, jamás empujar.
 - Pinta **por encima de todo** — incluido el sobrevuelo Z1 y los paneles revelados `z:7`.
   La cadena de apilamiento exacta la determinará el diagnóstico (sección 5).
-- **Cierre:** clic fuera, `Esc`, o al ejecutar una entrada.
+- **Cierre:** clic fuera, `Esc`, o al ejecutar una entrada — con la distinción de 1.3.1.
 
-> **Supersesión explícita:** este cierre reemplaza al protocolo de la v1.0 §4 ("la bandeja
-> permanece abierta tras usar una opción; autocierre a ~3s sin interacción"). En escritorio,
-> ejecutar una entrada cierra el panel. El autocierre por inactividad queda derogado.
+#### 1.3.1 Cierre por tipo de entrada (enmienda 2026-08-04)
+
+El cierre no es uniforme: depende de si la entrada **conmuta** o **informa**.
+
+- **Toggles** (Sonido, Mensajes, Saldo: visible/oculto) — **cierran al ejecutar**. El efecto es
+  inmediato y visible en la mesa; el panel no tiene nada más que decir.
+- **"Mano actual"** — al ejecutar, **muestra su desglose** y el panel permanece abierto el
+  tiempo de leerlo: **autocierre de lectura ~4–5 s**, o **cierre por clic fuera / `Esc`**, lo
+  que llegue primero. Es una entrada que informa: cerrar de inmediato destruiría lo que el
+  usuario acaba de pagar. La ventana de lectura respeta la regla de los 2 segundos por entrada
+  del sistema de diseño (la lectura completa cabe con margen).
+
+> **Supersesión explícita, enmendada:** este cierre reemplaza al protocolo de la v1.0 §4 ("la
+> bandeja permanece abierta tras usar una opción; autocierre a ~3s sin interacción"). El
+> autocierre por inactividad queda derogado **como regla general** —los toggles cierran al
+> ejecutar— pero **sobrevive acotado** en "Mano actual" como **autocierre de lectura**: único
+> heredero legítimo de la v1.0 §4, y solo ahí.
 
 ---
 
@@ -52,16 +66,20 @@ Orden del panel:
 | # | Entrada | Tipo | Estado |
 |---|---|---|---|
 | 1 | **Sonido** | Toggle on/off | Funcional desde el estreno |
-| 2 | **Mensajes** | Toggle | Según v1.0 |
+| 2 | **Mensajes** | Toggle | Aún deshabilitado — semántica resuelta en esta sección |
 | 3 | **Mano actual** | Acción bajo demanda | Según v1.0 + sección 3 de esta revisión |
 | 4 | **Saldo: visible/oculto** | Toggle de privacidad | **Entrada nueva** — sección 4 |
 
 **Sonido** — hereda la función **íntegra** de la bocina actual: mismo toggle, misma
 persistencia, mismos handlers. No se reescribe: se relocaliza.
 
-**Mensajes** — toggle, según v1.0. La v1.0 lo deja **ubicado y deshabilitado hasta su
-implementación**, con el estado de no habilitados vigente (atenuado, sin respuesta al
-clic/tap). Esta revisión no lo habilita ni le añade especificación.
+**Mensajes** — **toggle, aún deshabilitado.** La v1.0 lo deja ubicado y deshabilitado hasta su
+implementación, con el estado de no habilitados vigente (atenuado, sin respuesta al clic/tap).
+
+**Semántica (resuelta 2026-08-04):** silencia los **mensajes narrativos** del centro de mesa,
+**jamás** los que portan **información imprescindible de juego** — apuestas a igualar,
+instrucciones de descarte, resultados, eliminaciones. **La clasificación de las familias se
+hará en el diagnóstico de implementación.**
 
 **Mano actual** — según v1.0, más la especificación ampliada de la sección 3.
 
@@ -223,25 +241,32 @@ original.
 
 ---
 
-## 7. Discrepancias detectadas contra la v1.0 (reportadas, no resueltas)
+## 7. Discrepancias detectadas contra la v1.0
 
-Ninguna es una contradicción de fondo con este delta; se registran para trazabilidad y, si el
-fundador lo considera, para decisión.
+Ninguna era una contradicción de fondo con este delta; se registran para trazabilidad. Las dos
+marcadas **RESUELTA** lo fueron por la **enmienda del 2026-08-04**; las demás siguen abiertas y,
+si el fundador lo considera, van a decisión.
 
-1. **"Mensajes" — tipo de control.** La v1.0 (§3.2) lo describe como *entrada ubicada y
-   deshabilitada*, sin declararlo toggle. Este delta lo llama *toggle, según v1.0*. Se ha
-   escrito como "toggle, aún deshabilitado" (sección 2). Verificado en código a HEAD `57f0939`:
-   **no existe hoy ningún toggle de mensajes**; lo único que hay son los mensajes de centro de
-   mesa (`game.message` / `discardMsg` en `GameTable.jsx`). Falta definir **qué alterna**
-   exactamente ese toggle cuando se implemente.
+1. **"Mensajes" — tipo de control. ✅ RESUELTA (enmienda 2026-08-04, sección 2).** La v1.0
+   (§3.2) lo describía como *entrada ubicada y deshabilitada*, sin declararlo toggle; este delta
+   lo llamaba *toggle, según v1.0*, y quedaba sin definir **qué alterna**. Verificado en código a
+   HEAD `57f0939`: **no existe hoy ningún toggle de mensajes**; lo único que hay son los mensajes
+   de centro de mesa (`game.message` / `discardMsg` en `GameTable.jsx`). **Resolución:** toggle,
+   aún deshabilitado; silencia los **narrativos** del centro de mesa y **nunca** los
+   **imprescindibles de juego** (apuestas a igualar, instrucciones de descarte, resultados,
+   eliminaciones). La **clasificación de las familias** se hará en el diagnóstico de
+   implementación (sección 5).
 2. **"Mano actual" — sin antecedente nominal en la v1.0.** La v1.0 no contiene ninguna entrada
    con ese nombre; la referencia "según v1.0" no tiene texto que heredar más allá del orden y
    del estado de no habilitados.
 3. **"Sugerencias" — sin subsección propia en la v1.0.** Su antecedente documental es
    **"Asistente IA"** (v1.0 §3.3). Se ha marcado esa entrada como la descartada.
-4. **Protocolo de cierre.** Contradicción real y **resuelta por supersesión explícita** de este
-   delta (sección 1.3): la v1.0 §4 mantenía el panel abierto tras usar una opción, con
-   autocierre a ~3s.
+4. **Protocolo de cierre. ✅ RESUELTA (enmienda 2026-08-04, sección 1.3.1).** Única
+   contradicción real: la v1.0 §4 mantenía el panel abierto tras usar una opción, con autocierre
+   a ~3s, y este delta lo cerraba al ejecutar. **Resolución:** cierre por tipo de entrada — los
+   **toggles cierran al ejecutar**; **"Mano actual"** muestra su desglose con **autocierre de
+   lectura ~4–5 s** o cierre por clic fuera / `Esc`, lo que llegue primero. El autocierre de la
+   v1.0 §4 queda derogado como regla general y **sobrevive acotado** ahí, como su único heredero.
 5. **Encuadre móvil de la v1.0.** La v1.0 está redactada en lenguaje táctil ("tap", "mesa 5") y
    asume alcance general. Esta revisión acota el alcance a escritorio y **sella móvil**; el
    lenguaje táctil de la v1.0 no aplica al gate de esta versión.
@@ -250,6 +275,10 @@ fundador lo considera, para decisión.
 
 ## 8. Historial de versiones
 
+- **v1.1 · enmienda** — 2026-08-04. Resuelve §7.1 y §7.4: **semántica del toggle de Mensajes**
+  (silencia narrativos, nunca lo imprescindible de juego; clasificación de familias al
+  diagnóstico) y **cierre por tipo de entrada** (toggles cierran al ejecutar; "Mano actual" con
+  autocierre de lectura ~4–5 s o clic fuera / `Esc`, heredero acotado de la v1.0 §4).
 - **v1.1** — 2026-08-04. Alcance acotado al gate de escritorio (móvil sellado con su bocina).
   Disparador ⋮ en la caja exacta del botón de sonido (Δ=0); el sonido pasa a ser la primera
   entrada del menú. Panel flotante fuera de flujo, por encima de Z1 y de los paneles `z:7`;
