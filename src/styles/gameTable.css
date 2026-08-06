@@ -5508,4 +5508,138 @@
        lo que la reserva promete */
     white-space: nowrap;
   }
+
+  /* ── DSK-U1 · Menú de utilidades (disparador ⋮ + panel flotante) ────────────
+     Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda y
+     apéndice de implementación). Sólo escritorio: el disparador ni siquiera se
+     monta fuera del gate (bifurcación de JSX por useIsDesktopTable), así que
+     móvil conserva su bocina sin que una sola regla la roce.
+
+     PUNTO DE PARTIDA MEDIDO · en el gate NO aplica ninguna de las reglas de
+     bocina del CSS: las tres que la vuelven absoluta al costado del óvalo
+     (.table-five :3200, .table-four :3418, .table-two :3751) viven dentro del
+     bloque landscape max-height:600 — el móvil horizontal. En escritorio la
+     bocina es la MISMA caja en las 20 celdas: 40,61 × 32, en flujo, esquina
+     superior derecha, position:static y z-index:auto. */
+  .game-table-screen {
+    /* Ley E2 del diagnóstico: reservar la caja no es cosmética. Cambiando sólo
+       el glifo 🔊 → ⋮ el botón encoge de 40,61 a 25 y arrastra .header-right
+       15,61px en 20/20 celdas; con ancho y alto explícitos, Δ=0 exacto. Son
+       píxeles medidos, no elegidos: espejan la caja viva a HEAD 7ef28c9. */
+    --dsk-u1-trigger-w: 40.61px;
+    --dsk-u1-trigger-h: 32px;
+    /* Panel: ancho del ensayo de medición con la tipografía viva (223,89 en el
+       peor caso de las cuatro etiquetas) y fila de 44 — por encima del estándar
+       táctil de campaña (40) y holgada para la regla de los 2 segundos por
+       entrada del sistema v1.2. */
+    --dsk-u1-panel-w: 224px;
+    --dsk-u1-item-h: 44px;
+    --dsk-u1-item-pad-x: 12px;
+    --dsk-u1-ico-w: 18px;
+    --dsk-u1-gap: 10px;
+    /* Por encima de TODO lo inventariado dentro del área (censo del
+       diagnóstico: paneles revelados 7, sobrevuelo Z1 9) y por debajo de los
+       modales que sí deben tapar el menú (leave-overlay 100, bancarrota 120).
+       Un único valor basta: la cadena del disparador a la raíz es
+       static/z-auto de punta a punta, sin transform, filter, opacity ni
+       isolation — el único contexto de apilamiento es el raíz. */
+    --dsk-u1-panel-z: 30;
+  }
+
+  /* El disparador hereda .mute-button (borde, radio, color y transición
+     EXACTOS de hoy) y sólo añade la reserva de caja y el centrado del glifo.
+     El ⋮ sube a 18px porque a los 15 heredados es un puntito ilegible; la caja
+     no se entera (width/height mandan sobre el contenido). */
+  .utilities-trigger {
+    box-sizing: border-box;
+    width: var(--dsk-u1-trigger-w);
+    height: var(--dsk-u1-trigger-h);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    /* ancla del embaldosado táctil de abajo; sin offsets no desplaza nada */
+    position: relative;
+  }
+  .utilities-trigger.is-open { border-color: rgba(var(--gold-brand-rgb), 0.55); }
+
+  /* Deuda táctil B2 · el gate admite portátiles con pantalla táctil. Visual
+     INTACTO (40,61 × 32) + pseudo transparente que lleva el hit a ≥40 por eje.
+     pointer:fine no recibe ni una regla → diff cero con ratón. El botón tiene
+     borde 1px, así que el ::after ancla al padding-box (38,61 × 30): −2 en
+     horizontal da 42,61 y −6 en vertical da 42, ambos con margen sobre 40. Los
+     2px hacia la derecha entran en el gap de 8 que lo separa de la ✕ —que NO
+     lleva embaldosado— así que quedan 6px de aire y ningún hit se solapa. */
+  @media (pointer: coarse) {
+    .utilities-trigger::after {
+      content: '';
+      position: absolute;
+      top: -6px; bottom: -6px;
+      left: -2px; right: -2px;
+    }
+  }
+
+  /* Panel · fuera de flujo estricto, jamás empuja (doctrina de la banda A2).
+     `fixed` sobre el viewport: se monta como hermano del área, vecino de las
+     cartas voladoras, y ningún ancestro tiene transform — no hace falta portal
+     (ensayo E3b: Δ=0 en 11 anclas y overflow +0 en las 20 celdas, al abrir y al
+     cerrar). left/top los pone el componente midiendo el disparador al abrir:
+     apertura ABAJO-DERECHA alineada al filo derecho del ⋮, uniforme en las 4
+     mesas. Cabe entera en las 20 celdas con 460..582px libres por debajo.
+     Estética v1.2: superficie de sistema, oro único en el borde, una sombra. */
+  .utilities-panel {
+    position: fixed;
+    z-index: var(--dsk-u1-panel-z);
+    box-sizing: border-box;
+    width: var(--dsk-u1-panel-w);
+    padding: 8px 0;
+    background: var(--surface-modal);
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary);
+  }
+
+  .util-item {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: var(--dsk-u1-gap);
+    width: 100%;
+    height: var(--dsk-u1-item-h);
+    padding: 0 var(--dsk-u1-item-pad-x);
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font-family: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  /* Hover como afordancia (lenguaje Z1 del sistema v1.2), sólo donde hay algo
+     que ejecutar: los no habilitados no fingen ser tocables. */
+  .util-item:not(.is-disabled):hover { background: rgba(var(--gold-brand-rgb), 0.10); }
+
+  .util-ico {
+    width: var(--dsk-u1-ico-w);
+    flex: 0 0 var(--dsk-u1-ico-w);
+    text-align: center;
+    font-size: var(--dsk-u1-ico-w);
+    line-height: 1;
+  }
+  .util-label { flex: 1 1 auto; white-space: nowrap; }
+  /* Estado del toggle de sonido — el gancho CSS de estado que hasta hoy no
+     existía (la bocina lo delegaba todo al glifo y al title). */
+  .util-state {
+    margin-left: auto;
+    font-size: 11px;
+    color: rgba(var(--text-primary-rgb), 0.5);
+  }
+  .util-item-sound.is-off .util-state { color: rgba(var(--gold-brand-rgb), 0.75); }
+
+  /* Estado de no habilitados heredado de la v1.0 §3: atenuados y sin respuesta
+     al clic (el atributo `disabled` ya bloquea el evento; aquí sólo se ve). */
+  .util-item.is-disabled { opacity: 0.45; cursor: default; }
 }

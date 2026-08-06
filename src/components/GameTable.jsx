@@ -4,6 +4,8 @@ import PlayingCard from './PlayingCard'
 import OpponentPanel from './OpponentPanel'
 import { SoundButton } from './SoundButton'
 import { MuteButton } from './MuteButton'
+import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
+import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
@@ -309,6 +311,10 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   const isLandscapeTable = useIsLandscapeTable()
   const isPortraitTable  = useIsPortraitTable()
   const isDesktopTable   = useIsDesktopTable()   // DSK-P1: header estático del panel IA
+  // DSK-U1 · el menú de utilidades sólo existe en el gate de escritorio; la
+  // bifurcación es de JSX (no de CSS) para que móvil conserve su bocina byte a
+  // byte. El hook se llama SIEMPRE (orden de hooks estable) y recibe el gate.
+  const utilMenu = useUtilitiesMenu(isDesktopTable)
   // AJ-1 · landscape mesas 5 y 4: AJILEI + "Mano #N" bajan de la cabecera a
   // .table-mid. El bloque debe centrarse en la franja IA↔humano, y esa franja se
   // define DENTRO de .table-mid: colgando de ahí, su 50% ya es el de la franja y
@@ -1239,7 +1245,11 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
               (ver brandInMid); en cualquier otro caso vive aquí, como siempre. */}
           {!brandInMid && renderBrand()}
           <div className="header-right">
-            <MuteButton />
+            {/* DSK-U1 · escritorio: la bocina se muda DENTRO del menú y su caja
+                pasa a ser el disparador ⋮. Móvil sigue con la bocina intacta. */}
+            {isDesktopTable
+              ? <UtilitiesTrigger open={utilMenu.open} onToggle={utilMenu.toggle} registerTrigger={utilMenu.registerTrigger} />
+              : <MuteButton />}
             <SoundButton className="btn-leave" onClick={() => setConfirmLeave(true)} title="Abandonar mesa">✕</SoundButton>
           </div>
         </header>
@@ -1503,6 +1513,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           }}
         />
       ))}
+
+      {/* DSK-U1 · panel del menú de utilidades. Vive AQUÍ, hermano del área y
+          vecino de las voladoras, no dentro de la cabecera: fuera de flujo
+          estricto y `fixed` sobre el viewport (ningún ancestro con transform),
+          así que ni empuja ni lo recorta el scroller. */}
+      {isDesktopTable && <UtilitiesPanel anchor={utilMenu.anchor} onClose={utilMenu.close} />}
 
       {/* Confirmación abandonar mesa */}
       {confirmLeave && (

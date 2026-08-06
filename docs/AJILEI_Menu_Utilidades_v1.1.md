@@ -217,7 +217,9 @@ La implementación seguirá el **flujo de campaña**:
 1. **Diagnóstico de solo lectura** — caja de la bocina, presupuesto del panel, cadena de
    apilamiento, persistencia actual del ajuste de sonido, handlers existentes.
 2. **Decisión.**
-3. **Implementación** con **modo `menu` permanente del arnés** (`scripts/diagDSK.mjs`).
+3. **Implementación** con **modo permanente del arnés** (`scripts/diagDSK.mjs`). *Nombre final:
+   `u1`* — la campaña DSK nombra sus modos por la tanda, no por la función (`b1`, `o1`, `z1`,
+   `a2`…), y un `menu` suelto habría roto esa convención.
 
 ---
 
@@ -273,8 +275,128 @@ si el fundador lo considera, van a decisión.
 
 ---
 
+## 9. Apéndice — decisiones de implementación (DSK-U1, 2026-08-05)
+
+Cerradas sobre el diagnóstico de solo lectura U1 (20 celdas: 4 mesas × 4 viewports + centinela
+1440×850) y aplicadas en la tanda **DSK-U1**. No reabren nada de las secciones 1–4: las
+concretan.
+
+### (a) Apertura y apilamiento
+
+**Apertura abajo-derecha**, alineada al filo derecho del disparador, **uniforme en las cuatro
+mesas**. El diagnóstico midió cinco direcciones candidatas: sólo *abajo-der* e *izq-arriba*
+caben en las 20 celdas (las otras tres se salen del área entre 62 y 184px). Se elige
+*abajo-der* porque es la lectura natural del ⋮ y porque *izq-arriba* tapa cartas de la IA en
+las mesas 5, 3 y 2. Tras el panel quedan **460–582px libres** por debajo en todas las celdas.
+
+**Panel `position: fixed`, `z-index: 30`**, montado como hermano del área siguiendo el patrón
+de las cartas voladoras. Ningún ancestro de la cadena tiene `transform`, así que el `fixed`
+ancla al viewport y **no hace falta portal**. El 30 se elige por el censo de z vivos: el techo
+real medido dentro del área es **10** (el "+N" volador del pozo, `.pot-float`), por encima del
+sobrevuelo Z1 (**9**) y de los paneles revelados (**7**); los modales quedan intactos por
+encima (`leave-overlay` 100, bancarrota 120). El arnés no se conforma con el número declarado:
+verifica que el panel **gane el hit-test** en su centro y sus cuatro esquinas con Z1 activo.
+
+**Δ=0 no es gratuito.** Cambiar sólo el glifo 🔊 → ⋮ encoge el botón de 40,61 a 25px y desplaza
+`.header-right` **15,61px** en las 20 celdas. La caja se **reserva explícitamente** (ancho y
+alto de la caja viva, `box-sizing: border-box`); con la reserva, Δ=0 exacto verificado.
+
+### (b) El timer se hereda — decisión de diseño, no descuido
+
+**El reloj de turno sigue corriendo con el menú abierto.** No es un efecto colateral: es la
+regla. Hoy ningún overlay lo pausa —medido: con el modal de abandonar abierto, el reloj del
+descarte bajó de 20s a 17s en 3 segundos— y el menú **no** introduce una excepción.
+
+**Razón:** "Mano actual" será una consulta **monetizada que se paga en fichas y en segundos**.
+Si abrir el menú congelara el turno, consultar sería gratis en tiempo y la ventaja competitiva
+de comprar información quedaría sin coste real. Que el reloj corra es lo que hace que la
+consulta sea una **decisión**, no un trámite. Se documenta aquí para que ningún ciclo futuro lo
+lea como bug.
+
+**Garantía de que no se convierte en trampa:** la guardia de contenido del arnés exige que el
+panel **jamás** toque `.action-buttons`, `.btn-mult`, `.timer-display` ni la banda "Tu mejor
+palo", en ningún estado de la mano — el jugador siempre ve el reloj y siempre alcanza sus
+botones. Y el cierre por clic fuera **no se traga la acción**: con el menú abierto, un clic
+sobre un botón de acción cierra el panel **y ejecuta el botón** (por eso el cierre usa un
+listener no bloqueante en vez de un overlay — molde del toggle de ficha H4).
+
+### (c) Regla de clasificación de mensajes
+
+Resuelve el método que la sección 2 dejaba al diagnóstico.
+
+> **Imprescindible** — todo mensaje que **exige o habilita una decisión del humano**, o que
+> **comunica un resultado o una eliminación**.
+> **Narrativa** — la **crónica de acciones ajenas** que no cambia lo que el humano debe hacer.
+
+**Método: fase + emisor. Jamás regex sobre el texto.** El motor emite `message` como cadena
+plana, sin etiqueta de familia; el único precedente de clasificar (`messageActionKind`) lee el
+verbo con expresiones regulares, y eso ata la semántica a la redacción: cambiar una palabra
+rompería la clasificación en silencio. La UI ya conoce la fase y el emisor de cada mensaje —
+esa es la señal estable.
+
+### (d) Las cuatro familias dudosas, resueltas
+
+| Familia | Resolución | Motivo |
+|---|---|---|
+| **apertura** | **Partida por emisor.** "Tu turno" → imprescindible; la crónica de apertura de una IA → narrativa | el mismo molde de texto sirve a dos funciones distintas; el emisor las separa sin ambigüedad |
+| **descarte-fin** | **Partida por emisor.** La variante de mesa 2 que porta "Tu turno." → imprescindible; "Descarte completado." → narrativa | idéntico criterio |
+| **igualar** | **Narrativa** | la cifra a igualar no vive en el mensaje: está protegida en `.call-box`, que el toggle no toca |
+| **retirarse** | **Narrativa** | el retiro de una IA no cambia la decisión del humano; cuando el retiro **cierra la mano**, quien lo comunica es la familia 15 ("Los demás se retiran…"), que es imprescindible |
+
+### (e) Emisores fuera del óvalo
+
+`.elim-notice` (eliminaciones), `.comodin-note` (parámetro congelado de la mano) y la pantalla
+GAME_OVER son **imprescindibles**: el toggle de Mensajes no los alcanza nunca.
+
+### (f) Sonido — lo que cambia el día 1
+
+- **Persistencia en `localStorage`** (`ajilei.sound`), leída al inicializar el contexto y
+  escrita en cada conmutación. Hasta hoy el ajuste era estado React volátil: sobrevivía al
+  cambio de pantalla y de mesa, pero **cada recarga devolvía el sonido encendido**.
+- **Mute real** vía `Howler.mute(!enabled)`, sincronizado en el arranque y en cada toggle:
+  **silencio es silencio, incluido lo que ya está sonando**. La guarda existente
+  (`if (!soundEnabled) return`) se conserva como segunda capa.
+- **Nota autorizada:** el contexto de sonido es compartido con móvil, así que **móvil hereda la
+  persistencia**. Es mejora, no regresión, y visualmente **Δ=0** — el sellado móvil de esta
+  tanda es visual: ni una regla CSS ni un nodo del árbol móvil cambian.
+- La entrada **refleja el estado** con glifo **y clase** (`is-off`): hasta hoy no existía gancho
+  CSS de estado, la bocina lo delegaba todo al glifo y al `title`.
+
+### (g) Estado de las otras tres entradas
+
+**Mensajes**, **Mano actual** y **Saldo: visible/oculto** se renderizan **presentes, visibles e
+inertes**, en el estado de no habilitados que la sección 6 hereda de la v1.0 §3 (atenuados, sin
+respuesta al clic). Cero lógica. En particular, **"Mano actual" no muestra todavía su saldo de
+consultas** (§3.5): el contador no existe, y anunciar una cifra sin ledger detrás sería
+inventarla. El **autocierre de lectura ~4–5 s** de §1.3.1 queda especificado y **sin
+implementar** hasta que esa entrada viva.
+
+### (h) Insumo verificado para "Mano actual"
+
+`getBestSuitScore` (`handEvaluator.js`) **ya devuelve el desglose completo por palos**
+(`suitScores`); la banda "Tu mejor palo" sólo consume `palo` y `points` y descarta el resto. El
+formato de §3.1 sale de esa misma fuente — **fuente única de cálculo, sin segunda calculadora y
+sin tocar `gameEngine.js`**, tal como manda §3.3. Dos cautelas registradas para el ciclo que la
+implemente:
+
+1. La llamada correcta es con **`handRules.ruleN`** y `handRules.comodinValue !== null` (los
+   parámetros **congelados** en el barajado del Pie). La función **recalcula el valor del
+   comodín por dentro** a partir del `ruleN` que recibe: pasarle el número de vivos cambiaría
+   la valoración en silencio.
+2. **Ese desliz ya existe hoy**, fuera del alcance de esta tanda: el aviso de descarte usa
+   `maxDiscard(aliveN)` mientras el motor aplica `handRules.maxDiscard`. En una mesa reducida a
+   mitad de sesión el texto puede anunciar un tope distinto del que se aplica. **Watch item.**
+
+---
+
 ## 8. Historial de versiones
 
+- **v1.1 · apéndice de implementación** — 2026-08-05. Sección 9: apertura abajo-derecha
+  uniforme y panel `fixed` z:30 (sin portal), **timer heredado** con su razón de diseño, regla
+  de clasificación de mensajes por **fase + emisor** con las cuatro dudosas resueltas, emisores
+  externos imprescindibles, sonido persistente con mute real (y la herencia autorizada en
+  móvil), estado inerte de las otras tres entradas e insumo verificado de "Mano actual".
+  Implementado en la tanda **DSK-U1** con modo `u1` permanente del arnés.
 - **v1.1 · enmienda** — 2026-08-04. Resuelve §7.1 y §7.4: **semántica del toggle de Mensajes**
   (silencia narrativos, nunca lo imprescindible de juego; clasificación de familias al
   diagnóstico) y **cierre por tipo de entrada** (toggles cierran al ejecutar; "Mano actual" con
