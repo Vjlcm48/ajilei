@@ -5528,15 +5528,19 @@
        píxeles medidos, no elegidos: espejan la caja viva a HEAD 7ef28c9. */
     --dsk-u1-trigger-w: 40.61px;
     --dsk-u1-trigger-h: 32px;
-    /* Panel: ancho del ensayo de medición con la tipografía viva (223,89 en el
-       peor caso de las cuatro etiquetas) y fila de 44 — por encima del estándar
-       táctil de campaña (40) y holgada para la regla de los 2 segundos por
-       entrada del sistema v1.2. */
-    --dsk-u1-panel-w: 224px;
+    /* U1b · Panel SOLO-ICONO. Las palabras se retiran (tooltip nativo en su
+       lugar), así que el ancho ya no lo dicta la etiqueta más larga —223,89 con
+       la tipografía viva— sino el icono más ancho más su aire. 64px de caja
+       total dejan 62 de interior: el icono mayor mide 26 y quedan 18px de
+       respiro por lado, y sobre todo la fila sigue midiendo 62×44, o sea por
+       encima de los 44 que exige el estándar táctil de esta tanda.
+       EL PANEL ENCOGE EN ANCHO, JAMÁS EN ÁREA TÁCTIL. */
+    --dsk-u1-panel-w: 64px;
     --dsk-u1-item-h: 44px;
-    --dsk-u1-item-pad-x: 12px;
-    --dsk-u1-ico-w: 18px;
-    --dsk-u1-gap: 10px;
+    --dsk-u1-ico-w: 18px;      /* glifos de texto (bocina, bocadillo) */
+    --dsk-u1-card-h: 26px;     /* silueta de carta con "?" — icono propio */
+    --dsk-u1-badge: 18px;      /* contador de consultas */
+    --dsk-u1-sep-gap: 6px;     /* aire que separa "Mano actual" del grupo */
     /* Por encima de TODO lo inventariado dentro del área (censo del
        diagnóstico: paneles revelados 7, sobrevuelo Z1 9) y por debajo de los
        modales que sí deben tapar el menú (leave-overlay 100, bancarrota 120).
@@ -5601,20 +5605,21 @@
     color: var(--text-primary);
   }
 
+  /* Fila SOLO-ICONO: el icono se centra y la caja conserva sus 62×44. El
+     `position: relative` es el ancla del badge — sin offsets, no mueve nada. */
   .util-item {
     box-sizing: border-box;
+    position: relative;
     display: flex;
     align-items: center;
-    gap: var(--dsk-u1-gap);
+    justify-content: center;
     width: 100%;
     height: var(--dsk-u1-item-h);
-    padding: 0 var(--dsk-u1-item-pad-x);
+    padding: 0;
     background: transparent;
     border: 0;
     color: inherit;
     font-family: inherit;
-    font-size: 14px;
-    text-align: left;
     cursor: pointer;
     transition: background-color 0.15s;
   }
@@ -5622,24 +5627,106 @@
      que ejecutar: los no habilitados no fingen ser tocables. */
   .util-item:not(.is-disabled):hover { background: rgba(var(--gold-brand-rgb), 0.10); }
 
+  /* Glifos de texto (bocina, bocadillo). line-height:1 + flex centrado evita
+     que la métrica del emoji descuadre la fila. */
   .util-ico {
-    width: var(--dsk-u1-ico-w);
-    flex: 0 0 var(--dsk-u1-ico-w);
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: var(--dsk-u1-ico-w);
     line-height: 1;
   }
-  .util-label { flex: 1 1 auto; white-space: nowrap; }
-  /* Estado del toggle de sonido — el gancho CSS de estado que hasta hoy no
-     existía (la bocina lo delegaba todo al glifo y al title). */
-  .util-state {
-    margin-left: auto;
-    font-size: 11px;
-    color: rgba(var(--text-primary-rgb), 0.5);
+  /* La ficha de Saldo es el ChipToken de la app (SVG dorado plano, el mismo del
+     cornerChip): no se le toca el color — es el glifo de moneda establecido, no
+     un acento nuevo. `line-height: 0` mata el hueco de línea del inline SVG. */
+  .util-ico-chip { line-height: 0; }
+  /* Silueta de carta con "?" — proporción 22:31, simplificación entera de los
+     assets 1055×1491. Hereda color del texto: el único acento dorado NUEVO del
+     panel es el filete del badge. */
+  .util-ico-slot { display: flex; line-height: 0; }
+  .util-ico-card {
+    height: var(--dsk-u1-card-h);
+    width: auto;
+    display: block;
+    color: var(--text-primary);
+    font-family: inherit;
   }
-  .util-item-sound.is-off .util-state { color: rgba(var(--gold-brand-rgb), 0.75); }
 
   /* Estado de no habilitados heredado de la v1.0 §3: atenuados y sin respuesta
-     al clic (el atributo `disabled` ya bloquea el evento; aquí sólo se ve). */
+     al clic (el atributo `disabled` ya bloquea el evento; aquí sólo se ve).
+     "Mano actual" lo lleva también, pero su badge se exceptúa: la entrada está
+     inerte, el contador no. */
   .util-item.is-disabled { opacity: 0.45; cursor: default; }
+
+  /* "Mano actual" cierra el panel separada del grupo de las tres: filete del
+     sistema + aire. Es la entrada premium y no pertenece a la misma familia.
+     La atenuación de no-habilitado baja al ICONO en vez de aplicarse a la fila
+     (misma especificidad que .util-item.is-disabled para ganarle, y el orden de
+     fuente desempata): si atenuara la fila entera se llevaría por delante el
+     badge, que sí está vivo. */
+  .util-item-mano.is-disabled {
+    opacity: 1;
+    margin-top: var(--dsk-u1-sep-gap);
+    border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+  }
+  .util-item-mano .util-ico-card { opacity: 0.45; }
+
+  /* Badge contador · el único acento dorado nuevo del panel (filete + cifra),
+     sobre superficie del sistema. Cifra a 10px bold: legible en 18px de disco. */
+  .util-badge {
+    position: absolute;
+    top: 4px; right: 3px;
+    box-sizing: border-box;
+    width: var(--dsk-u1-badge);
+    height: var(--dsk-u1-badge);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.55);
+    border-radius: 50%;
+    background: var(--surface-modal);
+    color: var(--gold-brand);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .util-badge:hover { border-color: var(--gold-brand); }
+
+  /* Deuda táctil del badge: 18px visuales → hit 40×44 CONFINADO a su propia
+     fila. Los offsets se calculan contra su padding-box (16×16, 1px dentro del
+     borde) y aterrizan exactamente en los filos de la entrada: arriba 5−5=0,
+     abajo 5+16+23=44, derecha 58+4=62. Confinarlo no es escrúpulo: desbordar
+     hacia arriba le robaría taps a la entrada de Saldo. */
+  @media (pointer: coarse) {
+    .util-badge::after {
+      content: '';
+      position: absolute;
+      top: -5px; bottom: -23px;
+      left: -20px; right: -4px;
+    }
+  }
+
+  /* Popup del contador · flotante y fuera de flujo, como el panel. Se ancla por
+     su borde DERECHO a la izquierda del badge (así el ancho puede crecer con la
+     cifra sin recalcular nada) y se centra en él con translateY. Un peldaño por
+     encima del panel: nace de él y debe pintarse sobre él. */
+  .utilities-popup {
+    position: fixed;
+    z-index: calc(var(--dsk-u1-panel-z) + 1);
+    transform: translateY(-50%);
+    box-sizing: border-box;
+    padding: 8px 12px;
+    white-space: nowrap;
+    background: var(--surface-modal);
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.2;
+  }
 }

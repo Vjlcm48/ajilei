@@ -3477,6 +3477,9 @@ const U1_PRE = {
   '1440x850': { y: 53,   right: { wide: 1236, narrow: 1124 } },
 }
 const U1_TOL = 0.05
+// U1b · el estándar de la fila del menú sube a 44 (el de campaña sigue siendo 40
+// para el disparador): con solo-icono el panel encoge en ancho, no en área.
+const U1_ITEM_MIN = 44
 
 async function u1Install(page) {
   await page.evaluate(({ ANCHORS }) => {
@@ -3554,10 +3557,40 @@ async function u1Install(page) {
       return hits
     }
     window.__u1Open = () => !!document.querySelector('.utilities-panel')
+    // U1b · sin palabras: el estado del sonido lo portan el glifo y la clase.
     window.__u1SoundEntry = () => {
       const e = document.querySelector('.util-item-sound')
       if (!e) return null
-      return { off: e.className.includes('is-off'), glyph: e.querySelector('.util-ico').textContent.trim(), state: e.querySelector('.util-state').textContent.trim() }
+      return { off: e.className.includes('is-off'), glyph: e.querySelector('.util-ico').textContent.trim(), title: e.getAttribute('title') }
+    }
+    // U1b · las dimensiones del panel se DERIVAN del contenido vivo, nunca se
+    // cablean: ancho = el token, alto = suma de filas + separación + padding +
+    // bordes. Recompactar el panel no puede volver a exigir tocar el arnés.
+    window.__u1PanelExpect = () => {
+      const p = document.querySelector('.utilities-panel')
+      if (!p) return null
+      const cs = getComputedStyle(p)
+      const items = [...p.querySelectorAll('.util-item')]
+      const sum = items.reduce((a, e) => a + e.getBoundingClientRect().height, 0)
+      const mt = items.reduce((a, e) => a + (parseFloat(getComputedStyle(e).marginTop) || 0), 0)
+      return {
+        n: items.length,
+        expW: parseFloat(cs.getPropertyValue('--dsk-u1-panel-w')),
+        expH: rnd(sum + mt + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) +
+          parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth)),
+        got: window.__u1R('.utilities-panel'),
+        itemH: items.map(e => rnd(e.getBoundingClientRect().height)),
+        itemW: items.map(e => rnd(e.getBoundingClientRect().width)),
+        sep: rnd(parseFloat(getComputedStyle(items[items.length - 1]).marginTop) || 0),
+        hairline: getComputedStyle(items[items.length - 1]).borderTopWidth,
+      }
+    }
+    window.__u1Titles = () =>
+      [...document.querySelectorAll('.utilities-panel .util-item')].map(e => e.getAttribute('title'))
+    window.__u1Popup = () => {
+      const p = document.querySelector('.utilities-popup')
+      if (!p) return null
+      return { rect: window.__u1R('.utilities-popup'), txt: p.textContent.trim(), z: Number(getComputedStyle(p).zIndex) }
     }
   }, { ANCHORS: U1_ANCHORS })
 }
@@ -3639,6 +3672,38 @@ async function runU1(browser) {
     await page.click('.table-header', { position: { x: 4, y: 4 } })
     await page.waitForTimeout(120)
     const cerradoClicFuera = await page.evaluate(() => window.__u1Open() === false)
+
+    // (3b) U1b · panel solo-icono: dimensiones derivadas, tooltips y el badge.
+    await u1OpenMenu(page)
+    const dims = await page.evaluate(() => window.__u1PanelExpect())
+    const titles = await page.evaluate(() => window.__u1Titles())
+    const preBadge = await page.evaluate(() => window.__u1Snap())
+    await page.click('.util-badge'); await page.waitForTimeout(180)
+    const press = await page.evaluate((base) => ({
+      popup: window.__u1Popup(),
+      menuOpen: window.__u1Open(),          // ← el invariante sellado
+      ls: localStorage.getItem('ajilei.consultas'),
+      badgeTxt: document.querySelector('.util-badge').textContent.trim(),
+      dAnchors: window.__u1Diff(base, window.__u1Snap()),
+      scr: window.__u1Scroll(),
+    }), preBadge)
+    // Autocierre a los 2s: vivo a ~1,4s y muerto a ~2,6s. Dos muestras, no una:
+    // comprobar sólo el final no distingue "se cerró a tiempo" de "nunca abrió".
+    await page.waitForTimeout(1220)
+    const vivo14 = await page.evaluate(() => !!document.querySelector('.utilities-popup'))
+    await page.waitForTimeout(1200)
+    const muerto26 = await page.evaluate(() => !document.querySelector('.utilities-popup'))
+    const menuTrasAuto = await page.evaluate(() => window.__u1Open())
+    // Vía 2 · clic en otra parte. Primero DENTRO del panel (su padding, fuera del
+    // badge): cierra el popup y el menú no se inmuta. El menú sigue abierto tras
+    // esto, así que NO se vuelve a llamar a u1OpenMenu — volvería a cerrarlo.
+    await page.click('.util-badge'); await page.waitForTimeout(150)
+    await page.click('.utilities-panel', { position: { x: 5, y: 3 } }); await page.waitForTimeout(150)
+    const trasClicDentro = await page.evaluate(() => ({ popup: !document.querySelector('.utilities-popup'), menu: window.__u1Open() }))
+    // …y luego FUERA del panel: cierra los dos, que es lo coherente.
+    await page.click('.util-badge'); await page.waitForTimeout(150)
+    await page.click('.table-header', { position: { x: 4, y: 4 } }); await page.waitForTimeout(150)
+    const trasClicFuera = await page.evaluate(() => ({ popup: !document.querySelector('.utilities-popup'), menu: window.__u1Open() }))
 
     // (4) Cierre AL EJECUTAR + toggle de sonido vivo. Cierra y deja el ajuste
     //     persistido; se devuelve a 'on' para no arrastrar estado a lo que sigue.
@@ -3775,16 +3840,46 @@ async function runU1(browser) {
       // gain maestro a 0. Sin Web Audio → null (el corte en seco de un sonido en
       // curso queda para la validación de oído).
       muteReal: trasEjecutar.gain.length === 0 ? null : trasEjecutar.gain.includes(0),
+      // ── U1b ──────────────────────────────────────────────────────────────
+      // Dimensiones DERIVADAS del contenido vivo (nunca los 224×194 de U1).
+      panelDims: dims != null && dims.n === 4 &&
+        Math.abs(dims.got.w - dims.expW) <= 0.5 && Math.abs(dims.got.h - dims.expH) <= 0.5,
+      // Solo-icono no puede encoger el área táctil: la fila conserva ≥44 de alto
+      // y el interior del panel ≥44 de ancho.
+      filas44: dims != null && dims.itemH.every(h => h >= U1_ITEM_MIN) && dims.itemW.every(w => w >= U1_ITEM_MIN),
+      // "Mano actual" separada del grupo: aire + filete, y va la ÚLTIMA.
+      manoSeparada: dims != null && dims.sep > 0 && parseFloat(dims.hairline) > 0 &&
+        titles[3] === 'Mano actual',
+      // Sin palabras, el tooltip nativo es la única leyenda: no puede faltar.
+      tooltips: titles.length === 4 &&
+        titles.every(t => t && t.trim()) &&
+        titles[0] === 'Sonido' && titles[1] === 'Mensajes' && titles[2] === 'Saldo',
+      // Contador: clave creada con las 20 gratis y badge que la pinta.
+      contador: press.ls === '20' && press.badgeTxt === '20',
+      // El popup abre por press, dice lo que debe y pinta sobre el panel.
+      popupAbre: press.popup != null && press.popup.txt === 'Tienes 20 consultas gratis' &&
+        press.popup.z > panelZ && press.popup.rect.x >= 0 && press.popup.rect.right <= vp.w,
+      // INVARIANTE SELLADO · presionar el badge NO es ejecutar.
+      badgeNoCierra: press.menuOpen === true && menuTrasAuto === true && trasClicDentro.menu === true,
+      // Popup fuera de flujo, igual que el panel.
+      popupFueraDeFlujo: press.dAnchors.max === 0 &&
+        press.scr.ovX === probes[0].ovClosed.x && press.scr.ovY === probes[0].ovClosed.y,
+      // Las dos vías de cierre, exactas: autocierre a 2s y clic en otra parte.
+      popupAutocierre: vivo14 === true && muerto26 === true,
+      popupClicFuera: trasClicDentro.popup === true && trasClicFuera.popup === true &&
+        trasClicFuera.menu === false,
     }
     const passed = Object.values(checks).every(v => v === true || v === null)
     cells.push({
       table: n, vp, caja: { got: caja, exp: { t: expT, hr: expHR, x: expX }, d: dCaja, dMax: dCajaMax },
       probes: probes.map(p => ({ tag: p.tag, dOpen: p.dOpen, dBack: p.dBack, panel: p.panel, maxZ: p.maxZ, guard: p.guard, ov: p.ovOpen })),
       panelZ, zTecho, zReal, libreAbajo, sonido: { antes, despues, ls: trasEjecutar.ls, gain: trasEjecutar.gain },
+      dims, titles,
+      badge: { press, vivo14, muerto26, menuTrasAuto, trasClicDentro, trasClicFuera },
       cierre: { esc: checks.cierreEsc, clicFuera: cerradoClicFuera, ejecutar: trasEjecutar.open === false, ...clicPasaAlBoton },
       guardHits, checks, passed,
     })
-    console.log(`T${n} ${key} · caja Δ=${dCajaMax} (${caja.glyph}) · flujo Δ=${dFlujo.max}/${dVuelta.max} · panel ${probes[0].panel.w}×${probes[0].panel.h}@${probes[0].panel.x},${probes[0].panel.y} libre↓${libreAbajo} · z ${panelZ}>${zTecho} (${probes.find(p => p.maxZ.max === zTecho)?.maxZ.who})${zReal?.z1Vivo ? ` · Z1 vivo slot ${zReal.z1Vivo.slotZ}/panel ${zReal.z1Vivo.panelZ1} techo ${zReal.z1Vivo.maxZ.max} wins=${zReal.z1Vivo.wins}` : ''} wins=${probes.every(p => p.wins)} · cierre esc/fuera/exec/pasa ${checks.cierreEsc}/${cerradoClicFuera}/${trasEjecutar.open === false}/${clicPasaAlBoton.cerrado && clicPasaAlBoton.arrancada} · guardia ${guardHits.length} · ${probes.length}f · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
+    console.log(`T${n} ${key} · caja Δ=${dCajaMax} (${caja.glyph}) · flujo Δ=${dFlujo.max}/${dVuelta.max} · panel ${probes[0].panel.w}×${probes[0].panel.h} (esp ${dims?.expW}×${dims?.expH}) filas ${dims?.itemW[0]}×${dims?.itemH[0]} sep ${dims?.sep}+${dims?.hairline} · badge "${press.badgeTxt}"/ls ${press.ls} popup ${press.popup?.rect.w}×${press.popup?.rect.h} z${press.popup?.z} auto ${vivo14}→${muerto26} menú ${press.menuOpen}/${trasClicDentro.menu}/${trasClicFuera.menu} · z ${panelZ}>${zTecho} (${probes.find(p => p.maxZ.max === zTecho)?.maxZ.who})${zReal?.z1Vivo ? ` · Z1 vivo slot ${zReal.z1Vivo.slotZ}/panel ${zReal.z1Vivo.panelZ1} techo ${zReal.z1Vivo.maxZ.max} wins=${zReal.z1Vivo.wins}` : ''} wins=${probes.every(p => p.wins)} · cierre esc/fuera/exec/pasa ${checks.cierreEsc}/${cerradoClicFuera}/${trasEjecutar.open === false}/${clicPasaAlBoton.cerrado && clicPasaAlBoton.arrancada} · guardia ${guardHits.length} · ${probes.length}f · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
     await page.close()
   }
 
@@ -3798,16 +3893,30 @@ async function runU1(browser) {
     await u1OpenMenu(page)
     const boxes = await page.evaluate(() => {
       const acc = []
-      const push = (name, el) => { if (!el) return; const hb = window.__hitBox(el); acc.push({ name, visual: `${hb.visualW}×${hb.visualH}`, w: hb.w, h: hb.h, occluded: !!hb.occluded }) }
-      push('⋮', document.querySelector('.utilities-trigger'))
-      document.querySelectorAll('.util-item').forEach((el, i) => push(`item${i}`, el))
+      const push = (name, el, min) => { if (!el) return; const hb = window.__hitBox(el); acc.push({ name, min, visual: `${hb.visualW}×${hb.visualH}`, w: hb.w, h: hb.h, occluded: !!hb.occluded }) }
+      // El disparador conserva el estándar de campaña (40); las filas del menú
+      // suben a 44, que es lo que U1b promete al quitarles la palabra.
+      push('⋮', document.querySelector('.utilities-trigger'), 40)
+      document.querySelectorAll('.util-item').forEach((el, i) => push(`item${i}`, el, 44))
+      // El badge es visual de 18: su embaldosado lo lleva a 40×44 SIN salirse de
+      // su propia fila (desbordar hacia arriba le robaría taps a Saldo).
+      push('badge', document.querySelector('.util-badge'), 40)
       return acc
     })
     // La ✕ vecina no lleva embaldosado: el pseudo del ⋮ no puede robarle el hit.
     const equis = await page.evaluate(() => { const hb = window.__hitBox(document.querySelector('.btn-leave')); return { w: hb.w, h: hb.h, occluded: !!hb.occluded } })
-    const ok = coarse && boxes.every(b => !b.occluded && b.w >= TACTIL_MIN && b.h >= TACTIL_MIN) && !equis.occluded
-    hits.push({ table: n, vp, coarse, boxes, equis, ok })
-    console.log(`hit T${n} ${vp.w}x${vp.h} · coarse=${coarse} · ${boxes.map(b => `${b.name} ${b.w}×${b.h}`).join(' · ')} · ✕ ${equis.w}×${equis.h} · ${ok ? 'OK' : 'FAIL'}`)
+    // El embaldosado del badge no puede desbordar su fila: se contrasta contra
+    // la caja de la entrada "Mano actual", no contra un número suelto.
+    const badgeConfinado = await page.evaluate(() => {
+      const b = document.querySelector('.util-badge'), it = document.querySelector('.util-item-mano')
+      if (!b || !it) return null
+      const hb = window.__hitBox(b), r = it.getBoundingClientRect()
+      return { dentro: hb.top >= Math.floor(r.top) - 1 && hb.bottom <= Math.ceil(r.bottom) + 1, itemTop: Math.round(r.top), itemBottom: Math.round(r.bottom), hitTop: hb.top, hitBottom: hb.bottom }
+    })
+    const ok = coarse && boxes.every(b => !b.occluded && b.w >= b.min && b.h >= b.min) &&
+      !equis.occluded && badgeConfinado?.dentro === true
+    hits.push({ table: n, vp, coarse, boxes, equis, badgeConfinado, ok })
+    console.log(`hit T${n} ${vp.w}x${vp.h} · coarse=${coarse} · ${boxes.map(b => `${b.name} ${b.w}×${b.h}≥${b.min}`).join(' · ')} · ✕ ${equis.w}×${equis.h} · badge en fila=${badgeConfinado?.dentro} · ${ok ? 'OK' : 'FAIL'}`)
     await page.close()
   }
 
@@ -3829,7 +3938,7 @@ async function runU1(browser) {
     const entry = await page.evaluate(() => window.__u1SoundEntry())
     const ok = lsAntes === 'off' && lsTras === 'off' && entry && entry.off === true && entry.glyph === '🔇'
     sound.push({ table: n, vp, lsAntes, lsTras, entry, ok })
-    console.log(`sonido T${n} ${vp.w}x${vp.h} · ls ${lsAntes}→${lsTras} · entrada ${entry?.glyph} "${entry?.state}" off=${entry?.off} · ${ok ? 'OK' : 'FAIL'}`)
+    console.log(`sonido T${n} ${vp.w}x${vp.h} · ls ${lsAntes}→${lsTras} · entrada ${entry?.glyph} title="${entry?.title}" off=${entry?.off} · ${ok ? 'OK' : 'FAIL'}`)
     await page.close()
   }
 

@@ -9,8 +9,34 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 // Geometría del panel — números del ensayo de medición del diagnóstico U1
 // (tipografía viva: 4 entradas, icono 18 + gap 10 + padding 12, font-size 14 →
 // ancho natural 223,89 en el peor caso). El CSS los espeja en sus tokens.
-const PANEL_W = 224
+// U1b · el panel pasa a SOLO-ICONO y se recompacta: 64px de ancho, medidos
+// contra el contenido nuevo (icono centrado en una fila que conserva sus 44px
+// de alto). Espeja --dsk-u1-panel-w del bloque DSK; el arnés contrasta los dos.
+const PANEL_W = 64
 const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
+
+// ── Contador de consultas de "Mano actual" (v1.1 §3.4 y §3.6) ───────────────
+// Infraestructura, no lógica: la clave se crea con las 20 gratis y se lee para
+// pintar el badge. El CONSUMO llega en su propio ciclo — aquí nadie decrementa.
+// Contador GLOBAL único (acumulable entre escenarios, mesas y dificultades), en
+// localStorage mientras no haya login; con login migra al ledger de Supabase.
+// Se inicializa al montar el panel, no al arrancar la app: es el primer momento
+// en que la función existe, y así móvil —donde el menú no se monta— no estrena
+// una clave que nunca va a leer.
+const CONSULTAS_KEY = 'ajilei.consultas'
+const CONSULTAS_GRATIS = 20
+
+export function readConsultas() {
+  try {
+    const raw = window.localStorage.getItem(CONSULTAS_KEY)
+    const n = Number(raw)
+    if (raw !== null && Number.isInteger(n) && n >= 0) return n
+    window.localStorage.setItem(CONSULTAS_KEY, String(CONSULTAS_GRATIS))
+    return CONSULTAS_GRATIS
+  } catch {
+    return CONSULTAS_GRATIS   // storage denegado: la cifra se muestra igual
+  }
+}
 
 // `enabled` es el gate de escritorio: si el viewport deja de cumplirlo, el menú
 // deja de estar abierto — el disparador desaparece y un panel huérfano no debe
@@ -53,8 +79,12 @@ export function useUtilitiesMenu(enabled = true) {
     if (!open) return
     const onDocDown = (e) => {
       // el propio disparador lo resuelve su onClick (toggle); dentro del panel,
-      // cada entrada decide (los toggles cierran al ejecutar)
-      if (e.target.closest && e.target.closest('.utilities-trigger, .utilities-panel')) return
+      // cada entrada decide (los toggles cierran al ejecutar).
+      // U1b · el popup del contador entra en la lista por el invariante sellado:
+      // presionar el badge —o el propio popup— no cierra el menú. El badge ya
+      // está cubierto por vivir dentro del panel; el popup no, porque se monta
+      // fuera de él (es flotante), así que hay que nombrarlo.
+      if (e.target.closest && e.target.closest('.utilities-trigger, .utilities-panel, .utilities-popup')) return
       close()
     }
     const onKey = (e) => { if (e.key === 'Escape') close() }

@@ -389,8 +389,104 @@ implemente:
 
 ---
 
+## 10. Apéndice — panel a solo-iconos y contador de consultas (DSK-U1b, 2026-08-06)
+
+Segunda tanda de implementación, sobre `82cd83a`. Refina el panel de la sección 9 sin reabrir
+ninguna de sus decisiones selladas (apertura, `fixed` z:30, timer heredado, clasificación de
+mensajes).
+
+### (a) Entradas a solo-icono
+
+Las palabras se retiran; cada entrada queda en **icono + `title` nativo** ("Sonido",
+"Mensajes", "Mano actual", "Saldo").
+
+**Motivo doble:** *uniformidad futura con móvil* —cuando el menú llegue al teléfono, un panel
+de iconos cabe donde uno de etiquetas no— y *economía de espacio*: el ancho deja de estar
+gobernado por la etiqueta más larga (223,89px medidos con la tipografía viva) y pasa a
+gobernarlo el icono. **El panel encoge de 224 a 64px, un 71 % menos.**
+
+**El área táctil NO encoge.** La fila conserva sus 44px de alto y el interior del panel mide 62
+de ancho: ambos por encima del estándar de 44 que esta tanda exige a las entradas (el
+disparador ⋮ conserva el de campaña, 40). *El panel encoge en ancho, jamás en área.*
+
+**Los cuatro iconos:**
+
+| Entrada | Icono | Procedencia |
+|---|---|---|
+| Sonido | 🔊 / 🔇 | el glifo de hoy — sigue portando el estado, ahora sin palabra que lo repita |
+| Mensajes | 💬 | glifo de texto |
+| Saldo | **`ChipToken`** | **el componente de ficha que ya usa el `cornerChip`** — SVG dorado plano de la app. Inventar otro glifo de moneda habría roto el lenguaje |
+| Mano actual | **silueta de carta con "?"** | SVG nuevo, `viewBox` 22:31 — la **simplificación entera de los assets 1055×1491** (0,7097 contra 0,7076), misma familia de proporción que `--card-w/h` |
+
+**Single-gold:** el trazo de la carta hereda `--text-primary` (`currentColor`). El único oro
+sólido del panel es la ficha de Saldo —glifo de moneda ya establecido, no un acento nuevo— y el
+único acento dorado que la tanda estrena es el **filete del badge**.
+
+### (b) "Mano actual", última y separada
+
+Cierra el panel, después del grupo de las tres, con **aire de 6px + filete de 1px** del sistema
+(`rgba(--gold-brand, .18)`). Es la entrada **premium** y la separación lo dice sin palabras.
+
+Detalle de marcado con consecuencia real: esta entrada **no puede ser un `<button disabled>`**
+—un botón deshabilitado bloquea los eventos de sus hijos y el badge quedaría muerto—, así que
+es un `<div>` inerte. Y el `role="menuitem"` con `aria-disabled` vive **en el icono, no en el
+contenedor**: un control vivo no puede colgar de un subárbol `aria-disabled`, porque las
+herramientas de accesibilidad lo dan por muerto con razón.
+
+### (c) El badge contador
+
+Disco de 18px junto al icono de "Mano actual": superficie del sistema, filete dorado fino,
+cifra a 10px bold. Muestra las **consultas restantes**.
+
+**Infraestructura, no lógica.** Clave `localStorage` **`ajilei.consultas`**, creada con las **20
+gratis** de §3.4 y leída para pintar el badge. **Nadie decrementa todavía** — el consumo es de
+su propio ciclo, y hasta entonces la cifra será 20 fija.
+
+*Momento de inicialización:* la clave se crea al **montar el panel por primera vez**, no al
+arrancar la app. Es el primer instante en que la función existe, y así móvil —donde el menú no
+se monta— no estrena una clave que nunca va a leer.
+
+Deuda táctil: 18px visuales, hit **40×44 confinado a su propia fila**. El confinamiento no es
+escrúpulo — desbordar hacia arriba le robaría taps a la entrada de Saldo.
+
+### (d) El popup del contador
+
+Al **presionar** el badge (clic/tap; **jamás** por hover) aparece un popup flotante fuera de
+flujo con **"Tienes N consultas gratis"**, N del contador vivo. Se ancla por su borde **derecho**
+a la izquierda del badge, centrado en él — así el ancho puede crecer con la cifra sin
+recalcular nada. Un peldaño por encima del panel (z:31): nace de él y debe pintarse sobre él.
+
+**Cierre por dos vías exactas, lo que llegue primero:**
+1. **Clic en cualquier otra parte.**
+2. **Autocierre a los 2 segundos.**
+
+Molde técnico: el patrón H4 ya usado — `setTimeout` en ref + `pointerdown` en captura, sin
+overlay.
+
+> **Invariante sellado — presionar el badge no es "ejecutar".** El menú **permanece abierto**.
+> Mientras el popup vive, ningún cierre del menú se dispara salvo por las vías del propio
+> popup. Coherencia: si el clic-en-otra-parte cae **fuera del panel**, cierra **ambos**; si cae
+> **dentro** (o sobre el propio popup), cierra sólo el popup y el menú no se inmuta.
+
+### (e) Nota sobre una pausa futura
+
+Esta tanda **no introduce ninguna pausa**. Queda anotado para cuando "Mano actual" viva: si
+algún día se implementa el **autocierre de lectura ~4–5 s** de §1.3.1, su temporizador deberá
+regirse por la **misma regla que el popup** —arrancar al abrir, morir al primer clic en otra
+parte— y, sobre todo, **no arrastrar consigo al reloj de turno**: el timer se hereda corriendo
+(§9.b) y una pausa de lectura no puede convertirse por la puerta de atrás en una pausa de
+juego. El popup de 2 s de esta tanda es el precedente y el molde.
+
+---
+
 ## 8. Historial de versiones
 
+- **v1.1 · apéndice U1b** — 2026-08-06. Sección 10: panel a **solo-iconos** con tooltips nativos
+  (224 → 64px de ancho, área táctil intacta a 44), ficha `ChipToken` para Saldo y **SVG propio
+  de carta con "?"** para Mano actual, esa entrada **última y separada** por filete del sistema,
+  **badge contador** con la clave `ajilei.consultas` inicializada a 20, y **popup** informativo
+  con sus dos cierres exactos (clic en otra parte / autocierre 2 s) bajo el invariante
+  **presionar el badge no cierra el menú**. Implementado en la tanda **DSK-U1b**.
 - **v1.1 · apéndice de implementación** — 2026-08-05. Sección 9: apertura abajo-derecha
   uniforme y panel `fixed` z:30 (sin portal), **timer heredado** con su razón de diseño, regla
   de clasificación de mensajes por **fase + emisor** con las cuatro dudosas resueltas, emisores
