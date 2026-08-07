@@ -2515,6 +2515,12 @@ async function f1Tokens(page) {
   })
 }
 
+// DSK-W1 · techo de MANOS del ciclo de f1 (receta H2: dimensionar contra el caso
+// más lento, no contra el más rápido). Medido con _w1probe: en mesa 2 la fase de
+// descarte del humano NO aparece todas las manos —alterna—, así que 4 manos
+// dejaban el estado exigido al azar. Ver la nota de dimensionado sobre F1_MANOS.
+const F1_MANOS = 12
+
 async function runF1(browser) {
   const out = []
   const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
@@ -2534,27 +2540,50 @@ async function runF1(browser) {
     // abre la fase de descarte (el peor caso vertical de la tanda).
     const states = [{ tag: 'reposo', ...(await f1Snap(page)) }]
     let selFrame = null
-    for (let hand = 0; hand < 4 && !selFrame; hand++) {
+    // DSK-W1 · bitácora del ciclo. Un modo que no alcanza su estado exigido tiene
+    // que poder decir POR QUÉ: cuántas manos jugó, si llegó a ver la fase, y si se
+    // quedó sin mesa (bancarrota / fin de partida) antes que sin iteraciones.
+    const ciclo = { manos: 0, vioDescarte: 0, cerradas: 0, gameOver: false, bancarrota: false, sinCerrar: false }
+    for (let hand = 0; hand < F1_MANOS && !selFrame; hand++) {
+      ciclo.manos++
       await clickIf(page, 'button:has-text("Iniciar mano")')
       let closed = false
+      // DSK-W1 · captura de la fase de descarte, invocable DOS veces por
+      // iteración. Es la corrección de fondo de esta tanda: el clic de apuesta
+      // cierra BET_2 y el motor abre DISCARD EN EL ACTO, así que el
+      // `clickIf('Sin descartar')` de la línea siguiente liquidaba la fase antes
+      // del próximo muestreo — el ciclo enterraba justo lo que venía a medir.
+      // No era azar ni tiempos: era ORDEN DE OPERACIONES. Medido en la celda
+      // peor (mesa 2 · 1366×768), manos con descarte visto: 1/10 sin rechequeo,
+      // 10/10 con él.
+      const capturarDescarte = async (tag) => {
+        if (!await page.locator('.discard-area .btn').first().isVisible().catch(() => false)) return
+        ciclo.vioDescarte++
+        if (selFrame) return
+        // selecciona TODAS las clicables: el peor caso es cualquiera de ellas
+        await page.evaluate(() => [...document.querySelectorAll('.player-zone .playing-card.card-clickable')].forEach(el => el.click()))
+        await page.waitForTimeout(350); await page.mouse.move(5, 5)
+        selFrame = { tag, ...(await f1Snap(page)) }
+        states.push(selFrame)
+      }
       for (let i = 0; i < 340; i++) {
         await page.waitForTimeout(230); await page.mouse.move(5, 5)
         if (i % 2 === 0) states.push({ tag: `h${hand}t${i}`, ...(await f1Snap(page)) })
-        if (!selFrame && await page.locator('.discard-area .btn').first().isVisible().catch(() => false)) {
-          // selecciona TODAS las clicables: el peor caso es cualquiera de ellas
-          await page.evaluate(() => [...document.querySelectorAll('.player-zone .playing-card.card-clickable')].forEach(el => el.click()))
-          await page.waitForTimeout(350); await page.mouse.move(5, 5)
-          selFrame = { tag: `h${hand}-sel`, ...(await f1Snap(page)) }
-          states.push(selFrame)
-        }
+        await capturarDescarte(`h${hand}-sel`)
         if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
           states.push({ tag: `h${hand}t${i}f`, ...(await f1Snap(page)) }); closed = true; break
         }
-        await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
+        const aposto = await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
           await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
           await clickIf(page, '.action-buttons button:has-text("Apostar")')
+        // RECHEQUEO · mirar aquí, no en el siguiente tick, es lo que hace
+        // determinista el selReached.
+        if (aposto) { await page.waitForTimeout(120); await capturarDescarte(`h${hand}-selr`) }
         await clickIf(page, 'button:has-text("Sin descartar")')
       }
+      if (closed) ciclo.cerradas++; else ciclo.sinCerrar = true
+      ciclo.gameOver = ciclo.gameOver || await page.locator('.game-over-screen').isVisible().catch(() => false)
+      ciclo.bancarrota = ciclo.bancarrota || await page.locator('.bankrupt-overlay').isVisible().catch(() => false)
       if (!closed || !await clickIf(page, 'button:has-text("Siguiente mano")')) break
       await page.waitForTimeout(1500); await page.mouse.move(5, 5)
     }
@@ -2634,11 +2663,11 @@ async function runF1(browser) {
       art: { sample: base.art ?? artFrames[0]?.art ?? null, artWasteW, artWasteH, artOk },
       caja: { dCardBox, cardIsSlot, dSizeW, dSizeH, sizeConst },
       aire: { airXMin, airXPre, airXExp, airYMin, tokenX: tok.airX, tokenY: tok.airY, airOk },
-      seleccion: { selReached, selTopVsZone, selTopVsOval, selInsideArea, selClearsOval, tag: selFrame?.tag ?? null },
+      seleccion: { selReached, selTopVsZone, selTopVsOval, selInsideArea, selClearsOval, tag: selFrame?.tag ?? null }, ciclo,
       intacto: { deckExpX, dDeckX, dDeckY, dOriginX, dOriginY, dZoneTop, dZoneH, dBar, overflowOk, untouched },
       passed,
     })
-    console.log(`T${n} ${vp.w}x${vp.h} carta ${base.slot1.w}x${base.slot1.h} (esp ${expectedW}, pre-A2 ${preW}, manda ${bound}) · arte waste ${artWasteW}/${artWasteH} · aire x=${airXMin}/${airXExp} y=${airYMin}/${tok.airY} · SEL tope vs área=${selTopVsZone} vs óvalo=${selTopVsOval} · mazo Δ=${Math.max(dDeckX.max, dDeckY.max)} origen Δ=${Math.max(dOriginX.max, dOriginY.max)} área Δ=${Math.max(dZoneTop.max, dZoneH.max, dBar.max)} · ${passed ? 'OK' : 'FAIL'}`)
+    console.log(`T${n} ${vp.w}x${vp.h} carta ${base.slot1.w}x${base.slot1.h} (esp ${expectedW}, pre-A2 ${preW}, manda ${bound}) · arte waste ${artWasteW}/${artWasteH} · aire x=${airXMin}/${airXExp} y=${airYMin}/${tok.airY} · SEL tope vs área=${selTopVsZone} vs óvalo=${selTopVsOval} (${ciclo.manos}m/${ciclo.cerradas}c/desc ${ciclo.vioDescarte}${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) · mazo Δ=${Math.max(dDeckX.max, dDeckY.max)} origen Δ=${Math.max(dOriginX.max, dOriginY.max)} área Δ=${Math.max(dZoneTop.max, dZoneH.max, dBar.max)} · ${passed ? 'OK' : 'FAIL'}`)
     await page.close()
   }
   return out
@@ -3294,6 +3323,9 @@ async function a2OutOfFlow(page, html) {
   }, html)
 }
 
+// DSK-W1 · techo de MANOS del ciclo de a2 (hermano del F1_MANOS de arriba).
+const A2_MANOS = 12
+
 async function runA2(browser) {
   const out = []
   const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
@@ -3313,11 +3345,18 @@ async function runA2(browser) {
     // —el único estado donde la banda está viva—. El ciclo NO se corta en la 1ª:
     // el respiro pila→carta 1 se exige CON y SIN Pie, y el Pie rota +1 por mano
     // (en mesa 5 el humano puede no serlo hasta la 3ª). Se para en cuanto la
-    // cobertura está completa, para no pagar 3 manos donde bastan 2.
+    // cobertura está completa, para no pagar manos de más.
+    // DSK-W1 · el techo sube de 3 a A2_MANOS por la receta H2: la banda sólo vive
+    // si el humano LLEGA AL SHOWDOWN con puntaje (`human.score`), y eso no pasa
+    // todas las manos. Con 3 manos la cobertura quedaba al azar de cómo cayera el
+    // juego; el ciclo sigue parando en cuanto está cubierta, así que el caso
+    // normal no paga ni una mano más.
     const states = [{ tag: 'reposo', ...(await a2Snap(page)) }]
     const covered = () => states.some(s => s.isPie) && states.some(s => s.isPie === false) &&
       states.some(s => s.tagVis === 'visible')
-    for (let hand = 0; hand < 3 && !covered(); hand++) {
+    const ciclo = { manos: 0, cerradas: 0, gameOver: false, bancarrota: false, sinCerrar: false }
+    for (let hand = 0; hand < A2_MANOS && !covered(); hand++) {
+      ciclo.manos++
       await clickIf(page, 'button:has-text("Iniciar mano")')
       let closed = false
       for (let i = 0; i < 240; i++) {
@@ -3326,16 +3365,29 @@ async function runA2(browser) {
         if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
           states.push({ tag: `h${hand}-pago`, ...(await a2Snap(page)) }); closed = true; break
         }
-        await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
+        const aposto = await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
           await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
           await clickIf(page, '.action-buttons button:has-text("Apostar")')
-        if (states[states.length - 1].kind.includes('discard')) {
+        // DSK-W1 · RECHEQUEO, hermano del de f1: el clic de apuesta cierra BET_2
+        // y DISCARD se abre en el acto, así que el `kind` muestreado ANTES de
+        // apostar ya no describe la fase viva. Se vuelve a mirar aquí en vez de
+        // esperar al siguiente tick, que es donde el ciclo perdía la fase.
+        let ult = states[states.length - 1]
+        if (aposto) {
+          await page.waitForTimeout(120)
+          ult = { tag: `h${hand}t${i}r`, ...(await a2Snap(page)) }
+          states.push(ult)
+        }
+        if (ult.kind.includes('discard')) {
           await page.evaluate(() => { const c = document.querySelector('.player-zone .playing-card.card-clickable'); if (c) c.click() })
           await page.waitForTimeout(250)
           states.push({ tag: `h${hand}-sel`, ...(await a2Snap(page)) })
           await clickIf(page, 'button:has-text("Sin descartar")') || await clickIf(page, '.discard-area .btn')
         }
       }
+      if (closed) ciclo.cerradas++; else ciclo.sinCerrar = true
+      ciclo.gameOver = ciclo.gameOver || await page.locator('.game-over-screen').isVisible().catch(() => false)
+      ciclo.bancarrota = ciclo.bancarrota || await page.locator('.bankrupt-overlay').isVisible().catch(() => false)
       if (!closed || covered()) break
       if (!await clickIf(page, 'button:has-text("Siguiente mano")')) break
       await page.waitForTimeout(1500); await page.mouse.move(5, 5)
@@ -3437,9 +3489,9 @@ async function runA2(browser) {
       banda: { frames: bandFrames.length, dy: bandDy, dyExp: bandDyExp, reserveVsCards, clearPaint: bandClearPaint,
         w: bandFrames[0]?.tagBox?.w ?? null, cx: bandFrames[0]?.tagCx ?? null, bandNoClip, bandCentered, bandNoBtn, bandNoPaint },
       fueraDeFlujo: oof, vuelos: { ...flights, bandTop: bandFrames[0]?.tagBox?.top ?? null },
-      gemeloIA: { ...dAi, ...aiSim, pre: aiPre }, checks, passed,
+      gemeloIA: { ...dAi, ...aiSim, pre: aiPre }, ciclo, checks, passed,
     })
-    console.log(`T${n} ${vp.w}x${vp.h} · sim ${base.simIzq}/${base.simDer} Δ=${dSim.max} · carta ${base.slotW}/${preW} · respiro ${base.respiro}/${live.gapLeft} pila@${pilaMin} · banda ${bandFrames.length}f dy=${bandDy} (exp ${bandDyExp}${reserveVsCards ? ` +${reserveVsCards} de reserva` : ''}) w=${bandFrames[0]?.tagBox?.w}/${live.bandW} aire↓=${bandClearPaint} · flujo Δ=${oof.dAnchors}/${oof.dSlots}/${oof.dScrollH} · vuelo ${round(flights.maxBottomInZone)}≤${bandFrames[0]?.tagBox?.top} · IA Δ=${dAi.max} · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
+    console.log(`T${n} ${vp.w}x${vp.h} · sim ${base.simIzq}/${base.simDer} Δ=${dSim.max} · carta ${base.slotW}/${preW} · respiro ${base.respiro}/${live.gapLeft} pila@${pilaMin} · banda ${bandFrames.length}f (${ciclo.manos}m/${ciclo.cerradas}c${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) dy=${bandDy} (exp ${bandDyExp}${reserveVsCards ? ` +${reserveVsCards} de reserva` : ''}) w=${bandFrames[0]?.tagBox?.w}/${live.bandW} aire↓=${bandClearPaint} · flujo Δ=${oof.dAnchors}/${oof.dSlots}/${oof.dScrollH} · vuelo ${round(flights.maxBottomInZone)}≤${bandFrames[0]?.tagBox?.top} · IA Δ=${dAi.max} · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
     await page.close()
   }
   return out
