@@ -55,6 +55,15 @@ export function useUtilitiesMenu(enabled = true) {
 
   const close = useCallback(() => setAnchor(null), [])
 
+  // DSK-U2 · El selector de reacciones se ancla al MISMO ⋮ que el panel, pero
+  // se monta cuando el panel ya se ha cerrado (la entrada 💬 cierra al ejecutar,
+  // como sus hermanas). Se expone la medida, no el ref: quien la pide la llama
+  // desde un manejador de evento, nunca durante el render.
+  const triggerRect = useCallback(() => {
+    const el = triggerRef.current
+    return el ? el.getBoundingClientRect() : null
+  }, [])
+
   // Se mide al abrir, no al renderizar: el disparador vive en flujo y su x
   // depende del ancho del área (cinco valores según mesa y viewport). Apertura
   // ABAJO-DERECHA alineada al filo derecho del ⋮ — decisión sellada: junto con
@@ -100,5 +109,5 @@ export function useUtilitiesMenu(enabled = true) {
     }
   }, [open, close])
 
-  return { open, anchor, toggle, close, registerTrigger }
+  return { open, anchor, toggle, close, registerTrigger, triggerRect }
 }

@@ -103,6 +103,18 @@
 //            Suma una sub-pasada pointer:coarse (hits ⋮ y entradas ≥40, sin
 //            robarle el hit a la ✕) y una de persistencia end-to-end
 //            (apagar → recargar → volver a la mesa). Args: [mesa] [WxH].
+//   u2     → DSK-U2: reacciones entre jugadores (selector + burbuja + candado).
+//            20 celdas con las diez puertas: el selector abre desde 💬 y cierra
+//            por sus TRES vías (Esc, clic fuera, selección), su rejilla 3×4 no
+//            toca cartas ni botones del humano, la burbuja se ancla por la
+//            TINTA del nombre (rect de Range, no la caja de 12ch), Δ=0 de layout
+//            y guardia de contenido, capa 25/31 contra el censo vivo, la frase
+//            mostrada es la elegida (lista importada de src/config/reacciones.js
+//            — nunca una copia), y la X mata lo visual SIN liberar el cooldown.
+//            Dos sub-pasadas: ciclo 0,3/2,4/0,3 muestreando opacidad + el reloj
+//            de turno corriendo indiferente, y pointer:coarse para el hit ≥40 de
+//            la X (embaldosado B2) sin desbordar hacia las cartas.
+//            Args: [mesa] [WxH].
 //            OJO: el modo r2 lanza el navegador SIN --hide-scrollbars (ver el
 //            launch al final): con las barras ocultas, la que aparece/desaparece
 //            por overflow desplazable NUNCA encoge el cliente y el saltito de
@@ -3903,9 +3915,13 @@ async function runU1(browser) {
       manoSeparada: dims != null && dims.sep > 0 && parseFloat(dims.hairline) > 0 &&
         titles[3] === 'Mano actual',
       // Sin palabras, el tooltip nativo es la única leyenda: no puede faltar.
+      // DSK-U2 · la segunda entrada dejó de ser "Mensajes" y pasó a ser
+      // "Reacciones" (v1.2 §1): la puerta se RE-APUNTA al nombre sellado, no se
+      // relaja — sigue exigiendo las cuatro leyendas, todas con texto, y las
+      // tres primeras con su nombre exacto.
       tooltips: titles.length === 4 &&
         titles.every(t => t && t.trim()) &&
-        titles[0] === 'Sonido' && titles[1] === 'Mensajes' && titles[2] === 'Saldo',
+        titles[0] === 'Sonido' && titles[1] === 'Reacciones' && titles[2] === 'Saldo',
       // Contador: clave creada con las 20 gratis y badge que la pinta.
       contador: press.ls === '20' && press.badgeTxt === '20',
       // El popup abre por press, dice lo que debe y pinta sobre el panel.
@@ -3999,6 +4015,450 @@ async function runU1(browser) {
   return { cells, hits, sound, passed }
 }
 
+// ── DSK-U2 · Reacciones entre jugadores ──────────────────────────────────────
+// Documento rector: docs/AJILEI_Menu_Utilidades_v1.2.md.
+// Modo NUEVO, no extensión de u1: aquél valida el CONTENEDOR del menú (caja del
+// ⋮, apertura, apilamiento, sonido); éste valida un sistema propio (selector +
+// burbuja + candado + cooldown). Mezclarlos haría que una regresión de
+// reacciones se leyera como una del menú.
+//
+// ANTI-CABLEADO: las frases y los tiempos se IMPORTAN de la misma fuente que
+// consume la app (src/config/reacciones.js). Una lista paralela en el arnés se
+// desincronizaría al primer retoque de redacción — que es justo el fallo que
+// esta campaña se niega a repetir.
+const U2_VIEWPORTS = [...VIEWPORTS, { w: 1440, h: 850 }]
+const U2_TABLES = [5, 4, 3, 2]
+
+// Lo que ni el selector ni la burbuja pueden tocar JAMÁS. Las cartas propias
+// encabezan la lista: son inocluibles por criterio rector de la tanda.
+const U2_GUARD = {
+  cartasHumano: '.player-zone .card-slot-wrapper',
+  botones: '.action-area .btn',
+  mults: '.btn-mult',
+  timer: '.timer-display',
+  bandaPalo: '.score-tag-player',
+}
+// Anclas del Δ=0 con burbuja presente/ausente.
+const U2_ANCHORS = [
+  '.game-table', '.table-header', '.table-mid', '.rivals-zone', '.center-zone',
+  '.ai-zone', '.player-zone', '.player-bar', '.player-zone .cards-row',
+  '.score-tag-player', '.header-right',
+]
+
+async function u2Install(page) {
+  await page.evaluate(({ G, A }) => {
+    const rnd = x => x == null ? null : Math.round(x * 100) / 100
+    const R = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: rnd(b.x), y: rnd(b.y), w: rnd(b.width), h: rnd(b.height), top: rnd(b.top), bottom: rnd(b.bottom), left: rnd(b.left), right: rnd(b.right) } }
+    window.__u2R = s => R(document.querySelector(s))
+    window.__u2snap = () => A.map(s => R(document.querySelector(s)))
+    // Rect de TINTA — el anclaje que la tanda declara regla.
+    window.__u2tinta = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const rg = document.createRange(); rg.selectNodeContents(el)
+      const b = rg.getBoundingClientRect()
+      return { x: rnd(b.x), w: rnd(b.width), top: rnd(b.top), left: rnd(b.left), right: rnd(b.right), centro: rnd(b.left + b.width / 2) }
+    }
+    // Oclusión de un rect contra la guardia, en % del propio rect.
+    window.__u2tapa = (b) => {
+      const out = {}
+      if (!b) return out
+      for (const [k, s] of Object.entries(G)) {
+        let acc = 0
+        document.querySelectorAll(s).forEach(e => {
+          const cs = getComputedStyle(e)
+          if (cs.visibility === 'hidden' || cs.display === 'none') return
+          const r = e.getBoundingClientRect()
+          if (!r.width || !r.height) return
+          const ow = Math.max(0, Math.min(b.right, r.right) - Math.max(b.left, r.left))
+          const oh = Math.max(0, Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top))
+          acc += ow * oh
+        })
+        if (acc > 0.5) out[k] = rnd(100 * acc / (b.w * b.h))
+      }
+      return out
+    }
+    // Puntos MEDIOS de los filos + centro. Nunca las esquinas: con
+    // `border-radius` caen fuera de la forma pintada y dan falso negativo
+    // (verificado en el diagnóstico de fase 1).
+    window.__u2gana = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const b = el.getBoundingClientRect()
+      const pts = [
+        [b.left + b.width / 2, b.top + b.height / 2],
+        [b.left + b.width / 2, b.top + 2], [b.left + b.width / 2, b.bottom - 2],
+        [b.left + 2, b.top + b.height / 2], [b.right - 2, b.top + b.height / 2],
+      ]
+      return pts.every(([x, y]) => {
+        if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false
+        const t = document.elementFromPoint(x, y)
+        return !!t && (t === el || el.contains(t) || t.closest(sel) === el)
+      })
+    }
+    window.__u2css = (sel, props) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const cs = getComputedStyle(el)
+      const o = {}
+      props.forEach(p => { o[p] = cs.getPropertyValue(p) })
+      return o
+    }
+    // ¿Algún ancestro de la burbuja crea contexto de apilamiento o transform?
+    // Si lo hiciera, el `fixed` dejaría de anclar al viewport.
+    window.__u2cadena = (sel) => {
+      const out = []
+      let el = document.querySelector(sel)
+      if (!el) return null
+      el = el.parentElement
+      while (el && el !== document.documentElement) {
+        const cs = getComputedStyle(el)
+        out.push({
+          cls: String(el.className).slice(0, 30) || el.tagName.toLowerCase(),
+          transform: cs.transform !== 'none',
+          ctx: (cs.position !== 'static' && cs.zIndex !== 'auto') || cs.transform !== 'none' ||
+            parseFloat(cs.opacity) < 1 || cs.filter !== 'none' || cs.isolation === 'isolate' ||
+            cs.contain.includes('paint') || cs.contain.includes('layout') || cs.perspective !== 'none',
+        })
+        el = el.parentElement
+      }
+      return out
+    }
+    window.__u2enPanel = () => {
+      const b = document.querySelector('.u2-burbuja')
+      return b ? !!b.closest('.opp-panel, .ai-zone') : null
+    }
+    // Censo z VIVO dentro del área. La burbuja es `pointer-events: none` a
+    // propósito (overlay puro: no le roba un solo clic al juego), así que su
+    // capa NO se puede auditar con elementFromPoint — que la salta y devolvería
+    // siempre lo de debajo. Se audita contra el censo: su z debe superar todo lo
+    // que vive dentro del área y quedarse por debajo del menú y los modales.
+    window.__u2zArea = () => {
+      let max = 0, quien = null
+      document.querySelectorAll('.game-table *').forEach(e => {
+        const cs = getComputedStyle(e)
+        if (cs.position === 'static' || cs.zIndex === 'auto') return
+        const z = Number(cs.zIndex)
+        if (Number.isFinite(z) && z > max) { max = z; quien = String(e.className).slice(0, 30) }
+      })
+      return { max, quien }
+    }
+  }, { G: U2_GUARD, A: U2_ANCHORS })
+}
+
+const u2Espera = (page, ms) => page.waitForTimeout(ms)
+
+// Abre el menú ⋮ y de ahí el selector. Un clic por paso y RECHEQUEO antes del
+// siguiente (lección W1): abrir el menú y abrir el selector son dos cambios de
+// estado encadenados, y encadenar clics sobre un estado muestreado una sola vez
+// es exactamente como se pierden las tandas.
+async function u2AbrirSelector(page) {
+  await page.click('.utilities-trigger')
+  await page.waitForSelector('.utilities-panel', { timeout: 2000 }).catch(() => {})
+  const listo = await page.evaluate(() => !!document.querySelector('.util-item-reacciones:not([disabled])'))
+  if (!listo) return false
+  await page.click('.util-item-reacciones')
+  await page.waitForSelector('.u2-selector', { timeout: 2000 }).catch(() => {})
+  return page.evaluate(() => !!document.querySelector('.u2-selector'))
+}
+
+async function runU2(browser) {
+  const { REACCIONES, REACCION_TOTAL_MS, REACCION_COOLDOWN_MS, REACCION_ENTRADA_MS, REACCION_VISIBLE_MS } =
+    await import('../src/config/reacciones.js')
+  const cells = []
+  const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
+  const vpFilter = process.argv[4] || null
+
+  for (const n of U2_TABLES) for (const vp of U2_VIEWPORTS) {
+    if (tblFilter && n !== tblFilter) continue
+    if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    const c = { mesa: n, vp: `${vp.w}x${vp.h}` }
+    try {
+      await gotoMesa(page, n)
+      await u2Install(page)
+      await installHitProbe(page)
+
+      const base = await page.evaluate(() => window.__u2snap())
+
+      // ── P1a · el selector ABRE desde la entrada 💬 (que cierra el menú) ────
+      const abrio = await u2AbrirSelector(page)
+      const tras = await page.evaluate(() => ({
+        selector: !!document.querySelector('.u2-selector'),
+        panel: !!document.querySelector('.utilities-panel'),
+        frases: [...document.querySelectorAll('.u2-frase')].map(e => e.textContent),
+      }))
+      // La entrada cierra al ejecutar (v1.1 §1.3.1) → el panel NO sobrevive.
+      const p1_abre = abrio && tras.selector && tras.panel === false
+      // Contenido = la fuente única, en su orden.
+      const p8_lista = JSON.stringify(tras.frases) === JSON.stringify(REACCIONES)
+
+      // ── P2 · la rejilla no toca cartas ni botones del humano ──────────────
+      const selRect = await page.evaluate(() => window.__u2R('.u2-selector'))
+      const selTapa = await page.evaluate(() => window.__u2tapa(window.__u2R('.u2-selector')))
+      const selDentro = await page.evaluate(() => {
+        const b = window.__u2R('.u2-selector')
+        return b && b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight
+      })
+      const p2 = Object.keys(selTapa).length === 0 && !!selDentro
+
+      // ── P10a · capa del selector (censo vivo, no número declarado) ─────────
+      const zSel = await page.evaluate(() => window.__u2css('.u2-selector', ['z-index', 'position']))
+      const selGana = await page.evaluate(() => window.__u2gana('.u2-selector'))
+
+      // ── P1b · cierre por Esc ──────────────────────────────────────────────
+      await page.keyboard.press('Escape')
+      await u2Espera(page, 80)
+      const p1_esc = await page.evaluate(() => !document.querySelector('.u2-selector'))
+
+      // ── P1c · cierre por clic fuera ───────────────────────────────────────
+      await u2AbrirSelector(page)
+      const reabrio = await page.evaluate(() => !!document.querySelector('.u2-selector'))
+      await page.mouse.click(4, Math.round(vp.h / 2))
+      await u2Espera(page, 80)
+      const p1_fuera = reabrio && await page.evaluate(() => !document.querySelector('.u2-selector'))
+
+      // ── P1d + envío · cierre por selección ────────────────────────────────
+      await u2AbrirSelector(page)
+      const elegida = REACCIONES[REACCIONES.length - 2]   // "¡Qué va! 🤦"
+      await page.click(`.u2-frase:nth-child(${REACCIONES.indexOf(elegida) + 1})`)
+      await u2Espera(page, 60)
+      const p1_sel = await page.evaluate(() => !document.querySelector('.u2-selector'))
+
+      // ── P8 · la frase mostrada es la elegida ──────────────────────────────
+      const burb = await page.evaluate(() => {
+        const b = document.querySelector('.u2-burbuja')
+        return b ? { texto: b.querySelector('.u2-texto')?.textContent ?? null } : null
+      })
+      // La burbuja une el emoji al último término con un ESPACIO DURO para que
+      // no quede huérfano al envolver (v1.2 §2: el emoji es parte de la frase).
+      // La puerta normaliza ese único carácter y nada más: sigue exigiendo la
+      // frase completa, exacta y sin recortar — sólo tolera que el espacio que
+      // la separa del emoji sea duro en vez de blando.
+      const normal = s => (s == null ? s : s.replace(/\u00A0/g, ' '))
+      const p8 = p8_lista && !!burb && normal(burb.texto) === elegida
+
+      // ── P3 · anclaje por TINTA (ruta humana, viva) ────────────────────────
+      const anclaje = await page.evaluate(() => {
+        const b = document.querySelector('.u2-burbuja')
+        if (!b) return null
+        const rb = b.getBoundingClientRect()
+        const cs = getComputedStyle(b)
+        const px = parseFloat(cs.getPropertyValue('--u2-pico-x'))
+        const tinta = window.__u2tinta('.pbr-name')
+        const caja = window.__u2R('.pbr-name')
+        return {
+          picoAbs: Math.round((rb.left + px) * 100) / 100,
+          tintaIzq: tinta.left, tintaDer: tinta.right, tintaCentro: tinta.centro,
+          cajaCentro: Math.round((caja.x + caja.w / 2) * 100) / 100,
+          desfase: Math.round((caja.x + caja.w / 2 - tinta.centro) * 100) / 100,
+        }
+      })
+      // El pico cae DENTRO de la tinta del nombre (no de su caja de 12ch).
+      const p3 = !!anclaje && anclaje.picoAbs >= anclaje.tintaIzq - 0.5 && anclaje.picoAbs <= anclaje.tintaDer + 0.5
+      // Anclaje LISTO en las dos rutas del rival (su burbuja viva llega en U2b):
+      // la tinta se resuelve y el desfase contra la caja es real, o sea que un
+      // pico centrado en la caja fallaría.
+      const rutasRival = await page.evaluate(() => {
+        const mide = (sel) => {
+          const t = window.__u2tinta(sel), c = window.__u2R(sel)
+          if (!t || !c) return null
+          return { tinta: t.w, caja: c.w, desfase: Math.round((c.x + c.w / 2 - t.centro) * 100) / 100 }
+        }
+        return { oppPanel: mide('.opp-panel .opp-name'), aiZone: mide('.ai-zone .ai-name') }
+      })
+
+      // ── P7 · Δ=0 con burbuja presente ─────────────────────────────────────
+      const conBurb = await page.evaluate(() => window.__u2snap())
+      let d7 = 0, d7who = null
+      base.forEach((p, i) => {
+        const q = conBurb[i]; if (!p || !q) return
+        const m = Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y), Math.abs(q.w - p.w), Math.abs(q.h - p.h))
+        if (m > d7) { d7 = round(m); d7who = U2_ANCHORS[i] }
+      })
+      // Guardia de contenido de la burbuja + cadena de apilamiento sana.
+      const burbTapa = await page.evaluate(() => window.__u2tapa(window.__u2R('.u2-burbuja')))
+      const enPanel = await page.evaluate(() => window.__u2enPanel())
+      const cadena = await page.evaluate(() => window.__u2cadena('.u2-burbuja'))
+      const cadenaOk = Array.isArray(cadena) && cadena.every(a => !a.transform)
+      const p7 = d7 <= 0.02 && Object.keys(burbTapa).length === 0 && enPanel === false && cadenaOk
+
+      // ── P10b · capa de la burbuja, contra el CENSO VIVO ───────────────────
+      // No por hit-test: la burbuja es `pointer-events: none` de propósito
+      // (overlay puro) y elementFromPoint la salta. Se audita su z contra lo
+      // que de verdad hay en el área, y contra el menú y los modales por arriba.
+      const zBurb = await page.evaluate(() => window.__u2css('.u2-burbuja', ['z-index', 'position', 'pointer-events']))
+      const zArea = await page.evaluate(() => window.__u2zArea())
+      const zMenu = await page.evaluate(() => {
+        const v = getComputedStyle(document.querySelector('.game-table-screen')).getPropertyValue('--dsk-u1-panel-z')
+        return Number(String(v).trim())
+      })
+      const peX = await page.evaluate(() => window.__u2css('.u2-cerrar', ['pointer-events']))
+      const xGana = await page.evaluate(() => window.__u2gana('.u2-cerrar'))
+      const zb = Number(zBurb && zBurb['z-index'])
+      const capaBurbuja = Number.isFinite(zb) && zb > zArea.max && zb < zMenu &&
+        zBurb.position === 'fixed' && zBurb['pointer-events'] === 'none' &&
+        peX && peX['pointer-events'] === 'auto' && xGana === true
+
+      // ── P5 · el candado y la X ────────────────────────────────────────────
+      // La X mata lo VISUAL al instante y NO libera el cooldown.
+      const hitX = await page.evaluate(() => {
+        const el = document.querySelector('.u2-cerrar')
+        return el ? window.__hitBox(el) : null
+      })
+      await page.click('.u2-cerrar')
+      await u2Espera(page, 60)
+      const trasX = await page.evaluate(() => ({
+        burbuja: !!document.querySelector('.u2-burbuja'),
+        entradaBloqueada: !!document.querySelector('.util-item-reacciones[disabled]'),
+      }))
+      // Ojo: para leer la entrada hay que abrir el menú (el panel está cerrado).
+      await page.click('.utilities-trigger')
+      await u2Espera(page, 80)
+      const enfriando = await page.evaluate(() => {
+        const e = document.querySelector('.util-item-reacciones')
+        return { existe: !!e, disabled: e ? e.disabled : null, cooling: e ? /is-cooling/.test(e.className) : null }
+      })
+      await page.keyboard.press('Escape')
+      const p5_xMata = trasX.burbuja === false
+      const p5_xNoLibera = enfriando.disabled === true && enfriando.cooling === true
+
+      // Y al vencer el cooldown vuelve a habilitarse (fuente: la constante).
+      await u2Espera(page, REACCION_COOLDOWN_MS + 250)
+      await page.click('.utilities-trigger')
+      await u2Espera(page, 80)
+      const trasCool = await page.evaluate(() => {
+        const e = document.querySelector('.util-item-reacciones')
+        return e ? { disabled: e.disabled, cooling: /is-cooling/.test(e.className) } : null
+      })
+      await page.keyboard.press('Escape')
+      const p5 = p5_xMata && p5_xNoLibera && trasCool && trasCool.disabled === false && trasCool.cooling === false
+
+      const checks = {
+        p1_selectorAbre: p1_abre, p1_esc, p1_fuera, p1_seleccion: p1_sel,
+        p2_rejillaLimpia: p2,
+        p3_anclajePorTinta: p3,
+        p5_candadoYCooldown: p5,
+        p7_deltaCero: p7,
+        p8_fraseElegida: p8,
+        // Selector: interactivo → se le exige ganar el hit-test, y vivir un
+        // peldaño por encima del panel del menú (calc(--dsk-u1-panel-z + 1)).
+        // Burbuja: overlay puro → se le exige la capa por censo (ver arriba).
+        p10_capa: zSel && zSel.position === 'fixed' && Number(zSel['z-index']) === zMenu + 1 &&
+          selGana === true && capaBurbuja,
+      }
+      c.checks = checks
+      c.detalle = {
+        selector: selRect, selTapa, zSel, selGana,
+        burbTapa, zBurb, zArea, zMenu, xGana, capaBurbuja, enPanel, cadenaOk,
+        anclaje, rutasRival, delta: { max: d7, who: d7who }, hitX,
+        cooldownMs: REACCION_COOLDOWN_MS, totalMs: REACCION_TOTAL_MS,
+      }
+      c.passed = Object.values(checks).every(Boolean)
+    } catch (e) {
+      c.error = String(e && e.message || e).slice(0, 300)
+      c.passed = false
+    }
+    cells.push(c)
+    const fallos = c.checks ? Object.entries(c.checks).filter(([, v]) => !v).map(([k]) => k) : ['ERROR']
+    console.log(`u2 m${n} ${vp.w}x${vp.h} · ${c.passed ? 'OK' : 'FALLA [' + fallos.join(',') + ']'}${c.error ? ' · ' + c.error : ''}`)
+    await page.close()
+  }
+
+  // ── P4 + P9 · ciclo de vida y reloj (sub-pasada, una celda por mesa) ──────
+  const ciclo = []
+  for (const n of U2_TABLES) {
+    if (tblFilter && n !== tblFilter) continue
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const r = { mesa: n }
+    try {
+      await gotoMesa(page, n)
+      await u2Install(page)
+      // Turno vivo del humano: es donde el reloj corre y donde la burbuja tiene
+      // que demostrar que no lo toca.
+      await clickIf(page, 'button:has-text("Iniciar mano")')
+      let conTimer = false
+      for (let i = 0; i < 120 && !conTimer; i++) {
+        await u2Espera(page, 250)
+        conTimer = await page.evaluate(() => !!document.querySelector('.timer-display'))
+      }
+      const t0 = await page.evaluate(() => { const e = document.querySelector('.timer-display'); return e ? parseInt(e.textContent, 10) : null })
+      await u2AbrirSelector(page)
+      await page.click('.u2-frase:nth-child(1)')
+      // Muestreo del ciclo, con las expectativas DERIVADAS de las constantes.
+      const dur = await page.evaluate(() => window.__u2css('.u2-burbuja', ['animation-duration']))
+      await u2Espera(page, Math.round(REACCION_ENTRADA_MS / 2))
+      const oSubiendo = await page.evaluate(() => { const e = document.querySelector('.u2-burbuja'); return e ? parseFloat(getComputedStyle(e).opacity) : null })
+      await u2Espera(page, REACCION_ENTRADA_MS)
+      const oPleno = await page.evaluate(() => { const e = document.querySelector('.u2-burbuja'); return e ? parseFloat(getComputedStyle(e).opacity) : null })
+      await u2Espera(page, REACCION_VISIBLE_MS - REACCION_ENTRADA_MS - 200)
+      const oFinVisible = await page.evaluate(() => { const e = document.querySelector('.u2-burbuja'); return e ? parseFloat(getComputedStyle(e).opacity) : null })
+      await u2Espera(page, 200 + Math.round(REACCION_ENTRADA_MS / 2) + 60)
+      const oBajando = await page.evaluate(() => { const e = document.querySelector('.u2-burbuja'); return e ? parseFloat(getComputedStyle(e).opacity) : null })
+      await u2Espera(page, REACCION_TOTAL_MS)
+      const viva = await page.evaluate(() => !!document.querySelector('.u2-burbuja'))
+      const t1 = await page.evaluate(() => { const e = document.querySelector('.timer-display'); return e ? parseInt(e.textContent, 10) : null })
+      r.dur = dur && dur['animation-duration']
+      r.opac = { subiendo: oSubiendo, pleno: oPleno, finVisible: oFinVisible, bajando: oBajando }
+      r.viva = viva
+      r.reloj = { t0, t1, caida: t0 != null && t1 != null ? t0 - t1 : null }
+      // El keyframe reparte el total: entrada acabada al 10%, salida abierta al 90%.
+      r.p4 = r.dur === `${REACCION_TOTAL_MS / 1000}s` &&
+        oSubiendo != null && oSubiendo > 0 && oSubiendo < 1 &&
+        oPleno === 1 && oFinVisible === 1 &&
+        oBajando != null && oBajando < 1 && viva === false
+      // El reloj no se entera: cae ~lo que duró la burbuja (tolerancia ±2s).
+      r.p9 = r.reloj.caida != null && r.reloj.caida >= Math.floor(REACCION_TOTAL_MS / 1000) - 1
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
+    r.ok = !!(r.p4 && r.p9)
+    ciclo.push(r)
+    console.log(`u2·ciclo m${n} · ${r.ok ? 'OK' : 'FALLA'} dur=${r.dur} opac=${JSON.stringify(r.opac)} viva=${r.viva} reloj=${JSON.stringify(r.reloj)}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  // ── P6 · hit de la X ≥40 en pointer:coarse (embaldosado B2) ───────────────
+  const tactil = []
+  for (const n of U2_TABLES) {
+    if (tblFilter && n !== tblFilter) continue
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, hasTouch: true })
+    await ctx.addInitScript(() => {
+      const mm = window.matchMedia.bind(window)
+      window.matchMedia = q => /pointer:\s*coarse/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} } : mm(q)
+    })
+    const page = await ctx.newPage()
+    const r = { mesa: n }
+    try {
+      await gotoMesa(page, n)
+      await u2Install(page)
+      await installHitProbe(page)
+      await u2AbrirSelector(page)
+      // Las entradas del selector también deben cumplir el estándar de 44.
+      const hitFrase = await page.evaluate(() => { const e = document.querySelector('.u2-frase'); return e ? window.__hitBox(e) : null })
+      await page.click('.u2-frase:nth-child(1)')
+      await u2Espera(page, 120)
+      const hitX = await page.evaluate(() => { const e = document.querySelector('.u2-cerrar'); return e ? window.__hitBox(e) : null })
+      // El hit de la X no puede desbordar hacia la DERECHA sobre las cartas.
+      const invade = await page.evaluate(() => {
+        const e = document.querySelector('.u2-cerrar')
+        const s1 = document.querySelector('.player-zone .card-slot-wrapper')
+        if (!e || !s1) return null
+        const r0 = e.getBoundingClientRect(), c = s1.getBoundingClientRect()
+        return Math.round((r0.right + 0 - c.left) * 100) / 100   // <0 = no llega
+      })
+      r.hitFrase = hitFrase; r.hitX = hitX; r.margenCartas = invade
+      r.p6 = !!hitX && hitX.w >= 40 && hitX.h >= 40 && !!hitFrase && hitFrase.h >= 44 && invade != null && invade < 0
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
+    r.ok = !!r.p6
+    tactil.push(r)
+    console.log(`u2·táctil m${n} · ${r.ok ? 'OK' : 'FALLA'} X=${r.hitX ? r.hitX.w + 'x' + r.hitX.h : '—'} frase.h=${r.hitFrase ? r.hitFrase.h : '—'} margenCartas=${r.margenCartas}${r.error ? ' · ' + r.error : ''}`)
+    await ctx.close()
+  }
+
+  const passed = cells.every(c => c.passed) && ciclo.every(r => r.ok) && tactil.every(r => r.ok)
+  console.log(`\n── U2: ${cells.filter(c => c.passed).length}/${cells.length} celdas · ciclo ${ciclo.filter(r => r.ok).length}/${ciclo.length} · táctil ${tactil.filter(r => r.ok).length}/${tactil.length} · ${passed ? 'VERDE' : 'ROJO'}`)
+  return { cells, ciclo, tactil, passed }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
@@ -4036,6 +4496,7 @@ try {
   if (MODE === 'o2') report.o2 = await runO2(browser)
   if (MODE === 'a2') report.a2 = await runA2(browser)
   if (MODE === 'u1') report.u1 = await runU1(browser)
+  if (MODE === 'u2') report.u2 = await runU2(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }

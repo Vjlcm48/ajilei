@@ -5,7 +5,9 @@ import OpponentPanel from './OpponentPanel'
 import { SoundButton } from './SoundButton'
 import { MuteButton } from './MuteButton'
 import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
+import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
+import { useReacciones } from '../hooks/useReacciones'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
@@ -318,6 +320,10 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // bifurcación es de JSX (no de CSS) para que móvil conserve su bocina byte a
   // byte. El hook se llama SIEMPRE (orden de hooks estable) y recibe el gate.
   const utilMenu = useUtilitiesMenu(isDesktopTable)
+  // DSK-U2 · circuito de reacciones. Mismo gate y mismo patrón: el hook se
+  // llama SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
+  // escritorio no hay selector, ni burbuja, ni listeners.
+  const reacciones = useReacciones(isDesktopTable)
   // AJ-1 · landscape mesas 5 y 4: AJILEI + "Mano #N" bajan de la cabecera a
   // .table-mid. El bloque debe centrarse en la franja IA↔humano, y esa franja se
   // define DENTRO de .table-mid: colgando de ahí, su 50% ya es el de la franja y
@@ -1535,7 +1541,34 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           vecino de las voladoras, no dentro de la cabecera: fuera de flujo
           estricto y `fixed` sobre el viewport (ningún ancestro con transform),
           así que ni empuja ni lo recorta el scroller. */}
-      {isDesktopTable && <UtilitiesPanel anchor={utilMenu.anchor} onClose={utilMenu.close} />}
+      {isDesktopTable && (
+        <UtilitiesPanel
+          anchor={utilMenu.anchor}
+          onClose={utilMenu.close}
+          onReacciones={() => reacciones.abrirSelector(utilMenu.triggerRect())}
+          reaccionesBloqueadas={reacciones.bloqueado}
+        />
+      )}
+
+      {/* DSK-U2 · selector de reacciones y burbuja. Viven AQUÍ por la misma
+          razón que el panel de utilidades: hermanos del área y vecinos de las
+          voladoras, fuera de flujo estricto. Jamás dentro de un .opp-panel —
+          es contexto de apilamiento y R2 le pone `transform`, que rompería el
+          `fixed`. La burbuja es overlay puro: Δ=0 de layout por construcción. */}
+      {isDesktopTable && (
+        <ReaccionesSelector
+          anchor={reacciones.selector}
+          bloqueado={reacciones.bloqueado}
+          onElegir={reacciones.enviar}
+        />
+      )}
+      {isDesktopTable && (
+        <ReaccionBurbuja
+          activa={reacciones.activa}
+          anchorSel=".pbr-name"
+          onCerrar={reacciones.cerrarBurbuja}
+        />
+      )}
 
       {/* Confirmación abandonar mesa */}
       {confirmLeave && (

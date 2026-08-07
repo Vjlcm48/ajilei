@@ -63,18 +63,19 @@ export function UtilitiesTrigger({ open, onToggle, registerTrigger }) {
   )
 }
 
-// Entradas inertes del grupo de tres: presentes, visibles y sin respuesta al
-// clic — el estado de no habilitados que la v1.1 §6 hereda de la v1.0 §3.
+// Entradas inertes: presentes, visibles y sin respuesta al clic — el estado de
+// no habilitados que la v1.1 §6 hereda de la v1.0 §3.
+// DSK-U2 · "Mensajes" SALE de aquí: pasa a ser Reacciones, entrada viva. Queda
+// sola "Saldo", que reutiliza el ChipToken del cornerChip (el glifo de moneda
+// de la app ya existe y es SVG dorado plano — inventar otro rompería el
+// lenguaje).
 const INERTES = [
-  { key: 'mensajes', title: 'Mensajes', ico: <span className="util-ico" aria-hidden="true">💬</span> },
-  // Saldo reutiliza el ChipToken del cornerChip: el glifo de moneda de la app ya
-  // existe y es SVG dorado plano — inventar otro rompería el lenguaje.
   { key: 'saldo', title: 'Saldo', ico: <span className="util-ico util-ico-chip" aria-hidden="true"><ChipToken size="compact" /></span> },
 ]
 
 const POPUP_MS = 2000
 
-export function UtilitiesPanel({ anchor, onClose }) {
+export function UtilitiesPanel({ anchor, onClose, onReacciones, reaccionesBloqueadas }) {
   const { soundEnabled, toggle: toggleSound } = useSoundContext()
   // Saldo de consultas de "Mano actual". Se lee (e inicializa a 20) la primera
   // vez que el panel se monta. Sin lógica de consumo: eso es U3 — aquí la cifra
@@ -138,6 +139,23 @@ export function UtilitiesPanel({ anchor, onClose }) {
           title="Sonido"
         >
           <span className="util-ico" aria-hidden="true">{soundEnabled ? '🔊' : '🔇'}</span>
+        </button>
+
+        {/* DSK-U2 · Reacciones · segunda entrada VIVA. Cierra al ejecutar, como
+            su hermana Sonido (v1.1 §1.3.1): el panel no tiene nada más que
+            decir, el selector toma el relevo. Durante el cooldown queda inerte
+            con clase PROPIA (`is-cooling`), nunca con `is-disabled`: aquélla es
+            la lengua de "no habilitado" —permanente— y esto es un estado
+            temporal de una entrada que sí está habilitada. */}
+        <button
+          type="button"
+          role="menuitem"
+          className={`util-item util-item-reacciones${reaccionesBloqueadas ? ' is-cooling' : ''}`}
+          onClick={() => { onClose(); onReacciones() }}
+          disabled={reaccionesBloqueadas}
+          title={reaccionesBloqueadas ? 'Reacciones (espera un momento)' : 'Reacciones'}
+        >
+          <span className="util-ico" aria-hidden="true">💬</span>
         </button>
 
         {INERTES.map(e => (

@@ -5548,6 +5548,24 @@
        static/z-auto de punta a punta, sin transform, filter, opacity ni
        isolation — el único contexto de apilamiento es el raíz. */
     --dsk-u1-panel-z: 30;
+
+    /* ── DSK-U2 · Reacciones ────────────────────────────────────────────────
+       Rejilla 3×4 para las 12 frases selladas. Elegida sobre 2×6 por el
+       criterio de la tanda: ninguna de las dos toca cartas ni botones del
+       humano en ninguna de las 20 celdas (0,00% las dos), y el desempate va a
+       la oclusión total — 3×4 es menor en 19 de 20 (media 34,97% contra
+       44,28%). Ambas caben en las 20 celdas con el ancla del ⋮. */
+    --dsk-u2-cols: 3;
+    --dsk-u2-gap: 4px;
+    --dsk-u2-fs: 14px;
+    /* CAPA · un peldaño POR ENCIMA del área y por DEBAJO del menú.
+       25 supera todo lo inventariado dentro del área (censo vivo: techo real
+       10 = el "+N" del pozo; paneles revelados 7; sobrevuelo Z1 9) y queda por
+       debajo del panel de utilidades (30): si llega una reacción mientras el
+       humano tiene el selector abierto, no se le tapa la superficie que está
+       tocando. Y muy por debajo de los modales (leave-overlay 100, bancarrota
+       120), que sí deben taparlo todo. */
+    --dsk-u2-bub-z: 25;
   }
 
   /* El disparador hereda .mute-button (borde, radio, color y transición
@@ -5728,5 +5746,175 @@
     color: var(--text-primary);
     font-size: 12px;
     line-height: 1.2;
+  }
+
+  /* ── DSK-U2 · Selector de reacciones ───────────────────────────────────────
+     Documento rector: docs/AJILEI_Menu_Utilidades_v1.2.md §3.
+     Superficie PROPIA: el panel de utilidades mide 64px de ancho (U1b) y una
+     rejilla de 12 frases no cabe dentro. Se ancla por su borde DERECHO al filo
+     derecho del ⋮ (molde del popup del contador) → el ancho puede crecer sin
+     recalcular el ancla. Estética del panel: superficie del sistema, filete
+     dorado de 1px, radio 8 y UNA sombra.
+     Un peldaño por encima del panel del menú: nace de él (aunque lo releva —
+     la entrada 💬 cierra al ejecutar, así que nunca coexisten, igual que el
+     popup del contador, con el que tampoco puede coincidir). */
+  .u2-selector {
+    position: fixed;
+    z-index: calc(var(--dsk-u1-panel-z) + 1);
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(var(--dsk-u2-cols), minmax(0, 1fr));
+    gap: var(--dsk-u2-gap);
+    padding: var(--dsk-u2-gap);
+    background: var(--surface-modal);
+    border: 1px solid var(--gold-brand);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Fila de 44px — el mismo estándar táctil que U1b exige a las entradas del
+     panel. El ancho lo iguala la rejilla a la frase más larga. */
+  .u2-frase {
+    box-sizing: border-box;
+    height: var(--dsk-u1-item-h);
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: var(--dsk-u2-fs);
+    line-height: 1.3;
+    white-space: nowrap;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  /* Hover como afordancia (lenguaje Z1 del sistema v1.2), sólo donde hay algo
+     que ejecutar — mismo criterio que .util-item. */
+  .u2-frase:not(:disabled):hover { background: rgba(var(--gold-brand-rgb), 0.10); }
+  .u2-frase:disabled { opacity: 0.45; cursor: default; }
+
+  /* La entrada 💬 durante el cooldown. Clase PROPIA, no `is-disabled`: aquélla
+     es la lengua de "no habilitado" (permanente, v1.0 §3) y esto es un estado
+     temporal de una entrada que sí está habilitada. Atenuación más suave para
+     que las dos no se confundan de un vistazo. */
+  .util-item.is-cooling { opacity: 0.6; cursor: default; }
+
+  /* ── DSK-U2 · Burbuja de reacción ──────────────────────────────────────────
+     Overlay PURO: fuera de flujo, `fixed`, sin ocupar una sola celda del
+     layout → Δ=0 por construcción. `pointer-events: none` para no robarle
+     clics al juego; la ÚNICA parte viva es la X.
+     La posición (left/top/max-width) y el desplazamiento del pico llegan en
+     línea desde el componente, que los mide contra la TINTA del nombre y el
+     corredor vivo hasta la primera carta. Aquí sólo vive la piel.
+     Sin oro: el filete es neutro. El único acento dorado de la familia del
+     menú sigue siendo el del badge del contador (U1b §10a). */
+  .u2-burbuja {
+    position: fixed;
+    z-index: var(--dsk-u2-bub-z);
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 12px;
+    background: var(--surface-modal);
+    border: 1px solid rgba(var(--text-primary-rgb), 0.22);
+    border-radius: 8px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary);
+    font-size: var(--dsk-u2-fs);
+    line-height: 1.3;
+    pointer-events: none;
+    animation: u2Burbuja var(--u2-dur) ease-out forwards;
+  }
+  /* El texto envuelve cuando el corredor obliga a estrechar: encoger es la
+     mitigación deliberada que deja las cartas propias intactas. `balance`
+     reparte las líneas en vez de dejar una colgando (degrada solo si el motor
+     no lo soporta: el reparto empeora, la caja no cambia). */
+  .u2-texto {
+    min-width: 0;
+    text-wrap: balance;
+  }
+
+  /* Pico de triángulo invertido, en DOS capas (filo + relleno) porque un
+     triángulo de bordes no admite `border` propio. `--u2-pico-x` es la
+     distancia desde el filo izquierdo de la burbuja hasta el centro de la
+     TINTA del nombre: el pico apunta al nombre aunque el cuerpo esté
+     desplazado contra el filo del área (asimetría deliberada del humano). */
+  .u2-burbuja::before,
+  .u2-burbuja::after {
+    content: '';
+    position: absolute;
+    left: var(--u2-pico-x);
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border: var(--u2-pico) solid transparent;
+    border-bottom: 0;
+  }
+  .u2-burbuja::before {
+    top: 100%;
+    border-top-color: rgba(var(--text-primary-rgb), 0.22);
+  }
+  .u2-burbuja::after {
+    top: calc(100% - 1px);
+    border-top-color: var(--surface-modal);
+  }
+
+  /* Ciclo de vida · 0,3s entrada / 2,4s visible / 0,3s salida.
+     LA DURACIÓN VIVE UNA SOLA VEZ: la constante REACCION_TOTAL_MS de
+     src/config/reacciones.js llega aquí como `--u2-dur` en línea, así que este
+     keyframe no repite ninguna cifra de tiempo — sólo REPARTE el total.
+     Los dos topes son ese reparto exacto: 300/3000 = 10% cierra la entrada y
+     (300+2400)/3000 = 90% abre la salida. Si algún día cambian los tramos en
+     JS, estos dos porcentajes son lo único que hay que revisar aquí.
+     (Es el arreglo de la deuda que GameTable.jsx:38-42 dejó anotada para
+     ELIM_NOTICE_MS, donde la duración sí vive dos veces.)
+     Sólo `opacity` y `transform` — ley del sistema v1.2 §5.1. */
+  @keyframes u2Burbuja {
+    0%   { opacity: 0; transform: translateY(4px)  scale(0.94); }
+    10%  { opacity: 1; transform: translateY(0)    scale(1); }
+    90%  { opacity: 1; transform: translateY(0)    scale(1); }
+    100% { opacity: 0; transform: translateY(-2px) scale(0.98); }
+  }
+
+  /* X de cierre anticipado · glifo discreto, la única parte viva de la burbuja.
+     Mata lo VISUAL y nada más: el cooldown sigue corriendo (config §
+     REACCION_COOLDOWN_MS). */
+  .u2-cerrar {
+    flex: 0 0 auto;
+    position: relative;
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .u2-cerrar:hover { color: var(--text-primary); }
+
+  @media (pointer: coarse) {
+    /* Embaldosado B2 · el hit crece a 40×40 sin mover un píxel visual. Se
+       expande hacia DENTRO de la burbuja (izquierda) y no hacia la derecha:
+       desbordar por ahí lo llevaría hacia la primera carta del humano, y las
+       cartas propias son inocluibles — mismo escrúpulo que confinó el hit del
+       badge del contador a su propia fila (U1b §10c). Arriba y abajo desborda
+       ~4px sobre espacio muerto (el aire de la banda y la zona del pico). */
+    .u2-cerrar::after {
+      content: '';
+      position: absolute;
+      top: -11px; bottom: -11px;
+      left: -22px; right: 0;
+    }
   }
 }
