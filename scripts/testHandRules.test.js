@@ -245,3 +245,50 @@ describe('TB-1 · bancarrota diferida', () => {
     expect(maxDiscard(siguiente.aliveCount)).toBe(5)   // y las reglas se reducen
   })
 })
+
+// ── 7 · qué fuente MANDA si las dos llegaran a divergir (DSK-U0) ────────────
+// Los tests de arriba blindan que `aliveCount` y `handRules` no divergen dentro
+// de una mano. Este blinda algo distinto y complementario: SI divergieran, quién
+// gobierna. Es la vacuna contra el patrón que DSK-U0 tuvo que sacar de la UI —
+// recalcular el tope con `maxDiscard(aliveCount)` en vez de leer el snapshot.
+// Mientras las dos fuentes coincidan por construcción, un lector equivocado
+// PARECE correcto; sólo fabricando la divergencia se ve que no lo es.
+describe('DSK-U0 · el tope que rige es el del snapshot, no el recuento vivo', () => {
+  it('con aliveCount y handRules divergentes, la selección se capa por handRules', () => {
+    let s = createInitialState(10, 5)
+    s = startHand(s)
+    s = advanceFromDeal(s); s = playBettingPhase(s, PHASES.BET_1)
+    s = advanceFromDeal(s); s = playBettingPhase(s, PHASES.BET_2)
+    expect(s.phase).toBe(PHASES.DISCARD)
+
+    // Divergencia IMPOSIBLE hoy, fabricada a mano: la mesa diría 3 vivos (tope 5)
+    // mientras las reglas congeladas de ESTA mano siguen siendo las de 5 (tope 3).
+    const divergente = { ...s, aliveCount: 3 }
+    expect(maxDiscard(divergente.aliveCount)).toBe(5)   // lo que diría el recuento vivo
+    expect(divergente.handRules.maxDiscard).toBe(3)     // lo que dicen las reglas
+
+    // Selección: manda el snapshot, no el recuento.
+    let d = divergente
+    for (let i = 0; i < 5; i++) d = toggleDiscard(d, i)
+    expect(d.selectedDiscards.length).toBe(3)
+
+    // Y el descarte aplicado también: pedir 5 repone sólo el tope congelado.
+    const antes = d.players[0].cards.map(c => `${c.value}-${c.palo}`)
+    const tras  = applyDiscard(divergente, [0, 1, 2, 3, 4])
+    const ahora = tras.players[0].cards.map(c => `${c.value}-${c.palo}`)
+    const cambiadas = ahora.filter((c, i) => c !== antes[i]).length
+    expect(cambiadas).toBe(3)
+  })
+
+  it('el snapshot está disponible para la UI en la fase de descarte', () => {
+    // La capa de presentación lo lee directamente (game.handRules.maxDiscard):
+    // si algún día dejara de existir en DISCARD, el aviso pintaría `undefined`.
+    let s = createInitialState(10, 5)
+    s = startHand(s)
+    s = advanceFromDeal(s); s = playBettingPhase(s, PHASES.BET_1)
+    s = advanceFromDeal(s); s = playBettingPhase(s, PHASES.BET_2)
+    expect(s.phase).toBe(PHASES.DISCARD)
+    expect(Number.isInteger(s.handRules.maxDiscard)).toBe(true)
+    expect(s.message).toContain(`hasta ${s.handRules.maxDiscard} cartas`)
+  })
+})

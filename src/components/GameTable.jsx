@@ -10,6 +10,7 @@ import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
 import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
+import { AJILEI_CONFIG } from '../config/ajileiConfig'
 import {
   PHASES,
   createInitialState,
@@ -19,7 +20,9 @@ import {
   applyAIBetAction,
   applyDiscard,
   toggleDiscard,
-  maxDiscard,
+  // DSK-U0 · `maxDiscard` ya no se importa: la UI no recalcula reglas, las lee
+  // del snapshot congelado de la mano (game.handRules). Quitar el import es
+  // parte del arreglo — mientras la función esté a mano, el patrón vuelve.
 } from '../engine/gameEngine'
 
 const TURN_TIME  = 20
@@ -1414,6 +1417,16 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                   <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
                     {timeLeft}s
                   </div>
+                  {/* DSK-U0 · HR-1 en la capa de presentación. El tope se lee del
+                      SNAPSHOT congelado (game.handRules), la misma y única fuente
+                      que ya consumen applyDiscard y toggleDiscard. Antes se
+                      recalculaba con `maxDiscard(aliveN)` y con un literal `5`: es
+                      el patrón que HR-1 erradicó del motor, sobreviviendo aquí.
+                      Hoy coinciden —`aliveCount` y `handRules` se escriben juntos y
+                      sólo en startHand, así que no pueden divergir dentro de una
+                      mano—, o sea que el Δ visible es CERO; lo que se quita es la
+                      dependencia de esa coincidencia. El día que algo escriba
+                      aliveCount a mitad de mano, el aviso ya no mentirá. */}
                   <p className="discard-hint">
                     {game.selectedDiscards.length === 0
                       ? (
@@ -1422,15 +1435,19 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                               muestra 2 líneas con salto FIJO para que el mazo horizontal
                               no tape el mensaje. CSS alterna ambas por media query. */}
                           <span className="discard-hint-1l">
-                            Pulsa las cartas a descartar (máx. {maxDiscard(aliveN)}) o continúa sin descartar.
+                            Pulsa las cartas a descartar (máx. {game.handRules.maxDiscard}) o continúa sin descartar.
                           </span>
                           <span className="discard-hint-2l">
-                            Pulsa las cartas a descartar.<br />(máx. {maxDiscard(aliveN)}). Continúa sin descartar.
+                            Pulsa las cartas a descartar.<br />(máx. {game.handRules.maxDiscard}). Continúa sin descartar.
                           </span>
                         </>
                       )
-                      : aliveN === 5
-                        ? `${game.selectedDiscards.length} de ${maxDiscard(5)} seleccionada(s).`
+                      /* El denominador sólo aporta cuando el tope RESTRINGE de
+                         verdad (mesa de 5 → 3 de 5 cartas). El gate también sale
+                         del snapshot: con `aliveN === 5` la frase dependía del
+                         recuento vivo, no de las reglas de la mano. */
+                      : game.handRules.maxDiscard < AJILEI_CONFIG.game.handSize
+                        ? `${game.selectedDiscards.length} de ${game.handRules.maxDiscard} seleccionada(s).`
                         : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
                   </p>
                   <SoundButton className="btn btn-primary" onClick={handleDiscard}>
