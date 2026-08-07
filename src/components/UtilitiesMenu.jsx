@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSoundContext } from '../context/SoundContext'
-import { readConsultas } from '../hooks/useUtilitiesMenu'
 import ChipToken from './ChipToken'
+import { BADGE_POPUP_MS } from '../config/consultas'
 
 // ── DSK-U1 / U1b · Menú de utilidades (SOLO gate de escritorio) ─────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda y apéndices).
@@ -73,14 +73,15 @@ const INERTES = [
   { key: 'saldo', title: 'Saldo', ico: <span className="util-ico util-ico-chip" aria-hidden="true"><ChipToken size="compact" /></span> },
 ]
 
-const POPUP_MS = 2000
-
-export function UtilitiesPanel({ anchor, onClose, onReacciones, reaccionesBloqueadas }) {
+export function UtilitiesPanel({
+  anchor, onClose, onReacciones, reaccionesBloqueadas,
+  consultas, manoDisponible, onManoActual,
+}) {
   const { soundEnabled, toggle: toggleSound } = useSoundContext()
-  // Saldo de consultas de "Mano actual". Se lee (e inicializa a 20) la primera
-  // vez que el panel se monta. Sin lógica de consumo: eso es U3 — aquí la cifra
-  // sólo se pinta, y hasta entonces será 20 fija.
-  const [consultas] = useState(readConsultas)
+  // DSK-U3 · el saldo de consultas SUBE a useConsultas. Ya no puede vivir en un
+  // useState local: el consumo lo mueve desde fuera y el popup del valor se
+  // pinta cuando este panel ya se ha desmontado (cierra al ejecutar). Un solo
+  // estado, dos consumidores — molde U1.
   const [popup, setPopup] = useState(null)   // null = cerrado; {top,right} = abierto
   const badgeRef = useRef(null)
   const popupTimer = useRef(null)
@@ -94,7 +95,7 @@ export function UtilitiesPanel({ anchor, onClose, onReacciones, reaccionesBloque
   // cierra ambos, que es lo coherente.
   useEffect(() => {
     if (!popup) return
-    popupTimer.current = setTimeout(() => setPopup(null), POPUP_MS)
+    popupTimer.current = setTimeout(() => setPopup(null), BADGE_POPUP_MS)
     const onDown = (e) => {
       if (e.target.closest && e.target.closest('.util-badge, .utilities-popup')) return
       setPopup(null)
@@ -173,18 +174,40 @@ export function UtilitiesPanel({ anchor, onClose, onReacciones, reaccionesBloque
 
         {/* "Mano actual" · última y separada por el filete del sistema: es la
             entrada premium y no pertenece al grupo de las tres.
-            Va en <div>, no en <button disabled>: un botón deshabilitado bloquea
-            los eventos de sus hijos y el badge quedaría muerto. La entrada sigue
-            inerte (sin handler); el badge es lo único interactivo. */}
-        <div className="util-item util-item-mano is-disabled" title="Mano actual">
-          {/* El rol de menú y su estado deshabilitado viven en el ICONO, no en
-              el contenedor: un control vivo —el badge— no puede colgar de un
-              subárbol `aria-disabled`. Las herramientas de accesibilidad lo
-              tratarían como muerto, y con razón (Playwright se niega a pulsarlo,
-              que fue justo como salió esto). */}
-          <span className="util-ico-slot" role="menuitem" aria-disabled="true" aria-label="Mano actual">
+            Va en <div>, no en <button>: un botón deshabilitado bloquea los
+            eventos de sus hijos y el badge —que sí está vivo siempre— quedaría
+            muerto. El contenedor sólo agrupa; quien recibe el press es el
+            icono. */}
+        {/* El tooltip es la ÚNICA leyenda de un panel sin palabras, así que no
+            se le cuelga el estado: dice el nombre de la entrada y nada más. La
+            no-disponibilidad la porta el lenguaje visual del sistema
+            (`is-disabled`: atenuado y sin respuesta) más `aria-disabled` para
+            quien no ve la atenuación. */}
+        <div
+          className={`util-item util-item-mano${manoDisponible ? '' : ' is-disabled'}`}
+          title="Mano actual"
+        >
+          {/* El rol de menú vive en el ICONO, no en el contenedor: un control
+              vivo —el badge— no puede colgar de un subárbol `aria-disabled`.
+              Las herramientas de accesibilidad lo tratarían como muerto, y con
+              razón (Playwright se niega a pulsarlo, que fue justo como salió
+              esto).
+              DSK-U3 · el icono pasa de <span> inerte a <button> vivo. Cierra al
+              ejecutar como sus hermanas (v1.1 §1.3.1): el valor se pinta en su
+              propia superficie, que el panel ya no puede sostener. Fuera de las
+              fases consultables queda `is-disabled` —la lengua de "no
+              habilitado" del sistema, distinta del `is-off` de apagado-por-ti. */}
+          <button
+            type="button"
+            className="util-ico-slot"
+            role="menuitem"
+            aria-label="Mano actual"
+            aria-disabled={manoDisponible ? undefined : 'true'}
+            disabled={!manoDisponible}
+            onClick={() => { onClose(); onManoActual() }}
+          >
             <CardQueryIcon />
-          </span>
+          </button>
           <button
             ref={badgeRef}
             type="button"

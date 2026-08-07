@@ -6,8 +6,12 @@ import { SoundButton } from './SoundButton'
 import { MuteButton } from './MuteButton'
 import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
+import { ManoActualPopup } from './ManoActual'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
+import { useConsultas } from '../hooks/useConsultas'
+import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
+import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
@@ -324,6 +328,32 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // llama SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
   // escritorio no hay selector, ni burbuja, ni listeners.
   const reacciones = useReacciones(isDesktopTable)
+  // DSK-U3 · "Mano actual". Mismo gate y mismo molde de hermandad: el hook se
+  // llama SIEMPRE (orden de hooks estable) y recibe el gate.
+  const consultas = useConsultas(isDesktopTable)
+  const manoDisponible = hayManoConsultable(phase, game.handCount, human.cards.length)
+  // El popup se ancla al ⋮ (el panel ya no existe: cierra al ejecutar) por su
+  // borde DERECHO, molde del popup del contador. Se mide en el press, nunca en
+  // el render.
+  const popupAnchorDesdeTrigger = () => {
+    const r = utilMenu.triggerRect()
+    if (!r) return { right: 12, top: 12 }
+    return { right: window.innerWidth - r.right, top: r.bottom + 6 }
+  }
+  // El valor se deriva EN EL PRESS, del estado vivo, y desde la fuente única —
+  // getBestSuitScore con el ruleN CONGELADO de la mano (handRules), jamás con un
+  // recuento vivo de jugadores: esa lectura viva es el patrón enfermo que HR-1
+  // erradicó. Sólo las cartas propias del humano: cero información oculta.
+  const pedirManoActual = () => {
+    const desglose = manoDisponible
+      ? desglosarPalos(getBestSuitScore(
+          human.cards,
+          game.handRules.ruleN,
+          game.handRules.comodinValue !== null,
+        ))
+      : null
+    consultas.consultar(game.handCount, desglose, popupAnchorDesdeTrigger())
+  }
   // AJ-1 · landscape mesas 5 y 4: AJILEI + "Mano #N" bajan de la cabecera a
   // .table-mid. El bloque debe centrarse en la franja IA↔humano, y esa franja se
   // define DENTRO de .table-mid: colgando de ahí, su 50% ya es el de la franja y
@@ -1547,7 +1577,17 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           onClose={utilMenu.close}
           onReacciones={() => reacciones.abrirSelector(utilMenu.triggerRect())}
           reaccionesBloqueadas={reacciones.bloqueado}
+          consultas={consultas.saldo}
+          manoDisponible={manoDisponible}
+          onManoActual={pedirManoActual}
         />
+      )}
+
+      {/* DSK-U3 · popup del valor de "Mano actual". Vive AQUÍ y no dentro del
+          panel porque la entrada cierra al ejecutar: cuando esto se pinta, el
+          panel ya se desmontó con su ancla. Overlay puro, Δ=0. */}
+      {isDesktopTable && (
+        <ManoActualPopup popup={consultas.popup} saldo={consultas.saldo} />
       )}
 
       {/* DSK-U2 · selector de reacciones y burbuja. Viven AQUÍ por la misma

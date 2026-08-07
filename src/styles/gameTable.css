@@ -5566,6 +5566,14 @@
        tocando. Y muy por debajo de los modales (leave-overlay 100, bancarrota
        120), que sí deben taparlo todo. */
     --dsk-u2-bub-z: 25;
+
+    /* ── DSK-U3 · Mano actual ───────────────────────────────────────────────
+       Ancho tope del popup del valor: la línea más larga que el motor puede
+       producir es la del desglose con los cuatro palos, y a 12px cabe holgada
+       en 260. No es una caja fija — el contenido la encoge cuando hay menos
+       palos; esto sólo impide que una mano de cuatro palos se estire por media
+       mesa. */
+    --dsk-u3-popup-w: 260px;
   }
 
   /* El disparador hereda .mute-button (borde, radio, color y transición
@@ -5917,4 +5925,75 @@
       left: -22px; right: 0;
     }
   }
+
+  /* ── DSK-U3 · Mano actual ──────────────────────────────────────────────────
+     Documento rector: docs/AJILEI_Menu_Utilidades_v1.3.md §3.
+
+     (a) La entrada pasa de inerte a VIVA. Las tres reglas de abajo son
+     aditivas: la separación del grupo colgaba de `.util-item-mano.is-disabled`,
+     y esa clase ahora entra y sale con la disponibilidad — el filete tiene que
+     dejar de depender de ella o desaparecería justo cuando la entrada está
+     habilitada. La regla vieja se conserva intacta (repite estos mismos valores
+     y sigue haciendo falta por su `opacity: 1`). */
+  .util-item-mano {
+    margin-top: var(--dsk-u1-sep-gap);
+    border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+  }
+  /* La atenuación del icono también era incondicional. Especificidad 0,3,1
+     contra 0,2,1 — le gana sin `!important` y sin tocar la regla original. */
+  .util-item-mano:not(.is-disabled) .util-ico-card { opacity: 1; }
+  /* El icono es ahora un <button>: hereda del sistema lo que el <span> traía
+     gratis. Sin caja propia — la reserva sigue siendo la de .util-ico-slot. */
+  button.util-ico-slot {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  button.util-ico-slot:disabled { cursor: default; }
+
+  /* (b) Popup del valor · superficie PROPIA, hermana del área. Estética del
+     popup del contador (superficie del sistema, filete dorado fino, radio 8,
+     una sombra) porque es su misma familia: una lectura flotante que nace del
+     menú. Se ancla por su borde DERECHO al filo derecho del ⋮ — el ancho puede
+     cambiar con el número de palos sin recalcular el ancla.
+     Un peldaño por encima del panel, igual que sus hermanos: nace de él y debe
+     pintarse sobre él (aunque no coexisten — la entrada cierra al ejecutar).
+     Fuera de flujo estricto: Δ=0 de layout por construcción. */
+  .u3-popup {
+    position: fixed;
+    z-index: calc(var(--dsk-u1-panel-z) + 1);
+    box-sizing: border-box;
+    max-width: var(--dsk-u3-popup-w);
+    padding: 10px 12px;
+    background: var(--surface-modal);
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .u3-popup p { margin: 0; }
+  .u3-popup p + p { margin-top: 4px; }
+  /* El mejor palo es la respuesta; el resto es contexto. La jerarquía la lleva
+     el tamaño y el color, no otro dorado — regla single-gold: el único acento
+     dorado de esta familia sigue siendo el filete. */
+  .u3-titulo { font-size: 13px; }
+  .u3-titulo strong { font-weight: 700; }
+  .u3-resto { color: var(--text-secondary); }
+  .u3-nota  { color: var(--text-muted); font-size: 11px; }
+  /* El saldo restante se dice en el mismo acto de consultar: el usuario jamás
+     descubre el cobro después (v1.1 §3.5). Separado por el filete del sistema,
+     como "Mano actual" lo está del grupo en el panel. */
+  .u3-saldo {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+  .u3-popup-agotadas .u3-resto { color: var(--text-muted); }
 }

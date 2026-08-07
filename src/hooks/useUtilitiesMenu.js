@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { CONSULTAS_KEY, CONSULTAS_GRATIS } from '../config/consultas'
 
 // ── DSK-U1 · Estado y protocolo de cierre del menú de utilidades ─────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda 2026-08-04).
@@ -23,8 +24,9 @@ const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 // Se inicializa al montar el panel, no al arrancar la app: es el primer momento
 // en que la función existe, y así móvil —donde el menú no se monta— no estrena
 // una clave que nunca va a leer.
-const CONSULTAS_KEY = 'ajilei.consultas'
-const CONSULTAS_GRATIS = 20
+// DSK-U3 · la clave y las 20 gratis se mudan a config/consultas.js: el arnés
+// necesita leerlas de la MISMA fuente que la app para sembrar el saldo y para
+// derivar sus expectativas (molde de config/reacciones.js en U2).
 
 export function readConsultas() {
   try {
@@ -36,6 +38,15 @@ export function readConsultas() {
   } catch {
     return CONSULTAS_GRATIS   // storage denegado: la cifra se muestra igual
   }
+}
+
+// DSK-U3 · el consumo ya vive (useConsultas). Se escribe SÓLO al cobrar, nunca
+// al leer: si el storage está denegado la sesión sigue contando en memoria y la
+// cifra mostrada no miente — simplemente no sobrevive al cierre del navegador.
+export function writeConsultas(n) {
+  try {
+    window.localStorage.setItem(CONSULTAS_KEY, String(n))
+  } catch { /* storage denegado: el contador vive sólo en memoria */ }
 }
 
 // `enabled` es el gate de escritorio: si el viewport deja de cumplirlo, el menú

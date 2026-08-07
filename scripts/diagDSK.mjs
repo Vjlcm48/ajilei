@@ -115,6 +115,24 @@
 //            de turno corriendo indiferente, y pointer:coarse para el hit ≥40 de
 //            la X (embaldosado B2) sin desbordar hacia las cartas.
 //            Args: [mesa] [WxH].
+//   u3     → DSK-U3: "Mano actual" funcional (consulta por mano con contador).
+//            20 celdas (16 de campaña + centinela 1440×850) × las cuatro mesas.
+//            Diez puertas: la entrada consume EXACTAMENTE 1 en el primer press
+//            de la mano; el valor mostrado coincide con getBestSuitScore del
+//            estado VIVO por verificación CRUZADA (cartas leídas del DOM +
+//            reglas leídas del chip de comodín + la misma fuente única corrida
+//            aquí en Node contra los data-* del popup — jamás una regex sobre
+//            el copy); el re-press de la misma mano deja Δcontador=0 y vuelve a
+//            derivar el valor; una mano nueva vuelve a cobrar; a N=0 sale el
+//            popup de agotadas con Δcontador=0; la entrada queda `is-disabled`
+//            en fase de pago y sin mano; el INVARIANTE SELLADO del badge (press
+//            del badge → popup del contador y el menú SIGUE ABIERTO); los dos
+//            autocierres (4s del valor, 2s del badge) y el cierre por clic
+//            fuera; Δ=0 de layout con el popup presente; y la capa contra el
+//            censo vivo. Expectativas derivadas de los tokens y constantes
+//            vivos. Lección W1 en cada clic: un cambio de estado por iteración
+//            y rechequeo antes del siguiente.
+//            Args: [mesa] [WxH].
 //            OJO: el modo r2 lanza el navegador SIN --hide-scrollbars (ver el
 //            launch al final): con las barras ocultas, la que aparece/desaparece
 //            por overflow desplazable NUNCA encoge el cliente y el saltito de
@@ -122,6 +140,17 @@
 // Salida: JSON a stdout y a scratchpad; PNGs a capturas-dsk/.
 import { chromium } from 'playwright-core'
 import { writeFileSync } from 'node:fs'
+// DSK-U3 · el arnés lee de la MISMA fuente que la app (clave, saldo gratis y
+// los dos autocierres) y recompone el valor con el MISMO evaluador. Ninguna de
+// estas cifras se repite aquí: si una se mueve en src/, la puerta se mueve con
+// ella. Los tres módulos son autocontenidos (sin imports propios), así que
+// `node` los carga tal cual — sin pasar por el resolvedor de Vite.
+import {
+  CONSULTAS_KEY as U3_KEY, CONSULTAS_GRATIS,
+  CONSULTA_POPUP_MS, BADGE_POPUP_MS,
+} from '../src/config/consultas.js'
+import { VALUE_NAMES, getCardPoints } from '../src/engine/deck.js'
+import { getBestSuitScore } from '../src/engine/handEvaluator.js'
 
 const BASE = 'http://localhost:5173'
 const OUT_DIR = 'capturas-dsk'
@@ -4459,6 +4488,405 @@ async function runU2(browser) {
   return { cells, ciclo, tactil, passed }
 }
 
+// ── DSK-U3 · "Mano actual" funcional ─────────────────────────────────────────
+const U3_VIEWPORTS = [...VIEWPORTS, { w: 1440, h: 850 }]
+const U3_TABLES = [5, 4, 3, 2]
+
+// Anclas del Δ=0 con el popup del valor presente/ausente. Mismas que U2: si el
+// overlay fuera de flujo moviera algo, se vería aquí.
+const U3_ANCHORS = [
+  '.game-table', '.table-header', '.table-mid', '.rivals-zone', '.center-zone',
+  '.ai-zone', '.player-zone', '.player-bar', '.player-zone .cards-row',
+  '.score-tag-player', '.header-right',
+]
+
+const u3Espera = (page, ms) => page.waitForTimeout(ms)
+
+// Reutiliza el instrumental de U2 —censo z vivo, hit-test por puntos medios de
+// los filos (nunca las esquinas: con border-radius caen fuera de la forma
+// pintada), lectura de estilos computados— y sólo añade su propio juego de
+// anclas. Duplicar el instrumental sería crear una segunda vara de medir.
+async function u3Install(page) {
+  await u2Install(page)
+  await page.evaluate((A) => {
+    window.__u3R = window.__u2R
+    window.__u3css = window.__u2css
+    window.__u3snap = () => A.map(s => window.__u2R(s))
+  }, U3_ANCHORS)
+}
+
+// Siembra el saldo ANTES de que la app arranque. Se usa la clave de la fuente
+// única (config/consultas.js), nunca un literal repetido aquí.
+async function u3Sembrar(page, n, saldo) {
+  await page.addInitScript(({ k, v }) => {
+    try { window.localStorage.setItem(k, String(v)) } catch { /* storage denegado */ }
+  }, { k: U3_KEY, v: saldo })
+  await gotoMesa(page, n)
+}
+
+// Lleva la mano hasta el turno vivo del humano (BET_1): es donde la consulta
+// tiene sentido y donde la entrada debe estar habilitada.
+async function u3TurnoVivo(page, maxMs = 30000) {
+  await clickIf(page, 'button:has-text("Iniciar mano")')
+  const t0 = Date.now()
+  while (Date.now() - t0 < maxMs) {
+    await u3Espera(page, 250)
+    const listo = await page.evaluate(() =>
+      !!document.querySelector('.timer-display') &&
+      document.querySelectorAll('.player-zone .playing-card img[alt]:not([alt=""])').length > 0
+    )
+    if (listo) return true
+  }
+  return false
+}
+
+// Un clic por iteración y RECHEQUEO antes del siguiente (lección W1). Abrir el
+// menú y presionar la entrada son dos cambios de estado encadenados.
+async function u3AbrirMenu(page) {
+  await page.click('.utilities-trigger')
+  await page.waitForSelector('.utilities-panel', { timeout: 2000 }).catch(() => {})
+  return page.evaluate(() => !!document.querySelector('.utilities-panel'))
+}
+
+async function u3CerrarMenu(page) {
+  await page.keyboard.press('Escape')
+  await u3Espera(page, 80)
+}
+
+// Lee el badge del contador. Exige el menú ABIERTO — el badge vive dentro del
+// panel.
+const u3Badge = (page) => page.evaluate(() => {
+  const b = document.querySelector('.util-badge')
+  return b ? Number(b.textContent.trim()) : null
+})
+
+// Presiona la entrada "Mano actual" y espera su popup. Devuelve null si la
+// entrada está inerte (que es una respuesta válida, no un fallo del arnés).
+async function u3Consultar(page) {
+  const listo = await page.evaluate(() =>
+    !!document.querySelector('.util-item-mano .util-ico-slot:not([disabled])'))
+  if (!listo) return false
+  await page.click('.util-item-mano .util-ico-slot')
+  await page.waitForSelector('.u3-popup', { timeout: 2000 }).catch(() => {})
+  return page.evaluate(() => !!document.querySelector('.u3-popup'))
+}
+
+// ── Verificación CRUZADA del valor ───────────────────────────────────────────
+// El arnés NO reutiliza el helper de la app (desglosarPalos): eso escondería un
+// error dentro del propio helper. Recompone la mano desde el DOM —el `alt` de
+// cada carta boca arriba: "Sota de Bastos"— y las reglas desde el chip de
+// comodín, corre getBestSuitScore aquí en Node y compara contra los data-* del
+// popup. Cero regex sobre el copy: un cambio de redacción no vuelve roja esta
+// puerta, y una redacción con números sueltos no la puede aprobar por accidente.
+const U3_NOMBRE_A_VALOR = Object.fromEntries(
+  Object.entries(VALUE_NAMES).map(([v, n]) => [n, Number(v)]))
+
+async function u3ManoDelDom(page) {
+  const alts = await page.evaluate(() =>
+    [...document.querySelectorAll('.player-zone .playing-card img[alt]')]
+      .map(i => i.getAttribute('alt')).filter(Boolean))
+  const cartas = []
+  for (const alt of alts) {
+    const m = alt.split(' de ')
+    if (m.length !== 2) return null
+    const value = U3_NOMBRE_A_VALOR[m[0]]
+    if (value === undefined) return null
+    cartas.push({ value, palo: m[1], points: getCardPoints(value) })
+  }
+  return cartas
+}
+
+// Reglas VIVAS leídas del chip de comodín, no del número de sillas: el chip es
+// el hogar visual de handRules (C4.5) y por tanto la lectura honesta. En mesas
+// 3/2 el chip no se monta — y ahí no hay comodín que valorar.
+async function u3ReglasDelDom(page) {
+  const txt = await page.evaluate(() => {
+    const e = document.querySelector('.comodin-note')
+    return e ? e.textContent.trim() : null
+  })
+  if (!txt || /Sin comod/i.test(txt)) return { ruleN: 2, comodinEnabled: false }
+  const v = Number((txt.match(/(\d+)\s*$/) || [])[1])
+  return { ruleN: v === 11 ? 5 : 4, comodinEnabled: true }
+}
+
+const u3PopupDatos = (page) => page.evaluate(() => {
+  const p = document.querySelector('.u3-popup')
+  if (!p) return null
+  return {
+    agotadas: p.classList.contains('u3-popup-agotadas'),
+    palo: p.dataset.palo ?? null,
+    pts: p.dataset.pts != null ? Number(p.dataset.pts) : null,
+    bonif: p.dataset.bonif != null ? Number(p.dataset.bonif) : null,
+    resto: p.dataset.resto ?? null,
+  }
+})
+
+async function u3ValorCuadra(page) {
+  const [cartas, reglas, datos] = await Promise.all([
+    u3ManoDelDom(page), u3ReglasDelDom(page), u3PopupDatos(page),
+  ])
+  if (!cartas || !cartas.length || !datos || datos.agotadas) return { ok: false, cartas, datos }
+  const score = getBestSuitScore(cartas, reglas.ruleN, reglas.comodinEnabled)
+  const crudo = score.suitScores[score.palo] ?? 0
+  const restoEsperado = Object.entries(score.suitScores)
+    .filter(([p]) => p !== score.palo)
+    .sort((a, b) => b[1] - a[1])
+    .map(([p, v]) => `${p}:${v}`).join(',')
+  const ok = datos.palo === score.palo &&
+    datos.pts === score.points &&
+    datos.bonif === score.points - crudo &&
+    datos.resto === restoEsperado
+  return { ok, esperado: { palo: score.palo, pts: score.points, bonif: score.points - crudo, resto: restoEsperado }, datos, reglas, nCartas: cartas.length }
+}
+
+async function runU3(browser) {
+  const cells = []
+  const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
+  const vpFilter = process.argv[4] || null
+
+  for (const n of U3_TABLES) for (const vp of U3_VIEWPORTS) {
+    if (tblFilter && n !== tblFilter) continue
+    if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    const c = { mesa: n, vp: `${vp.w}x${vp.h}` }
+    try {
+      await u3Sembrar(page, n, CONSULTAS_GRATIS)
+      await u3Install(page)
+
+      // ── P5a · sin mano repartida la entrada está inerte ───────────────────
+      await u3AbrirMenu(page)
+      const enEspera = await page.evaluate(() => {
+        const d = document.querySelector('.util-item-mano')
+        const b = document.querySelector('.util-item-mano .util-ico-slot')
+        return { disabled: b ? b.disabled : null, clase: d ? /is-disabled/.test(d.className) : null }
+      })
+      const p5_sinMano = enEspera.disabled === true && enEspera.clase === true
+      await u3CerrarMenu(page)
+
+      // ── Turno vivo del humano ─────────────────────────────────────────────
+      const vivo = await u3TurnoVivo(page)
+      const base = await page.evaluate(() => window.__u3snap())
+
+      // ── P1 · primer press: consume exactamente 1 y el valor cuadra ────────
+      await u3AbrirMenu(page)
+      const n0 = await u3Badge(page)
+      const habilitada = await page.evaluate(() =>
+        !!document.querySelector('.util-item-mano .util-ico-slot:not([disabled])'))
+      const abrio1 = await u3Consultar(page)
+      // Cierra al ejecutar, como sus hermanas: el panel NO sobrevive.
+      const panelMuerto = await page.evaluate(() => !document.querySelector('.utilities-panel'))
+      const val1 = await u3ValorCuadra(page)
+
+      // ── P7 · Δ=0 con el popup presente ────────────────────────────────────
+      const conPopup = await page.evaluate(() => window.__u3snap())
+      let d7 = 0, d7who = null
+      base.forEach((p, i) => {
+        const q = conPopup[i]; if (!p || !q) return
+        const m = Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y), Math.abs(q.w - p.w), Math.abs(q.h - p.h))
+        if (m > d7) { d7 = round(m); d7who = U3_ANCHORS[i] }
+      })
+
+      // ── P8 · capa contra el censo vivo ────────────────────────────────────
+      const zPop = await page.evaluate(() => window.__u3css('.u3-popup', ['z-index', 'position']))
+      const zArea = await page.evaluate(() => window.__u2zArea())
+      const zMenu = await page.evaluate(() => Number(String(getComputedStyle(
+        document.querySelector('.game-table-screen')).getPropertyValue('--dsk-u1-panel-z')).trim()))
+      const popGana = await page.evaluate(() => window.__u2gana('.u3-popup'))
+      const dentro = await page.evaluate(() => {
+        const b = window.__u3R('.u3-popup')
+        return b && b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight
+      })
+      const zp = Number(zPop && zPop['z-index'])
+      const p8 = Number.isFinite(zp) && zPop.position === 'fixed' &&
+        zp === zMenu + 1 && zp > zArea.max && popGana === true && !!dentro
+
+      // ── P9 · cierre por clic fuera ────────────────────────────────────────
+      await page.mouse.click(4, Math.round(vp.h / 2))
+      await u3Espera(page, 120)
+      const p9_fuera = await page.evaluate(() => !document.querySelector('.u3-popup'))
+
+      // ── P2 · re-press de la MISMA mano: Δcontador=0 y valor re-derivado ───
+      await u3AbrirMenu(page)
+      const n1 = await u3Badge(page)
+      const abrio2 = await u3Consultar(page)
+      const val2 = await u3ValorCuadra(page)
+      await page.mouse.click(4, Math.round(vp.h / 2))
+      await u3Espera(page, 120)
+      await u3AbrirMenu(page)
+      const n2 = await u3Badge(page)
+
+      // ── P6 · INVARIANTE SELLADO del badge · el menú sigue abierto ─────────
+      await page.click('.util-badge')
+      await u3Espera(page, 120)
+      const trasBadge = await page.evaluate(() => ({
+        popup: !!document.querySelector('.utilities-popup'),
+        panel: !!document.querySelector('.utilities-panel'),
+        valor: !!document.querySelector('.u3-popup'),
+      }))
+      const p6 = trasBadge.popup === true && trasBadge.panel === true && trasBadge.valor === false
+      await u3CerrarMenu(page)
+
+      const checks = {
+        p1_consumeUno: !!vivo && habilitada && abrio1 && panelMuerto && n0 === CONSULTAS_GRATIS && n1 === CONSULTAS_GRATIS - 1,
+        p1b_valorCruzado: val1.ok,
+        p2_repressGratis: abrio2 && n2 === n1,
+        p2b_valorRederivado: val2.ok,
+        p5_entradaInerteSinMano: p5_sinMano,
+        p6_invarianteBadge: p6,
+        p7_deltaCero: d7 <= 0.02,
+        p8_capa: p8,
+        p9_cierreFuera: p9_fuera,
+      }
+      c.checks = checks
+      c.detalle = {
+        badge: { n0, n1, n2 }, val1, val2,
+        delta: { max: d7, who: d7who },
+        zPop, zArea, zMenu, popGana, dentro, trasBadge,
+        popup: await page.evaluate(() => window.__u3R('.u3-popup')),
+      }
+      c.passed = Object.values(checks).every(Boolean)
+    } catch (e) {
+      c.error = String(e && e.message || e).slice(0, 300)
+      c.passed = false
+    }
+    cells.push(c)
+    const fallos = c.checks ? Object.entries(c.checks).filter(([, v]) => !v).map(([k]) => k) : ['ERROR']
+    console.log(`u3 m${n} ${vp.w}x${vp.h} · ${c.passed ? 'OK' : 'FALLA [' + fallos.join(',') + ']'}${c.error ? ' · ' + c.error : ''}`)
+    await page.close()
+  }
+
+  // ── P3 · mano NUEVA vuelve a cobrar + inerte en fase de pago ──────────────
+  const manos = []
+  for (const n of U3_TABLES) {
+    if (tblFilter && n !== tblFilter) continue
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const r = { mesa: n }
+    try {
+      await u3Sembrar(page, n, CONSULTAS_GRATIS)
+      await u3Install(page)
+      await u3TurnoVivo(page)
+      await u3AbrirMenu(page)
+      await u3Consultar(page)
+      await page.mouse.click(4, 384)
+      await u3Espera(page, 120)
+      await u3AbrirMenu(page)
+      r.tras1 = await u3Badge(page)
+      await u3CerrarMenu(page)
+
+      // Se juega la mano hasta el showdown y ahí la entrada debe estar inerte:
+      // es donde la banda gratuita "Tu mejor palo" toma el relevo.
+      await playToShowdown(page)
+      await u3AbrirMenu(page)
+      const enPago = await page.evaluate(() => {
+        const b = document.querySelector('.util-item-mano .util-ico-slot')
+        const d = document.querySelector('.util-item-mano')
+        return { disabled: b ? b.disabled : null, clase: d ? /is-disabled/.test(d.className) : null }
+      })
+      // La banda gratuita SÍ está visible aquí: la frontera es real, no coinciden.
+      const banda = await page.evaluate(() => {
+        const e = document.querySelector('.score-tag-player')
+        return e ? getComputedStyle(e).visibility : null
+      })
+      r.enPago = enPago; r.banda = banda
+      await u3CerrarMenu(page)
+
+      await clickIf(page, 'button:has-text("Siguiente mano")')
+      await u3TurnoVivo(page)
+      await u3AbrirMenu(page)
+      r.tras2Antes = await u3Badge(page)
+      await u3Consultar(page)
+      const val = await u3ValorCuadra(page)
+      await page.mouse.click(4, 384)
+      await u3Espera(page, 120)
+      await u3AbrirMenu(page)
+      r.tras2 = await u3Badge(page)
+      await u3CerrarMenu(page)
+      r.val = val.ok
+
+      r.p3 = r.tras1 === CONSULTAS_GRATIS - 1 && r.tras2 === CONSULTAS_GRATIS - 2 && val.ok
+      r.p5 = enPago.disabled === true && enPago.clase === true && banda === 'visible'
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
+    r.ok = !!(r.p3 && r.p5)
+    manos.push(r)
+    console.log(`u3·manos m${n} · ${r.ok ? 'OK' : 'FALLA'} badge=${r.tras1}→${r.tras2} enPago=${JSON.stringify(r.enPago)} banda=${r.banda} valor=${r.val}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  // ── P4 · N=0 · popup de agotadas y Δcontador=0 ────────────────────────────
+  const agotadas = []
+  for (const n of U3_TABLES) {
+    if (tblFilter && n !== tblFilter) continue
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const r = { mesa: n }
+    try {
+      await u3Sembrar(page, n, 0)
+      await u3Install(page)
+      await u3TurnoVivo(page)
+      await u3AbrirMenu(page)
+      r.antes = await u3Badge(page)
+      // La entrada sigue HABILITADA con saldo 0: quien no tiene gratis merece
+      // que se lo digan, no un botón muerto sin explicación.
+      const abrio = await u3Consultar(page)
+      const datos = await u3PopupDatos(page)
+      await page.mouse.click(4, 384)
+      await u3Espera(page, 120)
+      await u3AbrirMenu(page)
+      r.despues = await u3Badge(page)
+      const almacen = await page.evaluate(k => Number(window.localStorage.getItem(k)), U3_KEY)
+      await u3CerrarMenu(page)
+      r.datos = datos; r.almacen = almacen
+      r.p4 = abrio && !!datos && datos.agotadas === true && datos.palo === null &&
+        r.antes === 0 && r.despues === 0 && almacen === 0
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
+    r.ok = !!r.p4
+    agotadas.push(r)
+    console.log(`u3·agotadas m${n} · ${r.ok ? 'OK' : 'FALLA'} badge=${r.antes}→${r.despues} storage=${r.almacen} popup=${JSON.stringify(r.datos)}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  // ── P10 · autocierres, con las expectativas DERIVADAS de la fuente única ──
+  const relojes = []
+  for (const n of U3_TABLES) {
+    if (tblFilter && n !== tblFilter) continue
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const r = { mesa: n }
+    try {
+      await u3Sembrar(page, n, CONSULTAS_GRATIS)
+      await u3Install(page)
+      await u3TurnoVivo(page)
+      await u3AbrirMenu(page)
+      await u3Consultar(page)
+      // A mitad de camino sigue vivo; pasada la marca, muerto.
+      await u3Espera(page, Math.round(CONSULTA_POPUP_MS / 2))
+      r.valorMedio = await page.evaluate(() => !!document.querySelector('.u3-popup'))
+      await u3Espera(page, CONSULTA_POPUP_MS / 2 + 400)
+      r.valorFin = await page.evaluate(() => !!document.querySelector('.u3-popup'))
+
+      await u3AbrirMenu(page)
+      await page.click('.util-badge')
+      await u3Espera(page, Math.round(BADGE_POPUP_MS / 2))
+      r.badgeMedio = await page.evaluate(() => !!document.querySelector('.utilities-popup'))
+      await u3Espera(page, BADGE_POPUP_MS / 2 + 400)
+      r.badgeFin = await page.evaluate(() => !!document.querySelector('.utilities-popup'))
+      // El menú sigue abierto pese al autocierre del popup: el invariante no
+      // depende de que el popup viva.
+      r.menuVivo = await page.evaluate(() => !!document.querySelector('.utilities-panel'))
+      await u3CerrarMenu(page)
+      r.p10 = r.valorMedio === true && r.valorFin === false &&
+        r.badgeMedio === true && r.badgeFin === false && r.menuVivo === true
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
+    r.ok = !!r.p10
+    relojes.push(r)
+    console.log(`u3·relojes m${n} · ${r.ok ? 'OK' : 'FALLA'} valor=${r.valorMedio}/${r.valorFin} (${CONSULTA_POPUP_MS}ms) badge=${r.badgeMedio}/${r.badgeFin} (${BADGE_POPUP_MS}ms) menu=${r.menuVivo}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  const passed = cells.every(c => c.passed) && manos.every(r => r.ok) &&
+    agotadas.every(r => r.ok) && relojes.every(r => r.ok)
+  console.log(`\n── U3: ${cells.filter(c => c.passed).length}/${cells.length} celdas · manos ${manos.filter(r => r.ok).length}/${manos.length} · agotadas ${agotadas.filter(r => r.ok).length}/${agotadas.length} · relojes ${relojes.filter(r => r.ok).length}/${relojes.length} · ${passed ? 'VERDE' : 'ROJO'}`)
+  return { cells, manos, agotadas, relojes, passed }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
@@ -4497,6 +4925,7 @@ try {
   if (MODE === 'a2') report.a2 = await runA2(browser)
   if (MODE === 'u1') report.u1 = await runU1(browser)
   if (MODE === 'u2') report.u2 = await runU2(browser)
+  if (MODE === 'u3') report.u3 = await runU3(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }
