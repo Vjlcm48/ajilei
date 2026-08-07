@@ -93,7 +93,91 @@ Los rails **flanquean solo la banda del humano**; el pozo y las IAs van a ancho 
 
 ## 10. PWA manifest
 
-- El manifest está bloqueado en `"portrait"`. Debe **desbloquearse** para permitir rotación cuando landscape entre en producción.
+> **ENMENDADO — 2026-08-07 (tanda PWA-M1).** El texto original decía: *"El manifest está
+> bloqueado en `"portrait"`. Debe **desbloquearse** para permitir rotación cuando landscape entre
+> en producción."* **Eso nunca fue cierto en el código.** El diagnóstico de PWA-M1 barrió el árbol
+> y las 113 revisiones de la única rama: no había manifest, ni `<link rel="manifest">`, ni service
+> worker, ni plugin de PWA en `vite.config.js`, y `git log -S'"orientation"'` sobre toda la
+> historia devuelve vacío. Tampoco existió jamás el overlay "Gira tu teléfono" (`git log -S"Gira
+> tu"` vacío). El bloqueo era una **intención escrita**, no un artefacto: se documentó la
+> decisión vertical-first de junio como si ya viviera en un archivo que nunca se creó. No había
+> lock que desbloquear.
+
+**La PWA nace en la tanda PWA-M1**, con `"orientation": "any"` **de nacimiento**. No hay
+migración ni desbloqueo: el miembro se escribe explícito —en vez de omitirlo— para que el
+archivo documente la decisión y nadie vuelva a fijarlo por inercia.
+
+### 10.1 Contenido sellado
+
+`public/manifest.webmanifest`:
+
+| Miembro | Valor | Origen |
+|---|---|---|
+| `name` / `short_name` | `"AJILEI"` | Marca |
+| `start_url` / `scope` | `"/"` | Ver 10.2 |
+| `display` | `"standalone"` | Ventana propia, sin barra de direcciones |
+| `orientation` | `"any"` | Esta enmienda. Coherente con §1: **la orientación no se fuerza desde código** — la app responde a las cuatro por CSS, y el manifest no puede contradecir a su propio layout |
+| `background_color` | `#0a1e10` | Token `--green-abyss` (`theme.css`), que es lo que el `body` pinta en `welcome.css`. Es el color de la pantalla de arranque, así que debe ser el que la app ya muestra |
+| `theme_color` | `#0a1e10` | Mismo token. Se descartó `--gold-brand`: teñiría la barra de estado de dorado brillante contra una app oscura |
+
+`index.html` suma `<link rel="manifest">`, `<meta name="theme-color">` espejando el manifest, y
+`<link rel="apple-touch-icon" sizes="180x180">`. Nada más del html se toca.
+
+### 10.2 `start_url` — decisión diferida
+
+`"/"` es correcto **hoy**, con la app sola en la raíz. Cuando llegue el sitio de marketing
+(arquitectura sellada: **landing en `/` + juego en `/jugar`**), `start_url` probablemente deba
+migrar a `/jugar` — instalar la app y aterrizar en la landing sería un sinsentido. **Se decide
+entonces**, con el `scope` en la misma revisión: no se adelanta aquí porque las rutas todavía no
+existen y un `start_url` apuntando al vacío rompe la instalación.
+
+### 10.3 Iconografía — de dónde salió
+
+El encargo original mandaba derivar los iconos de `public/favicon.svg`. **Ese archivo era el logo
+de Vite** —el rayo violeta del andamiaje, `#863bff` / `#7e14ff` / `#47bfff`—, así que la pestaña
+del navegador llevaba meses mostrando la marca equivocada. Y no había ninguna alternativa: el
+resto de assets son andamiaje (`icons.svg` es un sprite de iconos sociales, `hero.png` y
+`vite.svg`/`react.svg` son plantilla) o arte de terceros (`baraja.svg`/`baraja2.svg` son un
+pliego "NAIPES LIBRES" con la cabeza del ñu de GNU, con su propia licencia y sin uso en el
+código).
+
+Decisión: **monograma tipográfico**, construido de **tokens vivos** y del tratamiento de marca
+que la app ya usa —`.table-title`: `--gold-brand` sobre `--green-abyss`, Arial 700, traza
+`5px/22px = 0,2273em`—, más el filete dorado al 45 % que enmarca el panel de utilidades y sus
+popups. Una sola construcción alimenta `public/favicon.svg` **y** los cuatro PNG.
+
+**Regla que esto dejó** (aplica a cualquier arte generado): *la caja de un texto no es su tinta.*
+`getBBox()` y el rect de un `Range` devuelven la caja de **avance**, que incluye el espacio de
+traza sobrante tras la última letra; con `text-anchor="middle"` eso descentra la palabra **11 px
+a la izquierda en un lienzo de 512** sin que ninguna medición de caja lo delate. El generador
+rasteriza, **cuenta píxeles dorados** y corrige tamaño y posición en una segunda pasada. Misma
+lección que el anclaje por tinta de `Menu_Utilidades_v1.2` §5.1, ahora en el terreno del arte.
+
+Zona segura del *maskable* verificada por medición, no por confianza: la esquina más lejana de la
+tinta cae a **195,97 px** del centro contra un radio seguro de **204,8 px** (40 % del lado).
+
+> **Límite conocido y aceptado.** A 16–32 px —el tamaño real de una pestaña— una palabra de seis
+> letras es un borrón dorado. El monograma es una **mejora estricta** sobre el rayo de Vite, pero
+> si la pestaña importa, lo que la resuelve es una variante de **inicial sola** para el favicon.
+> Queda como ítem abierto, no como deuda oculta.
+
+### 10.4 Sin service worker — deuda deliberada
+
+La PWA nace **instalable pero no offline**: no hay service worker ni estrategia de cacheo. Es una
+**decisión, no un olvido** — un SW mal calibrado sirve una versión vieja del juego y convierte
+cada despliegue en una ruleta. Se aborda **antes del lanzamiento**, con su propia tanda y su
+política de actualización.
+
+**Consecuencia de instalación a registrar:** el manifest se lee **al instalar**, no en caliente
+en todas las plataformas. Cualquier instalación existente puede retener metadata vieja hasta
+**desinstalar y reinstalar**.
+
+### 10.5 Pendiente de producto
+
+El **"contexto de instalación PWA (prompt condicional)"** que §11 lista como paridad **no está
+implementado**: no hay captura de `beforeinstallprompt` ni botón propio de instalar. Hoy la
+instalación va por el chrome del navegador. Cuándo y cómo ofrecerla —y en qué momento de la
+sesión— es **decisión de producto**, no de esta tanda.
 
 ---
 

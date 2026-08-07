@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- PWA-M1 · instalabilidad. El manifest nace con orientation "any": la app
+         responde a las cuatro orientaciones por CSS y jamás fuerza una desde
+         código (doctrina de AJILEI_Diseno_Landscape_v1.0 §1). theme-color
+         espeja el del manifest — mismo token --green-abyss, que es lo que el
+         body ya pinta. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a1e10" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180.png" />
     <title>ajilei</title>
   </head>
   <body>
