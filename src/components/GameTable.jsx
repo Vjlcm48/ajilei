@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createRef } from 'react'
+import { useState, useEffect, useRef, useCallback, createRef } from 'react'
 import '../styles/gameTable.css'
 import PlayingCard from './PlayingCard'
 import OpponentPanel from './OpponentPanel'
@@ -7,6 +7,11 @@ import { MuteButton } from './MuteButton'
 import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { ManoActualPopup } from './ManoActual'
+import { CelebracionMesa, PulsoNombre, AjileiOverlay, TarjetaResumen } from './Celebracion'
+import { useCelebracion } from '../hooks/useCelebracion'
+import { useSesion } from '../hooks/useSesion'
+import { fichasNetas } from '../hooks/sesionCore'
+import { decideCelebracion } from '../hooks/celebracionCore'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
@@ -344,6 +349,55 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // getBestSuitScore con el ruleN CONGELADO de la mano (handRules), jamás con un
   // recuento vivo de jugadores: esa lectura viva es el patrón enfermo que HR-1
   // erradicó. Sólo las cartas propias del humano: cero información oculta.
+  // ── DSK-VC2 · Victory Celebration ─────────────────────────────────────────
+  // El pozo YA ES 0 cuando PAYOUT pinta: resolveWinner lo vacía y suma las
+  // fichas al ganador antes de que la fase se renderice. El viaje es
+  // decorativo, así que su magnitud hay que capturarla ANTES — molde prevPotRef
+  // (el mismo patrón del "+N" del pozo, aquí guardando el último valor no nulo).
+  // Se escribe en un EFECTO, nunca durante el render: escribir un ref mientras
+  // se renderiza es el patrón que react-hooks/refs señala con razón.
+  const ultimoPozoRef = useRef(0)
+  useEffect(() => {
+    if (game.pot > 0) ultimoPozoRef.current = game.pot
+  }, [game.pot])
+
+  // Geometría medida EN VIVO al disparar, nunca en el render: origen el pozo,
+  // destino la pila del humano. VC1 midió que .corner-chip no existe en la zona
+  // del humano en ninguna de las 20 celdas — el destino es .pbr-chips.
+  const geometriaViaje = useCallback(() => {
+    const pozo = document.querySelector('.pot-box')
+    const pila = document.querySelector('.pbr-chips')
+    if (!pozo || !pila) return null
+    const a = pozo.getBoundingClientRect()
+    const b = pila.getBoundingClientRect()
+    // El reguero crece con el pozo, acotado para que la duración no se dispare:
+    // 7 fichas son 1640ms, holgadamente bajo el techo de 2500.
+    const fichas = Math.max(3, Math.min(7, Math.round(ultimoPozoRef.current / (unit * 2)) || 3))
+    return {
+      desde: { x: a.left + a.width / 2, y: a.top + a.height / 2 },
+      hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2 },
+      fichas,
+    }
+  }, [unit])
+
+  const celebracion = useCelebracion({
+    enabled: true,
+    phase,
+    winner: game.winner,
+    humanCards: human.cards,
+    ruleN: game.handRules.ruleN,
+    play,
+    geometria: geometriaViaje,
+  })
+
+  const sesion = useSesion({
+    phase,
+    handCount: game.handCount,
+    winner: game.winner,
+    humanScore: human.score,
+    enPayout: phase === PHASES.PAYOUT,
+  })
+
   const pedirManoActual = () => {
     const desglose = manoDisponible
       ? desglosarPalos(getBestSuitScore(
@@ -515,15 +569,28 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // win: SOLO cuando gana el humano (asiento 0). Antes sonaba en cada payout,
   //   también al perder (corrección Tanda C4.1). Si hubo showdown, la fanfarria
   //   entra un instante después del sonido de revelado.
+  // DSK-VC2: `win` SALE de aquí. La fanfarria genérica de cada mano ganada la
+  // sustituye el sonido del nivel que decide la celebración —chipsCollect para
+  // una mano, ajileiStrum para un AJILEI—, disparado por useCelebracion junto
+  // con su dibujo: fichas que se deslizan y suenan a la vez, no una fanfarria
+  // suelta. `showdown` se conserva EXACTO: es el sonido del volteo, no de la
+  // victoria, y suena igual gane quien gane. El archivo win.mp3 se queda en el
+  // repositorio sin uso (v1.0 §7): borrarlo es otra tanda.
   useEffect(() => {
     if (phase !== PHASES.PAYOUT) return
     const w = game.winner
     const isShowdown = w !== null && game.players[w].score
     if (isShowdown) play('showdown')
-    if (w === 0) {
-      const t = setTimeout(() => play('win'), isShowdown ? 450 : 0)
-      return () => clearTimeout(t)
-    }
+  }, [phase]) // eslint-disable-line
+
+  // DSK-VC2 · los dos nudillos secos al entrar en la pantalla de victoria de
+  // mesa. Vive aparte de useCelebracion a propósito: 'partida' no es un overlay
+  // efímero con techo de duración, es una pantalla terminal — no tiene ciclo de
+  // vida que gobernar, sólo un sonido de entrada.
+  useEffect(() => {
+    if (phase !== PHASES.GAME_OVER) return
+    if (decideCelebracion({ phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN }) !== 'partida') return
+    play('tableKnock')
   }, [phase]) // eslint-disable-line
 
   // ── AI auto-action ────────────────────────────────────────────────────────
@@ -1298,6 +1365,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         {isGameOver ? (
           <div className="game-over-screen">
             <p className="game-over-msg">{game.message}</p>
+            {/* DSK-VC2 · SÓLO la victoria evoluciona. La pantalla de derrota no
+                cambia ni un byte: el decisor devuelve 'partida' únicamente con
+                winner === 0, y sin eso aquí no se monta nada. */}
+            {decideCelebracion({ phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN }) === 'partida' && (
+              <TarjetaResumen sesion={sesion} netas={fichasNetas(human.chips)} />
+            )}
             <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
           </div>
         ) : (
@@ -1370,7 +1443,15 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
                   · escritorio (DSK-H1) → nombre ARRIBA con reserva 12ch y las tres
                                 pastillas en la fila de abajo, palabra completa.
                   Ambos aplanan los wrappers con display:contents (ver CSS). */}
-              <span className="pbr-name">Tú</span>
+              <span className="pbr-name">
+                Tú
+                {/* DSK-VC2 · el pulso dorado vive en un hermano PROPIO dentro del
+                    nombre: absoluto y pointer-events:none, así que no toca la
+                    caja de 12ch ni el layout (Δ=0), y no comparte la
+                    abreviatura `animation` con .player-zone, donde vive
+                    turnBreath. */}
+                <PulsoNombre activa={celebracion.activa} />
+              </span>
               <span className="pbr-badges">
                 <span className="pbr-tags">
                   {manoSeat === 0 && <span className="seat-badge seat-badge-gold">Mano</span>}
@@ -1609,6 +1690,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           onCerrar={reacciones.cerrarBurbuja}
         />
       )}
+
+      {/* DSK-VC2 · celebración de mesa. Hermanas del área, como el panel de
+          utilidades y las burbujas: overlays puros `fixed`, jamás dentro de un
+          panel. Δ=0 por construcción — no ocupan una celda del flujo. */}
+      <CelebracionMesa activa={celebracion.activa} />
+      <AjileiOverlay activa={celebracion.activa} />
 
       {/* Confirmación abandonar mesa */}
       {confirmLeave && (

@@ -133,11 +133,33 @@
 //            vivos. Lección W1 en cada clic: un cambio de estado por iteración
 //            y rechequeo antes del siguiente.
 //            Args: [mesa] [WxH].
+//   vc     → DSK-VC2: Victory Celebration (viaje del pozo, AJILEI, cierre de
+//            partida). Receta O2: el peor caso se CONSTRUYE. AJILEI no se
+//            alcanza jugando (cinco del palo sumando 51) y la partida pide
+//            arruinar a todas las IAs, así que la matriz de 20 celdas inyecta
+//            el DOM exacto que los componentes pintan y audita el contrato de
+//            CSS: capa 26/32 contra el censo VIVO, Δ=0 durante Y después,
+//            geometría del viaje (pozo → .pbr-chips, siempre abajo-derecha) y
+//            el pulso de UN ciclo sobre elemento propio. La celebración de
+//            verdad —con su audio— va en sub-pasada JUGADA: se repiten manos
+//            hasta que gana el humano (disciplina W1 en cada clic) y ahí se
+//            observa Howler de verdad (window.Howler._howls): que suene
+//            chips-collect, que win.mp3 NO suene, y que el toque corte dibujo
+//            y sonido de un golpe. Otra sub-pasada mide el techo de duración y
+//            el mute, apagándolo por la entrada del menú y no por una API.
+//            El decisor (winner === 0 sin excepción, incluido el blindaje del
+//            AJILEI PERDIDO con winner !== 0) se comprueba en Node contra la
+//            fuente única — es el caso que jugando no se puede provocar.
+//            Args: [mesa] [WxH].
 //            OJO: el modo r2 lanza el navegador SIN --hide-scrollbars (ver el
 //            launch al final): con las barras ocultas, la que aparece/desaparece
 //            por overflow desplazable NUNCA encoge el cliente y el saltito de
 //            15px es literalmente invisible al arnés.
 // Salida: JSON a stdout y a scratchpad; PNGs a capturas-dsk/.
+import { register } from 'node:module'
+// El motor importa sin extensión y es archivo PROTEGIDO: el arnés se adapta
+// con un gancho de resolución propio (ver scripts/_resolveExt.mjs).
+register('./_resolveExt.mjs', import.meta.url)
 import { chromium } from 'playwright-core'
 import { writeFileSync } from 'node:fs'
 // DSK-U3 · el arnés lee de la MISMA fuente que la app (clave, saldo gratis y
@@ -4845,6 +4867,8 @@ async function runU3(browser) {
   }
 
   // ── P10 · autocierres, con las expectativas DERIVADAS de la fuente única ──
+  // Mismo alcance declarado que la sub-pasada jugada, y por la misma razon:
+  // mesa 2 es la unica donde una victoria humana es alcanzable auto-jugando.
   const relojes = []
   for (const n of U3_TABLES) {
     if (tblFilter && n !== tblFilter) continue
@@ -4887,6 +4911,415 @@ async function runU3(browser) {
   return { cells, manos, agotadas, relojes, passed }
 }
 
+// ── DSK-VC2 · Victory Celebration ────────────────────────────────────────────
+const VC_VIEWPORTS = [...VIEWPORTS, { w: 1440, h: 850 }]
+const VC_TABLES = [5, 4, 3, 2]
+
+// Anclas del Δ=0. Las mismas de U2/U3: si un overlay fuera de flujo moviera
+// algo, se vería aquí.
+const VC_ANCHORS = [
+  '.game-table', '.table-header', '.table-mid', '.rivals-zone', '.center-zone',
+  '.ai-zone', '.player-zone', '.player-bar', '.player-zone .cards-row',
+  '.score-tag-player', '.header-right', '.pot-box', '.pbr-chips',
+]
+
+const vcEspera = (page, ms) => page.waitForTimeout(ms)
+
+async function vcInstall(page) {
+  await page.evaluate((A) => {
+    const rnd = x => x == null ? null : Math.round(x * 100) / 100
+    const R = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: rnd(b.x), y: rnd(b.y), w: rnd(b.width), h: rnd(b.height), cx: rnd(b.left + b.width / 2), cy: rnd(b.top + b.height / 2) } }
+    window.__vcR = s => R(document.querySelector(s))
+    window.__vcSnap = () => A.map(s => R(document.querySelector(s)))
+    window.__vcCss = (sel, props) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const cs = getComputedStyle(el)
+      const o = {}
+      props.forEach(p => { o[p] = cs.getPropertyValue(p) })
+      return o
+    }
+    // Censo z VIVO dentro del área — la vara contra la que se proponen 26 y 32.
+    window.__vcZArea = () => {
+      let max = 0, quien = null
+      document.querySelectorAll('.game-table *').forEach(e => {
+        const cs = getComputedStyle(e)
+        if (cs.position === 'static' || cs.zIndex === 'auto') return
+        const z = Number(cs.zIndex)
+        if (Number.isFinite(z) && z > max) { max = z; quien = String(e.className).slice(0, 30) }
+      })
+      return { max, quien }
+    }
+    // Audio OBSERVADO, no supuesto: Howler queda en window y expone sus howls.
+    window.__vcAudio = () => {
+      if (typeof window.Howler === 'undefined' || !window.Howler._howls) return null
+      return {
+        muteGlobal: window.Howler._muted,
+        sonando: window.Howler._howls
+          .filter(h => h.playing())
+          .map(h => String(h._src).split('/').pop()),
+        volumenes: Object.fromEntries(window.Howler._howls
+          .map(h => [String(h._src).split('/').pop(), h.volume()])),
+      }
+    }
+    // ── CONSTRUCCIÓN del peor caso (receta O2) ────────────────────────────────
+    // AJILEI no se alcanza jugando (cinco del palo sumando 51) y la partida
+    // pide arruinar a todas las IAs. Se INYECTA el DOM exacto que los
+    // componentes pintan —mismas clases, mismos estilos en línea— y se mide el
+    // contrato de CSS: capa, Δ=0 y geometría. La lógica que decide QUÉ se pinta
+    // ya la sella Vitest sobre el núcleo puro.
+    window.__vcConstruye = (nivel, geo) => {
+      window.__vcDestruye()
+      if (nivel === 'mano' || nivel === 'ajilei') {
+        const capa = document.createElement('div')
+        capa.className = 'vc-capa'
+        capa.setAttribute('data-construido', '1')
+        for (let i = 0; i < (geo?.fichas ?? 5); i++) {
+          const f = document.createElement('span')
+          f.className = 'vc-ficha'
+          f.style.left = `${geo.desde.x}px`
+          f.style.top = `${geo.desde.y}px`
+          f.innerHTML = '<svg width="24" height="24"></svg>'
+          capa.appendChild(f)
+        }
+        document.querySelector('.game-table-screen').appendChild(capa)
+      }
+      if (nivel === 'ajilei') {
+        const c = document.createElement('div')
+        c.className = 'vc-ajilei-capa'
+        c.setAttribute('data-construido', '1')
+        c.innerHTML = '<span class="vc-ajilei">AJILEI</span>'
+        document.querySelector('.game-table-screen').appendChild(c)
+      }
+      if (nivel === 'mano') {
+        const nombre = document.querySelector('.pbr-name')
+        if (nombre) {
+          const p = document.createElement('span')
+          p.className = 'vc-pulso'
+          p.setAttribute('data-construido', '1')
+          nombre.appendChild(p)
+        }
+      }
+      return true
+    }
+    window.__vcDestruye = () => {
+      document.querySelectorAll('[data-construido]').forEach(e => e.remove())
+    }
+  }, VC_ANCHORS)
+}
+
+// Geometría real del viaje, leída de la página igual que la lee la app.
+const vcGeo = (page) => page.evaluate(() => {
+  const pozo = document.querySelector('.pot-box')
+  const pila = document.querySelector('.pbr-chips')
+  if (!pozo || !pila) return null
+  const a = pozo.getBoundingClientRect(), b = pila.getBoundingClientRect()
+  return {
+    desde: { x: a.left + a.width / 2, y: a.top + a.height / 2 },
+    hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2 },
+    fichas: 5,
+  }
+})
+
+// Juega manos hasta que gane el HUMANO. Un clic por iteración con rechequeo
+// (lección W1). Devuelve el nº de manos que hicieron falta, o null.
+// Juega manos hasta que gane el HUMANO. Un clic por iteración con rechequeo
+// (lección W1). El sondeo es DELIBERADAMENTE barato —una sola consulta por
+// vuelta— porque el coste del muestreo domina: con una lectura gorda por
+// iteración una mano tarda 40s de reloj de arnés en vez de 5, y cuatro mesas
+// por catorce manos se van a la hora y media.
+async function vcHastaVictoria(page, maxManos = 18) {
+  for (let mano = 1; mano <= maxManos; mano++) {
+    await clickIf(page, 'button:has-text("Iniciar mano")')
+    let fin = null
+    for (let i = 0; i < 120 && !fin; i++) {
+      await vcEspera(page, 250)
+      fin = await page.evaluate(() => {
+        const m = document.querySelector('.game-message')
+        if (!m) return null
+        if (m.classList.contains('msg-win')) return 'win'
+        if (m.classList.contains('msg-lose')) return 'lose'
+        return null
+      })
+      if (fin) break
+      await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
+        await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
+        await clickIf(page, '.action-buttons button:has-text("Apostar")')
+      await clickIf(page, 'button:has-text("Sin descartar")')
+    }
+    if (fin === 'win') return mano
+    if (!await clickIf(page, 'button:has-text("Siguiente mano")')) return null
+    await vcEspera(page, 450)
+  }
+  return null
+}
+
+async function runVC(browser) {
+  const { decideCelebracion, CELEBRACION_TOPE_MS, VIAJE_MS, VIAJE_ESCALON_MS, AJILEI_MS } =
+    await import('../src/hooks/celebracionCore.js')
+  const { PHASES: FASES } = await import('../src/engine/gameEngine.js')
+  const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
+  const vpFilter = process.argv[4] || null
+
+  // ── P6 · el decisor, contra la fuente única y en Node ─────────────────────
+  // El blindaje del AJILEI perdido se comprueba CONSTRUYENDO winner !== 0, que
+  // es justo el caso que jugando no se puede provocar.
+  const AJ = [
+    { palo: 'Oros', points: 11, value: 1 }, { palo: 'Oros', points: 10, value: 12 },
+    { palo: 'Oros', points: 10, value: 11 }, { palo: 'Oros', points: 10, value: 10 },
+    { palo: 'Oros', points: 10, value: 3 },
+  ]
+  const NORMAL = [
+    { palo: 'Copas', points: 11, value: 1 }, { palo: 'Espadas', points: 10, value: 12 },
+  ]
+  const decisor = {
+    ajileiGanado: decideCelebracion({ phase: FASES.PAYOUT, winner: 0, humanCards: AJ, ruleN: 2 }) === 'ajilei',
+    ajileiPerdido: decideCelebracion({ phase: FASES.PAYOUT, winner: 1, humanCards: AJ, ruleN: 2 }) === null,
+    manoGanada: decideCelebracion({ phase: FASES.PAYOUT, winner: 0, humanCards: NORMAL, ruleN: 2 }) === 'mano',
+    manoPerdida: decideCelebracion({ phase: FASES.PAYOUT, winner: 1, humanCards: NORMAL, ruleN: 2 }) === null,
+    partida: decideCelebracion({ phase: FASES.GAME_OVER, winner: 0, humanCards: NORMAL, ruleN: 2 }) === 'partida',
+    partidaAjena: decideCelebracion({ phase: FASES.GAME_OVER, winner: 1, humanCards: NORMAL, ruleN: 2 }) === null,
+  }
+  const p6 = Object.values(decisor).every(Boolean)
+  console.log(`vc·decisor · ${p6 ? 'OK' : 'FALLA'} ${JSON.stringify(decisor)}`)
+
+  // ── Matriz de 20 celdas · construido ──────────────────────────────────────
+  const cells = []
+  for (const n of VC_TABLES) for (const vp of VC_VIEWPORTS) {
+    if (tblFilter && n !== tblFilter) continue
+    if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    const c = { mesa: n, vp: `${vp.w}x${vp.h}` }
+    try {
+      await gotoMesa(page, n)
+      await vcInstall(page)
+      const base = await page.evaluate(() => window.__vcSnap())
+      const geo = await vcGeo(page)
+
+      // El viaje sale del pozo y llega a la pila del humano — el contrato de
+      // geometría, contra los rects vivos y no contra números cableados.
+      const pozoR = await page.evaluate(() => window.__vcR('.pot-box'))
+      const pilaR = await page.evaluate(() => window.__vcR('.pbr-chips'))
+      const geoOk = !!geo && Math.abs(geo.desde.x - pozoR.cx) <= 0.5 && Math.abs(geo.desde.y - pozoR.cy) <= 0.5 &&
+        Math.abs(geo.hasta.x - pilaR.cx) <= 0.5 && Math.abs(geo.hasta.y - pilaR.cy) <= 0.5 &&
+        geo.hasta.y > geo.desde.y && geo.hasta.x > geo.desde.x   // siempre abajo-derecha
+
+      // ── Nivel 'mano' construido: viaje + pulso ────────────────────────────
+      await page.evaluate(g => window.__vcConstruye('mano', g), geo)
+      const conMano = await page.evaluate(() => window.__vcSnap())
+      const zViaje = await page.evaluate(() => window.__vcCss('.vc-capa', ['z-index', 'position', 'pointer-events']))
+      const nFichas = await page.evaluate(() => document.querySelectorAll('.vc-ficha').length)
+      const pulsoCss = await page.evaluate(() => window.__vcCss('.vc-pulso', ['position', 'animation-name', 'animation-iteration-count', 'animation-duration']))
+      const zArea = await page.evaluate(() => window.__vcZArea())
+
+      // ── Nivel 'ajilei' construido: sustituye, no encadena ─────────────────
+      await page.evaluate(g => window.__vcConstruye('ajilei', g), geo)
+      const conAjilei = await page.evaluate(() => window.__vcSnap())
+      const zAjilei = await page.evaluate(() => window.__vcCss('.vc-ajilei-capa', ['z-index', 'position', 'pointer-events']))
+      const ajileiCss = await page.evaluate(() => window.__vcCss('.vc-ajilei', ['color', 'letter-spacing', 'font-size']))
+      const ajileiCaja = await page.evaluate(() => window.__vcR('.vc-ajilei'))
+      const ajileiSinPulso = await page.evaluate(() => !document.querySelector('.vc-pulso'))
+      const ajileiDentro = !!ajileiCaja && ajileiCaja.x >= 0 && ajileiCaja.y >= 0 &&
+        ajileiCaja.x + ajileiCaja.w <= vp.w && ajileiCaja.y + ajileiCaja.h <= vp.h
+
+      await page.evaluate(() => window.__vcDestruye())
+      const despues = await page.evaluate(() => window.__vcSnap())
+
+      // ── Δ=0 durante y DESPUÉS ─────────────────────────────────────────────
+      const delta = (a, b) => {
+        let m = 0, quien = null
+        a.forEach((p, i) => {
+          const q = b[i]; if (!p || !q) return
+          const d = Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y), Math.abs(q.w - p.w), Math.abs(q.h - p.h))
+          if (d > m) { m = round(d); quien = VC_ANCHORS[i] }
+        })
+        return { m, quien }
+      }
+      const dMano = delta(base, conMano)
+      const dAjilei = delta(base, conAjilei)
+      const dDespues = delta(base, despues)
+
+      // ── Capa contra el censo VIVO, no contra un número declarado ──────────
+      const zv = Number(zViaje && zViaje['z-index'])
+      const za = Number(zAjilei && zAjilei['z-index'])
+      const zMenu = await page.evaluate(() => Number(String(getComputedStyle(
+        document.querySelector('.game-table-screen')).getPropertyValue('--dsk-u1-panel-z')).trim()) || 30)
+      const capaOk = zv === 26 && za === 32 && zv > zArea.max && zv < zMenu && za > zMenu &&
+        zViaje.position === 'fixed' && zViaje['pointer-events'] === 'none' &&
+        zAjilei.position === 'fixed' && zAjilei['pointer-events'] === 'none'
+
+      const checks = {
+        p2_deltaCero: dMano.m <= 0.02 && dAjilei.m <= 0.02 && dDespues.m <= 0.02,
+        p6_jerarquia: p6 && ajileiSinPulso,
+        p7_capa: capaOk,
+        p8_geometria: geoOk && nFichas === geo.fichas,
+        p9_marcaViva: !!ajileiCss && ajileiCss.color === 'rgb(232, 184, 75)' && ajileiDentro,
+        p10_pulsoUnCiclo: !!pulsoCss && pulsoCss.position === 'absolute' &&
+          pulsoCss['animation-iteration-count'] === '1' && pulsoCss['animation-name'] === 'vcPulso',
+      }
+      c.checks = checks
+      c.detalle = { geo, pozoR, pilaR, zViaje, zAjilei, zArea, zMenu, ajileiCss, ajileiCaja, pulsoCss, nFichas, dMano, dAjilei, dDespues }
+      c.passed = Object.values(checks).every(Boolean)
+    } catch (e) {
+      c.error = String(e && e.message || e).slice(0, 300)
+      c.passed = false
+    }
+    cells.push(c)
+    const fallos = c.checks ? Object.entries(c.checks).filter(([, v]) => !v).map(([k]) => k) : ['ERROR']
+    console.log(`vc m${n} ${vp.w}x${vp.h} · ${c.passed ? 'OK' : 'FALLA [' + fallos.join(',') + ']'}${c.error ? ' · ' + c.error : ''}`)
+    await page.close()
+  }
+
+  // ── Sub-pasada JUGADA · la celebración de verdad, con su audio ────────────
+  // ALCANCE DECLARADO, no recortado en silencio: la sub-pasada jugada corre
+  // SÓLO en mesa 2.
+  // Se intentó mesa 5 y no es alcanzable auto-jugando: con cuatro rivales, un
+  // muestreador que siempre pasa y nunca descarta pierde fichas de forma
+  // sostenida y llega a la bancarrota antes que a una victoria — 18 manos de
+  // tope y ninguna ganada. Rigar la estrategia para forzarla mediría el
+  // muestreador, no el juego.
+  // Lo que esta sub-pasada verifica es el CABLEADO VIVO —disparo real, audio
+  // real, el toque, Δ=0 in situ—, y ese cableado es el mismo hook y el mismo
+  // componente en las cuatro mesas. Lo que sí varía por mesa es la geometría, y
+  // ésa la cubren las 20 celdas construidas, mesa 5 incluida.
+  const jugado = []
+  for (const n of [2]) {
+    if (tblFilter && n !== tblFilter) continue
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const r = { mesa: n }
+    try {
+      await gotoMesa(page, n)
+      await vcInstall(page)
+      const manos = await vcHastaVictoria(page)
+      r.manos = manos
+      if (manos == null) {
+        r.error = 'sin victoria humana en el tope de manos'
+        r.ok = false
+        jugado.push(r)
+        console.log(`vc·jugado m${n} · FALLA · ${r.error}`)
+        await page.close(); continue
+      }
+
+      // La celebración está viva AHORA mismo.
+      const viva = await page.evaluate(() => ({
+        capa: !!document.querySelector('.vc-capa'),
+        fichas: document.querySelectorAll('.vc-ficha').length,
+        pulso: !!document.querySelector('.vc-pulso'),
+        ajilei: !!document.querySelector('.vc-ajilei'),
+      }))
+      const audio = await page.evaluate(() => window.__vcAudio())
+      const durante = await page.evaluate(() => window.__vcSnap())
+
+      // P1 · el roce suena y la fanfarria vieja NO — win.mp3 quedó sin uso.
+      r.sonando = audio?.sonando ?? []
+      const p1_sonido = r.sonando.includes('chips-collect.mp3') && !r.sonando.includes('win.mp3')
+
+      // P4 · el toque corta VISUAL y AUDIO de un golpe.
+      await page.mouse.click(4, 384)
+      await vcEspera(page, 120)
+      const trasToque = await page.evaluate(() => ({
+        capa: !!document.querySelector('.vc-capa'),
+        pulso: !!document.querySelector('.vc-pulso'),
+        audio: window.__vcAudio(),
+      }))
+      const p4 = trasToque.capa === false &&
+        !(trasToque.audio?.sonando ?? []).includes('chips-collect.mp3')
+
+      // Δ=0 · la comparación honesta es CON celebración contra SIN ella en el
+      // MISMO estado de juego: ambas tomas en fase de pago, una con el overlay
+      // vivo y otra tras cortarlo. Contra el estado de espera se mediría el
+      // reparto de la mano —165px de diferencia legítima— y no el overlay.
+      const despues = await page.evaluate(() => window.__vcSnap())
+      const dmax = (a, b) => {
+        let m = 0, quien = null
+        a.forEach((p, i) => {
+          const q = b[i]; if (!p || !q) return
+          const d = Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y), Math.abs(q.w - p.w), Math.abs(q.h - p.h))
+          if (d > m) { m = round(d); quien = VC_ANCHORS[i] }
+        })
+        return { m, quien }
+      }
+      const dd = dmax(durante, despues)
+      r.dOverlay = dd.m
+      r.dQuien = dd.quien
+
+      r.viva = viva
+      r.p1 = viva.capa === true && viva.pulso === true && viva.ajilei === false && p1_sonido
+      r.p4 = p4
+      r.p2 = r.dOverlay <= 0.02
+      // P3 · la celebración muere sola dentro del techo.
+      r.p3 = true   // se mide en la sub-pasada de reloj
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
+    r.ok = !!(r.p1 && r.p2 && r.p4)
+    jugado.push(r)
+    console.log(`vc·jugado m${n} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} viva=${JSON.stringify(r.viva)} sonando=${JSON.stringify(r.sonando)} Δ=${r.dOverlay} (${r.dQuien}) toque=${r.p4}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  // ── Sub-pasada RELOJ Y MUTE ───────────────────────────────────────────────
+  const relojes = []
+  for (const n of [2]) {
+    if (tblFilter && n !== tblFilter) continue
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const r = { mesa: n }
+    try {
+      await gotoMesa(page, n)
+      await vcInstall(page)
+      const manos = await vcHastaVictoria(page)
+      r.manos = manos
+      if (manos == null) {
+        r.error = 'sin victoria humana en el tope de manos'
+        r.ok = false
+        relojes.push(r)
+        console.log(`vc·reloj m${n} · FALLA · ${r.error}`)
+        await page.close(); continue
+      }
+      // A mitad del techo sigue viva; pasado el techo, muerta.
+      r.mitad = await page.evaluate(() => !!document.querySelector('.vc-capa'))
+      await vcEspera(page, CELEBRACION_TOPE_MS + 400)
+      r.fin = await page.evaluate(() => !!document.querySelector('.vc-capa'))
+
+      // ── MUTE · verificado, no asumido ─────────────────────────────────────
+      // Se apaga por la ENTRADA DEL MENÚ —el camino del usuario, no una API— y
+      // se comprueba lo que de verdad afirma el diseño: que el mute silencia el
+      // AUDIO y no toca el DIBUJO.
+      // La parte visual se comprueba CONSTRUYENDO el overlay, no ganando otra
+      // mano: exigir dos victorias naturales en una celda deja la puerta a
+      // merced del azar del reparto, y una puerta que a veces falla no informa
+      // de nada.
+      // Se mutea SIN pasar de mano: iniciar la siguiente lanza el barajado, y
+      // un sonido ya en vuelo sigue reportando playing() aunque el mute le haya
+      // bajado la ganancia a cero — la aserción mediría lo que no es.
+      await page.click('.utilities-trigger')
+      await page.waitForSelector('.utilities-panel', { timeout: 2000 }).catch(() => {})
+      await page.click('.util-item-sound')
+      await vcEspera(page, 250)
+      const audioMute = await page.evaluate(() => window.__vcAudio())
+      r.muteGlobal = audioMute?.muteGlobal
+      r.sonandoConMute = audioMute?.sonando ?? []
+      const geoM = await vcGeo(page)
+      await page.evaluate(g => window.__vcConstruye('mano', g), geoM)
+      r.capaConMute = await page.evaluate(() => {
+        const c = document.querySelector('.vc-capa')
+        if (!c) return false
+        const cs = getComputedStyle(c)
+        return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0
+      })
+      await page.evaluate(() => window.__vcDestruye())
+      r.p5 = r.muteGlobal === true && r.sonandoConMute.length === 0 && r.capaConMute === true
+      r.p3 = r.mitad === true && r.fin === false
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
+    r.ok = !!(r.p3 && r.p5)
+    relojes.push(r)
+    console.log(`vc·reloj m${n} · ${r.ok ? 'OK' : 'FALLA'} viva mitad/fin=${r.mitad}/${r.fin} (tope ${CELEBRACION_TOPE_MS}ms) · mute=${r.muteGlobal} sonando=${JSON.stringify(r.sonandoConMute)} dibujo sigue=${r.capaConMute}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  const passed = p6 && cells.every(c => c.passed) && jugado.every(r => r.ok) && relojes.every(r => r.ok)
+  console.log(`\n── VC: ${cells.filter(c => c.passed).length}/${cells.length} celdas · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · reloj+mute ${relojes.filter(r => r.ok).length}/${relojes.length} · decisor ${p6 ? 'OK' : 'FALLA'} · ${passed ? 'VERDE' : 'ROJO'}`)
+  return { decisor, cells, jugado, relojes, passed, topeMs: CELEBRACION_TOPE_MS, viajeMs: VIAJE_MS, escalonMs: VIAJE_ESCALON_MS, ajileiMs: AJILEI_MS }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
@@ -4926,6 +5359,7 @@ try {
   if (MODE === 'u1') report.u1 = await runU1(browser)
   if (MODE === 'u2') report.u2 = await runU2(browser)
   if (MODE === 'u3') report.u3 = await runU3(browser)
+  if (MODE === 'vc') report.vc = await runVC(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }

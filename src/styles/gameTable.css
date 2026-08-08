@@ -289,6 +289,147 @@
   margin: 0;
 }
 
+/* ── DSK-VC2 · Victory Celebration ─────────────────────────────────────────
+   Documento rector: docs/AJILEI_Victory_Celebration_v1.0.md.
+   Las tres superficies son OVERLAYS PUROS —fuera de flujo, `fixed`,
+   pointer-events:none— hermanas del área, jamás dentro de un panel: .opp-panel
+   es contexto de apilamiento y la coreografía R2 le aplica `transform`, que
+   anclaría un `fixed` descendiente al panel en vez de al viewport.
+   NO van tras el gate de escritorio: una victoria se celebra igual en el
+   teléfono, y al no ocupar flujo no pueden mover el layout de nadie.
+
+   CAPAS (censo vivo del área: techo real 10 = "+N" del pozo; paneles revelados
+   7; sobrevuelo Z1 9):
+   · 26 el viaje — por encima de todo el tablero y de la burbuja de reacciones
+     (25), y por DEBAJO del panel de utilidades (30): una celebración no tapa la
+     superficie que el usuario está tocando. Doctrina sellada en U2.
+   · 32 AJILEI — un peldaño sobre los popups (31), porque es el momento y debe
+     verse entero; y muy por debajo de los modales bloqueantes (100 abandonar,
+     120 bancarrota), que sí deben taparlo todo. */
+.vc-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 26;
+  pointer-events: none;
+}
+
+/* Molde FlyingCard: se pinta en el origen y la transición la lleva al destino.
+   Sólo `transform` y `opacity` — ley del sistema v1.2 §5.1. */
+.vc-ficha {
+  position: absolute;
+  display: block;
+  margin-left: -12px;   /* mitad del ChipToken compact (24px): centra en el punto medido */
+  margin-top: -12px;
+  will-change: transform, opacity;
+}
+
+/* Pulso dorado · un ciclo, uno solo. Vive en un hermano ABSOLUTO dentro del
+   nombre, no en .player-zone: allí la abreviatura `animation` es de turnBreath,
+   y aunque en fase de pago el halo de turno está apagado (turnSeat es null),
+   compartir la propiedad es pedir que algún día se pisen.
+   Absoluto y sin caja propia → no toca la reserva de 12ch del nombre: Δ=0. */
+.pbr-name { position: relative; }
+
+.vc-pulso {
+  position: absolute;
+  inset: -6px -10px;
+  border-radius: 8px;
+  pointer-events: none;
+  animation: vcPulso 900ms ease-out 1 both;
+}
+
+@keyframes vcPulso {
+  0%   { opacity: 0; box-shadow: 0 0 0 0 rgba(var(--gold-brand-rgb), 0.00); }
+  25%  { opacity: 1; box-shadow: 0 0 18px 2px rgba(var(--gold-brand-rgb), 0.70); }
+  100% { opacity: 0; box-shadow: 0 0 26px 6px rgba(var(--gold-brand-rgb), 0.00); }
+}
+
+/* AJILEI · la palabra en grande, tratamiento de marca. Hereda de .table-title
+   su lenguaje —oro y traza generosa— pero a escala de momento. */
+.vc-ajilei-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.vc-ajilei {
+  color: var(--gold-brand);
+  font-size: clamp(44px, 11vw, 132px);
+  font-weight: 700;
+  letter-spacing: 0.23em;   /* la traza de .table-title (5/22), en em */
+  line-height: 1;
+  text-shadow: 0 4px 28px rgba(0, 0, 0, 0.55);
+  /* La aparición es el molde msgPop; la salida, su espejo. */
+  animation: vcAjilei 2000ms ease-out 1 both;
+}
+
+@keyframes vcAjilei {
+  0%   { opacity: 0; transform: scale(0.80); }
+  10%  { opacity: 1; transform: scale(1.06); }
+  18%  { opacity: 1; transform: scale(1); }
+  82%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+
+/* Tarjeta-resumen · NO es overlay: es la pantalla. Cuando el humano gana la
+   mesa el tablero ya no existe (isGameOver lo sustituye), así que la tarjeta
+   vive en flujo dentro de .game-over-screen, bajo el título en oro que se
+   conserva. Superficie del sistema, filete dorado fino, radio 8 y una sombra —
+   la familia de los popups del menú. */
+.vc-tarjeta {
+  box-sizing: border-box;
+  width: min(420px, 100%);
+  padding: 18px 22px;
+  background: var(--surface-modal);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+/* Fichas netas · la cifra del conteo. Tabular para que los dígitos no bailen
+   mientras sube: un ancho por dígito distinto haría vibrar la línea entera. */
+.vc-netas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+}
+
+.vc-netas-ico { display: inline-flex; }
+
+.vc-netas-num {
+  color: var(--gold-brand);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.vc-netas-neg .vc-netas-num { color: var(--lose-red); }
+.vc-netas-word { color: var(--text-muted); font-size: 13px; }
+
+.vc-detalle { margin: 0; }
+
+.vc-detalle > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 0;
+}
+
+.vc-detalle dt { color: var(--text-secondary); font-size: 13px; }
+.vc-detalle dd { margin: 0; font-size: 14px; font-weight: 700; }
+
 /* ── Actions ── */
 /* Franja fija de 84px dentro de la barra única: la fase más alta (apostar:
    timer+multiplicadores / botones) cabe en dos líneas y la barra no salta
