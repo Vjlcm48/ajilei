@@ -4671,6 +4671,44 @@
   .player-zone .deck-shuffle-wrapper,
   .ai-zone .deck-shuffle-wrapper { min-height: var(--dsk-deck-reserve-h); }
 
+  /* ── DSK-SH1 · El abanico del barajado vuelve al centro del mazo IA (mesa 2) ──
+     SÍNTOMA: escritorio, mesa 2, la IA como PIE — el abanico abría 32px A LA
+     IZQUIERDA del mazo. En todos los demás escenarios abría centrado.
+
+     CAUSA, medida (scripts/_sh1probe.mjs, 16 celdas: 4 mesas × 2 viewports ×
+     PIE-IA/PIE-humano). Dos hechos que por separado son inocuos:
+       · `.ai-zone .deck-pile { margin-left: 32px }` (:848) es regla BASE, nacida
+         en 819e276 —el punto de restauración v1.2, antes del motor multi-IA— y
+         es el hueco entre la última carta de la IA y su mazo. El bloque móvil
+         portrait la neutraliza (:1729, margin-left:0); ESTE gate nunca lo hizo,
+         así que en escritorio sobrevive y empuja el mazo 32px a la derecha
+         DENTRO de su envoltorio.
+       · `.shuffle-fan-card` es absoluto con `inset: 0` y encima lleva
+         width/height explícitos: con la caja sobre-restringida gana la
+         dimensión, el `right` se ignora y el abanico ancla ARRIBA-IZQUIERDA del
+         ENVOLTORIO. No del mazo — del envoltorio.
+     Juntos: envoltorio 112px, mazo dentro a x=32, abanico a x=0. dx = −32px
+     EXACTOS, idénticos en 1366×768 y 1920×937, repetidos mano tras mano.
+
+     POR QUÉ SÓLO AHÍ: en mesas 3/4/5 el rival va por `.opp-deck-wrapper`, que
+     es absoluto y se ajusta al mazo sin márgenes (medido dx=0 en las 12 celdas
+     de control); el mazo del HUMANO no tiene margin-left (sólo margin-right), y
+     mesa 2 es la única mesa que en escritorio sigue pintando al rival por la
+     vía legacy `.ai-zone` — porque `isLandscapeTable` es el gate MÓVIL
+     (max-height:600) y aquí es falso.
+
+     ARREGLO ESTRUCTURAL, no parche numérico: los 32px no cambian de valor,
+     cambian de DUEÑO. Pasan del mazo (la tinta) al envoltorio (la caja a la que
+     el abanico ancla). El mazo conserva su x EXACTA —antes envoltorio en X y
+     mazo en X+32; ahora envoltorio en X+32 y mazo en X+0— y el hueco con la
+     última carta es el mismo, así que la fila no se mueve: lo que el envoltorio
+     pierde de ancho lo recupera de margen.
+     Descartado `padding-left` en el envoltorio: el bloque contenedor de un
+     absoluto es el PADDING-BOX, así que `left:0` se resuelve ANTES del padding y
+     el abanico no se habría movido ni un píxel. */
+  .ai-zone .deck-pile           { margin-left: 0; }
+  .ai-zone .deck-shuffle-wrapper { margin-left: 32px; }
+
   .player-zone .shuffle-fan-card,
   .ai-zone .shuffle-fan-card {
     width: var(--dsk-deck-w);
