@@ -71,6 +71,48 @@ eliminación mete otros 4,75 s. La jerarquía de tres se reduce en la práctica 
 
 ## 3. Mano ganada y AJILEI
 
+### 3.0 La secuencia — el viaje va DETRÁS del sonido del ganador (VC2b)
+
+La celebración de mesa tiene **dos tiempos**, no uno:
+
+| | Qué suena | Qué se dibuja |
+|---|---|---|
+| **Primer tiempo** | `showdown.mp3` — el sonido del volteo, que suena gane quien gane | nada todavía |
+| **Segundo tiempo** | el sonido del nivel (`chips-collect` o `ajilei-strum`) | el viaje del pozo, con su pulso |
+
+El segundo arranca en el **`end`** del primero, que Howler emite **por id** — el mismo id que
+`play()` ya devolvía desde VC2 para que el toque pudiera cortar el audio. Antes arrancaban en
+paralelo y las dos capas se embarraban.
+
+**La guardia es obligatoria, no un adorno defensivo:** el `end` de un sonido que nunca empezó no
+puede ser la condición de un visual. Cuando no hay a qué esperar, el viaje sale **de inmediato**:
+
+- **manos ganadas por retiros** — no hubo comparación, no hubo volteo, no suena nada;
+- **con el mute puesto** — `play()` devuelve `null`, y ése es el único aviso que hace falta.
+
+La decisión vive en `esperaPrecedente(audio)`, pura y sellada por Vitest: devuelve **0** = «arranca
+ya», o los ms de una **red de seguridad**. La red **no es el reloj** — manda el `end`; sólo cubre
+que el evento no llegue nunca (un archivo que no carga, un `stop` externo), y está **acotada** a
+3000 ms para que un audio largo no deje la celebración colgada.
+
+`showdown.mp3` mide **2,088 s** de archivo con **1,77 s útiles**: el `end` llega ~0,32 s después
+del último sonido audible. Es la cola de silencio del archivo, no un retardo de diseño; si algún
+día molesta, la cortina de `cardShuffle` la recorta sin tocar el fichero.
+
+> **El techo de 2,5 s mide el DIBUJO, no la espera.** El reloj de la celebración empieza en su
+> arranque. Que espera + celebración sumen más de 2,5 s es lo esperado y no infringe nada — pero el
+> arnés hubo que corregirlo: medir desde el pago daba un falso rojo al principio y un falso verde
+> al final.
+
+`activa` nace con `esperando: true` — ya decidida y ya medida, todavía callada. **Un solo estado
+para los dos tiempos, a propósito:** así el toque que corta, el corte por `resize` y la guardia de
+id que ya existían cubren la espera sin una línea nueva, y la secuencia entera se corta desde
+cualquier punto (ver §6).
+
+**El orden de los hooks en `GameTable` es portante:** el efecto que dispara `showdown` es hermano
+**anterior** al de `useCelebracion`, porque React vacía los efectos en orden de declaración. Al
+revés, la celebración leería el asa de la mano anterior.
+
 ### 3.1 El viaje del pozo
 
 **El pozo ya es 0 cuando la fase de pago pinta**: `resolveWinner` lo vacía y suma las fichas al
@@ -168,6 +210,13 @@ Corta **visual y audio de un golpe**. El audio exige el id de Howler, y para eso
 devolverlo** (`{ sound, id }`) — una línea aditiva: ninguna de las llamadas anteriores se entera.
 Sin ese id se cortaría el dibujo y el sonido seguiría sonando solo.
 
+**VC2b · corta en cualquier punto de la secuencia, la espera incluida.** Si el toque llega mientras
+`showdown.mp3` todavía suena, la celebración **no llega a nacer** —ni entonces ni después—: el
+corte suelta el listener `end` y su temporizador-red, e incrementa la guardia de id para que un
+`end` tardío no resucite lo cortado. Lo que **no** se toca es `showdown.mp3`: no es el sonido de la
+celebración sino el del volteo, y suena igual en cada mano que el humano pierde, donde este gesto
+ni existe. Puerta propia en el arnés (`vc·guardia corte`), con victoria natural y todo.
+
 **El mute se hereda gratis** y está **verificado, no asumido**: `Howler.mute()` es global y
 silencia incluso lo que ya está sonando. El arnés lo apaga **por la entrada del menú** —el camino
 del usuario, no una API— y comprueba lo que el diseño afirma: que silencia el **audio** y no toca
@@ -229,6 +278,17 @@ La celebración **de verdad** va en sub-pasada **jugada**: se repiten manos hast
 humano y ahí se observa **Howler de verdad** (`window.Howler._howls`) — que suene `chips-collect`,
 que `win.mp3` **no** suene, y que el toque corte dibujo y sonido.
 
+**VC2b · la secuencia se observa en sus dos tiempos**, con lo que hay en la página y no con relojes
+de arnés: en el instante del pago `showdown.mp3` **suena** y el viaje **no está** en el DOM; cuando
+el viaje aparece, `showdown` ya **no** suena y `chips-collect` sí. Y una sub-pasada **guardias**
+con dos victorias naturales propias, porque son estados de partida incompatibles y compartir una
+mano mediría uno de los dos mal:
+
+| Escenario | Qué prueba |
+|---|---|
+| **mute** | apagado por el menú **antes** de jugar: el viaje sale **en el mismo instante** del pago y no suena absolutamente nada |
+| **corte** | el toque llega **durante** la espera: la celebración no nace, y sigue sin nacer 3,2 s después |
+
 ### 8.1 Alcance declarado de la sub-pasada jugada
 
 **Corre sólo en mesa 2**, y se dice en vez de recortarlo en silencio. Se intentó mesa 5 y **no es
@@ -279,3 +339,9 @@ fase 4**, cuando los protegidos se abran.
   tres licencias con sus IDs y el bug conocido de mesa 2. Modo `vc` permanente del arnés
   (20 celdas construidas + sub-pasadas jugada y de reloj/mute + decisor en Node) y 26 pruebas
   nuevas de Vitest sobre los dos núcleos puros.
+- **v1.0b** — 2026-08-13 (**DSK-VC2b**). El viaje del pozo pasa a ser **secuencial** al sonido del
+  ganador: arranca en el `end` de `showdown.mp3` en vez de solaparse con él (§3.0). Guardia
+  obligatoria de arranque inmediato cuando no hubo volteo o el mute está puesto, sellada en
+  `esperaPrecedente` con 7 pruebas nuevas. El toque corta también **durante la espera** (§6). El
+  modo `vc` suma la puerta de secuencia en la sub-pasada jugada y una sub-pasada **guardias** con
+  dos victorias naturales (mute · corte), y su reloj se corrige para medir desde el arranque.

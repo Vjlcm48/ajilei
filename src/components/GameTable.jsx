@@ -380,15 +380,13 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     }
   }, [unit])
 
-  const celebracion = useCelebracion({
-    enabled: true,
-    phase,
-    winner: game.winner,
-    humanCards: human.cards,
-    ruleN: game.handRules.ruleN,
-    play,
-    geometria: geometriaViaje,
-  })
+  // VC2b · El asa del sonido del ganador, para que la celebración pueda
+  // encadenarse a su final. Se lee con una función estable, nunca durante el
+  // render. La llamada a useCelebracion vive MÁS ABAJO, justo detrás del efecto
+  // que llena este ref: el orden de declaración de los hooks es el orden en que
+  // React vacía sus efectos, y aquí ese orden es portante.
+  const showdownAudioRef = useRef(null)
+  const precedenteViaje = useCallback(() => showdownAudioRef.current, [])
 
   const sesion = useSesion({
     phase,
@@ -576,12 +574,30 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // suelta. `showdown` se conserva EXACTO: es el sonido del volteo, no de la
   // victoria, y suena igual gane quien gane. El archivo win.mp3 se queda en el
   // repositorio sin uso (v1.0 §7): borrarlo es otra tanda.
+  // DSK-VC2b: `showdown` deja de ser sólo un sonido y pasa a ser el PRIMER
+  // TIEMPO de la secuencia de victoria — el viaje del pozo arranca en su final.
+  // Por eso su asa se guarda: sin el {sound, id} no hay `end` al que engancharse.
+  // Se limpia fuera del pago para que ninguna mano herede el asa de la anterior.
   useEffect(() => {
-    if (phase !== PHASES.PAYOUT) return
+    if (phase !== PHASES.PAYOUT) { showdownAudioRef.current = null; return }
     const w = game.winner
     const isShowdown = w !== null && game.players[w].score
-    if (isShowdown) play('showdown')
+    showdownAudioRef.current = isShowdown ? play('showdown') : null
   }, [phase]) // eslint-disable-line
+
+  // VC2b · AQUÍ, y no más arriba, por el orden de vaciado de efectos: el efecto
+  // de showdown es hermano ANTERIOR, así que cuando el de useCelebracion corre,
+  // showdownAudioRef ya trae el asa de ESTA mano. Al revés leería la anterior.
+  const celebracion = useCelebracion({
+    enabled: true,
+    phase,
+    winner: game.winner,
+    humanCards: human.cards,
+    ruleN: game.handRules.ruleN,
+    play,
+    geometria: geometriaViaje,
+    precedente: precedenteViaje,
+  })
 
   // DSK-VC2 · los dos nudillos secos al entrar en la pantalla de victoria de
   // mesa. Vive aparte de useCelebracion a propósito: 'partida' no es un overlay

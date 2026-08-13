@@ -58,6 +58,30 @@ export function sonidoDe(nivel) {
   return null
 }
 
+// ── DSK-VC2b · La espera al sonido del ganador ──────────────────────────────
+// El viaje del pozo deja de arrancar EN PARALELO con showdown.mp3 y arranca en
+// su `end`. La condición de un visual, sin embargo, no puede ser el final de un
+// sonido que nunca empezó: en las manos ganadas por retiros no hay volteo y no
+// suena nada, y con el mute puesto play() devuelve null. En esos casos la
+// espera es CERO y el viaje sale de inmediato.
+//
+// El temporizador que devuelve esta función es la RED, no el reloj: manda el
+// evento `end` de Howler, y esto sólo cubre que el evento no llegue nunca (un
+// archivo que no carga, un stop externo). Por eso el margen sobre la duración.
+export const ESPERA_MARGEN_MS = 250
+export const ESPERA_TOPE_MS = 3000
+
+// Devuelve los ms de la red de seguridad, o 0 = «no hay a qué esperar».
+export function esperaPrecedente(audio) {
+  if (!audio || !audio.sound || audio.id == null) return 0
+  const s = audio.sound
+  // Un sonido que ya terminó (o que jamás llegó a sonar) no encadena nada.
+  if (typeof s.playing === 'function' && !s.playing(audio.id)) return 0
+  const dur = typeof s.duration === 'function' ? Number(s.duration()) * 1000 : 0
+  if (!Number.isFinite(dur) || dur <= 0) return ESPERA_TOPE_MS
+  return Math.min(ESPERA_TOPE_MS, dur + ESPERA_MARGEN_MS)
+}
+
 // Duración total de la celebración en mesa, para el arnés y para el temporizador.
 export function duracionDe(nivel, nFichas = 1) {
   if (nivel === 'ajilei') return AJILEI_MS

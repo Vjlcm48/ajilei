@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   decideCelebracion, llevaViaje, llevaPulso, sonidoDe, duracionDe,
   CELEBRACION_TOPE_MS, VIAJE_MS, VIAJE_ESCALON_MS, AJILEI_MS,
+  esperaPrecedente, ESPERA_MARGEN_MS, ESPERA_TOPE_MS,
 } from '../src/hooks/celebracionCore.js'
 import {
   sesionInicial, anotarMano, fichasNetas, valorConteo, CONTEO_MS,
@@ -120,6 +121,53 @@ describe('VC2 · qué acompaña a cada nivel', () => {
 
   it('la partida está EXENTA del techo: es pantalla terminal', () => {
     expect(duracionDe('partida')).toBe(null)
+  })
+})
+
+// ── DSK-VC2b · la espera al sonido del ganador ──────────────────────────────
+// La regla entera: 0 = «arranca YA». Todo lo demás es la red de seguridad, y la
+// red nunca es la que manda — manda el `end` de Howler.
+describe('VC2b · esperaPrecedente', () => {
+  // Doble mínimo de un Howl: sólo lo que la función consulta.
+  const howl = ({ suena = true, dur = 2.088 } = {}) => ({
+    sound: { playing: () => suena, duration: () => dur },
+    id: 7,
+  })
+
+  it('sin sonido precedente arranca de inmediato — el mute pasa por aquí', () => {
+    // Con el mute puesto, play() devuelve null: ése es el único aviso que llega,
+    // y es suficiente. Un onend de un sonido que no sonó no puede ser condición.
+    expect(esperaPrecedente(null)).toBe(0)
+    expect(esperaPrecedente(undefined)).toBe(0)
+  })
+
+  it('un asa sin id no encadena', () => {
+    expect(esperaPrecedente({ sound: { playing: () => true, duration: () => 2 } })).toBe(0)
+    expect(esperaPrecedente({ sound: null, id: 3 })).toBe(0)
+  })
+
+  it('sin comparación no hay volteo: si ya no suena, arranca de inmediato', () => {
+    expect(esperaPrecedente(howl({ suena: false }))).toBe(0)
+  })
+
+  it('con showdown sonando espera su duración más el margen', () => {
+    expect(esperaPrecedente(howl({ dur: 2.088 }))).toBe(2088 + ESPERA_MARGEN_MS)
+  })
+
+  it('la red está ACOTADA: un archivo largo no deja la celebración colgada', () => {
+    expect(esperaPrecedente(howl({ dur: 60 }))).toBe(ESPERA_TOPE_MS)
+  })
+
+  it('una duración inservible cae al tope, no a cero: el end sigue mandando', () => {
+    expect(esperaPrecedente(howl({ dur: 0 }))).toBe(ESPERA_TOPE_MS)
+    expect(esperaPrecedente(howl({ dur: NaN }))).toBe(ESPERA_TOPE_MS)
+  })
+
+  it('la espera JAMÁS se cuenta contra el techo de la celebración', () => {
+    // El techo mide el dibujo, que arranca cuando la espera acaba. Que la suma
+    // de ambos supere 2,5s es lo esperado y no infringe nada.
+    expect(esperaPrecedente(howl()) + duracionDe('mano', 7)).toBeGreaterThan(CELEBRACION_TOPE_MS)
+    expect(duracionDe('mano', 7)).toBeLessThanOrEqual(CELEBRACION_TOPE_MS)
   })
 })
 

@@ -34,8 +34,11 @@ function FichaViajera({ desde, hasta, retraso }) {
   )
 }
 
+// VC2b · `esperando` es el primer tiempo de la celebración: ya decidida y ya
+// medida, pero todavía callada porque showdown.mp3 no ha terminado. Nada se
+// dibuja hasta entonces — el guardia es el mismo en las tres superficies.
 export function CelebracionMesa({ activa }) {
-  if (!activa || !llevaViaje(activa.nivel)) return null
+  if (!activa || activa.esperando || !llevaViaje(activa.nivel)) return null
   return (
     <div className="vc-capa" aria-hidden="true">
       {Array.from({ length: activa.fichas }, (_, i) => (
@@ -56,7 +59,7 @@ export function CelebracionMesa({ activa }) {
 // halo de turno está apagado (turnSeat es null y se midió `animation: none`),
 // compartir la propiedad es pedir que algún día se pisen.
 export function PulsoNombre({ activa }) {
-  if (!activa || !llevaPulso(activa.nivel)) return null
+  if (!activa || activa.esperando || !llevaPulso(activa.nivel)) return null
   return <span key={activa.id} className="vc-pulso" aria-hidden="true" />
 }
 
@@ -65,7 +68,7 @@ export function PulsoNombre({ activa }) {
 // .table-title, ambos tokens vivos (el CSS los hereda, aquí no se cablea nada).
 // Aparición molde msgPop. Una sola vez, breve.
 export function AjileiOverlay({ activa }) {
-  if (!activa || activa.nivel !== 'ajilei') return null
+  if (!activa || activa.esperando || activa.nivel !== 'ajilei') return null
   return (
     <div className="vc-ajilei-capa" role="status">
       <span key={activa.id} className="vc-ajilei">AJILEI</span>

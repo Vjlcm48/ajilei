@@ -5200,6 +5200,25 @@ async function runVC(browser) {
         await page.close(); continue
       }
 
+      // ── P11 · VC2b · la secuencia, observada en sus DOS tiempos ───────────
+      // Primer tiempo: el pago acaba de pintar, showdown.mp3 SUENA y el viaje
+      // todavía NO está en el DOM. Que ambas cosas sean ciertas a la vez es la
+      // prueba de que dejaron de arrancar en paralelo — y se mide con lo que
+      // hay en la página, no con relojes de arnés.
+      const antes = await page.evaluate(() => ({
+        capa: !!document.querySelector('.vc-capa'),
+        sonando: window.__vcAudio()?.sonando ?? [],
+      }))
+      r.antes = antes
+      const t0 = Date.now()
+      // Segundo tiempo: se espera al arranque sondeando barato.
+      let esperaMs = null
+      for (let i = 0; i < 45 && esperaMs === null; i++) {
+        if (await page.evaluate(() => !!document.querySelector('.vc-capa'))) esperaMs = Date.now() - t0
+        else await vcEspera(page, 80)
+      }
+      r.esperaMs = esperaMs
+
       // La celebración está viva AHORA mismo.
       const viva = await page.evaluate(() => ({
         capa: !!document.querySelector('.vc-capa'),
@@ -5209,6 +5228,10 @@ async function runVC(browser) {
       }))
       const audio = await page.evaluate(() => window.__vcAudio())
       const durante = await page.evaluate(() => window.__vcSnap())
+      // El roce entra cuando el volteo ya se calló: nunca solapados.
+      r.p11 = antes.capa === false && antes.sonando.includes('showdown.mp3') &&
+        !antes.sonando.includes('chips-collect.mp3') &&
+        esperaMs !== null && !(audio?.sonando ?? []).includes('showdown.mp3')
 
       // P1 · el roce suena y la fanfarria vieja NO — win.mp3 quedó sin uso.
       r.sonando = audio?.sonando ?? []
@@ -5250,9 +5273,9 @@ async function runVC(browser) {
       // P3 · la celebración muere sola dentro del techo.
       r.p3 = true   // se mide en la sub-pasada de reloj
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
-    r.ok = !!(r.p1 && r.p2 && r.p4)
+    r.ok = !!(r.p1 && r.p2 && r.p4 && r.p11)
     jugado.push(r)
-    console.log(`vc·jugado m${n} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} viva=${JSON.stringify(r.viva)} sonando=${JSON.stringify(r.sonando)} Δ=${r.dOverlay} (${r.dQuien}) toque=${r.p4}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`vc·jugado m${n} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} viva=${JSON.stringify(r.viva)} sonando=${JSON.stringify(r.sonando)} Δ=${r.dOverlay} (${r.dQuien}) toque=${r.p4} · secuencia=${r.p11} antes=${JSON.stringify(r.antes)} espera=${r.esperaMs}ms${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
@@ -5274,9 +5297,22 @@ async function runVC(browser) {
         console.log(`vc·reloj m${n} · FALLA · ${r.error}`)
         await page.close(); continue
       }
-      // A mitad del techo sigue viva; pasado el techo, muerta.
+      // VC2b · el techo mide el DIBUJO, y el dibujo ya no arranca en el pago:
+      // entre uno y otro está la espera al final de showdown. Medir desde el
+      // pago daría un falso rojo (a mitad del techo la celebración aún no ha
+      // nacido) y, peor, un falso verde al final: a los 2900ms el viaje llevaría
+      // vivo apenas 800. El reloj se cuenta desde el ARRANQUE observado.
+      let arranqueMs = null
+      const tPago = Date.now()
+      for (let i = 0; i < 45 && arranqueMs === null; i++) {
+        if (await page.evaluate(() => !!document.querySelector('.vc-capa'))) arranqueMs = Date.now() - tPago
+        else await vcEspera(page, 80)
+      }
+      r.arranqueMs = arranqueMs
+      // A mitad de vida sigue viva; pasado el techo, muerta.
+      await vcEspera(page, 400)
       r.mitad = await page.evaluate(() => !!document.querySelector('.vc-capa'))
-      await vcEspera(page, CELEBRACION_TOPE_MS + 400)
+      await vcEspera(page, CELEBRACION_TOPE_MS)
       r.fin = await page.evaluate(() => !!document.querySelector('.vc-capa'))
 
       // ── MUTE · verificado, no asumido ─────────────────────────────────────
@@ -5307,17 +5343,96 @@ async function runVC(browser) {
       })
       await page.evaluate(() => window.__vcDestruye())
       r.p5 = r.muteGlobal === true && r.sonandoConMute.length === 0 && r.capaConMute === true
-      r.p3 = r.mitad === true && r.fin === false
+      r.p3 = r.arranqueMs !== null && r.mitad === true && r.fin === false
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
     r.ok = !!(r.p3 && r.p5)
     relojes.push(r)
-    console.log(`vc·reloj m${n} · ${r.ok ? 'OK' : 'FALLA'} viva mitad/fin=${r.mitad}/${r.fin} (tope ${CELEBRACION_TOPE_MS}ms) · mute=${r.muteGlobal} sonando=${JSON.stringify(r.sonandoConMute)} dibujo sigue=${r.capaConMute}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`vc·reloj m${n} · ${r.ok ? 'OK' : 'FALLA'} arranque=${r.arranqueMs}ms viva mitad/fin=${r.mitad}/${r.fin} (tope ${CELEBRACION_TOPE_MS}ms) · mute=${r.muteGlobal} sonando=${JSON.stringify(r.sonandoConMute)} dibujo sigue=${r.capaConMute}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
-  const passed = p6 && cells.every(c => c.passed) && jugado.every(r => r.ok) && relojes.every(r => r.ok)
-  console.log(`\n── VC: ${cells.filter(c => c.passed).length}/${cells.length} celdas · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · reloj+mute ${relojes.filter(r => r.ok).length}/${relojes.length} · decisor ${p6 ? 'OK' : 'FALLA'} · ${passed ? 'VERDE' : 'ROJO'}`)
-  return { decisor, cells, jugado, relojes, passed, topeMs: CELEBRACION_TOPE_MS, viajeMs: VIAJE_MS, escalonMs: VIAJE_ESCALON_MS, ajileiMs: AJILEI_MS }
+  // ── Sub-pasada GUARDIAS · VC2b · los dos bordes de la espera ──────────────
+  // 'mute'  · la guardia obligatoria: con el sonido apagado NO hay showdown a
+  //           cuyo final engancharse, así que el viaje sale de inmediato. El
+  //           onend de un sonido que no sonó no puede ser condición de un
+  //           visual — si lo fuera, el mute se comería la celebración entera.
+  // 'corte' · el toque corta en CUALQUIER punto, la espera incluida: se toca
+  //           mientras showdown todavía suena y la celebración no llega a
+  //           nacer, ni entonces ni después.
+  // Cada escenario se lleva su propia victoria natural: son estados de partida
+  // incompatibles y compartir una sola mano mediría uno de los dos mal.
+  const guardias = []
+  for (const esc of ['mute', 'corte']) {
+    if (tblFilter && tblFilter !== 2) continue
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const r = { esc }
+    try {
+      await gotoMesa(page, 2)
+      await vcInstall(page)
+      if (esc === 'mute') {
+        // Por la ENTRADA DEL MENÚ, el camino del usuario, y ANTES de jugar:
+        // así ni un solo sonido de la mano llega a nacer.
+        await page.click('.utilities-trigger')
+        await page.waitForSelector('.utilities-panel', { timeout: 2000 }).catch(() => {})
+        await page.click('.util-item-sound')
+        await vcEspera(page, 250)
+      }
+      const manos = await vcHastaVictoria(page)
+      r.manos = manos
+      if (manos == null) {
+        r.error = 'sin victoria humana en el tope de manos'
+        r.ok = false
+        guardias.push(r)
+        console.log(`vc·guardia ${esc} · FALLA · ${r.error}`)
+        await page.close(); continue
+      }
+
+      if (esc === 'mute') {
+        const yaMismo = await page.evaluate(() => ({
+          capa: !!document.querySelector('.vc-capa'),
+          fichas: document.querySelectorAll('.vc-ficha').length,
+          audio: window.__vcAudio(),
+        }))
+        r.capa = yaMismo.capa
+        r.fichas = yaMismo.fichas
+        r.muteGlobal = yaMismo.audio?.muteGlobal
+        r.sonando = yaMismo.audio?.sonando ?? []
+        // Sin espera: el dibujo ya está en el mismo instante en que se detecta
+        // el pago, y no suena absolutamente nada.
+        r.ok = r.capa === true && r.fichas > 0 && r.muteGlobal === true && r.sonando.length === 0
+      } else {
+        // El toque llega DURANTE la espera: showdown suena, el viaje aún no está.
+        const antes = await page.evaluate(() => ({
+          capa: !!document.querySelector('.vc-capa'),
+          sonando: window.__vcAudio()?.sonando ?? [],
+        }))
+        r.antes = antes
+        await page.mouse.click(4, 384)
+        // Se deja pasar holgadamente MÁS que la espera completa: si la
+        // celebración fuera a resucitar, aquí aparecería.
+        await vcEspera(page, 3200)
+        const despues = await page.evaluate(() => ({
+          capa: !!document.querySelector('.vc-capa'),
+          pulso: !!document.querySelector('.vc-pulso'),
+          sonando: window.__vcAudio()?.sonando ?? [],
+        }))
+        r.despues = despues
+        r.ok = antes.capa === false && antes.sonando.includes('showdown.mp3') &&
+          despues.capa === false && despues.pulso === false &&
+          !despues.sonando.includes('chips-collect.mp3')
+      }
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
+    guardias.push(r)
+    console.log(`vc·guardia ${esc} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} ${JSON.stringify(
+      esc === 'mute' ? { capa: r.capa, fichas: r.fichas, mute: r.muteGlobal, sonando: r.sonando }
+        : { antes: r.antes, despues: r.despues })}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  const passed = p6 && cells.every(c => c.passed) && jugado.every(r => r.ok) &&
+    relojes.every(r => r.ok) && guardias.every(r => r.ok)
+  console.log(`\n── VC: ${cells.filter(c => c.passed).length}/${cells.length} celdas · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · reloj+mute ${relojes.filter(r => r.ok).length}/${relojes.length} · guardias ${guardias.filter(r => r.ok).length}/${guardias.length} · decisor ${p6 ? 'OK' : 'FALLA'} · ${passed ? 'VERDE' : 'ROJO'}`)
+  return { decisor, cells, jugado, relojes, guardias, passed, topeMs: CELEBRACION_TOPE_MS, viajeMs: VIAJE_MS, escalonMs: VIAJE_ESCALON_MS, ajileiMs: AJILEI_MS }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
