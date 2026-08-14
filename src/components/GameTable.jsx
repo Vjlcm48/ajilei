@@ -12,6 +12,7 @@ import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion } from '../hooks/celebracionCore'
+import { composeResultado, claseTono } from '../hooks/resultadoCore'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
@@ -167,6 +168,21 @@ function messageActionKind(msg) {
   return null
 }
 
+// ── MSG-U1 · La clase del mensaje del centro, en UN solo sitio ───────────────
+// Estaba DUPLICADA literal en las dos rutas de render del óvalo (center-zone de
+// 3/4/5 y portrait, y two-ovals de mesa 2 landscape). El censo MSG-C0 lo dejó
+// anotado como aviso de mantenimiento: cualquier tratamiento nuevo había que
+// aplicarlo dos veces o se desincronizaban. Se salda ANTES de tocar nada más.
+//
+// El interruptor es por FASE Y EMISOR, jamás por regex: si hay resultado
+// compuesto manda su tono; sólo cuando NO lo hay se mira el verbo del texto,
+// que es la crónica de apuestas y sigue exactamente como estaba (Tanda C4.3).
+function claseDelMensaje(resultado, msg) {
+  if (resultado) return claseTono(resultado.tono)
+  const kind = messageActionKind(msg)
+  return kind ? ` msg-action msg-action-${kind}` : ''
+}
+
 // Diff prev/next hands per active seat (Mano→Pie order) → per-player discard plan
 function buildDiscardPlan(prevGame, nextGame) {
   const { numPlayers: N, manoIndex, players } = prevGame
@@ -317,6 +333,17 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
 
   const { phase, currentBet } = game
   const human        = game.players[0]
+  // MSG-U1 · El resultado se COMPONE desde el estado, no se hereda del motor.
+  // Vale null fuera de PAYOUT/GAME_OVER, y ahí el óvalo sigue pintando
+  // game.message como siempre: el interruptor es la fase, jamás el texto.
+  const resultado = composeResultado({
+    phase,
+    winner: game.winner,
+    players: game.players,
+    numPlayers: game.numPlayers,
+    manoIndex: game.manoIndex,
+    ruleN: game.handRules.ruleN,
+  })
   const unit         = game.unit
   const humanIsTurn  = game.activePlayerIndex === 0
   const pieSeat      = game.pieIndex
@@ -1263,13 +1290,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   }
 
   function renderCenterZone() {
-    const centerMsg  = discardMsg ?? game.message
-    // El resultado (winner) conserva su estilo win/lose; solo fuera de él
-    // estilamos por tipo de acción (Tanda C4.3).
-    const actionKind = game.winner !== null ? null : messageActionKind(centerMsg)
-    const msgClass = game.winner === 0 ? ' msg-win'
-                   : game.winner !== null ? ' msg-lose'
-                   : actionKind ? ` msg-action msg-action-${actionKind}` : ''
+    // MSG-U1 · en resultado manda el compositor; fuera de él, la crónica del
+    // motor con su estilo por tipo de acción (Tanda C4.3). Una sola función de
+    // clase para las dos rutas — el aviso del censo, saldado.
+    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? game.message)
+    const actionKind = resultado ? null : messageActionKind(centerMsg)
+    const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
       <section className="center-zone">
         {/* C4.5.2: mientras hay aviso de reducción, REEMPLAZA el contenido del óvalo
@@ -1291,7 +1317,10 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
               <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
             </div>
             {/* key cambia solo en acciones → reproduce el pop sin animar mensajes neutros de fase/reparto */}
-            <p className={`game-message${msgClass}`} key={actionKind ? centerMsg : 'msg'}>
+            {/* data-tono: afidávit para el arnés (molde U3). No pinta nada — un
+                atributo no mueve un píxel — y permite verificar que el color
+                aplicado y el tono compuesto son el mismo hecho, sin leer prosa. */}
+            <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} key={actionKind ? centerMsg : 'msg'}>
               {centerMsg}
             </p>
             {/* C4.4: el chip refleja el estado real según jugadores vivos. Solo en
@@ -1327,11 +1356,12 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
   // No incluye .comodin-note (no aplica al 2: guardado por numPlayers>=4) ni
   // .elim-notice (no se renderiza en el 2). Portrait y 3/4/5 siguen en center-zone.
   function renderTwoOvalsZone() {
-    const centerMsg  = discardMsg ?? game.message
-    const actionKind = game.winner !== null ? null : messageActionKind(centerMsg)
-    const msgClass = game.winner === 0 ? ' msg-win'
-                   : game.winner !== null ? ' msg-lose'
-                   : actionKind ? ` msg-action msg-action-${actionKind}` : ''
+    // MSG-U1 · misma composición y misma función de clase que center-zone: esta
+    // ruta sólo existe en mesa 2 landscape móvil, y la voz es una sola en todo
+    // el juego (alcance multiplataforma deliberado, v1.0 §4).
+    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? game.message)
+    const actionKind = resultado ? null : messageActionKind(centerMsg)
+    const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
       <div className="two-ovals">
         <section className="felt-oval oval-left">
@@ -1349,7 +1379,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           </div>
         </section>
         <section className="felt-oval oval-right">
-          <p className={`game-message${msgClass}`} key={actionKind ? centerMsg : 'msg'}>
+          <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} key={actionKind ? centerMsg : 'msg'}>
             {centerMsg}
           </p>
         </section>
@@ -1380,7 +1410,17 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
             reconstruir el tablero cuando el propio humano queda eliminado. */}
         {isGameOver ? (
           <div className="game-over-screen">
-            <p className="game-over-msg">{game.message}</p>
+            {/* MSG-U1 · el TEXTO no cambia (decisión de Victor) pero sale del
+                compositor, para que nadie pinte game.message en un resultado.
+                Lo que cambia es el tono: el oro de marca queda RESERVADO a la
+                victoria; la derrota pasa a neutro sobrio. Antes las dos se
+                pintaban en el mismo oro, sin consultar winner para nada. */}
+            <p
+              className={`game-over-msg${resultado?.tono === 'neutro' ? ' game-over-msg-neutro' : ''}`}
+              data-tono={resultado?.tono ?? ''}
+            >
+              {resultado ? resultado.texto : game.message}
+            </p>
             {/* DSK-VC2 · SÓLO la victoria evoluciona. La pantalla de derrota no
                 cambia ni un byte: el decisor devuelve 'partida' únicamente con
                 winner === 0, y sin eso aquí no se monta nada. */}

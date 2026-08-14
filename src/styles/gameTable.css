@@ -289,6 +289,18 @@
   margin: 0;
 }
 
+/* MSG-U1 · El oro de marca queda RESERVADO a la victoria. Hasta aquí la pantalla
+   terminal pintaba en el mismo oro "¡Ganaste la mesa!" y "IA 2 gana la mesa. Te
+   quedaste sin fichas.", sin consultar winner para nada: la derrota se celebraba
+   con el color de la casa.
+   Neutro SOBRIO, ni oro ni rojo: --text-secondary, token vivo de theme.css, el
+   mismo que ya viste el texto de apoyo del sistema. Sólo cambia el color — mismo
+   cuerpo, mismo peso, misma caja: la clase se SUMA a .game-over-msg y no hereda
+   nada distinto, así que la pantalla no se mueve.
+   Fuera de todo @media a propósito (alcance multiplataforma, v1.0 §4): es la
+   única regla de esta tanda en hoja compartida, y móvil la recibe por diseño. */
+.game-over-msg-neutro { color: var(--text-secondary); }
+
 /* ── DSK-VC2 · Victory Celebration ─────────────────────────────────────────
    Documento rector: docs/AJILEI_Victory_Celebration_v1.0.md.
    Las tres superficies son OVERLAYS PUROS —fuera de flujo, `fixed`,

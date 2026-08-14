@@ -5435,6 +5435,366 @@ async function runVC(browser) {
   return { decisor, cells, jugado, relojes, guardias, passed, topeMs: CELEBRACION_TOPE_MS, viajeMs: VIAJE_MS, escalonMs: VIAJE_ESCALON_MS, ajileiMs: AJILEI_MS }
 }
 
+// ── MSG-U1 · Mensajes de resultado compuestos desde el estado ────────────────
+// Anclas del Δ=0: el mensaje vive DENTRO del óvalo, así que una frase más larga
+// que la de hoy podría ensanchar la caja y empujar al pozo, a las cartas o a la
+// barra de acciones. Se miden las dos rutas de render y las dos plataformas.
+const MSG_ANCHORS = [
+  '.game-table', '.table-header', '.center-zone', '.pot-box', '.call-box',
+  '.player-zone', '.player-zone .cards-row', '.player-bar', '.action-area',
+  '.two-ovals', '.oval-left', '.oval-right', '.rivals-zone', '.ai-zone',
+]
+
+// Celdas: escritorio en las cuatro mesas + móvil en sus DOS gates. La ruta
+// two-ovals SÓLO existe en mesa 2 landscape móvil (isLandscapeTable es el gate
+// max-height:600), así que sin esa celda una de las dos rutas queda sin medir.
+const MSG_CELDAS = [
+  { n: 5, vp: { w: 1366, h: 768 }, gate: 'escritorio', movil: false },
+  { n: 4, vp: { w: 1366, h: 768 }, gate: 'escritorio', movil: false },
+  { n: 3, vp: { w: 1366, h: 768 }, gate: 'escritorio', movil: false },
+  { n: 2, vp: { w: 1366, h: 768 }, gate: 'escritorio', movil: false },
+  { n: 5, vp: { w: 360, h: 640 }, gate: 'móvil portrait',  movil: true },
+  { n: 2, vp: { w: 360, h: 640 }, gate: 'móvil portrait',  movil: true },
+  { n: 2, vp: { w: 740, h: 360 }, gate: 'móvil landscape', movil: true },
+]
+
+// Manos sintéticas para reconstruir el caso desde lo que la PÁGINA muestra. No
+// hace falta ver las cartas: una puntuación de 51 sólo la alcanza un AJILEI
+// natural y una de 52 sólo el de comodín — ninguna mano corriente llega ahí.
+const MSG_AJILEI_NAT = [
+  { palo: 'Oros', points: 11, value: 1 }, { palo: 'Oros', points: 10, value: 12 },
+  { palo: 'Oros', points: 10, value: 11 }, { palo: 'Oros', points: 10, value: 10 },
+  { palo: 'Oros', points: 10, value: 3 },
+]
+const MSG_AJILEI_COM = [
+  { palo: 'Espadas', points: 11, value: 1 }, { palo: 'Espadas', points: 10, value: 12 },
+  { palo: 'Espadas', points: 10, value: 11 }, { palo: 'Espadas', points: 10, value: 10 },
+  { palo: 'Oros', points: 7, value: 7 },
+]
+const MSG_NORMAL = [
+  { palo: 'Copas', points: 11, value: 1 }, { palo: 'Espadas', points: 10, value: 12 },
+]
+
+// Lo que la página muestra, sin leer una sola letra del mensaje para deducirlo:
+// puntuaciones por zona, quién lleva el chip de ganador, quién es la Mano.
+const msgLee = (page) => page.evaluate(() => {
+  const txt = e => (e ? e.textContent.trim() : null)
+  const parseScore = s => {
+    const m = s && s.match(/([A-Za-zÁÉÍÓÚáéíóúÑñ]+)\s*\((\d+)\s*pts\)/)
+    return m ? { palo: m[1], pts: Number(m[2]) } : null
+  }
+  const esMano = raiz => [...raiz.querySelectorAll('.seat-badge-gold')]
+    .some(b => ['M', 'Mano'].includes(b.textContent.trim()))
+
+  const zonas = []
+  const zHum = document.querySelector('.player-zone')
+  if (zHum) zonas.push({
+    quien: 'humano', nombre: 'Tú',
+    score: parseScore(txt(zHum.querySelector('.score-tag-player'))),
+    gana: !!zHum.querySelector('.win-score-chip'),
+    mano: esMano(zHum),
+  })
+  document.querySelectorAll('.opp-panel').forEach(p => zonas.push({
+    quien: 'IA', nombre: txt(p.querySelector('.opp-name')),
+    score: parseScore(txt(p.querySelector('.opp-score'))),
+    gana: !!p.querySelector('.win-score-chip'),
+    mano: esMano(p),
+  }))
+  document.querySelectorAll('.ai-zone').forEach(p => zonas.push({
+    quien: 'IA', nombre: txt(p.querySelector('.ai-name')),
+    score: parseScore(txt(p.querySelector('.score-tag'))),
+    gana: !!p.querySelector('.win-score-chip'),
+    mano: esMano(p),
+  }))
+
+  const el = document.querySelector('.game-message')
+  return {
+    texto: txt(el),
+    tono: el ? (el.getAttribute('data-tono') || '') : null,
+    clase: el ? el.className : null,
+    color: el ? getComputedStyle(el).color : null,
+    ruta: document.querySelector('.two-ovals') ? 'two-ovals' : 'center-zone',
+    zonas,
+  }
+})
+
+// Juega una mano completa pasando siempre y devuelve cuando el resultado está
+// en pantalla. Un clic por iteración con rechequeo (lección W1).
+async function msgJuegaUnaMano(page, primera) {
+  if (primera) await clickIf(page, 'button:has-text("Iniciar mano")')
+  else if (!await clickIf(page, 'button:has-text("Siguiente mano")')) return false
+  // Tope generoso a propósito: una mano de mesa 5 son cuatro IAs × tres rondas
+  // de apuesta × el ritmo de la casa (AI_SPEED_FACTOR) más el reparto y el
+  // descarte. Con 120 vueltas (30s) se quedaba corta y la celda salía vacía
+  // sin que nada estuviera roto.
+  for (let i = 0; i < 320; i++) {
+    await page.waitForTimeout(250)
+    const fin = await page.evaluate(() => {
+      const m = document.querySelector('.game-message')
+      return !!m && (m.classList.contains('msg-win') || m.classList.contains('msg-lose'))
+    })
+    if (fin) return true
+    await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
+      await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
+      await clickIf(page, '.action-buttons button:has-text("Apostar")')
+    await clickIf(page, 'button:has-text("Sin descartar")')
+  }
+  return false
+}
+
+async function runMSG(browser) {
+  const { composeResultado, claseTono } = await import('../src/hooks/resultadoCore.js')
+  const { PHASES: FASES } = await import('../src/engine/gameEngine.js')
+  const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
+
+  // ── P1 · El compositor entero, CONSTRUIDO (receta O2) ─────────────────────
+  // El peor caso no se juega: un doble AJILEI en las dos direcciones no cae ni
+  // en mil manos, y la pantalla terminal exige arruinar a todas las IAs.
+  const carta = (palo, points, value = 10) => ({ palo, points, value })
+  const sc = (palo, points) => ({ palo, points, suitScores: { [palo]: points } })
+  const construye = ({ n, winner, manoIndex = 0, phase = FASES.PAYOUT, asientos }) => composeResultado({
+    phase, winner, numPlayers: n, manoIndex, ruleN: n,
+    players: asientos.map((a, i) => ({
+      id: i, name: i === 0 ? 'Tú' : (n === 2 ? 'IA' : `IA ${i}`), isHuman: i === 0,
+      cards: a.cards ?? [carta('Copas', 11, 1), carta('Espadas', 10, 12)],
+      score: a.score ?? null, eliminated: !!a.eliminated,
+    })),
+  })
+
+  const matriz = []
+  for (const n of [5, 4, 3, 2]) for (let w = 0; w < n; w++) {
+    const iguales = Array.from({ length: n }, () => ({ score: sc('Bastos', 27) }))
+    const gana    = iguales.map((a, i) => (i === w ? { score: sc('Espadas', 31) } : a))
+    const perfecta = iguales.map((a, i) => (i === w ? { cards: MSG_AJILEI_NAT, score: sc('Oros', 51) } : a))
+    const dobles  = iguales.map((a, i) => (i <= 1 ? { cards: MSG_AJILEI_NAT, score: sc('Oros', 51) } : a))
+    matriz.push(
+      { caso: `corriente n${n} w${w}`,      r: construye({ n, winner: w, asientos: gana }) },
+      { caso: `empate-mano n${n} w${w}`,    r: construye({ n, winner: w, manoIndex: w, asientos: iguales }) },
+      { caso: `empate-cerca n${n} w${w}`,   r: construye({ n, winner: w, manoIndex: (w + 1) % n, asientos: iguales }) },
+      { caso: `ajilei n${n} w${w}`,         r: construye({ n, winner: w, asientos: perfecta }) },
+      { caso: `retiros n${n} w${w}`,        r: construye({ n, winner: w, asientos: Array.from({ length: n }, () => ({ score: null })) }) },
+      { caso: `fin n${n} w${w}`,            r: construye({ n, winner: w, phase: FASES.GAME_OVER, asientos: iguales }) },
+    )
+    if (w < 2) matriz.push({ caso: `doble-ajilei n${n} w${w}`, r: construye({ n, winner: w, manoIndex: w, asientos: dobles }) })
+  }
+
+  const sinPierdes  = matriz.every(m => m.r && !/Pierdes/.test(m.r.texto))
+  const sinVozVieja = matriz.every(m => m.r && !/\(\d+ pts\)/.test(m.r.texto))
+  // Texto y tono son el MISMO hecho: si el texto tutea la victoria, el tono gana.
+  const coherente   = matriz.every(m => m.r && (/\bGanas\b|¡Ganaste|Ganaste el pozo/.test(m.r.texto) === ['gana', 'oro'].includes(m.r.tono)))
+  const oroSoloGana = matriz.filter(m => m.caso.startsWith('fin'))
+    .every(m => (m.r.tono === 'oro') === /¡Ganaste la mesa!/.test(m.r.texto))
+  // El doble AJILEI, veraz en las dos direcciones — el caso que el motor miente.
+  const dobles = matriz.filter(m => m.caso.startsWith('doble-ajilei'))
+  const dobleOk = dobles.every(m => /\bGanas\b/.test(m.r.texto) === (m.r.tono === 'gana')) &&
+    dobles.some(m => m.r.tono === 'gana') && dobles.some(m => m.r.tono === 'pierde')
+
+  // La frase MÁS LARGA que el compositor puede producir, POR MESA — la munición
+  // del Δ=0. Por mesa y no global porque las plantillas no son intercambiables:
+  // "La IA" sólo existe en el 2 y "IA 2" sólo de 3 en adelante.
+  const largaDe = {}
+  for (const n of [5, 4, 3, 2]) {
+    largaDe[n] = matriz.filter(m => m.caso.includes(`n${n} `))
+      .reduce((a, m) => (m.r.texto.length > a.length ? m.r.texto : a), '')
+  }
+  const larga = Object.values(largaDe).reduce((a, t) => (t.length > a.length ? t : a), '')
+
+  // ── La vara honesta: el peor caso de HOY ──────────────────────────────────
+  // Comparar la frase nueva contra el mensaje que hubiera en pantalla en ese
+  // instante mediría "corto → largo", que es una sensibilidad del óvalo
+  // preexistente y no una consecuencia de la tanda. Lo que hay que comparar es
+  // PEOR CASO CONTRA PEOR CASO: la cadena más larga que el motor puede emitir
+  // hoy en esa mesa, contra la más larga que el compositor puede emitir mañana.
+  // Cadenas del motor tomadas del censo MSG-C0, con los palos más largos
+  // ("Espadas", 7) y puntuaciones de dos cifras.
+  const MOTOR_HOY = {
+    2: [
+      'Pierdes. La IA gana con Espadas (31 pts) vs tu Espadas (31 pts).',
+      '¡Ganas! Tu Espadas (31 pts) supera al Espadas de la IA (31 pts).',
+      '¡Ambos con AJILEI! Ganas por ser el mano.',
+      'Empate (31 pts). Ganas por ser el mano.',
+    ],
+    3: null, 4: null, 5: null,   // se rellenan abajo: mismas plantillas de N>2
+  }
+  for (const n of [3, 4, 5]) {
+    MOTOR_HOY[n] = [
+      `Empate. Gana IA ${n - 1} por ser el más cercano a la Mano.`,
+      `¡AJILEI! IA ${n - 1} gana con mano perfecta (comodín).`,
+      `IA ${n - 1} gana con Espadas (31 pts).`,
+      `Los demás se retiran. Gana IA ${n - 1}.`,
+    ]
+  }
+  const motorLargaDe = {}
+  for (const n of [5, 4, 3, 2]) motorLargaDe[n] = MOTOR_HOY[n].reduce((a, t) => (t.length > a.length ? t : a), '')
+  const p1 = sinPierdes && sinVozVieja && coherente && oroSoloGana && dobleOk
+  console.log(`msg·compositor · ${p1 ? 'OK' : 'FALLA'} ${matriz.length} casos ${JSON.stringify({ sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk })}`)
+  console.log(`msg·frase más larga (${larga.length} car) · "${larga}"`)
+  for (const n of [5, 4, 3, 2]) {
+    console.log(`msg·peor caso T${n} · hoy ${motorLargaDe[n].length} car "${motorLargaDe[n]}" → mañana ${largaDe[n].length} car "${largaDe[n]}"`)
+  }
+
+  // ── P2 · Jugado: el texto pintado se RE-DERIVA del estado visible ─────────
+  // Verificación cruzada contra winner/scores, jamás regex de prosa: se leen las
+  // puntuaciones de cada zona, quién lleva el chip de ganador y quién es la
+  // Mano, se recompone con el MISMO compositor y se compara la cadena entera.
+  const jugado = []
+  for (const celda of MSG_CELDAS) {
+    if (tblFilter && celda.n !== tblFilter) continue
+    const page = await browser.newPage({
+      viewport: { width: celda.vp.w, height: celda.vp.h },
+      ...(celda.movil ? { hasTouch: true, isMobile: true } : {}),
+    })
+    const r = { ...celda, manos: [] }
+    try {
+      await gotoMesa(page, celda.n)
+      for (let mano = 1; mano <= 3; mano++) {
+        if (!await msgJuegaUnaMano(page, mano === 1)) break
+        const l = await msgLee(page)
+        const conScore = l.zonas.filter(z => z.score)
+        const idxGana  = conScore.findIndex(z => z.gana)
+        let esperado = null, via = 'plantilla'
+        if (conScore.length && idxGana >= 0) {
+          // Reconstrucción completa desde la página.
+          via = 're-derivado'
+          const players = conScore.map((z, i) => ({
+            id: i, name: z.nombre, isHuman: z.quien === 'humano',
+            cards: z.score.pts >= 52 ? MSG_AJILEI_COM : z.score.pts >= 51 ? MSG_AJILEI_NAT : MSG_NORMAL,
+            score: { palo: z.score.palo, points: z.score.pts }, eliminated: false,
+          }))
+          esperado = composeResultado({
+            phase: FASES.PAYOUT, winner: idxGana, players, numPlayers: celda.n,
+            manoIndex: conScore[idxGana].mano ? idxGana : (idxGana + 1) % players.length,
+            ruleN: celda.n,
+          })
+        }
+        const claseEsperada = claseTono(l.tono)
+        const m = {
+          mano, ruta: l.ruta, via, texto: l.texto, tono: l.tono,
+          esperado: esperado ? esperado.texto : null,
+          // Ganadas por retiros: no hay puntuaciones que re-derivar, así que se
+          // comprueba pertenencia a las plantillas conservadas y coherencia de
+          // tono. Se DECLARA, no se disfraza de re-derivación.
+          coincide: esperado
+            ? l.texto === esperado.texto && l.tono === esperado.tono
+            : /Ganaste el pozo|gana el pozo|Los demás se retiran/.test(l.texto),
+          sinPierdes: !/Pierdes/.test(l.texto),
+          sinVozVieja: !/\(\d+ pts\)/.test(l.texto),
+          // El color aplicado y el tono compuesto tienen que ser el mismo hecho.
+          tonoAplicado: l.clase.includes(claseEsperada.trim()) && !!l.tono,
+        }
+        m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado
+        r.manos.push(m)
+      }
+      r.ok = r.manos.length > 0 && r.manos.every(m => m.ok)
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
+    jugado.push(r)
+    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono}${m.ok ? '' : ' ✗esperado="' + m.esperado + '"'}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  // ── P3 · Fin de partida: el oro es de la victoria ─────────────────────────
+  // CONSTRUIDO: llegar a GAME_OVER jugando exige arruinar a todas las IAs. Lo
+  // que se audita aquí es el contrato de CSS —qué color pinta cada clase y que
+  // nada más cambie—; que el tono correcto le llegue a cada caso lo sella P1.
+  const finales = []
+  {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    try {
+      await gotoMesa(page, 2)
+      const medido = await page.evaluate(() => {
+        const caja = document.createElement('div')
+        caja.className = 'game-over-screen'
+        caja.setAttribute('data-construido', '1')
+        caja.innerHTML = '<p class="game-over-msg">¡Ganaste la mesa! Eres el último con fichas.</p>' +
+          '<p class="game-over-msg game-over-msg-neutro">IA 1 gana la mesa. Te quedaste sin fichas.</p>'
+        document.querySelector('.game-table-screen').appendChild(caja)
+        const [a, b] = caja.querySelectorAll('.game-over-msg')
+        const cs = e => { const c = getComputedStyle(e); return { color: c.color, fontSize: c.fontSize, fontWeight: c.fontWeight } }
+        const oroVivo = getComputedStyle(document.documentElement).getPropertyValue('--gold-brand').trim()
+        const neutroVivo = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim()
+        const out = { victoria: cs(a), derrota: cs(b), oroVivo, neutroVivo }
+        caja.remove()
+        return out
+      })
+      // Oro exacto #e8b84b → rgb(232, 184, 75). El neutro NO puede ser el oro.
+      finales.push({
+        ...medido,
+        p3: medido.victoria.color === 'rgb(232, 184, 75)' &&
+          medido.derrota.color !== medido.victoria.color &&
+          medido.derrota.fontSize === medido.victoria.fontSize &&
+          medido.derrota.fontWeight === medido.victoria.fontWeight,
+      })
+    } catch (e) { finales.push({ error: String(e && e.message || e).slice(0, 200), p3: false }) }
+    const f = finales[0]
+    console.log(`msg·fin de partida · ${f.p3 ? 'OK' : 'FALLA'} victoria=${f.victoria?.color} derrota=${f.derrota?.color} (mismo cuerpo ${f.victoria?.fontSize}/${f.victoria?.fontWeight})${f.error ? ' · ' + f.error : ''}`)
+    await page.close()
+  }
+
+  // ── P4 · Δ=0 con la frase MÁS LARGA ───────────────────────────────────────
+  // La robustez del óvalo se midió en escritorio; en móvil NO se asume. Se
+  // inyecta la frase más larga que el compositor puede producir y se comprueba
+  // que ninguna ancla se mueve, en las dos plataformas y en las dos rutas.
+  const anchuras = []
+  for (const celda of MSG_CELDAS) {
+    if (tblFilter && celda.n !== tblFilter) continue
+    const page = await browser.newPage({
+      viewport: { width: celda.vp.w, height: celda.vp.h },
+      ...(celda.movil ? { hasTouch: true, isMobile: true } : {}),
+    })
+    const r = { ...celda }
+    try {
+      await gotoMesa(page, celda.n)
+      await clickIf(page, 'button:has-text("Iniciar mano")')
+      await page.waitForTimeout(4800)   // el reparto termina en ~4,5s
+      const d = await page.evaluate(({ anchors, hoy, manana }) => {
+        const rnd = x => (x == null ? null : Math.round(x * 100) / 100)
+        const R = s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { x: rnd(b.x), y: rnd(b.y), w: rnd(b.width), h: rnd(b.height) } }
+        const snap = () => anchors.map(R)
+        const el = document.querySelector('.game-message')
+        if (!el) return null
+        const previo = el.textContent
+        const corto = snap()
+        el.textContent = hoy
+        const conHoy = snap()
+        const desbordaHoy = el.scrollWidth > el.clientWidth + 0.5
+        el.textContent = manana
+        const conManana = snap()
+        const desborda = el.scrollWidth > el.clientWidth + 0.5
+        el.textContent = previo
+        const dmax = (a, b) => {
+          let m = 0, quien = null
+          a.forEach((p, i) => {
+            const q = b[i]; if (!p || !q) return
+            const dd = Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y), Math.abs(q.w - p.w), Math.abs(q.h - p.h))
+            if (dd > m) { m = rnd(dd); quien = anchors[i] }
+          })
+          return { m, quien }
+        }
+        // El que manda: peor caso de hoy vs peor caso de mañana.
+        const contraHoy = dmax(conHoy, conManana)
+        // Informativo: cuánto se mueve el óvalo entre un mensaje corriente y el
+        // peor caso — sensibilidad PREEXISTENTE, no consecuencia de la tanda.
+        const sensibilidad = dmax(corto, conHoy)
+        return { m: contraHoy.m, quien: contraHoy.quien, sens: sensibilidad.m, sensQuien: sensibilidad.quien, desborda, desbordaHoy }
+      }, { anchors: MSG_ANCHORS, hoy: motorLargaDe[celda.n], manana: largaDe[celda.n] })
+      r.delta = d ? d.m : null
+      r.quien = d ? d.quien : null
+      r.sens = d ? d.sens : null
+      r.sensQuien = d ? d.sensQuien : null
+      r.desborda = d ? d.desborda : null
+      r.desbordaHoy = d ? d.desbordaHoy : null
+      r.ok = !!d && d.m <= 0.02 && d.desborda === d.desbordaHoy
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
+    anchuras.push(r)
+    console.log(`msg·Δ larga T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} Δ(hoy→mañana)=${r.delta} (${r.quien}) · desborde hoy/mañana=${r.desbordaHoy}/${r.desborda} · sensibilidad preexistente del óvalo=${r.sens} (${r.sensQuien})${r.error ? ' · ' + r.error : ''}`)
+    await page.close()
+  }
+
+  const passed = p1 && jugado.every(r => r.ok) && finales.every(f => f.p3) && anchuras.every(r => r.ok)
+  console.log(`\n── MSG: compositor ${p1 ? 'OK' : 'FALLA'} (${matriz.length} casos) · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · fin ${finales.filter(f => f.p3).length}/${finales.length} · Δ larga ${anchuras.filter(r => r.ok).length}/${anchuras.length} · ${passed ? 'VERDE' : 'ROJO'}`)
+  return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, finales, anchuras, passed }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
@@ -5475,6 +5835,7 @@ try {
   if (MODE === 'u2') report.u2 = await runU2(browser)
   if (MODE === 'u3') report.u3 = await runU3(browser)
   if (MODE === 'vc') report.vc = await runVC(browser)
+  if (MODE === 'msg') report.msg = await runMSG(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }
