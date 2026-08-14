@@ -2,6 +2,7 @@ import '../styles/opponentPanel.css'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
 import { DECK_ANCHORS } from '../config/seatLayouts'
+import { vozResto } from '../hooks/resultadoCore'
 
 // Panel compacto de rival (mesas 3-5). Diseñado conforme a docs/AJILEI_Sistema_Diseno_v1.2.md.
 // Muestra solo: nombre, saldo, 5 cartas pequeñas con solape, estado breve, badge Mano.
@@ -129,7 +130,9 @@ export default function OpponentPanel({
       </span>
 
       <span className="opp-score" style={{ visibility: showScore && score && !resetting ? 'visible' : 'hidden' }}>
-        {score && <>Mejor palo: <strong>{score.palo}</strong> ({score.points} pts)</>}
+        {/* MSG-U1b · voz de la casa (ver src/hooks/resultadoCore.js). Ésta es la
+            ruta opp-panel; la legacy .ai-zone de mesa 2 lleva la misma línea. */}
+        {score && <>Mejor palo: <strong>{score.palo}</strong>{vozResto(score)}</>}
       </span>
     </div>
   )

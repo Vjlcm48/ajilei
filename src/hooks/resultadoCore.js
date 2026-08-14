@@ -25,6 +25,13 @@ import { isAjilei } from '../engine/handEvaluator'
 // "Oros, 27 pts". El motor decía "Oros (27 pts)" y las dos convivían en el pago.
 export const voz = (score) => `${score.palo}, ${score.points} pts`
 
+// MSG-U1b · Las bandas de puntaje ("Tu mejor palo:" y "Mejor palo:") ponen el
+// PALO en negrita, así que no pueden consumir `voz` de una pieza. En vez de
+// reescribir el formato en tres JSX —que es como nacieron las dos voces— se
+// expone la cola: `<strong>{palo}</strong>{vozResto(score)}` da exactamente la
+// misma cadena que `voz(score)`, y hay prueba que ata las dos formas.
+export const vozResto = (score) => `, ${score.points} pts`
+
 // Segunda persona para el humano, tercera para las IAs. Dos formas porque el
 // castellano las distingue: al inicio de frase "La IA gana…", en medio "Gana la
 // IA…". En mesas de 3+ el nombre propio ("IA 2") vale para las dos.

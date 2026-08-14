@@ -2268,7 +2268,10 @@ const A1_PRE = {
 // DSK-A2 · va como MARCADO, no como texto plano: el JSX envuelve el palo en
 // <strong> (negrita) y `textContent` lo perdía. Medido: 182,75 en plano contra
 // 185,42 real — 2,67px que hacían parecer suficiente la reserva de 183 de A1.
-const A1_WORST_TAG = 'Tu mejor palo: <strong>Espadas</strong> (999 pts)'
+// MSG-U1b · la banda pasa a la voz de la casa: "Espadas, 999 pts". Dos
+// caracteres MENOS que la forma vieja "(999 pts)", así que la reserva medida en
+// A1/A2 sigue siendo suficiente por construcción — pero se vuelve a medir igual.
+const A1_WORST_TAG = 'Tu mejor palo: <strong>Espadas</strong>, 999 pts'
 
 async function a1Snap(page) {
   return page.evaluate(() => {
@@ -5479,8 +5482,12 @@ const MSG_NORMAL = [
 // puntuaciones por zona, quién lleva el chip de ganador, quién es la Mano.
 const msgLee = (page) => page.evaluate(() => {
   const txt = e => (e ? e.textContent.trim() : null)
+  // MSG-U1b · las bandas hablan la voz de la casa: "Mejor palo: Oros, 27 pts".
+  // El paréntesis desapareció de la pantalla entera, así que el parser va a la
+  // forma nueva y sólo a ella: si algún día reapareciera la vieja, esta puerta
+  // dejaría de leer y la celda caería — que es justo lo que se quiere.
   const parseScore = s => {
-    const m = s && s.match(/([A-Za-zÁÉÍÓÚáéíóúÑñ]+)\s*\((\d+)\s*pts\)/)
+    const m = s && s.match(/([A-Za-zÁÉÍÓÚáéíóúÑñ]+)\s*,\s*(\d+)\s*pts/)
     return m ? { palo: m[1], pts: Number(m[2]) } : null
   }
   const esMano = raiz => [...raiz.querySelectorAll('.seat-badge-gold')]
@@ -5507,6 +5514,14 @@ const msgLee = (page) => page.evaluate(() => {
     mano: esMano(p),
   }))
 
+  // MSG-U1b · barrido de PANTALLA ENTERA, no sólo del mensaje: la voz queda
+  // unificada al 100% o no queda unificada. Se lee el innerText del área para
+  // que un "(27" y un "pts)" partidos entre dos nodos por el <strong> no se
+  // escapen del barrido.
+  const pantalla = document.querySelector('.game-table-screen')
+  const bruto = pantalla ? pantalla.innerText : ''
+  const vozVieja = (bruto.match(/\(\s*\d+\s*pts\s*\)/g) || [])
+
   const el = document.querySelector('.game-message')
   return {
     texto: txt(el),
@@ -5514,7 +5529,7 @@ const msgLee = (page) => page.evaluate(() => {
     clase: el ? el.className : null,
     color: el ? getComputedStyle(el).color : null,
     ruta: document.querySelector('.two-ovals') ? 'two-ovals' : 'center-zone',
-    zonas,
+    zonas, vozVieja,
   }
 })
 
@@ -5679,16 +5694,20 @@ async function runMSG(browser) {
             : /Ganaste el pozo|gana el pozo|Los demás se retiran/.test(l.texto),
           sinPierdes: !/Pierdes/.test(l.texto),
           sinVozVieja: !/\(\d+ pts\)/.test(l.texto),
+          // MSG-U1b · y NADA en toda la pantalla habla la voz vieja: ni el
+          // mensaje, ni la banda del humano, ni las de los rivales.
+          vozVieja: l.vozVieja,
+          pantallaLimpia: l.vozVieja.length === 0,
           // El color aplicado y el tono compuesto tienen que ser el mismo hecho.
           tonoAplicado: l.clase.includes(claseEsperada.trim()) && !!l.tono,
         }
-        m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado
+        m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado && m.pantallaLimpia
         r.manos.push(m)
       }
       r.ok = r.manos.length > 0 && r.manos.every(m => m.ok)
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
     jugado.push(r)
-    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono}${m.ok ? '' : ' ✗esperado="' + m.esperado + '"'}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 

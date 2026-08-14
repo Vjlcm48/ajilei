@@ -12,7 +12,7 @@ import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion } from '../hooks/celebracionCore'
-import { composeResultado, claseTono } from '../hooks/resultadoCore'
+import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
@@ -1188,7 +1188,10 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           </div>
         </div>
         <div className="score-tag" style={{ visibility: isPayoutPhase && !isClearing && !isShuffling && rival.score ? 'visible' : 'hidden' }}>
-          {rival.score && <>Mejor palo: <strong>{rival.score.palo}</strong> ({rival.score.points} pts)</>}
+          {/* MSG-U1b · voz de la casa, igual que el mensaje del óvalo y que
+              Mano actual. La cola sale de vozResto para no reescribir el
+              formato en cada JSX — así nacieron las dos voces. */}
+          {rival.score && <>Mejor palo: <strong>{rival.score.palo}</strong>{vozResto(rival.score)}</>}
         </div>
         {/* M2-3 · Renglón de palabras de acción — SOLO portrait (antes las
             acciones de la IA solo se narraban en el .game-message del óvalo).
@@ -1474,7 +1477,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
         {/* Player Zone — dos pisos (Tanda C3.2): cartas + barra única */}
         <section className={`player-zone${turnSeat === 0 ? ' turn-active' : ''}${turnSeat !== null && turnSeat !== 0 ? ' turn-dimmed' : ''}`}>
           <div className="score-tag score-tag-player" style={{ visibility: isPayoutPhase && !inReset && human.score ? 'visible' : 'hidden' }}>
-            {human.score && <>Tu mejor palo: <strong>{human.score.palo}</strong> ({human.score.points} pts)</>}
+            {human.score && <>Tu mejor palo: <strong>{human.score.palo}</strong>{vozResto(human.score)}</>}
           </div>
 
           <div className="cards-row">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { composeResultado, claseTono, voz } from '../src/hooks/resultadoCore.js'
+import { composeResultado, claseTono, voz, vozResto } from '../src/hooks/resultadoCore.js'
 import { PHASES } from '../src/engine/gameEngine.js'
 
 // ── MSG-U1 · El compositor de resultados ────────────────────────────────────
@@ -81,6 +81,24 @@ describe('MSG-U1 · victoria corriente · sin contraste y con la voz de la casa'
   it('la voz es "Palo, N pts" — la de Mano actual y la tarjeta de sesión', () => {
     expect(voz(score('Oros', 27))).toBe('Oros, 27 pts')
     expect(normal(2, 0).texto).not.toMatch(/\(\d+ pts\)/)
+  })
+})
+
+// ── MSG-U1b · las bandas de puntaje entran en la misma voz ──────────────────
+// "Tu mejor palo:" y "Mejor palo:" ponen el PALO en negrita, así que renderizan
+// la voz en dos piezas. Esta prueba ata las dos formas: si alguien retoca el
+// formato en un sitio y no en el otro, aquí se parte.
+describe('MSG-U1b · vozResto · la forma partida y la entera son la MISMA', () => {
+  it('palo + vozResto reconstruye voz al carácter', () => {
+    for (const [palo, pts] of [['Oros', 27], ['Espadas', 999], ['Copas', 0], ['Bastos', 7]]) {
+      const s = score(palo, pts)
+      expect(s.palo + vozResto(s)).toBe(voz(s))
+    }
+  })
+
+  it('la cola no lleva paréntesis: es la coma de la casa', () => {
+    expect(vozResto(score('Oros', 27))).toBe(', 27 pts')
+    expect(vozResto(score('Oros', 27))).not.toMatch(/[()]/)
   })
 })
 

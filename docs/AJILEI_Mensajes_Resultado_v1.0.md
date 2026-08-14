@@ -49,6 +49,16 @@ pero sólo se consulta cuando el compositor ha dicho `null`. Ya no puede tocar u
 Voz de la casa: **"Oros, 27 pts"**, la misma de Mano actual (U3) y de la tarjeta de sesión (VC2). El
 motor decía `"Oros (27 pts)"` y las dos convivían en pantalla durante el pago.
 
+> **MSG-U1b — la voz queda unificada al 100 %.** Las bandas de puntaje del pago
+> (`Tu mejor palo:` y `Mejor palo:`, en sus **tres** superficies: la del humano, la de la ruta
+> `opp-panel` y la de la legacy `.ai-zone`) hablan la misma voz. **No queda un solo `(N pts)` en
+> pantalla**, y el arnés lo sella barriendo el `innerText` del área entera, no sólo el mensaje.
+>
+> Esas bandas ponen el **palo en negrita**, así que renderizan la voz en dos piezas. En vez de
+> reescribir el formato en tres JSX —que es exactamente como nacieron las dos voces— se expone la
+> cola: `<strong>{palo}</strong>{vozResto(score)}` produce carácter a carácter lo mismo que
+> `voz(score)`, y hay prueba que ata las dos formas.
+
 Segunda persona para el humano, tercera para las IAs. El castellano distingue el sujeto al inicio de
 frase (`La IA gana…`) del sujeto en medio (`Gana la IA…`); en mesas de 3+ el nombre propio vale para
 las dos posiciones.
@@ -195,10 +205,8 @@ arnés, construida en ambos sentidos.
 
 ## 9. Deuda declarada
 
-- **La banda `Tu mejor palo:`** (`.score-tag-player`) y la de los rivales (`.opp-score` /
-  `.score-tag`) siguen con la voz vieja: `Mejor palo: Oros (27 pts)`. Es texto de UI puro y
-  ejecutable hoy, pero **queda fuera del alcance de esta tanda**: MSG-U1 unifica los mensajes de
-  resultado, no todas las superficies de puntuación. Es el último `(N pts)` que queda en pantalla.
+- ~~**Las bandas de puntaje** siguen con la voz vieja.~~ **Saldada en MSG-U1b**: las tres
+  superficies hablan la voz de la casa y no queda un `(N pts)` en pantalla.
 - **Las cadenas del motor** quedan vivas y sin consumidor para los resultados. Borrarlas exige tocar
   un protegido; queda para fase 4.
 
@@ -209,3 +217,11 @@ arnés, construida en ambos sentidos.
   desaparición de `"Pierdes."` y del contraste, concordancia arreglada, oro reservado a la victoria,
   clase de color unificada en las dos rutas, y el bug de mesa 2 neutralizado en pantalla. Modo `msg`
   permanente del arnés y 29 pruebas nuevas de Vitest sobre el compositor puro.
+- **v1.0b** — 2026-08-14 (**MSG-U1b**). Las **bandas de puntaje** entran en la misma voz en sus tres
+  superficies (`.score-tag-player`, `.opp-score`, `.score-tag` de la legacy `.ai-zone`): desaparece
+  el último `(N pts)` de la pantalla. Cola compartida `vozResto` para que el formato siga teniendo
+  una sola fuente pese al `<strong>` del palo, con prueba que ata la forma partida a la entera. El
+  modo `msg` suma el **barrido de pantalla entera** —`innerText` del área, no sólo el mensaje— y su
+  parser de bandas pasa a la forma nueva: si la vieja reapareciera, la puerta dejaría de leer y la
+  celda caería. `A1_WORST_TAG` se actualiza al marcado real (dos caracteres **menos** que la forma
+  vieja, así que la reserva medida en A1/A2 sigue holgada — y se vuelve a medir igual).
