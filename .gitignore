@@ -20,6 +20,18 @@ dist
 dist-ssr
 *.local
 
+# Salidas del arnés (capturas, volcados JSON, logs de corrida). Son
+# REGENERABLES: cualquier modo de scripts/diagDSK.mjs las vuelve a escribir.
+# Se ignoran porque llegaron a pesar 101 MB sin rastrear, a un `git add -A`
+# distraído del desastre. La carpeta NO se borra nunca: el arnés escribe en
+# ella con writeFileSync y sin mkdirSync, así que sin el directorio revienta.
+# `evidencia/` es la excepción y por eso se re-incluye: guarda capturas
+# tomadas contra código que ya no está en el árbol —sostienen el
+# "byte-idéntico" de 8da6a89— y ésas no se regeneran sin repetir el stash.
+capturas-dsk/*
+!capturas-dsk/evidencia/
+!capturas-dsk/evidencia/**
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

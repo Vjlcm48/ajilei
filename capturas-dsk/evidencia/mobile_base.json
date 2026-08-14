@@ -1,0 +1,96 @@
+{
+  "tag": "base",
+  "cells": [
+    {
+      "gate": "portrait",
+      "vp": "360x640",
+      "mesa": 5,
+      "hashes": [
+        "6fa9757356a44c82"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    },
+    {
+      "gate": "portrait",
+      "vp": "360x640",
+      "mesa": 4,
+      "hashes": [
+        "41bf4c9348a327c1"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    },
+    {
+      "gate": "portrait",
+      "vp": "360x640",
+      "mesa": 3,
+      "hashes": [
+        "66a0d5b1ee5579dc"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    },
+    {
+      "gate": "portrait",
+      "vp": "360x640",
+      "mesa": 2,
+      "hashes": [
+        "6d19b7426311b862"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    },
+    {
+      "gate": "landscape",
+      "vp": "740x360",
+      "mesa": 5,
+      "hashes": [
+        "b832977259dd5608",
+        "d4d9de9b4f2e0ed4"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    },
+    {
+      "gate": "landscape",
+      "vp": "740x360",
+      "mesa": 4,
+      "hashes": [
+        "179981f982ea0aad",
+        "a1f2f124d6174b97"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    },
+    {
+      "gate": "landscape",
+      "vp": "740x360",
+      "mesa": 3,
+      "hashes": [
+        "9084219b7c72a8fb"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    },
+    {
+      "gate": "landscape",
+      "vp": "740x360",
+      "mesa": 2,
+      "hashes": [
+        "14f23dc454cb476c",
+        "bc769c07a4b7254b"
+      ],
+      "gateOk": true,
+      "muteGlyph": "🔊",
+      "trigger": false
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+[
+ {
+  "hash": "9084219b7c72a8fb",
+  "tomas": 13,
+  "rol": {
+   "rivales": [],
+   "humano": [
+    "Mano"
+   ],
+   "mazoVisible": true,
+   "u3": {
+    "entrada": false,
+    "popup": false,
+    "trigger": false
+   }
+  }
+ },
+ {
+  "hash": "61552975f55d3835",
+  "tomas": 1,
+  "rol": {
+   "rivales": [],
+   "humano": [
+    "Mano"
+   ],
+   "mazoVisible": true,
+   "u3": {
+    "entrada": false,
+    "popup": false,
+    "trigger": false
+   }
+  }
+ }
+]
