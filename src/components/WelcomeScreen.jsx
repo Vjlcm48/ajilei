@@ -50,6 +50,33 @@ function WelcomeScreen({ onSelectMode }) {
         }}>
           by HEPTACREATION
         </p>
+
+        {/* DSK-U2c · crédito CC BY, obligatorio y VISIBLE (v1.4 §6). La
+            licencia de los emoji de las reacciones exige atribución, y un
+            comentario en código no la cumple: la lección de la lámina GNU
+            (Diseno_Landscape §10.3) fue exactamente ésta. Va aquí y no en
+            ModeSelect —donde el encargo lo situaba— porque la marca de la casa
+            vive en esta pantalla. Un peldaño por debajo de HEPTACREATION en
+            tamaño y opacidad: acredita sin competir. */}
+        <p style={{
+          textAlign: 'center',
+          fontSize: '0.58rem',
+          color: 'rgba(232, 184, 75, 0.42)',
+          letterSpacing: '0.04em',
+          fontWeight: 400,
+          marginTop: '0.35rem'
+        }}>
+          Emoji:{' '}
+          <a
+            href="https://googlefonts.github.io/noto-emoji-animation/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'inherit', textDecoration: 'underline' }}
+          >
+            Google Animated Noto Emoji
+          </a>
+          {' '}· CC BY 4.0
+        </p>
       </section>
     </main>
   )

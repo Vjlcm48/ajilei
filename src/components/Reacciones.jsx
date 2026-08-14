@@ -5,10 +5,12 @@ import {
   REACCION_PICO_PX,
   REACCION_GAP_PX,
   REACCION_MIN_W_PX,
+  textoDe,
+  rutaEmoji,
 } from '../config/reacciones'
 
 // ── DSK-U2 · Selector de reacciones y burbuja ────────────────────────────────
-// Documento rector: docs/AJILEI_Menu_Utilidades_v1.2.md §3 y §4.
+// Documento rector: docs/AJILEI_Menu_Utilidades_v1.4.md §2, §4 y §5.
 // Ambas superficies se montan como HERMANAS DEL ÁREA (vecinas del panel de
 // utilidades y de las cartas voladoras), nunca dentro de un panel de jugador:
 // .opp-panel es position:relative con z-index (1, y 7 revelado) —o sea, un
@@ -40,10 +42,19 @@ export function ReaccionesSelector({ anchor, bloqueado, onElegir }) {
           type="button"
           role="menuitem"
           className="u2-frase"
+          // La frase SELLADA COMPLETA, emoji incluido, vive en el nombre
+          // accesible. Es lo que oye un lector de pantalla y lo que lee el
+          // arnés: `textContent` ya no la contiene entera, porque el emoji
+          // dejó de ser texto (v1.4 §5.3).
+          aria-label={frase}
           disabled={bloqueado}
           onClick={() => onElegir(frase)}
         >
-          {frase}
+          {textoDe(frase)}
+          {/* Glifo de Noto, ESTÁTICO en el selector: doce bucles en una
+              rejilla 3×4 son ruido, y el peso de doce animados no se paga por
+              una superficie que se lee de un vistazo (v1.4 §4). */}
+          <img className="u2-glifo" src={rutaEmoji(frase, 'svg')} alt="" />
         </button>
       ))}
     </div>
@@ -73,12 +84,15 @@ function filosArea() {
 // la TINTA — más que el ancho del propio nombre. Un pico centrado en la caja
 // apuntaría a espacio vacío. El rect bueno es el del Range sobre el contenido.
 //
-// El emoji es PARTE de la frase (v1.2 §2), así que no puede quedarse huérfano
-// en una línea propia cuando el corredor obliga a envolver — que es justo lo
-// que hacía la frase más larga en mesa 2. Se une al último término con un
-// espacio duro EN EL RENDER: el contenido sellado no se toca, sólo se pinta sin
-// dejar que el salto lo separe.
-const sinHuerfano = (t) => t.replace(/\s+(\S+)$/u, '\u00A0$1')
+// ── DSK-U2c · el emoji tiene piso propio ─────────────────────────────────────
+// Aquí vivía `sinHuerfano`, que soldaba el emoji al último término con un
+// espacio duro para que no quedara solo al envolver. La v1.4 §1.1 lo ARCHIVA
+// con contabilidad: aquel remedio hacía del par `término + emoji` un bloque
+// INDIVISIBLE, y ese bloque fijaba el techo de tamaño del emoji en 17,03px
+// medidos en la celda más estrecha — ilegible para cualquier animación.
+// Sin soldadura no hay huérfano posible: el emoji ya no comparte renglón, y el
+// texto envuelve MEJOR que antes: el bloque indivisible más ancho de una frase
+// vuelve a ser una palabra normal.
 
 // TOPE DE ANCHO POR CORREDOR VIVO. Las cartas propias son inocluibles, así que
 // la burbuja del humano no puede pasar de la primera carta: su tope sale de
@@ -133,6 +147,12 @@ export function ReaccionBurbuja({ activa, anchorSel, onCerrar }) {
       ref={ref}
       className="u2-burbuja"
       role="status"
+      // La frase SELLADA COMPLETA, emoji incluido. El texto pintado ya no la
+      // contiene entera —el emoji dejó de ser texto—, así que aquí es donde
+      // viven el anuncio del lector de pantalla y la lectura del arnés
+      // (v1.4 §5.3). El `alt=""` de la imagen es deliberado: repetirlo la
+      // anunciaría dos veces.
+      aria-label={activa.frase}
       style={{
         // La duración vive UNA sola vez, en config/reacciones.js; el keyframe
         // sólo reparte los tramos (ver su comentario en gameTable.css).
@@ -145,7 +165,8 @@ export function ReaccionBurbuja({ activa, anchorSel, onCerrar }) {
         visibility: pos ? 'visible' : 'hidden',
       }}
     >
-      <span className="u2-texto">{sinHuerfano(activa.frase)}</span>
+      {/* Piso 1 · la frase, texto puro */}
+      <span className="u2-texto">{textoDe(activa.frase)}</span>
       <button
         type="button"
         className="u2-cerrar"
@@ -155,6 +176,20 @@ export function ReaccionBurbuja({ activa, anchorSel, onCerrar }) {
       >
         ✕
       </button>
+      {/* Piso 2 · el emoji, centrado y vivo.
+          EL INTERCAMBIO SE ESCRIBE. Un WebP/AVIF/GIF animado IGNORA
+          `prefers-reduced-motion` —medido: 9 de 10 cuadros distintos con la
+          preferencia puesta—, porque la media query es una CONSULTA y no un
+          comportamiento. Sin este <source> no habría forma de respetarla
+          (v1.4 §5.1).
+          La caja va en el CSS y es innegociable: el `top` de la burbuja se
+          calcula UNA sola vez, arriba, al montar. Un <img> sin caja mide 0
+          antes de decodificar y 512 después — +515,38px de estirón medidos
+          sobre el nombre (v1.4 §5.2). */}
+      <picture className="u2-emoji">
+        <source media="(prefers-reduced-motion: reduce)" srcSet={rutaEmoji(activa.frase, 'svg')} />
+        <img src={rutaEmoji(activa.frase, 'avif')} alt="" />
+      </picture>
     </div>
   )
 }

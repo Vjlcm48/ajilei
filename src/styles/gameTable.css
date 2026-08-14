@@ -5749,6 +5749,24 @@
     --dsk-u2-cols: 3;
     --dsk-u2-gap: 4px;
     --dsk-u2-fs: 14px;
+
+    /* ── DSK-U2c · el emoji, pieza propia (v1.4 §2 y §4) ───────────────────
+       TAMAÑO EXPLÍCITO, jamás un factor: un factor esconde de qué depende y
+       el arnés tiene que poder leer el número. Los 40px salen de la holgura
+       MEDIDA en la celda más estrecha (mesa 2 @1920×937): la fila de cartas
+       queda 106,09px por encima del borde superior de la burbuja, el segundo
+       piso cuesta ~46px con su aire y sobran 60. A lo ancho no hay discusión:
+       40 contra un tope de 130,5px, el más estrecho de las 20 celdas. */
+    --dsk-u2-emoji: 40px;
+    --dsk-u2-emoji-gap: 6px;
+    /* Factor de conversión glifo→imagen para el SELECTOR, medido por CONTEO
+       DE PÍXELES (doctrina Diseno_Landscape §10.3: la caja de un texto no es
+       su tinta, y el rect de un Range devuelve la caja de AVANCE). Al mismo
+       tamaño nominal, la tinta del SVG de Noto queda 11% por debajo de la del
+       glifo del sistema; sin corregir, el cambio de fuente se leería como un
+       encogimiento. Dispersión registrada 0,94..1,31 según emoji: un solo
+       número deja ±20% por pieza, y se acepta antes que doce excepciones. */
+    --dsk-u2-glifo: 1.11em;
     /* CAPA · un peldaño POR ENCIMA del área y por DEBAJO del menú.
        25 supera todo lo inventariado dentro del área (censo vivo: techo real
        10 = el "+N" del pozo; paneles revelados 7; sobrevuelo Z1 9) y queda por
@@ -5994,6 +6012,22 @@
   .u2-frase:not(:disabled):hover { background: rgba(var(--gold-brand-rgb), 0.10); }
   .u2-frase:disabled { opacity: 0.45; cursor: default; }
 
+  /* DSK-U2c · glifo de Noto en el selector (v1.4 §4). El tamaño nominal es el
+     de siempre (1em heredado del cuerpo de la frase), corregido por el factor
+     medido. LA FILA NO CRECE: sigue midiendo 44px de estándar táctil y la
+     tinta a 1,11em ronda los 15,5px, muy por debajo.
+     El `vertical-align` SÍ hace falta aquí, y no contradice a la v1.4 §8: lo
+     que aquélla retira es la compensación de la BURBUJA, donde el emoji tiene
+     línea propia. En el selector sigue en renglón con el texto, y una imagen
+     en línea se apoya en la base — sin corregir, quedaría colgando. */
+  .u2-glifo {
+    display: inline-block;
+    width: var(--dsk-u2-glifo);
+    height: var(--dsk-u2-glifo);
+    margin-left: 0.35em;
+    vertical-align: -0.2em;
+  }
+
   /* La entrada 💬 durante el cooldown. Clase PROPIA, no `is-disabled`: aquélla
      es la lengua de "no habilitado" (permanente, v1.0 §3) y esto es un estado
      temporal de una entrada que sí está habilitada. Atenuación más suave para
@@ -6013,9 +6047,17 @@
     position: fixed;
     z-index: var(--dsk-u2-bub-z);
     box-sizing: border-box;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    /* DSK-U2c · DOS PISOS (v1.4 §2): fila 1 = frase + ✕, fila 2 = el emoji
+       centrado. Rejilla y no `flex-wrap`, y la razón es de ANCHO: en un flex
+       que envuelve, la contribución max-content del contenedor SUMA la del
+       emoji a la de la fila del texto, así que la burbuja engordaría 40px sin
+       que nadie se lo pidiera. Con `grid-template-columns` el ancho lo sigue
+       mandando el texto y el segundo piso no opina. */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 8px;
+    row-gap: var(--dsk-u2-emoji-gap);
     padding: 7px 12px;
     background: var(--surface-modal);
     border: 1px solid rgba(var(--text-primary-rgb), 0.22);
@@ -6032,8 +6074,31 @@
      reparte las líneas en vez de dejar una colgando (degrada solo si el motor
      no lo soporta: el reparto empeora, la caja no cambia). */
   .u2-texto {
+    grid-column: 1;
+    grid-row: 1;
     min-width: 0;
     text-wrap: balance;
+  }
+
+  /* Segundo piso · el emoji. Aquí NO hay `vertical-align` que negociar: la
+     v1.4 §8 lo retira porque el emoji dejó de compartir renglón con el texto —
+     centrado en línea propia no hay línea base contra la que compensar. */
+  .u2-emoji {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+    display: block;
+    line-height: 0;
+  }
+  /* CAJA EXPLÍCITA, innegociable (v1.4 §5.2). El `top` de la burbuja se
+     calcula UNA sola vez, en el useLayoutEffect del componente: todo lo que
+     crezca DESPUÉS del montaje queda fuera de esa cuenta. Un <img> sin caja
+     mide 0 antes de decodificar y 512 después — +515,38px medidos de estirón
+     hacia abajo, justo sobre el nombre al que apunta el pico. */
+  .u2-emoji img {
+    display: block;
+    width: var(--dsk-u2-emoji);
+    height: var(--dsk-u2-emoji);
   }
 
   /* Pico de triángulo invertido, en DOS capas (filo + relleno) porque un
@@ -6082,6 +6147,11 @@
      Mata lo VISUAL y nada más: el cooldown sigue corriendo (config §
      REACCION_COOLDOWN_MS). */
   .u2-cerrar {
+    /* Sigue en el PISO 1, arriba a la derecha: el segundo piso no la mueve ni
+       le cambia el hit (v1.4 §2). `flex` queda inerte bajo la rejilla y se
+       conserva por si el contenedor volviera a ser flex algún día. */
+    grid-column: 2;
+    grid-row: 1;
     flex: 0 0 auto;
     position: relative;
     pointer-events: auto;

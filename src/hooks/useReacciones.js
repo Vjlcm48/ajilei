@@ -31,6 +31,20 @@ export function useReacciones(enabled = true) {
   const coolRef    = useRef(null)
   const seqRef     = useRef(0)
 
+  // ── DSK-U2c · veto externo (v1.4 §7) ──────────────────────────────────────
+  // La celebración manda el lenguaje de movimiento: con una viva, no se envía.
+  // El veto vive EN UN REF Y NO EN ESTADO a propósito. `useCelebracion` se
+  // declara MÁS ABAJO en GameTable y el orden de los hooks de ese archivo es
+  // portante (Victory_Celebration §3.0), así que el dato no puede llegar como
+  // argumento sin reordenarlos. Un ref propio lo resuelve sin mover nada: se
+  // escribe desde un efecto —jamás durante el render— y se lee en `enviar`,
+  // que es un manejador. Y siendo del hook, el compilador lo reconoce como ref
+  // y no lo pide en las dependencias.
+  // La cara VISIBLE del bloqueo viaja aparte, por prop, porque un ref no
+  // repinta: `bloqueado` sigue diciendo lo suyo y GameTable une los dos.
+  const vetoRef = useRef(false)
+  const vetar = useCallback((v) => { vetoRef.current = !!v }, [])
+
   // El gate de escritorio se DERIVA, no se sincroniza: fuera de él el selector
   // simplemente no está abierto y se lleva sus listeners consigo (molde U1).
   const abierto = enabled && selector !== null
@@ -53,7 +67,7 @@ export function useReacciones(enabled = true) {
   // Guarda real del candado. El selector ya deshabilita sus entradas, pero el
   // envío se protege también aquí: la UI puede fallar, la regla no.
   const enviar = useCallback((frase) => {
-    if (bloqueado) return
+    if (bloqueado || vetoRef.current) return
 
     const id = ++seqRef.current
     setSelector(null)
@@ -109,5 +123,6 @@ export function useReacciones(enabled = true) {
     cerrarSelector,
     enviar,
     cerrarBurbuja,
+    vetar,
   }
 }

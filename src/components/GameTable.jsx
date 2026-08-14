@@ -626,6 +626,24 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
     precedente: precedenteViaje,
   })
 
+  // ── DSK-U2c · la celebración aparta a las reacciones (v1.4 §7) ────────────
+  // Dos gramáticas de movimiento sobre la misma superficie y a la misma altura;
+  // si compiten no se lee ninguna. CERO MAQUINARIA NUEVA: el bloqueo se une al
+  // `bloqueado` que ya existe (por el ref para la regla, por prop para la cara
+  // visible) y la retirada reutiliza el camino de la ✕ —`cerrarBurbuja` con su
+  // guardia de id—, que mata lo visual y deja el cooldown corriendo.
+  // SIN COLA, y está razonado: una reacción encolada se dispararía cuando el
+  // momento ya pasó, y eso es peor que no decir nada. Mismo criterio que VC §6
+  // aplica al corte — no se resucita lo cortado.
+  const vcViva = !!celebracion.activa
+  const burbujaViva = reacciones.activa?.id ?? null
+  const retirarBurbuja = reacciones.cerrarBurbuja
+  const vetarReacciones = reacciones.vetar
+  useEffect(() => {
+    vetarReacciones(vcViva)
+    if (vcViva && burbujaViva !== null) retirarBurbuja(burbujaViva)
+  }, [vcViva, burbujaViva, retirarBurbuja, vetarReacciones])
+
   // DSK-VC2 · los dos nudillos secos al entrar en la pantalla de victoria de
   // mesa. Vive aparte de useCelebracion a propósito: 'partida' no es un overlay
   // efímero con techo de duración, es una pantalla terminal — no tiene ciclo de
@@ -1716,7 +1734,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
           anchor={utilMenu.anchor}
           onClose={utilMenu.close}
           onReacciones={() => reacciones.abrirSelector(utilMenu.triggerRect())}
-          reaccionesBloqueadas={reacciones.bloqueado}
+          reaccionesBloqueadas={reacciones.bloqueado || vcViva}
           consultas={consultas.saldo}
           manoDisponible={manoDisponible}
           onManoActual={pedirManoActual}
@@ -1738,7 +1756,7 @@ export default function GameTable({ stake, numPlayers = 2, onLeave }) {
       {isDesktopTable && (
         <ReaccionesSelector
           anchor={reacciones.selector}
-          bloqueado={reacciones.bloqueado}
+          bloqueado={reacciones.bloqueado || vcViva}
           onElegir={reacciones.enviar}
         />
       )}

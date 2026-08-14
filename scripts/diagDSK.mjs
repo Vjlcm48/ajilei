@@ -114,6 +114,16 @@
 //            Dos sub-pasadas: ciclo 0,3/2,4/0,3 muestreando opacidad + el reloj
 //            de turno corriendo indiferente, y pointer:coarse para el hit ≥40 de
 //            la X (embaldosado B2) sin desbordar hacia las cartas.
+//            DSK-U2c (emoji vivo, v1.4): la frase sellada se lee del NOMBRE
+//            ACCESIBLE y no del textContent —el emoji dejó de ser texto—, y las
+//            dos guardias que medían CAJAS miden ahora también TINTA, que es lo
+//            que de verdad rebosa. Tres puertas nuevas por celda (tinta dentro
+//            de la caja y a la izquierda de la ✕ · tinta dentro de la fila de
+//            44px · intercambio a SVG bajo prefers-reduced-motion, leyendo
+//            currentSrc) y tres sub-pasadas nuevas: assets 12/12 con su
+//            presupuesto de peso (global, una vez), caja del <img> estable ante
+//            recurso FRESCO (m5 1366, ensayo revertido) y jerarquía con la
+//            celebración viva (m2, alcance declarado como vc·jugado).
 //            Args: [mesa] [WxH].
 //   u3     → DSK-U3: "Mano actual" funcional (consulta por mano con contador).
 //            20 celdas (16 de campaña + centinela 1440×850) × las cuatro mesas.
@@ -4113,6 +4123,66 @@ async function u2Install(page) {
       const b = rg.getBoundingClientRect()
       return { x: rnd(b.x), w: rnd(b.width), top: rnd(b.top), left: rnd(b.left), right: rnd(b.right), centro: rnd(b.left + b.width / 2) }
     }
+    // DSK-U2c · TINTA de un elemento Y de todo lo pintable que cuelga de él.
+    // El Range cubre el TEXTO, pero desde U2c el emoji es una IMAGEN, y una
+    // imagen no es texto: `p2` y la guardia de la burbuja medían CAJAS y la
+    // caja no se entera de lo que rebosa (v1.4 §8). Se une el rect del Range
+    // con el de cada <img> descendiente — lo que de verdad se pinta.
+    window.__u2ink = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const rg = document.createRange(); rg.selectNodeContents(el)
+      const b = rg.getBoundingClientRect()
+      let L = b.left, T = b.top, Rr = b.right, Bo = b.bottom
+      el.querySelectorAll('img').forEach(i => {
+        const r = i.getBoundingClientRect()
+        if (!r.width || !r.height) return
+        L = Math.min(L, r.left); T = Math.min(T, r.top)
+        Rr = Math.max(Rr, r.right); Bo = Math.max(Bo, r.bottom)
+      })
+      return { left: rnd(L), top: rnd(T), right: rnd(Rr), bottom: rnd(Bo), w: rnd(Rr - L), h: rnd(Bo - T) }
+    }
+    // Tinta de CADA fila del selector: la rejilla tiene `height` fija de 44px,
+    // así que un glifo mayor desbordaría su botón sin mover una sola caja.
+    window.__u2inkFilas = () => {
+      const out = []
+      document.querySelectorAll('.u2-frase').forEach(el => {
+        const rg = document.createRange(); rg.selectNodeContents(el)
+        const t = rg.getBoundingClientRect()
+        const c = el.getBoundingClientRect()
+        let L = t.left, T = t.top, Rr = t.right, Bo = t.bottom
+        el.querySelectorAll('img').forEach(i => {
+          const r = i.getBoundingClientRect()
+          if (!r.width || !r.height) return
+          L = Math.min(L, r.left); T = Math.min(T, r.top)
+          Rr = Math.max(Rr, r.right); Bo = Math.max(Bo, r.bottom)
+        })
+        out.push({
+          inkH: rnd(Bo - T), inkW: rnd(Rr - L), filaH: rnd(c.height),
+          pista: rnd(el.scrollWidth - el.clientWidth),
+          rebosaFila: (Bo - T) > c.height + 0.5,
+        })
+      })
+      return out
+    }
+    // Unión de la tinta de las 12 filas — lo que el selector PINTA de verdad.
+    window.__u2inkSelector = () => {
+      const el = document.querySelector('.u2-selector')
+      if (!el) return null
+      let L = Infinity, T = Infinity, Rr = -Infinity, Bo = -Infinity
+      el.querySelectorAll('.u2-frase').forEach(f => {
+        const rg = document.createRange(); rg.selectNodeContents(f)
+        const t = rg.getBoundingClientRect()
+        L = Math.min(L, t.left); T = Math.min(T, t.top); Rr = Math.max(Rr, t.right); Bo = Math.max(Bo, t.bottom)
+        f.querySelectorAll('img').forEach(i => {
+          const r = i.getBoundingClientRect()
+          if (!r.width || !r.height) return
+          L = Math.min(L, r.left); T = Math.min(T, r.top); Rr = Math.max(Rr, r.right); Bo = Math.max(Bo, r.bottom)
+        })
+      })
+      if (!Number.isFinite(L)) return null
+      return { left: rnd(L), top: rnd(T), right: rnd(Rr), bottom: rnd(Bo), w: rnd(Rr - L), h: rnd(Bo - T) }
+    }
     // Oclusión de un rect contra la guardia, en % del propio rect.
     window.__u2tapa = (b) => {
       const out = {}
@@ -4217,7 +4287,8 @@ async function u2AbrirSelector(page) {
 }
 
 async function runU2(browser) {
-  const { REACCIONES, REACCION_TOTAL_MS, REACCION_COOLDOWN_MS, REACCION_ENTRADA_MS, REACCION_VISIBLE_MS } =
+  const { REACCIONES, REACCION_TOTAL_MS, REACCION_COOLDOWN_MS, REACCION_ENTRADA_MS, REACCION_VISIBLE_MS,
+    textoDe, rutaEmoji, EMOJI_PRESUPUESTO } =
     await import('../src/config/reacciones.js')
   const cells = []
   const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
@@ -4237,24 +4308,69 @@ async function runU2(browser) {
 
       // ── P1a · el selector ABRE desde la entrada 💬 (que cierra el menú) ────
       const abrio = await u2AbrirSelector(page)
+      // Los doce SVG se piden al ABRIR el selector, y cada celda arranca con
+      // caché fría. Igual que con el AVIF de la burbuja: se espera a que estén
+      // decodificados, acotado. El selector no tiene reloj de vida, así que la
+      // espera no le quita tiempo a nada. Sin esto la puerta medía una carrera.
+      const glifosListosMs = await page.evaluate(async () => {
+        const t0 = performance.now()
+        const listos = () => {
+          const g = [...document.querySelectorAll('.u2-frase .u2-glifo')]
+          return g.length > 0 && g.every(i => i.complete && i.naturalWidth > 0)
+        }
+        while (!listos() && performance.now() - t0 < 3000) await new Promise(r => setTimeout(r, 20))
+        return Math.round(performance.now() - t0)
+      })
       const tras = await page.evaluate(() => ({
         selector: !!document.querySelector('.u2-selector'),
         panel: !!document.querySelector('.utilities-panel'),
-        frases: [...document.querySelectorAll('.u2-frase')].map(e => e.textContent),
+        // DSK-U2c · se lee el NOMBRE ACCESIBLE, no el textContent. El emoji
+        // dejó de ser texto (es un <img>), así que textContent ya no devuelve
+        // la frase sellada entera y el `alt` no la rescata — no entra en
+        // textContent (v1.4 §5.3). Esto no relaja la puerta: sigue exigiendo
+        // la frase completa y exacta contra la fuente única.
+        frases: [...document.querySelectorAll('.u2-frase')].map(e => e.getAttribute('aria-label')),
+        // Y se comprueba que el glifo de cada fila EXISTE y CARGÓ: un
+        // aria-label correcto sobre una imagen rota pasaría desapercibido.
+        glifos: [...document.querySelectorAll('.u2-frase .u2-glifo')].map(i => ({
+          src: i.getAttribute('src'), ok: i.complete && i.naturalWidth > 0,
+        })),
       }))
       // La entrada cierra al ejecutar (v1.1 §1.3.1) → el panel NO sobrevive.
       const p1_abre = abrio && tras.selector && tras.panel === false
       // Contenido = la fuente única, en su orden.
-      const p8_lista = JSON.stringify(tras.frases) === JSON.stringify(REACCIONES)
+      const p8_lista = JSON.stringify(tras.frases) === JSON.stringify(REACCIONES) &&
+        tras.glifos.length === REACCIONES.length && tras.glifos.every(g => g.ok) &&
+        tras.glifos.every((g, i) => g.src === rutaEmoji(REACCIONES[i], 'svg'))
 
       // ── P2 · la rejilla no toca cartas ni botones del humano ──────────────
+      // DSK-U2c · se mide la CAJA **y la TINTA**. La caja del selector no
+      // crece con el glifo (las filas tienen `height` fija de 44px y las
+      // columnas son minmax(0,1fr)): con sólo mirarla, la puerta seguía verde
+      // con la rejilla rota (v1.4 §8). Lo que rebosa es la tinta.
       const selRect = await page.evaluate(() => window.__u2R('.u2-selector'))
+      const selInk = await page.evaluate(() => window.__u2inkSelector())
       const selTapa = await page.evaluate(() => window.__u2tapa(window.__u2R('.u2-selector')))
+      const selTapaInk = await page.evaluate(() => window.__u2tapa(window.__u2inkSelector()))
       const selDentro = await page.evaluate(() => {
-        const b = window.__u2R('.u2-selector')
-        return b && b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight
+        const b = window.__u2R('.u2-selector'), t = window.__u2inkSelector()
+        const dentro = r => r && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight
+        return dentro(b) && dentro(t)
       })
-      const p2 = Object.keys(selTapa).length === 0 && !!selDentro
+      const p2 = Object.keys(selTapa).length === 0 && Object.keys(selTapaInk).length === 0 && !!selDentro
+
+      // ── P13 · la tinta cabe en la fila de 44px ────────────────────────────
+      // El estándar táctil de la fila es el techo real del glifo: la rejilla no
+      // crece, así que un glifo mayor desborda su botón en silencio. La altura
+      // se lee del TOKEN VIVO, jamás cableada.
+      const filaH = await page.evaluate(() => {
+        const v = getComputedStyle(document.querySelector('.game-table-screen')).getPropertyValue('--dsk-u1-item-h')
+        return parseFloat(String(v).trim())
+      })
+      const inkFilas = await page.evaluate(() => window.__u2inkFilas())
+      const p13 = Number.isFinite(filaH) && inkFilas.length === REACCIONES.length &&
+        inkFilas.every(f => f.rebosaFila === false && f.inkH <= filaH + 0.5 && f.pista <= 0.5 &&
+          Math.abs(f.filaH - filaH) < 0.5)
 
       // ── P10a · capa del selector (censo vivo, no número declarado) ─────────
       const zSel = await page.evaluate(() => window.__u2css('.u2-selector', ['z-index', 'position']))
@@ -4279,18 +4395,43 @@ async function runU2(browser) {
       await u2Espera(page, 60)
       const p1_sel = await page.evaluate(() => !document.querySelector('.u2-selector'))
 
+      // El AVIF se pide al MONTAR la burbuja, no antes, y cada celda arranca
+      // con caché fría: hay unos milisegundos entre que la burbuja existe y que
+      // su emoji está decodificado. Se espera a que lo esté, ACOTADO y muy por
+      // debajo de los 3s de vida de la burbuja. Lo que la puerta exige es que
+      // el recurso sea el correcto y CARGUE — no que gane una carrera contra el
+      // arnés, que es lo que medía antes (rojo intermitente en el centinela).
+      const emojiListoMs = await page.evaluate(async () => {
+        const t0 = performance.now()
+        const listo = () => { const i = document.querySelector('.u2-burbuja .u2-emoji img'); return !!i && i.complete && i.naturalWidth > 0 }
+        while (!listo() && performance.now() - t0 < 1200) await new Promise(r => setTimeout(r, 20))
+        return Math.round(performance.now() - t0)
+      })
+
       // ── P8 · la frase mostrada es la elegida ──────────────────────────────
+      // DSK-U2c · la frase sellada COMPLETA vive en el `aria-label` de la
+      // burbuja, no en su texto: el emoji tiene piso propio y es una imagen
+      // (v1.4 §5.3). Se exige la frase exacta ahí, el texto del piso 1 exacto
+      // sin el emoji, y el recurso del piso 2 apuntando al codepoint que la
+      // fuente única deriva de esa misma frase — las tres cosas a la vez, para
+      // que una burbuja con la imagen equivocada no pueda pasar por buena.
       const burb = await page.evaluate(() => {
         const b = document.querySelector('.u2-burbuja')
-        return b ? { texto: b.querySelector('.u2-texto')?.textContent ?? null } : null
+        if (!b) return null
+        const im = b.querySelector('.u2-emoji img')
+        const so = b.querySelector('.u2-emoji source')
+        return {
+          aria: b.getAttribute('aria-label'),
+          texto: b.querySelector('.u2-texto')?.textContent ?? null,
+          img: im ? im.getAttribute('src') : null,
+          imgOk: im ? (im.complete && im.naturalWidth > 0) : false,
+          fuente: so ? { media: so.getAttribute('media'), srcset: so.getAttribute('srcset') } : null,
+          servido: im ? im.currentSrc : null,
+        }
       })
-      // La burbuja une el emoji al último término con un ESPACIO DURO para que
-      // no quede huérfano al envolver (v1.2 §2: el emoji es parte de la frase).
-      // La puerta normaliza ese único carácter y nada más: sigue exigiendo la
-      // frase completa, exacta y sin recortar — sólo tolera que el espacio que
-      // la separa del emoji sea duro en vez de blando.
-      const normal = s => (s == null ? s : s.replace(/\u00A0/g, ' '))
-      const p8 = p8_lista && !!burb && normal(burb.texto) === elegida
+      const p8 = p8_lista && !!burb && burb.aria === elegida &&
+        burb.texto === textoDe(elegida) &&
+        burb.img === rutaEmoji(elegida, 'avif') && burb.imgOk === true
 
       // ── P3 · anclaje por TINTA (ruta humana, viva) ────────────────────────
       const anclaje = await page.evaluate(() => {
@@ -4331,11 +4472,70 @@ async function runU2(browser) {
         if (m > d7) { d7 = round(m); d7who = U2_ANCHORS[i] }
       })
       // Guardia de contenido de la burbuja + cadena de apilamiento sana.
+      // DSK-U2c · la guardia va por CAJA **y por TINTA**. La caja está acotada
+      // por el tope de ancho del corredor, pero lo que se pinta puede salirse
+      // de ella —un término indivisible, o un emoji mayor— y la caja no se
+      // entera (v1.4 §8). Las cartas propias son inocluibles por la TINTA.
       const burbTapa = await page.evaluate(() => window.__u2tapa(window.__u2R('.u2-burbuja')))
+      const burbInk = await page.evaluate(() => window.__u2ink('.u2-burbuja'))
+      const burbTapaInk = await page.evaluate(() => window.__u2tapa(window.__u2ink('.u2-burbuja')))
       const enPanel = await page.evaluate(() => window.__u2enPanel())
       const cadena = await page.evaluate(() => window.__u2cadena('.u2-burbuja'))
       const cadenaOk = Array.isArray(cadena) && cadena.every(a => !a.transform)
-      const p7 = d7 <= 0.02 && Object.keys(burbTapa).length === 0 && enPanel === false && cadenaOk
+      const p7 = d7 <= 0.02 && Object.keys(burbTapa).length === 0 &&
+        Object.keys(burbTapaInk).length === 0 && enPanel === false && cadenaOk
+
+      // ── P12 · la tinta cabe en la caja ────────────────────────────────────
+      // Dos hechos distintos, los dos medidos: el texto del piso 1 no desborda
+      // su pista, y su tinta se queda a la IZQUIERDA de la ✕ — que es lo único
+      // vivo de la burbuja y no puede quedar debajo de una letra.
+      const tintaCaja = await page.evaluate(() => {
+        const t = document.querySelector('.u2-texto')
+        const x = document.querySelector('.u2-cerrar')
+        const b = document.querySelector('.u2-burbuja')
+        const e = document.querySelector('.u2-emoji img')
+        if (!t || !x || !b) return null
+        const rnd = v => Math.round(v * 100) / 100
+        const rg = document.createRange(); rg.selectNodeContents(t)
+        const ti = rg.getBoundingClientRect()
+        const rb = b.getBoundingClientRect(), rx = x.getBoundingClientRect()
+        const re = e ? e.getBoundingClientRect() : null
+        return {
+          pista: rnd(t.scrollWidth - t.clientWidth),
+          tintaVsX: rnd(ti.right - rx.left),
+          tintaVsBurb: rnd(ti.right - rb.right),
+          emojiVsBurb: re ? rnd(Math.max(re.right - rb.right, rb.left - re.left)) : null,
+          pisos: re ? rnd(re.top - ti.bottom) : null,
+        }
+      })
+      const p12 = !!tintaCaja && tintaCaja.pista <= 0.5 && tintaCaja.tintaVsX <= 0.5 &&
+        tintaCaja.tintaVsBurb <= 0.5 && tintaCaja.emojiVsBurb !== null && tintaCaja.emojiVsBurb <= 0.5
+
+      // ── P15 · el intercambio por prefers-reduced-motion ───────────────────
+      // El ráster animado IGNORA la preferencia (medido: 9 de 10 cuadros
+      // distintos con ella puesta), porque la media query es una consulta y no
+      // un comportamiento. Lo que se audita es que el <picture> sirva el SVG
+      // cuando la preferencia está activa, y el AVIF cuando no — leyendo
+      // `currentSrc`, o sea lo que el motor ELIGIÓ, no lo que el markup dice.
+      const rmAntes = await page.evaluate(() => {
+        const im = document.querySelector('.u2-emoji img')
+        return { mq: matchMedia('(prefers-reduced-motion: reduce)').matches, servido: im ? im.currentSrc : null }
+      })
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await u2Espera(page, 150)
+      const rmReduce = await page.evaluate(() => {
+        const im = document.querySelector('.u2-emoji img')
+        return { mq: matchMedia('(prefers-reduced-motion: reduce)').matches, servido: im ? im.currentSrc : null }
+      })
+      await page.emulateMedia({ reducedMotion: null })
+      await u2Espera(page, 150)
+      const rmVuelta = await page.evaluate(() => {
+        const im = document.querySelector('.u2-emoji img')
+        return { mq: matchMedia('(prefers-reduced-motion: reduce)').matches, servido: im ? im.currentSrc : null }
+      })
+      const p15 = rmAntes.mq === false && rmAntes.servido?.endsWith('.avif') === true &&
+        rmReduce.mq === true && rmReduce.servido?.endsWith('.svg') === true &&
+        rmVuelta.mq === false && rmVuelta.servido?.endsWith('.avif') === true
 
       // ── P10b · capa de la burbuja, contra el CENSO VIVO ───────────────────
       // No por hit-test: la burbuja es `pointer-events: none` de propósito
@@ -4395,6 +4595,10 @@ async function runU2(browser) {
         p5_candadoYCooldown: p5,
         p7_deltaCero: p7,
         p8_fraseElegida: p8,
+        // ── DSK-U2c ──────────────────────────────────────────────────────
+        p12_tintaEnCaja: p12,
+        p13_tintaEnFila: p13,
+        p15_reducedMotion: p15,
         // Selector: interactivo → se le exige ganar el hit-test, y vivir un
         // peldaño por encima del panel del menú (calc(--dsk-u1-panel-z + 1)).
         // Burbuja: overlay puro → se le exige la capa por censo (ver arriba).
@@ -4403,10 +4607,13 @@ async function runU2(browser) {
       }
       c.checks = checks
       c.detalle = {
-        selector: selRect, selTapa, zSel, selGana,
-        burbTapa, zBurb, zArea, zMenu, xGana, capaBurbuja, enPanel, cadenaOk,
+        selector: selRect, selInk, selTapa, selTapaInk, zSel, selGana,
+        burbTapa, burbInk, burbTapaInk, zBurb, zArea, zMenu, xGana, capaBurbuja, enPanel, cadenaOk,
         anclaje, rutasRival, delta: { max: d7, who: d7who }, hitX,
         cooldownMs: REACCION_COOLDOWN_MS, totalMs: REACCION_TOTAL_MS,
+        // DSK-U2c
+        burbuja: burb, tintaCaja, filaH, inkFilas, emojiListoMs, glifosListosMs,
+        rm: { antes: rmAntes, reduce: rmReduce, vuelta: rmVuelta },
       }
       c.passed = Object.values(checks).every(Boolean)
     } catch (e) {
@@ -4489,8 +4696,18 @@ async function runU2(browser) {
       // Las entradas del selector también deben cumplir el estándar de 44.
       const hitFrase = await page.evaluate(() => { const e = document.querySelector('.u2-frase'); return e ? window.__hitBox(e) : null })
       await page.click('.u2-frase:nth-child(1)')
-      await u2Espera(page, 120)
+      // SE ESPERA A QUE TERMINE LA ENTRADA, y no un puñado de ms arbitrario.
+      // El keyframe entra con `scale(0.94 → 1)`, así que a mitad de camino la
+      // burbuja ENTERA está encogida y la ✕ mide 17,54px en vez de 18: su
+      // embaldosado daba 39 y la puerta reprobaba una geometría correcta.
+      // El estándar táctil se le exige al estado en REPOSO, que es donde el
+      // dedo lo encuentra. El margen sale de la constante, jamás cableado.
+      await u2Espera(page, REACCION_ENTRADA_MS + 60)
       const hitX = await page.evaluate(() => { const e = document.querySelector('.u2-cerrar'); return e ? window.__hitBox(e) : null })
+      const escalaEnReposo = await page.evaluate(() => {
+        const b = document.querySelector('.u2-burbuja')
+        return b ? getComputedStyle(b).transform : null
+      })
       // El hit de la X no puede desbordar hacia la DERECHA sobre las cartas.
       const invade = await page.evaluate(() => {
         const e = document.querySelector('.u2-cerrar')
@@ -4499,18 +4716,238 @@ async function runU2(browser) {
         const r0 = e.getBoundingClientRect(), c = s1.getBoundingClientRect()
         return Math.round((r0.right + 0 - c.left) * 100) / 100   // <0 = no llega
       })
-      r.hitFrase = hitFrase; r.hitX = hitX; r.margenCartas = invade
-      r.p6 = !!hitX && hitX.w >= 40 && hitX.h >= 40 && !!hitFrase && hitFrase.h >= 44 && invade != null && invade < 0
+      r.hitFrase = hitFrase; r.hitX = hitX; r.margenCartas = invade; r.escalaEnReposo = escalaEnReposo
+      // `none` o la identidad: si la burbuja siguiera escalada, el hit medido
+      // no sería el que encuentra el dedo y la puerta no significaría nada.
+      const enReposo = escalaEnReposo === 'none' || escalaEnReposo === 'matrix(1, 0, 0, 1, 0, 0)'
+      r.p6 = !!hitX && hitX.w >= 40 && hitX.h >= 40 && !!hitFrase && hitFrase.h >= 44 &&
+        invade != null && invade < 0 && enReposo
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
     r.ok = !!r.p6
     tactil.push(r)
-    console.log(`u2·táctil m${n} · ${r.ok ? 'OK' : 'FALLA'} X=${r.hitX ? r.hitX.w + 'x' + r.hitX.h : '—'} frase.h=${r.hitFrase ? r.hitFrase.h : '—'} margenCartas=${r.margenCartas}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`u2·táctil m${n} · ${r.ok ? 'OK' : 'FALLA'} X=${r.hitX ? r.hitX.w + 'x' + r.hitX.h : '—'} frase.h=${r.hitFrase ? r.hitFrase.h : '—'} margenCartas=${r.margenCartas} reposo=${r.escalaEnReposo}${r.error ? ' · ' + r.error : ''}`)
     await ctx.close()
   }
 
-  const passed = cells.every(c => c.passed) && ciclo.every(r => r.ok) && tactil.every(r => r.ok)
-  console.log(`\n── U2: ${cells.filter(c => c.passed).length}/${cells.length} celdas · ciclo ${ciclo.filter(r => r.ok).length}/${ciclo.length} · táctil ${tactil.filter(r => r.ok).length}/${tactil.length} · ${passed ? 'VERDE' : 'ROJO'}`)
-  return { cells, ciclo, tactil, passed }
+  // ── P11 + P16 · assets · sub-pasada GLOBAL (una sola vez, no por celda) ───
+  // Los recursos no dependen de la mesa ni del viewport, así que medirlos 20
+  // veces sólo gastaría reloj. Se piden POR LA RUTA QUE USA LA APP —al mismo
+  // servidor, no al disco— porque lo que importa es que se SIRVAN: un archivo
+  // presente en `public/` pero mal enrutado rompe la burbuja igual que uno
+  // ausente. Y las claves salen de la fuente única, jamás de una lista aquí.
+  // El presupuesto NO se cablea aquí: sale de la fuente única, igual que las
+  // frases. Una cifra repetida en dos sitios es una cifra que dirá dos cosas.
+  const assets = { svg: [], avif: [], presupuesto: EMOJI_PRESUPUESTO }
+  {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    try {
+      await page.goto(BASE)
+      const urls = REACCIONES.map(f => ({ svg: rutaEmoji(f, 'svg'), avif: rutaEmoji(f, 'avif') }))
+      const res = await page.evaluate(async (urls) => {
+        const out = []
+        for (const u of urls) {
+          const fila = {}
+          for (const ext of ['svg', 'avif']) {
+            try {
+              const r = await fetch(u[ext], { cache: 'no-store' })
+              fila[ext] = r.ok ? (await r.blob()).size : `HTTP ${r.status}`
+            } catch (e) { fila[ext] = String(e).slice(0, 40) }
+          }
+          out.push(fila)
+        }
+        return out
+      }, urls)
+      res.forEach((r, i) => { assets.svg.push({ ruta: urls[i].svg, size: r.svg }); assets.avif.push({ ruta: urls[i].avif, size: r.avif }) })
+    } catch (e) { assets.error = String(e && e.message || e).slice(0, 200) }
+    await page.close()
+  }
+  const suma = a => a.reduce((x, y) => x + (typeof y.size === 'number' ? y.size : 0), 0)
+  assets.total = { svg: suma(assets.svg), avif: suma(assets.avif) }
+  // REGLA DURA de v1.4 §3: 12/12 en AMBOS formatos, o no hay tanda. Un set
+  // mixto animado/estático se ve peor que todo estático.
+  const p11 = assets.svg.length === REACCIONES.length && assets.avif.length === REACCIONES.length &&
+    assets.svg.every(x => typeof x.size === 'number' && x.size > 0) &&
+    assets.avif.every(x => typeof x.size === 'number' && x.size > 0)
+  const p16 = assets.total.svg <= assets.presupuesto.svg && assets.total.avif <= assets.presupuesto.avif
+  assets.p11_doceDeDoce = p11
+  assets.p16_presupuesto = p16
+  assets.ok = p11 && p16
+  console.log(`u2·assets · ${assets.ok ? 'OK' : 'FALLA'} · svg ${assets.svg.filter(x => typeof x.size === 'number').length}/${REACCIONES.length} ${assets.total.svg}B/${assets.presupuesto.svg}B · avif ${assets.avif.filter(x => typeof x.size === 'number').length}/${REACCIONES.length} ${assets.total.avif}B/${assets.presupuesto.avif}B`)
+
+  // ── P14 · la caja del <img> no se mueve ante un recurso FRESCO ────────────
+  // ALCANCE DECLARADO: una celda (mesa 5 @1366×768). El ensayo exige MUTAR el
+  // `src` para forzar una descarga de verdad, y eso no se hace veinte veces
+  // sobre la página viva. Lo que se prueba es de CSS, no de mesa: que la caja
+  // esté declarada y por tanto sea la misma antes y después de decodificar.
+  // Sin ella son +515,38px de estirón medidos, y la burbuja se coloca UNA sola
+  // vez al montar, así que ese estirón cae sobre el nombre (v1.4 §5.2).
+  const cajaImg = { alcance: 'm5 1366x768' }
+  {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    try {
+      await gotoMesa(page, 5)
+      await u2Install(page)
+      await u2AbrirSelector(page)
+      await page.click('.u2-frase:nth-child(8)')
+      await page.waitForSelector('.u2-burbuja', { timeout: 2000 })
+      await u2Espera(page, 400)
+      const r = await page.evaluate(async () => {
+        const rnd = v => Math.round(v * 100) / 100
+        const b = document.querySelector('.u2-burbuja')
+        const im = b.querySelector('.u2-emoji img')
+        const cs = getComputedStyle(im)
+        const antes = rnd(b.getBoundingClientRect().height)
+        const original = im.getAttribute('src')
+        // Recurso fresco de verdad: query nueva + cache:no-store en el mismo
+        // sitio. `complete` vuelve a false y `naturalWidth` a 0 hasta que baje.
+        im.src = `${original}?fresco=${performance.now()}`
+        const preCarga = rnd(b.getBoundingClientRect().height)
+        const preNat = [im.naturalWidth, im.naturalHeight]
+        await new Promise(res => { im.onload = res; im.onerror = res })
+        const postCarga = rnd(b.getBoundingClientRect().height)
+        im.src = original
+        return {
+          antes, preCarga, postCarga, preNat,
+          cssW: cs.width, cssH: cs.height,
+          dPre: rnd(preCarga - antes), dPost: rnd(postCarga - preCarga),
+        }
+      })
+      Object.assign(cajaImg, r)
+      cajaImg.ok = Math.abs(r.dPre) <= 0.02 && Math.abs(r.dPost) <= 0.02 &&
+        /^\d/.test(r.cssW) && /^\d/.test(r.cssH)
+    } catch (e) { cajaImg.error = String(e && e.message || e).slice(0, 200); cajaImg.ok = false }
+    await page.close()
+  }
+  console.log(`u2·caja img · ${cajaImg.ok ? 'OK' : 'FALLA'} css=${cajaImg.cssW}×${cajaImg.cssH} alto ${cajaImg.antes}→${cajaImg.preCarga}→${cajaImg.postCarga} (Δ ${cajaImg.dPre}/${cajaImg.dPost}) natural-pre=${JSON.stringify(cajaImg.preNat)}${cajaImg.error ? ' · ' + cajaImg.error : ''}`)
+
+  // ── P17 · la celebración manda el lenguaje de movimiento (v1.4 §7) ────────
+  // ALCANCE DECLARADO: mesa 2, igual que `vc·jugado` y por la misma razón — con
+  // cuatro rivales, un muestreador que siempre pasa llega a la bancarrota antes
+  // que a una victoria. Lo que se verifica es el CABLEADO, que es el mismo hook
+  // y el mismo componente en las cuatro mesas.
+  //
+  // LA PARADOJA DE ESTA PUERTA, y cómo se resuelve. Cualquier toque durante la
+  // celebración LA CORTA (VC §6, y es su diseño), así que abrir el menú para
+  // mirar la entrada 💬 la mata antes de poder leerla: la primera versión de
+  // esta puerta se medía a sí misma y daba rojo con la implementación correcta.
+  // La única superficie observable con una celebración VIVA es la que ya estaba
+  // abierta cuando nació. Así que se juega a mano —sin `vcHastaVictoria`— para
+  // poder DEJAR EL SELECTOR ABIERTO cruzando la resolución de la mano, y se
+  // observa sin tocar nada.
+  const jerarquia = { alcance: 'm2 1366x768' }
+  {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    try {
+      await gotoMesa(page, 2)
+      await u2Install(page)
+      const estado = () => page.evaluate(() => {
+        const m = document.querySelector('.game-message')
+        const f = document.querySelector('.u2-frase')
+        return {
+          fin: m ? (m.classList.contains('msg-win') ? 'win' : m.classList.contains('msg-lose') ? 'lose' : null) : null,
+          selector: !!document.querySelector('.u2-selector'),
+          fraseOff: f ? f.disabled : null,
+          vcCapa: !!document.querySelector('.vc-capa'),
+          burbuja: !!document.querySelector('.u2-burbuja'),
+        }
+      })
+      // Las acciones del humano se ejecutan CON EL TECLADO, no con el ratón.
+      // Es la pieza que hace observable esta puerta: un `pointerdown` corta la
+      // celebración (VC §6) Y cierra el selector (v1.2 §3.1), así que jugando a
+      // clics es imposible llegar a la resolución con la superficie abierta —
+      // la versión anterior perdía la carrera en 4 de 4 victorias. `focus()` no
+      // despacha eventos de puntero y `Enter` sobre un <button> dispara su
+      // click: la mano avanza sin tocar nada.
+      const teclear = async (sels) => {
+        for (const sel of sels) {
+          const l = page.locator(sel).first()
+          if (await l.count() && await l.isVisible().catch(() => false) && await l.isEnabled().catch(() => false)) {
+            await l.focus()
+            await page.keyboard.press('Enter')
+            return true
+          }
+        }
+        return false
+      }
+      const ACCIONES = [
+        '.action-buttons button:has-text("Pasar")',
+        '.action-buttons button:has-text("Igualar")',
+        '.action-buttons button:has-text("Apostar")',
+        'button:has-text("Sin descartar")',
+      ]
+      let manos = 0, veredicto = null
+      const intentos = []
+      for (let mano = 1; mano <= 18 && !veredicto; mano++) {
+        manos = mano
+        await teclear(['button:has-text("Iniciar mano")'])
+        // El selector se abre AL PRINCIPIO de la mano —cuando no hay ninguna
+        // celebración que cortar— y se queda abierto toda la mano.
+        if (!await page.evaluate(() => !!document.querySelector('.u2-selector'))) {
+          await u2AbrirSelector(page)
+        }
+        for (let i = 0; i < 160 && !veredicto; i++) {
+          const s = await estado()
+          if (s.fin === 'win' && s.selector) {
+            // (a) Con la celebración VIVA, las entradas del selector están
+            //     inertes. Se muestrea SIN TOCAR hasta ver el veto: `activa` se
+            //     pone en la transición de fase, o sea antes de que la capa
+            //     dibuje, y por eso `vioCapa` puede quedar en false sin que eso
+            //     reste — el veto entra en el PRIMER tiempo.
+            //     EL `disabled` OBSERVADO SÓLO PUEDE VENIR DEL VETO: esta
+            //     sub-pasada no envía ninguna reacción, así que no hay burbuja
+            //     viva ni cooldown corriendo y la unión `bloqueado` del hook es
+            //     false. Si no, la puerta se estaría midiendo a sí misma.
+            const muestras = []
+            let vetado = false
+            for (let q = 0; q < 30 && !vetado; q++) {
+              const s2 = await estado()
+              muestras.push(s2)
+              if (s2.fraseOff === true) vetado = true
+              else await u2Espera(page, 100)
+            }
+            const mensaje = await page.evaluate(() => document.querySelector('.game-message')?.textContent ?? null)
+            intentos.push({ mano, vetado, vioCapa: muestras.some(m => m.vcCapa), selectorVivo: muestras.every(m => m.selector), mensaje })
+            if (vetado) {
+              // (b) Al morir la celebración se desbloquea SOLO: nada que
+              //     sincronizar. Se espera sin tocar a que se levante.
+              let libre = false
+              for (let q = 0; q < 80 && !libre; q++) {
+                const s3 = await estado()
+                if (s3.vcCapa === false && s3.fraseOff === false) libre = true
+                else await u2Espera(page, 150)
+              }
+              veredicto = {
+                vetado: true, libre,
+                vioCapa: muestras.some(m => m.vcCapa),
+                selectorSobrevive: muestras.every(m => m.selector),
+              }
+            }
+            break
+          }
+          if (s.fin) break
+          if (!await teclear(ACCIONES)) await u2Espera(page, 250)
+        }
+        if (veredicto) break
+        // NO TODA VICTORIA CELEBRA (la de mesa exige fase de pago y asiento 0,
+        // Victory_Celebration §2), y una mano perdida no dice nada: se sigue
+        // jugando. Lo que sería rojo es una celebración viva SIN veto.
+        if (!await teclear(['button:has-text("Siguiente mano")'])) break
+        await u2Espera(page, 450)
+      }
+      jerarquia.manos = manos
+      jerarquia.intentos = intentos
+      if (!veredicto) throw new Error(`sin celebración observable con el selector abierto en ${manos} manos (intentos: ${intentos.length})`)
+      Object.assign(jerarquia, veredicto)
+      jerarquia.ok = veredicto.vetado === true && veredicto.libre === true && veredicto.selectorSobrevive === true
+    } catch (e) { jerarquia.error = String(e && e.message || e).slice(0, 200); jerarquia.ok = false }
+    await page.close()
+  }
+  console.log(`u2·jerarquía VC · ${jerarquia.ok ? 'OK' : 'FALLA'} manos=${jerarquia.manos} intentos=${(jerarquia.intentos ?? []).length} vetadoConVCViva=${jerarquia.vetado} vioCapa=${jerarquia.vioCapa} selectorSobrevive=${jerarquia.selectorSobrevive} sueltaAlMorir=${jerarquia.libre}${jerarquia.error ? ' · ' + jerarquia.error : ''}`)
+
+  const passed = cells.every(c => c.passed) && ciclo.every(r => r.ok) && tactil.every(r => r.ok) &&
+    assets.ok && cajaImg.ok && jerarquia.ok
+  console.log(`\n── U2: ${cells.filter(c => c.passed).length}/${cells.length} celdas · ciclo ${ciclo.filter(r => r.ok).length}/${ciclo.length} · táctil ${tactil.filter(r => r.ok).length}/${tactil.length} · assets ${assets.ok ? 'ok' : 'FALLA'} · caja img ${cajaImg.ok ? 'ok' : 'FALLA'} · jerarquía ${jerarquia.ok ? 'ok' : 'FALLA'} · ${passed ? 'VERDE' : 'ROJO'}`)
+  return { cells, ciclo, tactil, assets, cajaImg, jerarquia, passed }
 }
 
 // ── DSK-U3 · "Mano actual" funcional ─────────────────────────────────────────
