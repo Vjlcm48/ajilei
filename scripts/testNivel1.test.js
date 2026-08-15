@@ -657,8 +657,13 @@ describe('8. D-5 · aislamiento de información en Avanzado', () => {
     return marca
   }
 
+  // Este bloque vigila AVANZADO, que no toca `state.deck` ni para su longitud.
+  // Pro salió de aquí en NIV-2 y no por rebajarle el listón: su frontera es más
+  // fina —puede leer `.length` y jamás el contenido— y necesita una trampa que
+  // distinga las dos cosas, que es la de `scripts/testNivel2.test.js` §8. Allí
+  // se le exige MÁS que aquí: los dos lados de la frontera, no sólo uno.
   for (const numPlayers of [2, 3, 4, 5]) {
-    for (const nivel of ['avanzado', 'pro']) {
+    for (const nivel of ['avanzado']) {
       it(`N=${numPlayers} · ${nivel}: ninguna rama lee cartas ajenas ni el mazo`, () => {
         const fases = [
           { phase: 'BET_1', currentBet: 0,   cards: M2.alta,    pot: 200 },

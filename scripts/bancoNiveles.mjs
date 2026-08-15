@@ -63,7 +63,7 @@ const {
   PHASES, createInitialState, startHand, advanceFromDeal,
   applyPlayerBetAction, applyAIBetAction, applyDiscard,
 } = await import('../src/engine/gameEngine.js')
-const { decideBetAction, decideDiscard, getPersonalityName, initPersonalities, _resetForTesting } =
+const { decideBetAction, decideDiscard, getPersonalityName, initPersonalities, _resetForTesting, _DIAG_PRO } =
   await import('../src/engine/aiPlayer.js')
 
 const RAIZ     = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -94,13 +94,20 @@ const J0_NIVEL    = arg('j0-nivel', NIVEL)
 // asiento 0 a ese nivel. Así una sola corrida produce a la vez el espejo
 // simétrico (que valida el banco) y el duelo entre niveles (puertas 2 y 3),
 // contra la misma baraja y en el mismo archivo de evidencia.
-const DUELO       = arg('duelo')
+// Acepta LISTA separada por comas (`--duelo avanzado,basico`): NIV-2 necesita
+// los dos peldaños de la escalera contra la MISMA mesa Pro y en la misma corrida.
+const DUELO       = (arg('duelo') ?? '').split(',').map(s => s.trim()).filter(Boolean)
 // Nivel VIGENTE del cerebro del asiento 0. Lo fija `correrCelda` al empezar cada
 // celda: es la única pieza mutable del banco y no cruza celdas.
 let J0_ACTUAL = J0_NIVEL
 const ESCRIBE_BASE = flag('base')
 const ARCHIVO_EVID = arg('evid', 'nivB0_base.json')
 const TANDA        = arg('tanda', 'NIV-B0')
+// NIV-2 §7 · archivo de REFERENCIA con la cifra de Básico contra mesa Avanzada
+// en la métrica de fichas. No existe en ninguna vara —la métrica nace en esta
+// tanda—, así que se mide aparte, en cuatro celdas de referencia, y se lee aquí.
+// No es re-lanzar la matriz de Avanzado (§8): es medir una magnitud nueva.
+const ARCHIVO_REF  = arg('ref', 'niv2_ref_avanzado.json')
 // El volcado lleva el nombre de su tanda: dos tandas distintas no se pisan el
 // archivo. `capturas-dsk/` está ignorada y es regenerable; lo que se rastrea es
 // el resumen de `evidencia/`.
@@ -224,7 +231,13 @@ function descarte(modo, s) {
 }
 
 // ── Bucle de mano — mismo encadenado que simHand, API pública ────────────────
-function jugarRonda(s, fase, modo) {
+// `cond` (opcional) acumula la CONDUCTA observada desde fuera: retiros y subidas
+// por asiento. No mira dentro de `aiPlayer` —compara el estado antes y después
+// de cada acción—, así que sirve igual para los tres conductores y para los tres
+// niveles. Es el insumo que NIV-2 §7 pide para explicar POR QUÉ un nivel gana
+// más manos: en este juego casi todo se decide en el showdown, luego quien menos
+// se retira (con razón) es quien más manos gana.
+function jugarRonda(s, fase, modo, cond) {
   let n = 0
   while (s.phase === fase) {
     if (++n > 5000) throw new Error(`ronda ${fase} sin converger`)
@@ -236,22 +249,28 @@ function jugarRonda(s, fase, modo) {
       s = asiento === 0 ? applyPlayerBetAction(s, 'pasar') : applyAIBetAction(s)
       continue
     }
+    const apuestaAntes = s.currentBet
     s = asiento === 0
       ? applyPlayerBetAction(s, APUESTA[modo](s), s.unit)
       : applyAIBetAction(s)
+    if (cond) {
+      cond.acciones[asiento]++
+      if (s.players[asiento].folded) cond.retiros[asiento]++
+      else if (s.currentBet > apuestaAntes) cond.subidas[asiento]++
+    }
   }
   return s
 }
 
-function jugarMano(s, modo) {
+function jugarMano(s, modo, cond) {
   s = advanceFromDeal(s)                            // DEAL_2 → BET_1
-  s = jugarRonda(s, PHASES.BET_1, modo)
+  s = jugarRonda(s, PHASES.BET_1, modo, cond)
   if (s.phase === PHASES.PAYOUT) return s
   s = advanceFromDeal(s)                            // DEAL_3 → BET_2
-  s = jugarRonda(s, PHASES.BET_2, modo)
+  s = jugarRonda(s, PHASES.BET_2, modo, cond)
   if (s.phase === PHASES.PAYOUT) return s
   s = applyDiscard(s, s.players[0].folded ? [] : descarte(modo, s))
-  return jugarRonda(s, PHASES.BET_3, modo)          // → SHOWDOWN → PAYOUT
+  return jugarRonda(s, PHASES.BET_3, modo, cond)    // → SHOWDOWN → PAYOUT
 }
 
 // ── Una celda de la matriz ───────────────────────────────────────────────────
@@ -276,7 +295,8 @@ function jugarMano(s, modo) {
 // del rector §6 —los puntos de una mano salen de los sentados al barajado del
 // Pie, no del tamaño nominal de la mesa—, y sale gratis en la misma corrida.
 function correrCelda(N, modo, j0nivel = J0_NIVEL) {
-  _resetForTesting()   // reparto de perfiles fresco por celda: aislamiento
+  _resetForTesting()   // reparto de perfiles fresco por celda: aislamiento (borra
+                       // también los contadores de Pro: cada celda cuenta lo suyo)
   J0_ACTUAL = j0nivel
 
   const acc = {
@@ -284,6 +304,13 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
     manosLlenas: 0,    // contadas (mesa completa) ← denominador primario
     partidas: 0, partidasCompletas: 0, sorteos: 0,
     ganadasPorAsiento: new Array(N).fill(0),   // sólo manos de mesa llena
+    // ── FICHAS NETAS · la métrica de fuerza (NIV-2) ─────────────────────────
+    // Suma del saldo de fichas de cada asiento sobre las manos CONTADAS. Ver el
+    // bloque de doctrina en `evaluarPuertas`: manos-ganadas y partidas-ganadas
+    // premian los dos extremos opuestos del eje pagar/retirar, y ninguna de las
+    // dos mide fuerza. Las fichas sí: el ante es forzado (`gameEngine.js:409`),
+    // así que retirarse cuesta y pagar de más también.
+    fichasPorAsiento:  new Array(N).fill(0),
     manoPorAsiento:    new Array(N).fill(0),
     piePorAsiento:     new Array(N).fill(0),
     partidasGanadasPorAsiento: new Array(N).fill(0),
@@ -297,6 +324,16 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
     rol: { mano: { j: 0, g: 0 }, pie: { j: 0, g: 0 }, medio: { j: 0, g: 0 } },
     manosPorPartida: [],
     fallas: { conservacion: 0, pasajero: 0, faseInesperada: 0, capPartida: 0 },
+    // Conducta observada desde fuera (NIV-2 §7, diagnóstico).
+    conducta: {
+      acciones: new Array(N).fill(0),
+      retiros:  new Array(N).fill(0),
+      subidas:  new Array(N).fill(0),
+    },
+    // Diagnóstico de Pro. `porAbandono` cuenta las manos que se cobraron sin
+    // showdown; `farolCobra` las que además las ganó un asiento que había
+    // faroleado en esa mano — el dato que la calibración necesitará.
+    pro: { porAbandono: 0, farolCobra: 0, farolAlShowdown: 0 },
   }
 
   const t0 = Date.now()
@@ -313,7 +350,7 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
 
     // `perfil01` sella qué temperamento compartieron los asientos 0 y 1 en esta
     // partida: es lo que permite abrir el duelo por perfil sin re-simular.
-    const racimo = { n: 0, g: new Array(N).fill(0), perfil01: null }
+    const racimo = { n: 0, g: new Array(N).fill(0), f: new Array(N).fill(0), perfil01: null }
     acc.racimos.push(racimo)
 
     if (SORTEO === 'partida') { initPersonalities(N); acc.sorteos++ }
@@ -323,6 +360,11 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
     racimo.perfil01 = perfilDe[0]
 
     for (;;) {
+      // El corte se toma ANTES de `startHand` a propósito: ahí es donde el motor
+      // cobra el ante (`gameEngine.js:409`), y el ante es justamente lo que hace
+      // que retirarse cueste. Medido después, cada asiento salía con un +1u
+      // fantasma por mano y la métrica dejaba de sumar cero.
+      const fichasAntes = s.players.map(p => p.chips)
       s = startHand(s)
       if (s.phase === PHASES.GAME_OVER) {
         acc.partidasCompletas++
@@ -335,8 +377,19 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
       const nVivos = vivos.reduce((a, v) => a + (v ? 1 : 0), 0)
       const llena  = nVivos === N
 
-      s = jugarMano(s, modo)
+      // El sello de faroles es POR MANO: se borra antes de jugarla y se lee
+      // después, así que ningún farol de la mano anterior se cuela.
+      for (const k of Object.keys(_DIAG_PRO.farolPorAsiento)) delete _DIAG_PRO.farolPorAsiento[k]
+
+      s = jugarMano(s, modo, acc.conducta)
       acc.manos++; manosPartida++
+
+      const enPie = s.players.filter(p => !p.folded).length
+      if (enPie === 1) acc.pro.porAbandono++
+      if (s.winner !== null && s.winner >= 0 && _DIAG_PRO.farolPorAsiento[s.winner] === true) {
+        if (enPie === 1) acc.pro.farolCobra++
+        else acc.pro.farolAlShowdown++
+      }
 
       // PUERTA (a) · conservación de fichas en el 100% de las manos —todas las
       // simuladas, no sólo las contadas. Reimplementación del invariante de
@@ -357,6 +410,11 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
       if (llena) {
         acc.manosLlenas++
         racimo.n++
+        for (let i = 0; i < N; i++) {
+          const d = s.players[i].chips - fichasAntes[i]
+          acc.fichasPorAsiento[i] += d
+          racimo.f[i] += d
+        }
         acc.manoPorAsiento[manoDe]++
         acc.piePorAsiento[pieDe]++
         if (g !== null && g >= 0) { acc.ganadasPorAsiento[g]++; racimo.g[g]++ }
@@ -420,22 +478,40 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
   // diferencia (no sumando dos σ independientes: las dos tasas salen de las
   // MISMAS manos y están negativamente correlacionadas, así que sumarlas
   // inflaría la barra y regalaría verdes).
-  const seDifPorRacimo = (racimos) => {
+  // `campo` selecciona la magnitud pareada: 'g' = manos ganadas, 'f' = fichas
+  // netas. La aritmética es la misma; lo que cambia es qué se está midiendo.
+  const seDifPorRacimo = (racimos, campo = 'g') => {
     const rac = racimos.filter(r => r.n > 0)
     const P = rac.length
     if (P < 2) return null
     const total = rac.reduce((a, r) => a + r.n, 0)
     if (total === 0) return null
-    const d = rac.reduce((a, r) => a + r.g[0] - r.g[1], 0) / total
-    const s2 = rac.reduce((a, r) => a + ((r.g[0] - r.g[1]) - d * r.n) ** 2, 0)
+    const d = rac.reduce((a, r) => a + r[campo][0] - r[campo][1], 0) / total
+    const s2 = rac.reduce((a, r) => a + ((r[campo][0] - r[campo][1]) - d * r.n) ** 2, 0)
     return { delta: d, se: Math.sqrt((P / (P - 1)) * s2) / total, manos: total, partidas: P }
   }
-  const duelo = { global: seDifPorRacimo(acc.racimos), porPerfil: {} }
-  for (const perfil of new Set(acc.racimos.map(r => r.perfil01).filter(Boolean))) {
-    duelo.porPerfil[perfil] = seDifPorRacimo(acc.racimos.filter(r => r.perfil01 === perfil))
+  const perfilesVistos = [...new Set(acc.racimos.map(r => r.perfil01).filter(Boolean))]
+  const duelo       = { global: seDifPorRacimo(acc.racimos, 'g'), porPerfil: {} }
+  const dueloFichas = { global: seDifPorRacimo(acc.racimos, 'f'), porPerfil: {} }
+  for (const perfil of perfilesVistos) {
+    const suyos = acc.racimos.filter(r => r.perfil01 === perfil)
+    duelo.porPerfil[perfil]       = seDifPorRacimo(suyos, 'g')
+    dueloFichas.porPerfil[perfil] = seDifPorRacimo(suyos, 'f')
   }
-  for (const d of [duelo.global, ...Object.values(duelo.porPerfil)]) {
+  for (const d of [duelo.global, ...Object.values(duelo.porPerfil),
+                   dueloFichas.global, ...Object.values(dueloFichas.porPerfil)]) {
     if (d) d.sigmas = d.se > 0 ? d.delta / d.se : 0
+  }
+
+  // Fichas netas por mano de cada asiento, con la misma barra por racimos.
+  const fichasCluster = (asiento) => {
+    const rac = acc.racimos.filter(r => r.n > 0)
+    const P = rac.length
+    if (P < 2) return null
+    const total = rac.reduce((a, r) => a + r.n, 0)
+    const media = rac.reduce((a, r) => a + r.f[asiento], 0) / total
+    const s2 = rac.reduce((a, r) => a + (r.f[asiento] - media * r.n) ** 2, 0)
+    return { porMano: media, se: Math.sqrt((P / (P - 1)) * s2) / total }
   }
   const tabla = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => {
     const p = tasa(v.g, v.j)
@@ -448,6 +524,10 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
     unit: UNIT, nivel: NIVEL, nivelAsiento0: j0nivel,
     sorteo: SORTEO, sorteosDePerfiles: acc.sorteos,
     duelo: modo === 'espejo' ? duelo : null,
+    dueloFichas: modo === 'espejo' ? dueloFichas : null,
+    fichas: acc.fichasPorAsiento.map((total, i) => ({
+      asiento: i, total, ...(fichasCluster(i) ?? { porMano: 0, se: null }),
+    })),
     tasaAsiento0: p0,
     seAsiento0: se(p0, acc.manosLlenas),          // binomial (optimista)
     seClusterAsiento0: seCl0,                     // por partida (el que manda)
@@ -474,6 +554,32 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
     },
     capacidad: { ms, manosPorMinuto: Math.round((acc.manos / ms) * 60000) },
     fallas: acc.fallas,
+    // ── Diagnóstico de conducta (NIV-2 §7) — se reporta, no es puerta ────────
+    conducta: acc.conducta.acciones.map((n, i) => ({
+      asiento: i, acciones: n,
+      tasaRetiro: n > 0 ? acc.conducta.retiros[i] / n : 0,
+      tasaSubida: n > 0 ? acc.conducta.subidas[i] / n : 0,
+    })),
+    diagPro: {
+      // Frecuencias efectivas de las ramas de Pro, leídas del contador del
+      // módulo. Cuenta TODAS las decisiones de asientos con cerebro Pro de esta
+      // celda — mesa y, bajo espejo, también el asiento 0 si su nivel es Pro.
+      decisiones: _DIAG_PRO.decisiones,
+      conLectura: _DIAG_PRO.conLectura,
+      tasaLectura: _DIAG_PRO.decisiones > 0 ? _DIAG_PRO.conLectura / _DIAG_PRO.decisiones : 0,
+      farolRespaldado: _DIAG_PRO.farolRespaldado,
+      faroles: _DIAG_PRO.faroles,
+      farolAbre: _DIAG_PRO.farolAbre,
+      farolSube: _DIAG_PRO.farolSube,
+      farolesPorMano: acc.manos > 0 ? _DIAG_PRO.faroles / acc.manos : 0,
+      farolCobraSinShowdown: acc.pro.farolCobra,
+      farolLlegaAShowdown: acc.pro.farolAlShowdown,
+      ajileis: _DIAG_PRO.ajileis,
+      disimulos: _DIAG_PRO.disimulos,
+      tasaDisimulo: _DIAG_PRO.ajileis > 0 ? _DIAG_PRO.disimulos / _DIAG_PRO.ajileis : 0,
+      manosPorAbandono: acc.pro.porAbandono,
+      tasaAbandono: acc.manos > 0 ? acc.pro.porAbandono / acc.manos : 0,
+    },
   }
 }
 
@@ -550,12 +656,36 @@ function aplicarUmbralFamiliaB3(detalles) {
     d.b3_pasa         = pares.every(p => p.sigmas <= umbral)
   }
 
-  // b2 también es una familia (una prueba por mesa), pero su margen es tan
-  // amplio que ninguna corrección cambia su veredicto. Se declara el dato en
-  // vez de corregir una puerta que la instrucción no abrió.
+  // ── RIDER NIV-2 §5 · b2 pasa a umbral por familia ───────────────────────
+  // Deuda declarada de B0.c: b2 también es una FAMILIA —una prueba por mesa, m=4
+  // en la matriz completa—, y hasta ahora se leía contra 3σ pelados mientras b3 y
+  // las cuatro puertas de nivel ya usaban Bonferroni. Se corrige por DOCTRINA, no
+  // para rescatar un veredicto: con los datos vigentes el máximo de b2 es 1,54σ,
+  // así que pasa con o sin corrección. Un banco que aplicara el umbral por
+  // familia sólo donde le conviene no sería un banco.
+  const m2          = detalles.length
+  const alfaB2      = m2 > 0 ? alfaFamilia / m2 : alfaFamilia
+  const umbralB2    = m2 > 0 ? umbralDeAlfa(alfaB2) : 3
+  for (const d of detalles) {
+    if (!d.b2_pareadoGemelos) continue
+    d.b2_umbralSigmas = umbralB2
+    d.b2_pasa = d.b2_pareadoGemelos.sigmas <= umbralB2
+  }
   const b2 = detalles.map(d => d.b2_pareadoGemelos?.sigmas ?? 0)
 
   return {
+    b2_metodo: {
+      correccion: 'Bonferroni',
+      familia: 'la comparación pareada gemelo-vs-gemelo (asientos 0 y 1) del conductor espejo simétrico, una por mesa',
+      tamanoFamilia: m2,
+      alfaFamilia,
+      alfaPorPrueba: alfaB2,
+      umbralSigmas: umbralB2,
+      umbralSinCorregir: 3,
+      maxSigmasObservado: b2.length ? Math.max(...b2) : null,
+      porQue: 'rider NIV-2 §5 (deuda declarada en B0.c): b2 es una familia de una prueba por mesa y se leía contra 3σ pelados mientras b3 y las puertas de nivel ya usaban Bonferroni. Es doctrina, no rescate — con los datos vigentes b2 pasa con o sin corrección.',
+      degeneracion: 'con m=1 el umbral vuelve a ser exactamente 3σ',
+    },
     correccion: 'Bonferroni',
     familia: 'las comparaciones por parejas de asientos NO GEMELOS del conductor espejo, sobre toda la matriz',
     tamanoFamilia: m,
@@ -568,7 +698,7 @@ function aplicarUmbralFamiliaB3(detalles) {
     umbralSinCorregir: 3,
     porQue: `b3 no es una prueba sino ${m}. A 3σ por prueba la familia falla por azar con probabilidad ~${(m * P_3SIGMA * 100).toFixed(1)}%, así que un rojo suelto es esperable por diseño. El alfa de familia se reparte entre las ${m} pruebas para devolver a la PUERTA la tasa de error de una sola prueba a 3σ.`,
     degeneracion: 'con m=1 el umbral vuelve a ser exactamente 3σ: la corrección no afloja nada cuando no hay familia',
-    b2_nota: `b2 (gemelo vs gemelo) es otra familia de ${b2.length} pruebas, máx ${Math.max(...b2).toFixed(2)}σ: verde con o sin corrección, así que su umbral se deja en 3σ`,
+    b2_nota: `b2 (gemelo vs gemelo) es otra familia de ${b2.length} pruebas, máx ${(b2.length ? Math.max(...b2) : 0).toFixed(2)}σ. Desde el rider NIV-2 §5 lleva su propio umbral por familia (${umbralB2.toFixed(3)}σ) en vez de 3σ pelados.`,
   }
 }
 
@@ -654,6 +784,9 @@ function evaluarPuertas(celdas) {
       // b1 sólo aplica a mesa 2: para N>=3 el 1/N queda como diagnóstico.
       b1_aplica: c.mesa === 2,
       b1_pasa: c.mesa === 2 ? desvios.every(d => d.sigmas <= 3) : null,
+      // b2_pasa lo fija `aplicarUmbralFamiliaB3` con el umbral por familia del
+      // rider NIV-2 §5. Aquí queda el valor sin corregir por si el archivo se
+      // lee antes de esa pasada.
       b2_pareadoGemelos: par(a0, a1),
       b2_pasa: par(a0, a1).sigmas <= 3,
       b3_paresNoGemelos: paresNoGemelos,
@@ -790,6 +923,122 @@ if (flag('curvas')) {
   process.exit(0)
 }
 
+// ── Modo --curvas-descarte · el instrumento de ② (NIV-2) ─────────────────────
+//
+// Mide la MISMA magnitud que CURVA_FINAL —P(una mano rival quede por debajo de
+// mi puntaje, contando medio empate)— pero CONDICIONADA a cuántas cartas cambió
+// esa mano. Es la traducción del dato público «cambió cuatro» a la única moneda
+// con la que `aiPlayer` sabe decidir: equidad.
+//
+// POR QUÉ NO SE PUEDE ENUMERAR. La curva de NIV-1 se enumeró exacta porque la
+// mano definitiva de un rival ciego es una combinación de C(40,5). Aquí la mano
+// pasa por una POLÍTICA (quedarse con el mejor palo, cambiar el resto hasta el
+// tope) y por una reposición desde las 35 restantes: el espacio es
+// C(40,5)·C(35,d) y d llega a 5. Monte Carlo con volumen es la vía honesta.
+//
+// LO QUE LA CURVA ENSEÑA, y que es la razón de ser de la capacidad: d=0 no es
+// «no quiso cambiar», es «no TENÍA qué cambiar» — las cinco cartas del mismo
+// palo—, y d alto es una mano que se quedó con uno o dos aciertos. El rango que
+// separa un d de otro es de decenas de puntos, muchísimo más ancho que la
+// amenaza del comodín que ③ ya cobra.
+//
+// DOS REGÍMENES, no cuatro mesas: lo único que cambia la política entre mesas es
+// el TOPE de descarte (5 en mesas 2-4, 3 en mesa 5, `gameEngine.js:23`). El
+// comodín NO entra aquí, exactamente por la misma razón declarada en --curvas:
+// su asimetría la cobra ③ sobre el puntaje, y mezclarla aquí haría inauditable
+// cuál de las dos capacidades movió una decisión.
+//
+// Se emite además la fila `marginal` (la mezcla sobre d) para el camino de
+// respaldo: un rival del que no hay lectura. Ojo con el contraste, que es un
+// hallazgo de esta medición: la marginal NO es CURVA_FINAL. CURVA_FINAL describe
+// una mano al azar; la marginal describe una mano YA DESCARTADA, que es más
+// fuerte. Avanzado usa la primera y ese es su límite declarado; Pro, que sabe
+// que la ronda de descarte ocurrió, usa la segunda.
+//
+// Uso: node scripts/bancoNiveles.mjs --curvas-descarte [--muestras 20000000]
+if (flag('curvas-descarte')) {
+  const { PALOS, VALORES, getCardPoints } = await import('../src/engine/deck.js')
+  const MUESTRAS = Number(arg('muestras', 20000000))
+  const DESDE = 13, HASTA = 51            // mismo soporte que CURVA_FINAL
+  const ANCHO = HASTA - DESDE + 1
+
+  const baraja = []
+  for (const p of PALOS) for (const v of VALORES) baraja.push({ palo: p, points: getCardPoints(v) })
+
+  const mejorPalo = (cartas) => {
+    const s = {}
+    for (const c of cartas) s[c.palo] = (s[c.palo] ?? 0) + c.points
+    let pts = 0, palo = ''
+    for (const k in s) if (s[k] > pts) { pts = s[k]; palo = k }
+    return { pts, palo }
+  }
+
+  const regimenes = {}
+  for (const tope of [5, 3]) {
+    // Histograma de puntaje final por número de cartas cambiadas.
+    const hist = Array.from({ length: tope + 1 }, () => new Float64Array(ANCHO))
+    const bolsa = baraja.slice()
+    const reparto = 5 + tope
+    for (let m = 0; m < MUESTRAS; m++) {
+      for (let i = 0; i < reparto; i++) {
+        const j = i + Math.floor(Math.random() * (bolsa.length - i))
+        const t = bolsa[i]; bolsa[i] = bolsa[j]; bolsa[j] = t
+      }
+      const mano = [bolsa[0], bolsa[1], bolsa[2], bolsa[3], bolsa[4]]
+      const bp = mejorPalo(mano).palo
+      const fuera = []
+      for (let i = 0; i < 5; i++) if (mano[i].palo !== bp) fuera.push(i)
+      const d = Math.min(fuera.length, tope)
+      let ptr = 5
+      for (let i = 0; i < d; i++) mano[fuera[i]] = bolsa[ptr++]
+      hist[d][mejorPalo(mano).pts - DESDE]++
+    }
+    const total = hist.map(h => h.reduce((a, x) => a + x, 0))
+    const granTotal = total.reduce((a, x) => a + x, 0)
+
+    // q[s] = P(X < s) + ½·P(X = s) — misma convención que CURVA_FINAL: el
+    // desempate real es por orden de asiento desde la Mano, que desde un asiento
+    // cualquiera vale ½.
+    const cdf = (h, n) => {
+      const fila = []
+      let acum = 0
+      for (let i = 0; i < ANCHO; i++) {
+        fila.push(n > 0 ? Math.round(((acum + 0.5 * h[i]) / n) * 1000) / 1000 : 0)
+        acum += h[i]
+      }
+      return fila
+    }
+    const marginal = new Float64Array(ANCHO)
+    for (const h of hist) for (let i = 0; i < ANCHO; i++) marginal[i] += h[i]
+
+    regimenes[`tope${tope}`] = {
+      tope,
+      frecuenciaDeD: total.map(n => Math.round((n / granTotal) * 100000) / 100000),
+      muestrasPorD: total,
+      d: hist.map((h, i) => cdf(h, total[i])),
+      marginal: cdf(marginal, granTotal),
+    }
+  }
+
+  const salida = {
+    generado: new Date().toISOString(),
+    muestrasPorRegimen: MUESTRAS,
+    desde: DESDE, hasta: HASTA,
+    nota: 'baraja SIN comodín (la asimetría la cobra ③) · q[s] = P(X<s) + ½P(X=s) · política de descarte = la de aiPlayer (todo lo que no sea del mejor palo, hasta el tope)',
+    regimenes,
+  }
+  mkdirSync(DIR_OUT, { recursive: true })
+  writeFileSync(join(DIR_OUT, 'niv2_curvas_descarte.json'), JSON.stringify(salida, null, 2) + '\n')
+  for (const [nombre, r] of Object.entries(regimenes)) {
+    console.log(`\n${nombre} · desde ${DESDE}`)
+    r.d.forEach((fila, d) => console.log(
+      `  d=${d} (${(100 * r.frecuenciaDeD[d]).toFixed(2)}% de las manos, n=${r.muestrasPorD[d]}): [${fila.join(', ')}]`))
+    console.log(`  marginal: [${r.marginal.join(', ')}]`)
+  }
+  console.log('\nVolcado → capturas-dsk/niv2_curvas_descarte.json')
+  process.exit(0)
+}
+
 // Tope de descarte por tamaño de mesa — copia local declarada: `maxDiscard` vive
 // en gameEngine.js, que es archivo protegido y no se importa por una constante.
 function maxDiscardDeMesa(n) { return n <= 4 ? 5 : 3 }
@@ -835,14 +1084,14 @@ if (RUTA_REPUERTAS) {
 mkdirSync(DIR_EVID, { recursive: true })   // idempotente: correr dos veces no rompe (ESC-1)
 
 console.log(`Banco ${TANDA} · mesas=[${MESAS}] conductores=[${CONDUCTORES}] manos/celda=${MANOS} unit=${UNIT} nivel=${NIVEL}` +
-  (J0_NIVEL !== NIVEL ? ` j0-nivel=${J0_NIVEL}` : '') + (DUELO ? ` +duelo=${DUELO}` : ''))
+  (J0_NIVEL !== NIVEL ? ` j0-nivel=${J0_NIVEL}` : '') + (DUELO.length ? ` +duelo=${DUELO.join(',')}` : ''))
 console.log('(sin siembra: Math.random sin semilla en baraja y en IA — límite conocido, se compensa con volumen)\n')
 
 const celdas = []
 const planCeldas = []
 for (const N of MESAS) {
   for (const modo of CONDUCTORES) planCeldas.push([N, modo, J0_NIVEL])
-  if (DUELO && DUELO !== NIVEL) planCeldas.push([N, 'espejo', DUELO])
+  for (const d of DUELO) if (d !== NIVEL) planCeldas.push([N, 'espejo', d])
 }
 {
   for (const [N, modo, j0n] of planCeldas) {
@@ -1002,6 +1251,185 @@ function puertasNiveluno() {
 }
 const puertasNiv1 = puertasNiveluno()
 
+// ── Puertas direccionales de NIV-2 (§7 de la instrucción) ────────────────────
+//
+// LA DECISIÓN DE INSTRUMENTO DE ESTA TANDA, dicha sin adorno, porque cambia cómo
+// se leen todas las cifras de abajo.
+//
+// Hasta NIV-1 la métrica primaria fue MANOS GANADAS. Midiendo NIV-2 se vio que
+// esa métrica no mide fuerza: premia, casi en exclusiva, NO RETIRARSE. En este
+// juego el 99% de las manos llega al showdown, así que cada retiro es una mano
+// que ya no se puede ganar y quien menos se retira gana más manos, juegue bien o
+// mal. La prueba estaba en la propia vara desde NIV-B0 y ahora se puede cerrar
+// con un número: el conductor PASIVO —iguala o pasa, jamás se retira— saca
+// EXACTAMENTE 25,00% de las manos en mesa 4 contra una mesa Pro, clavado en 1/N,
+// mientras pierde 0,60 unidades por mano. Perfecto en la métrica, arruinado en
+// la mesa.
+//
+// La métrica opuesta —PARTIDAS ganadas— tiene el defecto simétrico: premia
+// retirarse, porque conservar fichas alarga la supervivencia. Leída así, Básico
+// (que se retira el 20% de las veces) «bate» a Avanzado, lo cual es falso.
+//
+// Ninguna de las dos mide fuerza. La que sí: FICHAS NETAS POR MANO. El ante es
+// forzado y se cobra a todos en cada barajado (`gameEngine.js:409`), así que
+// retirarse cuesta de verdad y pagar de más también; la métrica no tiene un lado
+// barato. Sus credenciales, medidas antes de usarla para nada:
+//
+//   · En el espejo SIMÉTRICO la diferencia pareada 0-1 es nula (mesa 4:
+//     −0,044u a 1,27σ con mesa Pro, +0,026u a 0,65σ con mesa Avanzada). Una
+//     métrica que no da cero cuando los dos lados son idénticos no sirve.
+//   · Ordena los tres niveles con el mismo signo y pasos comparables:
+//     Básico contra mesa Avanzada −0,247u, Avanzado contra mesa Pro −0,178u,
+//     Básico contra mesa Pro −0,455u ≈ la suma de los dos peldaños.
+//   · Tritura a los conductores basura: PASIVO −0,60u, ALEATORIO −1,54u.
+//
+// Se publican LAS DOS lecturas en cada puerta. La de fichas manda; la de manos
+// se conserva porque es la que la instrucción enuncia y porque su ceguera es,
+// ella misma, un resultado de esta tanda. Ninguna cifra se esconde.
+function puertasNivelDos() {
+  const duelos = celdas.filter(c => c.conductor === 'espejo' && c.nivelAsiento0 !== c.nivel)
+  if (!duelos.length) return null
+
+  let base = null, ref = null
+  try { base = JSON.parse(readFileSync(join(DIR_EVID, 'niv1_avanzado.json'), 'utf8')) } catch { base = null }
+  try { ref  = JSON.parse(readFileSync(join(DIR_EVID, ARCHIVO_REF), 'utf8')) } catch { ref = null }
+  const varaManos = (mesa, j0) => base?.lineaBase?.find(
+    c => c.mesa === mesa && c.conductor === 'espejo' && c.nivelAsiento0 === j0)?.duelo?.global ?? null
+  const refFichas = (mesa) => ref?.lineaBase?.find(
+    c => c.mesa === mesa && c.conductor === 'espejo' && c.nivelAsiento0 === 'basico')?.dueloFichas?.global ?? null
+  const umbralFamilia = (m) => (m > 0 ? umbralDeAlfa(P_3SIGMA / m) : 3)
+  const enUnidades = (d) => (d ? { u: d.delta / UNIT, se: d.se / UNIT, sigmas: d.sigmas, manos: d.manos, partidas: d.partidas } : null)
+
+  const de = (mesa, j0) => duelos.find(c => c.mesa === mesa && c.nivelAsiento0 === j0) ?? null
+
+  // ── N1 · La escalera completa ordena ──────────────────────────────────────
+  // (a) Avanzado contra mesa Pro pierde, con significancia.
+  // (b) Básico contra mesa Pro pierde MÁS que Avanzado contra la misma mesa Pro
+  //     — el peldaño Básico < Avanzado medido contra un rival común, que es una
+  //     comparación más limpia que enfrentarlos a dos mesas distintas.
+  // (c) Lectura literal del enunciado en MANOS, contra la vara rastreada de
+  //     NIV-1: la cifra de Básico contra mesa Pro por debajo de la que ese mismo
+  //     Básico sacó contra mesa Avanzada. No se re-lanza nada (§8).
+  const n1detalle = []
+  for (const N of MESAS) {
+    const av = de(N, 'avanzado'), ba = de(N, 'basico')
+    const fila = { mesa: N }
+    if (av) {
+      fila.avanzadoVsPro = { fichas: enUnidades(av.dueloFichas?.global), manos: enUnidades(av.duelo?.global) }
+      fila.avanzadoVsPro.manos = av.duelo?.global
+        ? { pp: av.duelo.global.delta * 100, se: av.duelo.global.se * 100, sigmas: av.duelo.global.sigmas }
+        : null
+    }
+    if (ba) {
+      fila.basicoVsPro = { fichas: enUnidades(ba.dueloFichas?.global) }
+      fila.basicoVsPro.manos = ba.duelo?.global
+        ? { pp: ba.duelo.global.delta * 100, se: ba.duelo.global.se * 100, sigmas: ba.duelo.global.sigmas }
+        : null
+      const v = varaManos(N, 'basico')
+      fila.basicoVsAvanzado_varaManos = v ? { pp: v.delta * 100, sigmas: v.sigmas } : null
+      fila.basicoVsAvanzado_refFichas = enUnidades(refFichas(N))
+    }
+    n1detalle.push(fila)
+  }
+  const conAv = n1detalle.filter(f => f.avanzadoVsPro?.fichas)
+  const conBa = n1detalle.filter(f => f.basicoVsPro?.fichas && f.basicoVsAvanzado_refFichas)
+  const u1 = umbralFamilia(conAv.length + conBa.length)
+  for (const f of n1detalle) {
+    // (a) Avanzado contra mesa Pro pierde, con significancia.
+    if (f.avanzadoVsPro?.fichas) {
+      const d = f.avanzadoVsPro.fichas
+      f.a_avanzadoPierde = d.u < 0 && Math.abs(d.sigmas) >= u1
+      f.a_literalEnManos = f.avanzadoVsPro.manos ? f.avanzadoVsPro.manos.pp < 0 : null
+    }
+    // (b) Básico contra mesa Pro por debajo de su cifra contra mesa Avanzada.
+    //     Las dos cifras salen de celdas independientes: σ en cuadratura.
+    if (f.basicoVsPro?.fichas && f.basicoVsAvanzado_refFichas) {
+      const b = f.basicoVsPro.fichas, r = f.basicoVsAvanzado_refFichas
+      const dif = b.u - r.u
+      const se  = Math.sqrt(b.se ** 2 + r.se ** 2)
+      f.b_caida = { u: dif, se, sigmas: se > 0 ? dif / se : 0 }
+      f.b_basicoCaeMas = dif < 0 && Math.abs(f.b_caida.sigmas) >= u1
+    }
+    if (f.basicoVsPro?.manos && f.basicoVsAvanzado_varaManos) {
+      f.b_literalEnManos = f.basicoVsPro.manos.pp <= f.basicoVsAvanzado_varaManos.pp
+    }
+    // Diagnóstico (no puerta): el peldaño medido contra un RIVAL COMÚN — las dos
+    // cifras contra la misma mesa Pro. Es una comparación más limpia que las dos
+    // del enunciado, que enfrentan a Básico con dos mesas distintas, y por eso se
+    // publica aunque no se gatee con ella.
+    if (f.basicoVsPro?.fichas && f.avanzadoVsPro?.fichas) {
+      const b = f.basicoVsPro.fichas, a = f.avanzadoVsPro.fichas
+      const dif = b.u - a.u
+      const se  = Math.sqrt(b.se ** 2 + a.se ** 2)
+      f.diag_peldanoContraRivalComun = { u: dif, se, sigmas: se > 0 ? dif / se : 0 }
+    }
+  }
+  const n1 = {
+    metrica: 'fichas netas por mano (unidades de entrada), pareada asiento0 vs su gemelo de temperamento',
+    umbralSigmas: u1, familia: conAv.length + conBa.length,
+    referenciaFichas: ref ? `capturas-dsk/evidencia/${ARCHIVO_REF}` : null,
+    pasa: n1detalle.every(f => (f.a_avanzadoPierde ?? true) && (f.b_basicoCaeMas ?? true)),
+    pasaLiteralEnManos: n1detalle.every(f => (f.a_literalEnManos ?? true) && (f.b_literalEnManos ?? true)),
+    detalle: n1detalle,
+  }
+
+  // ── N3 · Por temperamento ─────────────────────────────────────────────────
+  // Los cuatro perfiles con el signo correcto. Prohibido que el nivel «suba»
+  // porque un solo temperamento cargue el promedio.
+  const n3detalle = []
+  for (const c of duelos) {
+    for (const [perfil, d] of Object.entries(c.dueloFichas?.porPerfil ?? {})) {
+      if (!d) continue
+      n3detalle.push({ mesa: c.mesa, nivelAsiento0: c.nivelAsiento0, perfil, ...enUnidades(d) })
+    }
+  }
+  const u3 = umbralFamilia(n3detalle.length)
+  for (const d of n3detalle) d.pasa = d.u <= 0 || Math.abs(d.sigmas) < u3
+  const n3 = n3detalle.length
+    ? { pasa: n3detalle.every(d => d.pasa), umbralSigmas: u3, familia: n3detalle.length,
+        perfilesCubiertos: [...new Set(n3detalle.map(d => d.perfil))].sort(), detalle: n3detalle }
+    : null
+
+  // ── N4 · «Difícil, no imposible» · sin puerta numérica (§7.4) ─────────────
+  const n4 = n1detalle.map(f => ({
+    mesa: f.mesa,
+    avanzadoVsPro_u: f.avanzadoVsPro?.fichas?.u ?? null,
+    basicoVsPro_u:   f.basicoVsPro?.fichas?.u ?? null,
+    avanzadoVsPro_manosPp: f.avanzadoVsPro?.manos?.pp ?? null,
+    basicoVsPro_manosPp:   f.basicoVsPro?.manos?.pp ?? null,
+  }))
+
+  // ── Diagnóstico de las ramas de Pro, por mesa (§7, no es puerta) ─────────
+  const diag = celdas.filter(c => c.diagPro?.decisiones > 0).map(c => ({
+    mesa: c.mesa, conductor: c.conductor, nivelAsiento0: c.nivelAsiento0,
+    tasaLectura: c.diagPro.tasaLectura,
+    farolesPorMano: c.diagPro.farolesPorMano,
+    farolAbre: c.diagPro.farolAbre, farolSube: c.diagPro.farolSube,
+    farolCobraSinShowdown: c.diagPro.farolCobraSinShowdown,
+    farolLlegaAShowdown: c.diagPro.farolLlegaAShowdown,
+    ajileis: c.diagPro.ajileis, disimulos: c.diagPro.disimulos, tasaDisimulo: c.diagPro.tasaDisimulo,
+    tasaAbandono: c.diagPro.tasaAbandono,
+    tasaRetiroPorAsiento: c.conducta.map(x => x.tasaRetiro),
+    tasaSubidaPorAsiento: c.conducta.map(x => x.tasaSubida),
+  }))
+
+  return {
+    metodoUmbral: {
+      correccion: 'Bonferroni por puerta',
+      alfaFamilia: P_3SIGMA,
+      porQue: 'misma doctrina que b3 y que las puertas de NIV-1: cada puerta es una FAMILIA de comparaciones y el alfa se reparte entre ellas.',
+    },
+    porQueFichas: 'manos-ganadas premia no retirarse (el PASIVO saca 1/N clavado mientras pierde 0,60u por mano) y partidas-ganadas premia lo contrario. Las fichas netas por mano no tienen lado barato: el ante es forzado. Credencial: en el espejo simétrico la diferencia pareada es nula.',
+    varaLeidaDe: base ? 'capturas-dsk/evidencia/niv1_avanzado.json' : null,
+    n1_escaleraOrdena: n1,
+    n2_sinRegresion: 'ver puertasNiv1.p1_pasivoCastigado y p4_sinRegresionContraBasura, evaluadas sobre esta misma corrida contra la vara rastreada',
+    n3_porTemperamento: n3,
+    n4_dificilNoImposible: n4,
+    diagnosticoPro: diag,
+  }
+}
+const puertasNiv2 = puertasNivelDos()
+
 const informe = {
   tanda: TANDA,
   generado: new Date().toISOString(),
@@ -1025,6 +1453,7 @@ const informe = {
   senalPasivo,
   puertas,
   puertasNiv1,
+  puertasNiv2,
   celdas,
 }
 
@@ -1065,6 +1494,44 @@ if (Object.values(puertasNiv1).some(v => v && v.detalle)) {
   }
 }
 
+if (puertasNiv2) {
+  const P = puertasNiv2
+  const u = (x) => (x === null || x === undefined ? '   n/d' : (x >= 0 ? '+' : '') + x.toFixed(3) + 'u')
+  console.log('\nPuertas NIV-2 (§7) · métrica primaria: FICHAS NETAS POR MANO')
+  console.log(`  (1) La escalera ordena: ${pinta(P.n1_escaleraOrdena.pasa)}  [umbral ${P.n1_escaleraOrdena.umbralSigmas.toFixed(2)}s, familia ${P.n1_escaleraOrdena.familia}]` +
+    `   · lectura literal en manos: ${pinta(P.n1_escaleraOrdena.pasaLiteralEnManos)}`)
+  for (const f of P.n1_escaleraOrdena.detalle) {
+    const a = f.avanzadoVsPro?.fichas, b = f.basicoVsPro?.fichas, r = f.basicoVsAvanzado_refFichas
+    console.log(`      mesa ${f.mesa} (a) avanzado-vs-Pro ${u(a?.u)} (${a ? a.sigmas.toFixed(2) : '—'}s) -> ${pinta(f.a_avanzadoPierde ?? null)}` +
+      `   manos ${f.avanzadoVsPro?.manos ? f.avanzadoVsPro.manos.pp.toFixed(2) + 'pp' : 'n/d'} -> ${pinta(f.a_literalEnManos ?? null)}`)
+    console.log(`             (b) basico-vs-Pro ${u(b?.u)} vs ref basico-vs-Avanzado ${u(r?.u)}` +
+      (f.b_caida ? `  caida ${u(f.b_caida.u)} (${f.b_caida.sigmas.toFixed(2)}s) -> ${pinta(f.b_basicoCaeMas)}` : '  -> n/d') +
+      (f.basicoVsPro?.manos && f.basicoVsAvanzado_varaManos
+        ? `   manos ${f.basicoVsPro.manos.pp.toFixed(2)}pp vs vara ${f.basicoVsAvanzado_varaManos.pp.toFixed(2)}pp -> ${pinta(f.b_literalEnManos)}` : ''))
+    if (f.diag_peldanoContraRivalComun) {
+      console.log(`             [diag] peldano contra rival comun ${u(f.diag_peldanoContraRivalComun.u)} (${f.diag_peldanoContraRivalComun.sigmas.toFixed(2)}s)`)
+    }
+  }
+  if (P.n3_porTemperamento) {
+    console.log(`  (3) Por temperamento: ${pinta(P.n3_porTemperamento.pasa)}  [umbral ${P.n3_porTemperamento.umbralSigmas.toFixed(2)}s, familia ${P.n3_porTemperamento.familia}, perfiles ${P.n3_porTemperamento.perfilesCubiertos.join('/')}]`)
+    for (const d of P.n3_porTemperamento.detalle) {
+      console.log(`      mesa ${d.mesa} j0=${d.nivelAsiento0.padEnd(9)} ${d.perfil.padEnd(13)} ${u(d.u)} (${d.sigmas.toFixed(2)}s, ${d.manos} manos) -> ${pinta(d.pasa)}`)
+    }
+  }
+  console.log('  (4) Dificil, no imposible (sin puerta numerica — la banda la fija calibracion):')
+  for (const f of P.n4_dificilNoImposible) {
+    console.log(`      mesa ${f.mesa}: avanzado ${u(f.avanzadoVsPro_u)} / ${f.avanzadoVsPro_manosPp === null ? 'n/d' : f.avanzadoVsPro_manosPp.toFixed(2) + 'pp'}` +
+      `   basico ${u(f.basicoVsPro_u)} / ${f.basicoVsPro_manosPp === null ? 'n/d' : f.basicoVsPro_manosPp.toFixed(2) + 'pp'}`)
+  }
+  console.log('  Diagnostico de las ramas de Pro (frecuencias efectivas):')
+  for (const d of P.diagnosticoPro) {
+    console.log(`      mesa ${d.mesa} ${(d.conductor + (d.nivelAsiento0 !== NIVEL ? ':' + d.nivelAsiento0 : '')).padEnd(17)}` +
+      ` lectura ${(100 * d.tasaLectura).toFixed(1)}%  farol/mano ${d.farolesPorMano.toFixed(4)} (abre ${d.farolAbre}/sube ${d.farolSube})` +
+      `  cobra sin showdown ${d.farolCobraSinShowdown}  ajilei ${d.ajileis} disimulo ${d.disimulos} (${(100 * d.tasaDisimulo).toFixed(1)}%)` +
+      `  abandono ${(100 * d.tasaAbandono).toFixed(1)}%  retiros ${d.tasaRetiroPorAsiento.map(x => (100 * x).toFixed(1)).join('/')}`)
+  }
+}
+
 writeFileSync(join(DIR_OUT, ARCHIVO_VOLCADO), JSON.stringify(informe, null, 2))
 console.log(`\nVolcado completo → capturas-dsk/${ARCHIVO_VOLCADO}`)
 
@@ -1082,16 +1549,23 @@ if (ESCRIBE_BASE) {
     ventajaPosicional: informe.ventajaPosicional,
     senalPasivo,
     puertasNiv1,
+    puertasNiv2,
     puertas: {
       a_conservacionFichas: puertas.a_conservacionFichas,
       b_espejoSimetrico: puertas.b_espejoSimetrico,
       c_escriturasFueraDeCapturas: puertas.c_escriturasFueraDeCapturas,
       extra_pasajeroSobrevive: puertas.extra_pasajeroSobrevive,
+      // Los métodos de umbral viajan CON la evidencia: sin ellos, las σ del
+      // detalle no se pueden leer contra nada. b2_metodo es el rider NIV-2 §5.
+      b3_metodo: puertas.b3_metodo,
+      b2_metodo: puertas.b3_metodo?.b2_metodo ?? null,
       b_detalle: puertas.b_detalle,
     },
     lineaBase: celdas.map(c => ({
       mesa: c.mesa, conductor: c.conductor,
-      nivel: c.nivel, nivelAsiento0: c.nivelAsiento0, duelo: c.duelo,
+      nivel: c.nivel, nivelAsiento0: c.nivelAsiento0,
+      duelo: c.duelo, dueloFichas: c.dueloFichas,
+      fichas: c.fichas, conducta: c.conducta, diagPro: c.diagPro,
       // Conteo exacto, que es lo que hace de esto una vara (rector §6). En la
       // primera vara esta línea decía `manos: c.manos`, campo que había dejado
       // de existir al cambiar el denominador: JSON.stringify borra `undefined`

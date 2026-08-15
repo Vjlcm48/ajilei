@@ -38,6 +38,7 @@ const PROFILES = {
 // compara decisión contra decisión sobre una batería de fixtures.
 const RANGO_NIVEL = { basico: 0, avanzado: 1, pro: 2 }
 const RANGO_AVANZADO = 1
+const RANGO_PRO      = 2
 
 function rangoDe(state) {
   return RANGO_NIVEL[state.nivelIA ?? 'basico'] ?? 0
@@ -189,11 +190,6 @@ const TABLA_BET_2 = {
   ],
 }
 
-// Sólo para las pruebas: `scripts/testNivel1.test.js` §3 re-deriva estas tablas
-// —la final por enumeración exacta, las intermedias por sus invariantes— y las
-// compara con lo que está escrito aquí. Mismo molde que `_resetForTesting`.
-export const _CURVAS_PARA_TEST = { CURVA_FINAL, TABLA_BET_1, TABLA_BET_2 }
-
 function enTabla(tabla, score, k) {
   const fila = tabla.k[Math.min(Math.max(k, 1), tabla.k.length) - 1]
   const i = Math.round(score) - tabla.desde
@@ -213,13 +209,207 @@ function equidad(score, phase, activeOpponents) {
 }
 
 // ③ aplicada a ④: la equidad con la amenaza del comodín dentro.
-function equidadConComodin(score, phase, k, comodinValue, p) {
-  const base = equidad(score, phase, k)
+//
+// NIV-2 la generalizó a recibir la FUENTE de equidad en vez de llamar a
+// `equidad` a pelo, porque Pro entra con una fuente distinta (② corrige la suya
+// con la lectura de descartes). La aritmética es la misma línea por línea: lo
+// único que cambió es de dónde salen `base` y su desplazada — y el envoltorio
+// `equidadConComodin(score, phase, k, cv, p)` de NIV-1 desapareció por quedarse
+// sin llamantes, no por cambiar de idea: era exactamente
+// `corrigePorComodin(s => equidad(s, phase, k), …)`. La transcripción del test
+// de oro (`scripts/testNivel2.test.js` §1) lo conserva palabra por palabra, que
+// es donde debe vivir la versión vieja.
+function corrigePorComodin(eqDe, score, k, comodinValue, p) {
+  const base = eqDe(score)
   if (p <= 0 || comodinValue === null || base <= 0) return base
   const g  = Math.pow(base, 1 / k)
-  const gc = Math.pow(equidad(score - comodinValue, phase, k), 1 / k)
+  const gc = Math.pow(eqDe(score - comodinValue), 1 / k)
   return Math.pow(g, k - 1) * ((1 - p) * g + p * gc)
 }
+
+// ══ ② LECTURA DE DESCARTES · Pro (rector §5.3) ═══════════════════════════════
+//
+// Dos fuentes, las dos PÚBLICAS, ninguna nueva para el motor:
+//
+//   · Los descartes de las OTRAS IAs — `aiPlayer` decide todos los descartes de
+//     asientos IA (`gameEngine.js:500-502`), así que se acuerda de lo que él
+//     mismo decidió. Es su propia memoria, no información ajena.
+//   · El descarte del HUMANO — nunca pasa por `decideDiscard`, pero la longitud
+//     del taco cae EXACTAMENTE en el total de la ronda (`gameEngine.js:511`).
+//     Restando lo propio queda lo suyo. Se lee `state.deck.length` y NADA MÁS:
+//     ni un índice, ni una iteración. Es la frontera fina de D-5 que esta tanda
+//     introduce, y la trampa Proxy de `scripts/testNivel2.test.js` §8 demuestra
+//     los dos lados —que la longitud se lee y que el contenido jamás—.
+//
+// POR QUÉ ES SIMETRÍA Y NO PRIVILEGIO (rector §5.3): el número de cartas que
+// cambió cada quien lo anuncia el propio juego en voz alta —«Descartaste 3, la
+// IA descartó 2», `gameEngine.js:517-520`— y el taco menguante está a la vista.
+// El humano tiene el dato gratis; que Pro lo use lo pone a la par.
+//
+// ── LA CURVA · medida, no estimada ───────────────────────────────────────────
+// `node scripts/bancoNiveles.mjs --curvas-descarte --muestras 20000000`, volcado
+// en capturas-dsk/niv2_curvas_descarte.json. Mide la misma magnitud que
+// CURVA_FINAL —q[s] = P(X < s) + ½·P(X = s) para la mano de UN rival— pero
+// condicionada a cuántas cartas cambió ese rival.
+//
+// TRES HALLAZGOS DE LA MEDICIÓN, ninguno supuesto:
+//
+// 1. d NUNCA PASA DE 3, y por eso hay una sola tabla y no una por mesa. Con 5
+//    cartas en 4 palos algún palo tiene al menos dos, y la suma mínima de dos
+//    cartas de un palo es 6+7=13, por encima del As (11): ningún palo de una
+//    sola carta puede ser el mejor. Luego el mejor palo tiene ≥2 cartas y sobran
+//    ≤3. El tope de descarte (5 en mesas 2-4, 3 en mesa 5) NO LIGA JAMÁS para
+//    esta política. Medido de los dos lados: los regímenes tope-5 y tope-3
+//    salieron idénticos dentro del ruido y las filas d=4 y d=5 con cero muestras
+//    en 20 millones.
+// 2. LA SEÑAL ES ENORME, mucho mayor que la del comodín que ③ ya cobra. Contra
+//    un puntaje de 30, un rival que cambió 3 queda por debajo el 69% de las
+//    veces; uno que cambió 1, el 17,9%; uno que no cambió nada, el 0%. Un d=0 no
+//    es «no quiso»: es «no TENÍA qué cambiar» — cinco cartas del mismo palo.
+// 3. LA MARGINAL NO ES `CURVA_FINAL`. CURVA_FINAL describe una mano al azar de
+//    C(40,5); la marginal describe una mano YA DESCARTADA, que es bastante más
+//    fuerte (contra 30: 0,581 frente a 0,858). Es un límite declarado de
+//    Avanzado, no un defecto que esta tanda arregle: NIV-2 no toca Avanzado. Lo
+//    que Pro hace con ello está abajo, y es deliberadamente lo MENOS invasivo
+//    que se puede hacer.
+const CURVA_DESCARTE = {
+  desde: 13,
+  // Filas d = 0 … 3 · cuántas cartas cambió el rival.
+  d: [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+     0.068, 0.177, 0.217, 0.287, 0.496, 0.705, 0.774, 0.817, 0.930],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.041, 0.097, 0.110, 0.179,
+     0.358, 0.510, 0.551, 0.621, 0.758, 0.827, 0.839, 0.859, 0.866, 0.878, 0.914, 0.950, 0.962,
+     0.969, 0.988],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.019, 0.040, 0.042, 0.098, 0.228, 0.320, 0.339, 0.432, 0.580,
+     0.636, 0.652, 0.674, 0.680, 0.707, 0.778, 0.839, 0.855, 0.882, 0.937, 0.965, 0.967, 0.971,
+     0.973, 0.975, 0.982, 0.990, 0.992, 0.994, 0.998],
+    [0.001, 0.001, 0.001, 0.008, 0.031, 0.050, 0.053, 0.165, 0.342, 0.408, 0.416, 0.425, 0.427,
+     0.458, 0.537, 0.600, 0.614, 0.690, 0.821, 0.876, 0.880, 0.885, 0.887, 0.895, 0.918, 0.938,
+     0.945, 0.955, 0.979, 0.991, 0.992, 0.993, 0.993, 0.994, 0.995, 0.997, 0.998, 0.998, 0.999],
+  ],
+  // La mezcla sobre d: el rival del que NO hay lectura, y el denominador de la
+  // razón de abajo. Frecuencias medidas de d: 0,15% / 3,83% / 31,74% / 64,28%.
+  marginal:
+    [0, 0.001, 0.001, 0.005, 0.020, 0.032, 0.034, 0.106, 0.220, 0.262, 0.273, 0.286, 0.288, 0.325,
+     0.418, 0.487, 0.502, 0.581, 0.712, 0.765, 0.774, 0.787, 0.790, 0.807, 0.851, 0.889, 0.900,
+     0.918, 0.956, 0.975, 0.977, 0.979, 0.980, 0.982, 0.987, 0.992, 0.994, 0.995, 0.998],
+}
+
+// PISO Y TECHO declarados. La tabla está redondeada a tres decimales, así que
+// donde la medición dio menos de 0,0005 quedó escrito un 0 y donde dio más de
+// 0,9995 quedó un 1. Esos extremos son de REDONDEO, no de probabilidad: sin
+// acotarlos, los momios de abajo se irían a 0 o a infinito por un artefacto de
+// formato y la decisión se volvería categórica —«imposible» / «seguro»— donde la
+// medición sólo dijo «muy improbable» o «casi seguro».
+const PISO_Q = 0.0005
+
+function qDescarte(d, score) {
+  const fila = d === null ? CURVA_DESCARTE.marginal : CURVA_DESCARTE.d[Math.min(Math.max(d, 0), 3)]
+  const i = Math.round(score) - CURVA_DESCARTE.desde
+  const v = i < 0 ? 0 : i >= fila.length ? 1 : fila[i]
+  return Math.min(Math.max(v, PISO_Q), 1 - PISO_Q)
+}
+
+// La probabilidad de batir a UN rival según la curva de Avanzado. En BET_3 la
+// equidad de NIV-1 es exactamente esta cifra elevada al número de rivales, así
+// que es el factor por rival que ② va a corregir uno por uno.
+function gPorRival(score) {
+  const i = Math.round(score) - CURVA_FINAL.desde
+  return i < 0 ? 0 : i >= CURVA_FINAL.q.length ? 1 : CURVA_FINAL.q[i]
+}
+
+// ── CÓMO SE GASTA LA LECTURA · la decisión de diseño de esta capacidad ────────
+//
+// PRIMERO, LO QUE NO SE HACE. La tentación es sustituir la curva de Avanzado por
+// la marginal de ②, que es la honesta para una mano ya descartada. Es un error, y
+// de los caros: las tablas de Avanzado están medidas sobre mano al azar y los
+// umbrales de personalidad (openMin/callMin/raiseMin) están calibrados contra ESA
+// escala. Cambiarle el suelo a la escala movería a las cuatro personalidades a la
+// vez, y entonces Pro no sería una hermana mayor: sería otra IA. Justo lo que
+// D-4 prohíbe. La discrepancia queda declarada como límite de Avanzado y como
+// insumo de la tanda de calibración, no se arregla de matute aquí.
+//
+// LO QUE SÍ ENTRA es una lectura RELATIVA, rival por rival: cuánto mejor o peor
+// es ESTE rival que un rival cualquiera del que no se supiera nada. La evidencia
+// se aplica en ESPACIO DE MOMIOS, que es la única forma de actualizar una
+// probabilidad sin salirse de [0,1]:
+//
+//     momio_i = momio(g) · momio(q_{d_i}(s)) / momio(q_marginal(s))
+//     g_i     = momio_i / (1 + momio_i)          equidad = Π g_i
+//
+// POR QUÉ MOMIOS Y NO UN FACTOR MULTIPLICATIVO — medido, no supuesto. La primera
+// versión multiplicaba la equidad por la razón de probabilidades y la topaba con
+// `Math.min(1, …)`. Ese tope es ASIMÉTRICO: las buenas noticias se recortaban al
+// llegar a 1 y las malas bajaban hasta 0 sin freno, de modo que la capacidad
+// sesgaba a Pro hacia el retiro sistemáticamente. En el banco se vio: Pro se
+// retiraba el 6% de las acciones contra el 2,5% de Avanzado, y en un juego donde
+// el 99% de las manos se decide en el showdown cada retiro es una mano que ya no
+// se puede ganar. En momios no hay tope que aplicar: la actualización es
+// simétrica por construcción y `g_i` nunca se sale del intervalo.
+//
+// Consecuencia buscada, y comprobada por prueba: con un rival del montón la
+// razón de momios vale 1 y `g_i` es EXACTAMENTE la de Avanzado. Pro sólo se
+// separa cuando la lectura dice algo, y todo lo que hace de más se puede
+// explicar señalando qué leyó — el listón que el rector §5.5 pone.
+const momio = (p) => p / (1 - p)
+
+function equidadConLectura(score, conteos) {
+  const g = gPorRival(score)
+  if (g <= 0) return 0
+  if (g >= 1) return 1
+  const oBase = momio(g)
+  const oCiego = momio(qDescarte(null, score))
+  let equidadTotal = 1
+  for (const d of conteos) {
+    const o = oBase * momio(qDescarte(d, score)) / oCiego
+    equidadTotal *= o / (1 + o)
+  }
+  return equidadTotal
+}
+
+// El listón por debajo del cual se supone que un rival suelta la mano. NO es un
+// número inventado: sale de la tabla de personalidades de este mismo archivo. Un
+// rival se retira en BET_3 cuando su puntaje no llega a `callMin + 4`
+// (`:445`), y su `callMin` lleva encima el `opponentAdj` de la mesa. Se usa la
+// media de los cuatro temperamentos porque desde fuera no se sabe cuál toca —y
+// mirar `_assignments` de otro asiento sería usar memoria propia para adivinar
+// conducta ajena, que no es lo que la capacidad declara—.
+const CALLMIN_MEDIO = PROFILE_NAMES.reduce((a, n) => a + PROFILES[n].callMin, 0) / PROFILE_NAMES.length
+
+function umbralDeRetiroRival(k) {
+  return CALLMIN_MEDIO + 4 + (Math.max(1, k) - 1) * 2
+}
+
+// P(TODOS los rivales suelten) según la lectura: el respaldo del farol.
+function respaldoDelFarol(conteos, k) {
+  const linea = umbralDeRetiroRival(k)
+  let p = 1
+  for (const d of conteos) p *= qDescarte(d, linea)
+  return p
+}
+
+// ── Los dos dados de Pro · declarados, no mágicos (rector §5.3, D-4) ──────────
+// Mismo molde que los 0,6 y 0,7 que ya gobiernan las subidas de BET_2 y BET_3:
+// una constante con nombre, a la vista, que las pruebas fijan por mock y el
+// banco mide en vivo. Ninguna de las dos es un multiplicador de agresión: no
+// mueven ningún umbral ni abren ninguna rama por su cuenta — sólo deciden CADA
+// CUÁNTO se ejerce una rama que la lectura ya autorizó.
+//
+// Por qué no valen 1. Un farol que se disparara SIEMPRE que la lectura lo
+// respalda es tan legible como el tell del Ajilei que Pro acaba de aprender a
+// esconder: bastaría con no creerle nunca. Un Ajilei que se jugara SIEMPRE lento
+// sería el mismo tell con el signo cambiado. La mitad es el punto donde la rama
+// no informa nada por sí sola, y es donde la tanda de calibración las encontrará
+// para afinarlas con Victor (§10.4 de la instrucción).
+const FREC_FAROL    = 0.5
+const FREC_DISIMULO = 0.5
+
+// Sólo para las pruebas: `scripts/testNivel1.test.js` §3 y `testNivel2.test.js`
+// §3 re-derivan estas tablas —la final por enumeración exacta, las demás por sus
+// invariantes de forma— y las comparan con lo que está escrito aquí. Mismo molde
+// que `_resetForTesting`.
+export const _CURVAS_PARA_TEST = { CURVA_FINAL, TABLA_BET_1, TABLA_BET_2, CURVA_DESCARTE }
 
 // Rango de puntajes posibles por fase — el dominio de las curvas.
 function rangoDeFase(phase) {
@@ -234,12 +424,23 @@ function rangoDeFase(phase) {
 // que mi mano vale CON la amenaza encima. Una sola fuente —la equidad corregida
 // de arriba—, dos monedas. Sin esto, ③ sólo se notaría al igualar y no al abrir
 // ni al subir, que es justo donde el rector §5.2 pide que se note.
-function puntajeEquivalente(eqCorregida, score, phase, k) {
+//
+// NIV-2 le añadió el `tope`. Con el default —el propio puntaje— la función es
+// LITERALMENTE la de NIV-1: la amenaza del comodín sólo puede restar, así que el
+// barrido nunca necesitaba mirar por encima. La lectura de descartes de ② sí
+// puede SUMAR (una mesa de rivales que reconstruyeron palo vale más que la que
+// las tablas suponen), y para eso Pro abre el barrido hasta el final del rango.
+// El tope se conserva en vez de abrirse para todos porque las tablas
+// intermedias NO son monótonas —TABLA_BET_1 baja de 0,519 a 0,455 en el tramo
+// medio— y ampliar el dominio movería decisiones de Avanzado que esta tanda no
+// tiene permiso de tocar. Pro sólo lo abre en BET_3, cuya curva sí es monótona.
+function puntajeEquivalente(eqCorregida, score, phase, k, tope = Math.round(score)) {
   const [lo, hi] = rangoDeFase(phase)
-  for (let s = lo; s <= Math.min(hi, Math.round(score)); s++) {
+  const alto = Math.min(hi, tope)
+  for (let s = lo; s <= alto; s++) {
     if (equidad(s, phase, k) >= eqCorregida) return s
   }
-  return Math.min(hi, Math.round(score))
+  return alto
 }
 
 // ── Personality module state ──────────────────────────────────────────────────
@@ -249,6 +450,31 @@ let _assignments     = null   // { [seatIndex]: profileName }
 let _lastNumPlayers  = 0
 let _lastHandCount   = -1     // -1 = never seen; tracks partida boundary
 let _lastAliveCount  = -1     // -1 = never seen; segunda señal del límite
+
+// ── ② Memoria de descartes · NACE Y MUERE CON LA MANO (rector §5.3) ───────────
+// `{ handCount, mazoAntes, porAsiento: { [seat]: cuántas cambió } }`. Sólo la
+// escribe `decideDiscard`, sólo cuando el nivel es Pro, y se tira entera en
+// cuanto cambia el número de mano o el rider detecta partida nueva. Prohibido
+// que sobreviva entre partidas: sería memoria de una mesa aplicada a otra.
+let _descartes = null
+
+function _olvidarDescartes() { _descartes = null }
+
+// ── Diagnóstico de Pro · NO participa en ninguna decisión ────────────────────
+// Contadores de frecuencia efectiva para el banco (`--nivel pro`) y las pruebas.
+// El motor no lo lee, la UI no lo lee y ninguna rama de decisión lo consulta:
+// sólo se escribe. `_resetForTesting` lo pone a cero como todo lo demás.
+export const _DIAG_PRO = {
+  decisiones: 0,      // llamadas a decideBetAction con nivel Pro
+  conLectura: 0,      // ...de ellas, las que tuvieron lectura de descartes viva
+  faroles: 0,         // faroles disparados (abren + suben)
+  farolAbre: 0,
+  farolSube: 0,
+  farolRespaldado: 0, // veces que la lectura y el precio respaldaron un farol
+  ajileis: 0,         // decisiones con Ajilei en mano
+  disimulos: 0,       // ...de ellas, las jugadas lentas
+  farolPorAsiento: {},// seat → true si ese asiento faroleó desde el último borrado
+}
 
 function _shuffled(arr) {
   const a = [...arr]
@@ -281,6 +507,10 @@ export function _resetForTesting() {
   _lastNumPlayers = 0
   _lastHandCount  = -1
   _lastAliveCount = -1
+  _olvidarDescartes()
+  for (const k of Object.keys(_DIAG_PRO)) {
+    _DIAG_PRO[k] = k === 'farolPorAsiento' ? {} : 0
+  }
 }
 
 // ── RIDER NIV-1 §4 · re-sorteo de perfiles por PARTIDA ────────────────────────
@@ -323,9 +553,77 @@ function _ensurePersonalities(state) {
   const partidaNueva = state.handCount < _lastHandCount || vivos > _lastAliveCount
   if (_assignments === null || state.numPlayers !== _lastNumPlayers || partidaNueva) {
     initPersonalities(state.numPlayers)
+    // NIV-2 §1: la memoria de descartes es de MESA, no sólo de mano. Las mismas
+    // dos señales que reparten rivales nuevos tiran la lectura vieja.
+    _olvidarDescartes()
   }
   _lastHandCount  = state.handCount
   _lastAliveCount = vivos
+}
+
+// ── ② Registro y lectura de la ronda de descarte ─────────────────────────────
+
+// Lo escribe `decideDiscard` por cada asiento IA que decide, y de paso deja
+// anotada la longitud del taco ANTES de que la ronda lo toque —`applyDiscard`
+// llama a todos los asientos con el MISMO estado previo (`gameEngine.js:495`),
+// así que ese número es el mismo para todos y sirve de origen de coordenadas.
+//
+// SE INDEXA POR `player.id`, NO POR LA CASILLA DEL ARRAY, y no es un detalle de
+// estilo: la memoria es de un JUGADOR, no de una posición. La distinción salió a
+// la luz midiendo. El banco conduce el asiento 0 con un ESTADO ESPEJO que
+// permuta los asientos 0↔1 (`bancoNiveles.mjs:165`), apoyado en que
+// `decideBetAction` es función pura de la mano, la posición relativa y el número
+// de rivales. ② añadía la primera dependencia de la IDENTIDAD del asiento, y con
+// ella el espejo empezaba a leer los descartes cruzados: en el espejo simétrico
+// de mesa 2 —donde los dos asientos deben ganar la mitad de las partidas por
+// construcción— el asiento 0 caía al 6,85%. Con `id`, que viaja dentro del
+// objeto del jugador y que el espejo NO toca, la permutación vuelve a ser
+// inofensiva y la pureza del adaptador se restituye.
+const _idDe = (state, i) => state.players[i].id ?? i
+
+function _anotarDescarte(state, aiIndex, cuantas) {
+  if (_descartes === null || _descartes.handCount !== state.handCount) {
+    // `state.deck.length` y nada más. Si el estado no trae taco (fixtures
+    // sintéticas), se anota `null` y la lectura no llegará a formarse: sin
+    // origen no hay resta, y sin resta Pro se queda ciego a propósito.
+    const mazo = state.deck
+    _descartes = {
+      handCount: state.handCount,
+      mazoAntes: Array.isArray(mazo) || mazo ? (typeof mazo.length === 'number' ? mazo.length : null) : null,
+      porJugador: {},
+    }
+  }
+  _descartes.porJugador[_idDe(state, aiIndex)] = cuantas
+}
+
+// Devuelve los conteos de los rivales VIVOS del asiento que decide, o `null` si
+// la lectura no está completa. «Ciego» y «leo mal» no se confunden: cualquier
+// incoherencia devuelve null y Pro cae al comportamiento de Avanzado.
+function lecturaDeDescartes(state, aiIndex) {
+  const mem = _descartes
+  if (mem === null || mem.handCount !== state.handCount || mem.mazoAntes === null) return null
+  const mazo = state.deck
+  const ahora = mazo && typeof mazo.length === 'number' ? mazo.length : null
+  if (ahora === null) return null
+
+  const total = mem.mazoAntes - ahora
+  if (total < 0) return null
+  const propios = Object.values(mem.porJugador).reduce((a, n) => a + n, 0)
+  const delHumano = total - propios
+  const tope = state.handRules.maxDiscard
+  if (delHumano < 0 || delHumano > tope) return null   // la cuenta no cuadra: ciego
+
+  const conteos = []
+  for (let i = 0; i < state.players.length; i++) {
+    if (i === aiIndex || state.players[i].folded) continue
+    const propio = mem.porJugador[_idDe(state, i)]
+    // Un asiento que no pasó por `decideDiscard` y no es el humano (o un humano
+    // que ya estaba retirado) no deja rastro utilizable: la lectura no se
+    // completa y se devuelve null antes que adivinar.
+    if (propio === undefined && !state.players[i].isHuman) return null
+    conteos.push(propio === undefined ? delHumano : propio)
+  }
+  return conteos.length ? conteos : null
 }
 
 // Apply ±noise% variance to a threshold — called once per decision, not at assignment
@@ -359,18 +657,40 @@ export function decideBetAction(state, aiIndex) {
   // ninguna acción impagable; el motor es la garantía dura de saldo ≥ 0.
   const canAffordRaise = ai.chips >= toCall + unit
 
-  // Ajilei always plays aggressively regardless of profile.
-  // El tell honesto se conserva en Básico Y en Avanzado a propósito (rector
-  // §5.3): disimularlo es capacidad exclusiva de Pro, y llega en NIV-2.
+  // Nivel de esta mesa. `avanzado` abre ③ y ④; `pro` abre ②, ⑥ y el Ajilei
+  // disimulado. Pro hereda lo de Avanzado por RANGO —el `>=`—, sin repetir una
+  // línea: es literalmente la arquitectura de hermanas mayores del rector §5.5.
+  const rango    = rangoDe(state)
+  const avanzado = rango >= RANGO_AVANZADO
+  const pro      = rango >= RANGO_PRO
+  if (pro) _DIAG_PRO.decisiones++
+
+  // ── Ajilei · agresión total, y en Pro también disimulo ────────────────────
+  // El tell honesto se conserva en Básico Y en Avanzado A PROPÓSITO (rector
+  // §5.3): quien sube sin pestañear tiene la mano perfecta, y esa legibilidad es
+  // parte de lo que hace que la escalera se SIENTA distinta.
+  //
+  // Pro lo esconde (instrucción NIV-2 §3, decisión sellada de Victor): con la
+  // frecuencia declarada arriba juega LENTO en las fases tempranas —iguala o
+  // pasa— para engordar el pote, y cobra en BET_3, que es la última ronda y por
+  // tanto la que ya no puede dejar dinero sin recoger. El Ajilei sigue siendo
+  // invencible; el disimulo sólo administra CUÁNDO se revela la agresión.
+  //
+  // INVARIANTE ABSOLUTA, compartida con los tres niveles: con Ajilei en la mano
+  // no se retira jamás. Las dos ramas de abajo devuelven acciones que se quedan.
   if (isAjilei(ai.cards, ruleN)) {
+    if (pro) {
+      _DIAG_PRO.ajileis++
+      if (phase !== 'BET_3' && Math.random() < FREC_DISIMULO) {
+        _DIAG_PRO.disimulos++
+        return { action: currentBet > 0 ? 'igualar' : 'pasar' }
+      }
+    }
     return { action: currentBet > 0 ? 'subir' : 'apostar' }
   }
 
   _ensurePersonalities(state)
   const profile = PROFILES[_assignments[aiIndex]]
-
-  // Nivel de esta mesa. `avanzado` abre ③ y ④; Pro las hereda por rango.
-  const avanzado = rangoDe(state) >= RANGO_AVANZADO
 
   // ── Threshold adjustments ─────────────────────────────────────────────────
   // More active opponents → raise the bar (each extra opponent adds 2 pts)
@@ -392,17 +712,31 @@ export function decideBetAction(state, aiIndex) {
   // ninguna comparación de abajo cambia de lado.
   const kRivales = Math.max(1, activeOpponents)
   const pComodin = avanzado ? probComodinEnRival(state, ai, activeOpponents) : 0
-  const eqMano   = avanzado
-    ? equidadConComodin(score, phase, kRivales, state.handRules.comodinValue, pComodin)
-    : 0
-  const scoreEf  = pComodin > 0 ? puntajeEquivalente(eqMano, score, phase, kRivales) : score
 
-  // ── No bet yet: open or pass ──────────────────────────────────────────────
-  if (currentBet === 0) {
-    // Saldo: no abrir si no se puede cubrir la apuesta de apertura (unit) → pasar.
-    if (scoreEf >= openMin && ai.chips >= unit) return { action: 'apostar' }
-    return { action: 'pasar' }
-  }
+  // ② · la lectura de descartes. Sólo Pro, sólo en BET_3 —antes de la ronda de
+  // descarte no hay nada que leer y la capacidad está inerte por construcción—,
+  // y sólo si la ronda dejó rastro COMPLETO: `lecturaDeDescartes` devuelve null
+  // ante la menor incoherencia y Pro cae a la decisión de Avanzado. Ciego y
+  // «leo mal» no se confunden.
+  const lectura = pro && phase === 'BET_3' ? lecturaDeDescartes(state, aiIndex) : null
+  if (lectura) _DIAG_PRO.conLectura++
+  // La fuente de equidad. Sin lectura —Básico, Avanzado, y Pro fuera de BET_3 o
+  // con la cuenta incompleta— es EXACTAMENTE la lambda de NIV-1.
+  const eqDe = lectura === null
+    ? (s => equidad(s, phase, kRivales))
+    : (s => equidadConLectura(s, lectura))
+  const eqMano = avanzado
+    ? corrigePorComodin(eqDe, score, kRivales, state.handRules.comodinValue, pComodin)
+    : 0
+  // El puntaje equivalente. La amenaza del comodín sólo RESTA, así que ahí el
+  // barrido se topa en el propio puntaje. La lectura de ② puede sumar —una mesa
+  // que reconstruyó palo vale más de lo que las tablas suponen—, y por eso con
+  // lectura viva el barrido se abre hasta el final del rango. Es seguro
+  // precisamente ahí y sólo ahí: la curva de BET_3 es monótona, y ② nunca actúa
+  // en otra fase.
+  const scoreEf = (pComodin > 0 || lectura !== null)
+    ? puntajeEquivalente(eqMano, score, phase, kRivales, lectura ? Infinity : Math.round(score))
+    : score
 
   // ④ · el veredicto del bote. Sólo Avanzado+, y sólo cuando hay bote que medir:
   // sin bote no hay matemática de bote y se cae al listón de Básico (estado
@@ -419,6 +753,64 @@ export function decideBetAction(state, aiIndex) {
   const pagaElBote = boteDecide && (
     toCall <= 0 || eqMano >= toCall / (bote + toCall + porIgualar)
   )
+
+  // ── ⑥ FAROL ESTRATÉGICO · Pro (rector §5.3) ───────────────────────────────
+  //
+  // POR FRECUENCIA, JAMÁS POR MONTO. `applyAIBetAction` pasa `state.unit` fijo e
+  // ignora cualquier cantidad que esta función devolviera (`gameEngine.js:482`),
+  // así que la única variable expresiva de un farol aquí es CUÁNDO y CUÁNTAS
+  // VECES. El techo se declara en vez de olvidarse.
+  //
+  // NUNCA CIEGO (D-4). Se exigen las tres cosas a la vez:
+  //
+  //   1. LECTURA VIVA. Sin ② no hay farol, ni uno. Un farol sin lectura sería
+  //      justamente el «multiplicador ciego de agresión» que D-4 prohíbe, y la
+  //      diferencia entre las dos cosas es esta línea.
+  //   2. QUE EL RESPALDO CUBRA EL PRECIO. Es la aritmética de bote de ④ puesta
+  //      del otro lado: farolear cuesta lo que pongo y paga el bote que se
+  //      queda sin dueño si todos sueltan, luego conviene cuando
+  //
+  //          P(todos sueltan) >= costo / (costo + bote)
+  //
+  //      Ni un umbral inventado: la probabilidad sale de la curva medida de ② y
+  //      el precio, del bote real de la mesa. Contra cuatro rivales el producto
+  //      se desploma solo —cada factor está entre 0 y 1— y el farol se apaga sin
+  //      que nadie tenga que prohibirlo por tamaño de mesa. El premio se cuenta
+  //      SIN `porIgualar` a propósito: quien se va no paga, así que sumar lo que
+  //      los vivos aún deben inflaría el bote que un farol exitoso cobra.
+  //   3. EL DADO. Con respaldo y precio, se farolea `FREC_FAROL` de las veces.
+  //
+  // Y sólo transforma un RETIRO en subida, o un paso en apertura: nunca cambia
+  // una mano que ya iba a pagar, porque eso no sería farol sino apuesta de valor
+  // mal contada.
+  const costoFarol    = currentBet === 0 ? unit : toCall + unit
+  const respaldoFarol = lectura ? respaldoDelFarol(lectura, kRivales) : 0
+  const farolRespaldado = lectura !== null && bote > 0 &&
+    respaldoFarol >= costoFarol / (costoFarol + bote)
+  if (farolRespaldado) _DIAG_PRO.farolRespaldado++
+  const farolar = farolRespaldado && Math.random() < FREC_FAROL
+
+  // Convierte un retiro en subida cuando el farol está autorizado y hay saldo.
+  const conFarol = (decision) => {
+    if (!farolar || decision.action !== 'retirarse' || !canAffordRaise) return decision
+    _DIAG_PRO.faroles++
+    _DIAG_PRO.farolSube++
+    _DIAG_PRO.farolPorAsiento[aiIndex] = true
+    return { action: 'subir' }
+  }
+
+  // ── No bet yet: open or pass ──────────────────────────────────────────────
+  if (currentBet === 0) {
+    // Saldo: no abrir si no se puede cubrir la apuesta de apertura (unit) → pasar.
+    if (scoreEf >= openMin && ai.chips >= unit) return { action: 'apostar' }
+    if (farolar && ai.chips >= unit) {
+      _DIAG_PRO.faroles++
+      _DIAG_PRO.farolAbre++
+      _DIAG_PRO.farolPorAsiento[aiIndex] = true
+      return { action: 'apostar' }
+    }
+    return { action: 'pasar' }
+  }
 
   // ── BET_1: only 2 cards — call liberally; fold only on big raise + weak hand
   if (phase === 'BET_1') {
@@ -439,12 +831,15 @@ export function decideBetAction(state, aiIndex) {
   }
 
   // ── BET_3: post-discard — highest bar ────────────────────────────────────
+  // La única fase con `conFarol`, y no por comodidad: es la única donde ②
+  // tiene algo que leer, y sin lectura no hay farol (`farolar` sale falso).
+  // Envolver las otras fases sería escribir una rama muerta.
   if (phase === 'BET_3') {
     if (scoreEf >= raiseMin) return (canAffordRaise && Math.random() < 0.7) ? { action: 'subir' } : { action: 'igualar' }
-    if (boteDecide)                      return pagaElBote ? { action: 'igualar' } : { action: 'retirarse' }
+    if (boteDecide)                      return conFarol(pagaElBote ? { action: 'igualar' } : { action: 'retirarse' })
     if (scoreEf >= callMin + 4)          return { action: 'igualar' }
-    if (scoreEf >= callMin) return toCall <= unit ? { action: 'igualar' } : { action: 'retirarse' }
-    return { action: 'retirarse' }
+    if (scoreEf >= callMin) return conFarol(toCall <= unit ? { action: 'igualar' } : { action: 'retirarse' })
+    return conFarol({ action: 'retirarse' })
   }
 
   if (boteDecide) return pagaElBote ? { action: 'igualar' } : { action: 'retirarse' }
@@ -475,5 +870,13 @@ export function decideDiscard(state, aiIndex) {
     if (card.palo !== bestSuit) indices.push(i)
   })
 
-  return indices.slice(0, topeDescarte)
+  const elegidos = indices.slice(0, topeDescarte)
+
+  // ② · aquí nace la memoria. `aiPlayer` decide TODOS los descartes de asientos
+  // IA, así que esto es acordarse de lo propio, no espiar lo ajeno. Sólo Pro
+  // anota: Básico y Avanzado no tocan `state.deck` ni una vez, y la trampa Proxy
+  // de la red de pruebas lo exige de los tres niveles por separado.
+  if (rangoDe(state) >= RANGO_PRO) _anotarDescarte(state, aiIndex, elegidos.length)
+
+  return elegidos
 }
