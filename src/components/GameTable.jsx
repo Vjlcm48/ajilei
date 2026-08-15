@@ -12,6 +12,7 @@ import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion } from '../hooks/celebracionCore'
+import { conNivel } from '../hooks/nivelCore'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
@@ -264,8 +265,15 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) 
 }
 
 // ── GameTable ─────────────────────────────────────────────────────────────────
-export default function GameTable({ stake, numPlayers = 2, onLeave }) {
-  const [game,         setGame]         = useState(() => createInitialState(stake, numPlayers))
+export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
+  // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
+  // creación del estado, que es el único punto donde se escribe: nace con la
+  // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
+  // la mesa— queda satisfecha por construcción, sin maquinaria de congelado.
+  // El motor NO lo conoce: lo transporta a ciegas en sus spreads. `conNivel`
+  // aplica el default 'basico' ante un nivel ausente o desconocido.
+  // En esta tanda `aiPlayer` no lo lee: viaja INERTE, Δ=0 de conducta de juego.
+  const [game,         setGame]         = useState(() => conNivel(createInitialState(stake, numPlayers), nivel))
   const [betAmount,    setBetAmount]    = useState(stake)
   const [dealStep,     setDealStep]     = useState(0)
   const [flyingCards,  setFlyingCards]  = useState([])
