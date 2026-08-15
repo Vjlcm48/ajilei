@@ -35,6 +35,15 @@
 //                               (default: el de la mesa). Distinto = DUELO.
 //   --duelo <nivel>             añade una celda espejo EXTRA por mesa con el
 //                               asiento 0 a ese nivel, sin quitar la simétrica
+//   --bandas                    compara cada celda producida contra la vara
+//                               sellada (capturas-dsk/evidencia/nivCAL_bandas.json)
+//                               y sale con codigo 1 si alguna se sale de banda.
+//                               Es la alarma anti-degradacion de toda tanda que
+//                               toque aiPlayer.js (NIV-CAL §3).
+//   --sellar-bandas <a,b,...>   lee volcados completos y ESCRIBE esa vara. Se
+//                               vuelve a sellar solo con autorizacion explicita.
+//   --ref <archivo>             vara de la que sale la cifra de referencia de la
+//                               puerta N1(b) (default niv1_avanzado.json)
 //   --repuertas <ruta>          recalcula los veredictos de un JSON ya escrito
 //                               (umbral por familia en b3) SIN volver a jugar
 //   --curvas [--muestras n]     mide las curvas de fuerza de la capacidad ④ y
@@ -103,11 +112,15 @@ let J0_ACTUAL = J0_NIVEL
 const ESCRIBE_BASE = flag('base')
 const ARCHIVO_EVID = arg('evid', 'nivB0_base.json')
 const TANDA        = arg('tanda', 'NIV-B0')
-// NIV-2 §7 · archivo de REFERENCIA con la cifra de Básico contra mesa Avanzada
-// en la métrica de fichas. No existe en ninguna vara —la métrica nace en esta
-// tanda—, así que se mide aparte, en cuatro celdas de referencia, y se lee aquí.
-// No es re-lanzar la matriz de Avanzado (§8): es medir una magnitud nueva.
-const ARCHIVO_REF  = arg('ref', 'niv2_ref_avanzado.json')
+// Archivo de REFERENCIA con la cifra de Básico contra mesa Avanzada en la
+// métrica de fichas, que la puerta N1(b) de NIV-2 necesita.
+//
+// En NIV-2 hubo que medirla en un archivo aparte (`niv2_ref_avanzado.json`)
+// porque la métrica de fichas nacía en esa tanda y ninguna vara la tenía. Desde
+// NIV-CAL §2 la matriz de NIV-1 se re-lanza con el banco actual, así que su
+// propia vara ya trae la cifra: la referencia vuelve a su sitio natural y el
+// archivo duplicado desaparece (instrucción §2, «no duplicar archivos»).
+const ARCHIVO_REF  = arg('ref', 'niv1_avanzado.json')
 // El volcado lleva el nombre de su tanda: dos tandas distintas no se pisan el
 // archivo. `capturas-dsk/` está ignorada y es regenerable; lo que se rastrea es
 // el resumen de `evidencia/`.
@@ -1043,6 +1056,165 @@ if (flag('curvas-descarte')) {
 // en gameEngine.js, que es archivo protegido y no se importa por una constante.
 function maxDiscardDeMesa(n) { return n <= 4 ? 5 : 3 }
 
+// ══ BANDAS DE REGRESIÓN · NIV-CAL §3 (decisión B de Victor) ══════════════════
+//
+// Qué son: la fotografía numérica de la escalera en el momento en que se selló,
+// convertida en ALARMA PERMANENTE. Toda tanda futura que toque `aiPlayer.js`
+// puede correr `--bandas` y saber, celda por celda, si movió algo que no debía.
+//
+// POR QUÉ HACEN FALTA. Esta fase ya enseñó cómo se degrada una IA sin que nadie
+// se entere: la curva de BET_3 de Avanzado llevaba una tanda entera haciéndole
+// pagar de más, y sólo salió a la luz porque NIV-2 midió una magnitud que hasta
+// entonces nadie miraba. Una vara que no se comprueba no es una vara.
+//
+// CÓMO SE COMPARA. Dos corridas del banco NUNCA dan la misma cifra: no hay
+// siembra y el ruido por racimos es real. Así que la banda no es un intervalo
+// fijo sino una PRUEBA DE DOS MUESTRAS: la celda nueva y la sellada se declaran
+// compatibles cuando
+//
+//     |nuevo − sellado| <= umbral · sqrt(se_nuevo² + se_sellado²)
+//
+// con `umbral` corregido por familia (Bonferroni) sobre el número de
+// comparaciones que la corrida hace de verdad. Misma doctrina que b3, que las
+// puertas de nivel y que b2 desde el rider de NIV-2. Con una sola comparación el
+// umbral degenera en 3σ exactos.
+//
+// SIGNO APARTE. En los duelos se exige ADEMÁS que el signo se conserve: una
+// escalera podría invertirse y seguir «dentro de tolerancia» si la magnitud es
+// pequeña, y esa es justo la degradación que estas bandas existen para cazar.
+const RUTA_BANDAS = join(DIR_EVID, 'nivCAL_bandas.json')
+
+// Extrae de una celda las cuatro magnitudes que se sellan. Trabaja sobre la
+// forma de `celdas` del VOLCADO completo, que es la misma que produce una celda
+// viva: así sellar y comparar leen exactamente lo mismo.
+function medidasDeCelda(c) {
+  const f0 = c.fichas?.find(x => x.asiento === 0) ?? null
+  const u  = c.unit || 1
+  return {
+    clave: `mesa${c.mesa}|${c.nivel}|${c.conductor}|j0=${c.nivelAsiento0}`,
+    mesa: c.mesa, nivel: c.nivel, conductor: c.conductor, nivelAsiento0: c.nivelAsiento0,
+    manosContadas: c.manosContadas,
+    fichasPorMano:  f0 ? f0.porMano / u : null,
+    seFichas:       f0 && f0.se !== null && f0.se !== undefined ? f0.se / u : null,
+    tasaManos:      c.tasaAsiento0 ?? null,
+    seManos:        c.seClusterAsiento0 ?? c.seAsiento0 ?? null,
+    dueloFichas:    c.dueloFichas?.global ? c.dueloFichas.global.delta / u : null,
+    seDueloFichas:  c.dueloFichas?.global ? c.dueloFichas.global.se / u : null,
+    dueloManos:     c.duelo?.global?.delta ?? null,
+    seDueloManos:   c.duelo?.global?.se ?? null,
+  }
+}
+
+const MAGNITUDES = [
+  { nombre: 'fichasPorMano', se: 'seFichas',      signo: false, etiqueta: 'fichas/mano asiento0 (u)' },
+  { nombre: 'tasaManos',     se: 'seManos',       signo: false, etiqueta: 'tasa de manos asiento0' },
+  { nombre: 'dueloFichas',   se: 'seDueloFichas', signo: true,  etiqueta: 'duelo 0-1 en fichas (u)' },
+  { nombre: 'dueloManos',    se: 'seDueloManos',  signo: true,  etiqueta: 'duelo 0-1 en manos' },
+]
+
+// ── Modo --sellar-bandas · escribe la vara permanente ───────────────────────
+// Uso: node scripts/bancoNiveles.mjs --sellar-bandas capturas-dsk/a.json,capturas-dsk/b.json
+const RUTA_SELLAR = arg('sellar-bandas')
+if (RUTA_SELLAR) {
+  const fuentes = RUTA_SELLAR.split(',').map(x => x.trim()).filter(Boolean)
+  const celdas = []
+  for (const f of fuentes) {
+    const j = JSON.parse(readFileSync(join(RAIZ, f), 'utf8'))
+    if (!Array.isArray(j.celdas)) { console.error(`${f}: no trae 'celdas'`); process.exit(1) }
+    for (const c of j.celdas) celdas.push({ ...medidasDeCelda(c), origen: f, tanda: j.tanda })
+  }
+  const vistas = new Set()
+  for (const c of celdas) {
+    if (vistas.has(c.clave)) { console.error(`clave duplicada entre volcados: ${c.clave}`); process.exit(1) }
+    vistas.add(c.clave)
+  }
+  mkdirSync(DIR_EVID, { recursive: true })
+  writeFileSync(RUTA_BANDAS, JSON.stringify({
+    tanda: TANDA,
+    generado: new Date().toISOString(),
+    commitOrigen: process.env.NIVCAL_COMMIT ?? null,
+    queEs: 'bandas de regresion permanentes de la escalera de niveles (NIV-CAL §3, decision B). Toda tanda que toque aiPlayer.js debe correr --bandas y reportar el resultado.',
+    metodo: {
+      prueba: 'dos muestras: |nuevo - sellado| <= umbral * sqrt(se_nuevo^2 + se_sellado^2)',
+      se: 'por CONGLOMERADOS (un racimo por partida), que es el que manda en todo este banco',
+      correccion: 'Bonferroni sobre el numero de comparaciones que la corrida hace de verdad; con m=1 degenera en 3 sigmas exactos',
+      alfaFamilia: P_3SIGMA,
+      signo: 'en los duelos se exige ademas que el signo se conserve, PERO solo si el valor sellado esta a mas de 3 sigmas de cero por si mismo. Un signo que nunca se establecio (el duelo del espejo simetrico, cuyo valor verdadero es cero) no se puede conservar: exigirselo convierte ruido en rojo.',
+      metricaPrimaria: 'fichas netas por mano; la tasa de manos se sella tambien, como secundaria',
+    },
+    fuentes,
+    celdas,
+  }, null, 2) + '\n')
+  console.log(`Bandas selladas → capturas-dsk/evidencia/${RUTA_BANDAS.split(/[\\/]/).pop()}  (${celdas.length} celdas de ${fuentes.length} volcado(s))`)
+  for (const c of celdas) {
+    console.log(`  ${c.clave.padEnd(38)} fichas ${c.fichasPorMano === null ? '  n/d' : (c.fichasPorMano >= 0 ? '+' : '') + c.fichasPorMano.toFixed(3)}u` +
+      `  manos ${(100 * c.tasaManos).toFixed(2)}%` +
+      (c.dueloFichas === null ? '' : `  duelo ${(c.dueloFichas >= 0 ? '+' : '') + c.dueloFichas.toFixed(3)}u`))
+  }
+  process.exit(0)
+}
+
+// ── Comparación contra las bandas selladas (bandera --bandas) ───────────────
+function compararConBandas(celdas) {
+  let vara
+  try { vara = JSON.parse(readFileSync(RUTA_BANDAS, 'utf8')) } catch {
+    return { disponible: false, porQue: `no existe ${RUTA_BANDAS}: sella primero con --sellar-bandas` }
+  }
+  const porClave = new Map(vara.celdas.map(c => [c.clave, c]))
+  const filas = []
+  for (const c of celdas) {
+    const nueva = medidasDeCelda(c)
+    const sellada = porClave.get(nueva.clave)
+    if (!sellada) { filas.push({ clave: nueva.clave, sinBanda: true }); continue }
+    const comparaciones = []
+    for (const m of MAGNITUDES) {
+      const a = nueva[m.nombre], b = sellada[m.nombre]
+      const sa = nueva[m.se], sb = sellada[m.se]
+      if (a === null || b === null || sa === null || sb === null) continue
+      const se = Math.sqrt(sa * sa + sb * sb)
+      const dif = a - b
+      // SÓLO SE EXIGE CONSERVAR UN SIGNO QUE SE ESTABLECIÓ. Una magnitud cuyo
+      // valor verdadero es CERO —el duelo pareado del espejo SIMÉTRICO, que por
+      // construcción debe dar cero— tiene signo aleatorio, y exigírselo convierte
+      // ruido en rojo. Se cazó en el primer uso real de la alarma: seis celdas de
+      // espejo simétrico salieron rojas por «signo invertido» con diferencias de
+      // 0,4 a 1,0 sigmas, es decir, por nada.
+      //
+      // El listón es el mismo con el que este banco declara cualquier otro
+      // efecto: el valor sellado tiene que estar a más de 3 sigmas de cero POR SÍ
+      // MISMO. Si no lo está, la comparación de magnitud sigue aplicándose y la
+      // de signo se declara inaplicable — que es distinto de aprobada.
+      const signoEstablecido = m.signo && sb > 0 && Math.abs(b) > 3 * sb
+      comparaciones.push({
+        magnitud: m.nombre, etiqueta: m.etiqueta,
+        sellado: b, nuevo: a, diferencia: dif,
+        se, sigmas: se > 0 ? dif / se : 0,
+        exigeSigno: m.signo,
+        signoEstablecido,
+        signoConservado: !signoEstablecido || Math.sign(a) === Math.sign(b),
+      })
+    }
+    filas.push({ clave: nueva.clave, manosContadas: nueva.manosContadas, comparaciones })
+  }
+  const m = filas.reduce((n, f) => n + (f.comparaciones?.length ?? 0), 0)
+  const umbral = m > 0 ? umbralDeAlfa(P_3SIGMA / m) : 3
+  for (const f of filas) {
+    for (const c of f.comparaciones ?? []) {
+      c.umbralSigmas = umbral
+      c.pasa = Math.abs(c.sigmas) <= umbral && c.signoConservado
+    }
+    f.pasa = f.sinBanda ? null : f.comparaciones.every(c => c.pasa)
+  }
+  return {
+    disponible: true,
+    varaDe: vara.tanda, varaGenerada: vara.generado, commitOrigen: vara.commitOrigen ?? null,
+    familia: m, umbralSigmas: umbral,
+    celdasSinBanda: filas.filter(f => f.sinBanda).map(f => f.clave),
+    pasa: filas.every(f => f.pasa !== false),
+    detalle: filas,
+  }
+}
+
 // ── Modo --repuertas · recalcular veredictos SIN volver a jugar ──────────────
 // Corrige el UMBRAL, no los dados. Lee un JSON ya escrito, reevalúa b3 con el
 // umbral por familia sobre las σ que ese archivo ya trae, y lo reescribe. No
@@ -1287,6 +1459,12 @@ const puertasNiv1 = puertasNiveluno()
 // se conserva porque es la que la instrucción enuncia y porque su ceguera es,
 // ella misma, un resultado de esta tanda. Ninguna cifra se esconde.
 function puertasNivelDos() {
+  // Sólo tiene sentido sobre una mesa PRO: sus dos cláusulas hablan de «contra
+  // mesa Pro». Corrida sobre una mesa Avanzada produciría las mismas cifras con
+  // etiquetas falsas —`basicoVsPro` sería en realidad basico-vs-Avanzado—, y una
+  // evidencia mal rotulada es peor que una ausente. La matriz de NIV-1 lleva sus
+  // propias puertas en `puertasNiv1`.
+  if (NIVEL !== 'pro') return null
   const duelos = celdas.filter(c => c.conductor === 'espejo' && c.nivelAsiento0 !== c.nivel)
   if (!duelos.length) return null
 
@@ -1529,6 +1707,26 @@ if (puertasNiv2) {
       ` lectura ${(100 * d.tasaLectura).toFixed(1)}%  farol/mano ${d.farolesPorMano.toFixed(4)} (abre ${d.farolAbre}/sube ${d.farolSube})` +
       `  cobra sin showdown ${d.farolCobraSinShowdown}  ajilei ${d.ajileis} disimulo ${d.disimulos} (${(100 * d.tasaDisimulo).toFixed(1)}%)` +
       `  abandono ${(100 * d.tasaAbandono).toFixed(1)}%  retiros ${d.tasaRetiroPorAsiento.map(x => (100 * x).toFixed(1)).join('/')}`)
+  }
+}
+
+// ── Alarma anti-degradación (NIV-CAL §3) ────────────────────────────────────
+let bandas = null
+if (flag('bandas')) {
+  bandas = compararConBandas(celdas)
+  informe.bandas = bandas
+  if (!bandas.disponible) {
+    console.log(`\nBandas: ${bandas.porQue}`)
+  } else {
+    console.log(`\nBANDAS DE REGRESION vs vara ${bandas.varaDe} (${bandas.varaGenerada}): ${bandas.pasa ? 'VERDE' : 'ROJA'}` +
+      `  [umbral ${bandas.umbralSigmas.toFixed(2)}s, familia ${bandas.familia}]`)
+    for (const f of bandas.detalle) {
+      if (f.sinBanda) { console.log(`   ${f.clave.padEnd(38)} SIN BANDA SELLADA (celda nueva)`); continue }
+      const peor = f.comparaciones.reduce((a, c) => (Math.abs(c.sigmas) > Math.abs(a.sigmas) ? c : a), f.comparaciones[0])
+      console.log(`   ${f.clave.padEnd(38)} ${f.pasa ? 'VERDE' : 'ROJA '}  peor: ${peor.magnitud} ${peor.sigmas.toFixed(2)}s` +
+        (f.pasa ? '' : `\n      ${f.comparaciones.filter(c => !c.pasa).map(c => `${c.etiqueta}: sellado ${c.sellado.toFixed(4)} -> nuevo ${c.nuevo.toFixed(4)} (${c.sigmas.toFixed(2)}s${c.signoConservado ? '' : ', SIGNO INVERTIDO'})`).join('\n      ')}`))
+    }
+    if (!bandas.pasa) process.exitCode = 1
   }
 }
 

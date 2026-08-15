@@ -35,6 +35,10 @@ const M5 = {
   ajilei:  [carta(1,'Copas'), carta(2,'Copas'), carta(3,'Copas'), carta(4,'Copas'), carta(5,'Copas')],    // 51
   comodin: [COMODIN, carta(1,'Copas'), carta(2,'Copas'), carta(3,'Copas'), carta(6,'Copas')],
   sinComodin47: [carta(1,'Copas'), carta(2,'Copas'), carta(3,'Copas'), carta(4,'Copas'), carta(6,'Copas')],
+  // Bastos 11+10+10 = 31. Tras la reparación de la curva (NIV-CAL §1) un 21 ya
+  // no paga en mesa 4 —y hace bien: es una mano floja después del descarte—, así
+  // que el contraste de ② en mesas grandes se monta sobre esta.
+  buena: [carta(1,'Bastos'), carta(2,'Bastos'), carta(3,'Bastos'), carta(6,'Oros'), carta(6,'Espadas')],
 }
 const M2 = {
   floja: [carta(6,'Oros'), carta(7,'Copas')],
@@ -91,14 +95,62 @@ const PERFILES = ['CONSERVADORA', 'EQUILIBRADA', 'AGRESIVA', 'IMPREDECIBLE']
 // perfiles y no de la capacidad que se está midiendo.
 const PAGA = ['igualar', 'subir']
 
-// ══ 1. TEST DE ORO DOBLE — Básico Y Avanzado, idénticos a antes de NIV-2 ═════
+// DADOS FIJOS para las pruebas de CONTRASTE — las que comparan dos decisiones
+// entre sí. Dos evaluaciones independientes traen dos sorteos de perfil y dos
+// tiradas de los dados de subida, y entonces la prueba mide el azar en vez de la
+// capacidad. Se cazó como intermitencia de ~1 de cada 8 corridas, en dos pruebas
+// distintas. Congelar el generador fija las dos cosas a la vez.
 //
-// Transcripción literal de la lógica de NIV-1 (③ + ④ incluidas). Del módulo vivo
-// sólo se importa el perfil vigente y las CURVAS: las curvas son datos medidos
-// que esta tanda no toca, y `scripts/testNivel1.test.js` §3 ya las re-deriva por
-// enumeración exacta contra la fuente. Lo que aquí se vigila es la LÓGICA DE
-// DECISIÓN, y de ésa no se importa ni una línea.
-const { CURVA_FINAL, TABLA_BET_1, TABLA_BET_2 } = _CURVAS_PARA_TEST
+// Coste declarado, el mismo que documenta `fijarPerfil` en NIV-1: con el mock
+// puesto sólo un temperamento es alcanzable. Es aceptable AQUÍ y sólo aquí,
+// porque estas pruebas afirman cosas sobre la LECTURA, no sobre el temperamento;
+// la cobertura de los cuatro perfiles la da la batería de oro del §1, que mockea
+// tres valores distintos y barre las cuatro mesas.
+const dadosFijos = () => vi.spyOn(Math, 'random').mockReturnValue(0.5)
+
+// ══ 1. TEST DE ORO DOBLE — Básico y Avanzado contra su referencia vigente ════
+//
+// Transcripción literal de la lógica de decisión. Del módulo vivo sólo se importa
+// el perfil vigente y las CURVAS: las curvas son datos medidos y
+// `scripts/testNivel1.test.js` §3 y `§3` de este archivo las re-derivan contra la
+// fuente. Lo que aquí se vigila es la LÓGICA DE DECISIÓN, y de ésa no se importa
+// ni una línea.
+//
+// ══ ACTA DE MOVIMIENTO DEL TEST DE ORO · NIV-CAL §1 ═════════════════════════
+//
+// Es la PRIMERA VEZ en la fase que una referencia de oro se mueve, así que queda
+// escrita entera y en el sitio donde se puede auditar.
+//
+// QUÉ CAMBIÓ. La curva de BET_3 de Avanzado. Antes: `CURVA_FINAL`, la
+// distribución EXACTA de una mano al azar de C(40,5). Ahora:
+// `CURVA_DESCARTE.marginal`, la distribución medida de una mano YA DESCARTADA.
+// Ni una línea más de la lógica de decisión se tocó — mismos umbrales, mismos
+// perfiles, mismas ramas, mismo orden.
+//
+// POR QUÉ. Hallazgo de NIV-2 (reporte, decisión propia nº 2): en BET_3 no queda
+// ninguna mano al azar sobre la mesa, porque todos los vivos acaban de descartar.
+// Contra un puntaje de 30 la curva vieja afirmaba 0,858 y la medición da 0,581.
+// Avanzado sobreestimaba su equidad y pagaba de más en la ronda final. El precio
+// estaba cuantificado: en FICHAS NETAS POR MANO, Básico batía a Avanzado en tres
+// de las cuatro mesas (+0,084u / +0,046u / +0,147u en mesas 2, 3 y 5).
+//
+// BAJO QUÉ AUTORIZACIÓN. Instrucción NIV-CAL §1, decisión A de Victor, que abre
+// `aiPlayer.js` con alcance quirúrgico exactamente para esto.
+//
+// QUÉ NO SE MOVIÓ, y es la mitad del acta:
+//   · LA BATERÍA DE BÁSICO NO SE TOCA NI UNA LÍNEA. Y no hace falta confiar en
+//     la promesa: con rango 0 la transcripción ni siquiera consulta `equidadAntes`
+//     —`avanzado` sale falso, `eqMano` vale 0 y `boteDecide` también—, así que la
+//     curva es inalcanzable desde el camino de Básico. La identidad de Básico
+//     sigue anclada, además, en `scripts/testNivel1.test.js` §1, que compara
+//     contra la lógica ANTERIOR A NIV-1 y que esta tanda no ha rozado.
+//   · La frontera Avanzado/Pro. Avanzado no recibe ②: usa la marginal, una sola
+//     para todos los rivales. Pro condiciona rival por rival. Lo vigila §4.
+//
+// Y la red se comprobó por mutación: revertir la curva a `CURVA_FINAL` hace
+// fallar esta batería. Una referencia que se mueve sin que nadie lo note no es
+// una referencia.
+const { CURVA_FINAL, TABLA_BET_1, TABLA_BET_2, CURVA_DESCARTE: CURVA_DESCARTE_REF } = _CURVAS_PARA_TEST
 
 const PERFILES_ANTES = {
   CONSERVADORA: { openMin: 32, callMin: 22, raiseMin: 40, noise: 0 },
@@ -135,9 +187,13 @@ function equidadAntes(score, phase, activeOpponents) {
   const k = Math.max(1, activeOpponents)
   if (phase === 'BET_1') return enTablaAntes(TABLA_BET_1, score, k)
   if (phase === 'BET_2') return enTablaAntes(TABLA_BET_2, score, k)
-  const i = Math.round(score) - CURVA_FINAL.desde
-  const q = i < 0 ? 0 : i >= CURVA_FINAL.q.length ? 1 : CURVA_FINAL.q[i]
-  return Math.pow(q, k)
+  // NIV-CAL §1 · aquí decía `CURVA_FINAL` (mano al azar). Ver el acta de arriba.
+  // El piso y el techo replican los del módulo: la tabla está redondeada a tres
+  // decimales y sus extremos son de formato, no de probabilidad.
+  const i = Math.round(score) - CURVA_DESCARTE_REF.desde
+  const fila = CURVA_DESCARTE_REF.marginal
+  const v = i < 0 ? 0 : i >= fila.length ? 1 : fila[i]
+  return Math.pow(Math.min(Math.max(v, 0.0005), 1 - 0.0005), k)
 }
 function equidadConComodinAntes(score, phase, k, comodinValue, p) {
   const base = equidadAntes(score, phase, k)
@@ -149,6 +205,7 @@ function equidadConComodinAntes(score, phase, k, comodinValue, p) {
 function rangoDeFaseAntes(phase) {
   if (phase === 'BET_1') return [TABLA_BET_1.desde, TABLA_BET_1.desde + TABLA_BET_1.k[0].length - 1]
   if (phase === 'BET_2') return [TABLA_BET_2.desde, TABLA_BET_2.desde + TABLA_BET_2.k[0].length - 1]
+  // El DOMINIO de la fase no se movió: las dos curvas comparten rejilla (13..51).
   return [CURVA_FINAL.desde, CURVA_FINAL.desde + CURVA_FINAL.q.length - 1]
 }
 function puntajeEquivalenteAntes(eqCorregida, score, phase, k) {
@@ -277,7 +334,7 @@ function bateria() {
   return casos
 }
 
-describe('1. Test de oro doble — Básico y Avanzado son idénticos a antes de NIV-2', () => {
+describe('1. Test de oro doble — Básico y Avanzado contra su referencia vigente', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it.each([0.05, 0.5, 0.95])('Math.random=%s · decideBetAction sin pasajero, `basico` y `avanzado`', (dado) => {
@@ -320,7 +377,8 @@ describe('1. Test de oro doble — Básico y Avanzado son idénticos a antes de 
     }
   })
 
-  it('CON la memoria de descartes viva, Avanzado sigue decidiendo lo de antes', () => {
+  it('CON la memoria de descartes viva, Avanzado sigue sin enterarse (no recibe ②)', () => {
+    dadosFijos()
     // La batería de arriba no puede cazar una capacidad de ② que se escapara al
     // rango de Avanzado: sus estados no han pasado por ninguna ronda de descarte,
     // así que la lectura sale nula y la rama nueva queda inerte. Esta prueba tapa
@@ -341,17 +399,19 @@ describe('1. Test de oro doble — Básico y Avanzado son idénticos a antes de 
   })
 
   it('…y la misma lectura SÍ mueve a Pro (si no, la prueba de arriba no probaría nada)', () => {
+    dadosFijos()
     _resetForTesting()
-    const flojos = rondaDeDescarte(4, [0, 3, 3, 3], 3, { currentBet: 200, pot: 1000, cartasEnBet3: { 1: M5.media } })
-    const conPro = decideBetAction(flojos, 1).action
+    const servidos = rondaDeDescarte(4, [0, 0, 0, 0], 0, { currentBet: 200, pot: 300, cartasEnBet3: { 1: M5.buena } })
+    const conPro = decideBetAction(servidos, 1).action
     _resetForTesting()
     const conAv = decideBetAction(
-      rondaDeDescarte(4, [0, 3, 3, 3], 3, { currentBet: 200, pot: 1000, cartasEnBet3: { 1: M5.media }, nivelIA: 'avanzado' }),
+      rondaDeDescarte(4, [0, 0, 0, 0], 0, { currentBet: 200, pot: 300, cartasEnBet3: { 1: M5.buena }, nivelIA: 'avanzado' }),
       1).action
     expect(conPro).not.toBe(conAv)
   })
 
   it('Básico y Avanzado no dejan rastro en la memoria de descartes', () => {
+    dadosFijos()
     // Si alguno anotara, la lectura de un Pro posterior saldría contaminada.
     for (const nivel of ['basico', 'avanzado']) {
       _resetForTesting()
@@ -469,6 +529,27 @@ describe('3. Curva de descarte', () => {
     }
   })
 
+  it('una mano DESCARTADA nunca es más floja que una al azar — el invariante de la reparación', () => {
+    // Éste es el vínculo entre las dos curvas, y la razón por la que
+    // `CURVA_FINAL` se conserva tras NIV-CAL §1 aunque ya no gobierne ninguna
+    // decisión: su enumeración es EXACTA, así que sirve de cota superior contra
+    // la que validar la marginal MEDIDA. Descartar sólo puede mejorar una mano
+    // —la política se queda con el mejor palo y cambia el resto—, luego la
+    // probabilidad de quedar por debajo de un puntaje dado no puede subir.
+    //
+    // Si esta desigualdad se rompiera, o la enumeración o la medición estarían
+    // mal, y la reparación de Avanzado se apoyaría en aire.
+    const holgura = 0.003   // el redondeo a tres decimales de las dos tablas
+    let separacionMaxima = 0
+    for (let i = 0; i < CURVA_DESCARTE.marginal.length; i++) {
+      expect(CURVA_DESCARTE.marginal[i]).toBeLessThanOrEqual(CURVA_FINAL.q[i] + holgura)
+      separacionMaxima = Math.max(separacionMaxima, CURVA_FINAL.q[i] - CURVA_DESCARTE.marginal[i])
+    }
+    // Y la separación es GRANDE, que es lo que hacía cara la fuga: no era un
+    // matiz de tercer decimal.
+    expect(separacionMaxima).toBeGreaterThan(0.25)
+  })
+
   it('se re-deriva por muestreo con la dinámica real', () => {
     // Misma magnitud, medida aquí de nuevo y a menor volumen. No pretende la
     // precisión del banco (20 millones de muestras); pretende que si alguien
@@ -551,6 +632,7 @@ function rondaDeDescarte(numPlayers, dPorAsiento, dHumano, over = {}) {
 
 describe('4. ② Memoria de descartes', () => {
   beforeEach(() => _resetForTesting())
+  afterEach(() => vi.restoreAllMocks())
 
   it('registra lo que CADA asiento IA cambió, y sólo en Pro', () => {
     const s = { ...estado({ numPlayers: 4, phase: 'DISCARD', deck: taco(20) }), nivelIA: 'pro' }
@@ -561,6 +643,7 @@ describe('4. ② Memoria de descartes', () => {
   })
 
   it('la lectura mueve la decisión: rivales que cambiaron mucho vs rivales servidos', () => {
+    dadosFijos()
     // Mismo estado, misma mano propia, mismo bote. Lo ÚNICO que cambia es
     // cuántas cartas cambiaron los rivales. Si Pro no leyera, no podría cambiar.
     //
@@ -569,8 +652,8 @@ describe('4. ② Memoria de descartes', () => {
     // primera. La regla vale para toda esta sección.
     const monta = (ds, dHumano, nivel = 'pro') => {
       _resetForTesting()
-      const s = rondaDeDescarte(4, ds, dHumano, { currentBet: 200, pot: 1000,
-        cartasEnBet3: { 1: M5.media }, nivelIA: nivel })
+      const s = rondaDeDescarte(4, ds, dHumano, { currentBet: 200, pot: 300,
+        cartasEnBet3: { 1: M5.buena }, nivelIA: nivel })
       return { s, accion: decideBetAction(s, 1).action }
     }
     const flojos   = monta([0, 3, 3, 3], 3)
@@ -583,19 +666,23 @@ describe('4. ② Memoria de descartes', () => {
 
     // Contra rivales que reconstruyeron palo se paga; contra rivales servidos se
     // suelta. Y Avanzado, que no lee, se retira en LOS DOS.
+    // Contra rivales que reconstruyeron palo se paga; contra rivales servidos se
+    // suelta. Y Avanzado, que no lee, PAGA EN LOS DOS: la mesa es la misma para
+    // él, porque su marginal no distingue un rival de otro.
     expect(PAGA).toContain(flojos.accion)
     expect(servidos.accion).toBe('retirarse')
-    expect(monta([0, 3, 3, 3], 3, 'avanzado').accion).toBe('retirarse')
-    expect(monta([0, 0, 0, 0], 0, 'avanzado').accion).toBe('retirarse')
+    expect(PAGA).toContain(monta([0, 3, 3, 3], 3, 'avanzado').accion)
+    expect(PAGA).toContain(monta([0, 0, 0, 0], 0, 'avanzado').accion)
   })
 
   it('deduce el descarte del HUMANO por la caída de `deck.length`', () => {
+    dadosFijos()
     // Mesa 2: el único rival es el humano, que nunca pasa por `decideDiscard`.
     // Todo lo que Pro sabe de él sale de la longitud del taco. Dos estados
     // idénticos salvo esa longitud, y la decisión cambia con ella.
     const monta = (dHumano) => {
       _resetForTesting()
-      const s = rondaDeDescarte(2, [0, 3], dHumano, { currentBet: 400, pot: 300,
+      const s = rondaDeDescarte(2, [0, 3], dHumano, { currentBet: 400, pot: 1000,
         cartasEnBet3: { 1: M5.media } })
       return { largoTaco: s.deck.length, accion: decideBetAction(s, 1).action }
     }
@@ -607,7 +694,8 @@ describe('4. ② Memoria de descartes', () => {
   })
 
   it('sin taco no hay lectura: Pro cae a la decisión de Avanzado', () => {
-    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 300, cartasEnBet3: { 1: M5.media } })
+    dadosFijos()
+    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 1000, cartasEnBet3: { 1: M5.media } })
     expect(PAGA).toContain(decideBetAction(s, 1).action)
     const sinTaco = { ...s }
     delete sinTaco.deck
@@ -619,7 +707,8 @@ describe('4. ② Memoria de descartes', () => {
   })
 
   it('una cuenta que no cuadra deja a Pro ciego en vez de adivinar', () => {
-    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 300, cartasEnBet3: { 1: M5.media } })
+    dadosFijos()
+    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 1000, cartasEnBet3: { 1: M5.media } })
     // Taco IMPOSIBLE: más largo que antes de la ronda. La resta sale negativa.
     const roto = { ...s, deck: taco(100) }
     _resetForTesting()
@@ -630,7 +719,8 @@ describe('4. ② Memoria de descartes', () => {
   })
 
   it('la memoria MUERE con la mano', () => {
-    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 300, cartasEnBet3: { 1: M5.media } })
+    dadosFijos()
+    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 1000, cartasEnBet3: { 1: M5.media } })
     expect(PAGA).toContain(decideBetAction(s, 1).action)
     // Mismo estado, número de mano distinto. SIN reiniciar el módulo a propósito:
     // la memoria de la mano anterior sigue ahí, y lo que se exige es que Pro la
@@ -645,12 +735,13 @@ describe('4. ② Memoria de descartes', () => {
   })
 
   it('la memoria MUERE con la partida, por las dos señales del rider NIV-1', () => {
+    dadosFijos()
     for (const nuevaPartida of [
       (s) => ({ ...s, handCount: 1 }),                                   // handCount retrocede
       (s) => ({ ...s, aliveCount: s.numPlayers + 1, numPlayers: s.numPlayers }), // aliveCount sube
     ]) {
       _resetForTesting()
-      const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 300, handCount: 7,
+      const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 1000, handCount: 7,
         cartasEnBet3: { 1: M5.media } })
       decideBetAction(s, 1)                     // fija _lastHandCount/_lastAliveCount
       const despues = nuevaPartida(s)
@@ -661,7 +752,8 @@ describe('4. ② Memoria de descartes', () => {
   })
 
   it('`_resetForTesting` la borra, y también los contadores de diagnóstico', () => {
-    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 300, cartasEnBet3: { 1: M5.media } })
+    dadosFijos()
+    const s = rondaDeDescarte(2, [0, 3], 3, { currentBet: 400, pot: 1000, cartasEnBet3: { 1: M5.media } })
     decideBetAction(s, 1)
     expect(_DIAG_PRO.decisiones).toBeGreaterThan(0)
     _resetForTesting()
@@ -674,11 +766,12 @@ describe('4. ② Memoria de descartes', () => {
   })
 
   it('se indexa por `player.id`, no por la casilla: el estado espejo del banco sigue siendo válido', () => {
+    dadosFijos()
     // Reproduce el adaptador espejo de `bancoNiveles.mjs:165`: permuta 0↔1 y
     // remapea Mano/Pie. Con la memoria indexada por casilla, la lectura salía
     // cruzada; con `id`, la permutación es inofensiva. Se comprueba pidiendo la
     // MISMA decisión por los dos caminos.
-    const s = rondaDeDescarte(4, [0, 3, 1, 3], 3, { currentBet: 200, pot: 1000, cartasEnBet3: { 2: M5.media } })
+    const s = rondaDeDescarte(4, [0, 3, 1, 3], 3, { currentBet: 200, pot: 300, cartasEnBet3: { 2: M5.buena } })
     const directa = decideBetAction(s, 2).action
     const perm = (i) => (i === 0 ? 1 : i === 1 ? 0 : i)
     const espejo = {
@@ -937,6 +1030,7 @@ describe('7. El rider de NIV-1 sigue en pie con Pro', () => {
 // LONGITUD y que el CONTENIDO no se toca jamás.
 describe('8. D-5 · aislamiento de información', () => {
   beforeEach(() => _resetForTesting())
+  afterEach(() => vi.restoreAllMocks())
 
   function trampaJugador(over = {}) {
     const base = jugador({ ...over, __cardsAccessed: false })
@@ -1054,23 +1148,28 @@ describe('8. D-5 · aislamiento de información', () => {
 
   it('mover las cartas ajenas NO cambia nada; mover los conteos SÍ (contraste completo)', () => {
     // Molde de NIV-1 §8, extendido a la frontera nueva de esta tanda.
-    const conCartas = (cartasAjenas) => {
-      _resetForTesting()
-      const s = rondaDeDescarte(4, [0, 3, 3, 3], 3, { currentBet: 200, pot: 1000,
-        cartasEnBet3: { 1: M5.media } })
-      return decideBetAction({
-        ...s,
-        players: s.players.map((p, i) => (i === 1 ? p : { ...p, cards: cartasAjenas })),
-      }, 1).action
-    }
+    //
+    // UN SOLO fixture y UNA sola tirada de dados para las dos variantes. Montar
+    // uno por variante compararía dos sorteos de perfil independientes, y eso no
+    // mide aislamiento: mide el azar del reparto. Se cazó como intermitencia de
+    // 1 de cada 8 corridas.
+    _resetForTesting()
+    const base = rondaDeDescarte(4, [0, 3, 3, 3], 3, { currentBet: 200, pot: 300,
+      cartasEnBet3: { 1: M5.buena } })
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const conCartas = (cartasAjenas) => decideBetAction({
+      ...base,
+      players: base.players.map((p, i) => (i === 1 ? p : { ...p, cards: cartasAjenas })),
+    }, 1).action
     // Ajilei en todas las manos ajenas o basura en todas: da exactamente igual.
     expect(conCartas(M5.ajilei)).toBe(conCartas(M5.floja))
+    vi.restoreAllMocks()
 
     // Y los conteos sí mueven la decisión, en las dos direcciones.
     const conConteos = (ds, dHumano) => {
       _resetForTesting()
       return decideBetAction(
-        rondaDeDescarte(4, ds, dHumano, { currentBet: 200, pot: 1000, cartasEnBet3: { 1: M5.media } }), 1).action
+        rondaDeDescarte(4, ds, dHumano, { currentBet: 200, pot: 300, cartasEnBet3: { 1: M5.buena } }), 1).action
     }
     expect(PAGA).toContain(conConteos([0, 3, 3, 3], 3))
     expect(conConteos([0, 0, 0, 0], 0)).toBe('retirarse')

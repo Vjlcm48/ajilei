@@ -1,6 +1,6 @@
 {
   "tanda": "NIV-1",
-  "generado": "2026-08-15T02:32:00.258Z",
+  "generado": "2026-08-15T15:03:54.890Z",
   "commit": null,
   "rector": "docs/AJILEI_Modos_y_Asistencia_v1.0.md §10",
   "configuracion": {
@@ -39,46 +39,46 @@
   "senalPasivo": [
     {
       "mesa": 2,
-      "manos": 100254,
-      "partidas": 243,
-      "tasa": 0.500219442615756,
+      "manos": 100082,
+      "partidas": 256,
+      "tasa": 0.4972622449591335,
       "esperado": 0.5,
-      "deltaPp": 0.021944261575601587,
-      "se": 0.0015492320093466164,
-      "sigmas": 0.1416460636186862,
+      "deltaPp": -0.2737755040866485,
+      "se": 0.001648855045105868,
+      "sigmas": -1.6603976492613408,
       "veredicto": "ruido"
     },
     {
       "mesa": 3,
-      "manos": 100132,
-      "partidas": 448,
-      "tasa": 0.33410897615148005,
+      "manos": 100015,
+      "partidas": 508,
+      "tasa": 0.33115032745088235,
       "esperado": 0.3333333333333333,
-      "deltaPp": 0.07756428181467379,
-      "se": 0.0015194116796318341,
-      "sigmas": 0.510488913929293,
+      "deltaPp": -0.21830058824509613,
+      "se": 0.0015156634793092808,
+      "sigmas": -1.4402972112554973,
       "veredicto": "ruido"
     },
     {
       "mesa": 4,
-      "manos": 100037,
-      "partidas": 612,
-      "tasa": 0.24754840708937692,
+      "manos": 100076,
+      "partidas": 685,
+      "tasa": 0.251318997561853,
       "esperado": 0.25,
-      "deltaPp": -0.24515929106230794,
-      "se": 0.0014211006084709993,
-      "sigmas": -1.7251367679455254,
+      "deltaPp": 0.1318997561852997,
+      "se": 0.0013776377198322777,
+      "sigmas": 0.9574342679972352,
       "veredicto": "ruido"
     },
     {
       "mesa": 5,
-      "manos": 100055,
-      "partidas": 730,
-      "tasa": 0.19955024736394983,
+      "manos": 100066,
+      "partidas": 879,
+      "tasa": 0.20205664261587353,
       "esperado": 0.2,
-      "deltaPp": -0.044975263605018245,
-      "se": 0.001290398266129145,
-      "sigmas": -0.3485378490156546,
+      "deltaPp": 0.20566426158735163,
+      "se": 0.0012575083943651704,
+      "sigmas": 1.6354901685660508,
       "veredicto": "ruido"
     }
   ],
@@ -97,39 +97,39 @@
       "detalle": [
         {
           "mesa": 3,
-          "tasa": 0.33410897615148005,
+          "tasa": 0.33115032745088235,
           "esperado": 0.3333333333333333,
-          "deltaPp": 0.07756428181467379,
-          "sigmas": 0.510488913929293,
-          "manos": 100132,
+          "deltaPp": -0.21830058824509613,
+          "sigmas": -1.4402972112554973,
+          "manos": 100015,
           "baseDeltaPp": 0.4990378789392069,
           "pasa": true
         },
         {
           "mesa": 4,
-          "tasa": 0.24754840708937692,
+          "tasa": 0.251318997561853,
           "esperado": 0.25,
-          "deltaPp": -0.24515929106230794,
-          "sigmas": -1.7251367679455254,
-          "manos": 100037,
+          "deltaPp": 0.1318997561852997,
+          "sigmas": 0.9574342679972352,
+          "manos": 100076,
           "baseDeltaPp": 1.5450294267528641,
           "pasa": true
         },
         {
           "mesa": 5,
-          "tasa": 0.19955024736394983,
+          "tasa": 0.20205664261587353,
           "esperado": 0.2,
-          "deltaPp": -0.044975263605018245,
-          "sigmas": -0.3485378490156546,
-          "manos": 100055,
+          "deltaPp": 0.20566426158735163,
+          "sigmas": 1.6354901685660508,
+          "manos": 100066,
           "baseDeltaPp": 1.0291632924427363,
           "pasa": true
         }
       ]
     },
     "p2_hermanaMayorDomina": {
-      "pasa": true,
-      "pasaPareado": true,
+      "pasa": false,
+      "pasaPareado": false,
       "umbralSigmas": 3.3995578407227973,
       "familia": 4,
       "detalle": [
@@ -137,34 +137,34 @@
           "mesa": 2,
           "nivelMesa": "avanzado",
           "nivelAsiento0": "basico",
-          "tasaAsiento0": 0.4940071395807989,
+          "tasaAsiento0": 0.49477204582148077,
           "esperado": 0.5,
-          "deltaPp": -0.5992860419201107,
-          "sigmas": -3.461884306115194,
+          "deltaPp": -0.5227954178519234,
+          "sigmas": -2.947077810445111,
           "pareado": {
-            "delta": -0.01198572083840217,
-            "se": 0.0034621956653000303,
-            "manos": 100286,
-            "partidas": 100,
-            "sigmas": -3.4618843061151776
+            "delta": -0.010455908357038518,
+            "se": 0.003547890157491043,
+            "manos": 104056,
+            "partidas": 91,
+            "sigmas": -2.9470778104451267
           },
-          "pasa": true,
-          "pasaPareado": true
+          "pasa": false,
+          "pasaPareado": false
         },
         {
           "mesa": 3,
           "nivelMesa": "avanzado",
           "nivelAsiento0": "basico",
-          "tasaAsiento0": 0.3204156527982768,
+          "tasaAsiento0": 0.3190047275441652,
           "esperado": 0.3333333333333333,
-          "deltaPp": -1.2917680535056542,
-          "sigmas": -6.588433109185903,
+          "deltaPp": -1.4328605789168114,
+          "sigmas": -7.942969712483036,
           "pareado": {
-            "delta": -0.01877817224460489,
-            "se": 0.003255977306750957,
-            "manos": 100276,
-            "partidas": 272,
-            "sigmas": -5.767292114005264
+            "delta": -0.020194078128887783,
+            "se": 0.0028769741041620783,
+            "manos": 100475,
+            "partidas": 266,
+            "sigmas": -7.019207472070496
           },
           "pasa": true,
           "pasaPareado": true
@@ -173,16 +173,16 @@
           "mesa": 4,
           "nivelMesa": "avanzado",
           "nivelAsiento0": "basico",
-          "tasaAsiento0": 0.2114655922256326,
+          "tasaAsiento0": 0.21004625513252145,
           "esperado": 0.25,
-          "deltaPp": -3.85344077743674,
-          "sigmas": -26.869263923329157,
+          "deltaPp": -3.9953744867478544,
+          "sigmas": -28.506014068232794,
           "pareado": {
-            "delta": -0.05309884924165925,
-            "se": 0.0023804721411245736,
-            "manos": 100021,
-            "partidas": 449,
-            "sigmas": -22.306015821119626
+            "delta": -0.05306852353217379,
+            "se": 0.002224822378950251,
+            "manos": 100097,
+            "partidas": 534,
+            "sigmas": -23.852925983787244
           },
           "pasa": true,
           "pasaPareado": true
@@ -191,16 +191,16 @@
           "mesa": 5,
           "nivelMesa": "avanzado",
           "nivelAsiento0": "basico",
-          "tasaAsiento0": 0.18822870627762334,
+          "tasaAsiento0": 0.18477880704699665,
           "esperado": 0.2,
-          "deltaPp": -1.1771293722376674,
-          "sigmas": -8.869498087002313,
+          "deltaPp": -1.5221192953003366,
+          "sigmas": -11.787207774548477,
           "pareado": {
-            "delta": -0.014299142051476912,
-            "se": 0.0021337897264639594,
-            "manos": 100006,
-            "partidas": 677,
-            "sigmas": -6.701289201149611
+            "delta": -0.015928690629652947,
+            "se": 0.002054789148344833,
+            "manos": 100071,
+            "partidas": 742,
+            "sigmas": -7.751983040441776
           },
           "pasa": true,
           "pasaPareado": true
@@ -221,161 +221,161 @@
         {
           "mesa": 2,
           "perfil": "AGRESIVA",
-          "deltaPp": -1.7957429106288565,
-          "se": 0.006553362433284139,
-          "sigmas": -2.7401855595661626,
-          "manos": 28846,
-          "partidas": 27,
-          "pasa": true
-        },
-        {
-          "mesa": 2,
-          "perfil": "IMPREDECIBLE",
-          "deltaPp": -0.9003637230934352,
-          "se": 0.005265094326018318,
-          "sigmas": -1.7100619045781227,
-          "manos": 33542,
-          "partidas": 26,
+          "deltaPp": -0.8140772747197695,
+          "se": 0.00749333843877632,
+          "sigmas": -1.0864013168110824,
+          "manos": 31938,
+          "partidas": 31,
           "pasa": true
         },
         {
           "mesa": 2,
           "perfil": "EQUILIBRADA",
-          "deltaPp": -1.413935376199527,
-          "se": 0.008752555465547677,
-          "sigmas": -1.6154543456081398,
-          "manos": 21571,
+          "deltaPp": -1.471489883507051,
+          "se": 0.006448280854792304,
+          "sigmas": -2.281987892033972,
+          "manos": 26096,
           "partidas": 25,
           "pasa": true
         },
         {
           "mesa": 2,
           "perfil": "CONSERVADORA",
-          "deltaPp": -0.47161144117106635,
-          "se": 0.008482436641273388,
-          "sigmas": -0.5559858105822147,
-          "manos": 16327,
-          "partidas": 22,
+          "deltaPp": -1.27593090877528,
+          "se": 0.008840410099742778,
+          "sigmas": -1.4432938001511997,
+          "manos": 23042,
+          "partidas": 14,
+          "pasa": true
+        },
+        {
+          "mesa": 2,
+          "perfil": "IMPREDECIBLE",
+          "deltaPp": -0.6527415143603132,
+          "se": 0.004922804221245782,
+          "sigmas": -1.3259546490661134,
+          "manos": 22980,
+          "partidas": 21,
           "pasa": true
         },
         {
           "mesa": 3,
-          "perfil": "CONSERVADORA",
-          "deltaPp": -2.3782714027365475,
-          "se": 0.00577299809401276,
-          "sigmas": -4.11964695641088,
-          "manos": 29307,
-          "partidas": 76,
-          "pasa": true
-        },
-        {
-          "mesa": 3,
-          "perfil": "AGRESIVA",
-          "deltaPp": -1.7209434903441887,
-          "se": 0.007297216363364125,
-          "sigmas": -2.358356124650809,
-          "manos": 28066,
-          "partidas": 69,
+          "perfil": "IMPREDECIBLE",
+          "deltaPp": -1.5460391298399234,
+          "se": 0.0051446798604900135,
+          "sigmas": -3.005122129587026,
+          "manos": 29236,
+          "partidas": 68,
           "pasa": true
         },
         {
           "mesa": 3,
           "perfil": "EQUILIBRADA",
-          "deltaPp": -2.0156012774200303,
-          "se": 0.007189127117406883,
-          "sigmas": -2.8036801193008496,
-          "manos": 19101,
+          "deltaPp": -2.2101069406584193,
+          "se": 0.004854747092871087,
+          "sigmas": -4.552465655530918,
+          "manos": 23845,
+          "partidas": 61,
+          "pasa": true
+        },
+        {
+          "mesa": 3,
+          "perfil": "AGRESIVA",
+          "deltaPp": -2.2817090448139585,
+          "se": 0.006450370944641277,
+          "sigmas": -3.537329968146275,
+          "manos": 26822,
+          "partidas": 74,
+          "pasa": true
+        },
+        {
+          "mesa": 3,
+          "perfil": "CONSERVADORA",
+          "deltaPp": -2.129107524790978,
+          "se": 0.0064950937995992665,
+          "sigmas": -3.2780242910769655,
+          "manos": 20572,
           "partidas": 63,
           "pasa": true
         },
         {
-          "mesa": 3,
-          "perfil": "IMPREDECIBLE",
-          "deltaPp": -1.336022183009831,
-          "se": 0.005659406047182429,
-          "sigmas": -2.360710950710063,
-          "manos": 23802,
-          "partidas": 64,
-          "pasa": true
-        },
-        {
-          "mesa": 4,
-          "perfil": "CONSERVADORA",
-          "deltaPp": -5.774103213761835,
-          "se": 0.005074601696287619,
-          "sigmas": -11.378436297741247,
-          "manos": 22497,
-          "partidas": 108,
-          "pasa": true
-        },
-        {
           "mesa": 4,
           "perfil": "AGRESIVA",
-          "deltaPp": -4.977697814760673,
-          "se": 0.004777467832939212,
-          "sigmas": -10.419113197248416,
-          "manos": 26679,
-          "partidas": 125,
+          "deltaPp": -5.405592469545958,
+          "se": 0.004059267350140161,
+          "sigmas": -13.31667023449271,
+          "manos": 28896,
+          "partidas": 143,
           "pasa": true
         },
         {
           "mesa": 4,
           "perfil": "EQUILIBRADA",
-          "deltaPp": -4.849709522606719,
-          "se": 0.004047151119762093,
-          "sigmas": -11.983020596700138,
-          "manos": 27713,
-          "partidas": 119,
+          "deltaPp": -5.240819339361505,
+          "se": 0.004191425213806446,
+          "sigmas": -12.503668971829397,
+          "manos": 27095,
+          "partidas": 146,
+          "pasa": true
+        },
+        {
+          "mesa": 4,
+          "perfil": "CONSERVADORA",
+          "deltaPp": -5.506586114687531,
+          "se": 0.004616486386491415,
+          "sigmas": -11.928089143294546,
+          "manos": 20194,
+          "partidas": 118,
           "pasa": true
         },
         {
           "mesa": 4,
           "perfil": "IMPREDECIBLE",
-          "deltaPp": -5.792841085941554,
-          "se": 0.005231229897831401,
-          "sigmas": -11.073573899596665,
-          "manos": 23132,
-          "partidas": 97,
+          "deltaPp": -5.0936768149882905,
+          "se": 0.0050318714705734745,
+          "sigmas": -10.122827748634391,
+          "manos": 23912,
+          "partidas": 127,
           "pasa": true
         },
         {
           "mesa": 5,
           "perfil": "CONSERVADORA",
-          "deltaPp": -1.3788322292404869,
-          "se": 0.004346468225760185,
-          "sigmas": -3.172304863678908,
-          "manos": 25964,
-          "partidas": 175,
-          "pasa": true
-        },
-        {
-          "mesa": 5,
-          "perfil": "AGRESIVA",
-          "deltaPp": -1.1810373306904525,
-          "se": 0.004369581605663967,
-          "sigmas": -2.7028613658560827,
-          "manos": 24216,
-          "partidas": 161,
-          "pasa": true
-        },
-        {
-          "mesa": 5,
-          "perfil": "EQUILIBRADA",
-          "deltaPp": -1.898547674173858,
-          "se": 0.00423260148100652,
-          "sigmas": -4.485533737805101,
-          "manos": 23755,
-          "partidas": 165,
+          "deltaPp": -1.9993105825577389,
+          "se": 0.003907540374743246,
+          "sigmas": -5.116544912703834,
+          "manos": 26109,
+          "partidas": 183,
           "pasa": true
         },
         {
           "mesa": 5,
           "perfil": "IMPREDECIBLE",
-          "deltaPp": -1.284952629358291,
-          "se": 0.00409487106033125,
-          "sigmas": -3.1379562638886753,
-          "manos": 26071,
-          "partidas": 176,
+          "deltaPp": -1.4366817286525315,
+          "se": 0.003874312420562843,
+          "sigmas": -3.708223738042831,
+          "manos": 25893,
+          "partidas": 194,
+          "pasa": true
+        },
+        {
+          "mesa": 5,
+          "perfil": "EQUILIBRADA",
+          "deltaPp": -1.2348582853110668,
+          "se": 0.004491847248145476,
+          "sigmas": -2.7491101479928908,
+          "manos": 25509,
+          "partidas": 184,
+          "pasa": true
+        },
+        {
+          "mesa": 5,
+          "perfil": "AGRESIVA",
+          "deltaPp": -1.7065602836879432,
+          "se": 0.004108401078103171,
+          "sigmas": -4.153830775635601,
+          "manos": 22560,
+          "partidas": 181,
           "pasa": true
         }
       ]
@@ -387,75 +387,122 @@
       "detalle": [
         {
           "mesa": 2,
-          "tasaNivel": 0.23572114230861532,
+          "tasaNivel": 0.26421622054015137,
           "tasaBase": 0.3126967471143757,
           "esperado": 0.5,
-          "difPp": -7.697560480576035,
-          "sigmas": -24.39433386229025,
+          "difPp": -4.84805265742243,
+          "sigmas": -15.299191222983517,
           "pasa": true
         },
         {
           "mesa": 3,
-          "tasaNivel": 0.1091149035721784,
+          "tasaNivel": 0.12118757624847504,
           "tasaBase": 0.15374695085376094,
           "esperado": 0.3333333333333333,
-          "difPp": -4.463204728158255,
-          "sigmas": -24.693453099988222,
+          "difPp": -3.2559374605285907,
+          "sigmas": -17.8021204402626,
           "pasa": true
         },
         {
           "mesa": 4,
-          "tasaNivel": 0.06702061711360409,
+          "tasaNivel": 0.06592626654404414,
           "tasaBase": 0.09794082367053179,
           "esperado": 0.25,
-          "difPp": -3.0920206556927705,
-          "sigmas": -24.294057116641184,
+          "difPp": -3.201455712648765,
+          "sigmas": -25.103262844053024,
           "pasa": true
         },
         {
           "mesa": 5,
-          "tasaNivel": 0.05169655889468738,
+          "tasaNivel": 0.04974452810190879,
           "tasaBase": 0.05876764929402824,
           "esperado": 0.2,
-          "difPp": -0.7071090399340854,
-          "sigmas": -7.080901479941281,
+          "difPp": -0.9023121192119448,
+          "sigmas": -9.018767784259502,
           "pasa": true
         }
       ]
     }
   },
+  "puertasNiv2": null,
   "puertas": {
     "a_conservacionFichas": true,
     "b_espejoSimetrico": true,
     "c_escriturasFueraDeCapturas": false,
     "extra_pasajeroSobrevive": true,
+    "b3_metodo": {
+      "b2_metodo": {
+        "correccion": "Bonferroni",
+        "familia": "la comparación pareada gemelo-vs-gemelo (asientos 0 y 1) del conductor espejo simétrico, una por mesa",
+        "tamanoFamilia": 4,
+        "alfaFamilia": 0.0026997960632601866,
+        "alfaPorPrueba": 0.0006749490158150466,
+        "umbralSigmas": 3.3995578407227973,
+        "umbralSinCorregir": 3,
+        "maxSigmasObservado": 1.3330693594317995,
+        "porQue": "rider NIV-2 §5 (deuda declarada en B0.c): b2 es una familia de una prueba por mesa y se leía contra 3σ pelados mientras b3 y las puertas de nivel ya usaban Bonferroni. Es doctrina, no rescate — con los datos vigentes b2 pasa con o sin corrección.",
+        "degeneracion": "con m=1 el umbral vuelve a ser exactamente 3σ"
+      },
+      "correccion": "Bonferroni",
+      "familia": "las comparaciones por parejas de asientos NO GEMELOS del conductor espejo, sobre toda la matriz",
+      "tamanoFamilia": 4,
+      "detalleFamilia": [
+        {
+          "mesa": 4,
+          "pares": 1
+        },
+        {
+          "mesa": 5,
+          "pares": 3
+        }
+      ],
+      "alfaFamilia": 0.0026997960632601866,
+      "alfaPorPrueba": 0.0006749490158150466,
+      "umbralSigmas": 3.3995578407227973,
+      "umbralSinCorregir": 3,
+      "porQue": "b3 no es una prueba sino 4. A 3σ por prueba la familia falla por azar con probabilidad ~1.1%, así que un rojo suelto es esperable por diseño. El alfa de familia se reparte entre las 4 pruebas para devolver a la PUERTA la tasa de error de una sola prueba a 3σ.",
+      "degeneracion": "con m=1 el umbral vuelve a ser exactamente 3σ: la corrección no afloja nada cuando no hay familia",
+      "b2_nota": "b2 (gemelo vs gemelo) es otra familia de 4 pruebas, máx 1.33σ. Desde el rider NIV-2 §5 lleva su propio umbral por familia (3.400σ) en vez de 3σ pelados."
+    },
+    "b2_metodo": {
+      "correccion": "Bonferroni",
+      "familia": "la comparación pareada gemelo-vs-gemelo (asientos 0 y 1) del conductor espejo simétrico, una por mesa",
+      "tamanoFamilia": 4,
+      "alfaFamilia": 0.0026997960632601866,
+      "alfaPorPrueba": 0.0006749490158150466,
+      "umbralSigmas": 3.3995578407227973,
+      "umbralSinCorregir": 3,
+      "maxSigmasObservado": 1.3330693594317995,
+      "porQue": "rider NIV-2 §5 (deuda declarada en B0.c): b2 es una familia de una prueba por mesa y se leía contra 3σ pelados mientras b3 y las puertas de nivel ya usaban Bonferroni. Es doctrina, no rescate — con los datos vigentes b2 pasa con o sin corrección.",
+      "degeneracion": "con m=1 el umbral vuelve a ser exactamente 3σ"
+    },
     "b_detalle": [
       {
         "mesa": 2,
         "esperado": 0.5,
-        "efectoDiseno": 1.1893165319937238,
+        "efectoDiseno": 0.8367892555969195,
         "desvios": [
           {
             "asiento": 0,
-            "delta": 0.002294655801629797,
-            "sigmas": 1.3308709992855148,
-            "sigmasBinomial": 1.4513918813836886
+            "delta": 0.000868960722975376,
+            "sigmas": 0.6028742072173209,
+            "sigmasBinomial": 0.5514863295209406
           },
           {
             "asiento": 1,
-            "delta": -0.0022946558016297414,
-            "sigmas": 1.3308709992854844,
-            "sigmasBinomial": 1.4513918813836535
+            "delta": -0.0008689607229753205,
+            "sigmas": 0.602874207217283,
+            "sigmasBinomial": 0.5514863295209054
           }
         ],
-        "maxSigmas": 1.3308709992855148,
-        "maxSigmasBinomial": 1.4513918813836886,
+        "maxSigmas": 0.6028742072173209,
+        "maxSigmasBinomial": 0.5514863295209406,
         "b1_aplica": true,
         "b1_pasa": true,
         "b2_pareadoGemelos": {
-          "delta": 0.004589311603259538,
-          "se": 0.002438353046527522,
-          "sigmas": 1.8821358169585873
+          "delta": 0.0017379214459506964,
+          "se": 0.0020383954478223683,
+          "sigmas": 0.852592880251636
         },
         "b2_pasa": true,
         "b3_paresNoGemelos": [],
@@ -465,184 +512,188 @@
           "nota": "mesa 2: los dos asientos SON los gemelos, así que 1/N es exacto"
         },
         "b3_umbralSigmas": 3.3995578407227973,
-        "b3_maxSigmas": null
+        "b3_maxSigmas": null,
+        "b2_umbralSigmas": 3.3995578407227973
       },
       {
         "mesa": 3,
         "esperado": 0.3333333333333333,
-        "efectoDiseno": 1.1541765290280306,
+        "efectoDiseno": 0.9668425311172927,
         "desvios": [
           {
             "asiento": 0,
-            "delta": 0.0014970059880239917,
-            "sigmas": 0.9346363367558889,
-            "sigmasBinomial": 1.0041041931365184
+            "delta": 0.001241347177848795,
+            "sigmas": 0.8467717272346525,
+            "sigmasBinomial": 0.832614983962521
           },
           {
             "asiento": 1,
-            "delta": -0.0014171656686626788,
-            "sigmas": 0.895114482060147,
-            "sigmasBinomial": 0.9526311951110605
+            "delta": -0.00009651224707135642,
+            "sigmas": 0.06111667700204821,
+            "sigmasBinomial": 0.06479884867944749
           },
           {
             "asiento": 2,
-            "delta": -0.00007984031936125735,
-            "sigmas": 0.053268240281413644,
-            "sigmasBinomial": 0.05361525755265829
+            "delta": -0.001144834930777383,
+            "sigmas": 0.730690166778528,
+            "sigmasBinomial": 0.7692558132641251
           }
         ],
-        "maxSigmas": 0.9346363367558889,
-        "maxSigmasBinomial": 1.0041041931365184,
+        "maxSigmas": 0.8467717272346525,
+        "maxSigmasBinomial": 0.832614983962521,
         "b1_aplica": false,
         "b1_pasa": null,
         "b2_pareadoGemelos": {
-          "delta": 0.0029141716566866704,
-          "se": 0.002252117631933455,
-          "sigmas": 1.2939695579687989
+          "delta": 0.0013378594249201514,
+          "se": 0.002154714120328892,
+          "sigmas": 0.6208988061562165
         },
         "b2_pasa": true,
         "b3_paresNoGemelos": [],
         "b3_pasa": true,
         "diagnostico1sobreN": {
-          "sesgoGemelosPp": 0.011976047904188603,
+          "sesgoGemelosPp": 0.17172523961661024,
           "nota": "N>=3: el adaptador duplica un perfil; los gemelos rinden por debajo de 1/N y los no gemelos por encima. Desviación esperada, cuantificada, no sesgo del banco."
         },
         "b3_umbralSigmas": 3.3995578407227973,
-        "b3_maxSigmas": null
+        "b3_maxSigmas": null,
+        "b2_umbralSigmas": 3.3995578407227973
       },
       {
         "mesa": 4,
         "esperado": 0.25,
-        "efectoDiseno": 1.0212268289277564,
+        "efectoDiseno": 0.9708140939633405,
         "desvios": [
           {
             "asiento": 0,
-            "delta": -0.0008992446345070237,
-            "sigmas": 0.650909662442018,
-            "sigmasBinomial": 0.6577817597585144
+            "delta": 0.0002570450302963878,
+            "sigmas": 0.19062323401631015,
+            "sigmasBinomial": 0.18782087939235745
           },
           {
             "asiento": 1,
-            "delta": 0.0006294712441549111,
-            "sigmas": 0.42821411326351655,
-            "sigmasBinomial": 0.45950881681945105
+            "delta": -0.0005315591403216302,
+            "sigmas": 0.3815918375693827,
+            "sigmasBinomial": 0.3888152725406328
           },
           {
             "asiento": 2,
-            "delta": 0.0006194796371048472,
-            "sigmas": 0.4822025717817848,
-            "sigmasBinomial": 0.45222102556246785
+            "delta": 0.0018841650279006195,
+            "sigmas": 1.382639782641251,
+            "sigmasBinomial": 1.3737828574467406
           },
           {
             "asiento": 3,
-            "delta": -0.00034970624675273454,
-            "sigmas": 0.27251709065037044,
-            "sigmasBinomial": 0.2556158726231655
+            "delta": -0.0016096509178753493,
+            "sigmas": 1.1086753683506732,
+            "sigmasBinomial": 1.1791041815773118
           }
         ],
-        "maxSigmas": 0.650909662442018,
-        "maxSigmasBinomial": 0.6577817597585144,
+        "maxSigmas": 1.382639782641251,
+        "maxSigmasBinomial": 1.3737828574467406,
         "b1_aplica": false,
         "b1_pasa": null,
         "b2_pareadoGemelos": {
-          "delta": -0.0015287158786619348,
-          "se": 0.002017293512303893,
-          "sigmas": 0.7578053809909061
+          "delta": 0.000788604170618018,
+          "se": 0.001938753875152506,
+          "sigmas": 0.40675826917740393
         },
         "b2_pasa": true,
         "b3_paresNoGemelos": [
           {
             "a": 2,
             "b": 3,
-            "delta": 0.0009691858838575818,
-            "se": 0.0018158029380148251,
-            "sigmas": 0.5337505868985817
+            "delta": 0.0034938159457759688,
+            "se": 0.001991219729780483,
+            "sigmas": 1.754610952032469
           }
         ],
         "b3_pasa": true,
         "diagnostico1sobreN": {
-          "sesgoGemelosPp": -0.026977339035208492,
+          "sesgoGemelosPp": -0.027451411002527015,
           "nota": "N>=3: el adaptador duplica un perfil; los gemelos rinden por debajo de 1/N y los no gemelos por encima. Desviación esperada, cuantificada, no sesgo del banco."
         },
         "b3_umbralSigmas": 3.3995578407227973,
-        "b3_maxSigmas": 0.5337505868985817
+        "b3_maxSigmas": 1.754610952032469,
+        "b2_umbralSigmas": 3.3995578407227973
       },
       {
         "mesa": 5,
         "esperado": 0.2,
-        "efectoDiseno": 1.0987804404550061,
+        "efectoDiseno": 1.1018263152018186,
         "desvios": [
           {
             "asiento": 0,
-            "delta": -0.0004854756862588405,
-            "sigmas": 0.3666759536406979,
-            "sigmasBinomial": 0.38435973926102296
+            "delta": -0.002572533655816195,
+            "sigmas": 1.947521680835465,
+            "sigmasBinomial": 2.0442729000014195
           },
           {
             "asiento": 1,
-            "delta": -0.0011747312902065932,
-            "sigmas": 0.9410740688636252,
-            "sigmasBinomial": 0.931265509275653
+            "delta": -0.00011393505701751128,
+            "sigmas": 0.08852020658372198,
+            "sigmasBinomial": 0.09011849625827104
           },
           {
             "asiento": 2,
-            "delta": 0.0007332081352139641,
-            "sigmas": 0.5627819264120313,
-            "sigmasBinomial": 0.5791701493556406
+            "delta": 0.001165335758617575,
+            "sigmas": 0.8885626662675796,
+            "sigmasBinomial": 0.9195382249590631
           },
           {
             "asiento": 3,
-            "delta": 0.0005434131138370435,
-            "sigmas": 0.42928975131266095,
-            "sigmasBinomial": 0.42940081425831206
+            "delta": -0.00019388948299470243,
+            "sigmas": 0.14665520363816872,
+            "sigmasBinomial": 0.1533825639015754
           },
           {
             "asiento": 4,
-            "delta": 0.0003835857274143706,
-            "sigmas": 0.2925149100684207,
-            "sigmasBinomial": 0.3031970069094164
+            "delta": 0.001715022437210778,
+            "sigmas": 1.2685371895280355,
+            "sigmasBinomial": 1.3519027301468458
           }
         ],
-        "maxSigmas": 0.9410740688636252,
-        "maxSigmasBinomial": 0.931265509275653,
+        "maxSigmas": 1.947521680835465,
+        "maxSigmasBinomial": 2.0442729000014195,
         "b1_aplica": false,
         "b1_pasa": null,
         "b2_pareadoGemelos": {
-          "delta": 0.0006892556039477526,
-          "se": 0.0018196633756261732,
-          "sigmas": 0.3787819292184026
+          "delta": -0.0024585985987986836,
+          "se": 0.0018443140871879495,
+          "sigmas": 1.3330693594317995
         },
         "b2_pasa": true,
         "b3_paresNoGemelos": [
           {
             "a": 2,
             "b": 3,
-            "delta": 0.00018979502137692061,
-            "se": 0.0018165125489114538,
-            "sigmas": 0.10448318757316342
+            "delta": 0.0013592252416122774,
+            "se": 0.0018622239916577016,
+            "sigmas": 0.7298935292968338
           },
           {
             "a": 2,
             "b": 4,
-            "delta": 0.0003496224077995935,
-            "se": 0.0018485039447572213,
-            "sigmas": 0.1891380371630812
+            "delta": -0.0005496866785932031,
+            "se": 0.0018835629718270905,
+            "sigmas": 0.2918334490616987
           },
           {
             "a": 3,
             "b": 4,
-            "delta": 0.0001598273864226729,
-            "se": 0.0018226251136554635,
-            "sigmas": 0.08769076274940737
+            "delta": -0.0019089119202054805,
+            "se": 0.0018909539577423955,
+            "sigmas": 1.0094967740433642
           }
         ],
         "b3_pasa": true,
         "diagnostico1sobreN": {
-          "sesgoGemelosPp": -0.1383505813721153,
+          "sesgoGemelosPp": -0.22387239273614357,
           "nota": "N>=3: el adaptador duplica un perfil; los gemelos rinden por debajo de 1/N y los no gemelos por encima. Desviación esperada, cuantificada, no sesgo del banco."
         },
         "b3_umbralSigmas": 3.3995578407227973,
-        "b3_maxSigmas": 0.1891380371630812
+        "b3_maxSigmas": 1.0094967740433642,
+        "b2_umbralSigmas": 3.3995578407227973
       }
     ]
   },
@@ -654,926 +705,1494 @@
       "nivelAsiento0": "avanzado",
       "duelo": {
         "global": {
-          "delta": 0.004589311603259511,
-          "se": 0.0034483519482529754,
-          "manos": 100015,
-          "partidas": 66,
-          "sigmas": 1.3308709992854921
+          "delta": 0.001737921445950643,
+          "se": 0.0028827264877899694,
+          "manos": 100695,
+          "partidas": 58,
+          "sigmas": 0.6028742072172839
+        },
+        "porPerfil": {
+          "IMPREDECIBLE": {
+            "delta": 0.010027226243442459,
+            "se": 0.009584508940604319,
+            "manos": 15059,
+            "partidas": 12,
+            "sigmas": 1.0461909217865706
+          },
+          "CONSERVADORA": {
+            "delta": 0.0007914018023537821,
+            "se": 0.0049821127075853865,
+            "manos": 39171,
+            "partidas": 17,
+            "sigmas": 0.1588486348670623
+          },
+          "AGRESIVA": {
+            "delta": 0.004634474510390193,
+            "se": 0.005028876811416281,
+            "manos": 26756,
+            "partidas": 18,
+            "sigmas": 0.9215724870947848
+          },
+          "EQUILIBRADA": {
+            "delta": -0.006646709625044396,
+            "se": 0.006467958063173508,
+            "manos": 19709,
+            "partidas": 11,
+            "sigmas": -1.0276364750861082
+          }
+        }
+      },
+      "dueloFichas": {
+        "global": {
+          "delta": 0.5958587814687919,
+          "se": 0.7751257003547375,
+          "manos": 100695,
+          "partidas": 58,
+          "sigmas": 0.7687253579594847
+        },
+        "porPerfil": {
+          "IMPREDECIBLE": {
+            "delta": 3.984328308652633,
+            "se": 2.781488521690058,
+            "manos": 15059,
+            "partidas": 12,
+            "sigmas": 1.4324446344404538
+          },
+          "CONSERVADORA": {
+            "delta": 0.7658727119552731,
+            "se": 1.1074439168192118,
+            "manos": 39171,
+            "partidas": 17,
+            "sigmas": 0.691567943372703
+          },
+          "AGRESIVA": {
+            "delta": 0,
+            "se": 1.6316494433599915,
+            "manos": 26756,
+            "partidas": 18,
+            "sigmas": 0
+          },
+          "EQUILIBRADA": {
+            "delta": -1.5221472423765792,
+            "se": 1.6806002859137186,
+            "manos": 19709,
+            "partidas": 11,
+            "sigmas": -0.9057164009400422
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": 30000,
+          "porMano": 0.29792939073439595,
+          "se": 0.38756285017736875
+        },
+        {
+          "asiento": 1,
+          "total": -30000,
+          "porMano": -0.29792939073439595,
+          "se": 0.38756285017736875
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 343515,
+          "tasaRetiro": 0.03364918562508187,
+          "tasaSubida": 0.20103925592768876
+        },
+        {
+          "asiento": 1,
+          "acciones": 343786,
+          "tasaRetiro": 0.03383791079334237,
+          "tasaSubida": 0.20043573618471958
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 23192,
+        "tasaAbandono": 0.23031928099707036
+      },
+      "manosContadas": 100695,
+      "manosSimuladas": 100695,
+      "partidasCompletas": 58,
+      "tasaAsiento0": 0.5008689607229754,
+      "seAsiento0": 0.0014413632438949866,
+      "seBinomialAsiento0": 0.001575670468078902,
+      "efectoDiseno": 0.8367892555969195,
+      "esperado": 0.5,
+      "sorteosDePerfiles": 58,
+      "porPerfil": {
+        "IMPREDECIBLE": {
+          "jugadas": 30118,
+          "ganadas": 15059,
+          "tasa": 0.5,
+          "se": 0.002881090761562303
+        },
+        "CONSERVADORA": {
+          "jugadas": 78342,
+          "ganadas": 39171,
+          "tasa": 0.5,
+          "se": 0.0017863751845045423
+        },
+        "AGRESIVA": {
+          "jugadas": 53512,
+          "ganadas": 26756,
+          "tasa": 0.5,
+          "se": 0.0021614461142551817
+        },
+        "EQUILIBRADA": {
+          "jugadas": 39418,
+          "ganadas": 19709,
+          "tasa": 0.5,
+          "se": 0.0025183884085996505
+        }
+      },
+      "porAsiento": [
+        {
+          "asiento": 0,
+          "tasa": 0.5008689607229754,
+          "se": 0.0014413632438949866,
+          "seBinomial": 0.001575670468078902
+        },
+        {
+          "asiento": 1,
+          "tasa": 0.4991310392770247,
+          "se": 0.001441363243894985,
+          "seBinomial": 0.001575670468078902
+        }
+      ],
+      "porRol": {
+        "mano": {
+          "jugadas": 100695,
+          "ganadas": 54353,
+          "tasa": 0.5397785391528874,
+          "se": 0.0015706784566138386
+        },
+        "pie": {
+          "jugadas": 100695,
+          "ganadas": 46342,
+          "tasa": 0.4602214608471126,
+          "se": 0.0015706784566138386
+        },
+        "medio": {
+          "jugadas": 0,
+          "ganadas": 0,
+          "tasa": 0,
+          "se": 0
+        }
+      },
+      "porVivos": {
+        "2": {
+          "jugadas": 100695,
+          "ganadas": 50435,
+          "tasa": 0.5008689607229754,
+          "se": 0.001575670468078902
+        }
+      },
+      "partidas": {
+        "completas": 58,
+        "tasaAsiento0": 0.5517241379310345,
+        "seAsiento0": 0.06530097606537921,
+        "medianaManosPorPartida": 1049
+      },
+      "manosPorMinuto": 6842242
+    },
+    {
+      "mesa": 2,
+      "conductor": "pasivo",
+      "nivel": "avanzado",
+      "nivelAsiento0": "avanzado",
+      "duelo": null,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -1280000,
+          "porMano": -12.789512599668273,
+          "se": 0.45964014019452154
+        },
+        {
+          "asiento": 1,
+          "total": 1280000,
+          "porMano": 12.789512599668273,
+          "se": 0.45964014019452154
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 363439,
+          "tasaRetiro": 0.0003742030987318367,
+          "tasaSubida": 0
+        },
+        {
+          "asiento": 1,
+          "acciones": 300210,
+          "tasaRetiro": 0,
+          "tasaSubida": 0.330568601978615
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 136,
+        "tasaAbandono": 0.001358885713714754
+      },
+      "manosContadas": 100082,
+      "manosSimuladas": 100082,
+      "partidasCompletas": 256,
+      "tasaAsiento0": 0.4972622449591335,
+      "seAsiento0": 0.001648855045105868,
+      "seBinomialAsiento0": 0.0015804672688819583,
+      "efectoDiseno": 1.0884135569953663,
+      "esperado": 0.5,
+      "sorteosDePerfiles": 256,
+      "porPerfil": {
+        "CONSERVADORA": {
+          "jugadas": 23524,
+          "ganadas": 11835,
+          "tasa": 0.50310321373916,
+          "se": 0.003259913334090082
+        },
+        "AGRESIVA": {
+          "jugadas": 23325,
+          "ganadas": 11768,
+          "tasa": 0.5045230439442658,
+          "se": 0.0032737190671286048
+        },
+        "IMPREDECIBLE": {
+          "jugadas": 24769,
+          "ganadas": 12418,
+          "tasa": 0.5013524970729542,
+          "se": 0.0031769777912561163
+        },
+        "EQUILIBRADA": {
+          "jugadas": 28464,
+          "ganadas": 14294,
+          "tasa": 0.5021781899943789,
+          "se": 0.0029635886162287196
+        }
+      },
+      "porAsiento": [
+        {
+          "asiento": 0,
+          "tasa": 0.4972622449591335,
+          "se": 0.001648855045105868,
+          "seBinomial": 0.0015804672688819583
+        },
+        {
+          "asiento": 1,
+          "tasa": 0.5027377550408665,
+          "se": 0.001648855045105868,
+          "seBinomial": 0.0015804672688819583
+        }
+      ],
+      "porRol": {
+        "mano": {
+          "jugadas": 100082,
+          "ganadas": 53858,
+          "tasa": 0.5381387262444796,
+          "se": 0.0015758864086179358
+        },
+        "pie": {
+          "jugadas": 100082,
+          "ganadas": 46224,
+          "tasa": 0.4618612737555205,
+          "se": 0.0015758864086179358
+        },
+        "medio": {
+          "jugadas": 0,
+          "ganadas": 0,
+          "tasa": 0,
+          "se": 0
+        }
+      },
+      "porVivos": {
+        "2": {
+          "jugadas": 100082,
+          "ganadas": 49767,
+          "tasa": 0.4972622449591335,
+          "se": 0.0015804672688819583
+        }
+      },
+      "partidas": {
+        "completas": 256,
+        "tasaAsiento0": 0,
+        "seAsiento0": 0,
+        "medianaManosPorPartida": 338
+      },
+      "manosPorMinuto": 8804868
+    },
+    {
+      "mesa": 2,
+      "conductor": "aleatorio",
+      "nivel": "avanzado",
+      "nivelAsiento0": "avanzado",
+      "duelo": null,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -8085000,
+          "porMano": -80.84272415482607,
+          "se": 0.5119034513496185
+        },
+        {
+          "asiento": 1,
+          "total": 8085000,
+          "porMano": 80.84272415482607,
+          "se": 0.5119034513496185
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 332375,
+          "tasaRetiro": 0.07193380970289583,
+          "tasaSubida": 0.4589304249717939
+        },
+        {
+          "asiento": 1,
+          "acciones": 372197,
+          "tasaRetiro": 0.025671888811570218,
+          "tasaSubida": 0.18715895077069403
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 33464,
+        "tasaAbandono": 0.33460988511034007
+      },
+      "manosContadas": 100009,
+      "manosSimuladas": 100009,
+      "partidasCompletas": 1617,
+      "tasaAsiento0": 0.26421622054015137,
+      "seAsiento0": 0.0015059284680233281,
+      "seBinomialAsiento0": 0.0013942328154843277,
+      "efectoDiseno": 1.16664328551888,
+      "esperado": 0.5,
+      "sorteosDePerfiles": 1617,
+      "porPerfil": {
+        "IMPREDECIBLE": {
+          "jugadas": 25534,
+          "ganadas": 18824,
+          "tasa": 0.7372131275945798,
+          "se": 0.002754475641148395
+        },
+        "CONSERVADORA": {
+          "jugadas": 24072,
+          "ganadas": 17699,
+          "tasa": 0.7352525756065138,
+          "se": 0.0028436625712532754
+        },
+        "EQUILIBRADA": {
+          "jugadas": 25697,
+          "ganadas": 18961,
+          "tasa": 0.7378682336459509,
+          "se": 0.0027435193118805364
+        },
+        "AGRESIVA": {
+          "jugadas": 24706,
+          "ganadas": 18101,
+          "tasa": 0.7326560349712621,
+          "se": 0.002815684820486098
+        }
+      },
+      "porAsiento": [
+        {
+          "asiento": 0,
+          "tasa": 0.26421622054015137,
+          "se": 0.0015059284680233281,
+          "seBinomial": 0.0013942328154843277
+        },
+        {
+          "asiento": 1,
+          "tasa": 0.7357837794598486,
+          "se": 0.0015059284680233281,
+          "seBinomial": 0.0013942328154843277
+        }
+      ],
+      "porRol": {
+        "mano": {
+          "jugadas": 100009,
+          "ganadas": 51747,
+          "tasa": 0.5174234318911298,
+          "se": 0.0015801074437054345
+        },
+        "pie": {
+          "jugadas": 100009,
+          "ganadas": 48262,
+          "tasa": 0.4825765681088702,
+          "se": 0.0015801074437054345
+        },
+        "medio": {
+          "jugadas": 0,
+          "ganadas": 0,
+          "tasa": 0,
+          "se": 0
+        }
+      },
+      "porVivos": {
+        "2": {
+          "jugadas": 100009,
+          "ganadas": 26424,
+          "tasa": 0.26421622054015137,
+          "se": 0.0013942328154843277
+        }
+      },
+      "partidas": {
+        "completas": 1617,
+        "tasaAsiento0": 0,
+        "seAsiento0": 0,
+        "medianaManosPorPartida": 60
+      },
+      "manosPorMinuto": 8876538
+    },
+    {
+      "mesa": 2,
+      "conductor": "espejo",
+      "nivel": "avanzado",
+      "nivelAsiento0": "basico",
+      "duelo": {
+        "global": {
+          "delta": -0.010455908357038518,
+          "se": 0.003547890157491043,
+          "manos": 104056,
+          "partidas": 91,
+          "sigmas": -2.9470778104451267
+        },
+        "porPerfil": {
+          "AGRESIVA": {
+            "delta": -0.008140772747197695,
+            "se": 0.00749333843877632,
+            "manos": 31938,
+            "partidas": 31,
+            "sigmas": -1.0864013168110824
+          },
+          "EQUILIBRADA": {
+            "delta": -0.014714898835070508,
+            "se": 0.006448280854792304,
+            "manos": 26096,
+            "partidas": 25,
+            "sigmas": -2.281987892033972
+          },
+          "CONSERVADORA": {
+            "delta": -0.0127593090877528,
+            "se": 0.008840410099742778,
+            "manos": 23042,
+            "partidas": 14,
+            "sigmas": -1.4432938001511997
+          },
+          "IMPREDECIBLE": {
+            "delta": -0.006527415143603133,
+            "se": 0.004922804221245782,
+            "manos": 22980,
+            "partidas": 21,
+            "sigmas": -1.3259546490661134
+          }
+        }
+      },
+      "dueloFichas": {
+        "global": {
+          "delta": -4.709002844622127,
+          "se": 1.0917870185315568,
+          "manos": 104056,
+          "partidas": 91,
+          "sigmas": -4.313114888429147
+        },
+        "porPerfil": {
+          "AGRESIVA": {
+            "delta": -5.322812950090801,
+            "se": 1.9855079155044002,
+            "manos": 31938,
+            "partidas": 31,
+            "sigmas": -2.680831896224694
+          },
+          "EQUILIBRADA": {
+            "delta": -4.9816063764561616,
+            "se": 2.613185677132304,
+            "manos": 26096,
+            "partidas": 25,
+            "sigmas": -1.9063346397654182
+          },
+          "CONSERVADORA": {
+            "delta": -4.339901050256054,
+            "se": 1.686107160204878,
+            "manos": 23042,
+            "partidas": 14,
+            "sigmas": -2.5739176919981257
+          },
+          "IMPREDECIBLE": {
+            "delta": -3.91644908616188,
+            "se": 2.4366986961689543,
+            "manos": 22980,
+            "partidas": 21,
+            "sigmas": -1.6072767192428963
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -245000,
+          "porMano": -2.3545014223110634,
+          "se": 0.5458935092657784
+        },
+        {
+          "asiento": 1,
+          "total": 245000,
+          "porMano": 2.3545014223110634,
+          "se": 0.5458935092657784
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 349180,
+          "tasaRetiro": 0.02022738988487313,
+          "tasaSubida": 0.20973709834469328
+        },
+        {
+          "asiento": 1,
+          "acciones": 352710,
+          "tasaRetiro": 0.03411017549828471,
+          "tasaSubida": 0.19810609282413313
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 19094,
+        "tasaAbandono": 0.1834973475820712
+      },
+      "manosContadas": 104056,
+      "manosSimuladas": 104056,
+      "partidasCompletas": 91,
+      "tasaAsiento0": 0.49477204582148077,
+      "seAsiento0": 0.0017739450787455221,
+      "seBinomialAsiento0": 0.0015499321953709577,
+      "efectoDiseno": 1.3099506683089697,
+      "esperado": 0.5,
+      "sorteosDePerfiles": 91,
+      "porPerfil": {
+        "AGRESIVA": {
+          "jugadas": 63876,
+          "ganadas": 31938,
+          "tasa": 0.5,
+          "se": 0.001978340984647832
+        },
+        "EQUILIBRADA": {
+          "jugadas": 52192,
+          "ganadas": 26096,
+          "tasa": 0.5,
+          "se": 0.0021886082635336657
+        },
+        "CONSERVADORA": {
+          "jugadas": 46084,
+          "ganadas": 23042,
+          "tasa": 0.5,
+          "se": 0.002329136387766948
+        },
+        "IMPREDECIBLE": {
+          "jugadas": 45960,
+          "ganadas": 22980,
+          "tasa": 0.5,
+          "se": 0.0023322762743014126
+        }
+      },
+      "porAsiento": [
+        {
+          "asiento": 0,
+          "tasa": 0.49477204582148077,
+          "se": 0.0017739450787455221,
+          "seBinomial": 0.0015499321953709577
+        },
+        {
+          "asiento": 1,
+          "tasa": 0.5052279541785193,
+          "se": 0.0017739450787455215,
+          "seBinomial": 0.0015499321953709579
+        }
+      ],
+      "porRol": {
+        "mano": {
+          "jugadas": 104056,
+          "ganadas": 55404,
+          "tasa": 0.5324440685784577,
+          "se": 0.0015467503340276109
+        },
+        "pie": {
+          "jugadas": 104056,
+          "ganadas": 48652,
+          "tasa": 0.4675559314215422,
+          "se": 0.0015467503340276109
+        },
+        "medio": {
+          "jugadas": 0,
+          "ganadas": 0,
+          "tasa": 0,
+          "se": 0
+        }
+      },
+      "porVivos": {
+        "2": {
+          "jugadas": 104056,
+          "ganadas": 51484,
+          "tasa": 0.49477204582148077,
+          "se": 0.0015499321953709577
+        }
+      },
+      "partidas": {
+        "completas": 91,
+        "tasaAsiento0": 0.23076923076923078,
+        "seAsiento0": 0.044166865520247275,
+        "medianaManosPorPartida": 641
+      },
+      "manosPorMinuto": 7118997
+    },
+    {
+      "mesa": 3,
+      "conductor": "espejo",
+      "nivel": "avanzado",
+      "nivelAsiento0": "avanzado",
+      "duelo": {
+        "global": {
+          "delta": 0.0013378594249201278,
+          "se": 0.0026135738631256353,
+          "manos": 100160,
+          "partidas": 244,
+          "sigmas": 0.5118888904559789
         },
         "porPerfil": {
           "CONSERVADORA": {
-            "delta": 0.0018312438371601634,
-            "se": 0.006425778304495643,
-            "manos": 28396,
-            "partidas": 19,
-            "sigmas": 0.28498397398475095
-          },
-          "IMPREDECIBLE": {
-            "delta": 0.01831041257367387,
-            "se": 0.012086479316601298,
-            "manos": 12725,
-            "partidas": 16,
-            "sigmas": 1.5149500606453472
-          },
-          "AGRESIVA": {
-            "delta": 0.00664405519676625,
-            "se": 0.00857183038673992,
-            "manos": 21523,
-            "partidas": 16,
-            "sigmas": 0.7751034373060138
+            "delta": -0.006284602723327847,
+            "se": 0.0045445462690495795,
+            "manos": 33415,
+            "partidas": 67,
+            "sigmas": -1.3828889291168274
           },
           "EQUILIBRADA": {
-            "delta": 0.0008295202162104306,
-            "se": 0.004509389509944424,
-            "manos": 37371,
-            "partidas": 15,
-            "sigmas": 0.1839539951874004
+            "delta": 0.005901475368842211,
+            "se": 0.005665669688242159,
+            "manos": 19995,
+            "partidas": 51,
+            "sigmas": 1.0416200896937946
+          },
+          "AGRESIVA": {
+            "delta": -0.0014497349703257373,
+            "se": 0.005925115294425729,
+            "manos": 22073,
+            "partidas": 62,
+            "sigmas": -0.24467624650099704
+          },
+          "IMPREDECIBLE": {
+            "delta": 0.01045507962880415,
+            "se": 0.005036957191896182,
+            "manos": 24677,
+            "partidas": 64,
+            "sigmas": 2.0756737114274135
           }
         }
+      },
+      "dueloFichas": {
+        "global": {
+          "delta": 1.0647963258785942,
+          "se": 1.1416335902007622,
+          "manos": 100160,
+          "partidas": 244,
+          "sigmas": 0.9326953367685549
+        },
+        "porPerfil": {
+          "CONSERVADORA": {
+            "delta": -2.6904084991770163,
+            "se": 1.829072698201678,
+            "manos": 33415,
+            "partidas": 67,
+            "sigmas": -1.4709139236631728
+          },
+          "EQUILIBRADA": {
+            "delta": 2.595648912228057,
+            "se": 2.581159304314461,
+            "manos": 19995,
+            "partidas": 51,
+            "sigmas": 1.0056136046656927
+          },
+          "AGRESIVA": {
+            "delta": -0.21292982376659267,
+            "se": 2.5364367799956877,
+            "manos": 22073,
+            "partidas": 62,
+            "sigmas": -0.08394840567126403
+          },
+          "IMPREDECIBLE": {
+            "delta": 6.052194351015116,
+            "se": 2.4876704778446688,
+            "manos": 24677,
+            "partidas": 64,
+            "sigmas": 2.4328762209128154
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": 94350,
+          "porMano": 0.9419928115015974,
+          "se": 0.6933204490789241
+        },
+        {
+          "asiento": 1,
+          "total": -12300,
+          "porMano": -0.12280351437699681,
+          "se": 0.6498284899604096
+        },
+        {
+          "asiento": 2,
+          "total": -82050,
+          "porMano": -0.8191892971246006,
+          "se": 0.7089523035266717
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 1928513,
+          "tasaRetiro": 0.04044566979844056,
+          "tasaSubida": 0.1806500656205066
+        },
+        {
+          "asiento": 1,
+          "acciones": 1252821,
+          "tasaRetiro": 0.04284730220837614,
+          "tasaSubida": 0.17982457190612228
+        },
+        {
+          "asiento": 2,
+          "acciones": 1014207,
+          "tasaRetiro": 0.04065442261786795,
+          "tasaSubida": 0.1984683600093472
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 117694,
+        "tasaAbandono": 0.20805461667915884
+      },
+      "manosContadas": 100160,
+      "manosSimuladas": 565688,
+      "partidasCompletas": 244,
+      "tasaAsiento0": 0.3345746805111821,
+      "seAsiento0": 0.0014659761750699075,
+      "seBinomialAsiento0": 0.001490901799462058,
+      "efectoDiseno": 0.9668425311172927,
+      "esperado": 0.3333333333333333,
+      "sorteosDePerfiles": 244,
+      "porPerfil": {
+        "CONSERVADORA": {
+          "jugadas": 91895,
+          "ganadas": 30553,
+          "tasa": 0.33247728385657543,
+          "se": 0.0015540610392993975
+        },
+        "AGRESIVA": {
+          "jugadas": 70112,
+          "ganadas": 23283,
+          "tasa": 0.3320829529895025,
+          "se": 0.001778641319537372
+        },
+        "EQUILIBRADA": {
+          "jugadas": 64881,
+          "ganadas": 21694,
+          "tasa": 0.3343659931258766,
+          "se": 0.001852123890825182
+        },
+        "IMPREDECIBLE": {
+          "jugadas": 73592,
+          "ganadas": 24630,
+          "tasa": 0.33468311773018805,
+          "se": 0.0017394657099338965
+        }
+      },
+      "porAsiento": [
+        {
+          "asiento": 0,
+          "tasa": 0.3345746805111821,
+          "se": 0.0014659761750699075,
+          "seBinomial": 0.001490901799462058
+        },
+        {
+          "asiento": 1,
+          "tasa": 0.33323682108626196,
+          "se": 0.0015791474897779863,
+          "seBinomial": 0.0014894129917151998
+        },
+        {
+          "asiento": 2,
+          "tasa": 0.33218849840255593,
+          "se": 0.0015667857360456066,
+          "seBinomial": 0.0014882369571178038
+        }
+      ],
+      "porRol": {
+        "mano": {
+          "jugadas": 100160,
+          "ganadas": 36988,
+          "tasa": 0.3692891373801917,
+          "se": 0.0015249347600130906
+        },
+        "pie": {
+          "jugadas": 100160,
+          "ganadas": 29594,
+          "tasa": 0.2954672523961661,
+          "se": 0.0014416442731962557
+        },
+        "medio": {
+          "jugadas": 100160,
+          "ganadas": 33578,
+          "tasa": 0.3352436102236422,
+          "se": 0.0014916411535450106
+        }
+      },
+      "porVivos": {
+        "2": {
+          "jugadas": 465528,
+          "ganadas": 233160,
+          "tasa": 0.5008506470072691,
+          "se": 0.0007328185801659595
+        },
+        "3": {
+          "jugadas": 100160,
+          "ganadas": 33511,
+          "tasa": 0.3345746805111821,
+          "se": 0.001490901799462058
+        }
+      },
+      "partidas": {
+        "completas": 244,
+        "tasaAsiento0": 0.3442622950819672,
+        "seAsiento0": 0.030416896139577345,
+        "medianaManosPorPartida": 1148
+      },
+      "manosPorMinuto": 6364388
+    },
+    {
+      "mesa": 3,
+      "conductor": "pasivo",
+      "nivel": "avanzado",
+      "nivelAsiento0": "avanzado",
+      "duelo": null,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -2511300,
+          "porMano": -25.109233614957756,
+          "se": 0.4973651860941641
+        },
+        {
+          "asiento": 1,
+          "total": 1254200,
+          "porMano": 12.540118982152677,
+          "se": 0.5893570657739958
+        },
+        {
+          "asiento": 2,
+          "total": 1257100,
+          "porMano": 12.569114632805078,
+          "se": 0.571673526028728
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 367697,
+          "tasaRetiro": 0.0008430854752690394,
+          "tasaSubida": 0
+        },
+        {
+          "asiento": 1,
+          "acciones": 334862,
+          "tasaRetiro": 0.045158901278735716,
+          "tasaSubida": 0.18023842657572373
+        },
+        {
+          "asiento": 2,
+          "acciones": 328226,
+          "tasaRetiro": 0.048625032751823435,
+          "tasaSubida": 0.16830781230006153
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 99,
+        "tasaAbandono": 0.0009621739299459628
       },
       "manosContadas": 100015,
-      "manosSimuladas": 100015,
-      "partidasCompletas": 66,
-      "tasaAsiento0": 0.5022946558016298,
-      "seAsiento0": 0.0017241759741264894,
-      "seBinomialAsiento0": 0.0015810036083722476,
-      "efectoDiseno": 1.1893165319937238,
-      "esperado": 0.5,
-      "sorteosDePerfiles": 66,
+      "manosSimuladas": 102892,
+      "partidasCompletas": 508,
+      "tasaAsiento0": 0.33115032745088235,
+      "seAsiento0": 0.0015156634793092808,
+      "seBinomialAsiento0": 0.0014881416921604493,
+      "efectoDiseno": 1.037330157654424,
+      "esperado": 0.3333333333333333,
+      "sorteosDePerfiles": 508,
       "porPerfil": {
-        "CONSERVADORA": {
-          "jugadas": 56792,
-          "ganadas": 28396,
-          "tasa": 0.5,
-          "se": 0.0020981011545471136
-        },
         "IMPREDECIBLE": {
-          "jugadas": 25450,
-          "ganadas": 12725,
-          "tasa": 0.5,
-          "se": 0.003134195704036113
-        },
-        "AGRESIVA": {
-          "jugadas": 43046,
-          "ganadas": 21523,
-          "tasa": 0.5,
-          "se": 0.002409925425529565
+          "jugadas": 53141,
+          "ganadas": 17807,
+          "tasa": 0.3350896671120227,
+          "se": 0.002047609791930513
         },
         "EQUILIBRADA": {
-          "jugadas": 74742,
-          "ganadas": 37371,
-          "tasa": 0.5,
-          "se": 0.0018288902595545943
+          "jugadas": 45278,
+          "ganadas": 15063,
+          "tasa": 0.332678121825169,
+          "se": 0.0022142985957667115
+        },
+        "AGRESIVA": {
+          "jugadas": 55249,
+          "ganadas": 18462,
+          "tasa": 0.3341598942967294,
+          "se": 0.0020067807519990643
+        },
+        "CONSERVADORA": {
+          "jugadas": 46362,
+          "ganadas": 15563,
+          "tasa": 0.3356843967041974,
+          "se": 0.0021931671016885415
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.5022946558016298,
-          "se": 0.0017241759741264894,
-          "seBinomial": 0.0015810036083722476
+          "tasa": 0.33115032745088235,
+          "se": 0.0015156634793092808,
+          "seBinomial": 0.0014881416921604493
         },
         {
           "asiento": 1,
-          "tasa": 0.49770534419837026,
-          "se": 0.001724175974126487,
-          "seBinomial": 0.0015810036083722476
+          "tasa": 0.33506973953906916,
+          "se": 0.001495751155917384,
+          "seBinomial": 0.0014925300482573718
+        },
+        {
+          "asiento": 2,
+          "tasa": 0.3337799330100485,
+          "se": 0.0014299502312272556,
+          "seBinomial": 0.0014910987180567594
         }
       ],
       "porRol": {
         "mano": {
           "jugadas": 100015,
-          "ganadas": 54088,
-          "tasa": 0.5407988801679748,
-          "se": 0.0015757480974002232
+          "ganadas": 37111,
+          "tasa": 0.3710543418487227,
+          "se": 0.001527540560971959
         },
         "pie": {
           "jugadas": 100015,
-          "ganadas": 45927,
-          "tasa": 0.4592011198320252,
-          "se": 0.0015757480974002234
+          "ganadas": 29804,
+          "tasa": 0.2979953007048943,
+          "se": 0.001446245923256608
         },
         "medio": {
-          "jugadas": 0,
-          "ganadas": 0,
-          "tasa": 0,
-          "se": 0
-        }
-      },
-      "porVivos": {
-        "2": {
           "jugadas": 100015,
-          "ganadas": 50237,
-          "tasa": 0.5022946558016298,
-          "se": 0.0015810036083722476
-        }
-      },
-      "partidas": {
-        "completas": 66,
-        "tasaAsiento0": 0.5909090909090909,
-        "seAsiento0": 0.060519911222631444,
-        "medianaManosPorPartida": 845
-      },
-      "manosPorMinuto": 6765389
-    },
-    {
-      "mesa": 2,
-      "conductor": "pasivo",
-      "nivel": "avanzado",
-      "nivelAsiento0": "avanzado",
-      "duelo": null,
-      "manosContadas": 100254,
-      "manosSimuladas": 100254,
-      "partidasCompletas": 243,
-      "tasaAsiento0": 0.500219442615756,
-      "seAsiento0": 0.0015492320093466164,
-      "seBinomialAsiento0": 0.0015791344489325657,
-      "efectoDiseno": 0.9624866346439592,
-      "esperado": 0.5,
-      "sorteosDePerfiles": 243,
-      "porPerfil": {
-        "IMPREDECIBLE": {
-          "jugadas": 24375,
-          "ganadas": 12114,
-          "tasa": 0.49698461538461536,
-          "se": 0.0032025048366784033
-        },
-        "EQUILIBRADA": {
-          "jugadas": 26355,
-          "ganadas": 13204,
-          "tasa": 0.5010055018023145,
-          "se": 0.0030799070923395694
-        },
-        "AGRESIVA": {
-          "jugadas": 24400,
-          "ganadas": 12178,
-          "tasa": 0.4990983606557377,
-          "se": 0.003200916793916639
-        },
-        "CONSERVADORA": {
-          "jugadas": 25124,
-          "ganadas": 12609,
-          "tasa": 0.5018707212227352,
-          "se": 0.0031544421866252074
-        }
-      },
-      "porAsiento": [
-        {
-          "asiento": 0,
-          "tasa": 0.500219442615756,
-          "se": 0.0015492320093466164,
-          "seBinomial": 0.0015791344489325657
-        },
-        {
-          "asiento": 1,
-          "tasa": 0.49978055738424404,
-          "se": 0.0015492320093466177,
-          "seBinomial": 0.0015791344489325659
-        }
-      ],
-      "porRol": {
-        "mano": {
-          "jugadas": 100254,
-          "ganadas": 54283,
-          "tasa": 0.5414547050491751,
-          "se": 0.0015736977796104688
-        },
-        "pie": {
-          "jugadas": 100254,
-          "ganadas": 45971,
-          "tasa": 0.4585452949508249,
-          "se": 0.0015736977796104688
-        },
-        "medio": {
-          "jugadas": 0,
-          "ganadas": 0,
-          "tasa": 0,
-          "se": 0
+          "ganadas": 33100,
+          "tasa": 0.33095035744638307,
+          "se": 0.0014879146816971537
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 100254,
-          "ganadas": 50149,
-          "tasa": 0.500219442615756,
-          "se": 0.0015791344489325657
-        }
-      },
-      "partidas": {
-        "completas": 243,
-        "tasaAsiento0": 0,
-        "seAsiento0": 0,
-        "medianaManosPorPartida": 335
-      },
-      "manosPorMinuto": 9297125
-    },
-    {
-      "mesa": 2,
-      "conductor": "aleatorio",
-      "nivel": "avanzado",
-      "nivelAsiento0": "avanzado",
-      "duelo": null,
-      "manosContadas": 100008,
-      "manosSimuladas": 100008,
-      "partidasCompletas": 1683,
-      "tasaAsiento0": 0.23572114230861532,
-      "seAsiento0": 0.0014776115972034887,
-      "seBinomialAsiento0": 0.0013421709056428588,
-      "efectoDiseno": 1.212006478971054,
-      "esperado": 0.5,
-      "sorteosDePerfiles": 1683,
-      "porPerfil": {
-        "EQUILIBRADA": {
-          "jugadas": 23120,
-          "ganadas": 17672,
-          "tasa": 0.7643598615916956,
-          "se": 0.0027911273749728167
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 27371,
-          "ganadas": 20775,
-          "tasa": 0.7590150158927332,
-          "se": 0.0025850850896271455
-        },
-        "AGRESIVA": {
-          "jugadas": 24914,
-          "ganadas": 19109,
-          "tasa": 0.7669984747531509,
-          "se": 0.002678273363385199
-        },
-        "CONSERVADORA": {
-          "jugadas": 24603,
-          "ganadas": 18878,
-          "tasa": 0.7673048002276145,
-          "se": 0.0026939134366804974
-        }
-      },
-      "porAsiento": [
-        {
-          "asiento": 0,
-          "tasa": 0.23572114230861532,
-          "se": 0.0014776115972034887,
-          "seBinomial": 0.0013421709056428588
-        },
-        {
-          "asiento": 1,
-          "tasa": 0.7642788576913847,
-          "se": 0.0014776115972034887,
-          "seBinomial": 0.0013421709056428588
-        }
-      ],
-      "porRol": {
-        "mano": {
-          "jugadas": 100008,
-          "ganadas": 53061,
-          "tasa": 0.5305675545956323,
-          "se": 0.0015781181861634034
-        },
-        "pie": {
-          "jugadas": 100008,
-          "ganadas": 46947,
-          "tasa": 0.4694324454043676,
-          "se": 0.0015781181861634034
-        },
-        "medio": {
-          "jugadas": 0,
-          "ganadas": 0,
-          "tasa": 0,
-          "se": 0
-        }
-      },
-      "porVivos": {
-        "2": {
-          "jugadas": 100008,
-          "ganadas": 23574,
-          "tasa": 0.23572114230861532,
-          "se": 0.0013421709056428588
-        }
-      },
-      "partidas": {
-        "completas": 1683,
-        "tasaAsiento0": 0,
-        "seAsiento0": 0,
-        "medianaManosPorPartida": 57
-      },
-      "manosPorMinuto": 9375750
-    },
-    {
-      "mesa": 2,
-      "conductor": "espejo",
-      "nivel": "avanzado",
-      "nivelAsiento0": "basico",
-      "duelo": {
-        "global": {
-          "delta": -0.01198572083840217,
-          "se": 0.0034621956653000303,
-          "manos": 100286,
-          "partidas": 100,
-          "sigmas": -3.4618843061151776
-        },
-        "porPerfil": {
-          "AGRESIVA": {
-            "delta": -0.017957429106288565,
-            "se": 0.006553362433284139,
-            "manos": 28846,
-            "partidas": 27,
-            "sigmas": -2.7401855595661626
-          },
-          "IMPREDECIBLE": {
-            "delta": -0.009003637230934352,
-            "se": 0.005265094326018318,
-            "manos": 33542,
-            "partidas": 26,
-            "sigmas": -1.7100619045781227
-          },
-          "EQUILIBRADA": {
-            "delta": -0.014139353761995271,
-            "se": 0.008752555465547677,
-            "manos": 21571,
-            "partidas": 25,
-            "sigmas": -1.6154543456081398
-          },
-          "CONSERVADORA": {
-            "delta": -0.004716114411710663,
-            "se": 0.008482436641273388,
-            "manos": 16327,
-            "partidas": 22,
-            "sigmas": -0.5559858105822147
-          }
-        }
-      },
-      "manosContadas": 100286,
-      "manosSimuladas": 100286,
-      "partidasCompletas": 100,
-      "tasaAsiento0": 0.4940071395807989,
-      "seAsiento0": 0.0017310978326500132,
-      "seBinomialAsiento0": 0.001578769226690363,
-      "efectoDiseno": 1.2022808236083744,
-      "esperado": 0.5,
-      "sorteosDePerfiles": 100,
-      "porPerfil": {
-        "AGRESIVA": {
-          "jugadas": 57692,
-          "ganadas": 28846,
-          "tasa": 0.5,
-          "se": 0.0020816715505976692
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 67084,
-          "ganadas": 33542,
-          "tasa": 0.5,
-          "se": 0.0019304587639455083
-        },
-        "EQUILIBRADA": {
-          "jugadas": 43142,
-          "ganadas": 21571,
-          "tasa": 0.5,
-          "se": 0.0024072426374530326
-        },
-        "CONSERVADORA": {
-          "jugadas": 32654,
-          "ganadas": 16327,
-          "tasa": 0.5,
-          "se": 0.002766953177981277
-        }
-      },
-      "porAsiento": [
-        {
-          "asiento": 0,
-          "tasa": 0.4940071395807989,
-          "se": 0.0017310978326500132,
-          "seBinomial": 0.001578769226690363
-        },
-        {
-          "asiento": 1,
-          "tasa": 0.5059928604192011,
-          "se": 0.0017310978326500132,
-          "seBinomial": 0.001578769226690363
-        }
-      ],
-      "porRol": {
-        "mano": {
-          "jugadas": 100286,
-          "ganadas": 53640,
-          "tasa": 0.5348702710248688,
-          "se": 0.0015750383199332149
-        },
-        "pie": {
-          "jugadas": 100286,
-          "ganadas": 46646,
-          "tasa": 0.4651297289751311,
-          "se": 0.0015750383199332149
-        },
-        "medio": {
-          "jugadas": 0,
-          "ganadas": 0,
-          "tasa": 0,
-          "se": 0
-        }
-      },
-      "porVivos": {
-        "2": {
-          "jugadas": 100286,
-          "ganadas": 49542,
-          "tasa": 0.4940071395807989,
-          "se": 0.001578769226690363
-        }
-      },
-      "partidas": {
-        "completas": 100,
-        "tasaAsiento0": 0.69,
-        "seAsiento0": 0.04624932431938871,
-        "medianaManosPorPartida": 757
-      },
-      "manosPorMinuto": 7338000
-    },
-    {
-      "mesa": 3,
-      "conductor": "espejo",
-      "nivel": "avanzado",
-      "nivelAsiento0": "avanzado",
-      "duelo": {
-        "global": {
-          "delta": 0.0029141716566866266,
-          "se": 0.002810259840975156,
-          "manos": 100200,
-          "partidas": 278,
-          "sigmas": 1.0369758746847457
-        },
-        "porPerfil": {
-          "CONSERVADORA": {
-            "delta": -0.0026096681993289426,
-            "se": 0.005637218949565446,
-            "manos": 24141,
-            "partidas": 65,
-            "sigmas": -0.46293539823038327
-          },
-          "IMPREDECIBLE": {
-            "delta": -0.0008949346697691068,
-            "se": 0.006096532849225662,
-            "manos": 22348,
-            "partidas": 66,
-            "sigmas": -0.14679403718504938
-          },
-          "EQUILIBRADA": {
-            "delta": 0.006057529610829103,
-            "se": 0.004937823770685585,
-            "manos": 29550,
-            "partidas": 72,
-            "sigmas": 1.2267609967757223
-          },
-          "AGRESIVA": {
-            "delta": 0.008112247009643641,
-            "se": 0.005980674883970825,
-            "manos": 24161,
-            "partidas": 75,
-            "sigmas": 1.356409964933184
-          }
-        }
-      },
-      "manosContadas": 100200,
-      "manosSimuladas": 476537,
-      "partidasCompletas": 278,
-      "tasaAsiento0": 0.3348303393213573,
-      "seAsiento0": 0.0016016988952302891,
-      "seBinomialAsiento0": 0.0014908870994232149,
-      "efectoDiseno": 1.1541765290280306,
-      "esperado": 0.3333333333333333,
-      "sorteosDePerfiles": 278,
-      "porPerfil": {
-        "CONSERVADORA": {
-          "jugadas": 74245,
-          "ganadas": 24725,
-          "tasa": 0.33301905852245944,
-          "se": 0.0017296476883390073
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 70956,
-          "ganadas": 23622,
-          "tasa": 0.33291053610688315,
-          "se": 0.00176913611499527
-        },
-        "EQUILIBRADA": {
-          "jugadas": 79636,
-          "ganadas": 26556,
-          "tasa": 0.33346727610628357,
-          "se": 0.0016706390564709417
-        },
-        "AGRESIVA": {
-          "jugadas": 75763,
-          "ganadas": 25297,
-          "tasa": 0.3338964930111004,
-          "se": 0.0017133583573834795
-        }
-      },
-      "porAsiento": [
-        {
-          "asiento": 0,
-          "tasa": 0.3348303393213573,
-          "se": 0.0016016988952302891,
-          "seBinomial": 0.0014908870994232149
-        },
-        {
-          "asiento": 1,
-          "tasa": 0.33191616766467064,
-          "se": 0.001583222813467398,
-          "seBinomial": 0.0014876330692671275
-        },
-        {
-          "asiento": 2,
-          "tasa": 0.33325349301397206,
-          "se": 0.0014988353086091196,
-          "seBinomial": 0.0014891343062717192
-        }
-      ],
-      "porRol": {
-        "mano": {
-          "jugadas": 100200,
-          "ganadas": 37426,
-          "tasa": 0.3735129740518962,
-          "se": 0.00152818180966182
-        },
-        "pie": {
-          "jugadas": 100200,
-          "ganadas": 29711,
-          "tasa": 0.29651696606786426,
-          "se": 0.0014428385159301887
-        },
-        "medio": {
-          "jugadas": 100200,
-          "ganadas": 33063,
-          "tasa": 0.32997005988023953,
-          "se": 0.001485424257301713
-        }
-      },
-      "porVivos": {
-        "2": {
-          "jugadas": 376337,
-          "ganadas": 188516,
-          "tasa": 0.5009233745286804,
-          "se": 0.0008150435304295445
+          "jugadas": 2877,
+          "ganadas": 1456,
+          "tasa": 0.5060827250608273,
+          "se": 0.009321116448005195
         },
         "3": {
-          "jugadas": 100200,
-          "ganadas": 33550,
-          "tasa": 0.3348303393213573,
-          "se": 0.0014908870994232149
-        }
-      },
-      "partidas": {
-        "completas": 278,
-        "tasaAsiento0": 0.33093525179856115,
-        "seAsiento0": 0.028221701361787168,
-        "medianaManosPorPartida": 879
-      },
-      "manosPorMinuto": 6477621
-    },
-    {
-      "mesa": 3,
-      "conductor": "pasivo",
-      "nivel": "avanzado",
-      "nivelAsiento0": "avanzado",
-      "duelo": null,
-      "manosContadas": 100132,
-      "manosSimuladas": 102405,
-      "partidasCompletas": 448,
-      "tasaAsiento0": 0.33410897615148005,
-      "seAsiento0": 0.0015194116796318341,
-      "seBinomialAsiento0": 0.0014905934439775306,
-      "efectoDiseno": 1.0390405753833416,
-      "esperado": 0.3333333333333333,
-      "sorteosDePerfiles": 448,
-      "porPerfil": {
-        "AGRESIVA": {
-          "jugadas": 55273,
-          "ganadas": 18240,
-          "tasa": 0.3299983717185606,
-          "se": 0.0020000336797304373
-        },
-        "CONSERVADORA": {
-          "jugadas": 47196,
-          "ganadas": 15761,
-          "tasa": 0.33394779218577847,
-          "se": 0.002170905046341504
-        },
-        "EQUILIBRADA": {
-          "jugadas": 46320,
-          "ganadas": 15524,
-          "tasa": 0.335146804835924,
-          "se": 0.002193290443966133
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 51475,
-          "ganadas": 17152,
-          "tasa": 0.33321029626032056,
-          "se": 0.00207756907077369
-        }
-      },
-      "porAsiento": [
-        {
-          "asiento": 0,
-          "tasa": 0.33410897615148005,
-          "se": 0.0015194116796318341,
-          "seBinomial": 0.0014905934439775306
-        },
-        {
-          "asiento": 1,
-          "tasa": 0.3330903207765749,
-          "se": 0.001524724900459154,
-          "seBinomial": 0.0014894573481647236
-        },
-        {
-          "asiento": 2,
-          "tasa": 0.33280070307194504,
-          "se": 0.0014668144160855476,
-          "seBinomial": 0.0014891329117488318
-        }
-      ],
-      "porRol": {
-        "mano": {
-          "jugadas": 100132,
-          "ganadas": 37412,
-          "tasa": 0.3736268126073583,
-          "se": 0.0015287946408367474
-        },
-        "pie": {
-          "jugadas": 100132,
-          "ganadas": 29751,
-          "tasa": 0.2971178044980626,
-          "se": 0.0014441728113834137
-        },
-        "medio": {
-          "jugadas": 100132,
-          "ganadas": 32969,
-          "tasa": 0.3292553828945792,
-          "se": 0.0014851099048246944
-        }
-      },
-      "porVivos": {
-        "2": {
-          "jugadas": 2273,
-          "ganadas": 1136,
-          "tasa": 0.4997800263968324,
-          "se": 0.010487458238080123
-        },
-        "3": {
-          "jugadas": 100132,
-          "ganadas": 33455,
-          "tasa": 0.33410897615148005,
-          "se": 0.0014905934439775306
-        }
-      },
-      "partidas": {
-        "completas": 448,
-        "tasaAsiento0": 0,
-        "seAsiento0": 0,
-        "medianaManosPorPartida": 203
-      },
-      "manosPorMinuto": 6200101
-    },
-    {
-      "mesa": 3,
-      "conductor": "aleatorio",
-      "nivel": "avanzado",
-      "nivelAsiento0": "avanzado",
-      "duelo": null,
-      "manosContadas": 100023,
-      "manosSimuladas": 100042,
-      "partidasCompletas": 2255,
-      "tasaAsiento0": 0.1091149035721784,
-      "seAsiento0": 0.0010311454662010658,
-      "seBinomialAsiento0": 0.0009858320774769808,
-      "efectoDiseno": 1.0940419691015708,
-      "esperado": 0.3333333333333333,
-      "sorteosDePerfiles": 2255,
-      "porPerfil": {
-        "CONSERVADORA": {
-          "jugadas": 49216,
-          "ganadas": 21808,
-          "tasa": 0.4431079323797139,
-          "se": 0.002239170280897016
-        },
-        "EQUILIBRADA": {
-          "jugadas": 50044,
-          "ganadas": 22438,
-          "tasa": 0.4483654384141955,
-          "se": 0.0022231347669873073
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 50845,
-          "ganadas": 22671,
-          "tasa": 0.4458845510866358,
-          "se": 0.002204383827196295
-        },
-        "AGRESIVA": {
-          "jugadas": 49941,
-          "ganadas": 22192,
-          "tasa": 0.44436434993292084,
-          "se": 0.002223494394657539
-        }
-      },
-      "porAsiento": [
-        {
-          "asiento": 0,
-          "tasa": 0.1091149035721784,
-          "se": 0.0010311454662010658,
-          "seBinomial": 0.0009858320774769808
-        },
-        {
-          "asiento": 1,
-          "tasa": 0.4501364686122192,
-          "se": 0.0015972820673879802,
-          "seBinomial": 0.0015730756917373852
-        },
-        {
-          "asiento": 2,
-          "tasa": 0.4407486278156024,
-          "se": 0.0015849031983713301,
-          "seBinomial": 0.0015698171721487972
-        }
-      ],
-      "porRol": {
-        "mano": {
-          "jugadas": 100023,
-          "ganadas": 36523,
-          "tasa": 0.3651460164162243,
-          "se": 0.0015223701851357742
-        },
-        "pie": {
-          "jugadas": 100023,
-          "ganadas": 30189,
-          "tasa": 0.30182058126630873,
-          "se": 0.0014514698150634182
-        },
-        "medio": {
-          "jugadas": 100023,
-          "ganadas": 33311,
-          "tasa": 0.333033402317467,
-          "se": 0.0014902049486905141
-        }
-      },
-      "porVivos": {
-        "2": {
-          "jugadas": 19,
-          "ganadas": 5,
-          "tasa": 0.2631578947368421,
-          "se": 0.10102261788814665
-        },
-        "3": {
-          "jugadas": 100023,
-          "ganadas": 10914,
-          "tasa": 0.1091149035721784,
-          "se": 0.0009858320774769808
-        }
-      },
-      "partidas": {
-        "completas": 2255,
-        "tasaAsiento0": 0,
-        "seAsiento0": 0,
-        "medianaManosPorPartida": 43
-      },
-      "manosPorMinuto": 5873307
-    },
-    {
-      "mesa": 3,
-      "conductor": "espejo",
-      "nivel": "avanzado",
-      "nivelAsiento0": "basico",
-      "duelo": {
-        "global": {
-          "delta": -0.01877817224460489,
-          "se": 0.003255977306750957,
-          "manos": 100276,
-          "partidas": 272,
-          "sigmas": -5.767292114005264
-        },
-        "porPerfil": {
-          "CONSERVADORA": {
-            "delta": -0.023782714027365474,
-            "se": 0.00577299809401276,
-            "manos": 29307,
-            "partidas": 76,
-            "sigmas": -4.11964695641088
-          },
-          "AGRESIVA": {
-            "delta": -0.017209434903441886,
-            "se": 0.007297216363364125,
-            "manos": 28066,
-            "partidas": 69,
-            "sigmas": -2.358356124650809
-          },
-          "EQUILIBRADA": {
-            "delta": -0.020156012774200302,
-            "se": 0.007189127117406883,
-            "manos": 19101,
-            "partidas": 63,
-            "sigmas": -2.8036801193008496
-          },
-          "IMPREDECIBLE": {
-            "delta": -0.013360221830098312,
-            "se": 0.005659406047182429,
-            "manos": 23802,
-            "partidas": 64,
-            "sigmas": -2.360710950710063
-          }
-        }
-      },
-      "manosContadas": 100276,
-      "manosSimuladas": 520941,
-      "partidasCompletas": 272,
-      "tasaAsiento0": 0.3204156527982768,
-      "seAsiento0": 0.001960660497113662,
-      "seBinomialAsiento0": 0.001473601465414453,
-      "efectoDiseno": 1.7702911908666,
-      "esperado": 0.3333333333333333,
-      "sorteosDePerfiles": 272,
-      "porPerfil": {
-        "CONSERVADORA": {
-          "jugadas": 79734,
-          "ganadas": 26605,
-          "tasa": 0.3336719592645546,
-          "se": 0.0016698679324111943
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 77220,
-          "ganadas": 25757,
-          "tasa": 0.3335534835534836,
-          "se": 0.0016966821576208247
-        },
-        "AGRESIVA": {
-          "jugadas": 79947,
-          "ganadas": 26655,
-          "tasa": 0.3334083830537731,
-          "se": 0.001667312843940733
-        },
-        "EQUILIBRADA": {
-          "jugadas": 63927,
-          "ganadas": 21259,
-          "tasa": 0.3325511912024653,
-          "se": 0.001863357016274256
-        }
-      },
-      "porAsiento": [
-        {
-          "asiento": 0,
-          "tasa": 0.3204156527982768,
-          "se": 0.001960660497113662,
-          "seBinomial": 0.001473601465414453
-        },
-        {
-          "asiento": 1,
-          "tasa": 0.33919382504288165,
-          "se": 0.0016686229331484346,
-          "seBinomial": 0.0014950733982750854
-        },
-        {
-          "asiento": 2,
-          "tasa": 0.3403905221588416,
-          "se": 0.0016295999306162694,
-          "seBinomial": 0.0014963516689859516
-        }
-      ],
-      "porRol": {
-        "mano": {
-          "jugadas": 100276,
-          "ganadas": 37001,
-          "tasa": 0.3689915832302844,
-          "se": 0.001523797670157587
-        },
-        "pie": {
-          "jugadas": 100276,
-          "ganadas": 30155,
-          "tasa": 0.30072001276476923,
-          "se": 0.0014481322132360393
-        },
-        "medio": {
-          "jugadas": 100276,
+          "jugadas": 100015,
           "ganadas": 33120,
-          "tasa": 0.33028840400494636,
-          "se": 0.0014852243875453854
+          "tasa": 0.33115032745088235,
+          "se": 0.0014881416921604493
+        }
+      },
+      "partidas": {
+        "completas": 508,
+        "tasaAsiento0": 0,
+        "seAsiento0": 0,
+        "medianaManosPorPartida": 186
+      },
+      "manosPorMinuto": 5612291
+    },
+    {
+      "mesa": 3,
+      "conductor": "aleatorio",
+      "nivel": "avanzado",
+      "nivelAsiento0": "avanzado",
+      "duelo": null,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -11069750,
+          "porMano": -110.69528609427812,
+          "se": 0.5439203977952449
+        },
+        {
+          "asiento": 1,
+          "total": 5482750,
+          "porMano": 54.82640347193056,
+          "se": 0.8620903247009731
+        },
+        {
+          "asiento": 2,
+          "total": 5587000,
+          "porMano": 55.868882622347556,
+          "se": 0.8467308057637641
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 337806,
+          "tasaRetiro": 0.09265969224939759,
+          "tasaSubida": 0.4488167764930167
+        },
+        {
+          "asiento": 1,
+          "acciones": 381298,
+          "tasaRetiro": 0.057015772440453395,
+          "tasaSubida": 0.14431494526590752
+        },
+        {
+          "asiento": 2,
+          "acciones": 410353,
+          "tasaRetiro": 0.0500642130068502,
+          "tasaSubida": 0.14330344849434512
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 10844,
+        "tasaAbandono": 0.1082959663647349
+      },
+      "manosContadas": 100002,
+      "manosSimuladas": 100133,
+      "partidasCompletas": 2216,
+      "tasaAsiento0": 0.12118757624847504,
+      "seAsiento0": 0.0010684107691548731,
+      "seBinomialAsiento0": 0.001031983612423872,
+      "efectoDiseno": 1.0718423484427613,
+      "esperado": 0.3333333333333333,
+      "sorteosDePerfiles": 2216,
+      "porPerfil": {
+        "EQUILIBRADA": {
+          "jugadas": 51521,
+          "ganadas": 22683,
+          "tasa": 0.4402670755614216,
+          "se": 0.002187038303546071
+        },
+        "IMPREDECIBLE": {
+          "jugadas": 47394,
+          "ganadas": 20664,
+          "tasa": 0.43600455753892897,
+          "se": 0.0022778316843947498
+        },
+        "AGRESIVA": {
+          "jugadas": 49857,
+          "ganadas": 21884,
+          "tasa": 0.4389353551156307,
+          "se": 0.0022225096836422163
+        },
+        "CONSERVADORA": {
+          "jugadas": 51232,
+          "ganadas": 22652,
+          "tasa": 0.44214553404122425,
+          "se": 0.002194180865002812
+        }
+      },
+      "porAsiento": [
+        {
+          "asiento": 0,
+          "tasa": 0.12118757624847504,
+          "se": 0.0010684107691548731,
+          "seBinomial": 0.001031983612423872
+        },
+        {
+          "asiento": 1,
+          "tasa": 0.4351512969740605,
+          "se": 0.0015753207637885084,
+          "seBinomial": 0.0015677682543069147
+        },
+        {
+          "asiento": 2,
+          "tasa": 0.44366112677746444,
+          "se": 0.001577000153713175,
+          "seBinomial": 0.0015710537703850758
+        }
+      ],
+      "porRol": {
+        "mano": {
+          "jugadas": 100002,
+          "ganadas": 36344,
+          "tasa": 0.3634327313453731,
+          "se": 0.001521002150679381
+        },
+        "pie": {
+          "jugadas": 100002,
+          "ganadas": 30287,
+          "tasa": 0.3028639427211456,
+          "se": 0.001453042161320528
+        },
+        "medio": {
+          "jugadas": 100002,
+          "ganadas": 33371,
+          "tasa": 0.33370332593348134,
+          "se": 0.001491110221864992
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 420665,
-          "ganadas": 203502,
-          "tasa": 0.4837626139564737,
-          "se": 0.0007705000795659658
+          "jugadas": 131,
+          "ganadas": 34,
+          "tasa": 0.2595419847328244,
+          "se": 0.03830172926693969
         },
         "3": {
-          "jugadas": 100276,
-          "ganadas": 32130,
-          "tasa": 0.3204156527982768,
-          "se": 0.001473601465414453
+          "jugadas": 100002,
+          "ganadas": 12119,
+          "tasa": 0.12118757624847504,
+          "se": 0.001031983612423872
         }
       },
       "partidas": {
-        "completas": 272,
-        "tasaAsiento0": 0.5073529411764706,
-        "seAsiento0": 0.030313674735033033,
-        "medianaManosPorPartida": 1263
+        "completas": 2216,
+        "tasaAsiento0": 0,
+        "seAsiento0": 0,
+        "medianaManosPorPartida": 44
       },
-      "manosPorMinuto": 6759615
+      "manosPorMinuto": 5349938
+    },
+    {
+      "mesa": 3,
+      "conductor": "espejo",
+      "nivel": "avanzado",
+      "nivelAsiento0": "basico",
+      "duelo": {
+        "global": {
+          "delta": -0.020194078128887783,
+          "se": 0.0028769741041620783,
+          "manos": 100475,
+          "partidas": 266,
+          "sigmas": -7.019207472070496
+        },
+        "porPerfil": {
+          "IMPREDECIBLE": {
+            "delta": -0.015460391298399235,
+            "se": 0.0051446798604900135,
+            "manos": 29236,
+            "partidas": 68,
+            "sigmas": -3.005122129587026
+          },
+          "EQUILIBRADA": {
+            "delta": -0.02210106940658419,
+            "se": 0.004854747092871087,
+            "manos": 23845,
+            "partidas": 61,
+            "sigmas": -4.552465655530918
+          },
+          "AGRESIVA": {
+            "delta": -0.022817090448139586,
+            "se": 0.006450370944641277,
+            "manos": 26822,
+            "partidas": 74,
+            "sigmas": -3.537329968146275
+          },
+          "CONSERVADORA": {
+            "delta": -0.02129107524790978,
+            "se": 0.0064950937995992665,
+            "manos": 20572,
+            "partidas": 63,
+            "sigmas": -3.2780242910769655
+          }
+        }
+      },
+      "dueloFichas": {
+        "global": {
+          "delta": -6.750933067927345,
+          "se": 1.205041626162543,
+          "manos": 100475,
+          "partidas": 266,
+          "sigmas": -5.602240554482506
+        },
+        "porPerfil": {
+          "IMPREDECIBLE": {
+            "delta": -5.479545765494596,
+            "se": 1.8156762560432886,
+            "manos": 29236,
+            "partidas": 68,
+            "sigmas": -3.01790902825132
+          },
+          "EQUILIBRADA": {
+            "delta": -8.052002516250786,
+            "se": 2.6681608288364456,
+            "manos": 23845,
+            "partidas": 61,
+            "sigmas": -3.0178100319995225
+          },
+          "AGRESIVA": {
+            "delta": -8.491163969875476,
+            "se": 2.470753876377262,
+            "manos": 26822,
+            "partidas": 74,
+            "sigmas": -3.4366692899114777
+          },
+          "CONSERVADORA": {
+            "delta": -4.780769978611705,
+            "se": 2.938626053309691,
+            "manos": 20572,
+            "partidas": 63,
+            "sigmas": -1.6268725220166274
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -421200,
+          "porMano": -4.192087583976114,
+          "se": 0.7006670564342042
+        },
+        {
+          "asiento": 1,
+          "total": 257100,
+          "porMano": 2.558845483951232,
+          "se": 0.7030116976062765
+        },
+        {
+          "asiento": 2,
+          "total": 164100,
+          "porMano": 1.6332421000248818,
+          "se": 0.7198570838037203
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 1312849,
+          "tasaRetiro": 0.03678031517714528,
+          "tasaSubida": 0.15730217260324683
+        },
+        {
+          "asiento": 1,
+          "acciones": 987238,
+          "tasaRetiro": 0.041650544245663154,
+          "tasaSubida": 0.14667587754928396
+        },
+        {
+          "asiento": 2,
+          "acciones": 687211,
+          "tasaRetiro": 0.04191580169700427,
+          "tasaSubida": 0.19466510285778313
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 67062,
+        "tasaAbandono": 0.16742980690970644
+      },
+      "manosContadas": 100475,
+      "manosSimuladas": 400538,
+      "partidasCompletas": 266,
+      "tasaAsiento0": 0.3190047275441652,
+      "seAsiento0": 0.001803935594346976,
+      "seBinomialAsiento0": 0.001470420675491387,
+      "efectoDiseno": 1.5050774693608533,
+      "esperado": 0.3333333333333333,
+      "sorteosDePerfiles": 266,
+      "porPerfil": {
+        "IMPREDECIBLE": {
+          "jugadas": 83127,
+          "ganadas": 27658,
+          "tasa": 0.33271981426010805,
+          "se": 0.0016342646745148757
+        },
+        "AGRESIVA": {
+          "jugadas": 76528,
+          "ganadas": 25529,
+          "tasa": 0.33359031988291865,
+          "se": 0.001704382971809757
+        },
+        "EQUILIBRADA": {
+          "jugadas": 74780,
+          "ganadas": 24847,
+          "tasa": 0.3322679860925381,
+          "se": 0.0017224737753593158
+        },
+        "CONSERVADORA": {
+          "jugadas": 66990,
+          "ganadas": 22441,
+          "tasa": 0.3349902970592626,
+          "se": 0.0018235812412927233
+        }
+      },
+      "porAsiento": [
+        {
+          "asiento": 0,
+          "tasa": 0.3190047275441652,
+          "se": 0.001803935594346976,
+          "seBinomial": 0.001470420675491387
+        },
+        {
+          "asiento": 1,
+          "tasa": 0.339198805673053,
+          "se": 0.001519070021116184,
+          "seBinomial": 0.001493597436008522
+        },
+        {
+          "asiento": 2,
+          "tasa": 0.3417964667827818,
+          "se": 0.001687167661850065,
+          "seBinomial": 0.0014963558357013406
+        }
+      ],
+      "porRol": {
+        "mano": {
+          "jugadas": 100475,
+          "ganadas": 36809,
+          "tasa": 0.3663498382682259,
+          "se": 0.0015200006360217583
+        },
+        "pie": {
+          "jugadas": 100475,
+          "ganadas": 30326,
+          "tasa": 0.30182632495645684,
+          "se": 0.0014482091437386807
+        },
+        "medio": {
+          "jugadas": 100475,
+          "ganadas": 33340,
+          "tasa": 0.33182383677531724,
+          "se": 0.0014854918453572172
+        }
+      },
+      "porVivos": {
+        "2": {
+          "jugadas": 300063,
+          "ganadas": 145502,
+          "tasa": 0.48490483665096995,
+          "se": 0.0009123590209041167
+        },
+        "3": {
+          "jugadas": 100475,
+          "ganadas": 32052,
+          "tasa": 0.3190047275441652,
+          "se": 0.001470420675491387
+        }
+      },
+      "partidas": {
+        "completas": 266,
+        "tasaAsiento0": 0.11278195488721804,
+        "seAsiento0": 0.019395196050723446,
+        "medianaManosPorPartida": 560
+      },
+      "manosPorMinuto": 6163704
     },
     {
       "mesa": 4,
@@ -1582,151 +2201,259 @@
       "nivelAsiento0": "avanzado",
       "duelo": {
         "global": {
-          "delta": -0.001528715878661924,
-          "se": 0.002394190148546015,
-          "manos": 100084,
-          "partidas": 427,
-          "sigmas": -0.6385106377579529
+          "delta": 0.0007886041706180061,
+          "se": 0.002218551210484073,
+          "manos": 100177,
+          "partidas": 467,
+          "sigmas": 0.35545907928171644
         },
         "porPerfil": {
-          "CONSERVADORA": {
-            "delta": -0.006069514912987814,
-            "se": 0.005025863023601518,
-            "manos": 21089,
-            "partidas": 92,
-            "sigmas": -1.2076562541568072
-          },
-          "EQUILIBRADA": {
-            "delta": 0.004312284385780711,
-            "se": 0.005073775233085048,
-            "manos": 26668,
-            "partidas": 114,
-            "sigmas": 0.8499163222015017
-          },
           "IMPREDECIBLE": {
-            "delta": -0.0031667839549612948,
-            "se": 0.004925261903310019,
-            "manos": 25578,
-            "partidas": 114,
-            "sigmas": -0.642967626317102
+            "delta": -0.0013599274705349048,
+            "se": 0.004594922975174011,
+            "manos": 24266,
+            "partidas": 121,
+            "sigmas": -0.29596306137937034
+          },
+          "CONSERVADORA": {
+            "delta": -0.00030957356241776953,
+            "se": 0.004176072965338709,
+            "manos": 25842,
+            "partidas": 113,
+            "sigmas": -0.07413030495090042
           },
           "AGRESIVA": {
-            "delta": -0.002205689932333919,
-            "se": 0.004138037238244283,
-            "manos": 26749,
-            "partidas": 107,
-            "sigmas": -0.5330280529978425
+            "delta": 0.006061321683000748,
+            "se": 0.00438270207054455,
+            "manos": 25407,
+            "partidas": 122,
+            "sigmas": 1.3830102036225405
+          },
+          "EQUILIBRADA": {
+            "delta": -0.0013786392020111913,
+            "se": 0.004515532410009879,
+            "manos": 24662,
+            "partidas": 111,
+            "sigmas": -0.30531044333887863
           }
         }
       },
-      "manosContadas": 100084,
-      "manosSimuladas": 831884,
-      "partidasCompletas": 427,
-      "tasaAsiento0": 0.24910075536549298,
-      "seAsiento0": 0.0013815198734849431,
-      "seBinomialAsiento0": 0.0013670866076267538,
-      "efectoDiseno": 1.0212268289277564,
+      "dueloFichas": {
+        "global": {
+          "delta": -0.02295936192938499,
+          "se": 1.3512315613998023,
+          "manos": 100177,
+          "partidas": 467,
+          "sigmas": -0.016991434026008348
+        },
+        "porPerfil": {
+          "IMPREDECIBLE": {
+            "delta": 0.3667683178109289,
+            "se": 2.776700988246093,
+            "manos": 24266,
+            "partidas": 121,
+            "sigmas": 0.13208779748466853
+          },
+          "CONSERVADORA": {
+            "delta": -0.520470551814875,
+            "se": 2.32641449774763,
+            "manos": 25842,
+            "partidas": 113,
+            "sigmas": -0.2237221923774891
+          },
+          "AGRESIVA": {
+            "delta": 1.1630652969654032,
+            "se": 2.9638289474454322,
+            "manos": 25407,
+            "partidas": 122,
+            "sigmas": 0.39241984527071516
+          },
+          "EQUILIBRADA": {
+            "delta": -1.1069661827913388,
+            "se": 2.7608982441735828,
+            "manos": 24662,
+            "partidas": 111,
+            "sigmas": -0.40094421629895527
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": 53700,
+          "porMano": 0.5360511893947713,
+          "se": 0.8511083446180909
+        },
+        {
+          "asiento": 1,
+          "total": 56000,
+          "porMano": 0.5590105513241562,
+          "se": 0.8271650607879442
+        },
+        {
+          "asiento": 2,
+          "total": -102700,
+          "porMano": -1.025185421803408,
+          "se": 0.838501271674928
+        },
+        {
+          "asiento": 3,
+          "total": -7000,
+          "porMano": -0.06987631891551953,
+          "se": 0.9028621552552624
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 4122616,
+          "tasaRetiro": 0.04455884321993608,
+          "tasaSubida": 0.17802361413238585
+        },
+        {
+          "asiento": 1,
+          "acciones": 2300940,
+          "tasaRetiro": 0.049196849983050406,
+          "tasaSubida": 0.17152250819230402
+        },
+        {
+          "asiento": 2,
+          "acciones": 1449056,
+          "tasaRetiro": 0.0519414018505841,
+          "tasaSubida": 0.1719968034361681
+        },
+        {
+          "asiento": 3,
+          "acciones": 1767995,
+          "tasaRetiro": 0.04885251372317229,
+          "tasaSubida": 0.1837346825075863
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 234980,
+        "tasaAbandono": 0.19463249015779827
+      },
+      "manosContadas": 100177,
+      "manosSimuladas": 1207301,
+      "partidasCompletas": 467,
+      "tasaAsiento0": 0.2502570450302964,
+      "seAsiento0": 0.0013484454380539702,
+      "seBinomialAsiento0": 0.0013685647257535264,
+      "efectoDiseno": 0.9708140939633405,
       "esperado": 0.25,
-      "sorteosDePerfiles": 427,
+      "sorteosDePerfiles": 467,
       "porPerfil": {
-        "CONSERVADORA": {
-          "jugadas": 95663,
-          "ganadas": 23772,
-          "tasa": 0.24849732916592623,
-          "se": 0.0013971856893447948
-        },
         "IMPREDECIBLE": {
-          "jugadas": 100601,
-          "ganadas": 25390,
-          "tasa": 0.2523831771055954,
-          "se": 0.0013695206509753653
+          "jugadas": 103769,
+          "ganadas": 26036,
+          "tasa": 0.25090344900692885,
+          "se": 0.0013458244023743916
         },
-        "EQUILIBRADA": {
-          "jugadas": 102890,
-          "ganadas": 25735,
-          "tasa": 0.25012148896880165,
-          "se": 0.0013501573135587279
+        "CONSERVADORA": {
+          "jugadas": 96993,
+          "ganadas": 24356,
+          "tasa": 0.2511109049106637,
+          "se": 0.001392423498233563
         },
         "AGRESIVA": {
-          "jugadas": 101182,
-          "ganadas": 25187,
-          "tasa": 0.2489276748828843,
-          "se": 0.0013593329410251922
+          "jugadas": 100163,
+          "ganadas": 24831,
+          "tasa": 0.2479059133612212,
+          "se": 0.0013643502295206558
+        },
+        "EQUILIBRADA": {
+          "jugadas": 99783,
+          "ganadas": 24954,
+          "tasa": 0.2500826794143291,
+          "se": 0.0013709455955562774
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.24910075536549298,
-          "se": 0.0013815198734849431,
-          "seBinomial": 0.0013670866076267538
+          "tasa": 0.2502570450302964,
+          "se": 0.0013484454380539702,
+          "seBinomial": 0.0013685647257535264
         },
         {
           "asiento": 1,
-          "tasa": 0.2506294712441549,
-          "se": 0.0014699918210485134,
-          "seBinomial": 0.0013698784900622292
+          "tasa": 0.24946844085967837,
+          "se": 0.00139300448276748,
+          "seBinomial": 0.0013671251564998134
         },
         {
           "asiento": 2,
-          "tasa": 0.25061947963710485,
-          "se": 0.0012846875428635946,
-          "seBinomial": 0.0013698603162786269
+          "tasa": 0.2518841650279006,
+          "se": 0.0013627302292006287,
+          "seBinomial": 0.0013715158969172577
         },
         {
           "asiento": 3,
-          "tasa": 0.24965029375324727,
-          "se": 0.0012832451936065727,
-          "seBinomial": 0.0013680928463635712
+          "tasa": 0.24839034908212465,
+          "se": 0.0014518685666030041,
+          "seBinomial": 0.0013651473237268029
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100084,
-          "ganadas": 28777,
-          "tasa": 0.28752847608009274,
-          "se": 0.0014306778709158982
+          "jugadas": 100177,
+          "ganadas": 28613,
+          "tasa": 0.2856244447328229,
+          "se": 0.0014271741417795126
         },
         "pie": {
-          "jugadas": 100084,
-          "ganadas": 21865,
-          "tasa": 0.21846648814995404,
-          "se": 0.0013061224346017097
+          "jugadas": 100177,
+          "ganadas": 21967,
+          "tasa": 0.21928187108817393,
+          "se": 0.001307267563350732
         },
         "medio": {
-          "jugadas": 200168,
-          "ganadas": 49442,
-          "tasa": 0.24700251788497662,
-          "se": 0.0009639402773493404
+          "jugadas": 200354,
+          "ganadas": 49597,
+          "tasa": 0.2475468420895016,
+          "se": 0.0009642050930265687
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 604872,
-          "ganadas": 302592,
-          "tasa": 0.5002579058048645,
-          "se": 0.0006428922730541004
+          "jugadas": 905731,
+          "ganadas": 452463,
+          "tasa": 0.49955560757001805,
+          "se": 0.0005253759842312924
         },
         "3": {
-          "jugadas": 126928,
-          "ganadas": 42488,
-          "tasa": 0.334740955502332,
-          "se": 0.0013245583693146418
+          "jugadas": 201393,
+          "ganadas": 67468,
+          "tasa": 0.33500667848435645,
+          "se": 0.001051751617716786
         },
         "4": {
-          "jugadas": 100084,
-          "ganadas": 24931,
-          "tasa": 0.24910075536549298,
-          "se": 0.0013670866076267538
+          "jugadas": 100177,
+          "ganadas": 25070,
+          "tasa": 0.2502570450302964,
+          "se": 0.0013685647257535264
         }
       },
       "partidas": {
-        "completas": 427,
-        "tasaAsiento0": 0.23185011709601874,
-        "seAsiento0": 0.020422678782710715,
-        "medianaManosPorPartida": 839
+        "completas": 467,
+        "tasaAsiento0": 0.2398286937901499,
+        "seAsiento0": 0.01975822228352714,
+        "medianaManosPorPartida": 1034
       },
-      "manosPorMinuto": 5680974
+      "manosPorMinuto": 5476530
     },
     {
       "mesa": 4,
@@ -1734,114 +2461,184 @@
       "nivel": "avanzado",
       "nivelAsiento0": "avanzado",
       "duelo": null,
-      "manosContadas": 100037,
-      "manosSimuladas": 106815,
-      "partidasCompletas": 612,
-      "tasaAsiento0": 0.24754840708937692,
-      "seAsiento0": 0.0014211006084709993,
-      "seBinomialAsiento0": 0.0013645486414784762,
-      "efectoDiseno": 1.0846050145528123,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -3323600,
+          "porMano": -33.210759822534875,
+          "se": 0.6229658499009896
+        },
+        {
+          "asiento": 1,
+          "total": 1129200,
+          "porMano": 11.283424597306047,
+          "se": 0.7457578860115786
+        },
+        {
+          "asiento": 2,
+          "total": 1112650,
+          "porMano": 11.118050281785843,
+          "se": 0.7433340643512759
+        },
+        {
+          "asiento": 3,
+          "total": 1081750,
+          "porMano": 10.809284943442984,
+          "se": 0.7196148869406728
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 385371,
+          "tasaRetiro": 0.0012455529866025206,
+          "tasaSubida": 0
+        },
+        {
+          "asiento": 1,
+          "acciones": 362505,
+          "tasaRetiro": 0.07455345443511124,
+          "tasaSubida": 0.13843946980041655
+        },
+        {
+          "asiento": 2,
+          "acciones": 351779,
+          "tasaRetiro": 0.07549342058508325,
+          "tasaSubida": 0.14630492439855705
+        },
+        {
+          "asiento": 3,
+          "acciones": 339003,
+          "tasaRetiro": 0.07914384238487565,
+          "tasaSubida": 0.13943534422999207
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 59,
+        "tasaAbandono": 0.0005630361965473476
+      },
+      "manosContadas": 100076,
+      "manosSimuladas": 104789,
+      "partidasCompletas": 685,
+      "tasaAsiento0": 0.251318997561853,
+      "seAsiento0": 0.0013776377198322777,
+      "seBinomialAsiento0": 0.0013711851360297261,
+      "efectoDiseno": 1.0094338336378714,
       "esperado": 0.25,
-      "sorteosDePerfiles": 612,
+      "sorteosDePerfiles": 685,
       "porPerfil": {
         "EQUILIBRADA": {
-          "jugadas": 73147,
-          "ganadas": 18310,
-          "tasa": 0.2503178530903523,
-          "se": 0.0016017186686201417
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 76126,
-          "ganadas": 19160,
-          "tasa": 0.2516879909623519,
-          "se": 0.0015729180608747822
+          "jugadas": 76473,
+          "ganadas": 19031,
+          "tasa": 0.24885907444457522,
+          "se": 0.001563447813342267
         },
         "CONSERVADORA": {
-          "jugadas": 75091,
-          "ganadas": 18843,
-          "tasa": 0.25093553155504655,
-          "se": 0.0015821466449086915
+          "jugadas": 72941,
+          "ganadas": 18440,
+          "tasa": 0.2528070632428949,
+          "se": 0.001609255952448794
+        },
+        "IMPREDECIBLE": {
+          "jugadas": 72929,
+          "ganadas": 17947,
+          "tasa": 0.24608866157495646,
+          "se": 0.0015949820883497047
         },
         "AGRESIVA": {
-          "jugadas": 75747,
-          "ganadas": 18960,
-          "tasa": 0.2503069428492217,
-          "se": 0.0015739664609170873
+          "jugadas": 77885,
+          "ganadas": 19507,
+          "tasa": 0.2504590100789626,
+          "se": 0.001552526821252523
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.24754840708937692,
-          "se": 0.0014211006084709993,
-          "seBinomial": 0.0013645486414784762
+          "tasa": 0.251318997561853,
+          "se": 0.0013776377198322777,
+          "seBinomial": 0.0013711851360297261
         },
         {
           "asiento": 1,
-          "tasa": 0.2508971680478223,
-          "se": 0.0014089013895089175,
-          "seBinomial": 0.001370686923245668
+          "tasa": 0.24955034174027738,
+          "se": 0.0012999870891300632,
+          "seBinomial": 0.0013679647209971035
         },
         {
           "asiento": 2,
-          "tasa": 0.25038735667802914,
-          "se": 0.0013855674854104723,
-          "seBinomial": 0.0013697594948533487
+          "tasa": 0.25030976457892,
+          "se": 0.0013146475495640045,
+          "seBinomial": 0.0013693512223123838
         },
         {
           "asiento": 3,
-          "tasa": 0.25116706818477164,
-          "se": 0.001354407836995568,
-          "seBinomial": 0.0013711768936920847
+          "tasa": 0.24882089611894959,
+          "se": 0.0013642564476282872,
+          "seBinomial": 0.001366627655092235
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100037,
-          "ganadas": 28682,
-          "tasa": 0.2867139158511351,
-          "se": 0.0014298021050069918
+          "jugadas": 100076,
+          "ganadas": 28598,
+          "tasa": 0.285762820256605,
+          "se": 0.0014281016447305578
         },
         "pie": {
-          "jugadas": 100037,
-          "ganadas": 21692,
-          "tasa": 0.21683976928536441,
-          "se": 0.0013029101023341865
+          "jugadas": 100076,
+          "ganadas": 21881,
+          "tasa": 0.2186438306886766,
+          "se": 0.0013065564173636154
         },
         "medio": {
-          "jugadas": 200074,
-          "ganadas": 49663,
-          "tasa": 0.24822315743175025,
-          "se": 0.0009657623982316632
+          "jugadas": 200152,
+          "ganadas": 49597,
+          "tasa": 0.2477966745273592,
+          "se": 0.0009650179561875133
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 224,
-          "ganadas": 111,
-          "tasa": 0.4955357142857143,
-          "se": 0.03340632359360203
+          "jugadas": 165,
+          "ganadas": 83,
+          "tasa": 0.503030303030303,
+          "se": 0.03892423232644801
         },
         "3": {
-          "jugadas": 6554,
-          "ganadas": 2217,
-          "tasa": 0.33826670735428743,
-          "se": 0.005844103544508297
+          "jugadas": 4548,
+          "ganadas": 1543,
+          "tasa": 0.33927000879507474,
+          "se": 0.007020604646739407
         },
         "4": {
-          "jugadas": 100037,
-          "ganadas": 24764,
-          "tasa": 0.24754840708937692,
-          "se": 0.0013645486414784762
+          "jugadas": 100076,
+          "ganadas": 25151,
+          "tasa": 0.251318997561853,
+          "se": 0.0013711851360297261
         }
       },
       "partidas": {
-        "completas": 612,
+        "completas": 685,
         "tasaAsiento0": 0,
         "seAsiento0": 0,
-        "medianaManosPorPartida": 151
+        "medianaManosPorPartida": 136
       },
-      "manosPorMinuto": 3917421
+      "manosPorMinuto": 3516409
     },
     {
       "mesa": 4,
@@ -1849,114 +2646,184 @@
       "nivel": "avanzado",
       "nivelAsiento0": "avanzado",
       "duelo": null,
-      "manosContadas": 100014,
-      "manosSimuladas": 100376,
-      "partidasCompletas": 2495,
-      "tasaAsiento0": 0.06702061711360409,
-      "seAsiento0": 0.0007787247005478048,
-      "seBinomialAsiento0": 0.0007906965358539925,
-      "efectoDiseno": 0.9699475013423355,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -13168350,
+          "porMano": -131.63611100004,
+          "se": 0.5449767579221168
+        },
+        {
+          "asiento": 1,
+          "total": 4860850,
+          "porMano": 48.591007237394535,
+          "se": 1.1905774862949976
+        },
+        {
+          "asiento": 2,
+          "total": 4488200,
+          "porMano": 44.86584829461394,
+          "se": 1.1623693840437128
+        },
+        {
+          "asiento": 3,
+          "total": 3819300,
+          "porMano": 38.179255468031506,
+          "se": 1.1113217768386443
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 348621,
+          "tasaRetiro": 0.11230820862770745,
+          "tasaSubida": 0.4382610341889903
+        },
+        {
+          "asiento": 1,
+          "acciones": 383075,
+          "tasaRetiro": 0.07908111988513998,
+          "tasaSubida": 0.13191672648959082
+        },
+        {
+          "asiento": 2,
+          "acciones": 407855,
+          "tasaRetiro": 0.0724816417599392,
+          "tasaSubida": 0.13101224699954642
+        },
+        {
+          "asiento": 3,
+          "acciones": 430083,
+          "tasaRetiro": 0.06744047079284696,
+          "tasaSubida": 0.12643373488373175
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 4697,
+        "tasaAbandono": 0.04680571195105181
+      },
+      "manosContadas": 100036,
+      "manosSimuladas": 100351,
+      "partidasCompletas": 2641,
+      "tasaAsiento0": 0.06592626654404414,
+      "seAsiento0": 0.0007829128950541423,
+      "seBinomialAsiento0": 0.0007845880008239386,
+      "efectoDiseno": 0.9957345318013008,
       "esperado": 0.25,
-      "sorteosDePerfiles": 2495,
+      "sorteosDePerfiles": 2641,
       "porPerfil": {
         "EQUILIBRADA": {
-          "jugadas": 75276,
-          "ganadas": 23425,
-          "tasa": 0.31118816090121687,
-          "se": 0.0016874603136411586
+          "jugadas": 74576,
+          "ganadas": 23252,
+          "tasa": 0.3117893155975113,
+          "se": 0.0016962574844049602
         },
         "AGRESIVA": {
-          "jugadas": 75354,
-          "ganadas": 23531,
-          "tasa": 0.31227273933699606,
-          "se": 0.0016881926335490802
+          "jugadas": 74260,
+          "ganadas": 23018,
+          "tasa": 0.30996498788042015,
+          "se": 0.0016971272687844616
         },
         "IMPREDECIBLE": {
-          "jugadas": 74756,
-          "ganadas": 23130,
-          "tasa": 0.3094066028144898,
-          "se": 0.001690647131144228
+          "jugadas": 77572,
+          "ganadas": 24163,
+          "tasa": 0.3114912597328933,
+          "se": 0.0016627431488601837
         },
         "CONSERVADORA": {
-          "jugadas": 74656,
-          "ganadas": 23225,
-          "tasa": 0.3110935490784398,
-          "se": 0.0016943115444092902
+          "jugadas": 73700,
+          "ganadas": 23008,
+          "tasa": 0.3121845318860244,
+          "se": 0.0017068993604062706
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.06702061711360409,
-          "se": 0.0007787247005478048,
-          "seBinomial": 0.0007906965358539925
+          "tasa": 0.06592626654404414,
+          "se": 0.0007829128950541423,
+          "seBinomial": 0.0007845880008239386
         },
         {
           "asiento": 1,
-          "tasa": 0.31571579978802966,
-          "se": 0.0014253745558062618,
-          "seBinomial": 0.0014697247779067867
+          "tasa": 0.31461673797432926,
+          "se": 0.0015254023349272378,
+          "seBinomial": 0.0014681806639514413
         },
         {
           "asiento": 2,
-          "tasa": 0.3098366228727978,
-          "se": 0.0014557578851308,
-          "seBinomial": 0.0014622173466540926
+          "tasa": 0.3123875404854253,
+          "se": 0.0014963068214813072,
+          "seBinomial": 0.001465347277268239
         },
         {
           "asiento": 3,
-          "tasa": 0.3074269602255684,
-          "se": 0.0014533600457312993,
-          "seBinomial": 0.0014590607264167862
+          "tasa": 0.30706945499620136,
+          "se": 0.001416446486713989,
+          "seBinomial": 0.0014584280316864706
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100014,
-          "ganadas": 28354,
-          "tasa": 0.2835003099566061,
-          "se": 0.0014251296442361798
+          "jugadas": 100036,
+          "ganadas": 28258,
+          "tasa": 0.2824783078091887,
+          "se": 0.0014234162192838973
         },
         "pie": {
-          "jugadas": 100014,
-          "ganadas": 21776,
-          "tasa": 0.21772951786749856,
-          "se": 0.0013049886320656886
+          "jugadas": 100036,
+          "ganadas": 21882,
+          "tasa": 0.21874125314886642,
+          "se": 0.001307027229224106
         },
         "medio": {
-          "jugadas": 200028,
-          "ganadas": 49884,
-          "tasa": 0.24938508608794768,
-          "se": 0.0009673829688655316
+          "jugadas": 200072,
+          "ganadas": 49896,
+          "tasa": 0.24939021952097246,
+          "se": 0.0009672832368916223
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 39,
-          "ganadas": 9,
-          "tasa": 0.23076923076923078,
-          "se": 0.0674660014851561
+          "jugadas": 46,
+          "ganadas": 12,
+          "tasa": 0.2608695652173913,
+          "se": 0.06474307670904994
         },
         "3": {
-          "jugadas": 323,
-          "ganadas": 43,
-          "tasa": 0.13312693498452013,
-          "se": 0.018902074039405536
+          "jugadas": 269,
+          "ganadas": 29,
+          "tasa": 0.10780669144981413,
+          "se": 0.018909332556349318
         },
         "4": {
-          "jugadas": 100014,
-          "ganadas": 6703,
-          "tasa": 0.06702061711360409,
-          "se": 0.0007906965358539925
+          "jugadas": 100036,
+          "ganadas": 6595,
+          "tasa": 0.06592626654404414,
+          "se": 0.0007845880008239386
         }
       },
       "partidas": {
-        "completas": 2495,
+        "completas": 2641,
         "tasaAsiento0": 0,
         "seAsiento0": 0,
-        "medianaManosPorPartida": 39
+        "medianaManosPorPartida": 37
       },
-      "manosPorMinuto": 3513746
+      "manosPorMinuto": 3291996
     },
     {
       "mesa": 4,
@@ -1965,151 +2832,259 @@
       "nivelAsiento0": "basico",
       "duelo": {
         "global": {
-          "delta": -0.05309884924165925,
-          "se": 0.0023804721411245736,
-          "manos": 100021,
-          "partidas": 449,
-          "sigmas": -22.306015821119626
+          "delta": -0.05306852353217379,
+          "se": 0.002224822378950251,
+          "manos": 100097,
+          "partidas": 534,
+          "sigmas": -23.852925983787244
         },
         "porPerfil": {
-          "CONSERVADORA": {
-            "delta": -0.05774103213761835,
-            "se": 0.005074601696287619,
-            "manos": 22497,
-            "partidas": 108,
-            "sigmas": -11.378436297741247
-          },
           "AGRESIVA": {
-            "delta": -0.04977697814760673,
-            "se": 0.004777467832939212,
-            "manos": 26679,
-            "partidas": 125,
-            "sigmas": -10.419113197248416
+            "delta": -0.05405592469545958,
+            "se": 0.004059267350140161,
+            "manos": 28896,
+            "partidas": 143,
+            "sigmas": -13.31667023449271
           },
           "EQUILIBRADA": {
-            "delta": -0.04849709522606719,
-            "se": 0.004047151119762093,
-            "manos": 27713,
-            "partidas": 119,
-            "sigmas": -11.983020596700138
+            "delta": -0.052408193393615056,
+            "se": 0.004191425213806446,
+            "manos": 27095,
+            "partidas": 146,
+            "sigmas": -12.503668971829397
+          },
+          "CONSERVADORA": {
+            "delta": -0.05506586114687531,
+            "se": 0.004616486386491415,
+            "manos": 20194,
+            "partidas": 118,
+            "sigmas": -11.928089143294546
           },
           "IMPREDECIBLE": {
-            "delta": -0.05792841085941553,
-            "se": 0.005231229897831401,
-            "manos": 23132,
-            "partidas": 97,
-            "sigmas": -11.073573899596665
+            "delta": -0.050936768149882905,
+            "se": 0.0050318714705734745,
+            "manos": 23912,
+            "partidas": 127,
+            "sigmas": -10.122827748634391
           }
         }
       },
-      "manosContadas": 100021,
-      "manosSimuladas": 841737,
-      "partidasCompletas": 449,
-      "tasaAsiento0": 0.2114655922256326,
-      "seAsiento0": 0.001434144526040031,
-      "seBinomialAsiento0": 0.0012911734423549455,
-      "efectoDiseno": 1.2337201838966292,
+      "dueloFichas": {
+        "global": {
+          "delta": -23.249448035405656,
+          "se": 1.435936468033656,
+          "manos": 100097,
+          "partidas": 534,
+          "sigmas": -16.191139756512353
+        },
+        "porPerfil": {
+          "AGRESIVA": {
+            "delta": -22.073989479512736,
+            "se": 2.72281107846995,
+            "manos": 28896,
+            "partidas": 143,
+            "sigmas": -8.10705878716967
+          },
+          "EQUILIBRADA": {
+            "delta": -22.14799778556929,
+            "se": 2.7838618478685193,
+            "manos": 27095,
+            "partidas": 146,
+            "sigmas": -7.955853772890002
+          },
+          "CONSERVADORA": {
+            "delta": -27.46607903337625,
+            "se": 2.9548117585373253,
+            "manos": 20194,
+            "partidas": 118,
+            "sigmas": -9.295373539115857
+          },
+          "IMPREDECIBLE": {
+            "delta": -22.356975577116092,
+            "se": 2.987064677077742,
+            "manos": 23912,
+            "partidas": 127,
+            "sigmas": -7.484597085787916
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -1640900,
+          "porMano": -16.393098694266563,
+          "se": 0.9103764388030764
+        },
+        {
+          "asiento": 1,
+          "total": 686300,
+          "porMano": 6.856349341139095,
+          "se": 0.8400285484847569
+        },
+        {
+          "asiento": 2,
+          "total": 517900,
+          "porMano": 5.173981238198947,
+          "se": 0.9289849552516383
+        },
+        {
+          "asiento": 3,
+          "total": 436700,
+          "porMano": 4.362768114928519,
+          "se": 0.8577262241027288
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 1640067,
+          "tasaRetiro": 0.04804376894358584,
+          "tasaSubida": 0.14105887137537673
+        },
+        {
+          "asiento": 1,
+          "acciones": 1116199,
+          "tasaRetiro": 0.05428870658368266,
+          "tasaSubida": 0.13139861261298388
+        },
+        {
+          "asiento": 2,
+          "acciones": 770949,
+          "tasaRetiro": 0.0585148952784166,
+          "tasaSubida": 0.17705970174421395
+        },
+        {
+          "asiento": 3,
+          "acciones": 821034,
+          "tasaRetiro": 0.0576857962033241,
+          "tasaSubida": 0.17771736615048828
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 72643,
+        "tasaAbandono": 0.14576001155758528
+      },
+      "manosContadas": 100097,
+      "manosSimuladas": 498374,
+      "partidasCompletas": 534,
+      "tasaAsiento0": 0.21004625513252145,
+      "seAsiento0": 0.0014015900213844047,
+      "seBinomialAsiento0": 0.0012875015836321258,
+      "efectoDiseno": 1.1850766740530314,
       "esperado": 0.25,
-      "sorteosDePerfiles": 449,
+      "sorteosDePerfiles": 534,
       "porPerfil": {
-        "CONSERVADORA": {
-          "jugadas": 99247,
-          "ganadas": 25096,
-          "tasa": 0.2528640664201437,
-          "se": 0.0013797000405948094
-        },
-        "EQUILIBRADA": {
-          "jugadas": 103018,
-          "ganadas": 25556,
-          "tasa": 0.2480731522646528,
-          "se": 0.001345615934724286
-        },
         "AGRESIVA": {
-          "jugadas": 104934,
-          "ganadas": 26105,
-          "tasa": 0.24877542074065603,
-          "se": 0.001334536680771267
+          "jugadas": 104732,
+          "ganadas": 26195,
+          "tasa": 0.2501145781614024,
+          "se": 0.0013382192096306005
         },
         "IMPREDECIBLE": {
-          "jugadas": 92885,
-          "ganadas": 23264,
-          "tasa": 0.2504602465414222,
-          "se": 0.0014216541100082448
+          "jugadas": 96559,
+          "ganadas": 24161,
+          "tasa": 0.25022007270166424,
+          "se": 0.0013938999356523877
+        },
+        "EQUILIBRADA": {
+          "jugadas": 106294,
+          "ganadas": 26504,
+          "tasa": 0.24934615312247163,
+          "se": 0.0013269874581935681
+        },
+        "CONSERVADORA": {
+          "jugadas": 92803,
+          "ganadas": 23237,
+          "tasa": 0.25039061237244487,
+          "se": 0.001422150380013935
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.2114655922256326,
-          "se": 0.001434144526040031,
-          "seBinomial": 0.0012911734423549455
+          "tasa": 0.21004625513252145,
+          "se": 0.0014015900213844047,
+          "seBinomial": 0.0012875015836321258
         },
         {
           "asiento": 1,
-          "tasa": 0.26456444146729186,
-          "se": 0.0014013022609947522,
-          "seBinomial": 0.0013947374184289962
+          "tasa": 0.26311477866469524,
+          "se": 0.0013143438101367168,
+          "seBinomial": 0.0013917525115218973
         },
         {
           "asiento": 2,
-          "tasa": 0.2616150608372242,
-          "se": 0.0013599298785375647,
-          "seBinomial": 0.0013897196229711941
+          "tasa": 0.263644265062889,
+          "se": 0.0013986692549383295,
+          "seBinomial": 0.0013926515614477754
         },
         {
           "asiento": 3,
-          "tasa": 0.26235490546985135,
-          "se": 0.0014712626064214854,
-          "seBinomial": 0.0013909858998872322
+          "tasa": 0.2631947011398943,
+          "se": 0.001432323514684297,
+          "seBinomial": 0.0013918883833282988
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100021,
-          "ganadas": 28508,
-          "tasa": 0.28502014576938844,
-          "se": 0.001427378284446278
+          "jugadas": 100097,
+          "ganadas": 28617,
+          "tasa": 0.2858926840964265,
+          "se": 0.0014281464065955432
         },
         "pie": {
-          "jugadas": 100021,
-          "ganadas": 21840,
-          "tasa": 0.21835414562941782,
-          "se": 0.0013062916150783817
+          "jugadas": 100097,
+          "ganadas": 22156,
+          "tasa": 0.22134529506378814,
+          "se": 0.001312191054749988
         },
         "medio": {
-          "jugadas": 200042,
-          "ganadas": 49673,
-          "tasa": 0.24831285430059688,
-          "se": 0.0009659564991950654
+          "jugadas": 200194,
+          "ganadas": 49324,
+          "tasa": 0.24638101041989272,
+          "se": 0.0009630614611047926
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 623089,
-          "ganadas": 299207,
-          "tasa": 0.48019945786235996,
-          "se": 0.0006329277753235185
+          "jugadas": 302338,
+          "ganadas": 146236,
+          "tasa": 0.48368382406445765,
+          "se": 0.0009088501422863022
         },
         "3": {
-          "jugadas": 118627,
-          "ganadas": 37453,
-          "tasa": 0.3157207043927605,
-          "se": 0.0013495110892393965
+          "jugadas": 95939,
+          "ganadas": 30317,
+          "tasa": 0.31600287682798445,
+          "se": 0.0015009805411869814
         },
         "4": {
-          "jugadas": 100021,
-          "ganadas": 21151,
-          "tasa": 0.2114655922256326,
-          "se": 0.0012911734423549455
+          "jugadas": 100097,
+          "ganadas": 21025,
+          "tasa": 0.21004625513252145,
+          "se": 0.0012875015836321258
         }
       },
       "partidas": {
-        "completas": 449,
-        "tasaAsiento0": 0.3184855233853007,
-        "seAsiento0": 0.021986657969877813,
-        "medianaManosPorPartida": 506
+        "completas": 534,
+        "tasaAsiento0": 0.033707865168539325,
+        "seAsiento0": 0.007809967341609163,
+        "medianaManosPorPartida": 222
       },
-      "manosPorMinuto": 6078255
+      "manosPorMinuto": 5165390
     },
     {
       "mesa": 5,
@@ -2118,163 +3093,283 @@
       "nivelAsiento0": "avanzado",
       "duelo": {
         "global": {
-          "delta": 0.0006892556039477365,
-          "se": 0.0020107395954623852,
-          "manos": 100108,
-          "partidas": 609,
-          "sigmas": 0.34278710455753314
+          "delta": -0.002458598598798685,
+          "se": 0.0020007627642805704,
+          "manos": 100057,
+          "partidas": 710,
+          "sigmas": -1.2288306453377755
         },
         "porPerfil": {
-          "IMPREDECIBLE": {
-            "delta": -0.0071659302714142505,
-            "se": 0.00372316565890793,
-            "manos": 26933,
-            "partidas": 160,
-            "sigmas": -1.9246874643542302
+          "CONSERVADORA": {
+            "delta": -0.001860991989643175,
+            "se": 0.003784894098883039,
+            "manos": 24718,
+            "partidas": 172,
+            "sigmas": -0.4916893157439657
           },
           "EQUILIBRADA": {
-            "delta": 0.004911955514365153,
-            "se": 0.0044874289803715234,
-            "manos": 21580,
-            "partidas": 136,
-            "sigmas": 1.0946035103509275
+            "delta": -0.0005249343832020997,
+            "se": 0.003661854170172563,
+            "manos": 28575,
+            "partidas": 188,
+            "sigmas": -0.14335207214911086
           },
-          "CONSERVADORA": {
-            "delta": 0.0017214225542980625,
-            "se": 0.003917307714906328,
-            "manos": 27303,
-            "partidas": 166,
-            "sigmas": 0.439440217511538
+          "IMPREDECIBLE": {
+            "delta": -0.009845288326300985,
+            "se": 0.004601300934167938,
+            "manos": 22041,
+            "partidas": 169,
+            "sigmas": -2.1396749456643236
           },
           "AGRESIVA": {
-            "delta": 0.004487073933805368,
-            "se": 0.004055699898065501,
-            "manos": 24292,
-            "partidas": 147,
-            "sigmas": 1.106362415016364
+            "delta": 0.0012943413016219714,
+            "se": 0.0040960442574543236,
+            "manos": 24723,
+            "partidas": 181,
+            "sigmas": 0.31599787997075984
           }
         }
       },
-      "manosContadas": 100108,
-      "manosSimuladas": 1226243,
-      "partidasCompletas": 609,
-      "tasaAsiento0": 0.19951452431374117,
-      "seAsiento0": 0.001323991064695105,
-      "seBinomialAsiento0": 0.0012630763232179961,
-      "efectoDiseno": 1.0987804404550061,
+      "dueloFichas": {
+        "global": {
+          "delta": -3.2391536824010316,
+          "se": 1.6050055737646078,
+          "manos": 100057,
+          "partidas": 710,
+          "sigmas": -2.01815727954356
+        },
+        "porPerfil": {
+          "CONSERVADORA": {
+            "delta": -2.283760822072983,
+            "se": 3.1076917137243747,
+            "manos": 24718,
+            "partidas": 172,
+            "sigmas": -0.7348736723103201
+          },
+          "EQUILIBRADA": {
+            "delta": -1.905511811023622,
+            "se": 3.046607922782891,
+            "manos": 28575,
+            "partidas": 188,
+            "sigmas": -0.6254535730620214
+          },
+          "IMPREDECIBLE": {
+            "delta": -9.03316546436187,
+            "se": 3.6469554728845996,
+            "manos": 22041,
+            "partidas": 169,
+            "sigmas": -2.4769058825982837
+          },
+          "AGRESIVA": {
+            "delta": -0.5703191360271812,
+            "se": 3.121739744189032,
+            "manos": 24723,
+            "partidas": 181,
+            "sigmas": -0.18269272353302443
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -263900,
+          "porMano": -2.6374966269226543,
+          "se": 1.0534939849709648
+        },
+        {
+          "asiento": 1,
+          "total": 60200,
+          "porMano": 0.6016570554783773,
+          "se": 1.02984760710566
+        },
+        {
+          "asiento": 2,
+          "total": 87300,
+          "porMano": 0.8725026734761187,
+          "se": 1.0305135746811236
+        },
+        {
+          "asiento": 3,
+          "total": 131300,
+          "porMano": 1.3122520163506801,
+          "se": 1.1287082645049
+        },
+        {
+          "asiento": 4,
+          "total": -14900,
+          "porMano": -0.14891511838252197,
+          "se": 1.0841699383097902
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 7035116,
+          "tasaRetiro": 0.04585155383365391,
+          "tasaSubida": 0.18268980923697634
+        },
+        {
+          "asiento": 1,
+          "acciones": 3559930,
+          "tasaRetiro": 0.05068358085692696,
+          "tasaSubida": 0.17713073009862554
+        },
+        {
+          "asiento": 2,
+          "acciones": 1986110,
+          "tasaRetiro": 0.05885927768351199,
+          "tasaSubida": 0.16121816012204762
+        },
+        {
+          "asiento": 3,
+          "acciones": 1972664,
+          "tasaRetiro": 0.05858676388883256,
+          "tasaSubida": 0.1657129648029264
+        },
+        {
+          "asiento": 4,
+          "acciones": 2330592,
+          "tasaRetiro": 0.05496672090181379,
+          "tasaSubida": 0.17722578640963327
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 409307,
+        "tasaAbandono": 0.19880128711067938
+      },
+      "manosContadas": 100057,
+      "manosSimuladas": 2058875,
+      "partidasCompletas": 710,
+      "tasaAsiento0": 0.19742746634418382,
+      "seAsiento0": 0.0013209268380070648,
+      "seBinomialAsiento0": 0.0012584100957432878,
+      "efectoDiseno": 1.1018263152018186,
       "esperado": 0.2,
-      "sorteosDePerfiles": 609,
+      "sorteosDePerfiles": 710,
       "porPerfil": {
-        "IMPREDECIBLE": {
-          "jugadas": 127041,
-          "ganadas": 25141,
-          "tasa": 0.19789674199667823,
-          "se": 0.0011177958955069728
+        "CONSERVADORA": {
+          "jugadas": 124775,
+          "ganadas": 24869,
+          "tasa": 0.19931075936686035,
+          "se": 0.0011309244124111852
         },
         "EQUILIBRADA": {
-          "jugadas": 121688,
-          "ganadas": 24687,
-          "tasa": 0.20287127736506474,
-          "se": 0.0011527911514684047
+          "jugadas": 128632,
+          "ganadas": 25704,
+          "tasa": 0.1998258598171528,
+          "se": 0.0011149197018814913
+        },
+        "IMPREDECIBLE": {
+          "jugadas": 122098,
+          "ganadas": 24502,
+          "tasa": 0.20067486772920112,
+          "se": 0.0011461829708367469
         },
         "AGRESIVA": {
-          "jugadas": 124400,
-          "ganadas": 24837,
-          "tasa": 0.19965434083601286,
-          "se": 0.0011333602722005446
-        },
-        "CONSERVADORA": {
-          "jugadas": 127411,
-          "ganadas": 25443,
-          "tasa": 0.19969233425685382,
-          "se": 0.0011199682809671168
+          "jugadas": 124780,
+          "ganadas": 24982,
+          "tasa": 0.20020836672543676,
+          "se": 0.0011328099344728602
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.19951452431374117,
-          "se": 0.001323991064695105,
-          "seBinomial": 0.0012630763232179961
+          "tasa": 0.19742746634418382,
+          "se": 0.0013209268380070648,
+          "seBinomial": 0.0012584100957432878
         },
         {
           "asiento": 1,
-          "tasa": 0.19882526870979342,
-          "se": 0.0012482878118457944,
-          "seBinomial": 0.0012614354107458679
+          "tasa": 0.1998860649429825,
+          "se": 0.001287107897898454,
+          "seBinomial": 0.0012642804945500227
         },
         {
           "asiento": 2,
-          "tasa": 0.20073320813521398,
-          "se": 0.0013028281485307654,
-          "seBinomial": 0.001265963268358529
+          "tasa": 0.20116533575861759,
+          "se": 0.0013114840436776224,
+          "seBinomial": 0.0012673054006748382
         },
         {
           "asiento": 3,
-          "tasa": 0.20054341311383705,
-          "se": 0.0012658422712758033,
-          "seBinomial": 0.0012655148658151955
+          "tasa": 0.1998061105170053,
+          "se": 0.0013220770772857898,
+          "seBinomial": 0.001264090767964474
         },
         {
           "asiento": 4,
-          "tasa": 0.20038358572741438,
-          "se": 0.0013113373514008157,
-          "seBinomial": 0.0012651369198013595
+          "tasa": 0.2017150224372108,
+          "se": 0.0013519685913574667,
+          "seBinomial": 0.0012685989893847537
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100108,
-          "ganadas": 22631,
-          "tasa": 0.22606584888320613,
-          "se": 0.0013220110733949176
+          "jugadas": 100057,
+          "ganadas": 22690,
+          "tasa": 0.22677074067781364,
+          "se": 0.0013238046747828084
         },
         "pie": {
-          "jugadas": 100108,
-          "ganadas": 17696,
-          "tasa": 0.17676908938346586,
-          "se": 0.001205673191436199
+          "jugadas": 100057,
+          "ganadas": 17620,
+          "tasa": 0.17609962321476758,
+          "se": 0.001204183925152738
         },
         "medio": {
-          "jugadas": 300324,
-          "ganadas": 59781,
-          "tasa": 0.199055020577776,
-          "se": 0.0007286062458160555
+          "jugadas": 300171,
+          "ganadas": 59747,
+          "tasa": 0.19904321203580624,
+          "se": 0.0007287756657326964
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 849195,
-          "ganadas": 425874,
-          "tasa": 0.5015031883136382,
-          "se": 0.000542580682459475
+          "jugadas": 1563886,
+          "ganadas": 782148,
+          "tasa": 0.5001310837234939,
+          "se": 0.00039982269619855555
         },
         "3": {
-          "jugadas": 182592,
-          "ganadas": 60744,
-          "tasa": 0.33267613038906413,
-          "se": 0.0011026515125176365
+          "jugadas": 292385,
+          "ganadas": 97521,
+          "tasa": 0.3335362621201498,
+          "se": 0.0008719312572773948
         },
         "4": {
-          "jugadas": 94348,
-          "ganadas": 23690,
-          "tasa": 0.25109170305676853,
-          "se": 0.0014117706633851835
+          "jugadas": 102547,
+          "ganadas": 25687,
+          "tasa": 0.2504900192107034,
+          "se": 0.0013530767868800162
         },
         "5": {
-          "jugadas": 100108,
-          "ganadas": 19973,
-          "tasa": 0.19951452431374117,
-          "se": 0.0012630763232179961
+          "jugadas": 100057,
+          "ganadas": 19754,
+          "tasa": 0.19742746634418382,
+          "se": 0.0012584100957432878
         }
       },
       "partidas": {
-        "completas": 609,
-        "tasaAsiento0": 0.21510673234811165,
-        "seAsiento0": 0.016650361123054576,
-        "medianaManosPorPartida": 633
+        "completas": 710,
+        "tasaAsiento0": 0.1676056338028169,
+        "seAsiento0": 0.014017794793538842,
+        "medianaManosPorPartida": 600
       },
-      "manosPorMinuto": 5105800
+      "manosPorMinuto": 5076122
     },
     {
       "mesa": 5,
@@ -2282,126 +3377,202 @@
       "nivel": "avanzado",
       "nivelAsiento0": "avanzado",
       "duelo": null,
-      "manosContadas": 100055,
-      "manosSimuladas": 113216,
-      "partidasCompletas": 730,
-      "tasaAsiento0": 0.19955024736394983,
-      "seAsiento0": 0.001290398266129145,
-      "seBinomialAsiento0": 0.001263495718086559,
-      "efectoDiseno": 1.0430376680813265,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -4154350,
+          "porMano": -41.51609937441289,
+          "se": 0.6960138951965774
+        },
+        {
+          "asiento": 1,
+          "total": 1061250,
+          "porMano": 10.60550036975596,
+          "se": 0.9432990392532414
+        },
+        {
+          "asiento": 2,
+          "total": 1030200,
+          "porMano": 10.29520516459137,
+          "se": 0.9389045532039221
+        },
+        {
+          "asiento": 3,
+          "total": 1097650,
+          "porMano": 10.969260288209782,
+          "se": 0.9271597179498058
+        },
+        {
+          "asiento": 4,
+          "total": 965250,
+          "porMano": 9.646133551855776,
+          "se": 0.8515500200277156
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 404231,
+          "tasaRetiro": 0.0016822064611571107,
+          "tasaSubida": 0
+        },
+        {
+          "asiento": 1,
+          "acciones": 376479,
+          "tasaRetiro": 0.09259746227545228,
+          "tasaSubida": 0.11903984020357045
+        },
+        {
+          "asiento": 2,
+          "acciones": 367369,
+          "tasaRetiro": 0.0954544340975967,
+          "tasaSubida": 0.11983319223995492
+        },
+        {
+          "asiento": 3,
+          "acciones": 363922,
+          "tasaRetiro": 0.09719939987140101,
+          "tasaSubida": 0.11555498156198306
+        },
+        {
+          "asiento": 4,
+          "acciones": 360358,
+          "tasaRetiro": 0.09882117227867843,
+          "tasaSubida": 0.11098685196388036
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 39,
+        "tasaAbandono": 0.00036065695050676926
+      },
+      "manosContadas": 100066,
+      "manosSimuladas": 108136,
+      "partidasCompletas": 879,
+      "tasaAsiento0": 0.20205664261587353,
+      "seAsiento0": 0.0012575083943651704,
+      "seBinomialAsiento0": 0.0012693439815007284,
+      "efectoDiseno": 0.9814385875595576,
       "esperado": 0.2,
-      "sorteosDePerfiles": 730,
+      "sorteosDePerfiles": 879,
       "porPerfil": {
-        "EQUILIBRADA": {
-          "jugadas": 100055,
-          "ganadas": 20049,
-          "tasa": 0.20037979111488682,
-          "se": 0.001265462973058284
-        },
-        "AGRESIVA": {
-          "jugadas": 100055,
-          "ganadas": 19972,
-          "tasa": 0.19961021438208984,
-          "se": 0.0012636382144897505
-        },
         "CONSERVADORA": {
-          "jugadas": 100055,
-          "ganadas": 20069,
-          "tasa": 0.20057968117535355,
-          "se": 0.0012659357410367367
+          "jugadas": 100066,
+          "ganadas": 19997,
+          "tasa": 0.19983810684947934,
+          "se": 0.001264109851377705
+        },
+        "EQUILIBRADA": {
+          "jugadas": 100066,
+          "ganadas": 20066,
+          "tasa": 0.2005276517498451,
+          "se": 0.0012657431558374143
         },
         "IMPREDECIBLE": {
-          "jugadas": 100055,
-          "ganadas": 19999,
-          "tasa": 0.19988006596371996,
-          "se": 0.0012642788977588622
+          "jugadas": 100066,
+          "ganadas": 20005,
+          "tasa": 0.19991805408430435,
+          "se": 0.0012642995207587833
+        },
+        "AGRESIVA": {
+          "jugadas": 100066,
+          "ganadas": 19779,
+          "tasa": 0.19765954470049768,
+          "se": 0.0012589108330665806
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.19955024736394983,
-          "se": 0.001290398266129145,
-          "seBinomial": 0.001263495718086559
+          "tasa": 0.20205664261587353,
+          "se": 0.0012575083943651704,
+          "seBinomial": 0.0012693439815007284
         },
         {
           "asiento": 1,
-          "tasa": 0.200799560241867,
-          "se": 0.0013176620036017834,
-          "seBinomial": 0.0012664552177772213
+          "tasa": 0.19932844322746987,
+          "se": 0.0012364254967912741,
+          "seBinomial": 0.0012628988504886282
         },
         {
           "asiento": 2,
-          "tasa": 0.1981410224376593,
-          "se": 0.0012376906809477813,
-          "seBinomial": 0.001260134203422133
+          "tasa": 0.1991885355665261,
+          "se": 0.0012846763495301323,
+          "seBinomial": 0.0012625658560158261
         },
         {
           "asiento": 3,
-          "tasa": 0.2013992304232672,
-          "se": 0.0012567518311574718,
-          "seBinomial": 0.0012678689536603609
+          "tasa": 0.19939839705794177,
+          "se": 0.001246234072728011,
+          "seBinomial": 0.0012630652567268393
         },
         {
           "asiento": 4,
-          "tasa": 0.2001099395332567,
-          "se": 0.0012950036378496118,
-          "seBinomial": 0.0012648239551541897
+          "tasa": 0.20002798153218876,
+          "se": 0.001267831087281627,
+          "seBinomial": 0.001264560187233159
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100055,
-          "ganadas": 22478,
-          "tasa": 0.2246564389585728,
-          "se": 0.0013194323544518578
+          "jugadas": 100066,
+          "ganadas": 22392,
+          "tasa": 0.22377231027521835,
+          "se": 0.0013175116629028578
         },
         "pie": {
-          "jugadas": 100055,
-          "ganadas": 17898,
-          "tasa": 0.17888161511168857,
-          "se": 0.0012116197491532261
+          "jugadas": 100066,
+          "ganadas": 17834,
+          "tasa": 0.17822237323366577,
+          "se": 0.0012098039495028702
         },
         "medio": {
-          "jugadas": 300165,
-          "ganadas": 59679,
-          "tasa": 0.19882064864324622,
-          "se": 0.0007284765757531045
+          "jugadas": 300198,
+          "ganadas": 59840,
+          "tasa": 0.19933510549703862,
+          "se": 0.0007291441427676207
         }
       },
       "porVivos": {
-        "2": {
-          "jugadas": 3,
-          "ganadas": 2,
-          "tasa": 0.6666666666666666,
-          "se": 0.2721655269759087
-        },
         "3": {
-          "jugadas": 1233,
-          "ganadas": 375,
-          "tasa": 0.30413625304136255,
-          "se": 0.01310130818884055
+          "jugadas": 567,
+          "ganadas": 190,
+          "tasa": 0.3350970017636684,
+          "se": 0.01982316004137257
         },
         "4": {
-          "jugadas": 11925,
-          "ganadas": 2965,
-          "tasa": 0.24863731656184487,
-          "se": 0.003958027179154293
+          "jugadas": 7503,
+          "ganadas": 1948,
+          "tasa": 0.259629481540717,
+          "se": 0.005061556490425953
         },
         "5": {
-          "jugadas": 100055,
-          "ganadas": 19966,
-          "tasa": 0.19955024736394983,
-          "se": 0.001263495718086559
+          "jugadas": 100066,
+          "ganadas": 20219,
+          "tasa": 0.20205664261587353,
+          "se": 0.0012693439815007284
         }
       },
       "partidas": {
-        "completas": 730,
+        "completas": 879,
         "tasaAsiento0": 0,
         "seAsiento0": 0,
-        "medianaManosPorPartida": 133
+        "medianaManosPorPartida": 110
       },
-      "manosPorMinuto": 2857787
+      "manosPorMinuto": 2634251
     },
     {
       "mesa": 5,
@@ -2409,126 +3580,208 @@
       "nivel": "avanzado",
       "nivelAsiento0": "avanzado",
       "duelo": null,
-      "manosContadas": 100026,
-      "manosSimuladas": 101608,
-      "partidasCompletas": 2560,
-      "tasaAsiento0": 0.05169655889468738,
-      "seAsiento0": 0.000676718387509059,
-      "seBinomialAsiento0": 0.0007000805793612471,
-      "efectoDiseno": 0.9343721680989587,
+      "dueloFichas": null,
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -13593750,
+          "porMano": -135.92254851966283,
+          "se": 0.5400062649133014
+        },
+        {
+          "asiento": 1,
+          "total": 3679350,
+          "porMano": 36.789453160152384,
+          "se": 1.3318019721821213
+        },
+        {
+          "asiento": 2,
+          "total": 3368200,
+          "porMano": 33.678295387507376,
+          "se": 1.3364334767559134
+        },
+        {
+          "asiento": 3,
+          "total": 3505500,
+          "porMano": 35.05114437411885,
+          "se": 1.3848731929506457
+        },
+        {
+          "asiento": 4,
+          "total": 3040700,
+          "porMano": 30.40365559788423,
+          "se": 1.3037502290688796
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 351884,
+          "tasaRetiro": 0.11588478021166065,
+          "tasaSubida": 0.4370076502483773
+        },
+        {
+          "asiento": 1,
+          "acciones": 379490,
+          "tasaRetiro": 0.10099607367783077,
+          "tasaSubida": 0.10815041239558354
+        },
+        {
+          "asiento": 2,
+          "acciones": 401336,
+          "tasaRetiro": 0.09205254450136544,
+          "tasaSubida": 0.10757320549365121
+        },
+        {
+          "asiento": 3,
+          "acciones": 421295,
+          "tasaRetiro": 0.08453458977675975,
+          "tasaSubida": 0.10727874767087195
+        },
+        {
+          "asiento": 4,
+          "acciones": 437786,
+          "tasaRetiro": 0.0800528111908558,
+          "tasaSubida": 0.1063030795868301
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 1852,
+        "tasaAbandono": 0.01829515257485503
+      },
+      "manosContadas": 100011,
+      "manosSimuladas": 101229,
+      "partidasCompletas": 2746,
+      "tasaAsiento0": 0.04974452810190879,
+      "seAsiento0": 0.0006794723238188679,
+      "seBinomialAsiento0": 0.0006874940792227128,
+      "efectoDiseno": 0.9767999280596817,
       "esperado": 0.2,
-      "sorteosDePerfiles": 2560,
+      "sorteosDePerfiles": 2746,
       "porPerfil": {
         "AGRESIVA": {
-          "jugadas": 100026,
-          "ganadas": 23816,
-          "tasa": 0.23809809449543118,
-          "se": 0.0013467005540621709
+          "jugadas": 100011,
+          "ganadas": 23671,
+          "tasa": 0.236683964763876,
+          "se": 0.0013440416461557867
         },
         "CONSERVADORA": {
-          "jugadas": 100026,
-          "ganadas": 23868,
-          "tasa": 0.23861795933057406,
-          "se": 0.001347709925920009
-        },
-        "EQUILIBRADA": {
-          "jugadas": 100026,
-          "ganadas": 23564,
-          "tasa": 0.23557874952512348,
-          "se": 0.001341769701934888
+          "jugadas": 100011,
+          "ganadas": 23825,
+          "tasa": 0.23822379538250793,
+          "se": 0.0013470458746367505
         },
         "IMPREDECIBLE": {
-          "jugadas": 100026,
-          "ganadas": 23607,
-          "tasa": 0.2360086377541839,
-          "se": 0.0013426157030942145
+          "jugadas": 100011,
+          "ganadas": 23886,
+          "tasa": 0.2388337282898881,
+          "se": 0.0013482291481081623
+        },
+        "EQUILIBRADA": {
+          "jugadas": 100011,
+          "ganadas": 23654,
+          "tasa": 0.2365139834618192,
+          "se": 0.0013437085175381615
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.05169655889468738,
-          "se": 0.000676718387509059,
-          "seBinomial": 0.0007000805793612471
+          "tasa": 0.04974452810190879,
+          "se": 0.0006794723238188679,
+          "seBinomial": 0.0006874940792227128
         },
         {
           "asiento": 1,
-          "tasa": 0.23911782936436526,
-          "se": 0.0013606680930116136,
-          "seBinomial": 0.0013486778741131197
+          "tasa": 0.23837377888432273,
+          "se": 0.0013778922964791326,
+          "seBinomial": 0.0013473371958497183
         },
         {
           "asiento": 2,
-          "tasa": 0.237938136084618,
-          "se": 0.0013403441152113555,
-          "seBinomial": 0.001346389422139147
+          "tasa": 0.2380038195798462,
+          "se": 0.0013633508279298438,
+          "seBinomial": 0.0013466181873837948
         },
         {
           "asiento": 3,
-          "tasa": 0.23389918621158498,
-          "se": 0.0013275694316907411,
-          "seBinomial": 0.0013384460374571269
+          "tasa": 0.23777384487706352,
+          "se": 0.0013195169681137243,
+          "seBinomial": 0.0013461705302203761
         },
         {
           "asiento": 4,
-          "tasa": 0.23734828944474437,
-          "se": 0.0013360812691424315,
-          "seBinomial": 0.0013452398578515442
+          "tasa": 0.23610402855685875,
+          "se": 0.0013172185587351536,
+          "seBinomial": 0.0013429038646060837
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100026,
-          "ganadas": 22383,
-          "tasa": 0.22377181932697499,
-          "se": 0.00131777404156794
+          "jugadas": 100011,
+          "ganadas": 22377,
+          "tasa": 0.2237453880073192,
+          "se": 0.0013178174618712654
         },
         "pie": {
-          "jugadas": 100026,
-          "ganadas": 17682,
-          "tasa": 0.17677403874992503,
-          "se": 0.0012061805474912256
+          "jugadas": 100011,
+          "ganadas": 17639,
+          "tasa": 0.17637059923408424,
+          "se": 0.0012051889216060272
         },
         "medio": {
-          "jugadas": 300078,
-          "ganadas": 59961,
-          "tasa": 0.1998180473077,
-          "se": 0.0007299525885902311
+          "jugadas": 300033,
+          "ganadas": 59995,
+          "tasa": 0.19996133758619886,
+          "se": 0.0007302036372234966
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 85,
-          "ganadas": 20,
-          "tasa": 0.23529411764705882,
-          "se": 0.04600905228676722
+          "jugadas": 111,
+          "ganadas": 28,
+          "tasa": 0.25225225225225223,
+          "se": 0.04122243042499324
         },
         "3": {
-          "jugadas": 505,
-          "ganadas": 59,
-          "tasa": 0.11683168316831684,
-          "se": 0.014294085253017917
+          "jugadas": 453,
+          "ganadas": 49,
+          "tasa": 0.10816777041942605,
+          "se": 0.014592893721142091
         },
         "4": {
-          "jugadas": 992,
-          "ganadas": 55,
-          "tasa": 0.055443548387096774,
-          "se": 0.007265803224789072
+          "jugadas": 654,
+          "ganadas": 47,
+          "tasa": 0.07186544342507645,
+          "se": 0.010098959999320726
         },
         "5": {
-          "jugadas": 100026,
-          "ganadas": 5171,
-          "tasa": 0.05169655889468738,
-          "se": 0.0007000805793612471
+          "jugadas": 100011,
+          "ganadas": 4975,
+          "tasa": 0.04974452810190879,
+          "se": 0.0006874940792227128
         }
       },
       "partidas": {
-        "completas": 2560,
+        "completas": 2746,
         "tasaAsiento0": 0,
         "seAsiento0": 0,
-        "medianaManosPorPartida": 38
+        "medianaManosPorPartida": 36
       },
-      "manosPorMinuto": 2500607
+      "manosPorMinuto": 2395008
     },
     {
       "mesa": 5,
@@ -2537,177 +3790,302 @@
       "nivelAsiento0": "basico",
       "duelo": {
         "global": {
-          "delta": -0.014299142051476912,
-          "se": 0.0021337897264639594,
-          "manos": 100006,
-          "partidas": 677,
-          "sigmas": -6.701289201149611
+          "delta": -0.015928690629652947,
+          "se": 0.002054789148344833,
+          "manos": 100071,
+          "partidas": 742,
+          "sigmas": -7.751983040441776
         },
         "porPerfil": {
           "CONSERVADORA": {
-            "delta": -0.013788322292404868,
-            "se": 0.004346468225760185,
-            "manos": 25964,
-            "partidas": 175,
-            "sigmas": -3.172304863678908
-          },
-          "AGRESIVA": {
-            "delta": -0.011810373306904525,
-            "se": 0.004369581605663967,
-            "manos": 24216,
-            "partidas": 161,
-            "sigmas": -2.7028613658560827
-          },
-          "EQUILIBRADA": {
-            "delta": -0.01898547674173858,
-            "se": 0.00423260148100652,
-            "manos": 23755,
-            "partidas": 165,
-            "sigmas": -4.485533737805101
+            "delta": -0.01999310582557739,
+            "se": 0.003907540374743246,
+            "manos": 26109,
+            "partidas": 183,
+            "sigmas": -5.116544912703834
           },
           "IMPREDECIBLE": {
-            "delta": -0.012849526293582908,
-            "se": 0.00409487106033125,
-            "manos": 26071,
-            "partidas": 176,
-            "sigmas": -3.1379562638886753
+            "delta": -0.014366817286525316,
+            "se": 0.003874312420562843,
+            "manos": 25893,
+            "partidas": 194,
+            "sigmas": -3.708223738042831
+          },
+          "EQUILIBRADA": {
+            "delta": -0.012348582853110667,
+            "se": 0.004491847248145476,
+            "manos": 25509,
+            "partidas": 184,
+            "sigmas": -2.7491101479928908
+          },
+          "AGRESIVA": {
+            "delta": -0.017065602836879433,
+            "se": 0.004108401078103171,
+            "manos": 22560,
+            "partidas": 181,
+            "sigmas": -4.153830775635601
           }
         }
       },
-      "manosContadas": 100006,
-      "manosSimuladas": 1875779,
-      "partidasCompletas": 677,
-      "tasaAsiento0": 0.18822870627762334,
-      "seAsiento0": 0.0013271657095937322,
-      "seBinomialAsiento0": 0.0012360804708476429,
-      "efectoDiseno": 1.1528075561110154,
+      "dueloFichas": {
+        "global": {
+          "delta": -12.278282419482167,
+          "se": 1.6787086111450782,
+          "manos": 100071,
+          "partidas": 742,
+          "sigmas": -7.314123688867554
+        },
+        "porPerfil": {
+          "CONSERVADORA": {
+            "delta": -14.84928568692788,
+            "se": 3.137826896213701,
+            "manos": 26109,
+            "partidas": 183,
+            "sigmas": -4.732346996211283
+          },
+          "IMPREDECIBLE": {
+            "delta": -10.61870003475843,
+            "se": 3.3383661344764866,
+            "manos": 25893,
+            "partidas": 194,
+            "sigmas": -3.1808074989424804
+          },
+          "EQUILIBRADA": {
+            "delta": -11.562585754047591,
+            "se": 3.3529513959547854,
+            "manos": 25509,
+            "partidas": 184,
+            "sigmas": -3.448479977370812
+          },
+          "AGRESIVA": {
+            "delta": -12.016843971631205,
+            "se": 3.661153282097157,
+            "manos": 22560,
+            "partidas": 181,
+            "sigmas": -3.282256449188546
+          }
+        }
+      },
+      "fichas": [
+        {
+          "asiento": 0,
+          "total": -894750,
+          "porMano": -8.941151782234613,
+          "se": 1.0450147023938365
+        },
+        {
+          "asiento": 1,
+          "total": 333950,
+          "porMano": 3.3371306372475544,
+          "se": 1.1112365910479776
+        },
+        {
+          "asiento": 2,
+          "total": 262650,
+          "porMano": 2.6246365080792637,
+          "se": 1.0704412158093537
+        },
+        {
+          "asiento": 3,
+          "total": 52700,
+          "porMano": 0.5266260954722147,
+          "se": 1.0726303778900634
+        },
+        {
+          "asiento": 4,
+          "total": 245450,
+          "porMano": 2.4527585414355806,
+          "se": 1.1051339807250207
+        }
+      ],
+      "conducta": [
+        {
+          "asiento": 0,
+          "acciones": 2833601,
+          "tasaRetiro": 0.0533519009910005,
+          "tasaSubida": 0.1363321794423421
+        },
+        {
+          "asiento": 1,
+          "acciones": 1471046,
+          "tasaRetiro": 0.06612777574596579,
+          "tasaSubida": 0.12284252157988261
+        },
+        {
+          "asiento": 2,
+          "acciones": 1149768,
+          "tasaRetiro": 0.06798501958656007,
+          "tasaSubida": 0.16494110116127775
+        },
+        {
+          "asiento": 3,
+          "acciones": 1318785,
+          "tasaRetiro": 0.06301178736488511,
+          "tasaSubida": 0.16608014194883927
+        },
+        {
+          "asiento": 4,
+          "acciones": 1335040,
+          "tasaRetiro": 0.06197042785234899,
+          "tasaSubida": 0.17076042665388302
+        }
+      ],
+      "diagPro": {
+        "decisiones": 0,
+        "conLectura": 0,
+        "tasaLectura": 0,
+        "farolRespaldado": 0,
+        "faroles": 0,
+        "farolAbre": 0,
+        "farolSube": 0,
+        "farolesPorMano": 0,
+        "farolCobraSinShowdown": 0,
+        "farolLlegaAShowdown": 0,
+        "ajileis": 0,
+        "disimulos": 0,
+        "tasaDisimulo": 0,
+        "manosPorAbandono": 119785,
+        "tasaAbandono": 0.1393558579834846
+      },
+      "manosContadas": 100071,
+      "manosSimuladas": 859562,
+      "partidasCompletas": 742,
+      "tasaAsiento0": 0.18477880704699665,
+      "seAsiento0": 0.0012913315217764904,
+      "seBinomialAsiento0": 0.0012269014798228944,
+      "efectoDiseno": 1.1077866426433927,
       "esperado": 0.2,
-      "sorteosDePerfiles": 677,
+      "sorteosDePerfiles": 742,
       "porPerfil": {
         "CONSERVADORA": {
-          "jugadas": 125970,
-          "ganadas": 24989,
-          "tasa": 0.19837262840358816,
-          "se": 0.001123553037179131
-        },
-        "IMPREDECIBLE": {
-          "jugadas": 126077,
-          "ganadas": 25204,
-          "tasa": 0.1999095790667608,
-          "se": 0.0011263371395460336
-        },
-        "EQUILIBRADA": {
-          "jugadas": 123761,
-          "ganadas": 24780,
-          "tasa": 0.20022462649784667,
-          "se": 0.0011374985581395307
+          "jugadas": 126180,
+          "ganadas": 25450,
+          "tasa": 0.20169598985576162,
+          "se": 0.001129633402535179
         },
         "AGRESIVA": {
-          "jugadas": 124222,
-          "ganadas": 25033,
-          "tasa": 0.20151824958541964,
-          "se": 0.0011381262229484125
+          "jugadas": 122631,
+          "ganadas": 24714,
+          "tasa": 0.2015314235389094,
+          "se": 0.001145513379417753
+        },
+        "EQUILIBRADA": {
+          "jugadas": 125580,
+          "ganadas": 24836,
+          "tasa": 0.19777034559643256,
+          "se": 0.001124008777455613
+        },
+        "IMPREDECIBLE": {
+          "jugadas": 125964,
+          "ganadas": 25071,
+          "tasa": 0.19903305706392302,
+          "se": 0.001124984869507249
         }
       },
       "porAsiento": [
         {
           "asiento": 0,
-          "tasa": 0.18822870627762334,
-          "se": 0.0013271657095937322,
-          "seBinomial": 0.0012360804708476429
+          "tasa": 0.18477880704699665,
+          "se": 0.0012913315217764904,
+          "seBinomial": 0.0012269014798228944
         },
         {
           "asiento": 1,
-          "tasa": 0.20252784832910026,
-          "se": 0.0013555142653634321,
-          "seBinomial": 0.001270828977252835
+          "tasa": 0.20070749767664958,
+          "se": 0.001311666930950754,
+          "seBinomial": 0.0012661365559321406
         },
         {
           "asiento": 2,
-          "tasa": 0.2031578105313681,
-          "se": 0.0013229012564286225,
-          "seBinomial": 0.0012723010730615054
+          "tasa": 0.2063035244976067,
+          "se": 0.0013039524061591082,
+          "seBinomial": 0.0012791645932851855
         },
         {
           "asiento": 3,
-          "tasa": 0.20423774573525588,
-          "se": 0.0013407461945916335,
-          "seBinomial": 0.0012748134689277231
+          "tasa": 0.20359544723246495,
+          "se": 0.0013551499693680393,
+          "seBinomial": 0.0012729073033629266
         },
         {
           "asiento": 4,
-          "tasa": 0.2018478891266524,
-          "se": 0.00131999324172748,
-          "seBinomial": 0.0012692346238681975
+          "tasa": 0.20461472354628213,
+          "se": 0.0012513920229558976,
+          "seBinomial": 0.0012752727931108873
         }
       ],
       "porRol": {
         "mano": {
-          "jugadas": 100006,
-          "ganadas": 22493,
-          "tasa": 0.22491650500969942,
-          "se": 0.001320297737888016
+          "jugadas": 100071,
+          "ganadas": 22289,
+          "tasa": 0.2227318603791308,
+          "se": 0.001315292929621921
         },
         "pie": {
-          "jugadas": 100006,
-          "ganadas": 17906,
-          "tasa": 0.17904925704457733,
-          "se": 0.0012123605144026297
+          "jugadas": 100071,
+          "ganadas": 17783,
+          "tasa": 0.17770383028050085,
+          "se": 0.0012083935770952322
         },
         "medio": {
-          "jugadas": 300018,
-          "ganadas": 59607,
-          "tasa": 0.1986780793152411,
-          "se": 0.0007284585286341402
+          "jugadas": 300213,
+          "ganadas": 59999,
+          "tasa": 0.1998547697801228,
+          "se": 0.0007298387566537668
         }
       },
       "porVivos": {
         "2": {
-          "jugadas": 1400364,
-          "ganadas": 669373,
-          "tasa": 0.4779992916127521,
-          "se": 0.00042211297704140306
+          "jugadas": 473648,
+          "ganadas": 228281,
+          "tasa": 0.48196339897983315,
+          "se": 0.000726038077190656
         },
         "3": {
-          "jugadas": 260811,
-          "ganadas": 81434,
-          "tasa": 0.31223376314649304,
-          "se": 0.0009073971388591513
+          "jugadas": 195873,
+          "ganadas": 61767,
+          "tasa": 0.3153420839013034,
+          "se": 0.0010498820148902104
         },
         "4": {
-          "jugadas": 114598,
-          "ganadas": 23519,
-          "tasa": 0.20523045777413218,
-          "se": 0.0011930344801563814
+          "jugadas": 89970,
+          "ganadas": 18731,
+          "tasa": 0.20819161942869846,
+          "se": 0.001353607675972161
         },
         "5": {
-          "jugadas": 100006,
-          "ganadas": 18824,
-          "tasa": 0.18822870627762334,
-          "se": 0.0012360804708476429
+          "jugadas": 100071,
+          "ganadas": 18491,
+          "tasa": 0.18477880704699665,
+          "se": 0.0012269014798228944
         }
       },
       "partidas": {
-        "completas": 677,
-        "tasaAsiento0": 0.3205317577548006,
-        "seAsiento0": 0.01793600761913766,
-        "medianaManosPorPartida": 834
+        "completas": 742,
+        "tasaAsiento0": 0.0215633423180593,
+        "seAsiento0": 0.005332396611292712,
+        "medianaManosPorPartida": 294
       },
-      "manosPorMinuto": 5565835
+      "manosPorMinuto": 4457538
     }
   ],
-  "commitPadre": "0a45935fb3017cde8d139386facd4f3f8fa9b2ae",
+  "commitPadre": "a1bc2ff3e85596d3acce5d3c8f60a887a93b5a11",
   "codigoMedido": {
-    "porQue": "el commit de esta tanda no existe todavia cuando la corrida escribe el archivo: el archivo va DENTRO de ese commit. En vez de un SHA imposible se registran los blobs del arbol al cerrar la tanda, mas el detalle exacto de lo que se movio DESPUES de medir.",
-    "commitPadre": "0a45935fb3017cde8d139386facd4f3f8fa9b2ae",
-    "blobsAlCerrar": {
-      "src/engine/aiPlayer.js": "ab1b54b2ae7abc276b0d0eacf860e0c684259b55",
-      "scripts/bancoNiveles.mjs": "69f3713f8632de5a62153b03a8c9dc9d16fc9ef9"
+    "porQue": "el commit de esta tanda no existe todavia cuando la corrida escribe el archivo: el archivo va DENTRO de ese commit. Se registran los blobs del arbol en el instante de medir.",
+    "commitPadre": "a1bc2ff3e85596d3acce5d3c8f60a887a93b5a11",
+    "blobsMedidos": {
+      "src/engine/aiPlayer.js": "0860812af9360685873bac87468317b17a4188a6",
+      "scripts/bancoNiveles.mjs": "46134bc510b6d9110bc764865e9948bdc5fb32b5"
     },
+    "reglaDeProcedencia": "el blob de aiPlayer.js que se mide es el blob que se commitea. Verificado: calculado antes de lanzar las dos matrices y de nuevo al cerrar la tanda, IDENTICO. La demostracion de la alarma de bandas revirtio la curva temporalmente y la restauro; el hash se comprobo a la vuelta y coincide.",
     "cambiosPosterioresALaCorrida": [
-      "src/engine/aiPlayer.js: se anadio el export _CURVAS_PARA_TEST (las mismas constantes ya existentes, expuestas para que las pruebas las re-deriven). Ni una linea de decision cambio.",
-      "scripts/bancoNiveles.mjs: comentarios de cabecera, el aviso sobre --sorteo celda y el parametro --volcado. Nada del bucle de simulacion ni de las puertas."
-    ],
-    "sinRelanzar": "la matriz NO se volvio a jugar despues de esos cambios: los numeros publicados son los de la corrida original."
+      "scripts/bancoNiveles.mjs: UNICO cambio, en la comparacion de bandas — el signo solo se exige cuando el valor sellado esta a mas de 3 sigmas de cero por si mismo. Se descubrio en el primer uso real de la alarma: seis celdas del espejo SIMETRICO, cuyo valor verdadero es cero y cuyo signo es por tanto aleatorio, salian rojas con diferencias de 0,4 a 1,0 sigmas. No toca el bucle de simulacion, ni las puertas, ni una sola cifra de este archivo: las bandas no forman parte de estas matrices."
+    ]
+  },
+  "relanzamiento": {
+    "tanda": "NIV-CAL",
+    "porQue": "NIV-CAL §2. La curva de BET_3 de Avanzado se reparo (§1, decision A de Victor), asi que la vara de NIV-1 medida contra la curva vieja dejo de describir el codigo. Este archivo REEMPLAZA al de ff966a6; la version anterior queda en la historia de git.",
+    "queCambio": "la curva de BET_3 de Avanzado pasa de CURVA_FINAL (mano al azar, enumeracion exacta de C(40,5)) a CURVA_DESCARTE.marginal (mano ya descartada, medida). Ninguna otra linea de decision.",
+    "metricaNueva": "esta version trae ademas FICHAS NETAS POR MANO, la metrica oficial de la fase (v1.1 §7), que la version anterior no podia tener porque nacio en NIV-2."
   }
 }

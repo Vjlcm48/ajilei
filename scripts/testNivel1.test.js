@@ -708,23 +708,31 @@ describe('8. D-5 · aislamiento de información en Avanzado', () => {
     // Prueba de contraste. Si Avanzado no leyera `pot` y los `contrib` ajenos,
     // la decisión no podría cambiar al moverlos con todo lo demás quieto.
     // Cambia en las dos direcciones — luego los lee, y sólo eso.
-    // El puntaje (21) queda por debajo del `raiseMin` de los cuatro perfiles en
-    // mesa 5, así que la rama es la misma sea cual sea el temperamento.
+    //
+    // NIV-CAL §1: la mano de referencia sube de 21 a 31 puntos. No es un ajuste
+    // cosmético — con la curva de BET_3 reparada, un 21 después del descarte
+    // tiene un 0,23% de equidad contra cuatro rivales y se suelta a CUALQUIER
+    // precio, así que dejó de servir para leer un contraste de bote. Lo que la
+    // prueba afirma es el mismo de siempre; lo que cambió es que ahora la
+    // aritmética que lo produce es la correcta. El 31 sigue por debajo del
+    // `raiseMin` de los cuatro perfiles en mesa 5 (28+6 = 34 el más bajo), así
+    // que la rama es la misma sea cual sea el temperamento.
+    const M5_31 = [carta(1,'Bastos'), carta(2,'Bastos'), carta(3,'Bastos'), carta(6,'Oros'), carta(6,'Espadas')]
     const conBote = (pot, contribAjeno) => ({
       numPlayers: 5, phase: 'BET_3', currentBet: 400, pot, unit: 50,
       manoIndex: 0, pieIndex: 4, handCount: 4, aliveCount: 5,
       handRules: makeHandRules(5), nivelIA: 'avanzado',
       players: Array.from({ length: 5 }, (_, i) => jugador({
-        id: i, isHuman: i === 0, cards: i === 1 ? M5.media : M5.fuerte,
+        id: i, isHuman: i === 0, cards: i === 1 ? M5_31 : M5.fuerte,
         contrib: i === 1 ? 0 : (i === 0 ? 400 : contribAjeno),
       })),
     })
     _resetForTesting()
-    // (a) bote de 8000 y los tres rivales ya pagados: nada más va a entrar.
-    expect(decideBetAction(conBote(8000, 400), 1).action).toBe('retirarse')
+    // (a) bote de 2000 y los tres rivales ya pagados: nada más va a entrar.
+    expect(decideBetAction(conBote(2000, 400), 1).action).toBe('retirarse')
     // (b) el mismo bote, pero los tres rivales deben todavía 400 cada uno: el
     //     bote de cierre es 1200 mayor y el mismo precio se vuelve pagable.
-    expect(decideBetAction(conBote(8000, 0), 1).action).toBe('igualar')
+    expect(decideBetAction(conBote(2000, 0), 1).action).toBe('igualar')
     // (c) y con `pot` gordo, iguala aunque nadie deba nada.
     expect(decideBetAction(conBote(30000, 400), 1).action).toBe('igualar')
   })

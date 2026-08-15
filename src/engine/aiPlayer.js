@@ -130,15 +130,27 @@ function probComodinEnRival(state, ai, activeOpponents) {
 // test §3 de `scripts/testNivel1.test.js` las vuelve a derivar y las compara:
 // si alguien mueve una cifra a mano, el test discrepa.
 //
-// MANO DEFINITIVA (BET_3) · enumeración EXACTA de las C(40,5) = 658.008 manos.
-// Para cada puntaje s, la probabilidad de que una mano al azar quede por debajo,
+// MANO AL AZAR · enumeración EXACTA de las C(40,5) = 658.008 manos. Para cada
+// puntaje s, la probabilidad de que una mano tomada al azar quede por debajo,
 // contando medio empate (el desempate real es por orden de asiento desde la
 // Mano, `gameEngine.js:157-163`, que desde un asiento cualquiera vale ½):
 //
 //     q[s] = P(X < s) + ½·P(X = s)
 //
-// Contra k rivales la equidad es q^k, y aquí eso es EXACTO: con la mano cerrada,
-// las manos de los rivales son independientes entre sí dada la mía.
+// ⚠ ESTA CURVA YA NO GOBIERNA NINGUNA DECISIÓN. Hasta NIV-2 fue la curva de
+// BET_3 de Avanzado, y era el sitio equivocado: en BET_3 el rival YA DESCARTÓ,
+// así que su mano no es una mano al azar sino una reconstruida, bastante más
+// fuerte. Contra un puntaje de 30 esta curva dice 0,858 y la realidad medida es
+// 0,581 — Avanzado sobreestimaba su equidad en cada mano definitiva y pagaba de
+// más. La fuga se midió en NIV-2 y se repara en NIV-CAL §1 (decisión A de
+// Victor): la curva de BET_3 pasa a ser `CURVA_DESCARTE.marginal`, medida sobre
+// la dinámica real. El coste de la fuga, para que quede en el acta: en FICHAS,
+// Básico batía a Avanzado en tres de las cuatro mesas.
+//
+// Se conserva por dos razones, ninguna decorativa: es el DOMINIO de puntajes de
+// la fase (`rangoDeFase`), y su enumeración exacta es la referencia contra la
+// que se valida por invariante la marginal medida —una mano descartada nunca
+// puede ser más floja que una al azar, y el test lo exige punto por punto—.
 const CURVA_FINAL = {
   desde: 13,
   q: [0.003, 0.006, 0.006, 0.033, 0.102, 0.150, 0.156, 0.325, 0.569, 0.643,
@@ -202,10 +214,19 @@ function equidad(score, phase, activeOpponents) {
   const k = Math.max(1, activeOpponents)
   if (phase === 'BET_1') return enTabla(TABLA_BET_1, score, k)
   if (phase === 'BET_2') return enTabla(TABLA_BET_2, score, k)
-  // Mano definitiva: la curva exacta, elevada a los rivales.
-  const i = Math.round(score) - CURVA_FINAL.desde
-  const q = i < 0 ? 0 : i >= CURVA_FINAL.q.length ? 1 : CURVA_FINAL.q[i]
-  return Math.pow(q, k)
+  // MANO DEFINITIVA · la marginal POST-DESCARTE, elevada a los rivales.
+  //
+  // NIV-CAL §1 (decisión A). Aquí estaba `CURVA_FINAL`, que describe una mano al
+  // azar; en BET_3 no queda ninguna mano al azar sobre la mesa. Elevar a k sigue
+  // siendo EXACTO: con la mano cerrada, las manos de los rivales son
+  // independientes entre sí dada la mía. Lo que cambia es de qué población salen.
+  //
+  // FRONTERA INTACTA, y es la mitad del encargo: Avanzado NO recibe ②. No lee un
+  // solo conteo de descarte ni toca la memoria — sigue sin mirar `state.deck`,
+  // como exige su trampa Proxy—; simplemente deja de suponer un rival imposible.
+  // La distinción con Pro se conserva entera: Avanzado usa la MARGINAL, la misma
+  // para todos los rivales; Pro CONDICIONA rival por rival con lo que leyó.
+  return Math.pow(qDescarte(null, score), k)
 }
 
 // ③ aplicada a ④: la equidad con la amenaza del comodín dentro.
@@ -311,60 +332,37 @@ function qDescarte(d, score) {
   return Math.min(Math.max(v, PISO_Q), 1 - PISO_Q)
 }
 
-// La probabilidad de batir a UN rival según la curva de Avanzado. En BET_3 la
-// equidad de NIV-1 es exactamente esta cifra elevada al número de rivales, así
-// que es el factor por rival que ② va a corregir uno por uno.
-function gPorRival(score) {
-  const i = Math.round(score) - CURVA_FINAL.desde
-  return i < 0 ? 0 : i >= CURVA_FINAL.q.length ? 1 : CURVA_FINAL.q[i]
-}
-
-// ── CÓMO SE GASTA LA LECTURA · la decisión de diseño de esta capacidad ────────
+// ── CÓMO SE GASTA LA LECTURA ──────────────────────────────────────────────────
 //
-// PRIMERO, LO QUE NO SE HACE. La tentación es sustituir la curva de Avanzado por
-// la marginal de ②, que es la honesta para una mano ya descartada. Es un error, y
-// de los caros: las tablas de Avanzado están medidas sobre mano al azar y los
-// umbrales de personalidad (openMin/callMin/raiseMin) están calibrados contra ESA
-// escala. Cambiarle el suelo a la escala movería a las cuatro personalidades a la
-// vez, y entonces Pro no sería una hermana mayor: sería otra IA. Justo lo que
-// D-4 prohíbe. La discrepancia queda declarada como límite de Avanzado y como
-// insumo de la tanda de calibración, no se arregla de matute aquí.
+// Avanzado supone que TODOS sus rivales son del montón y usa la marginal para
+// los k. Pro sabe cuántas cambió cada uno, así que sustituye la marginal por la
+// fila que a cada rival le corresponde y multiplica:
 //
-// LO QUE SÍ ENTRA es una lectura RELATIVA, rival por rival: cuánto mejor o peor
-// es ESTE rival que un rival cualquiera del que no se supiera nada. La evidencia
-// se aplica en ESPACIO DE MOMIOS, que es la única forma de actualizar una
-// probabilidad sin salirse de [0,1]:
+//     equidad = Π q_{d_i}(s)          contra    equidad = q_marginal(s)^k
 //
-//     momio_i = momio(g) · momio(q_{d_i}(s)) / momio(q_marginal(s))
-//     g_i     = momio_i / (1 + momio_i)          equidad = Π g_i
+// Con toda la mesa en el montón las dos expresiones coinciden término a término,
+// y Pro decide EXACTAMENTE como Avanzado. El nivel sólo se separa cuando la
+// lectura dice algo, y todo lo que Pro hace de más se puede explicar señalando
+// qué leyó: el listón que el rector §5.5 pone.
 //
-// POR QUÉ MOMIOS Y NO UN FACTOR MULTIPLICATIVO — medido, no supuesto. La primera
-// versión multiplicaba la equidad por la razón de probabilidades y la topaba con
-// `Math.min(1, …)`. Ese tope es ASIMÉTRICO: las buenas noticias se recortaban al
-// llegar a 1 y las malas bajaban hasta 0 sin freno, de modo que la capacidad
-// sesgaba a Pro hacia el retiro sistemáticamente. En el banco se vio: Pro se
-// retiraba el 6% de las acciones contra el 2,5% de Avanzado, y en un juego donde
-// el 99% de las manos se decide en el showdown cada retiro es una mano que ya no
-// se puede ganar. En momios no hay tope que aplicar: la actualización es
-// simétrica por construcción y `g_i` nunca se sale del intervalo.
+// ACTA DE UNA SIMPLIFICACIÓN, porque aquí vivían quince líneas de maquinaria y
+// conviene decir por qué murieron. En NIV-2 la base de Avanzado era `CURVA_FINAL`
+// —mano al azar— y la evidencia de ② vivía en otra escala, la post-descarte. Para
+// cruzarlas hacía falta una actualización en ESPACIO DE MOMIOS,
 //
-// Consecuencia buscada, y comprobada por prueba: con un rival del montón la
-// razón de momios vale 1 y `g_i` es EXACTAMENTE la de Avanzado. Pro sólo se
-// separa cuando la lectura dice algo, y todo lo que hace de más se puede
-// explicar señalando qué leyó — el listón que el rector §5.5 pone.
-const momio = (p) => p / (1 - p)
-
+//     momio_i = momio(g) · momio(q_{d_i}) / momio(q_marginal),
+//
+// que era la única forma de mover una probabilidad de una escala a otra sin
+// salirse de [0,1] ni sesgar la corrección hacia un lado (un factor
+// multiplicativo topado con `min(1, …)` sí lo hace, y estaba medido: empujaba a
+// Pro al 6% de retiros contra el 2,5% de Avanzado). Reparada la base en NIV-CAL
+// §1, las dos escalas son LA MISMA: con g = q_marginal, la razón de momios se
+// cancela y toda la expresión colapsa a `q_{d_i}` exacto. La maquinaria no se
+// borró por gusto — dejó de tener trabajo que hacer, y lo que queda es el objeto
+// que ② siempre estuvo aproximando.
 function equidadConLectura(score, conteos) {
-  const g = gPorRival(score)
-  if (g <= 0) return 0
-  if (g >= 1) return 1
-  const oBase = momio(g)
-  const oCiego = momio(qDescarte(null, score))
   let equidadTotal = 1
-  for (const d of conteos) {
-    const o = oBase * momio(qDescarte(d, score)) / oCiego
-    equidadTotal *= o / (1 + o)
-  }
+  for (const d of conteos) equidadTotal *= qDescarte(d, score)
   return equidadTotal
 }
 
@@ -400,8 +398,22 @@ function respaldoDelFarol(conteos, k) {
 // respalda es tan legible como el tell del Ajilei que Pro acaba de aprender a
 // esconder: bastaría con no creerle nunca. Un Ajilei que se jugara SIEMPRE lento
 // sería el mismo tell con el signo cambiado. La mitad es el punto donde la rama
-// no informa nada por sí sola, y es donde la tanda de calibración las encontrará
-// para afinarlas con Victor (§10.4 de la instrucción).
+// no informa nada por sí sola.
+//
+// ── CALIBRADAS POR EVIDENCIA · NIV-CAL §4 (decisión C de Victor) · CERRADO ────
+// Las dos SE QUEDAN EN 0,5, y no por inercia: se midieron y no hay nada que
+// afinar. Queda escrito para que nadie las mueva sin traer evidencia nueva.
+//
+//   · FREC_FAROL. La frecuencia efectiva NO la gobierna esta constante sino el
+//     producto de respaldo, que se autorregula con el tamaño de la mesa: 0,19
+//     faroles por mano en mesa 2 y 0,035 en mesa 5 (medido, NIV-2 §7). Subirla
+//     no haría a Pro más audaz donde importa —contra cuatro rivales el producto
+//     ya cierra la rama solo—; sólo la haría más legible en el duelo.
+//   · FREC_DISIMULO. El techo del disimulo es ESTRUCTURAL, no de la constante:
+//     el Ajilei se fabrica casi siempre EN el descarte, así que la inmensa
+//     mayoría de las decisiones con Ajilei ya son de BET_3, donde Pro cobra por
+//     diseño. Medido: sólo el 1,4-3,5% de las decisiones con Ajilei son
+//     disimulables. Con la constante a 1 el techo apenas se movería.
 const FREC_FAROL    = 0.5
 const FREC_DISIMULO = 0.5
 
@@ -800,6 +812,20 @@ export function decideBetAction(state, aiIndex) {
   }
 
   // ── No bet yet: open or pass ──────────────────────────────────────────────
+  //
+  // LÍMITE CONOCIDO, DECLARADO Y SIN REMEDIO EN ESTA FASE — «el tell del pase»
+  // (NIV-CAL §5, decisión D de Victor; confirmado por Victor jugando de verdad,
+  // no sólo medido). Abrir o pasar se decide por un UMBRAL DE PUNTAJE, así que
+  // el pase revela debilidad: en los TRES niveles, una IA que pasa casi nunca
+  // lleva una mano fuerte. El farol de Pro tapa una parte del agujero —a veces
+  // abre con nada— pero sólo en BET_3 y sólo con lectura, así que el tell
+  // sobrevive entero en BET_1 y BET_2.
+  //
+  // Por qué no se arregla aquí: taparlo de verdad exige un pase-trampa con mano
+  // fuerte —jugar lento a propósito—, y eso es un modelo de rival, no un umbral.
+  // El remedio tiene nombre: capacidad ⑤ (modelado adaptativo), DIFERIDA por el
+  // rector §5.4 hasta que exista gancho de showdown (deuda de motor, v1.0 §8).
+  // Se declara para que ninguna tanda futura crea que es un descuido.
   if (currentBet === 0) {
     // Saldo: no abrir si no se puede cubrir la apuesta de apertura (unit) → pasar.
     if (scoreEf >= openMin && ai.chips >= unit) return { action: 'apostar' }
