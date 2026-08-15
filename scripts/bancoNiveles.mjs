@@ -31,13 +31,22 @@
 //                               allí `unit` es el stake, GameTable.jsx:268)
 //   --sorteo <partida|celda>    cuándo re-repartir los perfiles (default partida)
 //   --nivel <basico|avanzado|pro>   pasajero `state.nivelIA` (default basico)
+//   --j0-nivel <nivel>          nivel del cerebro del asiento 0 bajo `espejo`
+//                               (default: el de la mesa). Distinto = DUELO.
+//   --duelo <nivel>             añade una celda espejo EXTRA por mesa con el
+//                               asiento 0 a ese nivel, sin quitar la simétrica
 //   --repuertas <ruta>          recalcula los veredictos de un JSON ya escrito
 //                               (umbral por familia en b3) SIN volver a jugar
+//   --curvas [--muestras n]     mide las curvas de fuerza de la capacidad ④ y
+//                               sale; no juega la matriz
 //   --base                      además del volcado, reescribe el resumen rastreado
+//   --evid <archivo>            nombre del resumen rastreado (default nivB0_base.json)
+//   --tanda <nombre>            etiqueta de la corrida (default NIV-B0)
+//   --volcado <archivo>         nombre del volcado completo
 //
 // Salidas (§6): volcado completo a capturas-dsk/ (ignorada, regenerable) y
-// —sólo con --base— el resumen a capturas-dsk/evidencia/nivB0_base.json, que
-// SÍ se rastrea: es la vara contra un commit exacto, misma doctrina que
+// —sólo con --base— el resumen a capturas-dsk/evidencia/<--evid>, que SÍ se
+// rastrea: es la vara contra un commit exacto, misma doctrina que
 // mobile_base.json. Sin siembra todavía; la reproducibilidad se compensa con
 // volumen y el JSON registra el conteo exacto de manos (§6 del rector).
 import { register } from 'node:module'
@@ -75,24 +84,50 @@ const MANOS       = Number(arg('manos', 100000))
 const UNIT        = Number(arg('unit', 50))
 const SORTEO      = arg('sorteo', 'partida')
 const NIVEL       = arg('nivel', 'basico')
+// NIV-1 §7 · nivel del CEREBRO que conduce el asiento 0 bajo `espejo`. Por
+// defecto es el mismo de la mesa (espejo simétrico, que es lo que valida el
+// banco). Distinto = DUELO: misma cabeza, mismo temperamento prestado por el
+// adaptador, sólo cambia el nivel. Es puro porque `decideBetAction` es función
+// pura del estado, y el estado espejo es nuestro.
+const J0_NIVEL    = arg('j0-nivel', NIVEL)
+// `--duelo <nivel>` añade, a lo pedido, una celda espejo EXTRA por mesa con el
+// asiento 0 a ese nivel. Así una sola corrida produce a la vez el espejo
+// simétrico (que valida el banco) y el duelo entre niveles (puertas 2 y 3),
+// contra la misma baraja y en el mismo archivo de evidencia.
+const DUELO       = arg('duelo')
+// Nivel VIGENTE del cerebro del asiento 0. Lo fija `correrCelda` al empezar cada
+// celda: es la única pieza mutable del banco y no cruza celdas.
+let J0_ACTUAL = J0_NIVEL
 const ESCRIBE_BASE = flag('base')
+const ARCHIVO_EVID = arg('evid', 'nivB0_base.json')
+const TANDA        = arg('tanda', 'NIV-B0')
+// El volcado lleva el nombre de su tanda: dos tandas distintas no se pisan el
+// archivo. `capturas-dsk/` está ignorada y es regenerable; lo que se rastrea es
+// el resumen de `evidencia/`.
+const ARCHIVO_VOLCADO = arg('volcado',
+  TANDA === 'NIV-B0' ? 'nivB0_matriz.json' : `${TANDA.replace(/[^A-Za-z0-9]/g, '')}_matriz.json`)
 
 // ── Por qué el banco re-reparte los perfiles en cada partida ─────────────────
-// MEDIDO, no supuesto: el re-sorteo por "sesión nueva" de `aiPlayer.js:59`
-// EXIGE `state.handCount === 0` en el momento de una decisión, y eso no ocurre
-// jamás jugando — `startHand` deja el contador en 1 antes de la primera
-// apuesta, así que la rama sólo se alcanza con un estado sintético (es lo que
-// hace testAI.test.js:134-159). Consecuencia: sin intervención, TODAS las manos
-// de una celda —y de la app entera, mesa tras mesa— corren sobre un ÚNICO
-// reparto de perfiles. La celda mediría entonces "el asiento 0 contra este
-// reparto concreto", no la línea base: dos corridas de 3000 manos dieron 25,17%
-// y 17,20% por ese solo motivo.
+// MEDIDO, no supuesto: hasta NIV-1, el re-sorteo por "sesión nueva" de
+// `aiPlayer.js` EXIGÍA `state.handCount === 0` en el momento de una decisión, y
+// eso no ocurre jamás jugando — `startHand` deja el contador en 1 antes de la
+// primera apuesta, así que la rama sólo se alcanzaba con un estado sintético.
+// Consecuencia: sin intervención, TODAS las manos de una celda —y de la app
+// entera, mesa tras mesa— corrían sobre un ÚNICO reparto de perfiles. La celda
+// medía entonces "el asiento 0 contra este reparto concreto", no la línea base:
+// dos corridas de 3000 manos dieron 25,17% y 17,20% por ese solo motivo.
 //
-// El banco lo corrige por la API pública —`initPersonalities`, exportada y
+// El banco lo corrigió por la API pública —`initPersonalities`, exportada y
 // declarada "also called directly by tests"— re-repartiendo al empezar cada
-// partida, que es exactamente lo que la rama muerta pretendía hacer. Con
-// `--sorteo celda` se reproduce el comportamiento de la app tal cual está.
-// Esto NO toca src/: es una decisión de MUESTREO del banco, y va declarada.
+// partida. Esa medición fue el insumo del rider de NIV-1 §4: la rama YA ESTÁ
+// REPARADA en `aiPlayer.js`, que ahora detecta el límite de partida por el
+// retroceso de `handCount` y la subida de `aliveCount`.
+//
+// El `initPersonalities` explícito de abajo se conserva a propósito: mantiene el
+// muestreo IDÉNTICO al de la vara NIV-B0, que se midió contra el motor sin
+// reparar. Hoy es redundante (el rider dispararía igual) y por eso es inocuo.
+// AVISO sobre `--sorteo celda`: ya NO reproduce el comportamiento de la app —la
+// app re-reparte por partida desde NIV-1—; sólo desactiva el sorteo del banco.
 
 // Tope de manos por partida: red anti-bucle, no un límite de diseño. El sondeo
 // midió partidas de 589 a 1859 manos con unit=10; 100k es tres órdenes por
@@ -138,7 +173,9 @@ function estadoEspejo(s) {
 }
 
 function j0Espejo(s) {
-  return decideBetAction(estadoEspejo(s), 1).action
+  // El nivel del asiento 0 viaja en SU estado espejo, no en el de la mesa: así
+  // el duelo enfrenta dos niveles sin que ninguno contamine al otro.
+  return decideBetAction({ ...estadoEspejo(s), nivelIA: J0_ACTUAL }, 1).action
 }
 
 // PASIVO · iguala o pasa, jamás sube, jamás se retira por decisión propia.
@@ -172,6 +209,9 @@ const APUESTA = { espejo: j0Espejo, pasivo: j0Pasivo, aleatorio: j0Aleatorio }
 // (`aiPlayer.js:152-168`). Por eso PASIVO usa el descarte de la IA — aísla la
 // pasividad de APUESTA, que es lo que ese conductor quiere medir.
 function descarte(modo, s) {
+  // Bajo `espejo` el descarte del asiento 0 también corre con SU nivel: en el
+  // duelo, la estrategia de comodín es parte de lo que se está midiendo.
+  if (modo === 'espejo') return decideDiscard({ ...s, nivelIA: J0_ACTUAL }, 0)
   if (modo !== 'aleatorio') return decideDiscard(s, 0)
   const tope  = s.handRules.maxDiscard
   const libres = s.players[0].cards.map((_, i) => i)
@@ -235,8 +275,9 @@ function jugarMano(s, modo) {
 // del asiento 0 por tamaño real de mesa. Es la misma doctrina que el ranking
 // del rector §6 —los puntos de una mano salen de los sentados al barajado del
 // Pie, no del tamaño nominal de la mesa—, y sale gratis en la misma corrida.
-function correrCelda(N, modo) {
+function correrCelda(N, modo, j0nivel = J0_NIVEL) {
   _resetForTesting()   // reparto de perfiles fresco por celda: aislamiento
+  J0_ACTUAL = j0nivel
 
   const acc = {
     manos: 0,          // simuladas (todas)
@@ -270,13 +311,16 @@ function correrCelda(N, modo) {
     let manosPartida = 0
     let completa = false
 
-    const racimo = { n: 0, g: new Array(N).fill(0) }
+    // `perfil01` sella qué temperamento compartieron los asientos 0 y 1 en esta
+    // partida: es lo que permite abrir el duelo por perfil sin re-simular.
+    const racimo = { n: 0, g: new Array(N).fill(0), perfil01: null }
     acc.racimos.push(racimo)
 
     if (SORTEO === 'partida') { initPersonalities(N); acc.sorteos++ }
     // Reparto vigente en ESTA partida. Bajo `espejo` el asiento 0 juega con el
     // perfil del 1 (adaptador), así que se etiqueta con él.
     const perfilDe = Array.from({ length: N }, (_, i) => getPersonalityName(i === 0 ? 1 : i))
+    racimo.perfil01 = perfilDe[0]
 
     for (;;) {
       s = startHand(s)
@@ -368,6 +412,31 @@ function correrCelda(N, modo) {
     return Math.sqrt((P / (P - 1)) * s2) / total
   }
   const seCl0 = seCluster(0)
+
+  // ── Duelo pareado asiento0 vs asiento1 (NIV-1 §7, puertas 2 y 3) ───────────
+  // Los dos asientos comparten temperamento POR CONSTRUCCIÓN del adaptador
+  // espejo; con `--j0-nivel` distinto de `--nivel`, lo ÚNICO que los separa es
+  // el nivel. La σ de la diferencia se estima por racimos sobre la propia
+  // diferencia (no sumando dos σ independientes: las dos tasas salen de las
+  // MISMAS manos y están negativamente correlacionadas, así que sumarlas
+  // inflaría la barra y regalaría verdes).
+  const seDifPorRacimo = (racimos) => {
+    const rac = racimos.filter(r => r.n > 0)
+    const P = rac.length
+    if (P < 2) return null
+    const total = rac.reduce((a, r) => a + r.n, 0)
+    if (total === 0) return null
+    const d = rac.reduce((a, r) => a + r.g[0] - r.g[1], 0) / total
+    const s2 = rac.reduce((a, r) => a + ((r.g[0] - r.g[1]) - d * r.n) ** 2, 0)
+    return { delta: d, se: Math.sqrt((P / (P - 1)) * s2) / total, manos: total, partidas: P }
+  }
+  const duelo = { global: seDifPorRacimo(acc.racimos), porPerfil: {} }
+  for (const perfil of new Set(acc.racimos.map(r => r.perfil01).filter(Boolean))) {
+    duelo.porPerfil[perfil] = seDifPorRacimo(acc.racimos.filter(r => r.perfil01 === perfil))
+  }
+  for (const d of [duelo.global, ...Object.values(duelo.porPerfil)]) {
+    if (d) d.sigmas = d.se > 0 ? d.delta / d.se : 0
+  }
   const tabla = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => {
     const p = tasa(v.g, v.j)
     return [k, { jugadas: v.j, ganadas: v.g, tasa: p, se: se(p, v.j) }]
@@ -376,7 +445,9 @@ function correrCelda(N, modo) {
   return {
     mesa: N, conductor: modo,
     manosContadas: acc.manosLlenas, manosSimuladas: acc.manos,
-    unit: UNIT, nivel: NIVEL, sorteo: SORTEO, sorteosDePerfiles: acc.sorteos,
+    unit: UNIT, nivel: NIVEL, nivelAsiento0: j0nivel,
+    sorteo: SORTEO, sorteosDePerfiles: acc.sorteos,
+    duelo: modo === 'espejo' ? duelo : null,
     tasaAsiento0: p0,
     seAsiento0: se(p0, acc.manosLlenas),          // binomial (optimista)
     seClusterAsiento0: seCl0,                     // por partida (el que manda)
@@ -529,7 +600,11 @@ function evaluarPuertas(celdas) {
   //   b3 · los no gemelos entre sí (mesas 4 y 5) — también exacto: perfiles
   //        distintos pero ninguno duplicado, así que sus tasas deben ser
   //        mutuamente consistentes.
-  const espejo = celdas.filter(c => c.conductor === 'espejo')
+  // Sólo el espejo SIMÉTRICO valida el banco. Una celda de duelo tiene los
+  // gemelos a niveles distintos a propósito, así que b2 ahí no mide simetría:
+  // mide el efecto que la tanda quiere. Mezclarlas pintaría de rojo el
+  // instrumento por hacer justo lo que se le pidió.
+  const espejo = celdas.filter(c => c.conductor === 'espejo' && c.nivelAsiento0 === c.nivel)
   const simetria = espejo.map(c => {
     // La σ que MANDA es la de conglomerados. La binomial se conserva al lado
     // porque su distancia a la otra es justamente el efecto de diseño, y ese
@@ -605,6 +680,120 @@ function evaluarPuertas(celdas) {
   }
 }
 
+// ── Modo --curvas · instrumento de medida de las curvas de fuerza (NIV-1) ────
+//
+// Produce las tablas de equidad que la capacidad ④ (disciplina de bote) usa en
+// `aiPlayer.js`. Se añade AQUÍ y no en un script aparte porque es exactamente lo
+// que este archivo es: el instrumento de medida de la fase.
+//
+// Qué mide: P(mi mano gane el showdown contra k rivales | puntaje en la fase),
+// con la dinámica real —reparto 2+3, descarte de todo lo que no sea del mejor
+// palo hasta el tope, reposición del taco—.
+//
+// POR QUÉ SE MIDE POR k Y NO SE ELEVA UNA CURVA A LA k. La tentación es medir
+// P(batir a UN rival) y elevarla a k por independencia. Es falso en las fases
+// intermedias, y no por poco: con la mano aún abierta, esa probabilidad es un
+// PROMEDIO sobre los desenlaces posibles de mi propia mano, y E[q]^k ≠ E[q^k]
+// (Jensen). Medido: a 2 cartas, puntaje 21 contra 4 rivales da 0,339 real
+// frente a 0,186 por la vía del promedio elevado — un 45% de subestimación, que
+// haría a la IA retirarse de manos que pagan. En BET_3 la mano ya es definitiva:
+// ahí q está condicionada al desenlace, la independencia entre rivales SÍ vale, y
+// `aiPlayer` usa la curva exacta enumerada con q^k en vez de tabla.
+//
+// El tope de descarte se toma de la mesa que corresponde a cada k (5 para mesas
+// 2-4, 3 para mesa 5), así que cada columna se mide en su propio terreno.
+//
+// Uso: node scripts/bancoNiveles.mjs --curvas [--muestras 4000000]
+if (flag('curvas')) {
+  const { PALOS, VALORES, getCardPoints } = await import('../src/engine/deck.js')
+  const MUESTRAS = Number(arg('muestras', 4000000))
+  const baraja = []
+  for (const p of PALOS) for (const v of VALORES) baraja.push({ palo: p, points: getCardPoints(v) })
+
+  const mejorPalo = (cartas) => {
+    const s = {}
+    for (const c of cartas) s[c.palo] = (s[c.palo] ?? 0) + c.points
+    let pts = 0, palo = ''
+    for (const k in s) if (s[k] > pts) { pts = s[k]; palo = k }
+    return { pts, palo }
+  }
+
+  // Una pasada por cada k: el tope de descarte es el de SU mesa.
+  const columnas = { BET_1: {}, BET_2: {} }
+  for (let k = 1; k <= 4; k++) {
+    const tope = maxDiscardDeMesa(k + 1)
+    const acc = { BET_1: new Map(), BET_2: new Map() }
+    const bolsa = baraja.slice()
+    const reparto = (k + 1) * 5 + tope * (k + 1)
+    for (let m = 0; m < MUESTRAS; m++) {
+      for (let i = 0; i < reparto; i++) {
+        const j = i + Math.floor(Math.random() * (bolsa.length - i))
+        const t = bolsa[i]; bolsa[i] = bolsa[j]; bolsa[j] = t
+      }
+      let ptr = 0
+      const manos = []
+      for (let p = 0; p <= k; p++) manos.push([bolsa[ptr++], bolsa[ptr++]])
+      const s2 = mejorPalo(manos[0]).pts
+      for (let r = 0; r < 3; r++) for (let p = 0; p <= k; p++) manos[p].push(bolsa[ptr++])
+      const s5 = mejorPalo(manos[0]).pts
+      const finales = manos.map((mano) => {
+        const bp = mejorPalo(mano).palo
+        const fuera = []
+        mano.forEach((c, i) => { if (c.palo !== bp) fuera.push(i) })
+        const idx = fuera.slice(0, tope)
+        return mejorPalo(mano.map((c, i) => (idx.includes(i) ? bolsa[ptr++] : c))).pts
+      })
+      const mio = finales[0]
+      let mayores = 0, iguales = 0
+      for (let i = 1; i <= k; i++) { if (finales[i] > mio) mayores++; else if (finales[i] === mio) iguales++ }
+      const g = mayores > 0 ? 0 : 1 / (1 + iguales)
+      for (const [fase, s] of [['BET_1', s2], ['BET_2', s5]]) {
+        const e = acc[fase].get(s) ?? (acc[fase].set(s, { n: 0, g: 0 }), acc[fase].get(s))
+        e.n++; e.g += g
+      }
+    }
+    for (const fase of ['BET_1', 'BET_2']) columnas[fase][k] = acc[fase]
+  }
+
+  // Serialización: array por k, indexado por puntaje desde `desde`, con
+  // arrastre del último valor con muestra suficiente para tapar los huecos del
+  // soporte (no todo entero es un puntaje posible).
+  const serializa = (fase, desde, hasta) => {
+    const filas = []
+    for (let k = 1; k <= 4; k++) {
+      const acc = columnas[fase][k]
+      const fila = []
+      let ultimo = 0
+      for (let s = desde; s <= hasta; s++) {
+        const e = acc.get(s)
+        if (e && e.n >= 500) ultimo = e.g / e.n
+        fila.push(Math.round(ultimo * 1000) / 1000)
+      }
+      filas.push(fila)
+    }
+    return filas
+  }
+  const tablas = {
+    generado: new Date().toISOString(),
+    muestrasPorK: MUESTRAS,
+    nota: 'baraja SIN comodín: la asimetría del comodín la cobra la capacidad ③ sobre el puntaje, no estas curvas',
+    BET_1: { desde: 6,  hasta: 21, k: serializa('BET_1', 6, 21) },
+    BET_2: { desde: 13, hasta: 41, k: serializa('BET_2', 13, 41) },
+  }
+  mkdirSync(DIR_OUT, { recursive: true })
+  writeFileSync(join(DIR_OUT, 'niv1_curvas.json'), JSON.stringify(tablas, null, 2) + '\n')
+  for (const fase of ['BET_1', 'BET_2']) {
+    console.log(`\n${fase} · desde ${tablas[fase].desde}`)
+    tablas[fase].k.forEach((fila, i) => console.log(`  k=${i + 1}: [${fila.join(', ')}]`))
+  }
+  console.log('\nVolcado → capturas-dsk/niv1_curvas.json')
+  process.exit(0)
+}
+
+// Tope de descarte por tamaño de mesa — copia local declarada: `maxDiscard` vive
+// en gameEngine.js, que es archivo protegido y no se importa por una constante.
+function maxDiscardDeMesa(n) { return n <= 4 ? 5 : 3 }
+
 // ── Modo --repuertas · recalcular veredictos SIN volver a jugar ──────────────
 // Corrige el UMBRAL, no los dados. Lee un JSON ya escrito, reevalúa b3 con el
 // umbral por familia sobre las σ que ese archivo ya trae, y lo reescribe. No
@@ -645,17 +834,24 @@ if (RUTA_REPUERTAS) {
 // ── Corrida ──────────────────────────────────────────────────────────────────
 mkdirSync(DIR_EVID, { recursive: true })   // idempotente: correr dos veces no rompe (ESC-1)
 
-console.log(`Banco NIV-B0 · mesas=[${MESAS}] conductores=[${CONDUCTORES}] manos/celda=${MANOS} unit=${UNIT} nivel=${NIVEL}`)
+console.log(`Banco ${TANDA} · mesas=[${MESAS}] conductores=[${CONDUCTORES}] manos/celda=${MANOS} unit=${UNIT} nivel=${NIVEL}` +
+  (J0_NIVEL !== NIVEL ? ` j0-nivel=${J0_NIVEL}` : '') + (DUELO ? ` +duelo=${DUELO}` : ''))
 console.log('(sin siembra: Math.random sin semilla en baraja y en IA — límite conocido, se compensa con volumen)\n')
 
 const celdas = []
+const planCeldas = []
 for (const N of MESAS) {
-  for (const modo of CONDUCTORES) {
-    const r = correrCelda(N, modo)
+  for (const modo of CONDUCTORES) planCeldas.push([N, modo, J0_NIVEL])
+  if (DUELO && DUELO !== NIVEL) planCeldas.push([N, 'espejo', DUELO])
+}
+{
+  for (const [N, modo, j0n] of planCeldas) {
+    const r = correrCelda(N, modo, j0n)
     celdas.push(r)
     const pct = (x) => (x * 100).toFixed(2).padStart(5)
+    const etiqueta = j0n === NIVEL ? modo : `${modo}:${j0n}`
     console.log(
-      `mesa ${N} · ${modo.padEnd(9)} → asiento0 ${pct(r.tasaAsiento0)}% ±${((r.seClusterAsiento0 ?? r.seAsiento0) * 100).toFixed(2)}` +
+      `mesa ${N} · ${etiqueta.padEnd(16)} → asiento0 ${pct(r.tasaAsiento0)}% ±${((r.seClusterAsiento0 ?? r.seAsiento0) * 100).toFixed(2)}` +
       `  (esperado ${pct(r.esperado)}%)  partidas=${r.partidas.completas}` +
       `  ${r.capacidad.manosPorMinuto.toLocaleString('es')} manos/min` +
       (Object.values(r.fallas).some(v => v > 0) ? `  ⚠ fallas=${JSON.stringify(r.fallas)}` : '')
@@ -697,8 +893,117 @@ const senalPasivo = celdas.filter(c => c.conductor === 'pasivo').map(c => {
   }
 })
 
+// -- Puertas direccionales de NIV-1 (§7 de la instrucción) --------------------
+// Cuatro puertas, todas con UMBRAL POR FAMILIA (lección B0.c): cada puerta es un
+// conjunto de comparaciones, y a 3σ por comparación una familia de m falla por
+// azar con probabilidad ~m·0,0027. El alfa de familia se reparte entre sus
+// pruebas por Bonferroni, igual que en b3, de modo que con m=1 el umbral
+// degenere exactamente en 3σ.
+//
+// Sólo se evalúan las puertas para las que ESTA corrida trae datos; lo que no se
+// midió se marca `null` y no se pinta de ningún color. La línea base NO se
+// re-lanza: se lee de la vara rastreada (§8 de la instrucción).
+function puertasNiveluno() {
+  let base = null
+  try { base = JSON.parse(readFileSync(join(DIR_EVID, 'nivB0_base.json'), 'utf8')) } catch { base = null }
+  const deBase = (mesa, conductor) =>
+    base?.lineaBase?.find(c => c.mesa === mesa && c.conductor === conductor) ?? null
+  const umbralFamilia = (m) => (m > 0 ? umbralDeAlfa(P_3SIGMA / m) : 3)
+
+  // P1 - PASIVO castigado: en N>=3 su ventaja desaparece o se invierte.
+  const p1detalle = senalPasivo.filter(s => s.mesa >= 3).map(s => ({
+    mesa: s.mesa, tasa: s.tasa, esperado: s.esperado, deltaPp: s.deltaPp,
+    sigmas: s.sigmas, manos: s.manos,
+    baseDeltaPp: base?.senalPasivo?.find(x => x.mesa === s.mesa)?.deltaPp ?? null,
+  }))
+  const u1 = umbralFamilia(p1detalle.length)
+  for (const d of p1detalle) d.pasa = d.deltaPp <= 0 || d.sigmas < u1
+  const p1 = p1detalle.length
+    ? { pasa: p1detalle.every(d => d.pasa), umbralSigmas: u1, familia: p1detalle.length, detalle: p1detalle }
+    : null
+
+  // P2 - la hermana mayor domina: asiento 0 con nivel distinto al de la mesa.
+  // Se publican DOS lecturas: la del enunciado (contra 1/N) y la PAREADA
+  // (asiento 0 contra su gemelo de temperamento, el asiento 1), que es la que
+  // de verdad aísla el nivel — el sesgo de gemelaje del adaptador (±0,5-1,0pp
+  // en N>=3, medido en la vara) cae dentro de la diferencia y se cancela.
+  const duelos = celdas.filter(c => c.conductor === 'espejo' && c.nivelAsiento0 !== c.nivel)
+  const u2 = umbralFamilia(duelos.length)
+  const p2detalle = duelos.map(c => {
+    const se = c.seClusterAsiento0 ?? c.seAsiento0
+    const d = c.tasaAsiento0 - c.esperado
+    return {
+      mesa: c.mesa, nivelMesa: c.nivel, nivelAsiento0: c.nivelAsiento0,
+      tasaAsiento0: c.tasaAsiento0, esperado: c.esperado,
+      deltaPp: d * 100, sigmas: se > 0 ? d / se : 0,
+      pareado: c.duelo?.global ?? null,
+      pasa: d < 0 && (se > 0 ? Math.abs(d / se) : 0) >= u2,
+      pasaPareado: (c.duelo?.global?.delta ?? 0) < 0 && Math.abs(c.duelo?.global?.sigmas ?? 0) >= u2,
+    }
+  })
+  const p2 = duelos.length
+    ? { pasa: p2detalle.every(d => d.pasa), pasaPareado: p2detalle.every(d => d.pasaPareado),
+        umbralSigmas: u2, familia: duelos.length, detalle: p2detalle }
+    : null
+
+  // P3 - por temperamento: los CUATRO perfiles con el signo correcto. La
+  // comparación es pareada DENTRO de la misma partida (los asientos 0 y 1
+  // comparten temperamento por construcción del adaptador), así que lo único
+  // que los separa es el nivel. Prohibido que el nivel "suba" porque un solo
+  // perfil cargue el promedio: se exige el signo en los cuatro.
+  const p3detalle = []
+  for (const c of duelos) {
+    for (const [perfil, d] of Object.entries(c.duelo?.porPerfil ?? {})) {
+      if (!d) continue
+      p3detalle.push({ mesa: c.mesa, perfil, deltaPp: d.delta * 100, se: d.se,
+                       sigmas: d.sigmas, manos: d.manos, partidas: d.partidas })
+    }
+  }
+  const u3 = umbralFamilia(p3detalle.length)
+  for (const d of p3detalle) d.pasa = d.deltaPp <= 0 || Math.abs(d.sigmas) < u3
+  const p3 = p3detalle.length
+    ? { pasa: p3detalle.every(d => d.pasa), umbralSigmas: u3, familia: p3detalle.length,
+        perfilesCubiertos: [...new Set(p3detalle.map(d => d.perfil))].sort(), detalle: p3detalle }
+    : null
+
+  // P4 - sin regresión contra basura: el ALEATORIO sigue triturado.
+  const p4detalle = celdas.filter(c => c.conductor === 'aleatorio').map(c => {
+    const b = deBase(c.mesa, 'aleatorio')
+    const seA = c.seClusterAsiento0 ?? c.seAsiento0
+    const seB = b?.seAsiento0 ?? null
+    const dif = b ? c.tasaAsiento0 - b.tasaAsiento0 : null
+    const seDif = b && seB !== null ? Math.sqrt(seA ** 2 + seB ** 2) : null
+    return {
+      mesa: c.mesa, tasaNivel: c.tasaAsiento0, tasaBase: b?.tasaAsiento0 ?? null,
+      esperado: c.esperado, difPp: dif === null ? null : dif * 100,
+      sigmas: seDif ? dif / seDif : null,
+    }
+  })
+  const u4 = umbralFamilia(p4detalle.filter(d => d.sigmas !== null).length)
+  for (const d of p4detalle) d.pasa = d.sigmas === null ? null : (d.difPp <= 0 || Math.abs(d.sigmas) < u4)
+  const p4 = p4detalle.some(d => d.pasa !== null)
+    ? { pasa: p4detalle.every(d => d.pasa !== false), umbralSigmas: u4,
+        familia: p4detalle.filter(d => d.sigmas !== null).length, detalle: p4detalle }
+    : null
+
+  return {
+    metodoUmbral: {
+      correccion: 'Bonferroni por puerta',
+      alfaFamilia: P_3SIGMA,
+      porQue: 'cada puerta es una FAMILIA de comparaciones (una por mesa, o una por mesa x perfil). A 3 sigmas por comparación un rojo suelto es esperable por diseño; el alfa se reparte para devolver a la PUERTA la tasa de error de una sola prueba a 3 sigmas.',
+      degeneracion: 'con m=1 el umbral vuelve a ser exactamente 3 sigmas',
+    },
+    lineaBaseLeidaDe: base ? 'capturas-dsk/evidencia/nivB0_base.json' : null,
+    p1_pasivoCastigado: p1,
+    p2_hermanaMayorDomina: p2,
+    p3_porTemperamento: p3,
+    p4_sinRegresionContraBasura: p4,
+  }
+}
+const puertasNiv1 = puertasNiveluno()
+
 const informe = {
-  tanda: 'NIV-B0',
+  tanda: TANDA,
   generado: new Date().toISOString(),
   rector: 'docs/AJILEI_Modos_y_Asistencia_v1.0.md §10',
   configuracion: { manosPorCelda: MANOS, unit: UNIT, nivel: NIVEL, sorteo: SORTEO, mesas: MESAS, conductores: CONDUCTORES, capPartida: CAP_PARTIDA },
@@ -719,6 +1024,7 @@ const informe = {
   ventajaPosicional: 'REAL, no sesgo del banco: la Mano gana por encima de 1/N y el Pie por debajo en las cuatro mesas. Origen medido: el 7,79% de las manos terminan en empate de showdown y la Mano cobra el 100% de ellos (9343/9343, gameEngine.js:157-163). El desempate por sí solo predice +3,89pp y se observan +2,64pp: abrir a ciegas más posAdj (−2 al Pie, +1 a la Mano) devuelve ~1,2pp.',
   senalPasivo,
   puertas,
+  puertasNiv1,
   celdas,
 }
 
@@ -730,12 +1036,41 @@ if (senalPasivo.length) {
   }
 }
 
-writeFileSync(join(DIR_OUT, 'nivB0_matriz.json'), JSON.stringify(informe, null, 2))
-console.log(`\nVolcado completo → capturas-dsk/nivB0_matriz.json`)
+const pinta = (v) => (v === null ? 'n/d' : v ? 'VERDE' : 'ROJA')
+if (Object.values(puertasNiv1).some(v => v && v.detalle)) {
+  const P = puertasNiv1
+  console.log('\nPuertas NIV-1 (§7):')
+  if (P.p1_pasivoCastigado) {
+    console.log(`  (1) PASIVO castigado: ${pinta(P.p1_pasivoCastigado.pasa)}  [umbral ${P.p1_pasivoCastigado.umbralSigmas.toFixed(2)}s, familia ${P.p1_pasivoCastigado.familia}]`)
+    for (const d of P.p1_pasivoCastigado.detalle)
+      console.log(`      mesa ${d.mesa}: ${d.deltaPp >= 0 ? '+' : ''}${d.deltaPp.toFixed(2)}pp (${d.sigmas.toFixed(2)}s)` +
+        (d.baseDeltaPp === null ? '' : `   base Basico ${d.baseDeltaPp >= 0 ? '+' : ''}${d.baseDeltaPp.toFixed(2)}pp`) + `  -> ${pinta(d.pasa)}`)
+  }
+  if (P.p2_hermanaMayorDomina) {
+    console.log(`  (2) La hermana mayor domina: vs 1/N ${pinta(P.p2_hermanaMayorDomina.pasa)} - pareado ${pinta(P.p2_hermanaMayorDomina.pasaPareado)}  [umbral ${P.p2_hermanaMayorDomina.umbralSigmas.toFixed(2)}s]`)
+    for (const d of P.p2_hermanaMayorDomina.detalle)
+      console.log(`      mesa ${d.mesa} (asiento0 ${d.nivelAsiento0} vs mesa ${d.nivelMesa}): vs 1/N ${d.deltaPp.toFixed(2)}pp (${d.sigmas.toFixed(2)}s)` +
+        (d.pareado ? ` - pareado 0vs1 ${(100 * d.pareado.delta).toFixed(2)}pp (${d.pareado.sigmas.toFixed(2)}s)` : ''))
+  }
+  if (P.p3_porTemperamento) {
+    console.log(`  (3) Por temperamento: ${pinta(P.p3_porTemperamento.pasa)}  [umbral ${P.p3_porTemperamento.umbralSigmas.toFixed(2)}s, familia ${P.p3_porTemperamento.familia}, perfiles ${P.p3_porTemperamento.perfilesCubiertos.join('/')}]`)
+    for (const d of P.p3_porTemperamento.detalle)
+      console.log(`      mesa ${d.mesa} ${d.perfil.padEnd(13)} ${d.deltaPp >= 0 ? '+' : ''}${d.deltaPp.toFixed(2)}pp (${d.sigmas.toFixed(2)}s, ${d.manos} manos) -> ${pinta(d.pasa)}`)
+  }
+  if (P.p4_sinRegresionContraBasura) {
+    console.log(`  (4) Sin regresion contra basura: ${pinta(P.p4_sinRegresionContraBasura.pasa)}  [umbral ${P.p4_sinRegresionContraBasura.umbralSigmas.toFixed(2)}s]`)
+    for (const d of P.p4_sinRegresionContraBasura.detalle)
+      console.log(`      mesa ${d.mesa}: ${(100 * d.tasaNivel).toFixed(2)}% vs base ${d.tasaBase === null ? 'n/d' : (100 * d.tasaBase).toFixed(2) + '%'}` +
+        (d.difPp === null ? '' : `  ${d.difPp >= 0 ? '+' : ''}${d.difPp.toFixed(2)}pp (${d.sigmas.toFixed(2)}s)`) + ` -> ${pinta(d.pasa)}`)
+  }
+}
+
+writeFileSync(join(DIR_OUT, ARCHIVO_VOLCADO), JSON.stringify(informe, null, 2))
+console.log(`\nVolcado completo → capturas-dsk/${ARCHIVO_VOLCADO}`)
 
 if (ESCRIBE_BASE) {
   const resumen = {
-    tanda: 'NIV-B0',
+    tanda: TANDA,
     generado: informe.generado,
     commit: process.env.NIVB0_COMMIT ?? null,
     rector: informe.rector,
@@ -746,6 +1081,7 @@ if (ESCRIBE_BASE) {
     adaptadorEspejo: informe.adaptadorEspejo,
     ventajaPosicional: informe.ventajaPosicional,
     senalPasivo,
+    puertasNiv1,
     puertas: {
       a_conservacionFichas: puertas.a_conservacionFichas,
       b_espejoSimetrico: puertas.b_espejoSimetrico,
@@ -755,6 +1091,7 @@ if (ESCRIBE_BASE) {
     },
     lineaBase: celdas.map(c => ({
       mesa: c.mesa, conductor: c.conductor,
+      nivel: c.nivel, nivelAsiento0: c.nivelAsiento0, duelo: c.duelo,
       // Conteo exacto, que es lo que hace de esto una vara (rector §6). En la
       // primera vara esta línea decía `manos: c.manos`, campo que había dejado
       // de existir al cambiar el denominador: JSON.stringify borra `undefined`
@@ -779,6 +1116,6 @@ if (ESCRIBE_BASE) {
       manosPorMinuto: c.capacidad.manosPorMinuto,
     })),
   }
-  writeFileSync(join(DIR_EVID, 'nivB0_base.json'), JSON.stringify(resumen, null, 2))
-  console.log('Resumen rastreado → capturas-dsk/evidencia/nivB0_base.json')
+  writeFileSync(join(DIR_EVID, ARCHIVO_EVID), JSON.stringify(resumen, null, 2))
+  console.log(`Resumen rastreado → capturas-dsk/evidencia/${ARCHIVO_EVID}`)
 }

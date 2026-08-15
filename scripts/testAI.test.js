@@ -131,31 +131,36 @@ describe('1. Asignación de personalidades', () => {
     }
   })
 
-  it('re-sorteo al detectar nueva sesión (handCount regresa a 0)', () => {
+  // NIV-1 §4 · esta prueba cambió de sujeto. Antes fabricaba un estado con
+  // `handCount === 0`, que es el ÚNICO camino que la condición vieja aceptaba y
+  // que NO OCURRE JAMÁS jugando: `startHand` deja el contador en 1 antes de la
+  // primera apuesta (`gameEngine.js:451`). Probaba, por tanto, una rama muerta.
+  // Ahora el re-sorteo es POR PARTIDA y se prueba por donde de verdad pasa: dos
+  // partidas seguidas por la API pública. La batería completa —estabilidad
+  // dentro de la partida, cambio entre partidas, puntos ciegos declarados—
+  // vive en `scripts/testNivel1.test.js` §7.
+  it('re-sorteo por partida: dos partidas seguidas, reparto válido en ambas y sin repetición', () => {
     _resetForTesting()
-    initPersonalities(3)
-    const s1p = [getPersonalityName(1), getPersonalityName(2)]
-    expect(s1p[0]).not.toBe(s1p[1])
 
-    // Avanzar _lastHandCount a 3 llamando decideBetAction con handCount=3
-    const cards2 = [makeCard(1,'Oros'), makeCard(2,'Oros')]
-    const stateH3 = {
-      players: [
-        { isHuman: true,  cards: [], chips: 500, contrib: 0, folded: false },
-        { isHuman: false, cards: cards2, chips: 500, contrib: 0, folded: false },
-        { isHuman: false, cards: cards2, chips: 500, contrib: 0, folded: false },
-      ],
-      currentBet: 0, phase: 'BET_1', manoIndex: 0, pieIndex: 2,
-      numPlayers: 3, unit: 10, handCount: 3, pot: 0, handRules: makeHandRules(3),
+    const jugarUnaMano = (s) => {
+      s = startHand(s)
+      if (s.phase === PHASES.GAME_OVER) return s
+      return simHand(s)
     }
-    decideBetAction(stateH3, 1)  // _lastHandCount → 3
 
-    // Nueva sesión: handCount vuelve a 0 → debe re-inicializar
-    decideBetAction({ ...stateH3, handCount: 0 }, 1)
+    const primeraMesa = jugarUnaMano(createInitialState(10, 3))
+    expect(primeraMesa.phase).toBe(PHASES.PAYOUT)
+    const primera = [getPersonalityName(1), getPersonalityName(2)]
+    primera.forEach(p => expect(VALID_PROFILES).toContain(p))
+    expect(primera[0]).not.toBe(primera[1])
 
-    const s2p = [getPersonalityName(1), getPersonalityName(2)]
-    s2p.forEach(p => expect(VALID_PROFILES).toContain(p))
-    expect(s2p[0]).not.toBe(s2p[1])  // sin repetición en la nueva sesión
+    // Mesa nueva: el estado nace de cero, exactamente como cuando el jugador
+    // sale de la mesa y entra en otra. No hay estado sintético de por medio.
+    const segundaMesa = jugarUnaMano(createInitialState(10, 3))
+    expect(segundaMesa.phase).toBe(PHASES.PAYOUT)
+    const segunda = [getPersonalityName(1), getPersonalityName(2)]
+    segunda.forEach(p => expect(VALID_PROFILES).toContain(p))
+    expect(segunda[0]).not.toBe(segunda[1])
   })
 
   it('100 sorteos N=5: los 4 perfiles aparecen y nunca se repiten en la misma mesa', () => {
@@ -174,6 +179,12 @@ describe('1. Asignación de personalidades', () => {
 })
 
 // ── 2. Aislamiento: las funciones de decisión no leen cartas ajenas ───────────
+// Puerta D-5. Esta es la trampa ORIGINAL, y cubre el nivel Básico. La regla
+// permanente del rector §2.1(b) —ninguna capacidad nueva entra sin ampliar la
+// vigilancia a los datos que introduce— se cumple en
+// `scripts/testNivel1.test.js` §8, que la extiende a todas las ramas de
+// Avanzado y de Pro (N=2…5, las tres fases de apuesta y el descarte) y añade la
+// vigilancia de `state.deck`, que esta tanda tampoco toca.
 describe('2. Aislamiento de información', () => {
   function makeTrapPlayer(fields = {}) {
     const base = { isHuman: true, chips: 500, contrib: 0, folded: false, cards: [], ...fields }
