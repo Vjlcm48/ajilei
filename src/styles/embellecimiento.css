@@ -1,0 +1,201 @@
+/* ── AJILEI · EMB-1 · Capa de embellecimiento ─────────────────────────────────
+   Autoridades: docs/AJILEI_Sistema_Diseno_v1.2.md (regla del dorado único) ·
+   docs/AJILEI_Menu_Utilidades_v1.4.md (Mano Actual / DSK-U3).
+
+   HOJA PROPIA, y no un añadido a gameTable.css o a welcome.css, por dos
+   razones: gameTable.css es archivo SELLADO de esta tanda —ni una línea se
+   toca— y la capa de pintura de EMB-1 se lee entera de un tirón, que es lo que
+   necesita el checkpoint de calibración.
+
+   ADITIVA POR CONSTRUCCIÓN: ninguna regla de aquí reescribe una existente.
+   Donde hay que ganarle a una declaración previa (el color plano del título) se
+   gana por ESPECIFICIDAD —`h1.welcome-title` 0,1,1 contra `.welcome-title`
+   0,1,0—, molde de `button.util-ico-slot` en U3. Cero `!important`.
+
+   Δ=0 DE LAYOUT es requisito duro: todo lo de aquí es pintura. El recorrido
+   vive en un pseudo-elemento absoluto (fuera de flujo) y el título sólo mueve
+   propiedades de pintura —background, color, mask—; ni una métrica se toca.
+   Cifras en `scripts/verifyEMB1.mjs`.                                         */
+
+/* Ángulo del cónico como propiedad TIPADA: sin este registro el navegador trata
+   el custom property como texto y la animación no interpola —saltaría de golpe
+   en vez de recorrer—. Soportado por todo el terreno de la campaña (Chromium
+   85+, Safari 16.4+, Firefox 128+); donde faltara, el trazo se queda quieto en
+   su ángulo inicial, que es exactamente la degradación de reduced-motion. */
+@property --emb-u3-ang {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* ── 1 · Recorrido dorado · ventana de Mano Actual (DSK-U3) ───────────────────
+   SEMÁNTICA: "Consulta viva durante esta mano." Cuando el cobro nazca en la
+   fase de nube, este mismo borde pasará a significar "pagada" sin tocar un
+   pixel: el efecto es permanente, la semántica evoluciona sola.
+
+   Mismo gate que monta la ventana —`useIsDesktopTable` en GameTable.jsx espeja
+   literalmente esta media query—, para que el trazo no pueda existir donde la
+   ventana no existe ni faltar donde sí.                                        */
+@media (orientation: landscape) and (min-height: 601px) {
+  .u3-popup::before {
+    /* Constantes declaradas, jamás números mágicos. El ciclo es provisional:
+       3 s por vuelta contra los 4 s de vida del popup (CONSULTA_POPUP_MS) —
+       una vuelta y un tercio, que es lo que hace falta para leerlo como
+       recorrido y no como carrera. Victor calibra en su checkpoint. */
+    --emb-u3-ciclo: 3s;
+    --emb-u3-grosor: 1px;   /* = el filete que la ventana ya lleva */
+
+    content: '';
+    position: absolute;
+    /* El bloque contenedor de un absoluto es la caja de RELLENO del padre; el
+       filete de 1px queda justo fuera de ella. `inset: -1px` devuelve exacta-
+       mente la caja de BORDE, así que el anillo se pinta SOBRE el filete
+       existente y no a su lado ni fuera de la ventana. Fuera de flujo: Δ=0 de
+       layout por construcción, no por medida (la medida lo confirma). */
+    inset: calc(-1 * var(--emb-u3-grosor));
+    border-radius: 8px;              /* radio EXTERIOR de la ventana */
+    padding: var(--emb-u3-grosor);   /* grosor del anillo */
+    pointer-events: none;
+
+    /* El trazo: un cometa de cola larga sobre un cónico que gira. Continuo y
+       sereno —un recorrido, no un parpadeo ni una alarma—: la cabeza es lo
+       único brillante y llega tras 215° de nada, así que en cualquier instante
+       hay una sola luz viajando. Sólo variantes de --gold-brand: cero colores
+       nuevos, regla del dorado único intacta. */
+    background: conic-gradient(
+      from var(--emb-u3-ang) at 50% 50%,
+      rgba(var(--gold-brand-rgb), 0)       0deg,
+      rgba(var(--gold-brand-rgb), 0)     215deg,
+      rgba(var(--gold-brand-rgb), 0.30)  300deg,
+      var(--gold-brand-hi)               348deg,
+      rgba(var(--gold-brand-hi-rgb), 0.55) 354deg,
+      rgba(var(--gold-brand-rgb), 0)     360deg
+    );
+
+    /* Anillo por máscara: se pinta el relleno completo y se descuenta la caja
+       de contenido. Queda visible SÓLO el marco de 1px — el área repintada por
+       cuadro es el perímetro de una ventana de 260px, no su superficie. */
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+
+    animation: emb-u3-recorrido var(--emb-u3-ciclo) linear infinite;
+  }
+
+  /* El intercambio se escribe EXPLÍCITO (lección U2c: el navegador no lo hace
+     solo en todo). Borde dorado estático, sin animación — el cometa cede el
+     sitio a un anillo parejo, que es lo que "borde dorado" quiere decir cuando
+     nada se mueve. */
+  @media (prefers-reduced-motion: reduce) {
+    .u3-popup::before {
+      animation: none;
+      background: rgba(var(--gold-brand-rgb), 0.85);
+    }
+  }
+}
+
+@keyframes emb-u3-recorrido {
+  to { --emb-u3-ang: 360deg; }
+}
+
+/* ── 2 · Resplandor del título · WelcomeScreen ────────────────────────────────
+   Alcance SOLO el título del juego (el momento de marca). El rótulo AJILEI
+   dentro de la mesa no se toca: en mesa, el lenguaje de movimiento pertenece al
+   juego y a VC2 (misma doctrina de v1.4 §7).
+
+   NOTA DE HORIZONTE: este tratamiento es el ensayo general de Identidad A — el
+   letterform propio de Victor heredará esta luz ya resuelta.
+
+   Terreno compartido: WelcomeScreen es pre-mesa, así que esto se ve también en
+   móvil. Sin gate a propósito.
+
+   El @supports es la red: `color: transparent` sin recorte por texto dejaría el
+   título INVISIBLE. Donde el recorte no exista, no entra nada y manda la regla
+   original de welcome.css (dorado plano, legible).                             */
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  h1.welcome-title {
+    /* Constante declarada. 7 s de ciclo; el barrido ocupa el 21% de él
+       (≈1,5 s) y el resto es reposo — mover el ciclo escala las dos cosas a la
+       vez y conserva la proporción. Provisional: Victor calibra. */
+    --emb-titulo-ciclo: 7s;
+
+    /* ── La caja de pintura, y por qué hay que agrandarla ──────────────────
+       MEDIDO: el h1 hereda la interlínea del sistema (26,09px) y lleva letras
+       de 72px, así que la caja del borde es TRES VECES más baja que el texto.
+       Chromium recorta el fondo a esa caja incluso con `background-clip: text`
+       —comprobado con captura: el rótulo salía decapitado, una franja por el
+       medio de las letras—. La caja tiene que crecer, pero la HUELLA DE FLUJO
+       no puede moverse ni un píxel (FL-1).
+       Relleno hacia fuera + margen negativo que lo devuelve: la caja del borde
+       crece 2×aire, la caja de MARGEN queda idéntica y el texto se queda donde
+       estaba. Ni la fuente, ni el tamaño, ni la interlínea se tocan — lo único
+       que cambia es dónde se puede pintar. Verificado en verifyEMB1.mjs con la
+       posición del TEXTO (rango DOM) y con los rects de todos los vecinos. */
+    --emb-titulo-aire: 0.55em;
+    /* Espeja `.welcome-title { margin: 0 0 14px }` de welcome.css. Es la única
+       cifra que esta hoja copia de otra; si allí cambia, el Δ=0 de `.star-arc`
+       se vuelve rojo en la misma corrida y lo dice. */
+    --emb-titulo-margen-base: 14px;
+
+    padding-top: var(--emb-titulo-aire);
+    padding-bottom: var(--emb-titulo-aire);
+    margin-top: calc(-1 * var(--emb-titulo-aire));
+    margin-bottom: calc(var(--emb-titulo-margen-base) - var(--emb-titulo-aire));
+
+    background-image:
+      /* (b) BARRIDO ESPECULAR — capa de arriba, la única que se mueve. */
+      linear-gradient(100deg,
+        rgba(var(--gold-brand-hi-rgb), 0)    42%,
+        rgba(var(--gold-brand-hi-rgb), 0.92) 50%,
+        rgba(var(--gold-brand-hi-rgb), 0)    58%),
+      /* (a) ORO DE MÚLTIPLES TONOS — capa base, siempre presente. Luz arriba,
+         el tono de marca al centro, profundidad abajo. Nada de dorado plano. */
+      linear-gradient(180deg,
+        var(--gold-brand-hi)    0%,
+        var(--gold-brand)      52%,
+        var(--gold-brand-deep) 100%);
+    /* ALTURAS EN `em`, jamás en `%`: el porcentaje se mide contra la caja de
+       relleno, que acaba de crecer con el aire de arriba — el degradado tonal
+       se estiraría sobre el aire en vez de sobre las letras. 1em centrado es
+       exactamente la caja tipográfica, y sigue al título solo cuando el
+       breakpoint de 680px lo baja a 56px.
+       La capa del barrido mide 2,4 anchos para que la banda entre y salga
+       entera, y 3em de alto para cruzar el rótulo con holgura. */
+    background-size: 240% 3em, 100% 1em;
+    background-repeat: no-repeat;
+    /* `center` en vertical centra ambas capas sobre la caja tipográfica —el
+       relleno es simétrico, así que el centro de la caja ES el centro del
+       texto—. Posición de REPOSO del barrido: -100% lo deja fuera del rótulo
+       por la derecha, que es donde el ciclo lo aparca el 79% del tiempo. */
+    background-position: -100% center, 0 center;
+
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+
+    animation: emb-titulo-barrido var(--emb-titulo-ciclo) linear infinite;
+  }
+
+  /* Gradiente estático, sin barrido. La capa (a) —que es la identidad— se
+     queda; se va sólo el movimiento. */
+  @media (prefers-reduced-motion: reduce) {
+    h1.welcome-title { animation: none; }
+  }
+}
+
+/* 200% = fuera del texto por la IZQUIERDA; -100% = fuera por la DERECHA. El
+   barrido cruza entre 0% y 21% del ciclo y luego se queda aparcado fuera hasta
+   el final: el salto de vuelta al punto de partida ocurre con la banda ya
+   invisible, así que no hay destello de retorno. Un brillo que pasa cada tantos
+   segundos — jamás un bucle continuo ni un letrero que grita. */
+@keyframes emb-titulo-barrido {
+  0%   { background-position:  200% center, 0 center; }
+  21%  { background-position: -100% center, 0 center; }
+  100% { background-position: -100% center, 0 center; }
+}

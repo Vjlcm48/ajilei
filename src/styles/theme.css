@@ -9,6 +9,21 @@
   --gold-dim:       #c9973a;
   --gold-dim-rgb:   201, 151, 58;
 
+  /* EMB-1 ── Variaciones de luminosidad del mismo tono — NO son un segundo
+     dorado. Regla del dorado único intacta; el Sistema de Diseño registra esta
+     precisión en su próximo salto natural de versión.
+     Derivadas de --gold-brand por la L de HSL, con H y S IDÉNTICOS (41,7° /
+     77,3%) — eso es lo que las hace el mismo oro y no otro:
+       hi   = L 82%  (la luz)
+       base = L 60,2% (--gold-brand, el tono)
+       deep = L 38%  (la sombra)
+     Viven aquí, en la capa de tokens, y no en la hoja que las estrena: son
+     fuente única, igual que --gold-brand. */
+  --gold-brand-hi:       #f5dfae;
+  --gold-brand-hi-rgb:   245, 223, 174;
+  --gold-brand-deep:     #ac7e16;
+  --gold-brand-deep-rgb: 172, 126, 22;
+
   /* GREENS ── five stops covering all background gradients */
   --green-abyss:   #0a1e10;
   --green-darkest: #0d2416;
