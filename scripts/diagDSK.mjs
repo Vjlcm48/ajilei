@@ -6065,28 +6065,114 @@ const msgLee = (page) => page.evaluate(() => {
   }
 })
 
+// ── ARN-2 · Quién es la Mano, leído donde el producto SÍ lo dice ─────────────
+// Hallazgo ① de ARN-1: el modo re-derivaba `manoIndex` de la pastilla del
+// GANADOR en el showdown y, cuando no la encontraba, ADIVINABA
+// (`(idxGana + 1) % players.length`), o sea afirmaba "el ganador no es la Mano"
+// sin tener el dato. Y no la encontraba por diseño, no por avería:
+// OpponentPanel.jsx:48 (`lettersHidden = letterBadges && inShowdown`) esconde la
+// letra M durante el showdown en los escenarios de header compacto — de las
+// celdas de este modo, mesa 5 portrait y mesa 2 landscape móvil. El producto
+// está bien: resultadoCore.js:117 decide «por ser la Mano» vs «por ser el más
+// cercano a la Mano» comparando `winner === manoIndex`, así que con el insumo
+// adivinado la frase ESPERADA salía falsa y el rojo no significaba nada.
+//
+// La fuente nueva es la MISMA pastilla que pinta `manoSeat = game.manoIndex`
+// (GameTable.jsx:1017 → 1189 en .ai-zone, 1542 en .player-zone, `isMano` en el
+// panel), pero leída ANTES del showdown: en vuelo, durante la apuesta, que es el
+// único instante en que el producto la pinta en TODOS los escenarios. No hace
+// falta abrir `src/` para nada.
+//
+// Se identifica por NOMBRE y no por índice: el orden DOM de los paneles no es
+// contrato de nada, y los nombres del motor sí lo son y son únicos
+// (createInitialState: 'Tú' en el asiento 0, 'IA' en mesa 2, 'IA n' en 3-5).
+const msgLeeMano = (page) => page.evaluate(() => {
+  const txt = e => (e ? e.textContent.trim() : null)
+  // Mismo reconocedor que msgLee: pastilla dorada con la palabra o su inicial.
+  // Las de TURNO dicen 'Turno'/'T' y las de PIE no son doradas, así que no
+  // entran; las reservadas por visibility (doctrina O1) tampoco, porque su
+  // texto es 'T'/'Turno'.
+  const esMano = raiz => [...raiz.querySelectorAll('.seat-badge-gold')]
+    .some(b => ['M', 'Mano'].includes(b.textContent.trim()))
+  const zonas = []
+  const zHum = document.querySelector('.player-zone')
+  if (zHum) zonas.push({ nombre: 'Tú', mano: esMano(zHum) })
+  document.querySelectorAll('.opp-panel').forEach(p => zonas.push({ nombre: txt(p.querySelector('.opp-name')), mano: esMano(p) }))
+  document.querySelectorAll('.ai-zone').forEach(p => zonas.push({ nombre: txt(p.querySelector('.ai-name')), mano: esMano(p) }))
+  const conMano = zonas.filter(z => z.mano)
+  // ── La señal de frescura, y por qué hace falta una ─────────────────────────
+  // "Siguiente mano" (GameTable.jsx:1673-1679) NO reparte al instante: primero
+  // enciende isClearing y BORRA el ganador —lo que apaga el chip de puntaje— y
+  // sólo 300ms más tarde llama a beginHand, que es donde manoIndex rota. O sea
+  // que existe una ventana en la que el showdown ya no se ve pero la Mano sigue
+  // siendo la de la mano ANTERIOR: muestrear ahí devuelve un dato viejo, que es
+  // exactamente el género de error que esta tanda vino a erradicar (medido: la
+  // primera versión de esta sonda leía 'Tú' en la mano 2 y la pastilla del
+  // showdown la desmentía con 'IA 1').
+  //
+  // La ausencia de chip no basta, entonces; hace falta una señal POSITIVA de que
+  // el estado ya es el de la mano en curso. Es la pastilla de TURNO: sólo se
+  // monta en BET_1/2/3 (`turnSeat = isBetPhaseEarly ? … : null`,
+  // GameTable.jsx:572 y 1020), fases a las que sólo se llega después de
+  // startHand y del reparto. En escritorio el slot se RESERVA siempre por
+  // doctrina O1 (visibility, GameTable.jsx:1194 · 1552 · OpponentPanel.jsx:78),
+  // así que se descarta lo invisible — un badge reservado no es una señal.
+  const turno = [...document.querySelectorAll('.seat-badge-gold')].some(b =>
+    ['T', 'Turno'].includes(b.textContent.trim()) && getComputedStyle(b).visibility !== 'hidden')
+  return {
+    showdown: !!document.querySelector('.win-score-chip'),
+    turno,
+    cuantas: conMano.length,
+    mano: conMano.length === 1 ? conMano[0].nombre : null,
+  }
+})
+
+// Corroboración INDEPENDIENTE del dato anterior, determinista y derivada de
+// información que el arnés controla por completo (el número de mano y el tamaño
+// de la mesa): gameEngine.js:66-67 arranca con `pieIndex = N-1` y
+// `manoIndex = 0`, y startHand no rota en handCount 0 (gameEngine.js:409-410 —
+// pie ← nextAliveIndex(pie), mano ← nextAliveIndex(pie)), así que sin eliminados
+// la Mano de la mano k es el asiento (k-1) % N. En las 3 manos que juega este
+// modo, con saldo inicial 5000 y ante de 50, nadie puede quebrar: la premisa se
+// cumple. Y si algún día dejara de cumplirse, el desacuerdo con la pastilla sale
+// ROJO al reporte — nunca se re-alinea en silencio.
+const msgManoPorRotacion = (n, mano) => {
+  const asiento = (mano - 1) % n
+  return asiento === 0 ? 'Tú' : (n === 2 ? 'IA' : `IA ${asiento}`)
+}
+
 // Juega una mano completa pasando siempre y devuelve cuando el resultado está
 // en pantalla. Un clic por iteración con rechequeo (lección W1).
+// ARN-2 · devuelve además la Mano muestreada en vuelo. `false` sigue
+// significando "no hubo mano que jugar".
 async function msgJuegaUnaMano(page, primera) {
   if (primera) await clickIf(page, 'button:has-text("Iniciar mano")')
   else if (!await clickIf(page, 'button:has-text("Siguiente mano")')) return false
+  // ARN-2 · una sola lectura limpia basta y no se repite: `manoIndex` se fija en
+  // startHand y no vuelve a moverse dentro de la mano. Limpia = exactamente UNA
+  // pastilla de Mano en pantalla y ningún chip de ganador todavía.
+  let manoVista = null, manoCuantas = null
   // Tope generoso a propósito: una mano de mesa 5 son cuatro IAs × tres rondas
   // de apuesta × el ritmo de la casa (AI_SPEED_FACTOR) más el reparto y el
   // descarte. Con 120 vueltas (30s) se quedaba corta y la celda salía vacía
   // sin que nada estuviera roto.
   for (let i = 0; i < 320; i++) {
     await page.waitForTimeout(250)
+    if (manoVista === null) {
+      const v = await msgLeeMano(page)
+      if (v.turno && !v.showdown) { manoVista = v.mano; manoCuantas = v.cuantas }
+    }
     const fin = await page.evaluate(() => {
       const m = document.querySelector('.game-message')
       return !!m && (m.classList.contains('msg-win') || m.classList.contains('msg-lose'))
     })
-    if (fin) return true
+    if (fin) return { jugada: true, manoVista, manoCuantas }
     await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
       await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
       await clickIf(page, '.action-buttons button:has-text("Apostar")')
     await clickIf(page, 'button:has-text("Sin descartar")')
   }
-  return false
+  return { jugada: false, manoVista, manoCuantas }
 }
 
 async function runMSG(browser) {
@@ -6195,10 +6281,22 @@ async function runMSG(browser) {
     try {
       await gotoMesa(page, celda.n)
       for (let mano = 1; mano <= 3; mano++) {
-        if (!await msgJuegaUnaMano(page, mano === 1)) break
+        const juego = await msgJuegaUnaMano(page, mano === 1)
+        if (!juego || !juego.jugada) break
         const l = await msgLee(page)
         const conScore = l.zonas.filter(z => z.score)
         const idxGana  = conScore.findIndex(z => z.gana)
+        // ARN-2 · las dos lecturas de la Mano, la observada en vuelo y la
+        // derivada de la rotación. Se registran las dos SIEMPRE y se exige que
+        // concuerden: si el arnés y el motor discrepan sobre quién abre, no hay
+        // frase esperada que valga.
+        const manoVista = juego.manoVista
+        const manoRotada = msgManoPorRotacion(celda.n, mano)
+        // La pastilla en el SHOWDOWN — la vieja fuente. Donde el producto no la
+        // esconde debe decir lo mismo que se leyó en vuelo; donde la esconde
+        // (mesa 5 portrait, mesa 2 landscape móvil) no hay nada que cruzar y se
+        // declara. Así el defecto de ARN-1 queda convertido en puerta.
+        const manoEnChapa = (l.zonas.find(z => z.mano) || {}).nombre ?? null
         let esperado = null, via = 'plantilla'
         if (conScore.length && idxGana >= 0) {
           // Reconstrucción completa desde la página.
@@ -6210,7 +6308,12 @@ async function runMSG(browser) {
           }))
           esperado = composeResultado({
             phase: FASES.PAYOUT, winner: idxGana, players, numPlayers: celda.n,
-            manoIndex: conScore[idxGana].mano ? idxGana : (idxGana + 1) % players.length,
+            // El nombre del asiento Mano traducido al índice de `players`, que
+            // aquí es el de `conScore` —los que llegaron a comparación— y no el
+            // del asiento. Si la Mano se retiró no figura en conScore y esto da
+            // -1: nunca iguala a `winner`, que es exactamente la verdad (el
+            // ganador no es la Mano → «el más cercano a la Mano»).
+            manoIndex: conScore.findIndex(z => z.nombre === manoVista),
             ruleN: celda.n,
           })
         }
@@ -6218,6 +6321,28 @@ async function runMSG(browser) {
         const m = {
           mano, ruta: l.ruta, via, texto: l.texto, tono: l.tono,
           esperado: esperado ? esperado.texto : null,
+          // ARN-2 · trazabilidad del insumo, para que el registro de corridas
+          // pueda demostrar que la condición que mordía se ejercitó de verdad.
+          manoVista, manoRotada, manoEnChapa,
+          // Cuántas pastillas de Mano había en la lectura en vuelo. Se registra
+          // para que un `manoLeida` en falso diga POR QUÉ: 0 = no se alcanzó
+          // ninguna fase de apuesta limpia, >1 = dos asientos se declaran Mano
+          // (imposible con un solo manoSeat, y por eso mismo digno de verse).
+          manoCuantas: juego.manoCuantas,
+          chapaOculta: manoEnChapa === null,
+          ganaLaMano: !!(manoVista && conScore[idxGana] && conScore[idxGana].nombre === manoVista),
+          // El insumo sólo LLEGA al texto por la vía del desempate: sin empate a
+          // puntos, resultadoCore.js:117 calcula `desempate` y no lo usa. Por eso
+          // la condición que mordía es la conjunción de tres cosas, y se registran
+          // las tres por separado para que el censo no exagere ni disimule.
+          hayEmpate: conScore.length > 1 &&
+            conScore.filter(z => z.score.pts === Math.max(...conScore.map(y => y.score.pts))).length > 1,
+          // Puerta 1: la Mano se LEYÓ. Sin dato no hay re-derivación honesta.
+          manoLeida: manoVista !== null,
+          // Puerta 2: observación y rotación determinista coinciden.
+          manoConcuerda: manoVista !== null && manoVista === manoRotada,
+          // Puerta 3 (cruce): donde la pastilla sobrevive al showdown, dice lo mismo.
+          manoCruce: manoEnChapa === null || manoEnChapa === manoVista,
           // Ganadas por retiros: no hay puntuaciones que re-derivar, así que se
           // comprueba pertenencia a las plantillas conservadas y coherencia de
           // tono. Se DECLARA, no se disfraza de re-derivación.
@@ -6233,13 +6358,21 @@ async function runMSG(browser) {
           // El color aplicado y el tono compuesto tienen que ser el mismo hecho.
           tonoAplicado: l.clase.includes(claseEsperada.trim()) && !!l.tono,
         }
-        m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado && m.pantallaLimpia
+        // ARN-2 · las cinco puertas originales conservan su significado exacto;
+        // se suman las tres de la Mano. La de lectura es indispensable: sin el
+        // insumo, `coincide` compararía contra una frase inventada, y un verde
+        // así valdría menos que el rojo que sustituye.
+        m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado && m.pantallaLimpia &&
+          m.manoLeida && m.manoConcuerda && m.manoCruce
         r.manos.push(m)
       }
       r.ok = r.manos.length > 0 && r.manos.every(m => m.ok)
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
     jugado.push(r)
-    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
+    // ARN-2 · la Mano se imprime en cada mano junto con si su pastilla estaba
+    // oculta y si el desempate lo ganó ella: ése es el registro con el que se
+    // demuestra que la condición del hallazgo ① se ejercitó, y no un "confía".
+    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
@@ -6341,9 +6474,36 @@ async function runMSG(browser) {
     await page.close()
   }
 
+  // ── ARN-2 · Censo de la condición del hallazgo ① ──────────────────────────
+  // Lo que falsificaba la frase esperada era la CONJUNCIÓN: pastilla de Mano
+  // oculta por el producto Y desempate ganado de verdad por la Mano, en la misma
+  // mano. Se cuenta explícitamente para que el verde pueda demostrarse en vez de
+  // creerse. Si no apareció, el reporte lo dice como residuo — nunca se rellena
+  // con confianza. Las claves llevan sufijo `_n` a propósito: nada aquí es una
+  // puerta, y un booleano suelto en este bloque se leería como veredicto.
+  const manosTodas = jugado.flatMap(r => r.manos.map(m => ({ celda: `T${r.n} ${r.vp.w}x${r.vp.h}`, ...m })))
+  const muerde = m => m.chapaOculta && m.ganaLaMano && m.hayEmpate
+  const condicion = {
+    manos_n: manosTodas.length,
+    chapaOculta_n: manosTodas.filter(m => m.chapaOculta).length,
+    ganaLaMano_n: manosTodas.filter(m => m.ganaLaMano).length,
+    empate_n: manosTodas.filter(m => m.hayEmpate).length,
+    cruceVisible_n: manosTodas.filter(m => !m.chapaOculta).length,
+    ejercitada: manosTodas.filter(muerde)
+      .map(m => `${m.celda} mano${m.mano} Mano=${m.manoVista} → "${m.texto}"`),
+    // Con la pastilla oculta y la Mano ganando, aunque no hubiera empate, el
+    // insumo YA sale distinto del que producía el código viejo: es la mitad de la
+    // condición, y se registra porque documenta cobertura real.
+    insumoDistinto: manosTodas.filter(m => m.chapaOculta && m.ganaLaMano)
+      .map(m => `${m.celda} mano${m.mano} Mano=${m.manoVista}${m.hayEmpate ? '' : ' (sin empate)'}`),
+  }
+  console.log(`msg·ARN-2 condición ① · manos=${condicion.manos_n} · pastilla oculta=${condicion.chapaOculta_n} · gana la Mano=${condicion.ganaLaMano_n} · empate a puntos=${condicion.empate_n} · cruces con pastilla visible=${condicion.cruceVisible_n}`)
+  console.log(`msg·ARN-2 insumo distinto del viejo (oculta + gana la Mano) ${condicion.insumoDistinto.length}: ${condicion.insumoDistinto.join(' | ') || '—'}`)
+  console.log(`msg·ARN-2 → CONDICIÓN COMPLETA EJERCITADA ${condicion.ejercitada.length} vez(ces)${condicion.ejercitada.length ? ':\n   · ' + condicion.ejercitada.join('\n   · ') : ' — residuo declarado, ver reporte'}`)
+
   const passed = p1 && jugado.every(r => r.ok) && finales.every(f => f.p3) && anchuras.every(r => r.ok)
   console.log(`\n── MSG: compositor ${p1 ? 'OK' : 'FALLA'} (${matriz.length} casos) · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · fin ${finales.filter(f => f.p3).length}/${finales.length} · Δ larga ${anchuras.filter(r => r.ok).length}/${anchuras.length} · ${passed ? 'VERDE' : 'ROJO'}`)
-  return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, finales, anchuras, passed }
+  return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, finales, anchuras, condicionARN2: condicion, passed }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
