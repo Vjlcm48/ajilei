@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSoundContext } from '../context/SoundContext'
 import ChipToken from './ChipToken'
+import { GodeteIcon } from './TapetesPanel'
 import { BADGE_POPUP_MS } from '../config/consultas'
 
 // ── DSK-U1 / U1b · Menú de utilidades (SOLO gate de escritorio) ─────────────
@@ -75,7 +76,7 @@ const INERTES = [
 
 export function UtilitiesPanel({
   anchor, onClose, onReacciones, reaccionesBloqueadas,
-  consultas, manoDisponible, onManoActual,
+  consultas, manoDisponible, onManoActual, onTapetes,
 }) {
   const { soundEnabled, toggle: toggleSound } = useSoundContext()
   // DSK-U3 · el saldo de consultas SUBE a useConsultas. Ya no puede vivir en un
@@ -157,6 +158,22 @@ export function UtilitiesPanel({
           title={reaccionesBloqueadas ? 'Reacciones (espera un momento)' : 'Reacciones'}
         >
           <span className="util-ico" aria-hidden="true">💬</span>
+        </button>
+
+        {/* EMB-2 · Tapetes · tercera entrada VIVA. Va AQUÍ, cerrando el grupo
+            de las vivas y por delante de la inerte, porque el orden del panel
+            agrupa por estado (vivas → inertes → premium) y no por antigüedad.
+            Cierra al ejecutar, como sus hermanas (v1.1 §1.3.1): el panel de
+            tapetes toma el relevo y no tiene sentido sostener dos superficies
+            del mismo menú a la vez. */}
+        <button
+          type="button"
+          role="menuitem"
+          className="util-item util-item-tapetes"
+          onClick={() => { onClose(); onTapetes() }}
+          title="Tapetes"
+        >
+          <GodeteIcon />
         </button>
 
         {INERTES.map(e => (

@@ -192,6 +192,13 @@ import { getBestSuitScore } from '../src/engine/handEvaluator.js'
 // para no clavar ni el orden de la rejilla ni los montos: los `id` son el
 // CONTRATO del producto y los rótulos son copy declarado provisional.
 import { NIVELES, NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
+// EMB-2 · el catálogo de tapetes y sus claves salen de la MISMA fuente única
+// que la app (mismo criterio que consultas.js y niveles.js): el modo `tapetes`
+// siembra el storage con la clave real y recorre los ids de contrato, así que
+// añadir un sexto tapete no exige tocar el arnés.
+import {
+  TAPETES, TAPETE_POR_DEFECTO, TAPETE_KEY, TAPETES_COMPRADOS_KEY, montoTexto,
+} from '../src/config/tapetes.js'
 
 const BASE = 'http://localhost:5173'
 const OUT_DIR = 'capturas-dsk'
@@ -3697,6 +3704,21 @@ const U1_TOL = 0.05
 // U1b · el estándar de la fila del menú sube a 44 (el de campaña sigue siendo 40
 // para el disparador): con solo-icono el panel encoge en ancho, no en área.
 const U1_ITEM_MIN = 44
+// ── EMB-2 · recableado del metro (regla ARN-1) ───────────────────────────────
+// «Quien mueve la ruta, recablea el metro.» EMB-2 mete una entrada nueva en el
+// ⋮ —Tapetes, tercera y viva— y tres puertas de `u1` la contaban a mano:
+//   · `panelDims`   exigía `dims.n === 4`                → 4 → 5
+//   · `manoSeparada` exigía `titles[3] === 'Mano actual'` → índice → LA ÚLTIMA
+//   · `tooltips`    exigía `titles.length === 4` y los tres primeros por índice
+//                                                        → la lista completa
+// Contabilidad: viejo 4 entradas · nuevo 5 entradas · movedor EMB-2.
+//
+// El recableado no relaja nada: la lista de abajo es MÁS estricta que la de
+// antes (sella las cinco leyendas y su orden, no tres de cuatro). Y deja de
+// depender de índices, que es el defecto de fondo que ARN-2 desmontó en `msg`:
+// una puerta atada a una posición se rompe la próxima vez que alguien inserte
+// algo en medio, y lo hace en silencio.
+const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Tapetes', 'Saldo', 'Mano actual']
 
 async function u1Install(page) {
   await page.evaluate(({ ANCHORS }) => {
@@ -4059,22 +4081,25 @@ async function runU1(browser) {
       muteReal: trasEjecutar.gain.length === 0 ? null : trasEjecutar.gain.includes(0),
       // ── U1b ──────────────────────────────────────────────────────────────
       // Dimensiones DERIVADAS del contenido vivo (nunca los 224×194 de U1).
-      panelDims: dims != null && dims.n === 4 &&
+      panelDims: dims != null && dims.n === U1_ENTRADAS.length &&
         Math.abs(dims.got.w - dims.expW) <= 0.5 && Math.abs(dims.got.h - dims.expH) <= 0.5,
       // Solo-icono no puede encoger el área táctil: la fila conserva ≥44 de alto
       // y el interior del panel ≥44 de ancho.
       filas44: dims != null && dims.itemH.every(h => h >= U1_ITEM_MIN) && dims.itemW.every(w => w >= U1_ITEM_MIN),
       // "Mano actual" separada del grupo: aire + filete, y va la ÚLTIMA.
+      // EMB-2 · "la ÚLTIMA", no "la cuarta": el sitio de la entrada premium es
+      // el final del panel, y eso no cambia porque entren más hermanas.
       manoSeparada: dims != null && dims.sep > 0 && parseFloat(dims.hairline) > 0 &&
-        titles[3] === 'Mano actual',
+        titles[titles.length - 1] === 'Mano actual',
       // Sin palabras, el tooltip nativo es la única leyenda: no puede faltar.
       // DSK-U2 · la segunda entrada dejó de ser "Mensajes" y pasó a ser
       // "Reacciones" (v1.2 §1): la puerta se RE-APUNTA al nombre sellado, no se
-      // relaja — sigue exigiendo las cuatro leyendas, todas con texto, y las
-      // tres primeras con su nombre exacto.
-      tooltips: titles.length === 4 &&
+      // relaja. EMB-2 la vuelve a re-apuntar por la entrada de Tapetes, y de
+      // paso la endurece: se sella la LISTA COMPLETA y su orden (U1_ENTRADAS),
+      // no tres nombres por índice y un recuento suelto.
+      tooltips: titles.length === U1_ENTRADAS.length &&
         titles.every(t => t && t.trim()) &&
-        titles[0] === 'Sonido' && titles[1] === 'Reacciones' && titles[2] === 'Saldo',
+        titles.join('|') === U1_ENTRADAS.join('|'),
       // Contador: clave creada con las 20 gratis y badge que la pinta.
       contador: press.ls === '20' && press.badgeTxt === '20',
       // El popup abre por press, dice lo que debe y pinta sobre el panel.
@@ -6506,6 +6531,536 @@ async function runMSG(browser) {
   return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, finales, anchuras, condicionARN2: condicion, passed }
 }
 
+
+// ══ EMB-2 · Modo `tapetes` ═══════════════════════════════════════════════════
+// Documento rector: docs/AJILEI_Tapetes_v1.0.md · instrucción EMB-2 §4.
+//
+// Modo DIRIGIDO, no matricial: 5 tapetes × 2 caminos de render (mesa 5 vía
+// `OpponentPanel`, mesa 2 vía `.ai-zone`) × 2 celdas de viewport del gate. No
+// son las 24 celdas de campaña a propósito — el fieltro es pintura y no tiene
+// con qué depender del ancho; lo que sí depende del camino es el DOM que se
+// mide, y de ahí que los dos caminos sean obligatorios.
+//
+// Tres puertas por combinación:
+//   (a) Δ=0 GEOMÉTRICO — y medido de la forma fuerte: el tapete se cambia EN
+//       VIVO dentro de la MISMA página, con el mismo estado de juego y el mismo
+//       panel abierto, así que entre las dos medidas no cambia absolutamente
+//       nada salvo el atributo. Un Δ=0 entre dos cargas distintas habría medido
+//       también el reparto; éste no puede.
+//   (b) BANDA DE LUMINANCIA — la "profundidad equivalente" del doc §2 dejada en
+//       operación falsable: cada parada del fieltro conserva la L de HSL del
+//       verde que sustituye, dentro de ±1,0 punto. Se lee el valor VIVO y se
+//       recompone su HSL; la escalera verde se lee también viva y se contrasta
+//       contra la constante sellada, para que un cambio en theme.css salga rojo
+//       en vez de re-basear la banda en silencio.
+//   (c) CAPTURA PNG a capturas-dsk/ para la grilla del checkpoint.
+//
+// Y tres pruebas que no son por combinación:
+//   · El FLUJO DE COMPRA completo (previa · «No» revierte · cerrar el panel
+//     revierte · «Sí» registra y no cobra · persiste tras recarga).
+//   · La prueba NEGATIVA del gate: celda móvil con `tricolor` sembrado en
+//     localStorage → el fieltro renderiza verde. El sello móvil PROBADO por el
+//     instrumento, no prometido.
+//   · Las capturas del peor caso llevan transitorios presentes (badge TURNO), y
+//     el tricolor añade la ZONA DE RIESGO #1 recortada: las fichas doradas
+//     sobre la banda amarilla, arriba, donde viven los oponentes.
+
+const TAP_VARIANTES = TAPETES.map(t => t.id).filter(id => id !== TAPETE_POR_DEFECTO)
+const TAP_MESAS = [5, 2]                                    // los DOS caminos de render
+const TAP_VPS = [{ w: 1920, h: 937 }, { w: 1024, h: 768 }]  // la ancha y la más estrecha del gate
+// Fuera del gate, por sus dos vías: portrait y landscape móvil.
+const TAP_MOVIL = [{ w: 360, h: 640 }, { w: 740, h: 360 }]
+
+// La escalera del verde, SELLADA. No es la banda: es el testigo de que la banda
+// sigue midiendo contra lo que decía medir. Sale de theme.css:28-32.
+const TAP_ESCALERA_VERDE = {
+  '--green-abyss':   { hex: '#0a1e10', h: 138.0, s: 50.0, l: 7.8 },
+  '--green-darkest': { hex: '#0d2416', h: 143.5, s: 46.9, l: 9.6 },
+  '--green-deep':    { hex: '#1a4a2e', h: 145.0, s: 48.0, l: 19.6 },
+  '--green-base':    { hex: '#235c38', h: 142.1, s: 44.9, l: 24.9 },
+  '--green-bright':  { hex: '#2e7548', h: 142.0, s: 43.6, l: 32.0 },
+}
+const TAP_PARADAS = Object.keys(TAP_ESCALERA_VERDE)
+// Tolerancia de la banda. El redondeo a 8 bits del hex ya cuesta hasta ~0,4
+// puntos de L por sí solo, así que 1,0 es holgura de cuantización y no de
+// criterio: un tapete que se desviara de verdad se iría en varios puntos.
+const TAP_TOL_L = 1.0
+// Las tintas traslúcidas del fieltro. Su ALFA no puede moverse —es el que fija
+// cuánta mesa se ve a través de la zona—; lo único que cambia es el rgb.
+const TAP_TINTAS = {
+  '--surface-game': 0.88,
+  '--surface-area': 0.45,
+  '--surface-area-light': 0.3,
+}
+// Zona de riesgo #1 (doc §2): el amarillo del tricolor NO es un segundo dorado.
+// Distancia mínima declarada contra --gold-brand (H 41,7 S 77,3 L 60,2), en
+// puntos de L. 25 es el listón; lo medido ronda los 43.
+const TAP_ORO = { h: 41.7, s: 77.3, l: 60.2 }
+const TAP_MIN_DL_ORO = 25
+
+// Las CONSTANTES SELLADAS de cada camino de render, para que el modo sostenga
+// la afirmación del §4(a) por sí mismo y no sólo por deducción. Mesa 5 (vía
+// `OpponentPanel`): `.rivals-zone` cerrada en 196px por O1. Mesa 2 (vía
+// `.ai-zone`): el piso convertido en techo por O2, con su escalón en
+// `min-height: 900` — 236 border-box abajo del escalón y 260 encima.
+// El Δ=0 en vivo ya implica que todo lo que cumple el verde lo cumple el
+// tapete; esto lo dice además con el número escrito, que es lo que se lee
+// dentro de seis meses.
+const TAP_CONSTANTES = {
+  5: () => ({ sel: '.rivals-zone', esperado: 196 }),
+  2: (vp) => ({ sel: '.ai-zone', esperado: vp.h >= 900 ? 260 : 236 }),
+}
+
+// Anclas del Δ=0. Se listan las de los DOS caminos juntas y se ignoran las que
+// no existan en la mesa medida: mesa 2 en escritorio no monta `.table-mid` ni
+// `.opp-panel` (toma el negativo y usa `.ai-zone`), y eso es estructura, no
+// falta. Cada ancla se mide en TODAS sus apariciones.
+const TAP_ANCLAS = [
+  '.game-table-screen', '.game-table', '.table-header', '.header-right',
+  '.table-mid', '.rivals-zone', '.center-zone', '.pot-box',
+  '.opp-panel', '.opp-cards', '.ai-zone', '.ai-info',
+  '.player-zone', '.player-bar', '.cards-row', '.card-slot-wrapper',
+  '.action-area', '.deck-shuffle-wrapper',
+]
+
+// ── Lectura de color, sin tocar el DOM ───────────────────────────────────────
+// Se PARSEA la cadena del token en vez de inyectar un elemento sonda y leer su
+// `color` computado: una sonda, por invisible que sea, es un nodo más en el
+// árbol que se está midiendo con Δ=0. El parseo cubre las dos formas que usan
+// theme.css y tapetes.css — hex de 6 dígitos y `rgb()/rgba()`.
+function tapParseColor(txt) {
+  const s = String(txt || '').trim()
+  let m = /^#([0-9a-f]{6})$/i.exec(s)
+  if (m) {
+    const n = parseInt(m[1], 16)
+    return { rgb: [(n >> 16) & 255, (n >> 8) & 255, n & 255], a: 1 }
+  }
+  m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,/\s]+([\d.]+))?\s*\)$/i.exec(s)
+  if (m) return { rgb: [+m[1], +m[2], +m[3]], a: m[4] === undefined ? 1 : +m[4] }
+  return null
+}
+function tapHSL([r, g, b]) {
+  r /= 255; g /= 255; b /= 255
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2
+  if (mx === mn) return { h: 0, s: 0, l: l * 100 }
+  const d = mx - mn
+  const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn)
+  let h
+  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0)
+  else if (mx === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  return { h: h * 60, s: s * 100, l: l * 100 }
+}
+
+// Devuelve los tokens vivos del fieltro tal cual los declara el árbol, más el
+// atributo y lo que de verdad pintan las tres superficies.
+const tapLeeTokens = (page) => page.evaluate((TOKENS) => {
+  const cs = getComputedStyle(document.body)
+  const out = {}
+  TOKENS.forEach(t => { out[t] = cs.getPropertyValue(t).trim() })
+  const de = (sel, prop) => {
+    const e = document.querySelector(sel)
+    return e ? getComputedStyle(e)[prop] : null
+  }
+  return {
+    tokens: out,
+    attr: document.body.dataset.tapete ?? null,
+    pintado: {
+      bodyBG: cs.backgroundColor,
+      mesaBG: de('.game-table', 'backgroundColor'),
+      mesaIMG: (de('.game-table', 'backgroundImage') || '').slice(0, 40),
+      pantallaIMG: (de('.game-table-screen', 'backgroundImage') || '').slice(0, 40),
+    },
+  }
+}, [...TAP_PARADAS, ...Object.keys(TAP_TINTAS),
+    '--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'])
+
+const tapMideAnclas = (page) => page.evaluate((SELS) => {
+  const r = {}
+  SELS.forEach(s => {
+    document.querySelectorAll(s).forEach((el, i) => {
+      const b = el.getBoundingClientRect()
+      r[s + '[' + i + ']'] = [b.x, b.y, b.width, b.height].map(v => Math.round(v * 100) / 100)
+    })
+  })
+  return r
+}, TAP_ANCLAS)
+
+// Δ máximo entre dos mapas de anclas. Una clave que aparece o desaparece NO es
+// un Δ de 0: es una falta estructural y se reporta aparte, porque un fieltro
+// que montara o desmontara un nodo sería el peor fallo posible de esta tanda.
+function tapDelta(a, b) {
+  const claves = new Set([...Object.keys(a), ...Object.keys(b)])
+  let max = 0, peor = null
+  const faltan = []
+  for (const k of claves) {
+    if (!a[k] || !b[k]) { faltan.push(k); continue }
+    for (let i = 0; i < 4; i++) {
+      const d = Math.abs(a[k][i] - b[k][i])
+      if (d > max) { max = d; peor = k + '[' + 'xywh'[i] + ']' }
+    }
+  }
+  return { max: round(max), peor, faltan, n: claves.size }
+}
+
+// Siembra el storage por la VÍA REAL de activación (las claves de
+// config/tapetes.js), antes de la primera navegación.
+const tapSiembra = (page, activo, comprados) => page.addInitScript(([k, v, kc, vc]) => {
+  if (v) localStorage.setItem(k, v)
+  if (vc) localStorage.setItem(kc, vc)
+}, [TAPETE_KEY, activo, TAPETES_COMPRADOS_KEY, comprados])
+
+const TAP_TODOS = TAPETES.map(t => t.id).join(',')
+
+const tapAbrePanel = async (page) => {
+  await page.click('.utilities-trigger'); await page.waitForTimeout(120)
+  await page.click('.util-item-tapetes'); await page.waitForTimeout(200)
+  return page.evaluate(() => !!document.querySelector('.tapetes-panel'))
+}
+
+// Espera a que haya un badge TURNO VISIBLE: es la señal POSITIVA de fase de
+// apuesta (lección ARN-2 — en escritorio el slot se reserva por visibility, así
+// que un badge reservado no es señal). Con él en pantalla, la captura del peor
+// caso lleva transitorios, que es lo que pide el §4.
+async function tapEsperaTurno(page, ms = 45000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < ms) {
+    const ok = await page.evaluate(() => [...document.querySelectorAll('.seat-badge-gold')]
+      .some(b => ['T', 'Turno'].includes(b.textContent.trim()) &&
+                 getComputedStyle(b).visibility !== 'hidden'))
+    if (ok) return true
+    await page.waitForTimeout(300)
+  }
+  return false
+}
+
+// Juzga una lectura de tokens contra la escalera verde VIVA de la misma celda.
+function tapJuzgaBanda(base, vivo, id) {
+  const paradas = TAP_PARADAS.map(t => {
+    const cv = tapParseColor(base.tokens[t]), cx = tapParseColor(vivo.tokens[t])
+    if (!cv || !cx) return { t, ok: false, motivo: 'ilegible' }
+    const hv = tapHSL(cv.rgb), hx = tapHSL(cx.rgb)
+    return {
+      t, hex: vivo.tokens[t],
+      lVerde: round(hv.l), lTapete: round(hx.l), dL: round(Math.abs(hx.l - hv.l)),
+      sVerde: round(hv.s), sTapete: round(hx.s), h: round(hx.h),
+      ok: Math.abs(hx.l - hv.l) <= TAP_TOL_L,
+    }
+  })
+  // Los alfas de las tintas son intocables: mueven cuánta mesa se ve a través.
+  const tintas = Object.entries(TAP_TINTAS).map(([t, a]) => {
+    const c = tapParseColor(vivo.tokens[t])
+    return { t, valor: vivo.tokens[t], alfa: c ? c.a : null, ok: !!c && Math.abs(c.a - a) < 0.005 }
+  })
+  // El tapete tiene que HABER CAMBIADO algo: si un id nuevo dejara los tokens
+  // idénticos al verde, todas las demás puertas pasarían en verde midiendo la
+  // nada. Ésta es la guardia contra ese falso verde.
+  const cambia = TAP_PARADAS.some(t => vivo.tokens[t] !== base.tokens[t])
+
+  // Bandas del tricolor: dentro de la envolvente de la escalera verde, menos
+  // saturadas que un pabellón, y lejos del oro de marca en L.
+  let bandas = null
+  if (id === 'tricolor') {
+    const lMin = tapHSL(tapParseColor(base.tokens['--green-darkest']).rgb).l - TAP_TOL_L
+    const lMax = tapHSL(tapParseColor(base.tokens['--green-base']).rgb).l + TAP_TOL_L
+    bandas = ['--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'].map(t => {
+      const c = tapParseColor(vivo.tokens[t])
+      if (!c) return { t, ok: false, motivo: 'ilegible' }
+      const x = tapHSL(c.rgb)
+      const dLoro = Math.abs(x.l - TAP_ORO.l)
+      return {
+        t, hex: vivo.tokens[t], h: round(x.h), s: round(x.s), l: round(x.l),
+        envolvente: [round(lMin), round(lMax)], dLoro: round(dLoro),
+        ok: x.l >= lMin && x.l <= lMax && x.s <= 60 && dLoro >= TAP_MIN_DL_ORO,
+      }
+    })
+  }
+  return { paradas, tintas, cambia, bandas }
+}
+
+async function runTapetes(browser) {
+  const celdas = []
+  const capturas = []
+
+  // ── (1) Δ=0 + banda · el tapete se cambia EN VIVO, misma página ────────────
+  for (const n of TAP_MESAS) {
+    for (const vp of TAP_VPS) {
+      const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+      await tapSiembra(page, TAPETE_POR_DEFECTO, TAP_TODOS)   // todo comprado: el press aplica directo
+      await gotoMesa(page, n)
+      await page.waitForTimeout(300)
+      await page.mouse.move(5, 5)
+      // El panel NO BLOQUEA NI PAUSA EL JUEGO (v1.0 §4), y eso empieza por no
+      // ocupar una celda del flujo: se miden las anclas con el panel CERRADO y
+      // se vuelven a medir con él abierto. Molde `fueraDeFlujo` de u1.
+      const anclasCerrado = await tapMideAnclas(page)
+      const panelAbre = await tapAbrePanel(page)
+
+      const base = await tapLeeTokens(page)
+      const anclasBase = await tapMideAnclas(page)
+      const dAbrir = tapDelta(anclasCerrado, anclasBase)
+      // Y cabe entero en el viewport, anclado al ⋮ como sus hermanos.
+      const panelRect = await page.evaluate(() => {
+        const e = document.querySelector('.tapetes-panel')
+        if (!e) return null
+        const b = e.getBoundingClientRect()
+        return { x: b.x, y: b.y, w: b.width, h: b.height, right: b.right, bottom: b.bottom }
+      })
+      // La escalera viva contra la sellada: si theme.css se mueve, se ve aquí.
+      const verdeIntacto = TAP_PARADAS.every(t =>
+        base.tokens[t].toLowerCase() === TAP_ESCALERA_VERDE[t].hex)
+
+      const cte = TAP_CONSTANTES[n](vp)
+      const leeCte = () => page.evaluate(s => {
+        const e = document.querySelector(s)
+        return e ? Math.round(e.getBoundingClientRect().height * 100) / 100 : null
+      }, cte.sel)
+      const cteVerde = await leeCte()
+
+      const variantes = []
+      for (const id of TAP_VARIANTES) {
+        await page.click('.tap-swatch[data-tap="' + id + '"]')
+        await page.waitForTimeout(220)
+        const vivo = await tapLeeTokens(page)
+        const d = tapDelta(anclasBase, await tapMideAnclas(page))
+        const banda = tapJuzgaBanda(base, vivo, id)
+        const cteVivo = await leeCte()
+        variantes.push({
+          id, attr: vivo.attr, delta: d, banda, pintado: vivo.pintado,
+          cte: { sel: cte.sel, esperado: cte.esperado, medido: cteVivo },
+          cteOk: cteVivo === cte.esperado,
+          delta0: d.max === 0 && d.faltan.length === 0,
+          aplicado: vivo.attr === id,
+          bandaOk: banda.paradas.every(p => p.ok) && banda.tintas.every(t => t.ok) &&
+            banda.cambia && (banda.bandas === null || banda.bandas.every(b => b.ok)),
+        })
+      }
+      // Vuelta al verde: el default tiene que restituirse EXACTO.
+      await page.click('.tap-swatch[data-tap="' + TAPETE_POR_DEFECTO + '"]')
+      await page.waitForTimeout(220)
+      const vuelta = await tapLeeTokens(page)
+      const dVuelta = tapDelta(anclasBase, await tapMideAnclas(page))
+      const verdeVuelve = vuelta.attr === TAPETE_POR_DEFECTO &&
+        TAP_PARADAS.every(t => vuelta.tokens[t] === base.tokens[t]) &&
+        dVuelta.max === 0 && dVuelta.faltan.length === 0
+
+      const checks = {
+        panelAbre,
+        panelFueraDeFlujo: dAbrir.max === 0 && dAbrir.faltan.length === 0,
+        panelEncaja: panelRect != null && panelRect.x >= 0 && panelRect.y >= 0 &&
+          panelRect.right <= vp.w && panelRect.bottom <= vp.h,
+        verdeIntacto,
+        // La constante del camino, en verde y con cada tapete puesto (§4a).
+        constanteCamino: cteVerde === cte.esperado && variantes.every(v => v.cteOk),
+        delta0: variantes.every(v => v.delta0),
+        aplicado: variantes.every(v => v.aplicado),
+        banda: variantes.every(v => v.bandaOk),
+        verdeVuelve,
+      }
+      const passed = Object.values(checks).every(v => v === true)
+      celdas.push({ mesa: n, vp, panelRect, dAbrir, variantes, vuelta: { attr: vuelta.attr, delta: dVuelta }, checks, passed })
+      console.log('T' + n + ' ' + vp.w + 'x' + vp.h + ' · panel ' + (panelRect && round(panelRect.w)) + '×' +
+        (panelRect && round(panelRect.h)) + ' Δabrir=' + dAbrir.max +
+        ' · ' + cte.sel + ' ' + cteVerde + '/' + cte.esperado +
+        ' · Δ ' + variantes.map(v => v.delta.max).join('/') +
+        ' (' + variantes.length + ' tapetes, ' + (variantes[0] && variantes[0].delta.n) + ' anclas) · banda ' +
+        variantes.filter(v => v.bandaOk).length + '/' + variantes.length + ' · vuelta ' + verdeVuelve + ' · ' +
+        (passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'))
+      await page.close()
+    }
+  }
+
+  // ── (2) Flujo de compra · previa, «No», Esc, «Sí» y persistencia ───────────
+  const compra = []
+  for (const n of TAP_MESAS) {
+    const vp = TAP_VPS[0]
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    await gotoMesa(page, n)          // arranque en FRÍO: nada sembrado en disco
+    await page.waitForTimeout(250)
+    await page.mouse.move(5, 5)
+    await tapAbrePanel(page)
+
+    const frio = await page.evaluate(([k, kc]) => ({
+      attr: document.body.dataset.tapete ?? null,
+      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
+      estados: [...document.querySelectorAll('.tap-swatch')].map(s => s.dataset.estado),
+      precios: [...document.querySelectorAll('.tap-precio')].map(e => e.textContent.trim()),
+    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
+
+    // Previa: se aplica al instante y el diálogo se pinta encima.
+    await page.click('.tap-swatch[data-tap="tricolor"]'); await page.waitForTimeout(220)
+    const previa = await page.evaluate(([k, kc]) => ({
+      attr: document.body.dataset.tapete ?? null,
+      dialogo: !!document.querySelector('.tap-dialogo'),
+      txt: document.querySelector('.tap-dialogo-txt') ? document.querySelector('.tap-dialogo-txt').textContent.trim() : null,
+      activoPanel: document.querySelector('.tapetes-panel').dataset.activo,
+      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
+    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
+
+    // «No» revierte al activo y no deja rastro en disco.
+    await page.click('.tap-btn-no'); await page.waitForTimeout(220)
+    const trasNo = await page.evaluate(([k, kc]) => ({
+      attr: document.body.dataset.tapete ?? null,
+      dialogo: !!document.querySelector('.tap-dialogo'),
+      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
+    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
+
+    // Cerrar el PANEL con la previa viva también revierte.
+    await page.click('.tap-swatch[data-tap="azul"]'); await page.waitForTimeout(180)
+    const previaAzul = await page.evaluate(() => document.body.dataset.tapete ?? null)
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200)
+    const trasEsc = await page.evaluate(() => ({
+      attr: document.body.dataset.tapete ?? null,
+      panel: !!document.querySelector('.tapetes-panel'),
+    }))
+
+    // Saldo ANTES de comprar: la compra no cobra (v1.0 §5) y hay que probarlo.
+    const saldoAntes = await page.evaluate(() =>
+      document.querySelector('.player-bar-right .bd-num')
+        ? document.querySelector('.player-bar-right .bd-num').textContent.trim() : null)
+
+    // «Sí» registra propiedad y deja el tapete puesto.
+    await tapAbrePanel(page)
+    await page.click('.tap-swatch[data-tap="tricolor"]'); await page.waitForTimeout(180)
+    await page.click('.tap-btn-si'); await page.waitForTimeout(250)
+    const trasSi = await page.evaluate(([k, kc]) => ({
+      attr: document.body.dataset.tapete ?? null,
+      dialogo: !!document.querySelector('.tap-dialogo'),
+      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
+      estado: document.querySelector('.tap-swatch[data-tap="tricolor"]').dataset.estado,
+      saldo: document.querySelector('.player-bar-right .bd-num')
+        ? document.querySelector('.player-bar-right .bd-num').textContent.trim() : null,
+    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
+
+    // El atributo VIVE MIENTRAS VIVE LA MESA: al abandonarla se retira y el
+    // lobby vuelve a su verde. Es la contrapartida obligatoria de haber sacado
+    // el efecto del árbol de React — sin esta puerta, una fuga al lobby sería
+    // invisible hasta que alguien la viera con los ojos.
+    await page.click('.btn-leave'); await page.waitForTimeout(200)
+    await page.click('.leave-modal button:has-text("Abandonar mesa")')
+    await page.waitForTimeout(300)
+    const trasSalir = await page.evaluate(([k]) => ({
+      attr: document.body.dataset.tapete ?? null,
+      mesa: !!document.querySelector('.game-table'),
+      ls: localStorage.getItem(k),
+    }), [TAPETE_KEY])
+
+    // Persistencia: recargar y volver a entrar por la ruta canónica.
+    await page.reload()
+    const enLobby = await page.evaluate(() => document.body.dataset.tapete ?? null)
+    await volverALaMesa(page, n)
+    await page.waitForTimeout(250)
+    await page.mouse.move(5, 5)
+    await tapAbrePanel(page)
+    const trasRecarga = await page.evaluate(() => {
+      const sw = document.querySelector('.tap-swatch[data-tap="tricolor"]')
+      return {
+        attr: document.body.dataset.tapete ?? null,
+        estado: sw.dataset.estado,
+        precioTricolor: !!sw.querySelector('.tap-precio'),
+        chip: sw.querySelector('.tap-chip') ? sw.querySelector('.tap-chip').textContent.trim() : null,
+      }
+    })
+
+    const c = {
+      frioVerde: frio.attr === TAPETE_POR_DEFECTO && frio.ls === null && frio.lsc === null,
+      estadosFrio: frio.estados[0] === 'activo' && frio.estados.slice(1).every(e => e === 'no-comprado'),
+      // Copy y montos SALEN de la fuente única: si alguien los escribiera a
+      // mano en el JSX, esta puerta es la que discrepa.
+      preciosDeLaFuente: frio.precios.length === TAP_VARIANTES.length &&
+        TAP_VARIANTES.every(id => frio.precios.includes(
+          montoTexto(TAPETES.find(t => t.id === id).precio) + ' fichas')),
+      previaAplica: previa.attr === 'tricolor' && previa.dialogo === true &&
+        previa.activoPanel === TAPETE_POR_DEFECTO,
+      previaNoPersiste: previa.ls === null && previa.lsc === null,
+      dialogoDiceLoQueDebe: previa.txt === '¿Comprar Tricolor por ' + montoTexto(50000) + ' fichas?',
+      noRevierte: trasNo.attr === TAPETE_POR_DEFECTO && trasNo.dialogo === false &&
+        trasNo.ls === null && trasNo.lsc === null,
+      cerrarPanelRevierte: previaAzul === 'azul' && trasEsc.attr === TAPETE_POR_DEFECTO &&
+        trasEsc.panel === false,
+      siRegistra: trasSi.attr === 'tricolor' && trasSi.dialogo === false &&
+        trasSi.ls === 'tricolor' && trasSi.lsc === 'verde,tricolor' &&
+        trasSi.estado === 'activo',
+      // Sin descuento de saldo — la economía nace en Supabase (v1.0 §5).
+      sinCobro: saldoAntes !== null && trasSi.saldo === saldoAntes,
+      // El lobby jamás ve el atributo: ni al abandonar la mesa ni tras recargar.
+      // La PROPIEDAD, en cambio, sobrevive — es lo único que debe sobrevivir.
+      salirLimpia: trasSalir.attr === null && trasSalir.mesa === false &&
+        trasSalir.ls === 'tricolor' && enLobby === null,
+      persiste: trasRecarga.attr === 'tricolor' && trasRecarga.estado === 'activo' &&
+        trasRecarga.precioTricolor === false && trasRecarga.chip === 'Puesto',
+    }
+    const passed = Object.values(c).every(v => v === true)
+    compra.push({ mesa: n, frio, previa, trasNo, previaAzul, trasEsc, saldoAntes, trasSi, trasSalir, enLobby, trasRecarga, checks: c, passed })
+    console.log('T' + n + ' compra · frío ' + frio.attr + '/' + frio.estados.join(',') +
+      ' · previa ' + previa.attr + ' · No→' + trasNo.attr + ' · Esc→' + trasEsc.attr +
+      ' · Sí→' + trasSi.attr + ' ls "' + trasSi.lsc + '" saldo ' + saldoAntes + '→' + trasSi.saldo +
+      ' · salir→' + trasSalir.attr + ' lobby→' + enLobby +
+      ' · recarga ' + trasRecarga.attr + '/' + trasRecarga.estado + ' · ' +
+      (passed ? 'OK' : 'FAIL [' + Object.entries(c).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'))
+    await page.close()
+  }
+
+  // ── (3) Prueba NEGATIVA del gate · móvil con tricolor sembrado ─────────────
+  const movil = []
+  for (const vp of TAP_MOVIL) {
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    await tapSiembra(page, 'tricolor', TAP_TODOS)
+    await gotoMesa(page, 5)
+    await page.waitForTimeout(300)
+    const t = await tapLeeTokens(page)
+    const ls = await page.evaluate(k => localStorage.getItem(k), TAPETE_KEY)
+    const ok = ls === 'tricolor' && t.attr === null &&
+      TAP_PARADAS.every(p => t.tokens[p].toLowerCase() === TAP_ESCALERA_VERDE[p].hex)
+    movil.push({ vp, ls, attr: t.attr, tokens: t.tokens, ok })
+    console.log('MÓVIL ' + vp.w + 'x' + vp.h + ' · storage "' + ls + '" · attr ' + t.attr +
+      ' · base ' + t.tokens['--green-base'] + ' · ' + (ok ? 'OK (verde, sellado)' : 'FAIL'))
+    await page.close()
+  }
+
+  // ── (4) Capturas · la grilla del checkpoint, con transitorios ──────────────
+  for (const n of TAP_MESAS) {
+    for (const vp of TAP_VPS) {
+      for (const t of TAPETES) {
+        const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+        await tapSiembra(page, t.id, TAP_TODOS)
+        await gotoMesa(page, n)
+        await clickIf(page, 'button:has-text("Iniciar mano")')
+        const turno = await tapEsperaTurno(page)
+        await page.mouse.move(5, 5)
+        await page.waitForTimeout(250)
+        const path = OUT_DIR + '/tapete_' + t.id + '_t' + n + '_' + vp.w + 'x' + vp.h + '.png'
+        await page.screenshot({ path })
+        capturas.push({ tapete: t.id, mesa: n, vp: vp.w + 'x' + vp.h, turno, path })
+        // ZONA DE RIESGO #1 · el tercio superior de la mesa, que es donde vive
+        // la banda amarilla (plena hasta el 8%, en transición hasta el 40%) y
+        // donde viven los oponentes con sus fichas doradas. El recorte se
+        // DERIVA de la caja viva de `.game-table`, nunca de píxeles cableados.
+        if (t.id === 'tricolor') {
+          const caja = await page.evaluate(() => {
+            const b = document.querySelector('.game-table').getBoundingClientRect()
+            return { x: Math.max(0, b.x), y: Math.max(0, b.y), width: b.width, height: b.height * 0.35 }
+          })
+          const pr = OUT_DIR + '/tapete_riesgo1_t' + n + '_' + vp.w + 'x' + vp.h + '.png'
+          await page.screenshot({ path: pr, clip: caja })
+          capturas.push({ tapete: 'tricolor', zona: 'riesgo1', mesa: n, vp: vp.w + 'x' + vp.h, turno, path: pr })
+        }
+        await page.close()
+      }
+    }
+  }
+  console.log('CAPTURAS ' + capturas.length + ' · con transitorio (TURNO) ' +
+    capturas.filter(c => c.turno).length + '/' + capturas.length)
+
+  const passed = celdas.every(c => c.passed) && compra.every(c => c.passed) &&
+    movil.every(m => m.ok) && capturas.every(c => c.turno === true)
+  console.log('\n── TAPETES: ' + celdas.filter(c => c.passed).length + '/' + celdas.length +
+    ' celdas · compra ' + compra.filter(c => c.passed).length + '/' + compra.length +
+    ' · móvil ' + movil.filter(m => m.ok).length + '/' + movil.length +
+    ' · ' + capturas.length + ' capturas · ' + (passed ? 'VERDE' : 'ROJO'))
+  return { celdas, compra, movil, capturas, escaleraVerde: TAP_ESCALERA_VERDE, tolL: TAP_TOL_L, passed }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
@@ -6565,6 +7120,7 @@ try {
   if (MODE === 'u3') report.u3 = await runU3(browser)
   if (MODE === 'vc') report.vc = await runVC(browser)
   if (MODE === 'msg') report.msg = await runMSG(browser)
+  if (MODE === 'tapetes') report.tapetes = await runTapetes(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }

@@ -7,6 +7,7 @@ import { MuteButton } from './MuteButton'
 import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { ManoActualPopup } from './ManoActual'
+import { TapetesPanel } from './TapetesPanel'
 import { CelebracionMesa, PulsoNombre, AjileiOverlay, TarjetaResumen } from './Celebracion'
 import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
@@ -17,6 +18,7 @@ import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
+import { useTapetes } from '../hooks/useTapetes'
 import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
 import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
@@ -371,6 +373,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // DSK-U3 · "Mano actual". Mismo gate y mismo molde de hermandad: el hook se
   // llama SIEMPRE (orden de hooks estable) y recibe el gate.
   const consultas = useConsultas(isDesktopTable)
+  // EMB-2 · Tapetes. Mismo gate y mismo molde de hermandad: el hook se llama
+  // SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
+  // escritorio no hay panel, no hay atributo y el fieltro es el verde de
+  // siempre — aunque el localStorage traiga otro (v1.0 §4: el panel hereda la
+  // cola del puerto móvil del ⋮ junto al resto del menú).
+  const tapetes = useTapetes(isDesktopTable)
   const manoDisponible = hayManoConsultable(phase, game.handCount, human.cards.length)
   // El popup se ancla al ⋮ (el panel ya no existe: cierra al ejecutar) por su
   // borde DERECHO, molde del popup del contador. Se mide en el press, nunca en
@@ -1417,6 +1425,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // EMB-2 · el tapete NO entra por aquí: `useTapetes` pone `data-tapete` en
+  // `body` mientras la mesa vive, y styles/tapetes.css redefine desde ahí los
+  // tokens de fieltro (`--green-*`, `--surface-game`). El porqué del `body` —el
+  // vacío de ~400px por lado que deja `#root` a 1920— está en el hook. Este
+  // árbol queda intacto: ni una clase, ni un atributo, ni una caja.
   return (
     <main className="game-table-screen">
       <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}${aliveN === 2 ? ' table-two' : ''}`}>
@@ -1746,6 +1759,24 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           consultas={consultas.saldo}
           manoDisponible={manoDisponible}
           onManoActual={pedirManoActual}
+          onTapetes={() => tapetes.abrir(utilMenu.triggerRect())}
+        />
+      )}
+
+      {/* EMB-2 · panel de tapetes. Vive AQUÍ por la misma razón que sus
+          hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se
+          pinta el panel de utilidades ya se desmontó con su ancla. Overlay
+          puro, Δ=0, y el juego sigue corriendo detrás. */}
+      {isDesktopTable && (
+        <TapetesPanel
+          ancla={tapetes.ancla}
+          activo={tapetes.activo}
+          comprados={tapetes.comprados}
+          previa={tapetes.previa}
+          dialogo={tapetes.dialogo}
+          onPresionar={tapetes.presionar}
+          onConfirmar={tapetes.confirmar}
+          onRevertir={tapetes.revertir}
         />
       )}
 
