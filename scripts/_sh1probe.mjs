@@ -19,6 +19,7 @@
 // CERO escritura en src/. Uso:  node scripts/_sh1probe.mjs
 import { chromium } from 'playwright-core'
 import { writeFileSync } from 'node:fs'
+import { NIVELES, NIVEL_POR_DEFECTO } from '../src/config/niveles.js'
 
 const BASE = 'http://localhost:5173'
 const VPS = [{ w: 1366, h: 768 }, { w: 1920, h: 937 }]
@@ -29,11 +30,21 @@ const TAG = process.argv[2] || 'probe'
 const espera = (p, ms) => p.waitForTimeout(ms)
 const r2 = x => (x == null ? null : Math.round(x * 100) / 100)
 
-async function entra(page, n) {
+// ARN-1 · ruta recableada a NIV-UI (`0a45935`): se intercaló NivelSelect y el
+// botón de apuesta pasó de `.stake-btn` (TableSelect, camino muerto) a
+// `.mode-stake-btn` (ModeSelect). Mismo criterio que `gotoMesa` del arnés: el
+// nivel se elige por índice derivado de config/niveles.js, nunca por el rótulo
+// visible, que es copy provisional. Lo que SH1 mide —las cajas de maqueta del
+// mazo y su abanico— no depende ni del nivel ni del monto.
+async function entra(page, n, nivel = NIVEL_POR_DEFECTO, stakeIdx = 0) {
+  const iNivel = NIVELES.findIndex(x => x.id === nivel)
   await page.goto(BASE)
   await page.click('button:has-text("Jugar vs IA")')
+  await page.waitForSelector('.nivel-grid button')
+  await page.click(`.nivel-grid button:nth-of-type(${iNivel + 1})`)
   await page.click(`button:has-text("Mesa de ${n} jugadores")`)
-  await page.click('.stake-btn')
+  await page.waitForSelector('.mode-stake-btn')
+  await page.click(`.mode-stake-grid button:nth-of-type(${stakeIdx + 1})`)
   await page.waitForSelector('.game-table')
   await page.mouse.move(4, 4)
 }

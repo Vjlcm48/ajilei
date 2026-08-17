@@ -171,7 +171,11 @@ import { register } from 'node:module'
 // con un gancho de resolución propio (ver scripts/_resolveExt.mjs).
 register('./_resolveExt.mjs', import.meta.url)
 import { chromium } from 'playwright-core'
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, readFileSync } from 'node:fs'
+// La versión del instrumento se LEE del paquete instalado, no se copia a mano:
+// una copia a mano miente en cuanto alguien actualiza el pin.
+const PW_VERSION = JSON.parse(
+  readFileSync(new URL('../node_modules/playwright-core/package.json', import.meta.url), 'utf8')).version
 // DSK-U3 · el arnés lee de la MISMA fuente que la app (clave, saldo gratis y
 // los dos autocierres) y recompone el valor con el MISMO evaluador. Ninguna de
 // estas cifras se repite aquí: si una se mueve en src/, la puerta se mueve con
@@ -183,10 +187,41 @@ import {
 } from '../src/config/consultas.js'
 import { VALUE_NAMES, getCardPoints } from '../src/engine/deck.js'
 import { getBestSuitScore } from '../src/engine/handEvaluator.js'
+// ARN-1 · NIV-UI metió una pantalla de nivel en la ruta. El arnés lee los
+// niveles de la MISMA fuente única que la app (mismo criterio que consultas.js)
+// para no clavar ni el orden de la rejilla ni los montos: los `id` son el
+// CONTRATO del producto y los rótulos son copy declarado provisional.
+import { NIVELES, NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
 
 const BASE = 'http://localhost:5173'
 const OUT_DIR = 'capturas-dsk'
 const MODE = process.argv[2] || 'all'
+
+// ── Metadatos del instrumento (ARN-1) ────────────────────────────────────────
+// Se vuelcan en cada JSON de salida. Un número de esta tanda que no aparezca
+// aquí es un número que nadie podrá atribuir dentro de seis meses.
+//   · playwright-core va PINEADO EXACTO en devDependencies (instrumento de
+//     medida: los píxeles cambian entre versiones).
+//   · OJO — el pin de playwright NO pina el navegador: los modos lanzan con
+//     `channel: 'msedge'`, o sea el Edge INSTALADO EN LA MÁQUINA, que se
+//     autoactualiza por su cuenta. La versión de Chromium con la que se
+//     re-fotografiaron las baselines de ARN-1 queda registrada abajo, y se
+//     RELEE en vivo en cada corrida para que una deriva del navegador se vea en
+//     el propio JSON en vez de esconderse dentro de un Δ inexplicable.
+const ARNES = {
+  tanda: 'ARN-1',
+  chromiumBaselines: '151.0.4129.86',   // Edge estable, 16-ago-2026
+}
+
+// Ruta canónica: nivel y apuesta parametrizables, con los defaults del §0 de
+// ARN-1. `--nivel` / `--stake` permiten reproducir cualquier celda histórica
+// sin editar el arnés.
+const argNamed = (nombre, porDefecto) => {
+  const i = process.argv.indexOf(`--${nombre}`)
+  return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : porDefecto
+}
+const ARNES_NIVEL = argNamed('nivel', NIVEL_POR_DEFECTO)
+const ARNES_STAKE_IDX = Number(argNamed('stake', 0))
 
 const VIEWPORTS = [
   { w: 1024, h: 768 },
@@ -197,16 +232,70 @@ const VIEWPORTS = [
 
 const round = (n) => n == null ? null : Math.round(n * 100) / 100
 
+// Última ruta recorrida, para que cada JSON diga con qué nivel y con qué monto
+// se tomaron sus números. Un baseline sin esa etiqueta no es comparable.
+let RUTA_USADA = null
+
 // ── Navegación a Mesa de N (5/4/3/2) ─────────────────────────────────────────
-async function gotoMesa(page, n = 5) {
+//
+//   REGLA DE CAMPAÑA (ARN-1): «Quien mueve la ruta, recablea el metro.»
+//
+// Toda tanda de producto que altere la ruta de navegación o renombre selectores
+// que este arnés consume DEBE incluir, en la MISMA tanda, la actualización del
+// arnés y la re-fotografía contabilizada de sus baselines. Así se rompió esta
+// vez: NIV-UI (`0a45935`) intercaló la pantalla de nivel y renombró el botón de
+// apuesta, y el arnés se quedó hablando con una pantalla que ya no existía —
+// TODOS los modos que navegan en rojo, por una causa que no era geometría, y
+// nadie se enteró hasta EMB-1. Un arnés a oscuras es peor que no tenerlo: da
+// rojos que no significan nada y entrena a ignorarlos.
+//
+// RUTA CANÓNICA (desde NIV-UI):
+//   Welcome → «Jugar vs IA» → NivelSelect → nivel → ModeSelect → «Mesa de N» → apuesta
+//
+// Nivel y apuesta se eligen por ÍNDICE DERIVADO de `config/niveles.js`, jamás
+// por el rótulo visible: los `id` son el contrato del producto («no se renombran
+// nunca») mientras que los nombres son copy que Victor declaró provisional. Un
+// arnés colgado del texto se rompe con el próximo ajuste de copy — que es
+// justo la clase de avería que esta tanda viene a reparar.
+async function gotoMesa(page, n = 5, nivel = ARNES_NIVEL, stakeIdx = ARNES_STAKE_IDX) {
+  const iNivel = NIVELES.findIndex(x => x.id === nivel)
+  if (iNivel < 0) throw new Error(`gotoMesa: nivel desconocido "${nivel}"`)
+  const montos = apuestasDe(nivel)
+  if (!montos[stakeIdx]) throw new Error(`gotoMesa: stake ${stakeIdx} fuera de ${nivel}`)
+
   await page.goto(BASE)
-  await page.click('button:has-text("Jugar vs IA")')
-  await page.click(`button:has-text("Mesa de ${n} jugadores")`)
-  await page.click('.stake-btn')
-  await page.waitForSelector('.game-table')
+  await recorrerRuta(page, n, iNivel, stakeIdx)
   await page.mouse.move(5, 5) // neutraliza hover de cartas
+  RUTA_USADA = { nivel, stakeIdx, monto: montos[stakeIdx] }
+  return RUTA_USADA
 }
 const gotoMesa5 = (page) => gotoMesa(page, 5)
+
+// Los tres clics de la ruta, sin el `goto`. Se comparte con `volverALaMesa`
+// para que exista UN SOLO sitio que sepa cómo se llega a la mesa: la avería de
+// NIV-UI se coló, entre otras cosas, porque `runU1` tenía su propia copia.
+async function recorrerRuta(page, n, iNivel, stakeIdx) {
+  await page.click('button:has-text("Jugar vs IA")')
+  // Pantalla 1 · nivel. `nth-of-type` sobre la rejilla: los hijos de
+  // `.nivel-grid` son los tres <button>, en el orden de NIVELES.
+  await page.waitForSelector('.nivel-grid button')
+  await page.click(`.nivel-grid button:nth-of-type(${iNivel + 1})`)
+  // Pantalla 2 · mesa y monto en la MISMA superficie: la rejilla de apuesta
+  // RELEVA a la de mesas en vez de apilarse debajo, así que hay que esperar el
+  // relevo antes de pulsar el monto o se clica sobre el DOM anterior.
+  await page.click(`button:has-text("Mesa de ${n} jugadores")`)
+  await page.waitForSelector('.mode-stake-btn')
+  await page.click(`.mode-stake-grid button:nth-of-type(${stakeIdx + 1})`)
+  await page.waitForSelector('.game-table')
+}
+
+// Re-navega SIN recargar ni tocar storage (la app ya está en Welcome tras un
+// `reload`). La usa la prueba de persistencia de sonido de `u1`.
+async function volverALaMesa(page, n = 5, nivel = ARNES_NIVEL, stakeIdx = ARNES_STAKE_IDX) {
+  const iNivel = NIVELES.findIndex(x => x.id === nivel)
+  await recorrerRuta(page, n, iNivel, stakeIdx)
+  await page.mouse.move(5, 5)
+}
 
 const clickIf = async (page, s) => {
   const b = page.locator(s).first()
@@ -4063,9 +4152,15 @@ async function runU1(browser) {
     const lsAntes = await page.evaluate(() => localStorage.getItem('ajilei.sound'))
     await page.reload({ waitUntil: 'load' }); await page.waitForTimeout(400)
     const lsTras = await page.evaluate(() => localStorage.getItem('ajilei.sound'))
-    await page.click('button:has-text("Jugar vs IA")')
-    await page.click(`button:has-text("Mesa de ${n} jugadores")`)
-    await page.click('.stake-btn'); await page.waitForSelector('.game-table')
+    // ARN-1 · esta segunda navegación repetía la ruta a mano en vez de llamar
+    // al helper, así que quedó igual de rota que `gotoMesa` y por separado.
+    // Se re-navega con `volverALaMesa`, que NO borra storage: la prueba es
+    // justamente que la preferencia SOBREVIVE a la recarga.
+    // OJO con el chip «Tu último»: tras la recarga el nivel quedó recordado y
+    // NivelSelect lo premarca. No salta la pantalla (regla dura de v1.0 §4.2),
+    // así que la ruta es idéntica; el chip sólo añade un <span> dentro del
+    // botón y `nth-of-type` sigue apuntando al mismo sitio.
+    await volverALaMesa(page, n); await page.waitForSelector('.game-table')
     await u1Install(page); await u1OpenMenu(page)
     const entry = await page.evaluate(() => window.__u1SoundEntry())
     const ok = lsAntes === 'off' && lsTras === 'off' && entry && entry.off === true && entry.glyph === '🔇'
@@ -6262,7 +6357,25 @@ const browser = await chromium.launch({
   channel: 'msedge', headless: true,
   ...(MODE === 'r2' ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {}),
 })
-const report = { mode: MODE, ts: new Date().toISOString() }
+// ARN-1 · el JSON se autoetiqueta. `chromium` se LEE del navegador vivo y se
+// contrasta contra la versión con la que se re-fotografiaron las baselines: si
+// el Edge de la máquina se autoactualiza, el aviso sale aquí y no dentro de un
+// Δ inexplicable seis meses después.
+const chromiumVivo = browser.version()
+const report = {
+  mode: MODE,
+  ts: new Date().toISOString(),
+  arnes: {
+    ...ARNES,
+    playwrightCore: PW_VERSION,
+    chromium: chromiumVivo,
+    chromiumDeriva: chromiumVivo !== ARNES.chromiumBaselines
+      ? `AVISO: baselines tomadas con ${ARNES.chromiumBaselines}`
+      : false,
+    ruta: { nivel: ARNES_NIVEL, stakeIdx: ARNES_STAKE_IDX, monto: apuestasDe(ARNES_NIVEL)[ARNES_STAKE_IDX] },
+  },
+}
+if (report.arnes.chromiumDeriva) console.log(`⚠ ${report.arnes.chromiumDeriva} · vivo ${chromiumVivo}`)
 try {
   if (MODE === 'd1d2' || MODE === 'all') {
     const { page, data } = await runD1D2(browser)
