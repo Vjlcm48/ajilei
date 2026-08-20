@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="15 30 60 90" role="img" aria-label="AJILEI">
+  <!--
+    AJILEI · Isotipo maestro v1.0 · "Letra doble" A+J con Heptacoin
+    HEPTACREATION — trazado sellado por Victor, construccion por etapas validadas.
+
+    Sistema de coordenadas: 1 cm = 10 unidades · svg_x = 20 + 10·x · svg_y = 95 − 10·y
+    Cotas selladas (cm):
+      a(0,0) · b(5,0) · c(5,4.5) · d(5,6) · e(4,6)
+      Pieza A: trazo continuo a→e→d (diagonal 7.2 + techo 1)
+      Pieza J: c→b→f(5,−1.5) + gancho V-A: arco circular f→g(4,−2)→h(3,−1.5)
+               centro del arco (4,−0.75) · radio 1.25 · quiebre en f (sellado)
+      Heptacoin: centro j(3.25, 2.25) · Ø 1.5 · desfase hacia la diagonal (sellado:
+                 la moneda sugiere el travesano de la A sin reabrir la lectura "4")
+      Grosor: G2 = 0.5 cm (5 u) uniforme, techo incluido · remates redondos
+    Color: gold-brand #e8b84b · rampa tonal sancionada solo dentro de la Heptacoin.
+    Doctrina: diseno unico en todos los tamanos.
+  -->
+  <defs>
+    <radialGradient id="ajFld" cx="50%" cy="36%" r="72%">
+      <stop offset="0%" stop-color="#f4d27e"/>
+      <stop offset="55%" stop-color="#e8b84b"/>
+      <stop offset="100%" stop-color="#c69736"/>
+    </radialGradient>
+    <linearGradient id="ajH" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7dc92"/>
+      <stop offset="100%" stop-color="#ddaa3d"/>
+    </linearGradient>
+    <path id="ajStar" d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z"/>
+    <g id="ajHeptacoin">
+      <circle cx="50" cy="50" r="47" fill="#8a6520"/>
+      <circle cx="50" cy="50" r="46" fill="url(#ajFld)"/>
+      <circle cx="50" cy="50" r="43.2" fill="none" stroke="#b8892f" stroke-width="3.6" stroke-dasharray="1.8 2.2"/>
+      <circle cx="50" cy="50" r="40.6" fill="none" stroke="#a97f2a" stroke-width="0.7"/>
+      <g fill="#a97f2a">
+        <use href="#ajStar" transform="translate(50 17)"/>
+        <use href="#ajStar" transform="translate(75.8 29.42) rotate(51.43)"/>
+        <use href="#ajStar" transform="translate(82.17 57.34) rotate(102.86)"/>
+        <use href="#ajStar" transform="translate(64.32 79.73) rotate(154.29)"/>
+        <use href="#ajStar" transform="translate(35.68 79.73) rotate(205.71)"/>
+        <use href="#ajStar" transform="translate(17.83 57.34) rotate(257.14)"/>
+        <use href="#ajStar" transform="translate(24.2 29.42) rotate(308.57)"/>
+      </g>
+      <g transform="translate(1 1.4)" fill="#8a6520">
+        <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+        <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+        <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+        <rect x="43" y="48" width="14" height="4.5"/>
+      </g>
+      <g fill="url(#ajH)">
+        <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+        <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+        <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+        <rect x="43" y="48" width="14" height="4.5"/>
+      </g>
+    </g>
+  </defs>
+
+  <!-- Letra doble · grosor G2 (0.5 cm) uniforme -->
+  <g stroke="#e8b84b" stroke-width="5" stroke-linecap="round" fill="none">
+    <!-- Pieza A: diagonal a→e + techo e→d -->
+    <path d="M20 95 L60 35 L70 35"/>
+    <!-- Pieza J: asta c→b→f + gancho V-A (arco r=12.5, quiebre en f) -->
+    <path d="M70 50 L70 110 A 12.5 12.5 0 0 1 50 110"/>
+  </g>
+
+  <!-- Heptacoin · centro j(3.25, 2.25) → (52.5, 72.5) · Ø 1.5 → 15 u -->
+  <svg x="45" y="65" width="15" height="15" viewBox="0 0 100 100"><use href="#ajHeptacoin"/></svg>
+</svg>

@@ -1,5 +1,10 @@
 # AJILEI — Especificación de Componente: Sistema de Fichas (Pila + Número)
 
+> ⚠ **NOTA DE CABECERA (IDN-1, 2026-08-20).**
+> §2/§3/§12 (representación visual de la ficha) **SUPERSEDED** por
+> `AJILEI_Identidad_A_v1.0.md` §4/§6 desde 2026-08-20. El resto del documento
+> sigue vigente.
+
 - **Archivo:** `docs/AJILEI_Componente_Fichas_v2.0.md`
 - **Versión:** 2.0 (consolida v1.0 + adenda de forma v1.1)
 - **Estado:** Aprobado para implementación — **Ajuste Global #3**

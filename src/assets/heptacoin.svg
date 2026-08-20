@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Heptacoin">
+  <!--
+    HEPTACOIN · Maestro oficial v1.0
+    HEPTACREATION · moneda del ecosistema (AJILEI, SumaMente, futuros)
+    Diseño sellado: HC-1 "Grabada" — H serifada en alto relieve,
+    7 estrellas de 5 puntas en bajo relieve, canto acuñado estriado.
+    Rampa tonal sancionada del oro único gold-brand #e8b84b:
+      brillo #f4d27e · base #e8b84b · sombra #c69736 / #a97f2a · profundo #8a6520
+    Doctrina: diseño único en todos los tamaños (sin variante simplificada).
+    Uso: escalar por ancho/alto del contenedor; no recolorear.
+  -->
+  <defs>
+    <radialGradient id="hpcFld" cx="50%" cy="36%" r="72%">
+      <stop offset="0%" stop-color="#f4d27e"/>
+      <stop offset="55%" stop-color="#e8b84b"/>
+      <stop offset="100%" stop-color="#c69736"/>
+    </radialGradient>
+    <linearGradient id="hpcH" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7dc92"/>
+      <stop offset="100%" stop-color="#ddaa3d"/>
+    </linearGradient>
+    <path id="hpcStar" d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z"/>
+  </defs>
+
+  <!-- cuerpo de la moneda -->
+  <circle cx="50" cy="50" r="47" fill="#8a6520"/>
+  <circle cx="50" cy="50" r="46" fill="url(#hpcFld)"/>
+
+  <!-- canto acuñado estriado + filete interior -->
+  <circle cx="50" cy="50" r="43.2" fill="none" stroke="#b8892f" stroke-width="3.6" stroke-dasharray="1.8 2.2"/>
+  <circle cx="50" cy="50" r="40.6" fill="none" stroke="#a97f2a" stroke-width="0.7"/>
+
+  <!-- anillo de 7 estrellas en bajo relieve (radio 33, puntas hacia afuera) -->
+  <g fill="#a97f2a">
+    <use href="#hpcStar" transform="translate(50 17)"/>
+    <use href="#hpcStar" transform="translate(75.8 29.42) rotate(51.43)"/>
+    <use href="#hpcStar" transform="translate(82.17 57.34) rotate(102.86)"/>
+    <use href="#hpcStar" transform="translate(64.32 79.73) rotate(154.29)"/>
+    <use href="#hpcStar" transform="translate(35.68 79.73) rotate(205.71)"/>
+    <use href="#hpcStar" transform="translate(17.83 57.34) rotate(257.14)"/>
+    <use href="#hpcStar" transform="translate(24.2 29.42) rotate(308.57)"/>
+  </g>
+
+  <!-- H serifada · sombra del relieve -->
+  <g transform="translate(1 1.4)" fill="#8a6520">
+    <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+    <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+    <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+    <rect x="43" y="48" width="14" height="4.5"/>
+  </g>
+  <!-- H serifada · cuerpo en alto relieve -->
+  <g fill="url(#hpcH)">
+    <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+    <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+    <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+    <rect x="43" y="48" width="14" height="4.5"/>
+  </g>
+</svg>
