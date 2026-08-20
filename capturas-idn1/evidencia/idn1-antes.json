@@ -1,0 +1,2536 @@
+{
+  "arnes": {
+    "tanda": "IDN-1",
+    "chromiumBaselines": "151.0.4129.93"
+  },
+  "modo": "antes",
+  "chromium": "151.0.4129.93",
+  "celdas": {
+    "bienvenida-1920": {
+      "vp": "1920x937",
+      "mesa": null,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/bienvenida-1920-wordmark.png",
+        "capturas-idn1/evidencia/antes/bienvenida-1920-tarjeta.png"
+      ],
+      "anclas": {
+        ".welcome-screen": [
+          {
+            "x": 398,
+            "y": 0,
+            "w": 1124,
+            "h": 985
+          }
+        ],
+        ".welcome-card": [
+          {
+            "x": 639,
+            "y": 271.515625,
+            "w": 642,
+            "h": 441.96875
+          }
+        ],
+        ".star-arc": [
+          {
+            "x": 860,
+            "y": 364.609375,
+            "w": 200,
+            "h": 65
+          }
+        ],
+        ".subtitle": [
+          {
+            "x": 680,
+            "y": 453.609375,
+            "w": 560,
+            "h": 24.796875
+          }
+        ],
+        ".mode-buttons": [
+          {
+            "x": 680,
+            "y": 514.40625,
+            "w": 560,
+            "h": 82.09375
+          }
+        ],
+        ".btn-mode-ai": [
+          {
+            "x": 770.25,
+            "y": 514.40625,
+            "w": 198.546875,
+            "h": 57
+          }
+        ],
+        ".deco-left": [
+          {
+            "x": 535.755859375,
+            "y": 405.5208740234375,
+            "w": 218.48828125,
+            "h": 252.739501953125
+          }
+        ],
+        ".deco-right": [
+          {
+            "x": 1170.9173583984375,
+            "y": 191.2066650390625,
+            "w": 208.165283203125,
+            "h": 247.961669921875
+          }
+        ]
+      },
+      "wordmark": {
+        ".welcome-title": {
+          "presente": true,
+          "texto": {
+            "x": 826.796875,
+            "y": 289.515625,
+            "w": 266.390625,
+            "h": 96
+          },
+          "caja": {
+            "x": 680,
+            "y": 284.921875,
+            "w": 560,
+            "h": 105.28125
+          },
+          "margen": {
+            "top": 324.521875,
+            "bottom": 364.603125,
+            "left": 680,
+            "right": 1240
+          },
+          "fontSize": "72px",
+          "letterSpacing": "12px",
+          "lineHeight": "26.1px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".welcome-title": {
+          "fontSize": 72,
+          "cap": 50,
+          "ratio": 0.6944444444444444,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      }
+    },
+    "bienvenida-360": {
+      "vp": "360x640",
+      "mesa": null,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/bienvenida-360-wordmark.png",
+        "capturas-idn1/evidencia/antes/bienvenida-360-tarjeta.png"
+      ],
+      "anclas": {
+        ".welcome-screen": [
+          {
+            "x": 1,
+            "y": 0,
+            "w": 358,
+            "h": 688
+          }
+        ],
+        ".welcome-card": [
+          {
+            "x": 25,
+            "y": 94.5,
+            "w": 310,
+            "h": 499
+          }
+        ],
+        ".star-arc": [
+          {
+            "x": 80,
+            "y": 172.703125,
+            "w": 200,
+            "h": 65
+          }
+        ],
+        ".subtitle": [
+          {
+            "x": 50,
+            "y": 261.703125,
+            "w": 260,
+            "h": 49.59375
+          }
+        ],
+        ".mode-buttons": [
+          {
+            "x": 50,
+            "y": 347.296875,
+            "w": 260,
+            "h": 145.203125
+          }
+        ],
+        ".btn-mode-ai": [
+          {
+            "x": 98.109375,
+            "y": 347.296875,
+            "w": 163.765625,
+            "h": 50
+          }
+        ],
+        ".deco-left": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".deco-right": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ]
+      },
+      "wordmark": {
+        ".welcome-title": {
+          "presente": true,
+          "texto": {
+            "x": 80.40625,
+            "y": 109.5,
+            "w": 199.1875,
+            "h": 74
+          },
+          "caja": {
+            "x": 50,
+            "y": 104.703125,
+            "w": 260,
+            "h": 84.796875
+          },
+          "margen": {
+            "top": 135.503125,
+            "bottom": 172.7,
+            "left": 50,
+            "right": 310
+          },
+          "fontSize": "56px",
+          "letterSpacing": "8px",
+          "lineHeight": "23.2px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".welcome-title": {
+          "fontSize": 56,
+          "cap": 39,
+          "ratio": 0.6964285714285714,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      }
+    },
+    "mesa5-1920": {
+      "vp": "1920x937",
+      "mesa": 5,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa5-1920-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa5-1920-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa5-1920-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa5-1920-oppcornerchip.png",
+        "capturas-idn1/evidencia/antes/mesa5-1920-utilicochip.png",
+        "capturas-idn1/evidencia/antes/mesa5-1920-celebracion.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 418,
+            "y": 53.5,
+            "w": 1084,
+            "h": 830
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 444,
+            "y": 71.5,
+            "w": 1032,
+            "h": 32
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 1396.765625,
+            "y": 71.5,
+            "w": 79.234375,
+            "h": 32
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 942.78125,
+            "y": 74.453125,
+            "w": 44.625,
+            "h": 26.09375
+          }
+        ],
+        ".table-mid": [
+          {
+            "x": 444,
+            "y": 113.5,
+            "w": 1032,
+            "h": 440
+          }
+        ],
+        ".center-zone": [
+          {
+            "x": 728.21875,
+            "y": 319.5,
+            "w": 463.5625,
+            "h": 234
+          }
+        ],
+        ".rivals-zone": [
+          {
+            "x": 728.21875,
+            "y": 113.5,
+            "w": 463.5625,
+            "h": 196
+          }
+        ],
+        ".player-zone": [
+          {
+            "x": 444,
+            "y": 563.5,
+            "w": 1032,
+            "h": 300
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 463,
+            "y": 577.5,
+            "w": 994,
+            "h": 181
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 903.703125,
+            "y": 766.5,
+            "w": 112.578125,
+            "h": 84
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 463,
+            "y": 777.34375,
+            "w": 131.390625,
+            "h": 62.3125
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 1345.671875,
+            "y": 782.453125,
+            "w": 111.328125,
+            "h": 52.09375
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 757.21875,
+            "y": 361.609375,
+            "w": 112,
+            "h": 77.484375
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 772.21875,
+            "y": 370.609375,
+            "w": 82,
+            "h": 26.09375
+          },
+          {
+            "x": 777.8125,
+            "y": 452.09375,
+            "w": 70.8125,
+            "h": 26.09375
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 764.8125,
+            "y": 443.09375,
+            "w": 96.8125,
+            "h": 68.28125
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 962.015625,
+            "y": 373.34375,
+            "w": 125.96875,
+            "h": 54
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 790.890625,
+            "y": 399,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip .chip-token": [
+          {
+            "x": 451,
+            "y": 410.5,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 735.21875,
+            "y": 290.5,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 1000.015625,
+            "y": 290.5,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 1272.828125,
+            "y": 410.5,
+            "w": 16,
+            "h": 16
+          }
+        ],
+        ".opp-chips .chip-token": [],
+        ".ai-chips .chip-token": [],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 1376.234375,
+            "y": 782.453125,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": [
+          {
+            "x": 1393.375,
+            "y": 260.5,
+            "w": 24,
+            "h": 24
+          }
+        ]
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 790.890625,
+            "y": 396.703125,
+            "w": 44.640625,
+            "h": 28.59375
+          }
+        ],
+        ".opp-corner-chip": [
+          {
+            "x": 445,
+            "y": 404.5,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 729.21875,
+            "y": 284.5,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 994.015625,
+            "y": 284.5,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 1266.828125,
+            "y": 404.5,
+            "w": 28,
+            "h": 28
+          }
+        ],
+        ".opp-chips": [],
+        ".ai-chips": [],
+        ".pbr-chips": [
+          {
+            "x": 1376.234375,
+            "y": 782.453125,
+            "w": 80.765625,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": [
+          {
+            "x": 1393.375,
+            "y": 260.5,
+            "w": 24,
+            "h": 24
+          }
+        ]
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 444,
+            "y": 72.453125,
+            "w": 89.40625,
+            "h": 30
+          },
+          "caja": {
+            "x": 444,
+            "y": 74.453125,
+            "w": 89.40625,
+            "h": 26.09375
+          },
+          "margen": {
+            "top": 74.453125,
+            "bottom": 100.546875,
+            "left": 444,
+            "right": 533.40625
+          },
+          "fontSize": "22px",
+          "letterSpacing": "5px",
+          "lineHeight": "26.1px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        },
+        ".vc-ajilei": {
+          "presente": true,
+          "texto": {
+            "x": 722.8234252929688,
+            "y": 409.3000183105469,
+            "w": 474.33746337890625,
+            "h": 117.60000610351562
+          },
+          "caja": {
+            "x": 722.8234252929688,
+            "y": 415.70001220703125,
+            "w": 474.33746337890625,
+            "h": 105.5999755859375
+          },
+          "margen": {
+            "top": 415.70001220703125,
+            "bottom": 521.2999877929688,
+            "left": 722.8234252929688,
+            "right": 1197.160888671875
+          },
+          "fontSize": "132px",
+          "letterSpacing": "30.36px",
+          "lineHeight": "132px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 22,
+          "cap": 16,
+          "ratio": 0.7272727272727273,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        },
+        ".vc-ajilei": {
+          "fontSize": 132,
+          "cap": 95,
+          "ratio": 0.7196969696969697,
+          "familia": "Arial, sans-serif"
+        }
+      },
+      "clases": "game-table table-wide table-five",
+      "anclasTrasOverlay": {
+        ".game-table": [
+          {
+            "x": 418,
+            "y": 53.5,
+            "w": 1084,
+            "h": 830
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 444,
+            "y": 71.5,
+            "w": 1032,
+            "h": 32
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 1396.765625,
+            "y": 71.5,
+            "w": 79.234375,
+            "h": 32
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 942.78125,
+            "y": 74.453125,
+            "w": 44.625,
+            "h": 26.09375
+          }
+        ],
+        ".table-mid": [
+          {
+            "x": 444,
+            "y": 113.5,
+            "w": 1032,
+            "h": 440
+          }
+        ],
+        ".center-zone": [
+          {
+            "x": 728.21875,
+            "y": 319.5,
+            "w": 463.5625,
+            "h": 234
+          }
+        ],
+        ".rivals-zone": [
+          {
+            "x": 728.21875,
+            "y": 113.5,
+            "w": 463.5625,
+            "h": 196
+          }
+        ],
+        ".player-zone": [
+          {
+            "x": 444,
+            "y": 563.5,
+            "w": 1032,
+            "h": 300
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 463,
+            "y": 577.5,
+            "w": 994,
+            "h": 181
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 903.703125,
+            "y": 766.5,
+            "w": 112.578125,
+            "h": 84
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 463,
+            "y": 777.34375,
+            "w": 131.390625,
+            "h": 62.3125
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 1345.671875,
+            "y": 782.453125,
+            "w": 111.328125,
+            "h": 52.09375
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 757.21875,
+            "y": 361.609375,
+            "w": 112,
+            "h": 77.484375
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 772.21875,
+            "y": 370.609375,
+            "w": 82,
+            "h": 26.09375
+          },
+          {
+            "x": 777.8125,
+            "y": 452.09375,
+            "w": 70.8125,
+            "h": 26.09375
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 764.8125,
+            "y": 443.09375,
+            "w": 96.8125,
+            "h": 68.28125
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 962.015625,
+            "y": 373.34375,
+            "w": 125.96875,
+            "h": 54
+          }
+        ]
+      }
+    },
+    "mesa5-1024": {
+      "vp": "1024x768",
+      "mesa": 5,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa5-1024-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa5-1024-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa5-1024-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa5-1024-oppcornerchip.png",
+        "capturas-idn1/evidencia/antes/mesa5-1024-utilicochip.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 21,
+            "y": 8,
+            "w": 982,
+            "h": 752
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 47,
+            "y": 22,
+            "w": 930,
+            "h": 32
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 897.765625,
+            "y": 22,
+            "w": 79.234375,
+            "h": 32
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 494.78125,
+            "y": 26.390625,
+            "w": 44.625,
+            "h": 23.203125
+          }
+        ],
+        ".table-mid": [
+          {
+            "x": 47,
+            "y": 60,
+            "w": 930,
+            "h": 418
+          }
+        ],
+        ".center-zone": [
+          {
+            "x": 296.015625,
+            "y": 266,
+            "w": 431.96875,
+            "h": 212
+          }
+        ],
+        ".rivals-zone": [
+          {
+            "x": 296.015625,
+            "y": 60,
+            "w": 431.96875,
+            "h": 196
+          }
+        ],
+        ".player-zone": [
+          {
+            "x": 47,
+            "y": 484,
+            "w": 930,
+            "h": 262
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 66,
+            "y": 500,
+            "w": 892,
+            "h": 145
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 455.703125,
+            "y": 653,
+            "w": 112.578125,
+            "h": 84
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 66,
+            "y": 666.734375,
+            "w": 131.390625,
+            "h": 56.515625
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 846.671875,
+            "y": 668.953125,
+            "w": 111.328125,
+            "h": 52.09375
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 325.015625,
+            "y": 300.453125,
+            "w": 112,
+            "h": 73.703125
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 340.015625,
+            "y": 309.453125,
+            "w": 82,
+            "h": 23.203125
+          },
+          {
+            "x": 345.609375,
+            "y": 387.15625,
+            "w": 70.8125,
+            "h": 23.203125
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 332.609375,
+            "y": 378.15625,
+            "w": 96.8125,
+            "h": 65.390625
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 514.015625,
+            "y": 310.296875,
+            "w": 125.96875,
+            "h": 54
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 358.6875,
+            "y": 334.953125,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip .chip-token": [
+          {
+            "x": 54,
+            "y": 346,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 303.015625,
+            "y": 237,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 547.890625,
+            "y": 237,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 796.78125,
+            "y": 346,
+            "w": 16,
+            "h": 16
+          }
+        ],
+        ".opp-chips .chip-token": [],
+        ".ai-chips .chip-token": [],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 877.234375,
+            "y": 668.953125,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": [
+          {
+            "x": 894.375,
+            "y": 211,
+            "w": 24,
+            "h": 24
+          }
+        ]
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 358.6875,
+            "y": 332.65625,
+            "w": 44.640625,
+            "h": 28.59375
+          }
+        ],
+        ".opp-corner-chip": [
+          {
+            "x": 48,
+            "y": 340,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 297.015625,
+            "y": 231,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 541.890625,
+            "y": 231,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 790.78125,
+            "y": 340,
+            "w": 28,
+            "h": 28
+          }
+        ],
+        ".opp-chips": [],
+        ".ai-chips": [],
+        ".pbr-chips": [
+          {
+            "x": 877.234375,
+            "y": 668.953125,
+            "w": 80.765625,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": [
+          {
+            "x": 894.375,
+            "y": 211,
+            "w": 24,
+            "h": 24
+          }
+        ]
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 47,
+            "y": 22.390625,
+            "w": 89.40625,
+            "h": 30
+          },
+          "caja": {
+            "x": 47,
+            "y": 26.390625,
+            "w": 89.40625,
+            "h": 23.203125
+          },
+          "margen": {
+            "top": 26.390625,
+            "bottom": 49.59375,
+            "left": 47,
+            "right": 136.40625
+          },
+          "fontSize": "22px",
+          "letterSpacing": "5px",
+          "lineHeight": "23.2px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 22,
+          "cap": 16,
+          "ratio": 0.7272727272727273,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      },
+      "clases": "game-table table-wide table-five"
+    },
+    "mesa5-800x1200": {
+      "vp": "800x1200",
+      "mesa": 5,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa5-800x1200-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa5-800x1200-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa5-800x1200-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa5-800x1200-oppchips.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 21,
+            "y": 185,
+            "w": 758,
+            "h": 830
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 47,
+            "y": 203,
+            "w": 706,
+            "h": 32
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 673.765625,
+            "y": 203,
+            "w": 79.234375,
+            "h": 32
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 382.78125,
+            "y": 207.390625,
+            "w": 44.625,
+            "h": 23.203125
+          }
+        ],
+        ".table-mid": [
+          {
+            "x": 47,
+            "y": 245,
+            "w": 706,
+            "h": 440
+          }
+        ],
+        ".center-zone": [
+          {
+            "x": 331.21875,
+            "y": 490.5,
+            "w": 137.5625,
+            "h": 194.5
+          }
+        ],
+        ".rivals-zone": [
+          {
+            "x": 331.21875,
+            "y": 245,
+            "w": 137.5625,
+            "h": 235.5
+          }
+        ],
+        ".player-zone": [
+          {
+            "x": 47,
+            "y": 695,
+            "w": 706,
+            "h": 300
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 66,
+            "y": 734,
+            "w": 668,
+            "h": 156
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 343.703125,
+            "y": 898,
+            "w": 112.578125,
+            "h": 84
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 66,
+            "y": 928.015625,
+            "w": 79.359375,
+            "h": 23.96875
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 543.625,
+            "y": 918.390625,
+            "w": 190.375,
+            "h": 43.203125
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 335,
+            "y": 516.203125,
+            "w": 112,
+            "h": 73.703125
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 350,
+            "y": 525.203125,
+            "w": 82,
+            "h": 23.203125
+          },
+          {
+            "x": 355.59375,
+            "y": 602.90625,
+            "w": 70.8125,
+            "h": 23.203125
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 342.59375,
+            "y": 593.90625,
+            "w": 96.8125,
+            "h": 65.390625
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 427.046875,
+            "y": 526.046875,
+            "w": 75.921875,
+            "h": 54
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 368.671875,
+            "y": 550.703125,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip .chip-token": [],
+        ".opp-chips .chip-token": [
+          {
+            "x": 103.375,
+            "y": 399.046875,
+            "w": 24,
+            "h": 24
+          },
+          {
+            "x": 300.390625,
+            "y": 310.40625,
+            "w": 24,
+            "h": 24
+          },
+          {
+            "x": 402.203125,
+            "y": 310.40625,
+            "w": 24,
+            "h": 24
+          },
+          {
+            "x": 599.203125,
+            "y": 399.046875,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".ai-chips .chip-token": [],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 543.625,
+            "y": 918.390625,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": []
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 368.671875,
+            "y": 548.40625,
+            "w": 44.640625,
+            "h": 28.59375
+          }
+        ],
+        ".opp-corner-chip": [],
+        ".opp-chips": [
+          {
+            "x": 103.375,
+            "y": 399.046875,
+            "w": 97.40625,
+            "h": 24
+          },
+          {
+            "x": 300.390625,
+            "y": 310.40625,
+            "w": 97.40625,
+            "h": 24
+          },
+          {
+            "x": 402.203125,
+            "y": 310.40625,
+            "w": 97.40625,
+            "h": 24
+          },
+          {
+            "x": 599.203125,
+            "y": 399.046875,
+            "w": 97.40625,
+            "h": 24
+          }
+        ],
+        ".ai-chips": [],
+        ".pbr-chips": [
+          {
+            "x": 543.625,
+            "y": 918.390625,
+            "w": 122.421875,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": []
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 47,
+            "y": 203.390625,
+            "w": 89.40625,
+            "h": 30
+          },
+          "caja": {
+            "x": 47,
+            "y": 207.390625,
+            "w": 89.40625,
+            "h": 23.203125
+          },
+          "margen": {
+            "top": 207.390625,
+            "bottom": 230.59375,
+            "left": 47,
+            "right": 136.40625
+          },
+          "fontSize": "22px",
+          "letterSpacing": "5px",
+          "lineHeight": "23.2px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 22,
+          "cap": 16,
+          "ratio": 0.7272727272727273,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      },
+      "clases": "game-table table-wide table-five"
+    },
+    "mesa5-740x360": {
+      "vp": "740x360",
+      "mesa": 5,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa5-740x360-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa5-740x360-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa5-740x360-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa5-740x360-oppcornerchip.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 7,
+            "y": 6,
+            "w": 726,
+            "h": 348
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 21,
+            "y": 14,
+            "w": 698,
+            "h": 0
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 370,
+            "y": 14,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 21,
+            "y": 171.33438110351562,
+            "w": 44.625,
+            "h": 23.203125
+          }
+        ],
+        ".table-mid": [
+          {
+            "x": 21,
+            "y": 18,
+            "w": 698,
+            "h": 169.40625
+          }
+        ],
+        ".center-zone": [
+          {
+            "x": 134,
+            "y": 149.609375,
+            "w": 486,
+            "h": 37.796875
+          }
+        ],
+        ".rivals-zone": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".player-zone": [
+          {
+            "x": 9,
+            "y": 191.40625,
+            "w": 722,
+            "h": 152.59375
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 146,
+            "y": 215.90625,
+            "w": 426,
+            "h": 103.59375
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 578,
+            "y": 247.703125,
+            "w": 150,
+            "h": 40
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 12,
+            "y": 253.71875,
+            "w": 80.765625,
+            "h": 52.984375
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 163,
+            "y": 160.5,
+            "w": 86,
+            "h": 16
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 174,
+            "y": 164.5,
+            "w": 30.671875,
+            "h": 8
+          },
+          {
+            "x": 272,
+            "y": 154.609375,
+            "w": 60.25,
+            "h": 8
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 261,
+            "y": 150.609375,
+            "w": 82.25,
+            "h": 35.796875
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 355.25,
+            "y": 160.5,
+            "w": 113.53125,
+            "h": 16
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 210.671875,
+            "y": 163,
+            "w": 11,
+            "h": 11
+          }
+        ],
+        ".opp-corner-chip .chip-token": [
+          {
+            "x": 46.03125,
+            "y": 127.0625,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 222.03125,
+            "y": 127.0625,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 398.03125,
+            "y": 127.0625,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 574.03125,
+            "y": 127.0625,
+            "w": 16,
+            "h": 16
+          }
+        ],
+        ".opp-chips .chip-token": [],
+        ".ai-chips .chip-token": [],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 12,
+            "y": 253.71875,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": []
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 210.671875,
+            "y": 161.5,
+            "w": 24.96875,
+            "h": 14
+          }
+        ],
+        ".opp-corner-chip": [
+          {
+            "x": 40.03125,
+            "y": 121.0625,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 216.03125,
+            "y": 121.0625,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 392.03125,
+            "y": 121.0625,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 568.03125,
+            "y": 121.0625,
+            "w": 28,
+            "h": 28
+          }
+        ],
+        ".opp-chips": [],
+        ".ai-chips": [],
+        ".pbr-chips": [
+          {
+            "x": 12,
+            "y": 253.71875,
+            "w": 80.765625,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": []
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 21,
+            "y": 149.13125610351562,
+            "w": 55.203125,
+            "h": 21
+          },
+          "caja": {
+            "x": 21,
+            "y": 148.13125610351562,
+            "w": 55.203125,
+            "h": 23.203125
+          },
+          "margen": {
+            "top": 148.13125610351562,
+            "bottom": 171.33438110351562,
+            "left": 21,
+            "right": 76.203125
+          },
+          "fontSize": "16px",
+          "letterSpacing": "2px",
+          "lineHeight": "23.2px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 16,
+          "cap": 11,
+          "ratio": 0.6875,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      },
+      "clases": "game-table table-wide table-five"
+    },
+    "mesa5-360x640": {
+      "vp": "360x640",
+      "mesa": 5,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa5-360x640-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa5-360x640-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa5-360x640-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa5-360x640-oppcornerchip.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 9,
+            "y": 4,
+            "w": 342,
+            "h": 632
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 21,
+            "y": 14,
+            "w": 318,
+            "h": 0
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 259.765625,
+            "y": 12,
+            "w": 79.234375,
+            "h": 32
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 157.6875,
+            "y": 19,
+            "w": 44.625,
+            "h": 23.203125
+          }
+        ],
+        ".table-mid": [
+          {
+            "x": 21,
+            "y": 16,
+            "w": 318,
+            "h": 355.640625
+          }
+        ],
+        ".center-zone": [
+          {
+            "x": 21,
+            "y": 274.8125,
+            "w": 318,
+            "h": 96
+          }
+        ],
+        ".rivals-zone": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".player-zone": [
+          {
+            "x": 21,
+            "y": 373.640625,
+            "w": 318,
+            "h": 250.359375
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 32,
+            "y": 379.640625,
+            "w": 296,
+            "h": 93.828125
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 32,
+            "y": 477.46875,
+            "w": 296,
+            "h": 68.15625
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 32,
+            "y": 551.625,
+            "w": 55.890625,
+            "h": 64.375
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 247.234375,
+            "y": 559.484375,
+            "w": 80.765625,
+            "h": 48.640625
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 44,
+            "y": 283.609375,
+            "w": 86,
+            "h": 50.203125
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 55,
+            "y": 287.609375,
+            "w": 64,
+            "h": 12
+          },
+          {
+            "x": 151,
+            "y": 294.46875,
+            "w": 70.8125,
+            "h": 12
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 142,
+            "y": 290.46875,
+            "w": 88.8125,
+            "h": 36.5
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 242.8125,
+            "y": 294.71875,
+            "w": 73.1875,
+            "h": 28
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 67.453125,
+            "y": 299.609375,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip .chip-token": [
+          {
+            "x": 28.25,
+            "y": 254,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 28.25,
+            "y": 139,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 187.75,
+            "y": 139,
+            "w": 16,
+            "h": 16
+          },
+          {
+            "x": 187.75,
+            "y": 254,
+            "w": 16,
+            "h": 16
+          }
+        ],
+        ".opp-chips .chip-token": [],
+        ".ai-chips .chip-token": [],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 247.234375,
+            "y": 559.484375,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": []
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 67.453125,
+            "y": 299.609375,
+            "w": 39.09375,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip": [
+          {
+            "x": 22.25,
+            "y": 248,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 22.25,
+            "y": 133,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 181.75,
+            "y": 133,
+            "w": 28,
+            "h": 28
+          },
+          {
+            "x": 181.75,
+            "y": 248,
+            "w": 28,
+            "h": 28
+          }
+        ],
+        ".opp-chips": [],
+        ".ai-chips": [],
+        ".pbr-chips": [
+          {
+            "x": 247.234375,
+            "y": 559.484375,
+            "w": 80.765625,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": []
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 21,
+            "y": 15,
+            "w": 66.609375,
+            "h": 24
+          },
+          "caja": {
+            "x": 21,
+            "y": 16,
+            "w": 66.609375,
+            "h": 23.203125
+          },
+          "margen": {
+            "top": 16,
+            "bottom": 39.203125,
+            "left": 21,
+            "right": 87.609375
+          },
+          "fontSize": "18px",
+          "letterSpacing": "3px",
+          "lineHeight": "23.2px",
+          "position": "absolute",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 18,
+          "cap": 13,
+          "ratio": 0.7222222222222222,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      },
+      "clases": "game-table table-wide table-five"
+    },
+    "mesa2-800x1200": {
+      "vp": "800x1200",
+      "mesa": 2,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa2-800x1200-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa2-800x1200-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa2-800x1200-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa2-800x1200-aichips.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 21,
+            "y": 185,
+            "w": 758,
+            "h": 830
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 47,
+            "y": 203,
+            "w": 706,
+            "h": 32
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 673.765625,
+            "y": 203,
+            "w": 79.234375,
+            "h": 32
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 382.78125,
+            "y": 207.390625,
+            "w": 44.625,
+            "h": 23.203125
+          }
+        ],
+        ".table-mid": [],
+        ".center-zone": [
+          {
+            "x": 47,
+            "y": 515,
+            "w": 706,
+            "h": 170
+          }
+        ],
+        ".rivals-zone": [],
+        ".player-zone": [
+          {
+            "x": 47,
+            "y": 695,
+            "w": 706,
+            "h": 300
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 66,
+            "y": 292.21875,
+            "w": 668,
+            "h": 156
+          },
+          {
+            "x": 66,
+            "y": 734,
+            "w": 668,
+            "h": 156
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 343.703125,
+            "y": 898,
+            "w": 112.578125,
+            "h": 84
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 66,
+            "y": 928.015625,
+            "w": 79.359375,
+            "h": 23.96875
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 543.625,
+            "y": 918.390625,
+            "w": 190.375,
+            "h": 43.203125
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 76,
+            "y": 563.140625,
+            "w": 112,
+            "h": 73.703125
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 91,
+            "y": 572.140625,
+            "w": 82,
+            "h": 23.203125
+          },
+          {
+            "x": 219,
+            "y": 576.296875,
+            "w": 70.8125,
+            "h": 23.203125
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 206,
+            "y": 567.296875,
+            "w": 96.8125,
+            "h": 65.390625
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 320.8125,
+            "y": 573,
+            "w": 403.1875,
+            "h": 54
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 109.671875,
+            "y": 597.640625,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip .chip-token": [],
+        ".opp-chips .chip-token": [],
+        ".ai-chips .chip-token": [
+          {
+            "x": 633.703125,
+            "y": 258.109375,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 543.625,
+            "y": 918.390625,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": []
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 109.671875,
+            "y": 595.34375,
+            "w": 44.640625,
+            "h": 28.59375
+          }
+        ],
+        ".opp-corner-chip": [],
+        ".opp-chips": [],
+        ".ai-chips": [
+          {
+            "x": 633.703125,
+            "y": 258,
+            "w": 100.296875,
+            "h": 24.21875
+          }
+        ],
+        ".pbr-chips": [
+          {
+            "x": 543.625,
+            "y": 918.390625,
+            "w": 122.421875,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": []
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 47,
+            "y": 203.390625,
+            "w": 89.40625,
+            "h": 30
+          },
+          "caja": {
+            "x": 47,
+            "y": 207.390625,
+            "w": 89.40625,
+            "h": 23.203125
+          },
+          "margen": {
+            "top": 207.390625,
+            "bottom": 230.59375,
+            "left": 47,
+            "right": 136.40625
+          },
+          "fontSize": "22px",
+          "letterSpacing": "5px",
+          "lineHeight": "23.2px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 22,
+          "cap": 16,
+          "ratio": 0.7272727272727273,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      },
+      "clases": "game-table table-two"
+    },
+    "mesa2-740x360": {
+      "vp": "740x360",
+      "mesa": 2,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa2-740x360-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa2-740x360-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa2-740x360-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa2-740x360-oppcornerchip.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 7,
+            "y": 6,
+            "w": 726,
+            "h": 348
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 21,
+            "y": 14,
+            "w": 698,
+            "h": 0
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 651,
+            "y": 14,
+            "w": 72,
+            "h": 28
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 21,
+            "y": 36,
+            "w": 44.625,
+            "h": 23.203125
+          }
+        ],
+        ".table-mid": [
+          {
+            "x": 9,
+            "y": 18,
+            "w": 722,
+            "h": 169.40625
+          }
+        ],
+        ".center-zone": [],
+        ".rivals-zone": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".player-zone": [
+          {
+            "x": 9,
+            "y": 191.40625,
+            "w": 722,
+            "h": 152.59375
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 146,
+            "y": 215.90625,
+            "w": 426,
+            "h": 103.59375
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 578,
+            "y": 247.703125,
+            "w": 150,
+            "h": 40
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 12,
+            "y": 253.71875,
+            "w": 80.765625,
+            "h": 52.984375
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 42.890625,
+            "y": 140.40625,
+            "w": 54.203125,
+            "h": 41
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 51.8125,
+            "y": 143.40625,
+            "w": 36.34375,
+            "h": 11
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 585,
+            "y": 145.109375,
+            "w": 135,
+            "h": 15.59375
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 49.890625,
+            "y": 154.40625,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip .chip-token": [
+          {
+            "x": 138,
+            "y": 168.40625,
+            "w": 16,
+            "h": 16
+          }
+        ],
+        ".opp-chips .chip-token": [],
+        ".ai-chips .chip-token": [],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 12,
+            "y": 253.71875,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": []
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 49.890625,
+            "y": 154.40625,
+            "w": 40.203125,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip": [
+          {
+            "x": 132,
+            "y": 162.40625,
+            "w": 28,
+            "h": 28
+          }
+        ],
+        ".opp-chips": [],
+        ".ai-chips": [],
+        ".pbr-chips": [
+          {
+            "x": 12,
+            "y": 253.71875,
+            "w": 80.765625,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": []
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 21,
+            "y": 15,
+            "w": 55.203125,
+            "h": 21
+          },
+          "caja": {
+            "x": 21,
+            "y": 14,
+            "w": 55.203125,
+            "h": 23.203125
+          },
+          "margen": {
+            "top": 14,
+            "bottom": 37.203125,
+            "left": 21,
+            "right": 76.203125
+          },
+          "fontSize": "16px",
+          "letterSpacing": "2px",
+          "lineHeight": "23.2px",
+          "position": "absolute",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 16,
+          "cap": 11,
+          "ratio": 0.6875,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      },
+      "clases": "game-table table-two"
+    },
+    "mesa2-360x640": {
+      "vp": "360x640",
+      "mesa": 2,
+      "capturas": [
+        "capturas-idn1/evidencia/antes/mesa2-360x640-wordmark.png",
+        "capturas-idn1/evidencia/antes/mesa2-360x640-pozo.png",
+        "capturas-idn1/evidencia/antes/mesa2-360x640-saldo.png",
+        "capturas-idn1/evidencia/antes/mesa2-360x640-oppcornerchip.png"
+      ],
+      "anclas": {
+        ".game-table": [
+          {
+            "x": 9,
+            "y": 4,
+            "w": 342,
+            "h": 632
+          }
+        ],
+        ".table-header": [
+          {
+            "x": 21,
+            "y": 14,
+            "w": 318,
+            "h": 32
+          }
+        ],
+        ".header-right": [
+          {
+            "x": 259.765625,
+            "y": 14,
+            "w": 79.234375,
+            "h": 32
+          }
+        ],
+        ".hand-badge": [
+          {
+            "x": 151.375,
+            "y": 18.390625,
+            "w": 44.625,
+            "h": 23.203125
+          }
+        ],
+        ".table-mid": [],
+        ".center-zone": [
+          {
+            "x": 21,
+            "y": 231,
+            "w": 318,
+            "h": 140.5
+          }
+        ],
+        ".rivals-zone": [],
+        ".player-zone": [
+          {
+            "x": 21,
+            "y": 373.5,
+            "w": 318,
+            "h": 250.359375
+          }
+        ],
+        ".cards-row": [
+          {
+            "x": 28,
+            "y": 90.203125,
+            "w": 304,
+            "h": 86
+          },
+          {
+            "x": 32,
+            "y": 379.5,
+            "w": 296,
+            "h": 93.828125
+          }
+        ],
+        ".action-area": [
+          {
+            "x": 32,
+            "y": 477.328125,
+            "w": 296,
+            "h": 68.15625
+          }
+        ],
+        ".player-bar-left": [
+          {
+            "x": 32,
+            "y": 551.484375,
+            "w": 55.890625,
+            "h": 64.375
+          }
+        ],
+        ".player-bar-right": [
+          {
+            "x": 247.234375,
+            "y": 559.34375,
+            "w": 80.765625,
+            "h": 48.640625
+          }
+        ],
+        ".pot-box": [
+          {
+            "x": 44,
+            "y": 250.546875,
+            "w": 90,
+            "h": 65.40625
+          }
+        ],
+        ".pot-label": [
+          {
+            "x": 57,
+            "y": 256.546875,
+            "w": 64,
+            "h": 23.203125
+          },
+          {
+            "x": 157,
+            "y": 261.75,
+            "w": 70.8125,
+            "h": 23.203125
+          }
+        ],
+        ".call-box": [
+          {
+            "x": 146,
+            "y": 255.75,
+            "w": 92.8125,
+            "h": 55
+          }
+        ],
+        ".game-message": [
+          {
+            "x": 44,
+            "y": 323.953125,
+            "w": 272,
+            "h": 28
+          }
+        ]
+      },
+      "fichas": {
+        ".pot-value .chip-token": [
+          {
+            "x": 68.34375,
+            "y": 279.75,
+            "w": 24,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip .chip-token": [
+          {
+            "x": 28,
+            "y": 210,
+            "w": 16,
+            "h": 16
+          }
+        ],
+        ".opp-chips .chip-token": [],
+        ".ai-chips .chip-token": [],
+        ".pbr-chips .chip-token": [
+          {
+            "x": 247.234375,
+            "y": 559.34375,
+            "w": 36,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip .chip-token": []
+      },
+      "cajas": {
+        ".pot-value": [
+          {
+            "x": 68.34375,
+            "y": 279.75,
+            "w": 41.3125,
+            "h": 24
+          }
+        ],
+        ".opp-corner-chip": [
+          {
+            "x": 22,
+            "y": 204,
+            "w": 28,
+            "h": 28
+          }
+        ],
+        ".opp-chips": [],
+        ".ai-chips": [],
+        ".pbr-chips": [
+          {
+            "x": 247.234375,
+            "y": 559.34375,
+            "w": 80.765625,
+            "h": 36
+          }
+        ],
+        ".util-ico-chip": []
+      },
+      "wordmark": {
+        ".table-title": {
+          "presente": true,
+          "texto": {
+            "x": 21,
+            "y": 17.390625,
+            "w": 66.609375,
+            "h": 24
+          },
+          "caja": {
+            "x": 21,
+            "y": 18.390625,
+            "w": 66.609375,
+            "h": 23.203125
+          },
+          "margen": {
+            "top": 18.390625,
+            "bottom": 41.59375,
+            "left": 21,
+            "right": 87.609375
+          },
+          "fontSize": "18px",
+          "letterSpacing": "3px",
+          "lineHeight": "23.2px",
+          "position": "static",
+          "nombreAccesible": "AJILEI",
+          "textoVisible": "AJILEI",
+          "isotipo": null
+        }
+      },
+      "calibre": {
+        ".table-title": {
+          "fontSize": 18,
+          "cap": 13,
+          "ratio": 0.7222222222222222,
+          "familia": "system-ui, \"Segoe UI\", Roboto, sans-serif"
+        }
+      },
+      "clases": "game-table table-two"
+    }
+  }
+}

@@ -32,6 +32,20 @@ capturas-dsk/*
 !capturas-dsk/evidencia/
 !capturas-dsk/evidencia/**
 
+# Salidas del arnés de identidad (scripts/verifyIDN1.mjs). Mismo criterio que
+# capturas-dsk, con un motivo MÁS fuerte para conservar `evidencia/`: IDN-1 es
+# una campaña de sustitución visual, y el "antes" de una sustitución no se
+# regenera sin volver a hacer stash del árbol. Ahí viven los dos JSON de cifras
+# y los recortes por contexto. `f2/` queda fuera: es el estado intermedio
+# (moneda sí, wordmark no) y se reconstruye stasheando los archivos de F3.
+# Los recortes `-tarjeta` también quedan fuera: pesan lo que tres wordmarks y
+# no dicen nada que el recorte del título no diga mejor — el Δ=0 de
+# `.welcome-card` es una cifra del JSON, no hace falta la foto.
+capturas-idn1/*
+!capturas-idn1/evidencia/
+!capturas-idn1/evidencia/**
+capturas-idn1/evidencia/**/*-tarjeta.png
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
