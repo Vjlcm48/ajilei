@@ -24,6 +24,7 @@ import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
+import { Wordmark } from './Wordmark'
 import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
 import {
@@ -1316,7 +1317,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   function renderBrand() {
     return (
       <>
-        <h1 className="table-title">AJILEI</h1>
+        <h1 className="table-title" aria-label="AJILEI"><Wordmark /></h1>
         <div className="header-center">
           <span className="hand-badge" style={{ visibility: game.handCount > 0 ? 'visible' : 'hidden' }}>
             Mano #{game.handCount > 0 ? game.handCount : '—'}

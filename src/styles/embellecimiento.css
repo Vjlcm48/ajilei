@@ -199,3 +199,139 @@
   21%  { background-position: -100% center, 0 center; }
   100% { background-position: -100% center, 0 center; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   IDN-1 · WORDMARK  [letra doble] + ILEI
+   Rector: docs/AJILEI_Identidad_A_v1.0.md §1, §3 y §6.
+   Marcado: src/components/Wordmark.jsx. Tres anfitriones, un solo bloque:
+   h1.welcome-title (bienvenida) · h1.table-title (mesa) · span.vc-ajilei
+   (overlay de celebración).
+
+   VIVE AQUÍ Y NO EN gameTable.css por mandato de Victor (2026-08-20): la
+   compensación de cajas de esta fase es aditiva y va en esta hoja. Ni una
+   línea de gameTable.css se abre — el <h1> de la mesa se recompone desde el
+   JSX y se calza desde aquí.
+
+   ── EL CALIBRE, Y DE DÓNDE SALE ──────────────────────────────────────────
+   Identidad A §3 sella la caja del símbolo en 60×90 unidades (ratio 2:3), con
+   la línea base en svg_y 95 sobre un viewBox que va de 30 a 120. De ahí,
+   los tres números de los que cuelga TODO lo demás:
+       altura sobre la base = (95−35)/90 = 66,67% de la caja
+       cuelgue bajo la base = (120−95)/90 = 27,78% de la caja
+       ancho                = 2/3 de la altura
+   Y el requisito del encargo: que la altura sobre la base iguale la altura de
+   mayúscula de "ILEI". Llamando C a esa altura:
+       alto  = C × 90/60 = 1,5·C
+       ancho = 1,5·C × 60/90 = 1,0·C
+       cuelgue = 1,5·C × 25/90 = 0,4167·C
+
+   C se MIDIÓ, no se supuso: `actualBoundingBoxAscent` de la "I" con la fuente
+   que el navegador resuelve de verdad (system-ui → Segoe UI) dio 50/72,
+   39/56, 16/22, 13/18 y 11/16 en los cinco tamaños del censo — es decir la
+   altura de mayúscula sellada de Segoe UI, 1434/2048 em. De ahí --wm-cap.
+   Si algún día cambia la familia, se cambia ESTA constante y no cinco reglas.
+
+   ── POR QUÉ LA RANURA ES UN INLINE Y NO UN INLINE-BLOCK (FL-1) ───────────
+   Un <img> en línea es elemento REEMPLAZADO: su caja de margen entra entera
+   en la caja de línea, cosa que las letras no hacen (ellas sólo aportan su
+   `line-height`). Los tres anfitriones heredan una interlínea de 26,09px con
+   letras de hasta 72px: el texto ya desborda su caja de línea y a nadie le
+   importa. Un <img> de 1,05em ahí dentro haría que importara.
+   Molde EMB-1: se reserva en flujo lo justo y lo que sobra sale del flujo.
+
+   El primer intento fue una ranura `inline-block` de alto CERO, y MIDIÓ MAL:
+   +16,91px de alto en la bienvenida a 1920 y +10,8 a 360. La causa es fina y
+   vale la pena dejarla escrita. Con `font-size:72px` y `line-height:26,1px`
+   el medio interlineado es NEGATIVO, así que el `strut` de la línea termina
+   16,88px POR ENCIMA de la línea base. Una caja de alto cero apoyada en la
+   base no "no ocupa nada": ocupa el punto de la base, que está más abajo que
+   el fondo del strut — y estira la caja de línea hasta ahí. En la mesa no
+   pasaba (allí 22px de letra con 26,1 de interlínea dejan el strut por debajo
+   de la base), lo que explica que sólo la bienvenida se moviera.
+   Y el crecimiento NO es compensable: vale 0,414·fs − interlínea/2, o sea que
+   depende de dos cosas que cambian por sitio y por breakpoint. No hay
+   constante que restar.
+
+   La ranura definitiva es un `display: inline` — NO reemplazado, luego aporta
+   `line-height` y nada más, exactamente como una letra: crecimiento cero, por
+   construcción y en los cinco tamaños. El ancho se reserva con `padding-left`,
+   que en un inline empuja horizontalmente sin tocar la caja de línea. Y el
+   símbolo va absoluto contra esa ranura, que es `position: relative`.         */
+
+:root {
+  /* Las dos métricas de la familia del sistema, MEDIDAS (no supuestas) sobre
+     la fuente que el navegador resuelve de verdad, en los ocho tamaños que
+     usan los tres anfitriones.
+       --wm-cap : altura de mayúscula. 1434/2048 em de Segoe UI = 0,7002.
+       --wm-desc: descenso de la caja en línea, 0,25 em exacto — verificado en
+                  18/72, 14/56, 33/132 y 11/44; los 7/26, 6/22 y 5/18 son
+                  6,5 · 5,5 · 4,5 que Chromium redondea al píxel entero.
+     Ese redondeo desplaza el símbolo como mucho medio píxel respecto de la
+     base, y NUNCA mueve una caja: el símbolo está fuera de flujo.
+     Si algún día cambia la familia tipográfica, se cambian estas DOS
+     constantes y ninguna regla más. */
+  --wm-cap:  0.7002em;
+  --wm-desc: 0.25em;
+}
+
+.wm-slot {
+  position: relative;
+  /* Inline de verdad: la caja de línea sólo ve su `line-height`, como con
+     cualquier letra. Aquí está todo el Δ=0 vertical de esta fase. */
+  display: inline;
+  /* La reserva horizontal del símbolo. En un inline, el relleno empuja el
+     texto que sigue sin alterar una sola métrica vertical. */
+  padding-left: var(--wm-cap);
+  /* La letra doble sustituye a "AJ", así que le toca la misma traza que
+     separa una letra de la siguiente. `letter-spacing` no se aplica detrás de
+     un inline atómico, de modo que la tracking se repone a mano — y se lee del
+     valor vivo del anfitrión, no de un literal por sitio. */
+  margin-right: var(--wm-track, 0px);
+}
+
+.wm-iso {
+  position: absolute;
+  /* El bloque contenedor de un absoluto dentro de un inline relativo es la
+     caja de RELLENO de ese inline. Su borde izquierdo es justo donde empieza
+     el `padding-left`, así que el símbolo cae exactamente sobre su reserva. */
+  left: 0;
+  /* …y su borde inferior está en `base + descenso`. Restando el descenso y
+     bajando 0,4167·C, la base del símbolo aterriza sobre la línea base del
+     texto y el descendente de la J queda colgando, como una firma. */
+  bottom: calc(var(--wm-desc) - 0.4167 * var(--wm-cap));
+  width: var(--wm-cap);
+  height: calc(1.5 * var(--wm-cap));
+  /* Decorativo y fuera de flujo: que no intercepte punteros ni se coma un
+     gesto destinado a lo que tenga debajo. */
+  pointer-events: none;
+}
+
+/* El oro del isotipo es el SUYO (Identidad A §5.2, "no recolorear"): al ser una
+   imagen no hereda `color`, así que el barrido dorado de EMB-1 —que pinta por
+   `background-clip: text`— no lo alcanza. El barrido recorre sólo "ILEI" y el
+   símbolo queda quieto al lado. Es el fallo de Victor del 2026-08-20, y aquí
+   no hace falta ni una regla para cumplirlo: sale de cómo pinta cada cosa. */
+
+/* "ILEI" no lleva nada propio: es el texto del anfitrión, con su color, su
+   tamaño, su traza y —en la bienvenida— su barrido. Existe como <span> sólo
+   para que el marcado sea legible y para poder anclar esto si algún día hace
+   falta. Declarar `letter-spacing: inherit` sería redundante; se omite. */
+
+/* ── La traza, por anfitrión ──────────────────────────────────────────────
+   Único sitio donde IDN-1 repite un número que ya vive en otra hoja, y por eso
+   va con el nombre del dueño al lado: si allí cambia, aquí se nota como un
+   respiro raro detrás del símbolo (no como un reflow), y la corrida de
+   verifyIDN1 lo canta en el Δ de ancho del <h1>.                            */
+h1.welcome-title  { --wm-track: 12px; }   /* welcome.css  .welcome-title      */
+h1.table-title    { --wm-track:  5px; }   /* gameTable.css .table-title       */
+span.vc-ajilei    { --wm-track: 0.23em; } /* gameTable.css .vc-ajilei (en em) */
+
+@media (max-width: 680px) {
+  h1.welcome-title { --wm-track: 8px; }   /* welcome.css @680                 */
+}
+@media (max-width: 767px) and (orientation: portrait) {
+  h1.table-title   { --wm-track: 3px; }   /* gameTable.css portrait           */
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  h1.table-title   { --wm-track: 2px; }   /* gameTable.css landscape móvil    */
+}

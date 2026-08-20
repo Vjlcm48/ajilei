@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import ChipToken from './ChipToken'
+import { Wordmark } from './Wordmark'
 import { VIAJE_MS, VIAJE_ESCALON_MS, llevaViaje, llevaPulso } from '../hooks/celebracionCore'
 import { CONTEO_MS, valorConteo } from '../hooks/sesionCore'
 
@@ -67,11 +68,17 @@ export function PulsoNombre({ activa }) {
 // La palabra en grande con el tratamiento de marca: --gold-brand y la traza de
 // .table-title, ambos tokens vivos (el CSS los hereda, aquí no se cablea nada).
 // Aparición molde msgPop. Una sola vez, breve.
+// IDN-1 · pasa a [letra doble] + ILEI, como los otros dos sitios del wordmark.
+// El `aria-label` va en el <span> y no en la capa: la capa es `role="status"`
+// —lo que se ANUNCIA— y el nombre tiene que ser el de la marca entera, no
+// "ILEI". Nótese que el overlay es `fixed` y no tiene vecinos en flujo: aquí
+// la ranura de FL-1 no está evitando un reflow de la página, está evitando que
+// el símbolo empuje a sus propias letras.
 export function AjileiOverlay({ activa }) {
   if (!activa || activa.esperando || activa.nivel !== 'ajilei') return null
   return (
     <div className="vc-ajilei-capa" role="status">
-      <span key={activa.id} className="vc-ajilei">AJILEI</span>
+      <span key={activa.id} className="vc-ajilei" aria-label="AJILEI"><Wordmark /></span>
     </div>
   )
 }

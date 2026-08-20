@@ -1,5 +1,6 @@
 import '../styles/welcome.css'
 import { SoundButton } from './SoundButton'
+import { Wordmark } from './Wordmark'
 import reyOroUrl     from '../assets/cards/doce_oro.png?url'
 import caballoOroUrl from '../assets/cards/once_oro.png?url'
 
@@ -10,7 +11,13 @@ function WelcomeScreen({ onSelectMode }) {
       <img className="deco-card deco-right" src={caballoOroUrl} alt="" aria-hidden="true" />
 
       <section className="welcome-card">
-        <h1 className="welcome-title">AJILEI</h1>
+        {/* IDN-1 · el nombre pasa a ser [letra doble] + ILEI. El `aria-label`
+            no es adorno: sin él la marca se leería "ILEI" en un lector de
+            pantalla. La clase y la caja del <h1> no se tocan — el barrido
+            dorado de EMB-1 sigue colgando de `h1.welcome-title` y ahora
+            recorre sólo las cuatro letras, con el símbolo quieto al lado
+            (decisión de Victor, 2026-08-20). */}
+        <h1 className="welcome-title" aria-label="AJILEI"><Wordmark /></h1>
 
         <svg className="star-arc" viewBox="0 0 200 65" aria-hidden="true">
           <defs>

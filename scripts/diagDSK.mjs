@@ -5528,6 +5528,16 @@ async function vcInstall(page) {
     // componentes pintan —mismas clases, mismos estilos en línea— y se mide el
     // contrato de CSS: capa, Δ=0 y geometría. La lógica que decide QUÉ se pinta
     // ya la sella Vitest sobre el núcleo puro.
+    //
+    // IDN-1 · «quien mueve la ruta, recablea el metro» (regla ARN-1).
+    // Esta receta llevaba el marcado del producto COPIADO Y CONGELADO: la
+    // palabra "AJILEI" en texto plano y un <svg> vacío de 24×24 como ficha.
+    // IDN-1 cambia las dos cosas —el wordmark pasa a [letra doble] + ILEI y la
+    // ficha pasa a ser un <img> de la Heptacoin—, así que una copia congelada
+    // mediría un producto que ya no existe. Las dos se CLONAN ahora del árbol
+    // vivo: el wordmark del <h1> de la mesa (que monta el mismo <Wordmark/>) y
+    // la ficha de cualquier `.chip-token` en pantalla. Si el marcado vuelve a
+    // moverse, esto lo sigue solo y no hay nada que recablear.
     window.__vcConstruye = (nivel, geo) => {
       window.__vcDestruye()
       if (nivel === 'mano' || nivel === 'ajilei') {
@@ -5539,7 +5549,13 @@ async function vcInstall(page) {
           f.className = 'vc-ficha'
           f.style.left = `${geo.desde.x}px`
           f.style.top = `${geo.desde.y}px`
-          f.innerHTML = '<svg width="24" height="24"></svg>'
+          // Clon de la ficha viva (IDN-1: es un <img> de la Heptacoin, ya no un
+          // <svg>). Si no hubiera ninguna en pantalla, cae al hueco de 24×24
+          // que es lo único que esta medida necesita: la CAJA.
+          const viva = document.querySelector('.chip-token')
+          f.innerHTML = viva
+            ? viva.outerHTML
+            : '<span style="display:inline-block;width:24px;height:24px"></span>'
           capa.appendChild(f)
         }
         document.querySelector('.game-table-screen').appendChild(capa)
@@ -5548,7 +5564,11 @@ async function vcInstall(page) {
         const c = document.createElement('div')
         c.className = 'vc-ajilei-capa'
         c.setAttribute('data-construido', '1')
-        c.innerHTML = '<span class="vc-ajilei">AJILEI</span>'
+        // Clon del wordmark vivo, con su nombre accesible (IDN-1). Copiar sólo
+        // el texto dejaba el overlay leyéndose "ILEI" para un lector de
+        // pantalla y midiendo una caja que el producto ya no pinta.
+        const marca = document.querySelector('.table-title')
+        c.innerHTML = `<span class="vc-ajilei"${marca?.getAttribute('aria-label') ? ` aria-label="${marca.getAttribute('aria-label')}"` : ''}>${marca ? marca.innerHTML : 'AJILEI'}</span>`
         document.querySelector('.game-table-screen').appendChild(c)
       }
       if (nivel === 'mano') {

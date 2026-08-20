@@ -145,11 +145,16 @@ function calibre(sel) {
 // el mismo molde que usa diagDSK (modo vc2), pero clonando el marcado REAL del
 // producto en vez de una copia congelada — ésa fue la avería que ARN-1 vino a
 // prohibir. Se lee del propio árbol y se destruye al terminar.
-function construyeAjilei(html) {
+// El anfitrión se clona ENTERO —marcado y `aria-label`— del <h1> vivo de la
+// mesa, que monta el mismo <Wordmark/>. Clonar sólo el innerHTML dejaba el
+// span sin nombre accesible y el arnés cantaba un rojo que era suyo, no del
+// producto: la primera corrida de F3 reportó «.vc-ajilei pierde el nombre
+// accesible ("ILEI")» midiendo un elemento que había fabricado él mal.
+function construyeAjilei({ html, label }) {
   const c = document.createElement('div')
   c.className = 'vc-ajilei-capa'
   c.setAttribute('data-idn1', '1')
-  c.innerHTML = `<span class="vc-ajilei">${html}</span>`
+  c.innerHTML = `<span class="vc-ajilei"${label ? ` aria-label="${label}"` : ''}>${html}</span>`
   document.querySelector('.game-table-screen').appendChild(c)
 }
 
@@ -247,11 +252,12 @@ async function medir() {
 
       // Overlay AJILEI de la celebración, construido con el marcado vivo.
       if (c.id === 'mesa5-1920') {
-        const html = await page.evaluate(() => {
+        const fuente = await page.evaluate(() => {
           const t = document.querySelector('.table-title')
-          return t ? t.innerHTML : 'AJILEI'
+          return { html: t ? t.innerHTML : 'AJILEI', label: t ? t.getAttribute('aria-label') : null }
         })
-        await page.evaluate(construyeAjilei, html)
+        await page.evaluate(construyeAjilei, fuente)
+        await asienta(page)   // el overlay entra con un pop; medir en vuelo no vale
         celda.wordmark['.vc-ajilei'] = await page.evaluate(wordmark, '.vc-ajilei')
         celda.calibre['.vc-ajilei']  = await page.evaluate(calibre, '.vc-ajilei')
         celda.anclasTrasOverlay = await page.evaluate(rects, ANCLAS_MESA)
@@ -293,14 +299,50 @@ function cmp() {
   }
 
   console.log(`\nIDN-1 · Δ ANTES → DESPUÉS   (Chromium ${A.chromium} → ${B.chromium})\n`)
-  console.log('celda              Δanclas    Δcajas-ficha   Δtexto-wm   Δmargen-wm   nombre accesible')
-  console.log('─'.repeat(96))
+  console.log('celda              Δanclas    Δcajas-ficha   Δtexto-wm   Δx-badge   ¿explicado?    nombre accesible')
+  console.log('─'.repeat(104))
 
   for (const id of Object.keys(A.celdas)) {
     const a = A.celdas[id], b = B.celdas[id]
     if (!b) { fallos.push(`falta la celda ${id} en 'despues'`); continue }
 
-    const anc = dRects(a.anclas, b.anclas)
+    // ── La ÚNICA consecuencia declarada de la Fase 3 ──────────────────────
+    // La letra doble es más angosta que la secuencia "AJ" con su traza, así
+    // que el <h1> de la mesa se estrecha. `.table-header` es `space-between`
+    // con tres ítems, de modo que la pastilla "Mano #N" —el del medio— se
+    // recentra la MITAD de ese estrechamiento. Es geometría de la sustitución,
+    // no una regresión.
+    //
+    // No se mete en una lista de excepciones: eso apagaría el ancla para
+    // siempre y un arnés que perdona por nombre es un arnés a oscuras
+    // (lección ARN-1). Lo que se exige es la IDENTIDAD: el desplazamiento
+    // tiene que ser exactamente la mitad del delta de ancho del título, o
+    // cero si en ese breakpoint el título está fuera de flujo. Cualquier otro
+    // valor —incluido el mismo 7,03px por otra causa— sigue siendo rojo.
+    const dWtitulo = (a.wordmark?.['.table-title']?.presente && b.wordmark?.['.table-title']?.presente)
+      ? b.wordmark['.table-title'].caja.w - a.wordmark['.table-title'].caja.w
+      : null
+    // El título se estrecha (Δw negativo) y la pastilla se va con él hacia la
+    // izquierda: mismo signo, la mitad de magnitud.
+    const esperadoBadge = dWtitulo === null ? null : dWtitulo / 2
+    const dxBadge = (a.anclas['.hand-badge']?.[0] && b.anclas['.hand-badge']?.[0])
+      ? b.anclas['.hand-badge'][0].x - a.anclas['.hand-badge'][0].x
+      : 0
+    // Tolerancia = 1/64px, la REJILLA DE LAYOUT de Chromium, no un número
+    // cómodo. Partir por la mitad un valor cuantizado a 1/64 cae en 1/128 y el
+    // motor lo re-cuantiza: los Δw medidos son −14,046875 y −10,40625, ambos
+    // múltiplos exactos de 1/64, y su mitad se separa del desplazamiento real
+    // en 1/128 justos. Una tolerancia más fina que la rejilla no mide mejor:
+    // sólo da rojos que no significan nada.
+    const REJILLA = 1 / 64
+    const badgeExplicado = Math.abs(dxBadge) < REJILLA ||
+      (esperadoBadge !== null && Math.abs(dxBadge - esperadoBadge) <= REJILLA)
+    if (!badgeExplicado) fallos.push(`${id}: .hand-badge se movió ${round(dxBadge)}px, y la mitad del Δ de ancho del título es ${round(esperadoBadge)}px — no cuadra`)
+
+    const anclasSinBadge = Object.fromEntries(
+      Object.entries(a.anclas).filter(([s]) => !(s === '.hand-badge' && badgeExplicado)))
+    const anc = dRects(anclasSinBadge,
+      Object.fromEntries(Object.entries(b.anclas).filter(([s]) => s in anclasSinBadge)))
     if (anc.m > peorAncla) { peorAncla = anc.m; peorAnclaQuien = `${id} · ${anc.quien}` }
     const caj = a.cajas ? dRects(a.cajas, b.cajas) : { m: 0, quien: null }
 
@@ -319,7 +361,8 @@ function cmp() {
     const ok = anc.m === 0 && caj.m === 0
     console.log(
       `${id.padEnd(18)} ${String(round(anc.m)).padStart(7)}  ${String(round(caj.m)).padStart(12)}  ` +
-      `${String(round(dTexto)).padStart(10)}  ${String(round(dMargen)).padStart(10)}   ${[...new Set(nombres)].join(', ') || '—'}` +
+      `${String(round(dTexto)).padStart(10)}  ${String(round(dxBadge)).padStart(9)}  ` +
+      `${badgeExplicado ? (dxBadge ? '= Δw/2 ✓' : '  (fijo)') : ' SIN EXPLICAR'}   ${[...new Set(nombres)].join(', ') || '—'}` +
       `${ok ? '' : '   ← ' + (anc.quien || caj.quien)}`
     )
   }
