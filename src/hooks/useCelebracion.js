@@ -62,7 +62,12 @@ export function useCelebracion({ enabled, phase, winner, humanCards, ruleN, play
     if (!enabled || antes === phase) return
 
     const nivel = decideCelebracion({ phase, winner, humanCards, ruleN })
-    if (nivel !== 'mano' && nivel !== 'ajilei') return
+    // VIS-3 · la guarda deja de enumerar niveles y pregunta por la BANDERA: lo
+    // que este hook sostiene son las celebraciones que vuelan. Enumerar era
+    // correcto con dos y se volvió una lista que hay que recordar ampliar con
+    // el tercero ('recoleccion'). `llevaViaje(null)` y `llevaViaje('partida')`
+    // son false, así que las dos salidas de antes se conservan exactas.
+    if (!llevaViaje(nivel)) return
 
     const geo = geometria()
     if (!geo) return

@@ -12,7 +12,7 @@ import { CelebracionMesa, PulsoNombre, AjileiOverlay, TarjetaResumen } from './C
 import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
-import { decideCelebracion } from '../hooks/celebracionCore'
+import { decideCelebracion, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
@@ -405,24 +405,41 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
     if (game.pot > 0) ultimoPozoRef.current = game.pot
   }, [game.pot])
 
-  // Geometría medida EN VIVO al disparar, nunca en el render: origen el pozo,
-  // destino la pila del humano. VC1 midió que .corner-chip no existe en la zona
-  // del humano en ninguna de las 20 celdas — el destino es .pbr-chips.
+  // Geometría medida EN VIVO al disparar, nunca en el render.
+  //
+  // VIS-3 · ORIGEN Y DESTINO SON MONEDAS, NO CAJAS. Antes se medían `.pot-box` y
+  // `.pbr-chips`, que son los CONTENEDORES: el reguero salía del centro del
+  // óvalo y aterrizaba en el centro de "N fichas", nunca sobre la Heptacoin. Se
+  // baja un nivel, a `.chip-token`, y el vuelo pasa a ir de moneda a moneda.
+  //
+  // EL DESTINO SE RESUELVE POR IDENTIFICADOR (VIS-3a), no por clase de posición
+  // ni por orden DOM: `game.winner` es el índice del motor y `data-coin-target`
+  // lleva ese mismo índice. Por eso funciona igual si gana el humano (0) o
+  // cualquier IA, y por eso PvP lo heredará sin tocar nada.
+  //
+  // `lado` es el ANCHO MEDIDO de la moneda destino, y de él sale la escala de
+  // llegada. Medido y no escrito, con motivo: en mesa 5 a 1024x600 la moneda del
+  // pozo mide 11 px porque el CSS de landscape móvil la achica, mientras su
+  // atributo `width` sigue diciendo 24. Un número escrito mentiría ahí.
   const geometriaViaje = useCallback(() => {
-    const pozo = document.querySelector('.pot-box')
-    const pila = document.querySelector('.pbr-chips')
-    if (!pozo || !pila) return null
-    const a = pozo.getBoundingClientRect()
-    const b = pila.getBoundingClientRect()
-    // El reguero crece con el pozo, acotado para que la duración no se dispare:
-    // 7 fichas son 1640ms, holgadamente bajo el techo de 2500.
-    const fichas = Math.max(3, Math.min(7, Math.round(ultimoPozoRef.current / (unit * 2)) || 3))
+    const moneda = (sel) => document.querySelector(`${sel} .chip-token`)
+    const origen  = moneda('[data-coin-source="pot"]')
+    const destino = moneda(`[data-coin-target="${game.winner}"]`)
+    if (!origen || !destino) {
+      // No debería ocurrir: VIS-3a midió 1 origen y 1 destino por jugador vivo
+      // en las siete celdas. Si ocurriera, NO se vuela y —lo que importa— no se
+      // retiene ningún saldo (§Fase 3): sin vuelo no hay nada que diferir.
+      console.warn(`[VIS-3] vuelo sin ${origen ? 'destino' : 'origen'}: winner=${game.winner}`)
+      return null
+    }
+    const a = origen.getBoundingClientRect()
+    const b = destino.getBoundingClientRect()
     return {
       desde: { x: a.left + a.width / 2, y: a.top + a.height / 2 },
-      hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2 },
-      fichas,
+      hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2, lado: b.width },
+      fichas: VIAJE_N,
     }
-  }, [unit])
+  }, [game.winner])
 
   // VC2b · El asa del sonido del ganador, para que la celebración pueda
   // encadenarse a su final. Se lee con una función estable, nunca durante el

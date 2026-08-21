@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import ChipToken from './ChipToken'
 import { Wordmark } from './Wordmark'
-import { VIAJE_MS, VIAJE_ESCALON_MS, llevaViaje, llevaPulso } from '../hooks/celebracionCore'
+import { VIAJE_MS, VIAJE_ESCALON_MS, VIAJE_DESVANECIDO_MS, llevaViaje, llevaPulso } from '../hooks/celebracionCore'
 import { CONTEO_MS, valorConteo } from '../hooks/sesionCore'
 
 // ── DSK-VC2 · Superficies de la celebración ─────────────────────────────────
@@ -13,20 +13,58 @@ import { CONTEO_MS, valorConteo } from '../hooks/sesionCore'
 // Molde FlyingCard entero: se pinta en el origen, un rAF después se aplica el
 // translate y la transición hace el resto; onTransitionEnd retira la ficha.
 // Reguero escalonado para que se lea como fichas deslizándose y no como un
-// bloque. Origen y destino llegan MEDIDOS en vivo (pozo → .pbr-chips).
+// bloque. Origen y destino llegan MEDIDOS en vivo, y desde VIS-3 son MONEDAS y
+// no cajas: la Heptacoin del pozo → la Heptacoin del ganador, sea el humano o
+// una IA. Con ellos llega `hasta.lado`, el lado medido de la moneda destino.
 function FichaViajera({ desde, hasta, retraso }) {
+  const ref = useRef(null)
   const [movida, setMovida] = useState(false)
+  const [escala, setEscala] = useState(1)
   useEffect(() => {
-    const id = requestAnimationFrame(() => setMovida(true))
+    const id = requestAnimationFrame(() => {
+      // VIS-3 · La escala de llegada se MIDE, no se escribe: se divide el lado
+      // de la moneda destino (medido al disparar) entre el lado propio de ESTA
+      // moneda, leído en vivo. Ni el 24 del ChipToken compact ni el atributo
+      // `width` sirven de referencia — el CSS puede pisarlos, y de hecho lo hace
+      // con la del pozo en landscape móvil.
+      const propio = ref.current ? ref.current.getBoundingClientRect().width : 0
+      setEscala(propio > 0 && hasta.lado > 0 ? hasta.lado / propio : 1)
+      setMovida(true)
+    })
     return () => cancelAnimationFrame(id)
-  }, [])
+  }, [hasta.lado])
+  // `translate` y `scale` van como PROPIEDADES INDEPENDIENTES y no dentro de un
+  // `transform`, porque necesitan relojes distintos: la moneda vuela a su tamaño
+  // durante la primera mitad del trayecto y sólo se ajusta en la segunda, al
+  // llegar. Con un solo `transform` la escala se interpolaría desde el primer
+  // fotograma y la moneda cambiaría de tamaño durante todo el vuelo.
+  // El centrado sobrevive: `.vc-ficha` lleva margin -12px y `scale` opera sobre
+  // el centro de la caja, así que el centro sigue cayendo en el punto medido.
+  const ajuste = VIAJE_MS / 2
   return (
     <span
+      ref={ref}
       className="vc-ficha"
       style={{
         left: desde.x, top: desde.y,
-        transform: movida ? `translate(${hasta.x - desde.x}px, ${hasta.y - desde.y}px)` : 'translate(0,0)',
-        transition: movida ? `transform ${VIAJE_MS}ms cubic-bezier(0.22,0.61,0.36,1) ${retraso}ms, opacity 240ms ease-out ${VIAJE_MS + retraso - 240}ms` : 'none',
+        // VIS-3 · La caja del envoltorio tiene que ser la caja de la MONEDA.
+        // `.vc-ficha` es un bloque con un <img> EN LÍNEA dentro, así que su caja
+        // medía 24x31,09: los 7,09 px de más son el hueco del descendente de la
+        // línea. Con `margin: -12px` la moneda quedaba centrada igual y nadie lo
+        // notó nunca —hasta que hubo escala—, porque `scale` pivota sobre el
+        // centro del ENVOLTORIO, que está 3,55 px por debajo del de la moneda.
+        // Medido antes de esto: la última moneda aterrizaba a dy=3,55 del centro
+        // del destino con la caja en 16x20,73 en vez de 16x16.
+        // `line-height: 0` deja el bloque a la altura exacta de la imagen, y con
+        // eso los dos centros vuelven a ser el mismo punto.
+        lineHeight: 0,
+        translate: movida ? `${hasta.x - desde.x}px ${hasta.y - desde.y}px` : '0 0',
+        scale: movida ? String(escala) : '1',
+        transition: movida
+          ? `translate ${VIAJE_MS}ms cubic-bezier(0.22,0.61,0.36,1) ${retraso}ms`
+            + `, scale ${ajuste}ms ease-out ${retraso + ajuste}ms`
+            + `, opacity ${VIAJE_DESVANECIDO_MS}ms ease-out ${VIAJE_MS + retraso - VIAJE_DESVANECIDO_MS}ms`
+          : 'none',
         opacity: movida ? 0 : 1,
       }}
     >

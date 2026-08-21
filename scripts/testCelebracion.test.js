@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  decideCelebracion, llevaViaje, llevaPulso, sonidoDe, duracionDe,
+  decideCelebracion, llevaViaje, llevaPulso, sonidoDe, duracionDe, banderasDe,
   CELEBRACION_TOPE_MS, VIAJE_MS, VIAJE_ESCALON_MS, AJILEI_MS,
+  VIAJE_N, VIAJE_DESVANECIDO_MS,
   esperaPrecedente, ESPERA_MARGEN_MS, ESPERA_TOPE_MS,
 } from '../src/hooks/celebracionCore.js'
 import {
@@ -34,26 +35,61 @@ const MANO_NORMAL = [
   carta('Espadas', 10, 11), carta('Bastos', 10, 10), carta('Bastos', 6, 6),
 ]
 
-describe('VC2 · el decisor · winner === 0 sin excepción', () => {
-  it('no celebra nada si gana una IA', () => {
+// VIS-3 · Este bloque se llamaba "winner === 0 sin excepción" y sellaba que una
+// victoria de IA no produjera NADA. La guarda se reabre con contabilidad: lo que
+// protegía era que una DERROTA no se subrayara, y eso sigue sellado abajo — lo
+// que cambia es que el dinero ahora se ve moverse hacia quien se lo llevó.
+describe('VC2/VIS-3 · el decisor · la victoria de IA recolecta, no celebra', () => {
+  it('gana una IA → recoleccion, en cualquier asiento', () => {
     for (const seat of [1, 2, 3, 4]) {
-      expect(decideCelebracion({ phase: PHASES.PAYOUT, winner: seat, humanCards: MANO_NORMAL, ruleN: 5 })).toBe(null)
+      expect(decideCelebracion({ phase: PHASES.PAYOUT, winner: seat, humanCards: MANO_NORMAL, ruleN: 5 })).toBe('recoleccion')
     }
+  })
+
+  // Lo que la guarda de v1.0 protegía de verdad, y sigue protegido: recolectar
+  // NO es celebrar. Ni overlay, ni pulso, ni fanfarria — sólo el vuelo y el roce.
+  it('recoleccion vuela pero no celebra', () => {
+    expect(banderasDe('recoleccion')).toEqual({ vuelo: true, overlay: false, fanfarria: false })
+    expect(llevaViaje('recoleccion')).toBe(true)
+    expect(llevaPulso('recoleccion')).toBe(false)
+    expect(sonidoDe('recoleccion')).toBe('chipsCollect')
+  })
+
+  it('las banderas de los otros tres niveles no se mueven', () => {
+    expect(banderasDe('mano')).toEqual({ vuelo: true, overlay: false, fanfarria: true })
+    expect(banderasDe('ajilei')).toEqual({ vuelo: true, overlay: true, fanfarria: true })
+    expect(banderasDe('partida')).toEqual({ vuelo: false, overlay: false, fanfarria: false })
+    expect(banderasDe(null)).toEqual({ vuelo: false, overlay: false, fanfarria: false })
   })
 
   it('no celebra con winner null (mesa terminada sin superviviente, humano en quiebra)', () => {
     expect(decideCelebracion({ phase: PHASES.GAME_OVER, winner: null, humanCards: MANO_NORMAL, ruleN: 2 })).toBe(null)
     expect(decideCelebracion({ phase: PHASES.PAYOUT, winner: null, humanCards: MANO_NORMAL, ruleN: 2 })).toBe(null)
+    // VIS-3 hace esta guarda INDISPENSABLE: con `winner !== 0` ya no cayendo en
+    // null, un `winner` nulo sin filtrar se leería como "ganó una IA".
+    expect(decideCelebracion({ phase: PHASES.PAYOUT, winner: undefined, humanCards: MANO_NORMAL, ruleN: 2 })).toBe(null)
+  })
+
+  it('la PARTIDA ajena sigue sin celebrarse: recoleccion es sólo de la mano', () => {
+    for (const seat of [1, 2, 3, 4]) {
+      expect(decideCelebracion({ phase: PHASES.GAME_OVER, winner: seat, humanCards: MANO_NORMAL, ruleN: 5 })).toBe(null)
+    }
   })
 
   // ── BLINDAJE EXPLÍCITO ────────────────────────────────────────────────────
   // Un AJILEI del humano que PIERDE existe de verdad: con dos AJILEI en mesa el
   // desempate lo gana el más cercano a la Mano, así que el humano puede tener
-  // mano perfecta y perder. Mano perfecta y derrota siguen siendo derrota.
+  // mano perfecta y perder. Mano perfecta y derrota siguen siendo derrota: NO
+  // se celebra. Sigue resolviéndose ANTES de mirar las cartas, así que jamás
+  // llega a 'ajilei' — lo único que cambia es que ahora se ve el pozo irse.
   it('AJILEI PERDIDO no celebra — ni natural ni de comodín', () => {
-    expect(decideCelebracion({ phase: PHASES.PAYOUT, winner: 1, humanCards: AJILEI_NATURAL, ruleN: 2 })).toBe(null)
-    expect(decideCelebracion({ phase: PHASES.PAYOUT, winner: 1, humanCards: AJILEI_COMODIN, ruleN: 5 })).toBe(null)
-    expect(decideCelebracion({ phase: PHASES.PAYOUT, winner: 3, humanCards: AJILEI_NATURAL, ruleN: 5 })).toBe(null)
+    for (const c of [{ w: 1, m: AJILEI_NATURAL, r: 2 }, { w: 1, m: AJILEI_COMODIN, r: 5 }, { w: 3, m: AJILEI_NATURAL, r: 5 }]) {
+      const nivel = decideCelebracion({ phase: PHASES.PAYOUT, winner: c.w, humanCards: c.m, ruleN: c.r })
+      expect(nivel).toBe('recoleccion')
+      expect(nivel).not.toBe('ajilei')
+      expect(banderasDe(nivel).overlay).toBe(false)
+      expect(banderasDe(nivel).fanfarria).toBe(false)
+    }
   })
 })
 
@@ -113,10 +149,22 @@ describe('VC2 · qué acompaña a cada nivel', () => {
   it('las celebraciones de mesa caben en el techo de 2,5s', () => {
     expect(duracionDe('ajilei')).toBe(AJILEI_MS)
     expect(AJILEI_MS).toBeLessThanOrEqual(CELEBRACION_TOPE_MS)
-    // Peor caso del reguero: 7 fichas.
-    const peor = duracionDe('mano', 7)
-    expect(peor).toBe(VIAJE_MS + 6 * VIAJE_ESCALON_MS)
-    expect(peor).toBeLessThanOrEqual(CELEBRACION_TOPE_MS)
+    // VIS-3 · el reguero ya no es "hasta 7": son 7 SIEMPRE, así que el peor caso
+    // pasó a ser el ÚNICO caso. Se comprueba contra la constante, no contra un 7
+    // escrito aquí: si alguien la mueve, esta prueba lo mide, no lo repite.
+    const real = duracionDe('mano', VIAJE_N)
+    expect(real).toBe(VIAJE_MS + (VIAJE_N - 1) * VIAJE_ESCALON_MS)
+    expect(real).toBeLessThanOrEqual(CELEBRACION_TOPE_MS)
+    // Recolectar dura exactamente lo mismo: es el mismo vuelo.
+    expect(duracionDe('recoleccion', VIAJE_N)).toBe(real)
+  })
+
+  it('VIS-3 · siete monedas, y el desvanecido cabe dentro del vuelo', () => {
+    expect(VIAJE_N).toBe(7)
+    // El desvanecido y el micro-ajuste de escala viven DENTRO del trayecto de
+    // una moneda: si no cupieran, la moneda se apagaría antes de llegar.
+    expect(VIAJE_DESVANECIDO_MS).toBeLessThan(VIAJE_MS)
+    expect(VIAJE_MS / 2 + VIAJE_MS / 2).toBe(VIAJE_MS)
   })
 
   it('la partida está EXENTA del techo: es pantalla terminal', () => {
