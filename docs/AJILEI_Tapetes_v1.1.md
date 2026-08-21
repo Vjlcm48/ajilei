@@ -87,11 +87,26 @@ Los cinco tokens van como literal y no como `var(--green-base)` porque tienen qu
 
 Tricolor (valores) · barrido dorado sobre el isotipo · cualquier propiedad de caja · activos (Heptacoin y reverso: VIS-2 y VIS-5) · vuelo de monedas (VIS-3) · archivos protegidos · la escalera sellada dentro del arnés.
 
-**Deuda declarada:** `scripts/diagDSK.mjs` guarda la escalera del verde de v1.0 como constante (`TAP_ESCALERA_VERDE`, con tolerancia `TAP_TOL_L` = 1,0) y **no se tocó en esta tanda** — el arnés completo no se corre hasta el cierre de la campaña VIS. Hay que actualizarla antes de correr el modo `tapetes`, o el testigo dará falso negativo sobre los cinco.
+**Deuda declarada en VIS-1b — RESUELTA en VIS-1c.** `scripts/diagDSK.mjs` guardaba la escalera del verde de v1.0 como constante (`TAP_ESCALERA_VERDE`, tolerancia `TAP_TOL_L` = 1,0) y comparaba cada rampa contra ella: en cuanto v1.1 calibró las cinco, el modo `tapetes` se volvía un falso rojo sobre todas. La constante **desaparece**. El arnés ya no guarda un solo color: guarda **relaciones**, y las lee enteras de tokens vivos.
+
+**El contrato de color v1.1 — cinco puertas, ningún hex dentro del arnés:**
+
+| # | puerta | qué exige |
+|---|---|---|
+| 1 | Escalera monótona | `L(abyss) < L(darkest) < L(deep) < L(base) < L(bright)`, leído de los cinco tokens computados en `body`. Es lo que "profundidad" significa sin nombrar un valor |
+| 2 | Superficies derivadas | `--surface-game` = rgb(`base`) al alfa de hoy; `--surface-area` y su variante ligera = rgb(`abyss`) a los suyos. Tolerancia ±1 por canal (redondeo a 8 bits). **Los alfas siguen intocables** |
+| 3 | Familia de matiz | las cinco paradas dentro de **±8°** del matiz del `base` — un tapete es un color en cinco profundidades, no cinco colores. **Se omite** cuando `S(base) < 12%`, porque ahí el matiz es ruido de cuantización (grafito) |
+| 4 | Swatch = base | el disco del menú ⋮ computa el `--green-base` de su tapete. Es la puerta que prueba que la fuente única de color de §4 no se rompió. El tricolor, que no tiene tono medio, exige que su degradado **contenga sus tres tintas** |
+| 5 | Default = raíz | con el verde puesto —y fuera del gate, en móvil—, los ocho tokens de `body` son los de `:root`. El verde no existe como regla, y ahora eso se **prueba** en vez de compararse contra una copia |
+
+La envolvente de L de las tres bandas del tricolor se reancla a **su propia** escalera (antes se medía contra la del verde, que desde v1.1 es otra familia y otra profundidad). Las puertas de geometría (Δ=0 sobre 18 anclas, constante del camino de render, panel fuera de flujo) y el flujo de compra **no cambian**.
+
+El modo **imprime lo medido tapete por tapete** —las cinco L, el matiz del base con su dispersión, el `base`, la tinta derivada y el color del disco— para que un verde se pueda leer y no sólo creer. Victor puede recalibrar los cinco tapetes sin tocar una línea del arnés, que es exactamente lo que no pasó esta vez.
 
 ---
 
 ## 6 · Historial
 
+- **v1.1 · apéndice VIS-1c** — 2026-08-21. Cierre de la tanda. (a) Las **tres superficies de cromo** de `theme.css` —`--surface-card`, `--surface-panel`, `--surface-modal`— se rederivan con el mismo parentesco que tenían con la rampa v1.0, porque se habían quedado con el rgb de la familia vieja y el lobby salía con el fondo un escalón más hondo que sus tarjetas: `rgba(9,23,14,.55)` · `rgba(9,21,13,.75)` · `#0c1d13`. Siguen sin heredar tapete: no son fieltro. (b) El modo `tapetes` del arnés pasa al **contrato de color v1.1** descrito en §5 y la constante `TAP_ESCALERA_VERDE` desaparece. (c) `scripts/screenshots/` entra en `.gitignore`, con el criterio de `capturas-dsk/`.
 - **v1.1** — 2026-08-21. Enmienda de color de la campaña **VIS**. Las cinco rampas se calibraron sobre lo medido en VIS-0 y se sellaron en tablero de muestras: Verde clásico B, Negro grafito A, Azul profundo B, Vinotinto B; **Tricolor queda en v1.0**, pendiente de revisión de Victor. La regla de derivación pasa de «misma L del verde» a «misma escalera de L × factor `k` por familia» (§2.1) — el verde deja de ser heredado y pasa a estar calibrado. **Un solo verde en todo el producto:** el token es compartido con móvil y el cambio alcanza a móvil por construcción (§3). **Fuente única de color:** los swatches del menú ⋮ leen los tokens `--tap-swatch-<id>` de `tapetes.css`; `config/tapetes.js` sólo guarda el nombre del token (§4). Vinotinto toma como referencia la camiseta local 2026 de la selección (burdeos intenso con detalles en oro). Implementado en el commit **VIS-1b**.
 - **v1.0 (15-ago-2026):** documento fundacional. Decisiones selladas por Victor en sesión: catálogo de 5, escalera de precios, tricolor como "mesa vestida", vista previa en vivo con confirmación Sí/No, tres estados visuales, cambio libre entre comprados, sin descuento hasta Supabase, cosméticos fuera de la tienda de dinero real. Procedencia: lienzos concebidos el 5-ago (catálogo de tienda) y 11-ago (proyección económica: doctrina del sumidero + resolución del dorado único); direcciones de color propuestas el 15-ago y decididas por Victor en esta fecha. Implementado en la tanda **EMB-2**.

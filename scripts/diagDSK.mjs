@@ -6567,12 +6567,9 @@ async function runMSG(browser) {
 //       panel abierto, así que entre las dos medidas no cambia absolutamente
 //       nada salvo el atributo. Un Δ=0 entre dos cargas distintas habría medido
 //       también el reparto; éste no puede.
-//   (b) BANDA DE LUMINANCIA — la "profundidad equivalente" del doc §2 dejada en
-//       operación falsable: cada parada del fieltro conserva la L de HSL del
-//       verde que sustituye, dentro de ±1,0 punto. Se lee el valor VIVO y se
-//       recompone su HSL; la escalera verde se lee también viva y se contrasta
-//       contra la constante sellada, para que un cambio en theme.css salga rojo
-//       en vez de re-basear la banda en silencio.
+//   (b) CONTRATO DE COLOR — v1.1, recableado en VIS-1c. Ver el bloque de
+//       constantes de abajo: cinco puertas relacionales sobre tokens VIVOS, sin
+//       un solo hex sellado dentro del arnés.
 //   (c) CAPTURA PNG a capturas-dsk/ para la grilla del checkpoint.
 //
 // Y tres pruebas que no son por combinación:
@@ -6591,27 +6588,53 @@ const TAP_VPS = [{ w: 1920, h: 937 }, { w: 1024, h: 768 }]  // la ancha y la má
 // Fuera del gate, por sus dos vías: portrait y landscape móvil.
 const TAP_MOVIL = [{ w: 360, h: 640 }, { w: 740, h: 360 }]
 
-// La escalera del verde, SELLADA. No es la banda: es el testigo de que la banda
-// sigue midiendo contra lo que decía medir. Sale de theme.css:28-32.
-const TAP_ESCALERA_VERDE = {
-  '--green-abyss':   { hex: '#0a1e10', h: 138.0, s: 50.0, l: 7.8 },
-  '--green-darkest': { hex: '#0d2416', h: 143.5, s: 46.9, l: 9.6 },
-  '--green-deep':    { hex: '#1a4a2e', h: 145.0, s: 48.0, l: 19.6 },
-  '--green-base':    { hex: '#235c38', h: 142.1, s: 44.9, l: 24.9 },
-  '--green-bright':  { hex: '#2e7548', h: 142.0, s: 43.6, l: 32.0 },
-}
-const TAP_PARADAS = Object.keys(TAP_ESCALERA_VERDE)
-// Tolerancia de la banda. El redondeo a 8 bits del hex ya cuesta hasta ~0,4
-// puntos de L por sí solo, así que 1,0 es holgura de cuantización y no de
-// criterio: un tapete que se desviara de verdad se iría en varios puntos.
-const TAP_TOL_L = 1.0
-// Las tintas traslúcidas del fieltro. Su ALFA no puede moverse —es el que fija
-// cuánta mesa se ve a través de la zona—; lo único que cambia es el rgb.
+// ── EL CONTRATO DE COLOR · VIS-1c ────────────────────────────────────────────
+// Hasta v1.0 este modo comparaba cada rampa contra TAP_ESCALERA_VERDE: los
+// cinco hexes de theme.css copiados aquí, con tolerancia de 1,0 punto de L. La
+// puerta decía "profundidad equivalente" y medía "idéntica al verde de 2026-08".
+// En cuanto VIS-1b calibró las cinco rampas —el verde incluido— se volvió un
+// FALSO ROJO sobre los cinco tapetes: el instrumento medía contra un recuerdo.
+//
+// El arnés ya no guarda un solo color. Guarda RELACIONES, y las lee enteras de
+// tokens vivos. Cinco puertas:
+//   (1) ESCALERA MONÓTONA · L(abyss) < L(darkest) < L(deep) < L(base) <
+//       L(bright). Es lo que "profundidad" significa sin nombrar un valor.
+//   (2) SUPERFICIES DERIVADAS · game = rgb(base) al alfa de hoy; area y su
+//       variante ligera = rgb(abyss) a los suyos. Los alfas siguen intocables:
+//       fijan cuánta mesa se ve a través de la zona.
+//   (3) FAMILIA DE MATIZ · las cinco paradas dentro de ±8° del matiz del base.
+//       Un tapete es UN color en cinco profundidades, no cinco colores.
+//   (4) SWATCH = BASE · el disco del menú ⋮ computa el `--green-base` de su
+//       tapete. Desde v1.1 lo lee por token (`--tap-swatch-<id>`), así que esta
+//       puerta es la que prueba que la fuente única de color no se rompió.
+//   (5) DEFAULT = RAÍZ · con el verde puesto, los tokens de `body` son los de
+//       `:root`. El verde no existe como regla; esto lo prueba en vez de
+//       compararlo contra una copia.
+// Ninguna nombra un hex. Victor puede recalibrar los cinco tapetes sin tocar
+// una línea del arnés — que es justo lo que no pasó esta vez.
+const TAP_PARADAS = ['--green-abyss', '--green-darkest', '--green-deep',
+                     '--green-base', '--green-bright']
+// Holgura de canal para una tinta derivada: el redondeo a 8 bits, y nada más.
+const TAP_TOL_CANAL = 1
+// Holgura de matiz. A L 6% un solo nivel de rgb mueve H casi dos grados, así
+// que ±8 es cuantización con margen y no criterio: una parada que se fuera de
+// familia de verdad se iría en decenas.
+const TAP_TOL_H = 8
+// Por debajo de esta saturación el matiz es RUIDO y no un dato: el grafito mide
+// S≈7% y sus cinco paradas dan H entre 210 y 240 sin que ninguna decisión de
+// diseño lo pida. La puerta (3) se OMITE ahí, declarándolo.
+const TAP_S_MIN_MATIZ = 12
+// Holgura de la envolvente del tricolor, en puntos de L (ver más abajo).
+const TAP_TRI_HOLGURA_L = 1.0
+// Las tintas traslúcidas del fieltro, cada una con la parada de la que DERIVA y
+// el alfa que le fija cuánta mesa deja ver.
 const TAP_TINTAS = {
-  '--surface-game': 0.88,
-  '--surface-area': 0.45,
-  '--surface-area-light': 0.3,
+  '--surface-game':       { de: '--green-base',  a: 0.88 },
+  '--surface-area':       { de: '--green-abyss', a: 0.45 },
+  '--surface-area-light': { de: '--green-abyss', a: 0.3 },
 }
+// Los ocho tokens que un tapete redefine: las cinco paradas y las tres tintas.
+const TAP_TOKENS = [...TAP_PARADAS, ...Object.keys(TAP_TINTAS)]
 // Zona de riesgo #1 (doc §2): el amarillo del tricolor NO es un segundo dorado.
 // Distancia mínima declarada contra --gold-brand (H 41,7 S 77,3 L 60,2), en
 // puntos de L. 25 es el listón; lo medido ronda los 43.
@@ -6671,19 +6694,33 @@ function tapHSL([r, g, b]) {
   else h = (r - g) / d + 4
   return { h: h * 60, s: s * 100, l: l * 100 }
 }
+// Distancia de matiz en el CÍRCULO: 358° y 2° distan 4, no 356. El vinotinto
+// vive en H≈344 y una recalibración que lo cruzara por el 0 no puede salir roja
+// por aritmética lineal.
+function tapDeltaH(a, b) {
+  const d = Math.abs(a - b) % 360
+  return d > 180 ? 360 - d : d
+}
 
 // Devuelve los tokens vivos del fieltro tal cual los declara el árbol, más el
-// atributo y lo que de verdad pintan las tres superficies.
+// atributo y lo que de verdad pintan las tres superficies. VIS-1c: lee los
+// MISMOS tokens en `:root`, que es la referencia contra la que se prueba que el
+// verde no existe como regla (puerta 5) — sin copiar sus valores al arnés.
 const tapLeeTokens = (page) => page.evaluate((TOKENS) => {
   const cs = getComputedStyle(document.body)
-  const out = {}
-  TOKENS.forEach(t => { out[t] = cs.getPropertyValue(t).trim() })
+  const cr = getComputedStyle(document.documentElement)
+  const out = {}, raiz = {}
+  TOKENS.forEach(t => {
+    out[t] = cs.getPropertyValue(t).trim()
+    raiz[t] = cr.getPropertyValue(t).trim()
+  })
   const de = (sel, prop) => {
     const e = document.querySelector(sel)
     return e ? getComputedStyle(e)[prop] : null
   }
   return {
     tokens: out,
+    raiz,
     attr: document.body.dataset.tapete ?? null,
     pintado: {
       bodyBG: cs.backgroundColor,
@@ -6692,8 +6729,19 @@ const tapLeeTokens = (page) => page.evaluate((TOKENS) => {
       pantallaIMG: (de('.game-table-screen', 'backgroundImage') || '').slice(0, 40),
     },
   }
-}, [...TAP_PARADAS, ...Object.keys(TAP_TINTAS),
-    '--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'])
+}, [...TAP_TOKENS, '--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'])
+
+// El disco del menú ⋮ de un tapete concreto. Se lee el `background` COMPUTADO,
+// no el atributo `style`: desde v1.1 el JSX escribe `var(--tap-swatch-<id>)` y
+// lo que interesa es en qué color resuelve, que es lo que ve el jugador.
+const tapLeeDisco = (page, id) => page.evaluate((x) => {
+  const sw = document.querySelector('.tap-swatch[data-tap="' + x + '"]')
+  if (!sw) return null
+  const d = sw.querySelector('.tap-disco')
+  if (!d) return null
+  const c = getComputedStyle(d)
+  return { styleAttr: d.getAttribute('style'), bgColor: c.backgroundColor, bgImage: c.backgroundImage }
+}, id)
 
 const tapMideAnclas = (page) => page.evaluate((SELS) => {
   const r = {}
@@ -6754,35 +6802,66 @@ async function tapEsperaTurno(page, ms = 45000) {
   return false
 }
 
-// Juzga una lectura de tokens contra la escalera verde VIVA de la misma celda.
-function tapJuzgaBanda(base, vivo, id) {
-  const paradas = TAP_PARADAS.map(t => {
-    const cv = tapParseColor(base.tokens[t]), cx = tapParseColor(vivo.tokens[t])
-    if (!cv || !cx) return { t, ok: false, motivo: 'ilegible' }
-    const hv = tapHSL(cv.rgb), hx = tapHSL(cx.rgb)
+// Juzga una lectura de tokens contra el CONTRATO v1.1. Todo sale de `vivo`: sus
+// tokens de `body` y los de `:root` que la misma lectura trae. Cero constantes
+// de color.
+function tapJuzgaBanda(vivo, id) {
+  const hslDe = (t) => {
+    const c = tapParseColor(vivo.tokens[t])
+    return c ? tapHSL(c.rgb) : null
+  }
+
+  // (1) Escalera monótona. Cada parada tiene que ser MÁS CLARA que la anterior.
+  const paradas = TAP_PARADAS.map((t, i) => {
+    const x = hslDe(t)
+    if (!x) return { t, ok: false, motivo: 'ilegible' }
+    const prev = i === 0 ? null : hslDe(TAP_PARADAS[i - 1])
     return {
-      t, hex: vivo.tokens[t],
-      lVerde: round(hv.l), lTapete: round(hx.l), dL: round(Math.abs(hx.l - hv.l)),
-      sVerde: round(hv.s), sTapete: round(hx.s), h: round(hx.h),
-      ok: Math.abs(hx.l - hv.l) <= TAP_TOL_L,
+      t, hex: vivo.tokens[t], l: round(x.l), s: round(x.s), h: round(x.h),
+      ok: prev === null || x.l > prev.l,
     }
   })
-  // Los alfas de las tintas son intocables: mueven cuánta mesa se ve a través.
-  const tintas = Object.entries(TAP_TINTAS).map(([t, a]) => {
-    const c = tapParseColor(vivo.tokens[t])
-    return { t, valor: vivo.tokens[t], alfa: c ? c.a : null, ok: !!c && Math.abs(c.a - a) < 0.005 }
-  })
-  // El tapete tiene que HABER CAMBIADO algo: si un id nuevo dejara los tokens
-  // idénticos al verde, todas las demás puertas pasarían en verde midiendo la
-  // nada. Ésta es la guardia contra ese falso verde.
-  const cambia = TAP_PARADAS.some(t => vivo.tokens[t] !== base.tokens[t])
 
-  // Bandas del tricolor: dentro de la envolvente de la escalera verde, menos
-  // saturadas que un pabellón, y lejos del oro de marca en L.
+  // (2) Superficies derivadas. Cada tinta es el rgb de SU parada al alfa de hoy.
+  const tintas = Object.entries(TAP_TINTAS).map(([t, d]) => {
+    const c = tapParseColor(vivo.tokens[t]), o = tapParseColor(vivo.tokens[d.de])
+    if (!c || !o) return { t, valor: vivo.tokens[t], ok: false, motivo: 'ilegible' }
+    const dCanal = Math.max(...[0, 1, 2].map(i => Math.abs(c.rgb[i] - o.rgb[i])))
+    return {
+      t, de: d.de, valor: vivo.tokens[t], alfa: c.a, alfaEsperado: d.a, dCanal,
+      ok: dCanal <= TAP_TOL_CANAL && Math.abs(c.a - d.a) < 0.005,
+    }
+  })
+
+  // (3) Familia de matiz. Se OMITE cuando el base está desaturado: ahí el H es
+  // ruido de cuantización y exigirle familia sería exigirle sentido al ruido.
+  const hBase = hslDe('--green-base')
+  let familia
+  if (!hBase) familia = { ok: false, motivo: 'base ilegible' }
+  else if (hBase.s < TAP_S_MIN_MATIZ) {
+    familia = { omitida: true, motivo: 'S(base) < ' + TAP_S_MIN_MATIZ + '% · matiz = ruido',
+      sBase: round(hBase.s), ok: true }
+  } else {
+    const ds = TAP_PARADAS.map(t => {
+      const x = hslDe(t)
+      return { t, h: x ? round(x.h) : null, dH: x ? round(tapDeltaH(x.h, hBase.h)) : null }
+    })
+    familia = { omitida: false, hBase: round(hBase.h), sBase: round(hBase.s), ds,
+      ok: ds.every(d => d.dH !== null && d.dH <= TAP_TOL_H) }
+  }
+
+  // El tapete tiene que HABER CAMBIADO algo respecto de `:root`: si un id nuevo
+  // dejara los tokens idénticos al verde, todas las demás puertas pasarían en
+  // verde midiendo la nada. Ésta es la guardia contra ese falso verde.
+  const cambia = TAP_PARADAS.some(t => vivo.tokens[t] !== vivo.raiz[t])
+
+  // Bandas del tricolor: dentro de la envolvente de SU PROPIA escalera —VIS-1c;
+  // antes se anclaban a la del verde, que desde v1.1 es otra familia y otra
+  // profundidad—, menos saturadas que un pabellón y lejos del oro de marca en L.
   let bandas = null
   if (id === 'tricolor') {
-    const lMin = tapHSL(tapParseColor(base.tokens['--green-darkest']).rgb).l - TAP_TOL_L
-    const lMax = tapHSL(tapParseColor(base.tokens['--green-base']).rgb).l + TAP_TOL_L
+    const lMin = hslDe('--green-darkest').l - TAP_TRI_HOLGURA_L
+    const lMax = hslDe('--green-base').l + TAP_TRI_HOLGURA_L
     bandas = ['--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'].map(t => {
       const c = tapParseColor(vivo.tokens[t])
       if (!c) return { t, ok: false, motivo: 'ilegible' }
@@ -6795,7 +6874,52 @@ function tapJuzgaBanda(base, vivo, id) {
       }
     })
   }
-  return { paradas, tintas, cambia, bandas }
+  const ok = paradas.every(p => p.ok) && tintas.every(t => t.ok) && familia.ok &&
+    cambia && (bandas === null || bandas.every(b => b.ok))
+  return { paradas, tintas, familia, cambia, bandas, ok }
+}
+
+// (4) SWATCH = BASE. El disco tiene que computar el `--green-base` del tapete
+// que representa. El tricolor no tiene tono medio: se exige que su degradado
+// CONTENGA sus tres tintas, que es la versión honesta de la misma promesa.
+function tapJuzgaDisco(disco, vivo, id) {
+  if (!disco) return { ok: false, motivo: 'sin disco' }
+  if (id === 'tricolor') {
+    const tintas = ['--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'].map(t => {
+      const c = tapParseColor(vivo.tokens[t])
+      return { t, hex: vivo.tokens[t],
+        presente: !!c && disco.bgImage.includes('rgb(' + c.rgb.join(', ') + ')') }
+    })
+    return { grad: disco.bgImage, styleAttr: disco.styleAttr, tintas, ok: tintas.every(x => x.presente) }
+  }
+  const b = tapParseColor(vivo.tokens['--green-base'])
+  const d = tapParseColor(disco.bgColor)
+  const dCanal = (b && d) ? Math.max(...[0, 1, 2].map(i => Math.abs(b.rgb[i] - d.rgb[i]))) : null
+  return {
+    bg: disco.bgColor, base: vivo.tokens['--green-base'], styleAttr: disco.styleAttr, dCanal,
+    ok: dCanal !== null && dCanal <= TAP_TOL_CANAL,
+  }
+}
+
+// Una línea por tapete con lo MEDIDO. El modo no dice sólo si pasa: dice contra
+// qué pasó, para que un verde se pueda leer y no sólo creer.
+// `ok` se pasa desde fuera porque el verde no lo calcula igual que sus cuatro
+// hermanos: su guardia contra el falso verde no es `cambia` —el verde ES la
+// raíz— sino `verdeEsRaiz`, que se mide en la celda y no aquí.
+function tapLinea(id, banda, disco, ok) {
+  const L = banda.paradas.map(p => p.l).join(' < ')
+  const fam = banda.familia.omitida
+    ? 'H ruido (S ' + banda.familia.sBase + '%)'
+    : 'H ' + banda.familia.hBase + ' ±' + Math.max(...banda.familia.ds.map(d => d.dH)) +
+      ' · S ' + banda.familia.sBase + '%'
+  const sw = id === 'tricolor'
+    ? 'disco grad ' + (disco.ok ? 'con sus 3 tintas' : 'INCOMPLETO')
+    : 'disco ' + disco.bg + (disco.ok ? '' : ' ≠ base ' + disco.base)
+  return '     ' + id.padEnd(10) + ' L ' + L +
+    ' · ' + fam +
+    ' · base ' + banda.paradas[3].hex +
+    ' → ' + banda.tintas[0].valor +
+    ' · ' + sw + ' · ' + (ok ? 'ok' : 'FALLA')
 }
 
 async function runTapetes(browser) {
@@ -6826,9 +6950,20 @@ async function runTapetes(browser) {
         const b = e.getBoundingClientRect()
         return { x: b.x, y: b.y, w: b.width, h: b.height, right: b.right, bottom: b.bottom }
       })
-      // La escalera viva contra la sellada: si theme.css se mueve, se ve aquí.
-      const verdeIntacto = TAP_PARADAS.every(t =>
-        base.tokens[t].toLowerCase() === TAP_ESCALERA_VERDE[t].hex)
+      // (5) DEFAULT = RAÍZ. Con el verde puesto, los ocho tokens de `body` son
+      // los de `:root`: el verde NO existe como regla, es la ausencia de
+      // variante. Antes esto se comprobaba contra una copia de theme.css dentro
+      // del arnés; ahora se comprueba contra el propio `:root` vivo, así que
+      // sobrevive a cualquier recalibración de Victor.
+      const verdeEsRaiz = TAP_TOKENS.every(t => base.tokens[t] === base.raiz[t])
+      // Y el verde también pasa el contrato de color, como los otros cuatro.
+      const bandaVerde = tapJuzgaBanda(base, TAPETE_POR_DEFECTO)
+      const discoVerde = tapJuzgaDisco(
+        await tapLeeDisco(page, TAPETE_POR_DEFECTO), base, TAPETE_POR_DEFECTO)
+      // `cambia` sólo aplica a las variantes: el verde ES la raíz por
+      // definición, así que su guardia contra el falso verde es `verdeEsRaiz`.
+      const verdeOk = bandaVerde.paradas.every(p => p.ok) &&
+        bandaVerde.tintas.every(t => t.ok) && bandaVerde.familia.ok && discoVerde.ok
 
       const cte = TAP_CONSTANTES[n](vp)
       const leeCte = () => page.evaluate(s => {
@@ -6843,16 +6978,17 @@ async function runTapetes(browser) {
         await page.waitForTimeout(220)
         const vivo = await tapLeeTokens(page)
         const d = tapDelta(anclasBase, await tapMideAnclas(page))
-        const banda = tapJuzgaBanda(base, vivo, id)
+        const banda = tapJuzgaBanda(vivo, id)
+        const disco = tapJuzgaDisco(await tapLeeDisco(page, id), vivo, id)
         const cteVivo = await leeCte()
         variantes.push({
-          id, attr: vivo.attr, delta: d, banda, pintado: vivo.pintado,
+          id, attr: vivo.attr, delta: d, banda, disco, pintado: vivo.pintado,
           cte: { sel: cte.sel, esperado: cte.esperado, medido: cteVivo },
           cteOk: cteVivo === cte.esperado,
           delta0: d.max === 0 && d.faltan.length === 0,
           aplicado: vivo.attr === id,
-          bandaOk: banda.paradas.every(p => p.ok) && banda.tintas.every(t => t.ok) &&
-            banda.cambia && (banda.bandas === null || banda.bandas.every(b => b.ok)),
+          bandaOk: banda.ok,
+          discoOk: disco.ok,
         })
       }
       // Vuelta al verde: el default tiene que restituirse EXACTO.
@@ -6869,23 +7005,30 @@ async function runTapetes(browser) {
         panelFueraDeFlujo: dAbrir.max === 0 && dAbrir.faltan.length === 0,
         panelEncaja: panelRect != null && panelRect.x >= 0 && panelRect.y >= 0 &&
           panelRect.right <= vp.w && panelRect.bottom <= vp.h,
-        verdeIntacto,
+        verdeEsRaiz,
+        verdeOk,
         // La constante del camino, en verde y con cada tapete puesto (§4a).
         constanteCamino: cteVerde === cte.esperado && variantes.every(v => v.cteOk),
         delta0: variantes.every(v => v.delta0),
         aplicado: variantes.every(v => v.aplicado),
         banda: variantes.every(v => v.bandaOk),
+        disco: variantes.every(v => v.discoOk),
         verdeVuelve,
       }
       const passed = Object.values(checks).every(v => v === true)
-      celdas.push({ mesa: n, vp, panelRect, dAbrir, variantes, vuelta: { attr: vuelta.attr, delta: dVuelta }, checks, passed })
+      celdas.push({ mesa: n, vp, panelRect, dAbrir, verde: { banda: bandaVerde, disco: discoVerde, esRaiz: verdeEsRaiz }, variantes, vuelta: { attr: vuelta.attr, delta: dVuelta }, checks, passed })
       console.log('T' + n + ' ' + vp.w + 'x' + vp.h + ' · panel ' + (panelRect && round(panelRect.w)) + '×' +
         (panelRect && round(panelRect.h)) + ' Δabrir=' + dAbrir.max +
         ' · ' + cte.sel + ' ' + cteVerde + '/' + cte.esperado +
         ' · Δ ' + variantes.map(v => v.delta.max).join('/') +
-        ' (' + variantes.length + ' tapetes, ' + (variantes[0] && variantes[0].delta.n) + ' anclas) · banda ' +
-        variantes.filter(v => v.bandaOk).length + '/' + variantes.length + ' · vuelta ' + verdeVuelve + ' · ' +
+        ' (' + variantes.length + ' tapetes, ' + (variantes[0] && variantes[0].delta.n) + ' anclas) · contrato ' +
+        (variantes.filter(v => v.bandaOk && v.discoOk).length + (verdeOk ? 1 : 0)) + '/' + (variantes.length + 1) +
+        ' · vuelta ' + verdeVuelve + ' · ' +
         (passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'))
+      // Lo MEDIDO, tapete por tapete. Un verde tiene que poder leerse.
+      console.log(tapLinea(TAPETE_POR_DEFECTO, bandaVerde, discoVerde, verdeOk && verdeEsRaiz) +
+        (verdeEsRaiz ? ' · = :root' : ' · ≠ :root ¡FALLA!'))
+      for (const v of variantes) console.log(tapLinea(v.id, v.banda, v.disco, v.bandaOk && v.discoOk))
       await page.close()
     }
   }
@@ -7030,11 +7173,14 @@ async function runTapetes(browser) {
     await page.waitForTimeout(300)
     const t = await tapLeeTokens(page)
     const ls = await page.evaluate(k => localStorage.getItem(k), TAPETE_KEY)
-    const ok = ls === 'tricolor' && t.attr === null &&
-      TAP_PARADAS.every(p => t.tokens[p].toLowerCase() === TAP_ESCALERA_VERDE[p].hex)
-    movil.push({ vp, ls, attr: t.attr, tokens: t.tokens, ok })
+    // VIS-1c: "renderiza verde" se prueba contra `:root` vivo, no contra una
+    // copia sellada de theme.css. Un solo verde en todo el producto significa
+    // exactamente esto: fuera del gate, `body` no redefine nada.
+    const esRaiz = TAP_TOKENS.every(p => t.tokens[p] === t.raiz[p])
+    const ok = ls === 'tricolor' && t.attr === null && esRaiz
+    movil.push({ vp, ls, attr: t.attr, tokens: t.tokens, raiz: t.raiz, esRaiz, ok })
     console.log('MÓVIL ' + vp.w + 'x' + vp.h + ' · storage "' + ls + '" · attr ' + t.attr +
-      ' · base ' + t.tokens['--green-base'] + ' · ' + (ok ? 'OK (verde, sellado)' : 'FAIL'))
+      ' · base ' + t.tokens['--green-base'] + ' · ' + (ok ? 'OK (verde, = :root)' : 'FAIL'))
     await page.close()
   }
 
@@ -7078,7 +7224,17 @@ async function runTapetes(browser) {
     ' celdas · compra ' + compra.filter(c => c.passed).length + '/' + compra.length +
     ' · móvil ' + movil.filter(m => m.ok).length + '/' + movil.length +
     ' · ' + capturas.length + ' capturas · ' + (passed ? 'VERDE' : 'ROJO'))
-  return { celdas, compra, movil, capturas, escaleraVerde: TAP_ESCALERA_VERDE, tolL: TAP_TOL_L, passed }
+  // El JSON se autoetiqueta con el CONTRATO, no con una tabla de colores: es lo
+  // que hay que poder leer dentro de seis meses para saber qué probó esta
+  // corrida. Los colores medidos ya viven, tapete por tapete, dentro de celdas.
+  const contrato = {
+    version: 'v1.1 (VIS-1c)',
+    puertas: ['escalera monótona L', 'superficies derivadas rgb+alfa',
+              'familia de matiz ±' + TAP_TOL_H + '°', 'swatch = base', 'default = :root'],
+    tolCanal: TAP_TOL_CANAL, tolH: TAP_TOL_H, sMinMatiz: TAP_S_MIN_MATIZ,
+    tintas: TAP_TINTAS, tokens: TAP_TOKENS,
+  }
+  return { celdas, compra, movil, capturas, contrato, passed }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
