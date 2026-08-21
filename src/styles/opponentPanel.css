@@ -123,6 +123,53 @@
   margin-left: calc(var(--opp-card-w) * -0.35);
 }
 
+/* VIS-2d: la ranura vacia no pinta sobre la carta vecina.
+
+   El solape de arriba pinta las ranuras en ORDEN DOM, y en estado normal
+   ninguna declara apilamiento —medido: las cinco `static`/`auto`, `.opp-cards`
+   y `.opp-panel` tampoco son contexto—. Asi que una ranura vacia posterior
+   cubria 21,52px del filo derecho de la carta anterior con su velo
+   `rgba(245,237,216,0.1)` y le cruzaba el punteado por encima. Defecto
+   PREEXISTENTE (verificado en 3777e48, con el PNG: misma geometria y mismo
+   veredicto de `elementFromPoint`); el reverso oficial de VIS-2b solo lo hizo
+   visible, porque tiene marco dorado donde el provisional tenia dibujo rojo.
+
+   `position: relative` A SECAS, sin `z-index`. Con `z-index: auto` NO crea
+   contexto de apilamiento, pero mueve la ranura al paso 6 del orden de pintado
+   (descendientes posicionados con z auto), que va despues de los no
+   posicionados: las llenas suben sobre las vacias sin encerrar nada. Bajar la
+   vacia habria necesitado z-index NEGATIVO —con `z-index: 0` subiria, que es
+   peor— y, al no ser contexto ni `.opp-cards` ni `.opp-panel`, se hundiria bajo
+   el fondo del propio panel; evitarlo pedia `isolation: isolate` en
+   `.opp-cards`, que confinaria el z-index de la ranura ampliada por Z1.
+
+   `:has(.card-back)` y no `:has(.playing-card:not(.card-empty))` POR
+   ESPECIFICIDAD: este selector es (0,2,0), la misma que `.opp-winner
+   .opp-card-slot` de abajo, y al ir antes en la hoja el showdown gana el empate
+   y conserva su `z-index: 5`. La otra forma sube a (0,3,0) y se lo llevaria por
+   delante. Tampoco se cruza con el zoom Z1 (gameTable.css), que exige una carta
+   BOCA ARRIBA: los dos selectores son excluyentes por construccion.
+
+   NO CUBRE una carta boca arriba junto a una vacia. Eso solo puede pasar en
+   `.opp-winner` —el unico estado con cartas de cara— y ahi las ranuras SI se
+   solapan en escritorio: la regla de abajo pide `margin-left: +0.3` pero el
+   paquete del gate la reescribe a -0.35, medido en vivo (-17,5175px). Como en
+   ese estado las cinco ranuras comparten `z-index: 5`, una vacia posterior
+   volveria a ganar por orden DOM. No se observo en ninguna mano de la
+   verificacion (el ganador siempre revela sus cinco cartas), asi que queda
+   como caso teorico y no se ensancha el selector: hacerlo es barato —esta
+   regla declara SOLO `position`, y `position: relative` es justo lo que la
+   regla de `.opp-winner` ya pone, asi que no habria conflicto de propiedad ni
+   con la especificidad (0,3,0) de `:has(.playing-card:not(.card-empty))`—,
+   pero se decide cuando el caso exista, no antes.
+
+   Sin gate a proposito (decision de Victor): alcanza tambien a movil, donde el
+   solape es del 50% y lo gobierna gameTable.css:1503. Ningun archivo movil
+   cambia; su render si. */
+.opp-card-slot:has(.card-back) {
+  position: relative;
+}
+
 .opp-card-slot .playing-card {
   width: 100%;
   height: 100%;
