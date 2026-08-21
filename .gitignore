@@ -46,6 +46,13 @@ capturas-idn1/*
 !capturas-idn1/evidencia/**
 capturas-idn1/evidencia/**/*-tarjeta.png
 
+# Salidas de las sondas efímeras de la campaña VIS (scripts/screenshots/). Mismo
+# criterio que las dos de arriba: son REGENERABLES —cualquier corrida del modo
+# o de la sonda las vuelve a escribir— y ya iban por 16 PNG sin rastrear cuando
+# VIS-1 las contó. La carpeta NO se borra: las sondas escriben con writeFileSync
+# y sin mkdirSync, así que sin el directorio revientan.
+scripts/screenshots/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
