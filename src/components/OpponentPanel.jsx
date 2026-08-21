@@ -9,6 +9,12 @@ import { vozResto } from '../hooks/resultadoCore'
 // GameTable controla el contenido de cada slot vía renderCard(i) — el panel es solo layout.
 export default function OpponentPanel({
   player,           // players[seat] del motor
+  chipsMostrados,   // VIS-3c: el saldo que se PINTA, que durante el vuelo de las
+                    // monedas no es el del motor: el ganador enseña su cifra
+                    // previa hasta que aterriza la séptima. GameTable lo calcula
+                    // (es quien conoce la celebración) y el panel sólo lo pinta.
+                    // Si no llega, se pinta `player.chips`: el panel nunca queda
+                    // sin cifra por una prop que alguien olvide pasar.
   playerIndex,      // VIS-3a: el ÍNDICE de ese jugador en el motor — el mismo que
                     // devuelve game.winner. El panel recibía el objeto pero no su
                     // índice, y el vuelo de monedas necesita nombrar el destino por
@@ -41,6 +47,9 @@ export default function OpponentPanel({
   showDeck,         // este asiento es el Pie → mazo visible
   shuffleChildren,  // <ShuffleDeck/> cuando baraja este asiento
 }) {
+  // VIS-3c · una sola lectura del saldo a pintar, para que las dos apariciones
+  // —el saldo inline y el flotante de la ficha de esquina— no puedan discrepar.
+  const chipsVista = chipsMostrados ?? player.chips
   const stateClasses =
     `${player.folded ? ' opp-folded' : ''}${isWinner ? ' opp-winner' : ''}` +
     `${isTurn ? ' turn-active' : ''}${isDimmed && !player.folded ? ' turn-dimmed' : ''}` +
@@ -94,7 +103,7 @@ export default function OpponentPanel({
             Fase 0 no la encontró montada en ninguna de las 11 celdas medidas —la
             ficha de esquina la sustituye en portrait, landscape y escritorio—,
             pero se etiqueta igual: el contrato no debe depender de qué rama gane. */}
-        {!letterBadges && !cornerChip && <span className="opp-chips" data-coin-target={playerIndex}><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>}
+        {!letterBadges && !cornerChip && <span className="opp-chips" data-coin-target={playerIndex}><BalanceDisplay chips={chipsVista} size="compact" /> fichas</span>}
       </div>
 
       <div className="opp-cards">
@@ -127,7 +136,7 @@ export default function OpponentPanel({
           <ChipToken size="icon" />
           {isChipOpen && (
             /* H5: solo el número, desnudo (sin caja ni "fichas") */
-            <span className="chip-balance-float">{player.chips}</span>
+            <span className="chip-balance-float">{chipsVista}</span>
           )}
         </span>
       )}

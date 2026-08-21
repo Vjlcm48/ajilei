@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { decideCelebracion, sonidoDe, duracionDe, llevaViaje, esperaPrecedente } from './celebracionCore'
 
 // ── DSK-VC2 · Ciclo de vida de la celebración ───────────────────────────────
@@ -56,7 +56,22 @@ export function useCelebracion({ enabled, phase, winner, humanCards, ruleN, play
 
   // Se dispara en la TRANSICIÓN de fase, jamás en cada render de la fase: una
   // celebración que se re-arma sola sería eterna.
-  useEffect(() => {
+  //
+  // VIS-3c · `useLayoutEffect` y no `useEffect`, por una razón MEDIDA. Desde que
+  // el saldo del ganador y el pozo se muestran diferidos, el instante en que
+  // esta celebración se arma dejó de ser sólo cosa suya: es el instante en que
+  // las cifras pasan a retenerse. Con un efecto normal, React pinta primero el
+  // render de PAYOUT —con los valores crudos del motor, que ya liquidó— y sólo
+  // después corre el efecto y vuelve a pintar con los valores retenidos. Eso deja
+  // UN FOTOGRAMA con el resultado destapado: medido, 19 ms enseñando "pozo 0 ·
+  // saldo 5050" antes de volver a "pozo 100 · saldo 4950" y empezar el vuelo. El
+  // número rebotaba a la vista.
+  // Un efecto de LAYOUT corre antes de que el navegador pinte, así que el primer
+  // fotograma de la fase de pago ya sale retenido y no hay rebote. La lógica no
+  // cambia ni una línea: sólo cambia si esto ocurre antes o después de pintar.
+  // `getBoundingClientRect` es válido aquí —el layout ya está calculado— y no hay
+  // render de servidor en este proyecto.
+  useLayoutEffect(() => {
     const antes = faseAnteriorRef.current
     faseAnteriorRef.current = phase
     if (!enabled || antes === phase) return

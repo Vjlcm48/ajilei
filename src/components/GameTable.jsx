@@ -12,7 +12,7 @@ import { CelebracionMesa, PulsoNombre, AjileiOverlay, TarjetaResumen } from './C
 import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
-import { decideCelebracion, VIAJE_N } from '../hooks/celebracionCore'
+import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
@@ -438,6 +438,15 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
       desde: { x: a.left + a.width / 2, y: a.top + a.height / 2 },
       hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2, lado: b.width },
       fichas: VIAJE_N,
+      // VIS-3c · La retención viaja DENTRO de la geometría, y por dos razones.
+      // La primera es de higiene: `ultimoPozoRef.current` no puede leerse durante
+      // el render —lo dice la nota de arriba y lo señala el linter—, y aquí se
+      // lee en un efecto, que es su sitio. La segunda es de exactitud: el pozo y
+      // el ganador quedan CONGELADOS en el instante de armar, el mismo en que se
+      // miden las monedas, así que la cifra retenida no puede desincronizarse de
+      // la que el vuelo está ilustrando.
+      pozo: ultimoPozoRef.current,
+      winner: game.winner,
     }
   }, [game.winner])
 
@@ -670,6 +679,52 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // momento ya pasó, y eso es peor que no decir nada. Mismo criterio que VC §6
   // aplica al corte — no se resucita lo cortado.
   const vcViva = !!celebracion.activa
+
+  // ── VIS-3c · El saldo diferido y el pozo que se vacía al salir la primera ──
+  //
+  // EL PROBLEMA. El motor liquida en PAYOUT y el pozo YA es 0 cuando la fase de
+  // pago pinta (`resolveWinner` lo vacía y suma las fichas al ganador antes de
+  // renderizar — VC v1.0 §3.1, y medido: el pozo pasa de "100" a "0" en el mismo
+  // instante en que aparece el mensaje de resultado). Así que el dinero llegaba
+  // ANTES que las monedas: el número ya había subido cuando el reguero empezaba
+  // a volar, y el vuelo ilustraba un movimiento ya ocurrido.
+  //
+  // LA CORRECCIÓN NO TOCA EL MOTOR, que es archivo protegido. La capa de UI
+  // muestra un valor DIFERIDO: mientras el vuelo está vivo, el pozo enseña su
+  // cifra y el ganador su saldo previo; cuando aterriza la última moneda, los
+  // dos saltan a lo que el motor dice desde hace rato.
+  //
+  // NO HAY ESTADO NUEVO, y es deliberado. La retención se DERIVA de la
+  // celebración, que ya sabe todo lo que hace falta:
+  //   · existe          → `celebracion.activa` (null si no se armó);
+  //   · vuela           → `llevaViaje(nivel)` (excluye 'partida');
+  //   · ya salió la 1ª  → `!esperando` (esperando es la espera a showdown.mp3;
+  //                        la capa se monta y las monedas nacen justo al caer).
+  // De ahí sale la LIBERACIÓN GARANTIZADA por todas las salidas que pedía la
+  // instrucción, sin una línea de más: el aterrizaje de la séptima, el techo de
+  // duración, "Siguiente mano", el cambio de fase, el desmontaje y el corte por
+  // resize son EXACTAMENTE los seis caminos por los que `activa` vuelve a null
+  // —los mismos que VC v1.0 §6 ya sellaba—, y con `activa` en null no hay
+  // retención. Un estado paralelo tendría que replicar esos seis caminos y
+  // envejecería el día que se añada un séptimo.
+  //
+  // INVARIANTES. Nunca se muestra menos que `chips - pozo` (se resta el pozo una
+  // vez y sólo al ganador). Nunca se retiene sin vuelo (sin `activa` no hay
+  // retención, y `geometriaViaje` devuelve null si no encuentra las monedas, con
+  // lo que `activa` no llega a armarse). El movimiento reducido no necesita
+  // gate: hoy la celebración no lo consulta (Fase 0), así que no hay caso en el
+  // que el vuelo se omita y la retención quede colgada.
+  const retencion = celebracion.activa && llevaViaje(celebracion.activa.nivel)
+    ? { winner: celebracion.activa.winner, pozo: celebracion.activa.pozo, volando: !celebracion.activa.esperando }
+    : null
+  // El pozo enseña su cifra hasta que sale la primera moneda; en ese instante,
+  // 0. Sin volteo la espera es cero, así que las dos cosas pasan en el mismo
+  // fotograma y se ve lo de siempre.
+  const pozoMostrado = retencion && !retencion.volando ? retencion.pozo : game.pot
+  // Sólo el GANADOR retiene, y sólo para pintar: `playerChips` —el que gobierna
+  // qué apuestas se pueden hacer— sigue leyendo el valor real del motor.
+  const saldoMostrado = (i, chips) => chips - (retencion && retencion.winner === i ? retencion.pozo : 0)
+
   const burbujaViva = reacciones.activa?.id ?? null
   const retirarBurbuja = reacciones.cerrarBurbuja
   const vetarReacciones = reacciones.vetar
@@ -1227,7 +1282,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               Fase 0 no lo encontró montado en ninguna de las 11 celdas medidas
               (cornerChip lo sustituye en portrait, landscape y escritorio); se
               etiqueta igual para que el contrato no dependa de qué rama gane. */}
-          {!isPortraitTable && !isDesktopTable && <span className="ai-chips" data-coin-target={seat}><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>}
+          {!isPortraitTable && !isDesktopTable && <span className="ai-chips" data-coin-target={seat}><BalanceDisplay chips={saldoMostrado(seat, rival.chips)} size="compact" /> fichas</span>}
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
@@ -1279,7 +1334,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           <span className="opp-corner-chip" data-coin-target={seat} onClick={() => handleChipTap(seat)}>
             <ChipToken size="icon" />
             {openChipSeat === seat && (
-              <span className="chip-balance-float">{rival.chips}</span>
+              <span className="chip-balance-float">{saldoMostrado(seat, rival.chips)}</span>
             )}
           </span>
         )}
@@ -1296,6 +1351,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
         // que indexa game.players y el mismo que devuelve game.winner. No hace
         // falta derivarlo por nombre (ARN-2) porque no se ha perdido.
         playerIndex={seat}
+        // VIS-3c · el saldo a pintar. GameTable es quien conoce la celebración,
+        // así que la retención se calcula aquí y el panel sólo la obedece.
+        chipsMostrados={saldoMostrado(seat, game.players[seat].chips)}
         seatPos={effLayout[seat]}
         isMano={manoSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
         isPie={deckSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
@@ -1381,7 +1439,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               <span className="pot-label">Pozo</span>
               <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
                 <ChipToken size="compact" />
-                {game.pot}
+                {pozoMostrado}
               </strong>
               {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
             </div>
@@ -1444,7 +1502,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
             <span className="pot-label">Pozo</span>
             <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
               <ChipToken size="compact" />
-              {game.pot}
+              {pozoMostrado}
             </strong>
             {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
           </div>
@@ -1746,7 +1804,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               {/* VIS-3a · DESTINO del vuelo cuando gana el humano. El índice es el
                   del MOTOR (0 = humano), el mismo que `game.winner`, nunca una
                   posición ni un orden DOM. */}
-              <span className="pbr-chips" data-coin-target="0"><BalanceDisplay chips={human.chips} size="full" /> <span className="pbr-fichas-word">fichas</span></span>
+              <span className="pbr-chips" data-coin-target="0"><BalanceDisplay chips={saldoMostrado(0, human.chips)} size="full" /> <span className="pbr-fichas-word">fichas</span></span>
               <span className="pbr-sep"> · </span>
               <span className="pbr-mesa">Mesa {unit}</span>
             </span>
