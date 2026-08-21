@@ -28,6 +28,22 @@
   initial-value: 0deg;
 }
 
+/* VIS-4b · La posición de la luz del título, como LONGITUD tipada y HEREDABLE.
+   Tipada por lo mismo que el ángulo de arriba: sin registro no interpola.
+   Heredable porque de ella cuelgan DOS consumidores que no son el mismo
+   elemento —el fondo recortado a texto del <h1> y el pseudo del isotipo—, y la
+   única forma de que sean una sola luz y no dos que se parecen es que lean la
+   misma propiedad animada en un solo sitio.
+   MEDIDO en Fase 0 sobre el Edge del arnés: interpola (20 valores distintos en
+   20 cuadros), hereda al descendiente, y lo hace también con keyframes escritos
+   con `var()` — que era el riesgo real, porque los extremos del recorrido salen
+   de longitudes medidas y no de literales. */
+@property --brillo-x {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 /* ── 1 · Recorrido dorado · ventana de Mano Actual (DSK-U3) ───────────────────
    SEMÁNTICA: "Consulta viva durante esta mano." Cuando el cobro nazca en la
    fase de nube, este mismo borde pasará a significar "pagada" sin tocar un
@@ -119,15 +135,40 @@
    original de welcome.css (dorado plano, legible).                             */
 @supports ((background-clip: text) or (-webkit-background-clip: text)) {
   h1.welcome-title {
-    /* Constante declarada. 5,985 s de ciclo; el barrido ocupa el 30,7% de él
-       (1,8375 s) y el resto es reposo — mover el ciclo escala las dos cosas a
-       la vez y conserva la proporción.
-       VIS-1a: calibrado por Victor sobre lo MEDIDO en VIS-0 (ciclo 7 s ·
-       recorrido 21% = 1,47 s · pausa 5,53 s). Aritmética sellada:
-         pausa     × 0,75 = 4,1475 s
-         recorrido × 1,25 = 1,8375 s
-         ciclo             = 5,985 s   ⇒ recorrido = 30,7% del ciclo. */
-    --emb-titulo-ciclo: 5.985s;
+    /* ── VIS-4b · Tiempos ──────────────────────────────────────────────────
+       El ciclo ya no es la constante: lo son el RECORRIDO y la PAUSA, y el
+       ciclo se deriva sumándolos. Así "más lento" y "más frecuente" son dos
+       mandos separados en vez de uno que mueve las dos cosas a la vez.
+       Primera calibración de Victor: 1,5 s de viaje, 2,5 s de reposo, 4 s de
+       ciclo. */
+    --brillo-recorrido: 1.5s;
+    --brillo-pausa: 2.5s;
+
+    /* ── VIS-4b · La banda, más angosta que el conjunto ────────────────────
+       Una luz angosta se ve VIAJAR; una ancha enciende y apaga, que es lo que
+       hacía la de VIS-1a. 35% del ancho del conjunto — sobre los 224,84 px
+       medidos a 1920 son 78,69 px. Es una fracción y no una cifra porque el
+       conjunto mide distinto en cada breakpoint (168,22 px a 375). */
+    --brillo-banda-frac: .35;
+    --brillo-banda: calc(var(--brillo-ancho) * var(--brillo-banda-frac));
+
+    /* ── VIS-4b · Las dos longitudes que se MIDEN, no se escriben ──────────
+       Las fija Wordmark.jsx al montar y en cada resize, porque dependen del
+       ancho real del texto con la fuente que el navegador resuelva:
+         --brillo-ancho   : del borde izquierdo de .wm-slot al derecho de
+                            .wm-ilei. NO es slot + ilei: entre ambos hay el
+                            hueco de --wm-track (12px aquí, 8 a ≤680), que es
+                            la traza que repone el letter-spacing del inline.
+                            Medido: 224,84 px a 1920 · 168,22 px a 375.
+         --brillo-slot-dx : del borde izquierdo del padding-box del <h1> al de
+                            .wm-slot. Es lo que convierte la coordenada del
+                            título en la del pseudo del isotipo.
+                            Medido: 167,58 px a 1920 · 53,39 px a 375.
+       El 0px es la degradación declarada: si el JS no llegara a fijarlas, la
+       banda mide 0 y no se pinta — el título se queda con su degradado tonal,
+       que es exactamente lo que hace reduced-motion. Nunca un título roto. */
+    --brillo-ancho: 0px;
+    --brillo-slot-dx: 0px;
 
     /* ── La banda especular · VIS-1a ───────────────────────────────────────
        Color. Antes era `--gold-brand-hi`, que es EXACTAMENTE el tope del
@@ -136,9 +177,6 @@
        segundo dorado — blanco cálido y opacidad plena, que es lo que
        destella. */
     --emb-titulo-banda: #fff6e0;
-    /* Semiancho. La banda mide el doble que antes: 24% de la línea de gradiente
-       ⇒ ≈327 px sobre el rótulo de la bienvenida. Antes 8% ⇒ 16% ⇒ ≈218 px. */
-    --emb-titulo-banda-semiancho: 12%;
 
     /* ── La caja de pintura, y por qué hay que agrandarla ──────────────────
        MEDIDO: el h1 hereda la interlínea del sistema (26,09px) y lleva letras
@@ -164,14 +202,17 @@
     margin-bottom: calc(var(--emb-titulo-margen-base) - var(--emb-titulo-aire));
 
     background-image:
-      /* (b) BARRIDO ESPECULAR — capa de arriba, la única que se mueve. Los dos
-         extremos transparentes llevan el rgb de `--emb-titulo-banda` escrito a
-         mano: `rgba()` no acepta un hex dentro de un `var()`, así que si el
-         token cambia de color hay que mover los tres a la vez. */
+      /* (b) LA LUZ — capa de arriba, la única que se mueve. Los dos extremos
+         transparentes llevan el rgb de `--emb-titulo-banda` escrito a mano:
+         `rgba()` no acepta un hex dentro de un `var()`, así que si el token
+         cambia de color hay que mover los tres a la vez.
+         VIS-4b: el degradado ya no recorta la banda con paradas al 50%±12%
+         sobre una capa gigante — la capa ES la banda, así que el degradado la
+         ocupa entera, de transparente a transparente pasando por el centro. */
       linear-gradient(100deg,
-        rgba(255, 246, 224, 0) calc(50% - var(--emb-titulo-banda-semiancho)),
+        rgba(255, 246, 224, 0)   0%,
         var(--emb-titulo-banda) 50%,
-        rgba(255, 246, 224, 0) calc(50% + var(--emb-titulo-banda-semiancho))),
+        rgba(255, 246, 224, 0) 100%),
       /* (a) ORO DE MÚLTIPLES TONOS — capa base, siempre presente. Luz arriba,
          el tono de marca al centro, profundidad abajo. Nada de dorado plano. */
       linear-gradient(180deg,
@@ -183,28 +224,107 @@
        se estiraría sobre el aire en vez de sobre las letras. 1em centrado es
        exactamente la caja tipográfica, y sigue al título solo cuando el
        breakpoint de 680px lo baja a 56px.
-       La capa del barrido mide 2,4 anchos para que la banda entre y salga
-       entera, y 3em de alto para cruzar el rótulo con holgura. */
-    background-size: 240% 3em, 100% 1em;
+       VIS-4b: la capa de la luz mide exactamente LA BANDA de ancho —ya no 2,4
+       anchos del <h1>— y sigue midiendo 3em de alto para cruzar el rótulo con
+       holgura. Que la capa sea la banda es lo que permite moverla en PÍXELES
+       medidos sobre el conjunto en vez de en porcentajes de una caja que no
+       tiene nada que ver con el wordmark. */
+    background-size: var(--brillo-banda) 3em, 100% 1em;
     background-repeat: no-repeat;
-    /* `center` en vertical centra ambas capas sobre la caja tipográfica —el
-       relleno es simétrico, así que el centro de la caja ES el centro del
-       texto—. Posición de REPOSO del barrido: -100% lo deja fuera del rótulo
-       por la derecha, que es donde el ciclo lo aparca el 69,3% del tiempo. */
-    background-position: -100% center, 0 center;
+    /* Los ejes van SEPARADOS, y hace falta: la X de la capa de la luz es la
+       propiedad animada y la de la capa tonal es 0, mientras que las dos
+       comparten `center` en Y. Con la abreviatura `background-position` no se
+       puede animar sólo una de las dos capas en un solo eje.
+       `center` en vertical centra ambas sobre la caja tipográfica: el relleno
+       de `--emb-titulo-aire` es simétrico, así que el centro de la caja ES el
+       centro del texto. */
+    /* `--brillo-x` está en coordenadas DEL CONJUNTO: 0 es el borde izquierdo de
+       `.wm-slot`. Aquí hay que llevarlo a las del <h1>, cuyo origen de fondo es
+       su padding-box —que empieza `--brillo-slot-dx` más a la izquierda, porque
+       el rótulo va centrado dentro de un bloque de 560px—. Sin esta suma el
+       viaje recorrería el cajón vacío de la izquierda y se pararía 57px después
+       de empezar el wordmark, sin llegar nunca a la última "I". */
+    background-position-x: calc(var(--brillo-x) + var(--brillo-slot-dx)), 0px;
+    background-position-y: center, center;
 
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     -webkit-text-fill-color: transparent;
 
-    animation: emb-titulo-barrido var(--emb-titulo-ciclo) linear infinite;
+    animation: emb-brillo calc(var(--brillo-recorrido) + var(--brillo-pausa)) linear infinite;
   }
 
-  /* Gradiente estático, sin barrido. La capa (a) —que es la identidad— se
-     queda; se va sólo el movimiento. */
+  /* ── VIS-4b · La misma luz, sobre el isotipo ──────────────────────────────
+     El símbolo es una <img>, y una imagen no hereda `color`: el fondo recortado
+     a texto del <h1> nunca lo alcanzó (así lo dejó IDN-1, y así lo pidió Victor
+     entonces). Para que la luz sea UNA y no dos, se pinta aquí por segunda vez
+     con la MISMA geometría, y se recorta a la silueta del propio activo.
+     El <img> NO se toca: esto es un pseudo hermano suyo.
+
+     La caja del pseudo COPIA la del <img> declaración por declaración —no con
+     números, con las mismas expresiones de `.wm-iso`—, así que si el calibre de
+     Identidad A se recalibra, las dos se mueven juntas. El bloque contenedor es
+     la caja de relleno de `.wm-slot`, que es `position: relative`.
+
+     AQUÍ NO HAY CONVERSIÓN, y ése es el motivo de elegir este origen. Se decidió
+     que `--brillo-x` viva en coordenadas DEL CONJUNTO —0 = borde izquierdo de
+     `.wm-slot`—, y el origen de fondo de este pseudo es exactamente ese borde:
+     el pseudo es absoluto con `left: 0` contra la caja de relleno de `.wm-slot`,
+     igual que el <img>. Así la propiedad se consume aquí tal cual y es el <h1>
+     quien suma `--brillo-slot-dx` para pasar a las suyas. La alternativa —medir
+     desde el <h1> y restar aquí— da el mismo resultado, pero deja el número
+     natural (dónde está la luz sobre el wordmark) en el sitio artificial.
+
+     Y el centro de la banda cae en el mismo sitio en las dos capas pese a que
+     tienen alturas distintas (3em contra ~1,05em): la línea de un degradado
+     lineal pasa SIEMPRE por el centro de su caja, así que la parada del 50%
+     está en el centro horizontal de la capa, sea cual sea el ángulo. Lo que
+     cambia con la altura es la inclinación, no dónde está lo más brillante.
+
+     `?no-inline` en la máscara por la misma razón que en ChipToken y Wordmark:
+     el activo pesa 4054 B, justo por debajo del umbral de 4096 con que Vite
+     inlinea, y un data URI borraría del build el nombre del archivo — que
+     Identidad A §5.4 declara ID de contrato. */
+  h1.welcome-title .wm-slot::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: calc(var(--wm-desc) - 0.4167 * var(--wm-cap));
+    width: var(--wm-cap);
+    height: calc(1.5 * var(--wm-cap));
+    pointer-events: none;
+
+    background-image: linear-gradient(100deg,
+      rgba(255, 246, 224, 0)   0%,
+      var(--emb-titulo-banda) 50%,
+      rgba(255, 246, 224, 0) 100%);
+    background-size: var(--brillo-banda) 100%;
+    background-repeat: no-repeat;
+    background-position-x: var(--brillo-x);
+    background-position-y: center;
+
+    -webkit-mask-image: url('../assets/ajilei-isotipo.svg?no-inline');
+    mask-image: url('../assets/ajilei-isotipo.svg?no-inline');
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  /* Gradiente estático, sin luz. La capa (a) —que es la identidad— se queda; se
+     va sólo el movimiento.
+     VIS-4b: no basta con `animation: none`. Sin animación `--brillo-x` se queda
+     en su valor inicial (0px) y la banda quedaría APARCADA sobre el arranque
+     del rótulo, encendida y quieta — que es peor que no tenerla. Se apaga la
+     luz de verdad: ancho de banda cero en el título (una capa de 0px no se
+     pinta) y el pseudo del isotipo desmontado. */
   @media (prefers-reduced-motion: reduce) {
-    h1.welcome-title { animation: none; }
+    h1.welcome-title {
+      animation: none;
+      --brillo-banda: 0px;
+    }
+    h1.welcome-title .wm-slot::after { display: none; }
   }
 }
 
@@ -218,10 +338,22 @@
    a token: la sintaxis de `@keyframes` no admite `var()` en la parada. Queda
    aquí su fórmula para poder recalcularlo a mano si el ciclo se mueve:
    recorrido% = duración_recorrido / ciclo = 1.8375 / 5.985 = 30,7%. */
-@keyframes emb-titulo-barrido {
-  0%    { background-position:  200% center, 0 center; }
-  30.7% { background-position: -100% center, 0 center; }
-  100%  { background-position: -100% center, 0 center; }
+/* VIS-4b · El recorrido, definido sobre el CONJUNTO y no sobre el cajón del
+   <h1>. La luz entra por la izquierda justo fuera del conjunto (a `-banda`, con
+   su borde derecho rozando el borde izquierdo del wordmark) y sale por la
+   derecha cuando su borde izquierdo alcanza el final del conjunto. Así el 100%
+   del recorrido es visible: antes viajaba sobre el 240% del <h1> y la luz sólo
+   tocaba letras ~0,4 s de cada 1,84 s.
+
+   El 37,5% es el ÚNICO número que CSS no deja tokenizar —una parada de keyframe
+   no admite `calc()` con variables—, y sale de la aritmética de los tokens:
+       recorrido / (recorrido + pausa) = 1,5 / 4 = 0,375
+   Si se mueven los tokens hay que mover esta parada con ellos. El resto del
+   ciclo la luz está aparcada fuera, a la derecha, en reposo. */
+@keyframes emb-brillo {
+  0%    { --brillo-x: calc(-1 * var(--brillo-banda)); }
+  37.5% { --brillo-x: var(--brillo-ancho); }
+  100%  { --brillo-x: var(--brillo-ancho); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
