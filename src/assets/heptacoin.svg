@@ -1,37 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Heptacoin">
   <!--
-    HEPTACOIN · Maestro oficial v1.0
+    HEPTACOIN · Maestro oficial v1.1 · acuñación tricolor (sellada 2026-08-21, VIS)
     HEPTACREATION · moneda del ecosistema (AJILEI, SumaMente, futuros)
     Diseño sellado: HC-1 "Grabada" — H serifada en alto relieve,
     7 estrellas de 5 puntas en bajo relieve, canto acuñado estriado.
-    Rampa tonal sancionada del oro único gold-brand #e8b84b:
-      brillo #f4d27e · base #e8b84b · sombra #c69736 / #a97f2a · profundo #8a6520
+    v1.1 (variante B "marcada"):
+      filete exterior vino #7c1d30 (2 u, r 45 a 47)
+      sombra de la H marino #1c305f, desplazada +1,3 / +1,8
+      campo: brillo #f4d27e 0% · base #e8b84b 45% · sombra #c69736 82% · profundo #9a7326 100%
+      estrellas #9a7326 · canto r 42,9 / 3,4 u · cuerpo de la H #f7dc92 a #d4a033
+    Base gold-brand #e8b84b intacta. Rampa tonal y acentos vino/marino existen
+    solo dentro de este activo (excepcion documentada al dorado unico).
     Doctrina: diseño único en todos los tamaños (sin variante simplificada).
     Uso: escalar por ancho/alto del contenedor; no recolorear.
   -->
   <defs>
-    <radialGradient id="hpcFld" cx="50%" cy="36%" r="72%">
-      <stop offset="0%" stop-color="#f4d27e"/>
-      <stop offset="55%" stop-color="#e8b84b"/>
-      <stop offset="100%" stop-color="#c69736"/>
-    </radialGradient>
+    <radialGradient id="hpcFld" cx="50%" cy="36%" r="72%"><stop offset="0%" stop-color="#f4d27e"/><stop offset="45%" stop-color="#e8b84b"/><stop offset="82%" stop-color="#c69736"/><stop offset="100%" stop-color="#9a7326"/></radialGradient>
     <linearGradient id="hpcH" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#f7dc92"/>
-      <stop offset="100%" stop-color="#ddaa3d"/>
+      <stop offset="100%" stop-color="#d4a033"/>
     </linearGradient>
     <path id="hpcStar" d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z"/>
   </defs>
 
   <!-- cuerpo de la moneda -->
-  <circle cx="50" cy="50" r="47" fill="#8a6520"/>
-  <circle cx="50" cy="50" r="46" fill="url(#hpcFld)"/>
+  <circle cx="50" cy="50" r="47" fill="#7c1d30"/>
+  <circle cx="50" cy="50" r="45.0" fill="url(#hpcFld)"/>
 
   <!-- canto acuñado estriado + filete interior -->
-  <circle cx="50" cy="50" r="43.2" fill="none" stroke="#b8892f" stroke-width="3.6" stroke-dasharray="1.8 2.2"/>
+  <circle cx="50" cy="50" r="42.9" fill="none" stroke="#b8892f" stroke-width="3.4" stroke-dasharray="1.8 2.2"/>
   <circle cx="50" cy="50" r="40.6" fill="none" stroke="#a97f2a" stroke-width="0.7"/>
 
   <!-- anillo de 7 estrellas en bajo relieve (radio 33, puntas hacia afuera) -->
-  <g fill="#a97f2a">
+  <g fill="#9a7326">
     <use href="#hpcStar" transform="translate(50 17)"/>
     <use href="#hpcStar" transform="translate(75.8 29.42) rotate(51.43)"/>
     <use href="#hpcStar" transform="translate(82.17 57.34) rotate(102.86)"/>
@@ -42,7 +43,7 @@
   </g>
 
   <!-- H serifada · sombra del relieve -->
-  <g transform="translate(1 1.4)" fill="#8a6520">
+  <g transform="translate(1.3 1.8)" fill="#1c305f">
     <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
     <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
     <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>

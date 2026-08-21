@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="15 30 60 90" role="img" aria-label="AJILEI">
   <!--
-    AJILEI · Isotipo maestro v1.0 · "Letra doble" A+J con Heptacoin
+    AJILEI · Isotipo maestro v1.1 · "Letra doble" A+J con Heptacoin v1.1 (acuñación tricolor, 2026-08-21)
     HEPTACREATION — trazado sellado por Victor, construccion por etapas validadas.
 
     Sistema de coordenadas: 1 cm = 10 unidades · svg_x = 20 + 10·x · svg_y = 95 − 10·y
@@ -12,45 +12,42 @@
       Heptacoin: centro j(3.25, 2.25) · Ø 1.5 · desfase hacia la diagonal (sellado:
                  la moneda sugiere el travesano de la A sin reabrir la lectura "4")
       Grosor: G2 = 0.5 cm (5 u) uniforme, techo incluido · remates redondos
-    Color: gold-brand #e8b84b · rampa tonal sancionada solo dentro de la Heptacoin.
+    Color: gold-brand #e8b84b · rampa tonal y acentos vino/marino solo dentro de la Heptacoin.
+    v1.1: unico cambio respecto a v1.0 es el cuerpo de la moneda (grupo ajHeptacoin); trazo intacto.
     Doctrina: diseno unico en todos los tamanos.
   -->
   <defs>
-    <radialGradient id="ajFld" cx="50%" cy="36%" r="72%">
-      <stop offset="0%" stop-color="#f4d27e"/>
-      <stop offset="55%" stop-color="#e8b84b"/>
-      <stop offset="100%" stop-color="#c69736"/>
-    </radialGradient>
+    <radialGradient id="ajFld" cx="50%" cy="36%" r="72%"><stop offset="0%" stop-color="#f4d27e"/><stop offset="45%" stop-color="#e8b84b"/><stop offset="82%" stop-color="#c69736"/><stop offset="100%" stop-color="#9a7326"/></radialGradient>
     <linearGradient id="ajH" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#f7dc92"/>
-      <stop offset="100%" stop-color="#ddaa3d"/>
+      <stop offset="100%" stop-color="#d4a033"/>
     </linearGradient>
     <path id="ajStar" d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z"/>
     <g id="ajHeptacoin">
-      <circle cx="50" cy="50" r="47" fill="#8a6520"/>
-      <circle cx="50" cy="50" r="46" fill="url(#ajFld)"/>
-      <circle cx="50" cy="50" r="43.2" fill="none" stroke="#b8892f" stroke-width="3.6" stroke-dasharray="1.8 2.2"/>
+      <circle cx="50" cy="50" r="47" fill="#7c1d30"/>
+      <circle cx="50" cy="50" r="45.0" fill="url(#ajFld)"/>
+      <circle cx="50" cy="50" r="42.9" fill="none" stroke="#b8892f" stroke-width="3.4" stroke-dasharray="1.8 2.2"/>
       <circle cx="50" cy="50" r="40.6" fill="none" stroke="#a97f2a" stroke-width="0.7"/>
-      <g fill="#a97f2a">
-        <use href="#ajStar" transform="translate(50 17)"/>
-        <use href="#ajStar" transform="translate(75.8 29.42) rotate(51.43)"/>
-        <use href="#ajStar" transform="translate(82.17 57.34) rotate(102.86)"/>
-        <use href="#ajStar" transform="translate(64.32 79.73) rotate(154.29)"/>
-        <use href="#ajStar" transform="translate(35.68 79.73) rotate(205.71)"/>
-        <use href="#ajStar" transform="translate(17.83 57.34) rotate(257.14)"/>
-        <use href="#ajStar" transform="translate(24.2 29.42) rotate(308.57)"/>
+      <g fill="#9a7326">
+      <use href="#ajStar" transform="translate(50 17)"/>
+      <use href="#ajStar" transform="translate(75.8 29.42) rotate(51.43)"/>
+      <use href="#ajStar" transform="translate(82.17 57.34) rotate(102.86)"/>
+      <use href="#ajStar" transform="translate(64.32 79.73) rotate(154.29)"/>
+      <use href="#ajStar" transform="translate(35.68 79.73) rotate(205.71)"/>
+      <use href="#ajStar" transform="translate(17.83 57.34) rotate(257.14)"/>
+      <use href="#ajStar" transform="translate(24.2 29.42) rotate(308.57)"/>
       </g>
-      <g transform="translate(1 1.4)" fill="#8a6520">
-        <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
-        <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
-        <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
-        <rect x="43" y="48" width="14" height="4.5"/>
+      <g transform="translate(1.3 1.8)" fill="#1c305f">
+      <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+      <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+      <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+      <rect x="43" y="48" width="14" height="4.5"/>
       </g>
       <g fill="url(#ajH)">
-        <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
-        <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
-        <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
-        <rect x="43" y="48" width="14" height="4.5"/>
+      <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+      <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+      <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+      <rect x="43" y="48" width="14" height="4.5"/>
       </g>
     </g>
   </defs>
