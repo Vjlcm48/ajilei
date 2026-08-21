@@ -49,14 +49,25 @@
      VIS-1b: `--surface-game` es el `--green-base` nuevo al alfa de hoy, y las
      dos tintas de zona son el `--green-abyss` nuevo a los alfas de hoy. Los
      alfas NO se mueven: fijan cuánta mesa se ve a través de la zona.
-     `--surface-panel` y `--surface-card` quedan fuera de la tanda a propósito
-     (tapetes.css §"qué es fieltro y qué es cromo": son cromo del lobby). */
-  --surface-panel:      rgba(10, 28, 14, 0.75);
+
+     VIS-1c: las TRES superficies de cromo —las que `tapetes.css` deja fuera del
+     fieltro porque sólo las usa el lobby, donde `data-tapete` no existe— se
+     habían quedado con el rgb de la familia VIEJA. No es que estuvieran fuera
+     de la calibración: es que su parentesco con la rampa se rompió, y el
+     resultado era un lobby con el fondo un escalón más hondo que sus tarjetas.
+     Se rederivan con el MISMO parentesco que tenían en v1.0, no con un valor
+     nuevo — la relación es el dato, el hex es su consecuencia:
+       --surface-card  = abyss, alfa .55            (10,30,15 → 9,23,14)
+       --surface-panel = abyss con G−2 y B−1, .75   (10,28,14 → 9,21,13)
+       --surface-modal = darkest +1/+1/+2           (#0e2518 → #0c1d13)
+     Estas tres NO son fieltro y siguen sin heredar tapete: un modal vinotinto
+     sería cromo teñido, que es justo lo que la frontera de tapetes.css evita. */
+  --surface-panel:      rgba(9, 21, 13, 0.75);
   --surface-game:       rgba(27, 72, 44, 0.88);
-  --surface-card:       rgba(10, 30, 15, 0.55);
+  --surface-card:       rgba(9, 23, 14, 0.55);
   --surface-area:       rgba(9, 23, 14, 0.45);
   --surface-area-light: rgba(9, 23, 14, 0.30);
-  --surface-modal:      #0e2518;
+  --surface-modal:      #0c1d13;
 
   /* TEXT */
   --text-primary:     #f5edd8;
