@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 910 1420" width="910" height="1420" role="img" aria-label="Reverso AJILEI">
+  <!--
+    AJILEI · Reverso oficial de las cartas · v1.0 · composición R-2 "Greca" (sellada 2026-08-21)
+    HEPTACREATION · sustituye al reverso provisional (reverso_carta.png)
+    Lienzo: 910 x 1420 (ratio 0,641 = 91:142, el de las cajas renderizadas). Opaco a sangre.
+    Zona segura: marco a 58 u de los lados y 72 u de arriba/abajo, sobrevive al recorte cover
+    hasta ratio 0,693 (mazo movil) y al radio de 8 px del contenedor a 54 px de ancho.
+    Campo: vinotinto profundo #41101c (un escalon mas hondo que el fieltro Vinotinto B #5a1426),
+      raya diplomatica diagonal #4a1422 (3 u cada 36 u, a 45 grados), halo radial #531826 tras la marca.
+    Marco: octogono achaflanado doble, oro gold-brand #e8b84b (10 u) y oro al 55 % (5 u), cuatro broches.
+    Marca: isotipo AJILEI v1.1 (letra doble + Heptacoin v1.1 B) a 440 u de ancho, centro (455, 650).
+    Estrellas: arco de 8 estrellas de 5 puntas en oro bajo la marca (cuerda 600 u, flecha 50 u,
+      radio 925 u, centro del arco (455, 2030)), misma linea estetica que la pantalla de bienvenida.
+    Regla del oro unico: fuera de la Heptacoin solo existe #e8b84b (plano o con opacidad).
+    Marca siempre derecha; marco simetrico. Uso: <img object-fit: cover> y background-size: cover.
+  -->
+  <defs>
+    <pattern id="rvPin" width="36" height="36" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+      <rect width="36" height="36" fill="#41101c"/>
+      <rect width="36" height="3" fill="#4a1422"/>
+    </pattern>
+    <radialGradient id="rvHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#531826" stop-opacity=".9"/>
+      <stop offset="100%" stop-color="#531826" stop-opacity="0"/>
+    </radialGradient>
+    <symbol id="rvIso" viewBox="15 30 60 90">
+      <defs>
+      <radialGradient id="rv_ajFld" cx="50%" cy="36%" r="72%"><stop offset="0%" stop-color="#f4d27e"/><stop offset="45%" stop-color="#e8b84b"/><stop offset="82%" stop-color="#c69736"/><stop offset="100%" stop-color="#9a7326"/></radialGradient>
+      <linearGradient id="rv_ajH" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f7dc92"/>
+      <stop offset="100%" stop-color="#d4a033"/>
+      </linearGradient>
+      <path id="rv_ajStar" d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z"/>
+      <g id="rv_ajHeptacoin">
+      <circle cx="50" cy="50" r="47" fill="#7c1d30"/>
+      <circle cx="50" cy="50" r="45.0" fill="url(#rv_ajFld)"/>
+      <circle cx="50" cy="50" r="42.9" fill="none" stroke="#b8892f" stroke-width="3.4" stroke-dasharray="1.8 2.2"/>
+      <circle cx="50" cy="50" r="40.6" fill="none" stroke="#a97f2a" stroke-width="0.7"/>
+      <g fill="#9a7326">
+      <use href="#rv_ajStar" transform="translate(50 17)"/>
+      <use href="#rv_ajStar" transform="translate(75.8 29.42) rotate(51.43)"/>
+      <use href="#rv_ajStar" transform="translate(82.17 57.34) rotate(102.86)"/>
+      <use href="#rv_ajStar" transform="translate(64.32 79.73) rotate(154.29)"/>
+      <use href="#rv_ajStar" transform="translate(35.68 79.73) rotate(205.71)"/>
+      <use href="#rv_ajStar" transform="translate(17.83 57.34) rotate(257.14)"/>
+      <use href="#rv_ajStar" transform="translate(24.2 29.42) rotate(308.57)"/>
+      </g>
+      <g transform="translate(1.3 1.8)" fill="#1c305f">
+      <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+      <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+      <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+      <rect x="43" y="48" width="14" height="4.5"/>
+      </g>
+      <g fill="url(#rv_ajH)">
+      <rect x="36" y="35" width="12" height="3.5"/><rect x="36" y="61.5" width="12" height="3.5"/>
+      <rect x="52" y="35" width="12" height="3.5"/><rect x="52" y="61.5" width="12" height="3.5"/>
+      <rect x="39.5" y="35" width="5" height="30"/><rect x="55.5" y="35" width="5" height="30"/>
+      <rect x="43" y="48" width="14" height="4.5"/>
+      </g>
+      </g>
+      </defs>
+      <g stroke="#e8b84b" stroke-width="5" stroke-linecap="round" fill="none">
+      <path d="M20 95 L60 35 L70 35"/>
+      <path d="M70 50 L70 110 A 12.5 12.5 0 0 1 50 110"/>
+      </g>
+      <svg x="45" y="65" width="15" height="15" viewBox="0 0 100 100"><use href="#rv_ajHeptacoin"/></svg>
+    </symbol>
+  </defs>
+
+  <!-- campo -->
+  <rect width="910" height="1420" fill="#41101c"/>
+  <rect width="910" height="1420" fill="url(#rvPin)"/>
+  <ellipse cx="455" cy="650" rx="340" ry="540" fill="url(#rvHalo)"/>
+
+  <!-- marco achaflanado doble + broches -->
+  <path d="M142 72 H768 L852 156 V1264 L768 1348 H142 L58 1264 V156 Z" fill="none" stroke="#e8b84b" stroke-width="10"/>
+  <path d="M146 98 H764 L826 160 V1260 L764 1322 H146 L84 1260 V160 Z" fill="none" stroke="#e8b84b" stroke-opacity=".55" stroke-width="5"/>
+  <path d="M455 42 L471 72 L455 102 L439 72 Z" fill="#e8b84b"/>
+  <path d="M455 1318 L471 1348 L455 1378 L439 1348 Z" fill="#e8b84b"/>
+  <path d="M58 680 L74 710 L58 740 L42 710 Z" fill="#e8b84b"/>
+  <path d="M852 680 L868 710 L852 740 L836 710 Z" fill="#e8b84b"/>
+
+  <!-- isotipo AJILEI v1.1 -->
+  <use href="#rvIso" x="235" y="320" width="440" height="660"/>
+
+  <!-- arco de 8 estrellas -->
+  <g fill="#e8b84b">
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(155.4 1154.9) scale(4.4)"/>
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(239.1 1130.6) scale(4.4)"/>
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(324.7 1114.2) scale(4.4)"/>
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(411.4 1106.0) scale(4.4)"/>
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(498.6 1106.0) scale(4.4)"/>
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(585.3 1114.2) scale(4.4)"/>
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(670.9 1130.6) scale(4.4)"/>
+    <path d="M0 -5 L1.123 -1.545 L4.755 -1.545 L1.817 0.59 L2.939 4.045 L0 1.91 L-2.939 4.045 L-1.817 0.59 L-4.755 -1.545 L-1.123 -1.545 Z" transform="translate(754.6 1154.9) scale(4.4)"/>
+  </g>
+</svg>

@@ -1,6 +1,6 @@
 import '../styles/playingCard.css'
 import CardImage from './CardImage'
-import reversoUrl from '../assets/cards/reverso_carta.png?url'
+import reversoUrl from '../assets/cards/reverso_carta.svg?no-inline'
 
 function PlayingCard({ card, selected, onClick, faceDown, animClass, highlight }) {
   if (faceDown) {
