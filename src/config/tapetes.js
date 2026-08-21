@@ -17,48 +17,56 @@
 // escalera ES el diseño (v1.0 §1) — a mayor carga venezolana, mayor precio, del
 // grafito sobrio al Tricolor insignia. No se derivan de nada.
 //
-// `swatch` es el color del disco del panel: el tono medio de cada familia, o
-// sea el mismo `--green-base` del que parte la variante (ver tapetes.css). Vive
-// aquí y no sólo en el CSS porque el panel lo pinta inline: un swatch que no
-// fuera EL color real del tapete sería una promesa falsa. El Tricolor lo
-// declara como degradado porque su tapete también lo es.
+// `swatch` es el NOMBRE DEL TOKEN CSS del disco del panel, nunca un color.
+//
+// VIS-1b (Tapetes v1.1). Hasta v1.0 este campo guardaba el hex y `TapetesPanel`
+// lo pintaba inline: una segunda copia del color del fieltro, en otro lenguaje,
+// que sólo coincidía con la de `tapetes.css` por disciplina (hallazgo 8 de
+// VIS-0 — dos fuentes que hay que mover a la vez o el disco miente). Ahora el
+// color vive donde viven los colores y aquí queda sólo su nombre; el panel
+// resuelve `var(<token>)`. PROHIBIDO cualquier hex de tapete en JS.
+//
+// Los tokens se declaran en `tapetes.css` §0, fuera de la media query, y valen
+// el `--green-base` de cada familia (el tono medio, que es el que el jugador
+// reconoce como "el color del tapete"). El Tricolor es un degradado porque su
+// tapete también lo es.
 export const TAPETES = [
   {
     id: 'verde',
     nombre: 'Verde clásico',
     descripcion: 'El de siempre',
     precio: 0,
-    swatch: '#235c38',   // --green-base, sin tocar
+    swatch: '--tap-swatch-verde',
   },
   {
     id: 'grafito',
     nombre: 'Negro grafito',
     descripcion: 'Sobrio y neutro',
     precio: 10000,
-    swatch: '#3b3f44',
+    swatch: '--tap-swatch-grafito',
   },
   {
     id: 'azul',
     nombre: 'Azul profundo',
     descripcion: 'Frío y hondo',
     precio: 15000,
-    swatch: '#233c5c',
+    swatch: '--tap-swatch-azul',
   },
   {
     id: 'vinotinto',
     nombre: 'Vinotinto',
     descripcion: 'Cálido y criollo',
     precio: 25000,
-    swatch: '#5c232e',
+    swatch: '--tap-swatch-vinotinto',
   },
   {
     id: 'tricolor',
     nombre: 'Tricolor',
     descripcion: 'La mesa vestida de tricolor',
     precio: 50000,
-    // Las tres bandas del tapete, en su orden y sus tonos exactos (tapetes.css).
-    // No es la bandera: es el tratamiento profundo, desaturado, del tapete.
-    swatch: 'linear-gradient(to bottom, #3c331b 0%, #1c2e45 50%, #3e191e 100%)',
+    // Las tres bandas del tapete, en su orden y sus tonos exactos. El degradado
+    // vive ahora en `tapetes.css` §0, como los otros cuatro.
+    swatch: '--tap-swatch-tricolor',
   },
 ]
 

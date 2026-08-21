@@ -82,10 +82,16 @@ export function TapetesPanel({ ancla, activo, comprados, previa, dialogo, onPres
               data-estado={estado}
               title={t.descripcion}
             >
-              {/* Disco del COLOR REAL del tapete, tomado de la fuente única
-                  (v1.0 §4: swatches circulares del color real). Inline porque
-                  el valor es dato de catálogo, no estilo de componente. */}
-              <span className="tap-disco" style={{ background: t.swatch }} aria-hidden="true" />
+              {/* Disco del COLOR REAL del tapete (v1.0 §4: swatches circulares
+                  del color real). VIS-1b: `t.swatch` ya no es un color sino el
+                  NOMBRE del token que lo guarda (`tapetes.css` §0). Sigue
+                  siendo inline porque QUÉ token toca cada disco es dato de
+                  catálogo; el color en sí ya no vive en JS. */}
+              <span
+                className="tap-disco"
+                style={{ background: `var(${t.swatch})` }}
+                aria-hidden="true"
+              />
               <span className="tap-nombre">{t.nombre}</span>
               {/* Tres estados visuales (v1.0 §4): el activo se resalta (molde
                   del chip "Tu último" de NivelSelect), el comprado lleva marca

@@ -43,23 +43,31 @@
    ── PROFUNDIDAD EQUIVALENTE, COMO OPERACIÓN Y NO COMO ADJETIVO ──────────────
    v1.0 §2 pide que los cuatro nuevos partan de la profundidad tonal del verde
    abisal actual, para heredar la legibilidad ya lograda. Aquí eso se traduce a
-   una regla exacta y falsable: **cada parada conserva la L de HSL del verde que
-   sustituye, y también su S; sólo cambia H.** La escalera de referencia,
-   medida sobre los tokens vivos:
+   una regla exacta y falsable: **cada parada conserva la ESCALERA de L del
+   verde, multiplicada por un factor k propio de la familia.** La escalera de
+   referencia de v1.0, que es la que fija la proporción:
 
-       --green-abyss   #0a1e10   H 138,0   S 50,0%   L  7,8%
-       --green-darkest #0d2416   H 143,5   S 46,9%   L  9,6%
-       --green-deep    #1a4a2e   H 145,0   S 48,0%   L 19,6%
-       --green-base    #235c38   H 142,1   S 44,9%   L 24,9%
-       --green-bright  #2e7548   H 142,0   S 43,6%   L 32,0%
+       L de v1.0:   7,8   ·   9,6   ·  19,6   ·  24,9   ·  32,0   %
 
-   Cada bloque de abajo es esa misma escalera de L y S con un H nuevo (el
-   grafito además baja S a un 16% del original: un gris no es un tono). El
-   arnés lo VERIFICA leyendo el valor vivo y recomponiendo su HSL — la
-   "profundidad equivalente" deja de ser una promesa de prosa.
+   ── ENMIENDA v1.1 · VIS-1b (docs/AJILEI_Tapetes_v1.1.md) ────────────────────
+   Las rampas se calibraron sobre lo MEDIDO en VIS-0 y se sellaron en tablero de
+   muestras: Verde clásico B · Negro grafito A · Azul profundo B · Vinotinto B.
+   La regla de derivación pasa a tener un solo grado de libertad por familia:
 
-   Los H son las CONSTANTES DE CALIBRACIÓN de Victor: cambiar la familia entera
-   de un tapete es cambiar un número aquí. Está previsto que itere.
+       verde     k = 0,78   H 142   S ≈ 45%    (theme.css — fuente del token)
+       azul      k = 0,78   H 214   S ≈ 45%
+       grafito   k = 0,68   S ≈ 7%             (un gris no es un tono)
+       vinotinto k = 0,86   H 344   S ≈ 64%    (era H 348 / S 45%)
+       tricolor  SIN CAMBIOS — queda en v1.0, pendiente de revisión de Victor.
+
+   El arnés lo VERIFICA leyendo el valor vivo y recomponiendo su HSL — la
+   "profundidad equivalente" deja de ser una promesa de prosa. AVISO: la
+   escalera sellada dentro del arnés (`scripts/diagDSK.mjs`, constante
+   TAP_ESCALERA_VERDE) sigue siendo la de v1.0 y NO se tocó en esta tanda; hay
+   que actualizarla antes de correr el modo `tapetes`.
+
+   Los H y los k son las CONSTANTES DE CALIBRACIÓN de Victor: cambiar la familia
+   entera de un tapete es cambiar un número aquí. Está previsto que itere.
 
    ── QUÉ ES FIELTRO Y QUÉ ES CROMO ───────────────────────────────────────────
    v1.0 §2 es explícito: **solo el fieltro cambia de color**. La frontera se
@@ -80,6 +88,34 @@
    sólo cambia su rgb, que es el `--green-abyss` de cada familia.             */
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   0 · LOS CINCO DISCOS DEL PANEL · VIS-1b
+   FUENTE ÚNICA DE COLOR. Hasta v1.0 el disco del menú ⋮ se pintaba con un hex
+   guardado en `config/tapetes.js`: una segunda copia del color, en otro
+   lenguaje, que sólo coincidía con el fieltro por disciplina (hallazgo 8 de
+   VIS-0). Desde v1.1 el catálogo guarda el NOMBRE del token y el color vive
+   aquí, con los otros colores. Prohibido cualquier hex de tapete en JS.
+
+   Cada disco es el `--green-base` de su familia — el tono medio, que es el que
+   el jugador reconoce como "el color del tapete". Van escritos como literal y
+   no como `var(--green-base)` porque estos cinco tokens tienen que convivir en
+   el MISMO elemento: `--green-base` sólo vale uno a la vez.
+
+   Fuera de la media query a propósito: son DATO, no estilo gateado. El panel
+   sólo existe dentro del gate, pero un token de dato que se evapora fuera de él
+   dejaría el disco transparente en vez de fallar ruidosamente.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --tap-swatch-verde:     #1b482c;   /* espejo de theme.css --green-base */
+  --tap-swatch-grafito:   #282b2e;
+  --tap-swatch-azul:      #1b2f48;
+  --tap-swatch-vinotinto: #5a1426;
+  /* El tricolor no tiene un tono medio: su disco es el degradado, simplificado
+     a tres paradas (el fieltro real lleva seis y una viñeta). Venía verbatim de
+     `config/tapetes.js`. Sigue en valores de v1.0, como el tapete. */
+  --tap-swatch-tricolor: linear-gradient(to bottom, #3c331b 0%, #1c2e45 50%, #3e191e 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    1 · LOS CUATRO FIELTROS
    Gate de escritorio: la MISMA media query que `DESKTOP_TABLE_MQ` en
    GameTable.jsx, espejada literal (molde EMB-1). Es el segundo cinturón: el
@@ -90,52 +126,61 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (orientation: landscape) and (min-height: 601px) {
 
-  /* ── Negro grafito · H 212, S al 16% ──────────────────────────────────────
-     Un gris no es un tono: la saturación baja al 16% de la del verde (50%→8,0%,
-     44,9%→7,2%…) y el H apenas inclina el neutro hacia el frío, para que no lea
-     como sepia. La L es idéntica al verde, parada por parada.               */
+  /* ── Negro grafito · k = 0,68, S ≈ 7% ─────────────────────────────────────
+     Un gris no es un tono: la saturación se queda en el entorno del 7% y el H
+     apenas inclina el neutro hacia el frío, para que no lea como sepia. v1.1
+     baja además la escalera entera a k = 0,68 — es el más hondo de los cinco,
+     porque un gris a la L del verde lee como cemento y no como fieltro.
+     El H de estas paradas es RUIDO DE CUANTIZACIÓN (a S≈7% y 8 bits, un solo
+     nivel de rgb mueve el matiz decenas de grados): el dato que manda es S. */
   body[data-tapete="grafito"] {
-    --green-abyss:   #121416;   /* H 212  S 8,0%  L  7,8% */
-    --green-darkest: #17181a;   /* H 212  S 7,5%  L  9,6% */
-    --green-deep:    #2e3236;   /* H 212  S 7,7%  L 19,6% */
-    --green-base:    #3b3f44;   /* H 212  S 7,2%  L 24,9% */
-    --green-bright:  #4c5157;   /* H 212  S 7,0%  L 32,0% */
-    --surface-game:  rgba(59, 63, 68, 0.88);   /* = --green-base al alfa de hoy */
+    --green-abyss:   #0d0d0f;   /* S  7,1%  L  5,5% */
+    --green-darkest: #0f1012;   /* S  9,1%  L  6,5% */
+    --green-deep:    #202224;   /* S  5,9%  L 13,3% */
+    --green-base:    #282b2e;   /* S  7,0%  L 16,9% */
+    --green-bright:  #34373b;   /* S  6,3%  L 21,8% */
+    --surface-game:  rgba(40, 43, 46, 0.88);   /* = --green-base al alfa de hoy */
     /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
-    --surface-area:       rgba(18, 20, 22, 0.45);
-    --surface-area-light: rgba(18, 20, 22, 0.30);
+    --surface-area:       rgba(13, 13, 15, 0.45);
+    --surface-area-light: rgba(13, 13, 15, 0.30);
   }
 
-  /* ── Azul profundo · H 214 ────────────────────────────────────────────────
-     La escalera completa, S y L intactas. El azul a la misma L que el verde se
-     percibe algo más oscuro (la luminancia relativa del azul es menor a igual
-     L de HSL): eso es física del color, no una desviación — la profundidad
-     TONAL, que es lo que v1.0 §2 pide heredar, es la misma.                  */
+  /* ── Azul profundo · H 214, k = 0,78 ──────────────────────────────────────
+     La escalera completa con la S intacta y la L del verde nuevo, parada por
+     parada: azul y verde comparten k, así que siguen siendo la misma
+     profundidad con dos matices. El azul a la misma L que el verde se percibe
+     algo más oscuro (la luminancia relativa del azul es menor a igual L de
+     HSL): eso es física del color, no una desviación — la profundidad TONAL,
+     que es lo que v1.0 §2 pide heredar, es la misma.                         */
   body[data-tapete="azul"] {
-    --green-abyss:   #0a131e;   /* H 214  S 50,0%  L  7,8% */
-    --green-darkest: #0d1724;   /* H 214  S 46,9%  L  9,6% */
-    --green-deep:    #1a2f4a;   /* H 214  S 48,0%  L 19,6% */
-    --green-base:    #233c5c;   /* H 214  S 44,9%  L 24,9% */
-    --green-bright:  #2e4d75;   /* H 214  S 43,6%  L 32,0% */
-    --surface-game:  rgba(35, 60, 92, 0.88);
+    --green-abyss:   #090f17;   /* H 214,3  S 43,8%  L  6,3% */
+    --green-darkest: #0b121c;   /* H 215,3  S 43,6%  L  7,6% */
+    --green-deep:    #152539;   /* H 213,3  S 46,2%  L 15,3% */
+    --green-base:    #1b2f48;   /* H 213,3  S 45,5%  L 19,4% */
+    --green-bright:  #233c5c;   /* H 213,7  S 44,9%  L 24,9% */
+    --surface-game:  rgba(27, 47, 72, 0.88);
     /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
-    --surface-area:       rgba(10, 19, 30, 0.45);
-    --surface-area-light: rgba(10, 19, 30, 0.30);
+    --surface-area:       rgba(9, 15, 23, 0.45);
+    --surface-area-light: rgba(9, 15, 23, 0.30);
   }
 
-  /* ── Vinotinto · H 348 ────────────────────────────────────────────────────
+  /* ── Vinotinto · H 344, S ≈ 64%, k = 0,86 ─────────────────────────────────
      El rojo de vino, no el rojo de bandera: el H se queda del lado magenta del
-     rojo puro y la S es la del verde, ni un punto más.                       */
+     rojo puro. v1.1 lo mueve de H 348 a H 344 y le sube la S del 45% al 64%
+     — es el único de los cinco que gana saturación, y el único con k > 0,8:
+     un burdeos apagado lee como marrón, y este tapete tiene referente. La
+     referencia sellada por Victor es la camiseta local 2026 de la selección
+     (burdeos intenso con detalles en oro).                                   */
   body[data-tapete="vinotinto"] {
-    --green-abyss:   #1e0a0e;   /* H 348  S 50,0%  L  7,8% */
-    --green-darkest: #240d12;   /* H 348  S 46,9%  L  9,6% */
-    --green-deep:    #4a1a24;   /* H 348  S 48,0%  L 19,6% */
-    --green-base:    #5c232e;   /* H 348  S 44,9%  L 24,9% */
-    --green-bright:  #752e3c;   /* H 348  S 43,6%  L 32,0% */
-    --surface-game:  rgba(92, 35, 46, 0.88);
+    --green-abyss:   #1b080d;   /* H 344,2  S 54,3%  L  6,9% */
+    --green-darkest: #210910;   /* H 342,5  S 57,1%  L  8,2% */
+    --green-deep:    #470f1e;   /* H 343,9  S 65,1%  L 16,9% */
+    --green-base:    #5a1426;   /* H 344,6  S 63,6%  L 21,6% */
+    --green-bright:  #731931;   /* H 344,0  S 64,3%  L 27,5% */
+    --surface-game:  rgba(90, 20, 38, 0.88);
     /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
-    --surface-area:       rgba(30, 10, 14, 0.45);
-    --surface-area-light: rgba(30, 10, 14, 0.30);
+    --surface-area:       rgba(27, 8, 13, 0.45);
+    --surface-area-light: rgba(27, 8, 13, 0.30);
   }
 
   /* ── Tricolor · la pieza insignia ─────────────────────────────────────────
@@ -149,7 +194,13 @@
          verde (9,6..24,9), y a S 38..42% — MENOS saturadas que la bandera real
          (que ronda S 100%). Son tonos de tapete, no de pabellón.
      (3) Las transiciones ocupan ~30% del alto cada una: no hay un solo filo
-         duro en el degradado. Por eso lee como tratamiento y no como franja.  */
+         duro en el degradado. Por eso lee como tratamiento y no como franja.
+
+     VIS-1b: el tricolor NO entra en la enmienda v1.1 — queda íntegro en sus
+     valores de v1.0, pendiente de la revisión de Victor. Consecuencia a la
+     vista: la frase (1) describía una relación con la familia AZUL que ya no se
+     sostiene numéricamente, porque el azul bajó a k = 0,78 y éste no. Se deja
+     escrita tal cual, como registro de lo que estas cifras QUERÍAN decir.     */
   body[data-tapete="tricolor"] {
     --green-abyss:   #0c131c;   /* H 214  S 42,5%  L  7,8% */
     --green-darkest: #0f1722;   /* H 214  S 39,9%  L  9,6% */
@@ -307,8 +358,9 @@
   }
   .tap-swatch:hover { background: rgba(var(--gold-brand-rgb), 0.10); }
 
-  /* El disco es el color real del tapete; el `background` lo pone el JSX desde
-     config/tapetes.js. Aquí sólo su caja y su filete. */
+  /* El disco es el color real del tapete. VIS-1b: el `background` lo pone el
+     JSX, pero ya no con un hex de catálogo sino con `var(--tap-swatch-<id>)`,
+     declarado arriba en §0. Aquí sólo su caja y su filete — sin tocar. */
   .tap-disco {
     width: var(--tap-disco);
     height: var(--tap-disco);

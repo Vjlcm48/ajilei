@@ -24,19 +24,38 @@
   --gold-brand-deep:     #ac7e16;
   --gold-brand-deep-rgb: 172, 126, 22;
 
-  /* GREENS ── five stops covering all background gradients */
-  --green-abyss:   #0a1e10;
-  --green-darkest: #0d2416;
-  --green-deep:    #1a4a2e;
-  --green-base:    #235c38;
-  --green-bright:  #2e7548;
+  /* GREENS ── five stops covering all background gradients
+     VIS-1b · Tapetes v1.1 (docs/AJILEI_Tapetes_v1.1.md): la escalera baja un
+     escalón entero. Se conserva la proporción de v1.0 (L 7,8 · 9,6 · 19,6 ·
+     24,9 · 32,0) multiplicada por k = 0,78, con H y S de la familia intactos:
+       --green-abyss   #09170e   H 141,4   S 43,8%   L  6,3%
+       --green-darkest #0b1c11   H 141,2   S 43,6%   L  7,6%
+       --green-deep    #153922   H 141,7   S 46,2%   L 15,3%
+       --green-base    #1b482c   H 142,7   S 45,5%   L 19,4%
+       --green-bright  #235c38   H 142,1   S 44,9%   L 24,9%
+     El nuevo `bright` ES el `base` de v1.0: la escalera entera se corrió una
+     parada hacia lo hondo, no se recalculó a ojo.
+     UN SOLO VERDE EN TODO EL PRODUCTO (decisión de Victor): este token es el
+     mismo que consume móvil —donde `data-tapete` nunca se aplica—, así que el
+     cambio alcanza a móvil por construcción. Ningún archivo móvil se toca; su
+     render sí cambia, y está decidido que así sea. */
+  --green-abyss:   #09170e;
+  --green-darkest: #0b1c11;
+  --green-deep:    #153922;
+  --green-base:    #1b482c;
+  --green-bright:  #235c38;
 
-  /* SURFACES */
+  /* SURFACES
+     VIS-1b: `--surface-game` es el `--green-base` nuevo al alfa de hoy, y las
+     dos tintas de zona son el `--green-abyss` nuevo a los alfas de hoy. Los
+     alfas NO se mueven: fijan cuánta mesa se ve a través de la zona.
+     `--surface-panel` y `--surface-card` quedan fuera de la tanda a propósito
+     (tapetes.css §"qué es fieltro y qué es cromo": son cromo del lobby). */
   --surface-panel:      rgba(10, 28, 14, 0.75);
-  --surface-game:       rgba(35, 92, 56, 0.88);
+  --surface-game:       rgba(27, 72, 44, 0.88);
   --surface-card:       rgba(10, 30, 15, 0.55);
-  --surface-area:       rgba(10, 30, 15, 0.45);
-  --surface-area-light: rgba(10, 30, 15, 0.30);
+  --surface-area:       rgba(9, 23, 14, 0.45);
+  --surface-area-light: rgba(9, 23, 14, 0.30);
   --surface-modal:      #0e2518;
 
   /* TEXT */
