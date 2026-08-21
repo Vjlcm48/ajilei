@@ -9,6 +9,10 @@ import { vozResto } from '../hooks/resultadoCore'
 // GameTable controla el contenido de cada slot vía renderCard(i) — el panel es solo layout.
 export default function OpponentPanel({
   player,           // players[seat] del motor
+  playerIndex,      // VIS-3a: el ÍNDICE de ese jugador en el motor — el mismo que
+                    // devuelve game.winner. El panel recibía el objeto pero no su
+                    // índice, y el vuelo de monedas necesita nombrar el destino por
+                    // identificador estable, jamás por posición ni por orden DOM.
   seatPos,          // 'top-left' | 'top-center' | 'top-right' | 'side-left' | 'side-right'
   isMano,
   isPie,
@@ -86,7 +90,11 @@ export default function OpponentPanel({
             desmonta (lo sustituye la ficha de esquina), cumpliendo DSK-1 en las IAs.
             Móvil intacto: donde cornerChip=true, letterBadges ya era true → !letterBadges
             ya lo desmontaba (la condición extra es no-op fuera del gate desktop). */}
-        {!letterBadges && !cornerChip && <span className="opp-chips"><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>}
+        {/* VIS-3a · destino del vuelo por la rama del saldo inline. El censo de
+            Fase 0 no la encontró montada en ninguna de las 11 celdas medidas —la
+            ficha de esquina la sustituye en portrait, landscape y escritorio—,
+            pero se etiqueta igual: el contrato no debe depender de qué rama gane. */}
+        {!letterBadges && !cornerChip && <span className="opp-chips" data-coin-target={playerIndex}><BalanceDisplay chips={player.chips} size="compact" /> fichas</span>}
       </div>
 
       <div className="opp-cards">
@@ -110,8 +118,12 @@ export default function OpponentPanel({
           despliega a la derecha sin empujar nada (patrón pot-float).
           M4-1: gate propio (cornerChip) separado de letterBadges — su CSS
           absolute está scopeado por mesa y sin él el span caería EN FLUJO. */}
+      {/* VIS-3a · DESTINO del vuelo de monedas cuando gana esta IA: es la rama
+          viva en las 11 celdas del censo. El vuelo mide el centro y el TAMAÑO de
+          `[data-coin-target="n"] .chip-token` (aquí 16 px, contra los 36 del
+          humano), y de ahí sale la escala de llegada. */}
       {cornerChip && (
-        <span className="opp-corner-chip" onClick={onChipTap}>
+        <span className="opp-corner-chip" data-coin-target={playerIndex} onClick={onChipTap}>
           <ChipToken size="icon" />
           {isChipOpen && (
             /* H5: solo el número, desnudo (sin caja ni "fichas") */

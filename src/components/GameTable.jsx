@@ -1206,7 +1206,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           </span>
           {/* DSK-P2: escritorio también desmonta el saldo inline (lo sustituye la
               ficha). Móvil intacto (portrait ya lo desmontaba; landscape usa opp-panel). */}
-          {!isPortraitTable && !isDesktopTable && <span className="ai-chips"><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>}
+          {/* VIS-3a · destino por la vía legacy .ai-zone, saldo inline. El censo de
+              Fase 0 no lo encontró montado en ninguna de las 11 celdas medidas
+              (cornerChip lo sustituye en portrait, landscape y escritorio); se
+              etiqueta igual para que el contrato no dependa de qué rama gane. */}
+          {!isPortraitTable && !isDesktopTable && <span className="ai-chips" data-coin-target={seat}><BalanceDisplay chips={rival.chips} size="compact" /> fichas</span>}
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
@@ -1251,8 +1255,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
             3/4/5 (handleChipTap/openChipSeat con el seat REAL del rival, el
             tap-fuera ya excluye .opp-corner-chip). El CSS de posicionamiento
             vive scopeado a .table-two (ancla a .ai-zone, relative en M2-2). */}
+        {/* VIS-3a · destino de la IA por la vía legacy .ai-zone (mesa 2): el
+            atributo lleva el índice del MOTOR, que aquí es `seat` — el mismo con
+            el que ya se llama a handleChipTap. */}
         {(isPortraitTable || isDesktopTable) && (
-          <span className="opp-corner-chip" onClick={() => handleChipTap(seat)}>
+          <span className="opp-corner-chip" data-coin-target={seat} onClick={() => handleChipTap(seat)}>
             <ChipToken size="icon" />
             {openChipSeat === seat && (
               <span className="chip-balance-float">{rival.chips}</span>
@@ -1268,6 +1275,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
       <OpponentPanel
         key={seat}
         player={game.players[seat]}
+        // VIS-3a · el índice del MOTOR, que aquí ya se tiene: `seat` es el mismo
+        // que indexa game.players y el mismo que devuelve game.winner. No hace
+        // falta derivarlo por nombre (ARN-2) porque no se ha perdido.
+        playerIndex={seat}
         seatPos={effLayout[seat]}
         isMano={manoSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
         isPie={deckSeat === seat && (phase !== PHASES.WAITING || isShuffling)}
@@ -1342,7 +1353,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
             el contenido normal reaparece solo. */}
         {!elimNotice && (
           <>
-            <div className="pot-box">
+            {/* VIS-3a · ORIGEN del vuelo de monedas. El atributo es el contrato:
+                el vuelo resuelve `[data-coin-source="pot"] .chip-token` y sale del
+                CENTRO DE LA MONEDA, no de la caja del óvalo. Hay dos `.pot-box` en
+                este archivo —éste y el de renderTwoOvalsZone— porque son rutas
+                alternativas de la misma zona; nunca coexisten (censo de Fase 0:
+                exactamente 1 en las 11 celdas medidas), así que los dos lo llevan
+                y el selector sigue devolviendo una sola moneda. */}
+            <div className="pot-box" data-coin-source="pot">
               <span className="pot-label">Pozo</span>
               <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
                 <ChipToken size="compact" />
@@ -1403,7 +1421,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
     return (
       <div className="two-ovals">
         <section className="felt-oval oval-left">
-          <div className="pot-box">
+          {/* VIS-3a · el mismo origen por la vía de los dos óvalos (mesa 2
+              landscape móvil). Ver la nota de renderCenterZone. */}
+          <div className="pot-box" data-coin-source="pot">
             <span className="pot-label">Pozo</span>
             <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
               <ChipToken size="compact" />
@@ -1706,7 +1726,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               {/* HU-1: la palabra va en un span propio SOLO para poder ocultarla por CSS
                   en portrait 4/5 (.table-wide); el espaciado lo da el gap del inline-flex,
                   así que el span no cambia nada en el resto de mesas/orientaciones. */}
-              <span className="pbr-chips"><BalanceDisplay chips={human.chips} size="full" /> <span className="pbr-fichas-word">fichas</span></span>
+              {/* VIS-3a · DESTINO del vuelo cuando gana el humano. El índice es el
+                  del MOTOR (0 = humano), el mismo que `game.winner`, nunca una
+                  posición ni un orden DOM. */}
+              <span className="pbr-chips" data-coin-target="0"><BalanceDisplay chips={human.chips} size="full" /> <span className="pbr-fichas-word">fichas</span></span>
               <span className="pbr-sep"> · </span>
               <span className="pbr-mesa">Mesa {unit}</span>
             </span>
