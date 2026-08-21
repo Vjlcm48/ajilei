@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, createRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, createRef } from 'react'
 import '../styles/gameTable.css'
 import PlayingCard from './PlayingCard'
 import OpponentPanel from './OpponentPanel'
@@ -648,7 +648,20 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // TIEMPO de la secuencia de victoria — el viaje del pozo arranca en su final.
   // Por eso su asa se guarda: sin el {sound, id} no hay `end` al que engancharse.
   // Se limpia fuera del pago para que ninguna mano herede el asa de la anterior.
-  useEffect(() => {
+  // VIS-3c · `useLayoutEffect`, y NO por gusto: para no romper VC2b.
+  // El armado de la celebración pasó a ser un efecto de LAYOUT (para que el
+  // primer fotograma de la fase de pago salga ya con las cifras retenidas), y
+  // React vacía TODOS los efectos de layout antes que cualquier efecto pasivo.
+  // Con este hermano quedándose en `useEffect`, el orden de la nota de abajo se
+  // invertía: la celebración se armaba ANTES de que este ref tuviera el asa,
+  // `precedente()` devolvía null, la espera daba 0 y el viaje salía EN PARALELO
+  // con showdown.mp3 — exactamente la avería que VC2b vino a arreglar.
+  // Lo cazó el arnés: `vc·jugado` dio `secuencia=false · espera=1ms` con
+  // showdown.mp3 y chips-collect sonando a la vez.
+  // Los dos hermanos tienen que ser de la MISMA clase para que su orden de
+  // declaración siga mandando. Que el `play()` ocurra antes de pintar no cambia
+  // nada: el sonido no espera al fotograma.
+  useLayoutEffect(() => {
     if (phase !== PHASES.PAYOUT) { showdownAudioRef.current = null; return }
     const w = game.winner
     const isShowdown = w !== null && game.players[w].score
