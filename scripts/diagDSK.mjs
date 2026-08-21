@@ -5589,17 +5589,28 @@ async function vcInstall(page) {
 }
 
 // Geometría real del viaje, leída de la página igual que la lee la app.
-const vcGeo = (page) => page.evaluate(() => {
-  const pozo = document.querySelector('.pot-box')
-  const pila = document.querySelector('.pbr-chips')
-  if (!pozo || !pila) return null
-  const a = pozo.getBoundingClientRect(), b = pila.getBoundingClientRect()
+//
+// VIS-3 · Antes esto medía `.pot-box` → `.pbr-chips` con `fichas: 5` cableado, y
+// `p8_geometria` lo comparaba contra esas mismas dos cajas: una copia midiéndose
+// a sí misma. Habría seguido en verde mientras la app volaba de moneda a moneda
+// y con siete fichas. Misma enfermedad que curó VIS-1c-b en el modo `tapetes`, y
+// la misma cura: el arnés lee el CONTRATO vivo —los atributos de VIS-3a y la
+// constante de la app— en vez de un recuerdo.
+//
+// El destino es el 0 (el humano) porque es lo que este modo construye; el modo
+// `vuelo` es el que comprueba los destinos de IA, jugando de verdad.
+const vcGeo = (page, n) => page.evaluate((nFichas) => {
+  const moneda = (sel) => document.querySelector(`${sel} .chip-token`)
+  const origen = moneda('[data-coin-source="pot"]')
+  const destino = moneda('[data-coin-target="0"]')
+  if (!origen || !destino) return null
+  const a = origen.getBoundingClientRect(), b = destino.getBoundingClientRect()
   return {
     desde: { x: a.left + a.width / 2, y: a.top + a.height / 2 },
-    hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2 },
-    fichas: 5,
+    hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2, lado: b.width },
+    fichas: nFichas,
   }
-})
+}, n)
 
 // Juega manos hasta que gane el HUMANO. Un clic por iteración con rechequeo
 // (lección W1). Devuelve el nº de manos que hicieron falta, o null.
@@ -5635,7 +5646,7 @@ async function vcHastaVictoria(page, maxManos = 18) {
 }
 
 async function runVC(browser) {
-  const { decideCelebracion, CELEBRACION_TOPE_MS, VIAJE_MS, VIAJE_ESCALON_MS, AJILEI_MS } =
+  const { decideCelebracion, banderasDe, CELEBRACION_TOPE_MS, VIAJE_MS, VIAJE_ESCALON_MS, AJILEI_MS, VIAJE_N } =
     await import('../src/hooks/celebracionCore.js')
   const { PHASES: FASES } = await import('../src/engine/gameEngine.js')
   const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
@@ -5652,11 +5663,20 @@ async function runVC(browser) {
   const NORMAL = [
     { palo: 'Copas', points: 11, value: 1 }, { palo: 'Espadas', points: 10, value: 12 },
   ]
+  // VIS-3 · La victoria de IA deja de ser `null` y pasa a 'recoleccion'. Las dos
+  // celdas que sellaban el null se reescriben a lo que la doctrina protege de
+  // verdad —que recolectar NO celebre—, y eso se comprueba por las BANDERAS y no
+  // por la ausencia de nivel: `overlay: false, fanfarria: false`.
   const decisor = {
     ajileiGanado: decideCelebracion({ phase: FASES.PAYOUT, winner: 0, humanCards: AJ, ruleN: 2 }) === 'ajilei',
-    ajileiPerdido: decideCelebracion({ phase: FASES.PAYOUT, winner: 1, humanCards: AJ, ruleN: 2 }) === null,
+    ajileiPerdidoRecolecta: decideCelebracion({ phase: FASES.PAYOUT, winner: 1, humanCards: AJ, ruleN: 2 }) === 'recoleccion',
+    ajileiPerdidoNoCelebra: (() => {
+      const b = banderasDe(decideCelebracion({ phase: FASES.PAYOUT, winner: 1, humanCards: AJ, ruleN: 2 }))
+      return b.vuelo === true && b.overlay === false && b.fanfarria === false
+    })(),
     manoGanada: decideCelebracion({ phase: FASES.PAYOUT, winner: 0, humanCards: NORMAL, ruleN: 2 }) === 'mano',
-    manoPerdida: decideCelebracion({ phase: FASES.PAYOUT, winner: 1, humanCards: NORMAL, ruleN: 2 }) === null,
+    manoPerdidaRecolecta: decideCelebracion({ phase: FASES.PAYOUT, winner: 1, humanCards: NORMAL, ruleN: 2 }) === 'recoleccion',
+    sinGanadorNoVuela: decideCelebracion({ phase: FASES.PAYOUT, winner: null, humanCards: NORMAL, ruleN: 2 }) === null,
     partida: decideCelebracion({ phase: FASES.GAME_OVER, winner: 0, humanCards: NORMAL, ruleN: 2 }) === 'partida',
     partidaAjena: decideCelebracion({ phase: FASES.GAME_OVER, winner: 1, humanCards: NORMAL, ruleN: 2 }) === null,
   }
@@ -5674,14 +5694,19 @@ async function runVC(browser) {
       await gotoMesa(page, n)
       await vcInstall(page)
       const base = await page.evaluate(() => window.__vcSnap())
-      const geo = await vcGeo(page)
+      const geo = await vcGeo(page, VIAJE_N)
 
-      // El viaje sale del pozo y llega a la pila del humano — el contrato de
-      // geometría, contra los rects vivos y no contra números cableados.
-      const pozoR = await page.evaluate(() => window.__vcR('.pot-box'))
-      const pilaR = await page.evaluate(() => window.__vcR('.pbr-chips'))
-      const geoOk = !!geo && Math.abs(geo.desde.x - pozoR.cx) <= 0.5 && Math.abs(geo.desde.y - pozoR.cy) <= 0.5 &&
+      // VIS-3 · El viaje va de MONEDA a MONEDA, no de caja a caja: sale de la
+      // Heptacoin del pozo y llega a la del ganador, resuelta por identificador.
+      // Se comprueba contra los rects vivos de esas monedas y contra la
+      // constante de la app, nunca contra números cableados aquí.
+      const pozoR = await page.evaluate(() => window.__vcR('[data-coin-source="pot"] .chip-token'))
+      const pilaR = await page.evaluate(() => window.__vcR('[data-coin-target="0"] .chip-token'))
+      const geoOk = !!geo && !!pozoR && !!pilaR &&
+        Math.abs(geo.desde.x - pozoR.cx) <= 0.5 && Math.abs(geo.desde.y - pozoR.cy) <= 0.5 &&
         Math.abs(geo.hasta.x - pilaR.cx) <= 0.5 && Math.abs(geo.hasta.y - pilaR.cy) <= 0.5 &&
+        geo.hasta.lado === pilaR.w &&                            // el lado del destino, que da la escala
+        geo.fichas === VIAJE_N &&                                // siete, y desde la fuente única
         geo.hasta.y > geo.desde.y && geo.hasta.x > geo.desde.x   // siempre abajo-derecha
 
       // ── Nivel 'mano' construido: viaje + pulso ────────────────────────────
@@ -5913,7 +5938,7 @@ async function runVC(browser) {
       const audioMute = await page.evaluate(() => window.__vcAudio())
       r.muteGlobal = audioMute?.muteGlobal
       r.sonandoConMute = audioMute?.sonando ?? []
-      const geoM = await vcGeo(page)
+      const geoM = await vcGeo(page, VIAJE_N)
       await page.evaluate(g => window.__vcConstruye('mano', g), geoM)
       r.capaConMute = await page.evaluate(() => {
         const c = document.querySelector('.vc-capa')
@@ -7238,6 +7263,261 @@ async function runTapetes(browser) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+// ── VIS-3 · Modo `vuelo` · el pozo va a la moneda del ganador ───────────────
+// Documento rector: docs/AJILEI_Victory_Celebration_v1.0.md §3.1 (Vuelo v2).
+//
+// Este modo JUEGA — no construye. El modo `vc` construye la celebración con
+// `__vcConstruye` para poder auditar sus 20 celdas en tiempo razonable, y eso
+// está bien para capas, tokens y Δ=0; pero el contrato de VIS-3 es "el vuelo
+// aterriza sobre la moneda del ganador", y un ganador no se puede construir:
+// hay que ganarle o perder contra él. Dos escenarios en mesa 5, uno por bando.
+//
+// LO QUE SE MIDE, y de dónde sale cada cosa:
+//   · el destino, del ATRIBUTO `data-coin-target` — nunca de una posición;
+//   · el índice del ganador, corroborado APARTE (chip de puntaje / mensaje),
+//     para que el arnés no se limite a repetirle a la app lo que ella dijo;
+//   · el aterrizaje, del último muestreo por rAF de la séptima moneda: su
+//     `transitionend` cae en el mismo instante en que useCelebracion desmonta
+//     la capa y se pierde por carrera (medido: 6 de 7 eventos en la primera
+//     corrida). El muestreo no tiene esa carrera y el error es despreciable
+//     porque la cola del easing es casi plana;
+//   · la escala, de dividir el lado MEDIDO del destino entre el lado MEDIDO de
+//     la moneda en vuelo. Ni un 24 ni un 36 escritos aquí;
+//   · las siete monedas, contra VIAJE_N importada de la app.
+//
+// ALCANCE DECLARADO: el orden de sucesos del SALDO sólo se comprueba en la
+// victoria humana. El saldo de una IA vive detrás del toggle de su ficha de
+// esquina, y abrirlo durante el vuelo es imposible por construcción — un
+// `pointerdown` corta la celebración (VC v1.0 §6). En la victoria de IA se
+// comprueba el pozo, la ausencia de celebración, y que al ABRIR el toggle
+// DESPUÉS del vuelo el saldo ya está liberado.
+async function runVuelo(browser) {
+  const { VIAJE_N } = await import('../src/hooks/celebracionCore.js')
+  const VP = { w: 1920, h: 1080 }
+  const cells = []
+
+  for (const esc of [{ id: 'humano', quien: 'win', maxManos: 40 }, { id: 'ia', quien: 'lose', maxManos: 10 }]) {
+    const page = await browser.newPage({ viewport: { width: VP.w, height: VP.h } })
+    const c = { escenario: esc.id, mesa: 5, vp: `${VP.w}x${VP.h}` }
+    try {
+      await gotoMesa(page, 5)
+      await vcEspera(page, 400)
+
+      await page.evaluate(() => {
+        const q = v => Math.round(v * 1000) / 1000
+        const R = e => { if (!e) return null; const b = e.getBoundingClientRect()
+          return { w: q(b.width), h: q(b.height), cx: q(b.left + b.width / 2), cy: q(b.top + b.height / 2) } }
+        const destinos = () => [...document.querySelectorAll('[data-coin-target]')].map(h => {
+          const m = h.querySelector('.chip-token')
+          return { idx: h.getAttribute('data-coin-target'), m: R(m) }
+        })
+        window.__vu = { nac: [], ultimos: {}, maxFichas: 0, overlay: false, pulso: false, traza: [] }
+        // El veredicto mira UNA mano: la que alcanzó el escenario. Sin este
+        // borrado, `ultimos[6]` podía traer la moneda de un vuelo ANTERIOR —las
+        // manos perdidas también vuelan desde VIS-3, y el robot las corta al
+        // instante— y el modo juzgaba una foto de otra mano. Se vio: destino "3"
+        // contra un ganador corroborado "4", y escala 1 (ni había despegado).
+        window.__vuReset = () => {
+          window.__vu.nac = []; window.__vu.ultimos = {}; window.__vu.maxFichas = 0
+          window.__vu.overlay = false; window.__vu.pulso = false; window.__vu.traza = []
+        }
+        const txt = s => { const e = document.querySelector(s); return e ? e.textContent.trim() : null }
+        const paso = () => {
+          if (document.querySelector('.vc-ajilei-capa')) window.__vu.overlay = true
+          if (document.querySelector('.vc-pulso')) window.__vu.pulso = true
+          const fichas = [...document.querySelectorAll('.vc-ficha')]
+          if (fichas.length > window.__vu.maxFichas) window.__vu.maxFichas = fichas.length
+          fichas.forEach((f, i) => {
+            if (f.__vu !== undefined) return
+            f.__vu = i
+            window.__vu.nac.push({ i, t: Math.round(performance.now()), img: R(f.querySelector('.chip-token')) })
+          })
+          for (const f of fichas) {
+            window.__vu.ultimos[f.__vu] = { t: Math.round(performance.now()),
+              img: R(f.querySelector('.chip-token')), scale: getComputedStyle(f).scale, escalaDeclarada: f.style.scale, destinos: destinos() }
+          }
+          // Traza de cifras: sólo se anota cuando algo cambia, para que el orden
+          // de sucesos se lea sin ruido.
+          const fila = { pot: txt('.pot-value'), saldo: txt('.pbr-chips .bd-num'), n: fichas.length,
+                         capa: !!document.querySelector('.vc-capa') }
+          const ult = window.__vu.traza[window.__vu.traza.length - 1]
+          if (!ult || ult.pot !== fila.pot || ult.saldo !== fila.saldo || ult.n !== fila.n || ult.capa !== fila.capa) {
+            window.__vu.traza.push({ ...fila, t: Math.round(performance.now()) })
+          }
+        }
+        const bucle = () => { paso(); requestAnimationFrame(bucle) }
+        requestAnimationFrame(bucle)
+        new MutationObserver(paso).observe(document.body, { childList: true, subtree: true, attributes: true })
+        paso()
+      })
+
+      // ── El robot: juega hasta que gane quien toca ──────────────────────────
+      // Descarta de verdad (hasta 3 cartas). Sin eso el humano no gana una mano
+      // en mesa 5 auto-jugando — es el mismo hallazgo que acotó la sub-pasada
+      // jugada del modo `vc` a la mesa de 2.
+      let fin = null, manos = 0, fallos = 0
+      for (let mano = 1; mano <= esc.maxManos && fin !== esc.quien; mano++) {
+        manos = mano
+        await page.evaluate(() => window.__vuReset && window.__vuReset())
+        await clickIf(page, 'button:has-text("Iniciar mano")')
+        fin = null
+        // MEDIDO: una mano de mesa 5 con cuatro IAs dura ~55 s de reloj. Con un
+        // presupuesto de 300 vueltas (~42 s de esperas) el bucle se rendía justo
+        // ANTES del final, y entonces el reintento buscaba el botón de una mano
+        // todavía en curso y daba la mesa por abortada en la primera mano.
+        for (let i = 0; i < 700 && !fin; i++) {
+          await vcEspera(page, 140)
+          const acabo = await page.locator('button:has-text("Siguiente mano")').first().isVisible().catch(() => false)
+          if (acabo) {
+            fin = await page.evaluate(() => {
+              const m = document.querySelector('.game-message')
+              if (!m) return 'fin'
+              return m.classList.contains('msg-win') ? 'win' : (m.classList.contains('msg-lose') ? 'lose' : 'fin')
+            })
+            break
+          }
+          await page.mouse.move(2, 2)
+          const hayDescarte = await page.locator('.action-area button:has-text("Sin descartar")').first().isVisible().catch(() => false)
+          if (hayDescarte) {
+            const cartas = page.locator('.card-clickable')
+            const n = Math.min(3, await cartas.count())
+            for (let k = 0; k < n; k++) await cartas.nth(k).click({ timeout: 1200 }).catch(() => {})
+            await vcEspera(page, 80)
+            if (!await clickIf(page, '.action-area button:has-text("Descartar")')) {
+              await clickIf(page, '.action-area button:has-text("Sin descartar")')
+            }
+            continue
+          }
+          await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
+            await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
+            await clickIf(page, '.action-buttons button:has-text("Apostar")')
+        }
+        if (fin === esc.quien) break
+        // "Siguiente mano" con reintento: el botón puede tardar en montarse
+        // (limpieza, ceremonia de eliminación), y rendirse al primer intento
+        // abortaba la búsqueda entera tras 3 manos — medido.
+        let siguio = false
+        for (let k = 0; k < 40 && !siguio; k++) {
+          siguio = await clickIf(page, 'button:has-text("Siguiente mano")')
+          if (!siguio) await vcEspera(page, 500)
+        }
+        // No se aborta al primer tropiezo: se cuentan. Una mano que no cierra es
+        // ruido del muestreador; tres seguidas ya son una mesa que no avanza.
+        fallos = siguio ? 0 : fallos + 1
+        if (fallos >= 3) { c.abortadaEn = `mano ${mano}: 3 manos sin cerrar`; break }
+        await vcEspera(page, 400)
+      }
+      c.manos = manos
+      c.alcanzado = fin === esc.quien
+      // Esperar AL HECHO, no al reloj: que la capa haya nacido y vuelto a morir.
+      // Un plazo fijo no sirve — la espera a showdown.mp3 mide 1883 ms medidos
+      // (y su tope son 3000) y el vuelo otros 1640, así que 3200 ms muestreaban
+      // la moneda EN EL AIRE: se vio escala 1,0001 contra 1,5, que es una moneda
+      // que ni había empezado a crecer, y un Δ de 75 px que era simple trayecto
+      // pendiente.
+      let nacio = false
+      for (let k = 0; k < 160; k++) {
+        const viva = await page.evaluate(() => !!document.querySelector('.vc-capa'))
+        if (viva) nacio = true
+        if (nacio && !viva) break
+        await vcEspera(page, 100)
+      }
+      c.capaNacio = nacio
+      await vcEspera(page, 300)
+
+      const v = await page.evaluate(() => window.__vu)
+      c.ganadorCorroborado = await page.evaluate(() => {
+        // El índice del ganador, leído por una vía DISTINTA del atributo que se
+        // está auditando: el chip de puntaje del showdown, o el humano si el
+        // mensaje es de victoria.
+        const m = document.querySelector('.game-message')
+        if (m && m.classList.contains('msg-win')) return '0'
+        const p = [...document.querySelectorAll('.opp-panel, .ai-zone')].find(x => x.querySelector('.win-score-chip'))
+        if (p) { const t = p.querySelector('[data-coin-target]'); return t ? t.getAttribute('data-coin-target') : null }
+        return null
+      })
+
+      // ── Veredicto ──────────────────────────────────────────────────────────
+      const iMax = Object.keys(v.ultimos).length ? Math.max(...Object.keys(v.ultimos).map(Number)) : -1
+      const sep = iMax >= 0 ? v.ultimos[iMax] : null
+      const ladoVuelo = v.nac.length ? v.nac[0].img.w : null
+      let destino = null, d = Infinity
+      if (sep) for (const t of sep.destinos) {
+        if (!t.m) continue
+        const dd = Math.hypot(t.m.cx - sep.img.cx, t.m.cy - sep.img.cy)
+        if (dd < d) { d = dd; destino = t }
+      }
+      const dx = sep && destino ? Math.abs(sep.img.cx - destino.m.cx) : null
+      const dy = sep && destino ? Math.abs(sep.img.cy - destino.m.cy) : null
+      const escEsperada = destino && ladoVuelo ? destino.m.w / ladoVuelo : null
+
+      // Orden de sucesos, leído de la traza y no de un cronómetro.
+      const t0 = v.nac.length ? v.nac[0].t : null                    // sale la primera
+      const antes = v.traza.filter(x => t0 !== null && x.t < t0)
+      const durante = v.traza.filter(x => t0 !== null && x.t >= t0)
+      const potAntes = antes.length ? antes[antes.length - 1].pot : null
+      const potDurante = durante.length ? durante[0].pot : null
+      // El saldo del humano: no puede subir mientras haya monedas en el aire.
+      const saldosConCapa = [...new Set(v.traza.filter(x => x.capa).map(x => x.saldo))]
+      const saldoFinal = v.traza.length ? v.traza[v.traza.length - 1].saldo : null
+      const subeAlFinal = esc.id === 'humano'
+        ? (saldosConCapa.length === 1 && saldoFinal !== null && Number(saldoFinal) > Number(saldosConCapa[0]))
+        : null
+
+      // En la victoria de IA: tras el vuelo, abrir el toggle debe dar el saldo
+      // ya LIBERADO (la retención no sobrevive a la celebración).
+      let saldoIALiberado = null
+      if (esc.id === 'ia' && c.alcanzado) {
+        await clickIf(page, `[data-coin-target="${c.ganadorCorroborado}"]`)
+        await vcEspera(page, 250)
+        saldoIALiberado = await page.evaluate(() => {
+          const e = document.querySelector('.chip-balance-float')
+          return e ? e.textContent.trim() : null
+        })
+      }
+
+      const checks = {
+        escenarioAlcanzado: c.alcanzado === true,
+        sieteMonedas: v.maxFichas === VIAJE_N,
+        destinoPorAtributo: !!destino && destino.idx === c.ganadorCorroborado,
+        bandoCorrecto: !!destino && (esc.id === 'humano' ? destino.idx === '0' : destino.idx !== '0'),
+        septimaEnDestino: dx !== null && dx <= 1 && dy <= 1,
+        // La escala se juzga contra el valor DECLARADO (`style.scale`), que es el
+        // destino de la transición, y no contra el computado, que es el valor
+        // ANIMADO del instante muestreado. El último muestreo cae un fotograma
+        // antes de que la capa muera, así que el computado se queda a un pelo:
+        // medido 1,48994 contra 1,5, que son 0,01006 — un artefacto de muestreo,
+        // no un error de la fórmula. El computado se conserva en el detalle para
+        // que se vea cuánto falta, y se exige que esté dentro de 0,05.
+        escalaDeLlegada: escEsperada !== null && sep.escalaDeclarada != null &&
+          Math.abs(Number(sep.escalaDeclarada) - escEsperada) <= 0.001 &&
+          Math.abs(Number(sep.scale) - escEsperada) <= 0.05,
+        pozoSeVaciaAlSalirLaPrimera: potAntes !== null && potAntes !== '0' && potDurante === '0',
+        sinCelebracionEnIA: esc.id === 'humano' ? true : (!v.overlay && !v.pulso),
+        saldoSubeAlFinal: esc.id === 'humano' ? subeAlFinal === true : true,
+      }
+      c.checks = checks
+      c.detalle = { iMax, ladoVuelo, destino, dx: dx === null ? null : round(dx), dy: dy === null ? null : round(dy),
+        escala: sep ? Number(sep.scale) : null, escalaDeclarada: sep ? Number(sep.escalaDeclarada) : null, escEsperada: escEsperada === null ? null : round(escEsperada),
+        maxFichas: v.maxFichas, ganadorCorroborado: c.ganadorCorroborado,
+        potAntes, potDurante, saldosConCapa, saldoFinal, saldoIALiberado,
+        traza: v.traza.slice(-10) }
+      c.passed = Object.values(checks).every(Boolean)
+    } catch (e) {
+      c.error = String(e && e.message || e).slice(0, 300)
+      c.passed = false
+    }
+    cells.push(c)
+    const fallos = c.checks ? Object.entries(c.checks).filter(([, v]) => !v).map(([k]) => k) : ['ERROR']
+    const d = c.detalle || {}
+    console.log(`vuelo ${c.escenario.padEnd(6)} m5 ${c.vp} · manos=${c.manos} · monedas=${d.maxFichas} · destino="${d.destino && d.destino.idx}" (corroborado "${d.ganadorCorroborado}") · Δ dx=${d.dx} dy=${d.dy} · escala decl=${d.escalaDeclarada} comp=${d.escala} vs ${d.escEsperada} · pozo ${d.potAntes}→${d.potDurante} · saldo ${JSON.stringify(d.saldosConCapa)}→${d.saldoFinal} · ${c.passed ? 'OK' : 'FALLA [' + fallos.join(',') + ']'}${c.error ? ' · ' + c.error : ''}`)
+    await page.close()
+  }
+  const verde = cells.every(c => c.passed)
+  console.log(`── VUELO · ${verde ? 'VERDE' : 'ROJO'} (${cells.filter(c => c.passed).length}/${cells.length} escenarios) · N=${VIAJE_N}`)
+  return { cells, verde, VIAJE_N }
+}
+
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
 // de 15px del área es invisible al arnés (falso verde comprobado). El modo r2 —
@@ -7297,6 +7577,7 @@ try {
   if (MODE === 'vc') report.vc = await runVC(browser)
   if (MODE === 'msg') report.msg = await runMSG(browser)
   if (MODE === 'tapetes') report.tapetes = await runTapetes(browser)
+  if (MODE === 'vuelo') report.vuelo = await runVuelo(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }
