@@ -40,12 +40,15 @@
 }
 
 /* Face-down back */
+/* El respaldo: lo único que se vería si el activo del reverso no cargara. El
+   <img> de PlayingCard lo tapa entero, así que en la práctica no se ve nunca —
+   VIS-0 lo encontró y lo llamó tinta muerta. Hasta VIS-2 eran rayas diagonales
+   rojas (#8B0000/#C41E3A), que no eran el reverso de nada: sobrevivían del
+   dorso improvisado anterior al PNG. Pasa a ser el CAMPO del reverso oficial
+   (#41101c, Identidad A v1.1 §6), para que el respaldo se parezca a lo que
+   respalda. */
 .card-back {
-  background: repeating-linear-gradient(
-    45deg,
-    #8B0000 0px, #8B0000 5px,
-    #C41E3A 5px, #C41E3A 10px
-  );
+  background: #41101c;
   border: 2px solid rgba(var(--gold-brand-rgb), 0.45);
 }
 
