@@ -16,6 +16,29 @@ import { CONSULTAS_KEY, CONSULTAS_GRATIS } from '../config/consultas'
 const PANEL_W = 64
 const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 
+// ── MOV-1a · D4 · Pinza vertical del panel ───────────────────────────────────
+// El alto del panel es CONSTANTE en las dos pieles (5 filas de 44 + filete 6 +
+// padding 8+8 + bordes 1+1 = 244) y lo espejan `--dsk-u1-item-h` y
+// `--dsk-u1-sep-gap` en ambas hojas. Aquí se declara porque el ancla se calcula
+// ANTES de que el panel exista: no hay caja que medir todavía.
+//
+// POR QUÉ LA PINZA VIVE EN UNA CADENA CSS Y NO EN ARITMÉTICA DE JS.
+// El área segura sólo se conoce desde CSS (`env(safe-area-inset-*)`); JS no
+// puede leerla sin montar un nodo sonda, y `getPropertyValue` de una custom
+// property devuelve el token sin resolver. Y la hoja no puede corregir un
+// `top` en línea sin `!important`, que está prohibido. Emitiendo el `clamp()`
+// COMO valor en línea, el cálculo lo hace el navegador: área segura incluida,
+// cero `!important`, y una sola expresión para las dos pieles.
+// En escritorio la pinza NO MUERDE por construcción —el panel abre a ~60px del
+// techo con 460..582px libres por debajo (medida de U1)— y por eso esta tanda
+// no toca su geometría; la celda 1920×1080 de la Fase 2 lo prueba en lugar de
+// suponerlo. `clamp(a,b,c)` es `max(a, min(b,c))`: si el viewport bajara de
+// 260px el panel quedaría clavado arriba y desbordaría, caso borde aceptado.
+const PANEL_H = 244
+const PANEL_MARGIN = 8   // aire mínimo a los filos del área segura
+const TOP_MIN = `calc(${PANEL_MARGIN}px + env(safe-area-inset-top, 0px))`
+const TOP_MAX = `calc(100dvh - ${PANEL_H + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px))`
+
 // ── Contador de consultas de "Mano actual" (v1.1 §3.4 y §3.6) ───────────────
 // Infraestructura, no lógica: la clave se crea con las 20 gratis y se lee para
 // pintar el badge. El CONSUMO llega en su propio ciclo — aquí nadie decrementa.
@@ -86,7 +109,13 @@ export function useUtilitiesMenu(enabled = true) {
       const el = triggerRef.current
       if (!el) return null
       const r = el.getBoundingClientRect()
-      return { left: r.right - PANEL_W, top: r.bottom + PANEL_GAP }
+      // `left` sigue siendo un número (nunca ha necesitado pinza: el mínimo
+      // medido en las 16 celdas móviles es 236,4px). `top` sale ya como
+      // longitud CSS — ver la nota de la pinza arriba.
+      return {
+        left: r.right - PANEL_W,
+        top: `clamp(${TOP_MIN}, ${r.bottom + PANEL_GAP}px, ${TOP_MAX})`,
+      }
     })
   }, [])
 

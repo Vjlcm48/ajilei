@@ -3,7 +3,6 @@ import '../styles/gameTable.css'
 import PlayingCard from './PlayingCard'
 import OpponentPanel from './OpponentPanel'
 import { SoundButton } from './SoundButton'
-import { MuteButton } from './MuteButton'
 import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { ManoActualPopup } from './ManoActual'
@@ -363,10 +362,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   const isLandscapeTable = useIsLandscapeTable()
   const isPortraitTable  = useIsPortraitTable()
   const isDesktopTable   = useIsDesktopTable()   // DSK-P1: header estático del panel IA
-  // DSK-U1 · el menú de utilidades sólo existe en el gate de escritorio; la
-  // bifurcación es de JSX (no de CSS) para que móvil conserve su bocina byte a
-  // byte. El hook se llama SIEMPRE (orden de hooks estable) y recibe el gate.
-  const utilMenu = useUtilitiesMenu(isDesktopTable)
+  // DSK-U1 · el menú de utilidades sólo existía en el gate de escritorio.
+  // MOV-1a · deja de estar gateado: el menú es ahora la ÚNICA cabecera en las
+  // dos pieles, así que el hook corre sin gate. Sus tres hermanos (reacciones,
+  // consultas, tapetes) SIGUEN gateados: lo que se porta en esta tanda es el
+  // envoltorio y la entrada Sonido, no lo que hay detrás (eso es MOV-1b).
+  // El cierre por `resize` que el hook ya traía cubre el cambio de orientación
+  // sin una línea nueva: girar el teléfono cierra el panel.
+  const utilMenu = useUtilitiesMenu()
   // DSK-U2 · circuito de reacciones. Mismo gate y mismo patrón: el hook se
   // llama SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
   // escritorio no hay selector, ni burbuja, ni listeners.
@@ -1549,10 +1552,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           {!brandInMid && renderBrand()}
           <div className="header-right">
             {/* DSK-U1 · escritorio: la bocina se muda DENTRO del menú y su caja
-                pasa a ser el disparador ⋮. Móvil sigue con la bocina intacta. */}
-            {isDesktopTable
-              ? <UtilitiesTrigger open={utilMenu.open} onToggle={utilMenu.toggle} registerTrigger={utilMenu.registerTrigger} />
-              : <MuteButton />}
+                pasa a ser el disparador ⋮.
+                MOV-1a · móvil hace lo mismo. Mismo contenedor y mismo orden en
+                el DOM que la bocina que releva —el disparador conserva su clase
+                `.mute-button`, así que TODAS las reglas de posición por celda de
+                gameTable.css (flujo en la cabecera, absoluto al flanco del óvalo
+                en mesas 5/4 horizontales, 32×28 en mesa 2 horizontal) le siguen
+                aplicando sin tocar esa hoja, que es protegida. */}
+            <UtilitiesTrigger open={utilMenu.open} onToggle={utilMenu.toggle} registerTrigger={utilMenu.registerTrigger} />
             <SoundButton className="btn-leave" onClick={() => setConfirmLeave(true)} title="Abandonar mesa">✕</SoundButton>
           </div>
         </header>
@@ -1862,18 +1869,23 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           vecino de las voladoras, no dentro de la cabecera: fuera de flujo
           estricto y `fixed` sobre el viewport (ningún ancestro con transform),
           así que ni empuja ni lo recorta el scroller. */}
-      {isDesktopTable && (
-        <UtilitiesPanel
-          anchor={utilMenu.anchor}
-          onClose={utilMenu.close}
-          onReacciones={() => reacciones.abrirSelector(utilMenu.triggerRect())}
-          reaccionesBloqueadas={reacciones.bloqueado || vcViva}
-          consultas={consultas.saldo}
-          manoDisponible={manoDisponible}
-          onManoActual={pedirManoActual}
-          onTapetes={() => tapetes.abrir(utilMenu.triggerRect())}
-        />
-      )}
+      {/* MOV-1a · el panel monta en las dos pieles. `soloSonido` deja vivas
+          Sonido y nada más: Reacciones, Tapetes y Mano actual salen en gris con
+          el tratamiento exacto de Saldo (`is-disabled` + `disabled`) porque sus
+          hooks y sus superficies siguen gateados a escritorio. Se encienden en
+          MOV-1b; hasta entonces la geometría del panel es la misma —64×244, las
+          cinco filas de 44— para que el puerto no cambie de forma dos veces. */}
+      <UtilitiesPanel
+        anchor={utilMenu.anchor}
+        onClose={utilMenu.close}
+        onReacciones={() => reacciones.abrirSelector(utilMenu.triggerRect())}
+        reaccionesBloqueadas={reacciones.bloqueado || vcViva}
+        consultas={consultas.saldo}
+        manoDisponible={manoDisponible}
+        onManoActual={pedirManoActual}
+        onTapetes={() => tapetes.abrir(utilMenu.triggerRect())}
+        soloSonido={!isDesktopTable}
+      />
 
       {/* EMB-2 · panel de tapetes. Vive AQUÍ por la misma razón que sus
           hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se

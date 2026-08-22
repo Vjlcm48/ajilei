@@ -11,6 +11,13 @@ import './styles/embellecimiento.css'
 // tirón. Después de embellecimiento.css — nada de aquí compite con nada de
 // allí, pero el orden de la cascada de pintura queda declarado y no al azar.
 import './styles/tapetes.css'
+// MOV-1a · piel MÓVIL del menú de utilidades. Hoja propia y global por la misma
+// razón que sus dos hermanas: gameTable.css es archivo sellado y toda la piel
+// del menú vive dentro de su bloque de escritorio. Su gate es el complemento
+// EXACTO del de aquel bloque, así que las dos pieles no pueden coexistir.
+// El sitio en esta lista es DOCUMENTACIÓN, no mecanismo: la hoja gana por
+// especificidad y no por orden de carga (ver su encabezado).
+import './styles/menuMovil.css'
 import App from './App.jsx'
 import { SoundProvider } from './context/SoundContext.jsx'
 

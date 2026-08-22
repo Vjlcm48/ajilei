@@ -1,0 +1,268 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOV-1a — Piel MÓVIL del menú de utilidades (⋮)
+   Gate: complemento EXACTO de DESKTOP_TABLE_MQ (GameTable.jsx:82) y del bloque
+         DSK de gameTable.css:4251.
+   Espejo JSX: `!useIsDesktopTable()` → la prop `soloSonido` de UtilitiesPanel.
+   ═══════════════════════════════════════════════════════════════════════════
+
+   POR QUÉ EXISTE ESTA HOJA (D2 de la instrucción, molde EMB-2).
+   Toda la piel del menú vive dentro del bloque de escritorio de `gameTable.css`
+   (5817-6289), que es archivo PROTEGIDO. Montar el componente en móvil sin más
+   da un panel sin una sola regla aplicada. EMB-2 metió cinco tapetes sin abrir
+   esa hoja y IDN-1 sustituyó trece monedas igual; esto es lo mismo: hoja propia,
+   cero líneas en el protegido.
+
+   ── DEUDA DECLARADA ────────────────────────────────────────────────────────
+   SON DOS PIELES DE UN MISMO MENÚ. Un cambio visual en el panel de escritorio
+   (`gameTable.css` §DSK-U1/U1b) NO llega aquí solo: hay que replicarlo a mano.
+   Los valores que se repiten son los tokens `--dsk-u1-*` de :5749-5770 y las
+   reglas de :5821-5935 y :6228-6245. Mientras la fusión no exista —desanidar el
+   bloque DSK es abrir el protegido, y eso lo decide Victor— el arnés es el
+   único guardián: el modo `menu-movil` contrasta la caja del panel y de las
+   entradas contra las MISMAS cifras que `u1` exige en escritorio (64×244, 62×44),
+   así que una piel que se desvíe de la otra sale en rojo y no en silencio.
+
+   ── EL COMPLEMENTO, LITERAL Y POR QUÉ ASÍ ──────────────────────────────────
+   La puerta de escritorio es `(orientation: landscape) and (min-height: 601px)`:
+   dos features de medio y nada más —ni ancho, ni puntero, ni nada que CSS no
+   pueda negar—, así que su complemento SÍ se expresa, y exacto:
+
+       @media not all and (orientation: landscape) and (min-height: 601px)
+
+   `not` de Media Queries 3 niega la consulta ENTERA (`not all and A and B` =
+   ¬(A ∧ B)), que es justo lo que hace falta. Se elige sobre la forma de MQ4
+   `@media not ((…) and (…))` por soporte: la de nivel 3 no tiene asteriscos.
+   Consecuencia buscada: las dos pieles son mutuamente excluyentes por
+   construcción — nunca aplican las dos, y nunca ninguna. Ni un solo hueco que
+   dependa de que alguien mantenga sincronizadas dos condiciones distintas.
+
+   ── LA CASCADA SE GANA POR ESPECIFICIDAD, NO POR ORDEN DE CARGA ────────────
+   Doctrina heredada de embellecimiento.css. El disparador conserva la clase
+   `.mute-button` a propósito (así hereda del protegido su posición por celda),
+   y eso lo pone a tiro de reglas que ya existen allí:
+     · `.mute-button` (0,1,0) declara `font-size: 15px`. Empate con
+       `.utilities-trigger` → lo resolvería el orden de importación, que es
+       frágil. Por eso las reglas del disparador van scopeadas a
+       `.game-table-screen …` (0,2,0): ganan siempre, se importe donde se importe.
+     · `.table-two .header-right .mute-button` (0,3,0) fija 32×28 y padding 0 en
+       mesa 2 horizontal. Nos gana, Y ESO ES LO QUE SE QUIERE (D5: el disparador
+       hereda la caja de la bocina por celda). No se contrarresta.
+     · `.table-five/.table-four .mute-button` (0,2,0) lo vuelven `absolute` al
+       flanco del óvalo en horizontal. También ganan a nuestro `position:
+       relative` (0,1,0) — y también es lo que se quiere: `absolute` ancla el
+       `::after` igual de bien.
+   El panel y las entradas no llevan scope: sus selectores no tienen un solo
+   competidor fuera del bloque de escritorio, que no puede estar activo a la vez.
+
+   Cero `!important`. Ni un margen que mueva a un vecino (doctrina O1).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media not all and (orientation: landscape) and (min-height: 601px) {
+
+  /* ── Tokens ────────────────────────────────────────────────────────────────
+     Espejo literal de gameTable.css:5749-5770. Se repiten porque allí viven
+     dentro del gate de escritorio y aquí no llegan; son el otro extremo de la
+     deuda declarada arriba. Mismos nombres a propósito: así las reglas copiadas
+     se leen idénticas a las del original y el diff entre pieles es legible. */
+  .game-table-screen {
+    --dsk-u1-panel-w: 64px;
+    --dsk-u1-item-h: 44px;
+    --dsk-u1-ico-w: 18px;      /* glifos de texto (bocina, bocadillo) */
+    --dsk-u1-card-h: 26px;     /* siluetas SVG: carta con "?" y godete */
+    --dsk-u1-sep-gap: 6px;     /* aire que separa "Mano actual" del grupo */
+    /* Por encima del techo VIVO del área en móvil —20, medido en las 16 celdas
+       de MOV-0 0.4: título, "Mano #N", .header-right, bocina, ✕ y marca— y por
+       debajo de los modales que sí deben taparlo (leave-overlay 100, bancarrota
+       120). Mismo valor y misma semántica que en escritorio, y aquí también
+       está libre: nada ocupa 21..99 salvo la celebración (26/32), que en
+       escritorio ya pinta por encima del menú igualmente.
+       La cadena del disparador a la raíz es static/z-auto de punta a punta, sin
+       transform, filter, opacity, contain ni isolation en ninguna de las 16
+       celdas (MOV-0 0.4), así que el único contexto de apilamiento es el raíz y
+       el `fixed` del panel ancla al viewport sin portal — igual que arriba. */
+    --dsk-u1-panel-z: 30;
+
+    /* Embaldosado táctil del disparador (D3). Tres tokens y no uno, porque el
+       reparto tiene que poder dejar de ser simétrico: el vecino de cada lado no
+       vale lo mismo (a la derecha vive la ✕ —un control— a 8px, y a la
+       izquierda hay 59..94px en casi todas las celdas). En el caso general
+       2,7 por lado bastan y quedan 5,3px hasta la ✕; el reparto desigual sólo
+       hace falta en mesa 2 horizontal, más abajo.
+       Las cifras salen de la caja de PADDING, que es la que ancla un `::after`
+       absoluto: 40,61×32 con borde de 1px = 38,61×30, así que
+       38,61+2,7+2,7 = 44,01 y 30+7+7 = 44. */
+    --mov-tap-l: 2.7px;
+    --mov-tap-r: 2.7px;
+    --mov-tap-y: 7px;
+  }
+
+  /* ── Disparador ────────────────────────────────────────────────────────────
+     Ley E2 del diagnóstico U1, que vale igual aquí: reservar la caja no es
+     cosmética. Con sólo cambiar el glifo 🔊 → ⋮ el botón encoge y arrastra a
+     `.header-right`; con ancho y alto explícitos, Δ=0 contra la bocina que
+     releva. Los 40,61×32 son la caja MEDIDA en 14 de las 16 celdas de MOV-0
+     0.2; las otras dos (mesa 2 horizontal) las fija el protegido en 32×28 y no
+     se tocan. El ⋮ sube a 18px porque a los 15 heredados es un puntito. */
+  .game-table-screen .utilities-trigger {
+    box-sizing: border-box;
+    width: 40.61px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+  }
+  /* Ancla del embaldosado. Va sin scope (0,1,0) a propósito: en mesas 5 y 4
+     horizontales el protegido lo vuelve `absolute` con (0,2,0) y debe ganar. */
+  .utilities-trigger { position: relative; }
+
+  /* EL HIT DEL DISPARADOR NO SE ENTIERRA. Medido: sin esta regla el embaldosado
+     de D3 se queda en 45×42 y 45×40 en mesa 2 vertical. No es que el pseudo
+     mida menos —mide lo que dice— sino que lo pinta encima el vecino de abajo:
+     en esa celda `.header-right` es la ÚNICA de las 16 que no lleva
+     `position`+z (mesas 5 y 4 la vuelven absoluta con z 20 en sus propias
+     reglas, mesa 3 también en horizontal), y a la vez es donde menos aire hay
+     —`.ai-zone` a 2..4px, el mínimo de las 16 celdas de MOV-0 0.2—. El
+     resultado es un botón que se ve entero y se toca a medias.
+     21 y no 20: por encima del techo VIVO del área, que es exactamente 20. Se
+     queda muy por debajo de la celebración (26/32), de los modales (100/120) y
+     de las cartas voladoras (200), así que no tapa nada que deba tapar a un
+     control. Lo que sube es un botón de 40,61×32 y un pseudo transparente.
+     (0,3,0) para no depender del orden de importación: le gana a
+     `.table-five/.table-four .mute-button` (0,2,0), y con
+     `.table-two .header-right .mute-button` (0,3,0) no compite —aquélla no
+     declara `z-index`—. El disparador es hijo de `.header-right` en las 16
+     celdas, incluso donde el protegido lo saca al flanco del óvalo. */
+  .game-table-screen .header-right .utilities-trigger { z-index: 21; }
+  .utilities-trigger.is-open { border-color: rgba(var(--gold-brand-rgb), 0.55); }
+
+  /* D3 · hit 44×44 css px SIN mover un píxel visual. En móvil el puntero es
+     coarse en las 16 celdas (medido), pero la consulta se conserva por
+     simetría con B2 y para que un móvil con puntero fino no cargue el pseudo. */
+  @media (pointer: coarse) {
+    .utilities-trigger::after {
+      content: '';
+      position: absolute;
+      top: calc(var(--mov-tap-y) * -1);
+      bottom: calc(var(--mov-tap-y) * -1);
+      left: calc(var(--mov-tap-l) * -1);
+      right: calc(var(--mov-tap-r) * -1);
+    }
+  }
+
+  /* Mesa 2 horizontal · la caja baja a 32×28 con padding 0 (padding-box 30×26),
+     así que el embaldosado necesita más de todo: 30+10+4 = 44 y 26+9+9 = 44.
+     El reparto horizontal se carga a la IZQUIERDA (84..119px libres) para dejar
+     4 de los 8px que la separan de la ✕ en vez de 1. */
+  @media (orientation: landscape) and (max-height: 600px) {
+    .table-two .utilities-trigger {
+      --mov-tap-l: 10px;
+      --mov-tap-r: 4px;
+      --mov-tap-y: 9px;
+    }
+  }
+
+  /* ── Panel ─────────────────────────────────────────────────────────────────
+     Fuera de flujo estricto, jamás empuja. `fixed` sobre el viewport: se monta
+     como hermano del área, vecino de las cartas voladoras, y ningún ancestro
+     tiene transform — no hace falta portal (verificado en las 16 celdas,
+     MOV-0 0.4). `left` lo pone el componente midiendo el disparador al abrir;
+     `top` llega ya como `clamp()` con el área segura dentro (D4, la pinza vive
+     en useUtilitiesMenu.js porque un valor en línea no se corrige desde una
+     hoja sin `!important`).
+     Estética: la misma superficie de sistema, el mismo oro único en el borde y
+     la misma sombra que arriba. Es el mismo menú. */
+  .utilities-panel {
+    position: fixed;
+    z-index: var(--dsk-u1-panel-z);
+    box-sizing: border-box;
+    width: var(--dsk-u1-panel-w);
+    padding: 8px 0;
+    background: var(--surface-modal);
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary);
+  }
+
+  /* Fila SOLO-ICONO: 62×44. El estándar táctil de la campaña son 40px y estas
+     filas lo superan sin ayuda de ningún pseudo — EL PANEL ENCOGE EN ANCHO,
+     JAMÁS EN ÁREA TÁCTIL, igual que en U1b. `position: relative` es herencia
+     del ancla del badge; sin offsets no mueve nada, y se conserva para que las
+     dos pieles sigan siendo el mismo CSS aunque aquí el badge no monte. */
+  .util-item {
+    box-sizing: border-box;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--dsk-u1-item-h);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  /* Sólo donde hay algo que ejecutar: los no habilitados no fingen ser
+     tocables. En táctil el hover es pegajoso, así que esto hoy sólo lo verá un
+     móvil con ratón — se conserva por identidad con la piel de escritorio. */
+  .util-item:not(.is-disabled):hover { background: rgba(var(--gold-brand-rgb), 0.10); }
+
+  /* Glifos de texto (bocina, bocadillo). line-height:1 + flex centrado evita
+     que la métrica del emoji descuadre la fila. */
+  .util-ico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--dsk-u1-ico-w);
+    line-height: 1;
+  }
+  /* La ficha de Saldo es el ChipToken de la app (hoja propia, global): no se le
+     toca el color. `line-height: 0` mata el hueco de línea del inline SVG. */
+  .util-ico-chip { line-height: 0; }
+  .util-ico-slot { display: flex; line-height: 0; }
+  /* Las DOS siluetas SVG del panel miden lo mismo: la carta con "?" de Mano
+     actual y el godete de Tapetes (su regla vive en tapetes.css:289, dentro del
+     gate de escritorio, así que aquí hay que dársela). */
+  .util-ico-card,
+  .util-ico-godete {
+    height: var(--dsk-u1-card-h);
+    width: auto;
+    display: block;
+    color: var(--text-primary);
+    font-family: inherit;
+  }
+  /* El icono de Mano actual es un <button>: hereda del sistema lo que el <span>
+     traía gratis. Sin caja propia — la reserva es la de .util-ico-slot. */
+  button.util-ico-slot {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  button.util-ico-slot:disabled { cursor: default; }
+
+  /* Estado de no habilitado (v1.0 §3): atenuado y sin respuesta al clic — el
+     atributo `disabled` ya bloquea el evento, aquí sólo se ve. En esta tanda lo
+     llevan CUATRO de las cinco entradas: Reacciones, Tapetes, Saldo y Mano
+     actual. Se encienden en MOV-1b. */
+  .util-item.is-disabled { opacity: 0.45; cursor: default; }
+
+  /* "Mano actual" cierra el panel separada del grupo: filete del sistema + aire.
+     A diferencia de escritorio NO se le devuelve `opacity: 1` a la fila, y es
+     deliberado: allí ese rescate existe para que el badge —vivo aunque la
+     entrada esté inerte— no se atenúe con ella, y aquí el badge no monta. Sin
+     badge, la fila se atenúa entera y queda EXACTAMENTE como Saldo, que es el
+     tratamiento que pide la tanda. La geometría no se entera: el filete y el
+     aire son los mismos, así que el panel sigue midiendo 64×244. */
+  .util-item-mano {
+    margin-top: var(--dsk-u1-sep-gap);
+    border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+  }
+}
