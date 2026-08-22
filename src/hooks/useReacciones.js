@@ -59,9 +59,21 @@ export function useReacciones(enabled = true) {
 
   // Anclado por su borde DERECHO al filo derecho del ⋮ (molde del popup del
   // contador): así el ancho puede crecer con la rejilla sin recalcular nada.
-  const abrirSelector = useCallback((rect) => {
+  //
+  // MOV-1b-c · el ancla puede llegar YA CALCULADA. En móvil la pone `anclaSatelite`
+  // (doctrina D6), que además de anclar PINZA contra los filos vivos de la fila
+  // de juego, y esa cuenta no puede vivir aquí: la comparten los tres satélites
+  // del ⋮. Cuando no llega, vale la de siempre, byte a byte — que es la de
+  // escritorio. El `top` se emite como CADENA en las dos ramas porque el de D6
+  // es un `clamp()` con `env()` dentro, y un solo lenguaje evita que el
+  // componente tenga que adivinar cuál de los dos le tocó.
+  const abrirSelector = useCallback((rect, ancla) => {
+    if (ancla) { setSelector(ancla); return }
     if (!rect) return
-    setSelector({ right: window.innerWidth - rect.right, top: rect.bottom + REACCION_GAP_PX })
+    setSelector({
+      right: window.innerWidth - rect.right,
+      top: `${rect.bottom + REACCION_GAP_PX}px`,
+    })
   }, [])
 
   // Guarda real del candado. El selector ya deshabilita sus entradas, pero el

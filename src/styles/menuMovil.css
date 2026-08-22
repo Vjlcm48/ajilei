@@ -341,4 +341,302 @@
        El título se queda encima: es lo que deja la fila más baja. */
     .tapetes-panel { --tap-cols: 5; }
   }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     MOV-1b-c · REACCIONES
+     Tercer bloque de la DEUDA DE DOS PIELES declarada arriba: las 17 reglas
+     `.u2-*` de gameTable.css:6007-6216 viven en el bloque DSK de un archivo
+     PROTEGIDO, así que se copian aquí con sus tokens en vez de abrirlo. Si el
+     selector o la burbuja cambian de aspecto en escritorio, esto hay que
+     replicarlo a mano — se dice para que nadie lo descubra tarde.
+     CONTABILIDAD DE LO QUE NO SE COPIA: nada. Las 17 están, incluida la ✕ y su
+     embaldosado B2, e incluida `.util-item.is-cooling`, que es piel de la
+     ENTRADA y no del selector pero pertenece al mismo circuito.
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  .game-table-screen {
+    /* UNA COLUMNA. La lista de cuatro visibles con desplazamiento no es una
+       caja nueva ni un `data-layout`: es el MISMO `--dsk-u2-cols` que ya
+       gobierna la rejilla, puesto a 1 — mismo criterio que la fila de cinco de
+       Tapetes. La rejilla 3×4 de escritorio mide 732,56 de ancho y no cabe en
+       ninguno de los cuatro viewports móviles; en una columna el ancho lo fija
+       la frase más larga y sale 242 de caja de cliente. */
+    --dsk-u2-cols: 1;
+    /* Relleno y separación 2 (escritorio usa 4): con doce filas apiladas, 4 de
+       separación sumaban 44 de recorrido extra sin ganar legibilidad. */
+    --dsk-u2-gap: 2px;
+    --dsk-u2-fs: 14px;
+    --dsk-u2-emoji: 40px;
+    --dsk-u2-emoji-gap: 6px;
+    --dsk-u2-glifo: 1.11em;
+    --dsk-u2-bub-z: 25;
+    /* Cuántas filas se ven de las doce. Declarado, no cableado: el alto del
+       contenedor se DERIVA de aquí y `ALTO_SELECTOR_REACCIONES`
+       (useUtilitiesMenu.js) lo espeja para que D6 pinze contra el mismo número. */
+    --mov-u2-visibles: 4;
+  }
+
+  /* ── Selector · lista de cuatro visibles ───────────────────────────────────
+     Satélite del ⋮ como sus dos hermanos (D6): en vertical cuelga bajo el
+     disparador, en horizontal va a 6px a su izquierda, y siempre pinzado al
+     techo derivado de los filos vivos.
+     186 es la caja de CLIENTE (4·44 + 3·2 de separación + 2·2 de relleno), que
+     es la cifra sellada de la lámina y la que mide `scrollHeight`; la caja de
+     BORDE sale 2px mayor por el filete, y por eso el alto se declara con ese
+     `+ 2px` explícito en vez de dejarlo al azar del `box-sizing`. */
+  .u2-selector {
+    position: fixed;
+    z-index: calc(var(--dsk-u1-panel-z) + 1);
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(var(--dsk-u2-cols), minmax(0, 1fr));
+    gap: var(--dsk-u2-gap);
+    padding: var(--dsk-u2-gap);
+    height: calc(
+      var(--mov-u2-visibles) * var(--dsk-u1-item-h)
+      + (var(--mov-u2-visibles) - 1) * var(--dsk-u2-gap)
+      + 2 * var(--dsk-u2-gap)
+      + 2px);
+    overflow-y: auto;
+    /* El gesto de desplazamiento MUERE aquí: sin esto, al llegar al final de la
+       lista el navegador encadena el desplazamiento a la página y la mesa se
+       movería debajo del dedo. */
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--gold-brand-rgb), 0.55) transparent;
+    /* Desvanecido inferior · afordancia de que hay más lista debajo. La máscara
+       vuelve a alfa plena en los últimos 2px A PROPÓSITO: ahí vive el filete
+       dorado, y una máscara que llega a 0 en el filo se lo comería y el panel
+       parecería roto por abajo. */
+    -webkit-mask-image: linear-gradient(to bottom,
+      #000 calc(100% - 20px), rgba(0, 0, 0, 0.12) calc(100% - 3px), #000 calc(100% - 2px));
+    mask-image: linear-gradient(to bottom,
+      #000 calc(100% - 20px), rgba(0, 0, 0, 0.12) calc(100% - 3px), #000 calc(100% - 2px));
+    background: var(--surface-modal);
+    border: 1px solid var(--gold-brand);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Fila de 44 — el mismo estándar táctil del panel. En una sola columna el
+     ancho lo iguala la rejilla a la frase más larga, así que el hit de cada
+     item sale 238,19×44 sin una regla de embaldosado. */
+  .u2-frase {
+    box-sizing: border-box;
+    height: var(--dsk-u1-item-h);
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: var(--dsk-u2-fs);
+    line-height: 1.3;
+    white-space: nowrap;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  .u2-frase:not(:disabled):hover { background: rgba(var(--gold-brand-rgb), 0.10); }
+  .u2-frase:disabled { opacity: 0.45; cursor: default; }
+
+  /* Glifo de Noto, estático en el selector (v1.4 §4). */
+  .u2-glifo {
+    display: inline-block;
+    width: var(--dsk-u2-glifo);
+    height: var(--dsk-u2-glifo);
+    margin-left: 0.35em;
+    vertical-align: -0.2em;
+  }
+
+  /* La entrada 💬 durante el enfriamiento. Clase propia y no `is-disabled`:
+     aquélla es la lengua de "no habilitado" (permanente) y esto es temporal. */
+  .util-item.is-cooling { opacity: 0.6; cursor: default; }
+
+  /* ── Burbuja ───────────────────────────────────────────────────────────────
+     Overlay puro: `fixed`, fuera de flujo, Δ=0 de layout por construcción.
+     La posición y el desplazamiento del pico llegan EN LÍNEA desde el
+     componente, que los mide contra la tinta del nombre y los filos vivos.
+     Aquí sólo vive la piel. Sin oro: el filete es neutro (regla del dorado
+     único — el acento dorado de la familia sigue siendo el del contador). */
+  .u2-burbuja {
+    position: fixed;
+    z-index: var(--dsk-u2-bub-z);
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 8px;
+    row-gap: var(--dsk-u2-emoji-gap);
+    padding: 7px 12px;
+    background: var(--surface-modal);
+    border: 1px solid rgba(var(--text-primary-rgb), 0.22);
+    border-radius: 8px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary);
+    font-size: var(--dsk-u2-fs);
+    line-height: 1.3;
+    pointer-events: none;
+    animation: u2Burbuja var(--u2-dur) ease-out forwards;
+  }
+  .u2-texto { grid-column: 1; grid-row: 1; min-width: 0; text-wrap: balance; }
+  .u2-emoji {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+    display: block;
+    line-height: 0;
+  }
+  /* Caja explícita, innegociable (v1.4 §5.2): el `top` de la burbuja se calcula
+     UNA vez, al montar, y un <img> sin caja mide 0 antes de decodificar. */
+  .u2-emoji img {
+    display: block;
+    width: var(--dsk-u2-emoji);
+    height: var(--dsk-u2-emoji);
+  }
+
+  /* ✕ de cierre anticipado · la ÚNICA parte viva de la burbuja. Mata lo visual
+     y nada más: el enfriamiento sigue corriendo.
+     VA ANTES de las dos ramas de orientación a propósito: la rama vertical la
+     recoloca, y a igual especificidad gana la última que se lee. */
+  .u2-cerrar {
+    grid-column: 2;
+    grid-row: 1;
+    flex: 0 0 auto;
+    position: relative;
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .u2-cerrar:hover { color: var(--text-primary); }
+
+  @media (pointer: coarse) {
+    /* Embaldosado B2 · el hit crece a 40×40 sin mover un píxel visual, hacia
+       DENTRO de la burbuja: desbordar por la derecha lo llevaría hacia las
+       cartas propias, que son inocluibles. */
+    .u2-cerrar::after {
+      content: '';
+      position: absolute;
+      top: -11px; bottom: -11px;
+      left: -22px; right: 0;
+    }
+  }
+
+  /* El pico, en DOS capas (filo + relleno), porque un triángulo de bordes no
+     admite `border` propio. La DIRECCIÓN la pone la orientación y cada rama
+     escribe su declaración completa: ninguna deshace a la otra. */
+  .u2-burbuja::before,
+  .u2-burbuja::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: var(--u2-pico) solid transparent;
+  }
+
+  /* SIN PICO cuando la burbuja cuelga del ⋮ y no del nombre. Ocurre SIEMPRE en
+     horizontal —encima de la tinta quedan 10,41px con el reloj del turno vivo y
+     la burbuja más corta mide 76— y en vertical sólo cuando la frase no cabe en
+     la banda del jugador. Un pico que no alcanza la tinta apuntaría a otra cosa,
+     y eso miente más que no tenerlo.
+     Va por ATRIBUTO y no por media query porque la decisión la toma la MEDIDA:
+     dos frases distintas en la misma pantalla pueden colgar de sitios distintos,
+     y una media query no sabe de eso. */
+  .u2-burbuja[data-ancla="satelite"]::before,
+  .u2-burbuja[data-ancla="satelite"]::after { display: none; }
+
+  /* ── Vertical · OPCIÓN E (autorizada por Victor) ───────────────────────────
+     Encima del nombre no hay sitio y está medido: los botones del turno ocupan
+     la banda entera justo encima, y los 44px que quedan hasta la tinta son las
+     propias pastillas Mano/Pie, que en vertical van ENCIMA del nombre. La
+     burbuja mínima se comía 5 646 px² de la guardia en las ocho celdas.
+     El sitio que sí existe es la banda libre de la misma fila, entre el bloque
+     del nombre y el del saldo. Ahí la burbuja se tumba: emoji a la izquierda,
+     texto a la derecha, pico por el costado izquierdo a la altura de la tinta.
+     Ni el emoji ni el texto cambian de tamaño — la instrucción lo prohíbe y no
+     hizo falta: lo único que cede es el aire entre las dos columnas. */
+  @media (orientation: portrait) {
+    .game-table-screen {
+      /* 6 → 4. La banda de 360×640 mide 159,34 de ancho y cada píxel del aire
+         entre columnas es un píxel menos de texto; se baja el aire, que es lo
+         autorizado, y no la tipografía ni el emoji. */
+      --dsk-u2-emoji-gap: 4px;
+    }
+    .u2-burbuja {
+      /* DOS columnas, las que pidió Victor: emoji y texto. La ✕ NO es la
+         tercera — medido, una tercera columna cuesta 22px (18 + separación) de
+         los 159,34 que mide la banda a 360×640 y deja el texto en ~50, que es
+         donde las frases largas se van a cuatro y cinco renglones. */
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      column-gap: var(--dsk-u2-emoji-gap);
+      row-gap: 0;
+    }
+    .u2-emoji {
+      grid-column: 1;
+      grid-row: 1;
+      justify-self: start;
+      align-self: center;
+    }
+    .u2-texto {
+      grid-column: 2;
+      grid-row: 1;
+      /* SIN `balance` aquí, y es una decisión medida, no una preferencia. El
+         repartidor de líneas ENCOGE la caja para igualar los renglones: con él
+         puesto, la burbuja usaba 130,98 de los 143,34 que la banda le daba a
+         360×640 y se iba a un renglón más. En escritorio y en el horizontal del
+         móvil sigue puesto: allí el ancho lo manda el corredor de las cartas y
+         un renglón colgando se nota; aquí el ancho es el recurso escaso. */
+      text-wrap: wrap;
+    }
+    /* La ✕ se apoya en el filo superior derecho, fuera de la rejilla. Su sitio
+       se lo reserva un flotante en el PRIMER renglón y sólo en él: así el
+       texto no se le mete debajo y los renglones siguientes usan el ancho
+       entero — un hueco de 20px en la línea 1 en vez de 22 en las cinco. */
+    .u2-cerrar {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      margin-top: 0;
+    }
+    .u2-texto::before {
+      content: '';
+      float: right;
+      width: 20px;
+      height: 1.3em;
+    }
+
+    .u2-burbuja::before,
+    .u2-burbuja::after {
+      top: var(--u2-pico-y);
+      transform: translateY(-50%);
+      border-left: 0;
+    }
+    .u2-burbuja::before { right: 100%; border-right-color: rgba(var(--text-primary-rgb), 0.22); }
+    .u2-burbuja::after  { right: calc(100% - 1px); border-right-color: var(--surface-modal); }
+  }
+
+  /* Ciclo de vida · 0,3s entrada / 2,4s visible / 0,3s salida. La duración vive
+     UNA sola vez, en config/reacciones.js, y llega como `--u2-dur`: este
+     keyframe sólo REPARTE el total (300/3000 = 10%, 2700/3000 = 90%).
+     Sólo `opacity` y `transform` — ley del sistema v1.2 §5.1. */
+  @keyframes u2Burbuja {
+    0%   { opacity: 0; transform: translateY(4px)  scale(0.94); }
+    10%  { opacity: 1; transform: translateY(0)    scale(1); }
+    90%  { opacity: 1; transform: translateY(0)    scale(1); }
+    100% { opacity: 0; transform: translateY(-2px) scale(0.98); }
+  }
+
 }

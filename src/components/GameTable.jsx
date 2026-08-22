@@ -16,6 +16,7 @@ import { conNivel } from '../hooks/nivelCore'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import {
   useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
+  ALTO_SELECTOR_REACCIONES,
 } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
@@ -373,10 +374,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // El cierre por `resize` que el hook ya traía cubre el cambio de orientación
   // sin una línea nueva: girar el teléfono cierra el panel.
   const utilMenu = useUtilitiesMenu()
-  // DSK-U2 · circuito de reacciones. Mismo gate y mismo patrón: el hook se
-  // llama SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
-  // escritorio no hay selector, ni burbuja, ni listeners.
-  const reacciones = useReacciones(isDesktopTable)
+  // DSK-U2 · circuito de reacciones.
+  // MOV-1b-c · sin gate: Reacciones se enciende en móvil con la MISMA lógica
+  // —una burbuja a la vez, enfriamiento de 5s inmune a la ✕, veto durante la
+  // celebración— y sin una línea nueva de estado. Lo que cambia por rama es
+  // sólo dónde se pintan sus dos superficies.
+  const reacciones = useReacciones()
   // DSK-U3 · "Mano actual". Mismo gate y mismo molde de hermandad: el hook se
   // llama SIEMPRE (orden de hooks estable) y recibe el gate.
   // MOV-1b-a · sin gate: "Mano actual" se enciende en móvil con el MISMO saldo
@@ -1886,7 +1889,16 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
       <UtilitiesPanel
         anchor={utilMenu.anchor}
         onClose={utilMenu.close}
-        onReacciones={() => reacciones.abrirSelector(utilMenu.triggerRect())}
+        // MOV-1b-c · en móvil el selector es el TERCER satélite del ⋮ y su
+        // ancla la pone D6, con la pinza contra los filos vivos. En escritorio
+        // se sigue pasando sólo el rect y el hook aplica la fórmula de siempre:
+        // la rama se escribe aquí, y no dentro de `anclaSatelite`, porque el
+        // selector de escritorio mide 198 de alto contra los 186 de la lista y
+        // una pinza pensada para el móvil podría moverlo. Δ=0 por construcción.
+        onReacciones={() => reacciones.abrirSelector(
+          utilMenu.triggerRect(),
+          isDesktopTable ? null : anclaSatelite(utilMenu.triggerRect(), ALTO_SELECTOR_REACCIONES),
+        )}
         reaccionesBloqueadas={reacciones.bloqueado || vcViva}
         consultas={consultas.saldo}
         manoDisponible={manoDisponible}
@@ -1928,20 +1940,20 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           voladoras, fuera de flujo estricto. Jamás dentro de un .opp-panel —
           es contexto de apilamiento y R2 le pone `transform`, que rompería el
           `fixed`. La burbuja es overlay puro: Δ=0 de layout por construcción. */}
-      {isDesktopTable && (
-        <ReaccionesSelector
-          anchor={reacciones.selector}
-          bloqueado={reacciones.bloqueado || vcViva}
-          onElegir={reacciones.enviar}
-        />
-      )}
-      {isDesktopTable && (
-        <ReaccionBurbuja
-          activa={reacciones.activa}
-          anchorSel=".pbr-name"
-          onCerrar={reacciones.cerrarBurbuja}
-        />
-      )}
+      {/* MOV-1b-c · las dos montan en las dos pieles. El selector cambia de
+          rejilla 3×4 a LISTA de cuatro visibles por un solo token; la burbuja
+          conserva su anclaje por tinta y sólo la rama vertical del móvil la
+          recoloca (opción E), porque encima del nombre no hay sitio. */}
+      <ReaccionesSelector
+        anchor={reacciones.selector}
+        bloqueado={reacciones.bloqueado || vcViva}
+        onElegir={reacciones.enviar}
+      />
+      <ReaccionBurbuja
+        activa={reacciones.activa}
+        anchorSel=".pbr-name"
+        onCerrar={reacciones.cerrarBurbuja}
+      />
 
       {/* DSK-VC2 · celebración de mesa. Hermanas del área, como el panel de
           utilidades y las burbujas: overlays puros `fixed`, jamás dentro de un

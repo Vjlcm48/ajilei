@@ -49,69 +49,84 @@
    fase de nube, este mismo borde pasará a significar "pagada" sin tocar un
    pixel: el efecto es permanente, la semántica evoluciona sola.
 
-   Mismo gate que monta la ventana —`useIsDesktopTable` en GameTable.jsx espeja
-   literalmente esta media query—, para que el trazo no pueda existir donde la
-   ventana no existe ni faltar donde sí.                                        */
-@media (orientation: landscape) and (min-height: 601px) {
+   El trazo no puede existir donde la ventana no existe ni faltar donde sí. Eso
+   se lograba con un gate espejo de `useIsDesktopTable`; desde MOV-1b-c se logra
+   SIN gate, que es la única forma que sigue siendo cierta cuando la ventana
+   monta en las dos ramas — ver el bloque de abajo.                             */
+/* ── MOV-1b-c · ESTE BLOQUE DEJA DE ESTAR GATEADO ────────────────────────────
+   Hasta aquí el recorrido vivía dentro de la media query de escritorio, con un
+   motivo escrito: "mismo gate que monta la ventana, para que el trazo no pueda
+   existir donde la ventana no existe ni faltar donde sí". Ese motivo se cumplía
+   solo mientras `.u3-popup` fuera una superficie de escritorio.
+   MOV-1b-a montó la ventana en móvil. Desde entonces el gate hace exactamente
+   lo que su comentario prometía impedir: la ventana existe y el trazo falta —
+   la misma avería que el cinturón de `tapetes.css`, y por la misma razón (un
+   sello que sobrevive a su motivo deja de proteger y estorba).
+   Δ=0 EN ESCRITORIO por construcción: las reglas siguen aplicando allí sin que
+   cambie una coma, y lo único que ocurre es que dejan de NO aplicar fuera.
+   Δ=0 de layout también en móvil: el trazo vive en un pseudo absoluto con
+   `inset: -1px` sobre el filete que la ventana ya lleva.
+   La ventana móvil tiene su propia piel (menuMovil.css), pero el recorrido no
+   se copia allí: es pintura sobre `.u3-popup`, y `.u3-popup` es la misma clase
+   en las dos ramas. Copiarlo sería una tercera piel que mantener a mano.       */
+.u3-popup::before {
+  /* Constantes declaradas, jamás números mágicos. El ciclo es provisional:
+     3 s por vuelta contra los 4 s de vida del popup (CONSULTA_POPUP_MS) —
+     una vuelta y un tercio, que es lo que hace falta para leerlo como
+     recorrido y no como carrera. Victor calibra en su checkpoint. */
+  --emb-u3-ciclo: 3s;
+  --emb-u3-grosor: 1px;   /* = el filete que la ventana ya lleva */
+
+  content: '';
+  position: absolute;
+  /* El bloque contenedor de un absoluto es la caja de RELLENO del padre; el
+     filete de 1px queda justo fuera de ella. `inset: -1px` devuelve exacta-
+     mente la caja de BORDE, así que el anillo se pinta SOBRE el filete
+     existente y no a su lado ni fuera de la ventana. Fuera de flujo: Δ=0 de
+     layout por construcción, no por medida (la medida lo confirma). */
+  inset: calc(-1 * var(--emb-u3-grosor));
+  border-radius: 8px;              /* radio EXTERIOR de la ventana */
+  padding: var(--emb-u3-grosor);   /* grosor del anillo */
+  pointer-events: none;
+
+  /* El trazo: un cometa de cola larga sobre un cónico que gira. Continuo y
+     sereno —un recorrido, no un parpadeo ni una alarma—: la cabeza es lo
+     único brillante y llega tras 215° de nada, así que en cualquier instante
+     hay una sola luz viajando. Sólo variantes de --gold-brand: cero colores
+     nuevos, regla del dorado único intacta. */
+  background: conic-gradient(
+    from var(--emb-u3-ang) at 50% 50%,
+    rgba(var(--gold-brand-rgb), 0)       0deg,
+    rgba(var(--gold-brand-rgb), 0)     215deg,
+    rgba(var(--gold-brand-rgb), 0.30)  300deg,
+    var(--gold-brand-hi)               348deg,
+    rgba(var(--gold-brand-hi-rgb), 0.55) 354deg,
+    rgba(var(--gold-brand-rgb), 0)     360deg
+  );
+
+  /* Anillo por máscara: se pinta el relleno completo y se descuenta la caja
+     de contenido. Queda visible SÓLO el marco de 1px — el área repintada por
+     cuadro es el perímetro de una ventana de 260px, no su superficie. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  animation: emb-u3-recorrido var(--emb-u3-ciclo) linear infinite;
+}
+
+/* El intercambio se escribe EXPLÍCITO (lección U2c: el navegador no lo hace
+   solo en todo). Borde dorado estático, sin animación — el cometa cede el
+   sitio a un anillo parejo, que es lo que "borde dorado" quiere decir cuando
+   nada se mueve. */
+@media (prefers-reduced-motion: reduce) {
   .u3-popup::before {
-    /* Constantes declaradas, jamás números mágicos. El ciclo es provisional:
-       3 s por vuelta contra los 4 s de vida del popup (CONSULTA_POPUP_MS) —
-       una vuelta y un tercio, que es lo que hace falta para leerlo como
-       recorrido y no como carrera. Victor calibra en su checkpoint. */
-    --emb-u3-ciclo: 3s;
-    --emb-u3-grosor: 1px;   /* = el filete que la ventana ya lleva */
-
-    content: '';
-    position: absolute;
-    /* El bloque contenedor de un absoluto es la caja de RELLENO del padre; el
-       filete de 1px queda justo fuera de ella. `inset: -1px` devuelve exacta-
-       mente la caja de BORDE, así que el anillo se pinta SOBRE el filete
-       existente y no a su lado ni fuera de la ventana. Fuera de flujo: Δ=0 de
-       layout por construcción, no por medida (la medida lo confirma). */
-    inset: calc(-1 * var(--emb-u3-grosor));
-    border-radius: 8px;              /* radio EXTERIOR de la ventana */
-    padding: var(--emb-u3-grosor);   /* grosor del anillo */
-    pointer-events: none;
-
-    /* El trazo: un cometa de cola larga sobre un cónico que gira. Continuo y
-       sereno —un recorrido, no un parpadeo ni una alarma—: la cabeza es lo
-       único brillante y llega tras 215° de nada, así que en cualquier instante
-       hay una sola luz viajando. Sólo variantes de --gold-brand: cero colores
-       nuevos, regla del dorado único intacta. */
-    background: conic-gradient(
-      from var(--emb-u3-ang) at 50% 50%,
-      rgba(var(--gold-brand-rgb), 0)       0deg,
-      rgba(var(--gold-brand-rgb), 0)     215deg,
-      rgba(var(--gold-brand-rgb), 0.30)  300deg,
-      var(--gold-brand-hi)               348deg,
-      rgba(var(--gold-brand-hi-rgb), 0.55) 354deg,
-      rgba(var(--gold-brand-rgb), 0)     360deg
-    );
-
-    /* Anillo por máscara: se pinta el relleno completo y se descuenta la caja
-       de contenido. Queda visible SÓLO el marco de 1px — el área repintada por
-       cuadro es el perímetro de una ventana de 260px, no su superficie. */
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-
-    animation: emb-u3-recorrido var(--emb-u3-ciclo) linear infinite;
-  }
-
-  /* El intercambio se escribe EXPLÍCITO (lección U2c: el navegador no lo hace
-     solo en todo). Borde dorado estático, sin animación — el cometa cede el
-     sitio a un anillo parejo, que es lo que "borde dorado" quiere decir cuando
-     nada se mueve. */
-  @media (prefers-reduced-motion: reduce) {
-    .u3-popup::before {
-      animation: none;
-      background: rgba(var(--gold-brand-rgb), 0.85);
-    }
+    animation: none;
+    background: rgba(var(--gold-brand-rgb), 0.85);
   }
 }
 

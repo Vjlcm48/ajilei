@@ -36,13 +36,17 @@ export const VIVAS_ESCRITORIO = [
   ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.MANO, ENTRADA.CONTADOR,
 ]
 
-// Móvil, a MOV-1b-a. Dos ausencias, cada una por su motivo MEDIDO:
-//   · REACCIONES entra en MOV-1b-c, cuando exista su lámina: el selector de hoy
-//     mide 732,56px de ancho y no cabe en ninguno de los cuatro viewports
-//     móviles (el más ancho es 812, pero 375, 360 y 640 no).
-//   · CONTADOR queda fuera por su superficie, no por su función: el popup del
-//     badge se ancla al propio badge, y en horizontal el panel vive en el filo
-//     izquierdo de la pantalla, así que el aviso se saldría. El SALDO de
-//     consultas sí es el mismo —una sola clave, un solo contador de 20— y la
-//     cifra se dice al consultar, en la última línea del aviso.
-export const VIVAS_MOVIL = [ENTRADA.SONIDO, ENTRADA.TAPETES, ENTRADA.MANO]
+// Móvil, a MOV-1b-c. Queda UNA sola ausencia, y por su superficie, no por su
+// función: el popup del CONTADOR se ancla al propio badge, y en horizontal el
+// panel vive en el filo izquierdo de la pantalla, así que el aviso se saldría.
+// El SALDO de consultas sí es el mismo —una sola clave, un solo contador de
+// 20— y la cifra se dice al consultar, en la última línea del aviso.
+//
+// REACCIONES entra aquí en MOV-1b-c. La razón por la que faltaba —el selector
+// de escritorio mide 732,56px de ancho y no cabe en ninguno de los cuatro
+// viewports móviles— la resuelve la LISTA de cuatro visibles con
+// desplazamiento (242×186, lámina aprobada por Victor), que es la misma rejilla
+// gobernada por `--dsk-u2-cols` con una sola columna.
+export const VIVAS_MOVIL = [
+  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.MANO,
+]

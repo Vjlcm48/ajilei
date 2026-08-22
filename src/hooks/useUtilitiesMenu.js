@@ -133,8 +133,15 @@ export function anclaSatelite(rect, alto) {
 //     del horizontal. Los dos MEDIDOS sobre el panel vivo, no estimados: el
 //     cálculo a mano daba 153 para la fila y se quedaba 8,59 corto, que es
 //     exactamente el error que un techo derivado no perdona.
+//   · Selector de reacciones: 186 EXACTO en las dos orientaciones, y es el
+//     único de los tres que no depende del contenido — la lista muestra cuatro
+//     filas de 44 con separación 2 y relleno 2 (4·44 + 3·2 + 2·2 = 186) y las
+//     otras ocho se alcanzan desplazando. Un alto sellado es también la única
+//     forma de que el techo derivado no cambie con la longitud de las frases,
+//     que son copy declarado provisional.
 export const ALTO_AVISO_MANO = 105
 export const ALTO_TAPETES = { v: 271, h: 162 }
+export const ALTO_SELECTOR_REACCIONES = 186
 
 // ── Contador de consultas de "Mano actual" (v1.1 §3.4 y §3.6) ───────────────
 // Infraestructura, no lógica: la clave se crea con las 20 gratis y se lee para
