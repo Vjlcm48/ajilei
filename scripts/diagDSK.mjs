@@ -780,7 +780,14 @@ async function installHitProbe(page) {
 }
 
 async function runTactil(browser) {
-  const TOUCH_VPS = [{ w: 1024, h: 768 }, { w: 1280, h: 720 }]
+  // TAC-1 · Entran 1366x768 y 1920x1080. El modo medía sólo los dos viewports
+  // bajos, y por eso dio por sano lo que no lo estaba: la oclusión de la primera
+  // carta del humano por el envoltorio del mazo existía en LOS CUATRO —medido:
+  // solape 56 px a 1024/1280/1366 y 63,5 px a 1920—, pero en los dos que faltaban
+  // no era que el defecto no ocurriera, es que nadie miraba. Un modo táctil que
+  // no cubre las pantallas grandes no está declarando un alcance: está dejando
+  // un hueco que se lee como verde.
+  const TOUCH_VPS = [{ w: 1024, h: 768 }, { w: 1280, h: 720 }, { w: 1366, h: 768 }, { w: 1920, h: 1080 }]
   const TABLES = [5, 4, 3, 2]   // táctil coarse en CADA mesa (mesa 2 = sin nombre-tap)
   const out = []
   for (const n of TABLES) for (const vp of TOUCH_VPS) {
