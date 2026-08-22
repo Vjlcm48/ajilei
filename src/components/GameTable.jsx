@@ -14,11 +14,14 @@ import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
-import { useUtilitiesMenu } from '../hooks/useUtilitiesMenu'
+import {
+  useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
+} from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
 import { useTapetes } from '../hooks/useTapetes'
 import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
+import { VIVAS_ESCRITORIO, VIVAS_MOVIL } from '../config/menuEntradas'
 import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
@@ -376,22 +379,27 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   const reacciones = useReacciones(isDesktopTable)
   // DSK-U3 · "Mano actual". Mismo gate y mismo molde de hermandad: el hook se
   // llama SIEMPRE (orden de hooks estable) y recibe el gate.
-  const consultas = useConsultas(isDesktopTable)
+  // MOV-1b-a · sin gate: "Mano actual" se enciende en móvil con el MISMO saldo
+  // y la MISMA clave que en escritorio — un solo contador de 20 consultas, una
+  // por mano. No hay dos economías.
+  const consultas = useConsultas()
   // EMB-2 · Tapetes. Mismo gate y mismo molde de hermandad: el hook se llama
   // SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
   // escritorio no hay panel, no hay atributo y el fieltro es el verde de
   // siempre — aunque el localStorage traiga otro (v1.0 §4: el panel hereda la
   // cola del puerto móvil del ⋮ junto al resto del menú).
-  const tapetes = useTapetes(isDesktopTable)
+  // MOV-1b-a · sin gate: Tapetes se enciende en móvil. El segundo cinturón que
+  // lo sostenía —el bloque gateado de tapetes.css— también se abrió; un sello
+  // que sobrevive a su motivo deja al jugador elegir un tapete y no ver nada.
+  const tapetes = useTapetes()
   const manoDisponible = hayManoConsultable(phase, game.handCount, human.cards.length)
   // El popup se ancla al ⋮ (el panel ya no existe: cierra al ejecutar) por su
   // borde DERECHO, molde del popup del contador. Se mide en el press, nunca en
   // el render.
-  const popupAnchorDesdeTrigger = () => {
-    const r = utilMenu.triggerRect()
-    if (!r) return { right: 12, top: 12 }
-    return { right: window.innerWidth - r.right, top: r.bottom + 6 }
-  }
+  // MOV-1b-a · D6. La regla de colocación de los satélites del ⋮ es una y vive
+  // en `anclaSatelite`; aquí sólo se dice a qué disparador se ancla y cuánto
+  // mide la superficie en el peor caso.
+  const popupAnchorDesdeTrigger = () => anclaSatelite(utilMenu.triggerRect(), ALTO_AVISO_MANO)
   // El valor se deriva EN EL PRESS, del estado vivo, y desde la fuente única —
   // getBestSuitScore con el ruleN CONGELADO de la mano (handRules), jamás con un
   // recuento vivo de jugadores: esa lectura viva es el patrón enfermo que HR-1
@@ -1883,15 +1891,19 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
         consultas={consultas.saldo}
         manoDisponible={manoDisponible}
         onManoActual={pedirManoActual}
-        onTapetes={() => tapetes.abrir(utilMenu.triggerRect())}
-        soloSonido={!isDesktopTable}
+        onTapetes={() => tapetes.abrir(anclaSatelite(utilMenu.triggerRect(), ALTO_TAPETES))}
+        vivas={isDesktopTable ? VIVAS_ESCRITORIO : VIVAS_MOVIL}
       />
 
       {/* EMB-2 · panel de tapetes. Vive AQUÍ por la misma razón que sus
           hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se
           pinta el panel de utilidades ya se desmontó con su ancla. Overlay
           puro, Δ=0, y el juego sigue corriendo detrás. */}
-      {isDesktopTable && (
+      {/* MOV-1b-a · monta en las dos pieles. Su colocación la pone D6 y su piel
+          es global desde esta tanda (tapetes.css se desanidó); lo único propio
+          de móvil es la disposición en FILA del horizontal, un token en
+          menuMovil.css. */}
+      {(
         <TapetesPanel
           ancla={tapetes.ancla}
           activo={tapetes.activo}
@@ -1907,9 +1919,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
       {/* DSK-U3 · popup del valor de "Mano actual". Vive AQUÍ y no dentro del
           panel porque la entrada cierra al ejecutar: cuando esto se pinta, el
           panel ya se desmontó con su ancla. Overlay puro, Δ=0. */}
-      {isDesktopTable && (
-        <ManoActualPopup popup={consultas.popup} saldo={consultas.saldo} />
-      )}
+      {/* MOV-1b-a · monta en las dos pieles. Su piel móvil son las diez reglas
+          copiadas en menuMovil.css; su colocación, D6. */}
+      <ManoActualPopup popup={consultas.popup} saldo={consultas.saldo} />
 
       {/* DSK-U2 · selector de reacciones y burbuja. Viven AQUÍ por la misma
           razón que el panel de utilidades: hermanos del área y vecinos de las

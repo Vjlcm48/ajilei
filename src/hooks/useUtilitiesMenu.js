@@ -61,7 +61,80 @@ const HORIZONTAL_MQ = '(orientation: landscape) and (max-height: 600px)'
 // ancla que desaparece a media mano no es un ancla.
 const OBSTACULOS_H = ['.action-area', '.player-zone .cards-row']
 const TOP_MIN = `calc(${PANEL_MARGIN}px + env(safe-area-inset-top, 0px))`
-const TOP_MAX = `calc(100dvh - ${PANEL_H + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px))`
+// Tope inferior de cualquier superficie de esta familia: que su pie no pase del
+// filo del área segura. Es función del alto porque cada satélite mide lo suyo.
+const topeInferior = (alto) =>
+  `calc(100dvh - ${alto + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px))`
+const TOP_MAX = topeInferior(PANEL_H)
+
+// ── MOV-1b-a · D6 · Satélites del ⋮ ──────────────────────────────────────────
+// El aviso de "Mano actual" y el panel de Tapetes (y en MOV-1b-c el selector de
+// Reacciones) no son el menú: son superficies que NACEN de él y lo relevan —la
+// entrada cierra al ejecutar—, así que se anclan al DISPARADOR y no al panel,
+// que para entonces ya se desmontó. Comparten una sola regla de colocación
+// porque comparten el problema, y tenerla en tres sitios era pedir que se
+// separaran.
+//
+// El TECHO se deriva de los filos VIVOS y no de una tabla por celda: es el
+// borde superior de la fila de juego, o sea lo primero que un satélite no puede
+// tapar. `.player-bar-right` entra por su nombre y no por `.player-bar` porque
+// esa caja es `display: contents` en landscape móvil (gameTable.css:2950-2952)
+// y mide 0×0 — mirarla directamente es no ver nada, que es como se coló el
+// saldo tapado en MOV-1a-c.
+const TECHOS_SATELITE = [
+  '.timer-display', '.player-zone .cards-row', '.action-area', '.player-bar-right',
+]
+
+function techoFilaDeJuego() {
+  let techo = Infinity
+  for (const sel of TECHOS_SATELITE) {
+    for (const el of document.querySelectorAll(sel)) {
+      const r = el.getBoundingClientRect()
+      if (r.width <= 0 || r.height <= 0) continue   // ocultos y `display: contents`
+      if (r.top < techo) techo = r.top
+    }
+  }
+  return Number.isFinite(techo) ? techo : null
+}
+
+// `alto` admite un número o `{ v, h }` cuando la superficie mide distinto por
+// orientación (el panel de Tapetes pasa a fila en horizontal). La orientación se
+// resuelve AQUÍ para que ningún consumidor tenga que repetir la media query.
+//
+// Devuelve `right` como número y `top` como longitud CSS: la pinza se emite como
+// `clamp()` en línea por la misma razón que la del panel —el área segura sólo se
+// conoce desde CSS y una hoja no corrige un valor en línea sin `!important`—.
+export function anclaSatelite(rect, alto) {
+  const horizontal = window.matchMedia(HORIZONTAL_MQ).matches
+  const h = typeof alto === 'number' ? alto : (horizontal ? alto.h : alto.v)
+  if (!rect) return { right: PANEL_MARGIN, top: TOP_MIN }
+  // Vertical: nace bajo el disparador, como en escritorio. Horizontal: a su
+  // izquierda y pegado al techo, porque debajo del ⋮ no hay banda libre —en
+  // mesas 5 y 4 vive a media altura, sobre la fila de juego.
+  const right = horizontal
+    ? window.innerWidth - (rect.left - PANEL_GAP)
+    : window.innerWidth - rect.right
+  const nominal = horizontal ? PANEL_MARGIN : rect.bottom + PANEL_GAP
+  const techo = techoFilaDeJuego()
+  const tope = techo == null
+    ? topeInferior(h)
+    : `min(calc(${techo - h}px - env(safe-area-inset-bottom, 0px)), ${topeInferior(h)})`
+  return { right, top: `clamp(${TOP_MIN}, ${nominal}px, ${tope})` }
+}
+
+// Altos MÁXIMOS de cada satélite. Se declaran porque el ancla se calcula ANTES
+// de que la superficie exista: no hay caja que medir todavía. Se usa el peor
+// caso a propósito —`top ≤ techo − altoMáx` garantiza que el pie quepa aunque
+// el contenido sea más corto—, y el arnés contrasta cada uno contra su caja viva.
+//   · Aviso de "Mano actual": 104,42 medido en las 16 celdas (desglose completo
+//     de los cuatro palos + nota del comodín + saldo). La variante "agotadas"
+//     mide 59,73 y le sobra sitio.
+//   · Tapetes: 270,98 en rejilla 3×2 (vertical) y 161,59 en la fila de cinco
+//     del horizontal. Los dos MEDIDOS sobre el panel vivo, no estimados: el
+//     cálculo a mano daba 153 para la fila y se quedaba 8,59 corto, que es
+//     exactamente el error que un techo derivado no perdona.
+export const ALTO_AVISO_MANO = 105
+export const ALTO_TAPETES = { v: 271, h: 162 }
 
 // ── Contador de consultas de "Mano actual" (v1.1 §3.4 y §3.6) ───────────────
 // Infraestructura, no lógica: la clave se crea con las 20 gratis y se lee para

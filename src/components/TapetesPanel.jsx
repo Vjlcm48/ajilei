@@ -54,7 +54,8 @@ export function TapetesPanel({ ancla, activo, comprados, previa, dialogo, onPres
       className="tapetes-panel"
       role="dialog"
       aria-label="Tapetes"
-      style={{ right: `${ancla.right}px`, top: `${ancla.top}px` }}
+      /* MOV-1b-a · `top` llega como longitud CSS (pinza de D6). */
+      style={{ right: `${ancla.right}px`, top: ancla.top }}
       /* Afordancia de arnés, deliberada (molde `data-palo` de U3): el modo
          `tapetes` cruza QUÉ se está pintando contra el atributo del árbol sin
          leer prosa con expresiones regulares. Un cambio de copy jamás debe

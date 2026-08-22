@@ -16,7 +16,9 @@
 export function ManoActualPopup({ popup, saldo }) {
   if (!popup) return null
 
-  const estilo = { right: `${popup.anchor.right}px`, top: `${popup.anchor.top}px` }
+  // MOV-1b-a · `top` llega como longitud CSS (la pinza de D6 con el área
+  // segura dentro); `right` sigue siendo número.
+  const estilo = { right: `${popup.anchor.right}px`, top: popup.anchor.top }
 
   if (popup.tipo === 'agotadas') {
     return (

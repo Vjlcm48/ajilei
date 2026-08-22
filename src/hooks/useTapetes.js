@@ -12,7 +12,6 @@ import {
 // un storage denegado no puede tumbar la mesa) y de useUtilitiesMenu (el gate
 // se DERIVA, jamás se sincroniza con un efecto).
 
-const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 
 export function readTapete() {
   try {
@@ -75,9 +74,13 @@ export function useTapetes(enabled = true) {
 
   // Se mide al abrir, no al renderizar — molde del panel de utilidades y del
   // selector de reacciones. El panel se ancla al ⋮ por su borde derecho.
-  const abrir = useCallback((rect) => {
-    if (!rect) return
-    setAncla({ right: window.innerWidth - rect.right, top: rect.bottom + PANEL_GAP })
+  // MOV-1b-a · el ancla llega HECHA desde `anclaSatelite` (D6). Antes se
+  // calculaba aquí, y con el puerto móvil eso habría significado tres copias de
+  // la misma regla de colocación —una por satélite— divergiendo a la primera
+  // celda que alguien midiera de más.
+  const abrir = useCallback((ancla) => {
+    if (!ancla) return
+    setAncla(ancla)
   }, [])
 
   const presionar = useCallback((id) => {

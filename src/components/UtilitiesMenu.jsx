@@ -3,6 +3,7 @@ import { useSoundContext } from '../context/SoundContext'
 import ChipToken from './ChipToken'
 import { GodeteIcon } from './TapetesPanel'
 import { BADGE_POPUP_MS } from '../config/consultas'
+import { ENTRADA, VIVAS_ESCRITORIO } from '../config/menuEntradas'
 
 // ── DSK-U1 / U1b · Menú de utilidades (SOLO gate de escritorio) ─────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda y apéndices).
@@ -71,19 +72,18 @@ export function UtilitiesTrigger({ open, onToggle, registerTrigger }) {
 // de la app ya existe y es SVG dorado plano — inventar otro rompería el
 // lenguaje).
 const INERTES = [
-  { key: 'saldo', title: 'Saldo', ico: <span className="util-ico util-ico-chip" aria-hidden="true"><ChipToken size="compact" /></span> },
+  { key: ENTRADA.SALDO, title: 'Saldo', ico: <span className="util-ico util-ico-chip" aria-hidden="true"><ChipToken size="compact" /></span> },
 ]
 
-// MOV-1a · `soloSonido` es la ÚNICA rama de JSX del puerto móvil (D1: componente
-// único, la rama es CSS). No se puede resolver en la hoja: "gris como Saldo" en
-// esta casa significa el atributo `disabled` de verdad —más `aria-disabled`—, y
-// eso no se declara desde CSS. Un `pointer-events: none` pintaría igual y
-// mentiría al lector de pantalla, que anunciaría tres entradas accionables que
-// no hacen nada. Escritorio no pasa la prop → `undefined` → render idéntico.
+// El gris de una entrada NO se puede resolver desde la hoja: en esta casa
+// significa el atributo `disabled` de verdad —más `aria-disabled`—, y eso no se
+// declara en CSS. Un `pointer-events: none` pintaría igual y le mentiría al
+// lector de pantalla, que anunciaría entradas accionables que no hacen nada.
 export function UtilitiesPanel({
   anchor, onClose, onReacciones, reaccionesBloqueadas,
-  consultas, manoDisponible, onManoActual, onTapetes, soloSonido = false,
+  consultas, manoDisponible, onManoActual, onTapetes, vivas = VIVAS_ESCRITORIO,
 }) {
+  const viva = (id) => vivas.includes(id)
   const { soundEnabled, toggle: toggleSound } = useSoundContext()
   // DSK-U3 · el saldo de consultas SUBE a useConsultas. Ya no puede vivir en un
   // useState local: el consumo lo mueve desde fuera y el popup del valor se
@@ -145,6 +145,7 @@ export function UtilitiesPanel({
           type="button"
           role="menuitem"
           className={`util-item util-item-sound${soundEnabled ? '' : ' is-off'}`}
+          data-entrada={ENTRADA.SONIDO}
           onClick={() => { toggleSound(); onClose() }}
           title="Sonido"
         >
@@ -160,10 +161,12 @@ export function UtilitiesPanel({
         <button
           type="button"
           role="menuitem"
-          className={`util-item util-item-reacciones${soloSonido ? ' is-disabled' : reaccionesBloqueadas ? ' is-cooling' : ''}`}
+          className={`util-item util-item-reacciones${!viva(ENTRADA.REACCIONES) ? ' is-disabled' : reaccionesBloqueadas ? ' is-cooling' : ''}`}
+          data-entrada={ENTRADA.REACCIONES}
           onClick={() => { onClose(); onReacciones() }}
-          disabled={soloSonido || reaccionesBloqueadas}
-          title={!soloSonido && reaccionesBloqueadas ? 'Reacciones (espera un momento)' : 'Reacciones'}
+          disabled={!viva(ENTRADA.REACCIONES) || reaccionesBloqueadas}
+          aria-disabled={viva(ENTRADA.REACCIONES) ? undefined : 'true'}
+          title={viva(ENTRADA.REACCIONES) && reaccionesBloqueadas ? 'Reacciones (espera un momento)' : 'Reacciones'}
         >
           <span className="util-ico" aria-hidden="true">💬</span>
         </button>
@@ -177,9 +180,11 @@ export function UtilitiesPanel({
         <button
           type="button"
           role="menuitem"
-          className={`util-item util-item-tapetes${soloSonido ? ' is-disabled' : ''}`}
+          className={`util-item util-item-tapetes${viva(ENTRADA.TAPETES) ? '' : ' is-disabled'}`}
+          data-entrada={ENTRADA.TAPETES}
           onClick={() => { onClose(); onTapetes() }}
-          disabled={soloSonido}
+          disabled={!viva(ENTRADA.TAPETES)}
+          aria-disabled={viva(ENTRADA.TAPETES) ? undefined : 'true'}
           title="Tapetes"
         >
           <GodeteIcon />
@@ -191,8 +196,10 @@ export function UtilitiesPanel({
             type="button"
             role="menuitem"
             className="util-item is-disabled"
+            data-entrada={e.key}
             title={e.title}
             disabled
+            aria-disabled="true"
           >
             {e.ico}
           </button>
@@ -209,13 +216,17 @@ export function UtilitiesPanel({
             no-disponibilidad la porta el lenguaje visual del sistema
             (`is-disabled`: atenuado y sin respuesta) más `aria-disabled` para
             quien no ve la atenuación. */}
-        {/* MOV-1a · en móvil la entrada va gris y el badge NO se monta: el
-            contador es un control VIVO y su popup vive en el bloque de
-            escritorio, así que aquí quedaría sin piel. No cuesta geometría —
+        {/* MOV-1b-a · la entrada se ENCIENDE en móvil; el badge sigue sin
+            montarse. No es olvido: el popup del contador (`.utilities-popup`)
+            se ancla al propio badge y en horizontal el panel vive en el filo
+            izquierdo, así que se saldría de la pantalla. El saldo de consultas
+            es el MISMO —una sola clave, un solo contador— y la cifra se dice al
+            consultar, en la última línea del aviso. No cuesta geometría:
             `.util-badge` es `position: absolute` (gameTable.css:5940-5942),
             luego el panel sigue midiendo 64×244 con badge y sin él. */}
         <div
-          className={`util-item util-item-mano${manoDisponible && !soloSonido ? '' : ' is-disabled'}`}
+          className={`util-item util-item-mano${manoDisponible && viva(ENTRADA.MANO) ? '' : ' is-disabled'}`}
+          data-entrada={ENTRADA.MANO}
           title="Mano actual"
         >
           {/* El rol de menú vive en el ICONO, no en el contenedor: un control
@@ -233,13 +244,13 @@ export function UtilitiesPanel({
             className="util-ico-slot"
             role="menuitem"
             aria-label="Mano actual"
-            aria-disabled={manoDisponible && !soloSonido ? undefined : 'true'}
-            disabled={!manoDisponible || soloSonido}
+            aria-disabled={manoDisponible && viva(ENTRADA.MANO) ? undefined : 'true'}
+            disabled={!manoDisponible || !viva(ENTRADA.MANO)}
             onClick={() => { onClose(); onManoActual() }}
           >
             <CardQueryIcon />
           </button>
-          {!soloSonido && (
+          {viva(ENTRADA.CONTADOR) && (
             <button
               ref={badgeRef}
               type="button"

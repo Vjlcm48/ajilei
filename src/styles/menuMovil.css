@@ -225,11 +225,11 @@
      toca el color. `line-height: 0` mata el hueco de línea del inline SVG. */
   .util-ico-chip { line-height: 0; }
   .util-ico-slot { display: flex; line-height: 0; }
-  /* Las DOS siluetas SVG del panel miden lo mismo: la carta con "?" de Mano
-     actual y el godete de Tapetes (su regla vive en tapetes.css:289, dentro del
-     gate de escritorio, así que aquí hay que dársela). */
-  .util-ico-card,
-  .util-ico-godete {
+  /* La silueta de la carta con "?" de Mano actual. El godete de Tapetes ya NO
+     se copia aquí: desde MOV-1b-a su regla vive global en `tapetes.css` —el
+     bloque entero se desanidó al encender Tapetes en móvil— y toma el mismo
+     token, así que las dos siluetas siguen midiendo igual sin duplicar nada. */
+  .util-ico-card {
     height: var(--dsk-u1-card-h);
     width: auto;
     display: block;
@@ -264,5 +264,81 @@
   .util-item-mano {
     margin-top: var(--dsk-u1-sep-gap);
     border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+  }
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     MOV-1b-a · SATÉLITES DEL ⋮ (doctrina D6)
+     Las superficies que NACEN del menú y lo relevan: el aviso de "Mano actual"
+     y el panel de Tapetes. Su colocación la calcula `anclaSatelite`
+     (useUtilitiesMenu.js) con los filos VIVOS; aquí sólo vive su piel.
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  /* ── Aviso de "Mano actual" ────────────────────────────────────────────────
+     Espejo de gameTable.css:6255-6288 (bloque DSK). Es el segundo bloque de la
+     DEUDA DE DOS PIELES declarada arriba, y crece con él: si el aviso cambia de
+     aspecto en escritorio, estas diez reglas hay que replicarlas a mano.
+     CONTABILIDAD DE LO QUE SE COPIA Y LO QUE NO, para que nadie lo descubra
+     tarde. De las 12 reglas que tocan a esta familia en todo el árbol:
+       · 10 se copian aquí — las de `.u3-*` del bloque DSK.
+       · `.utilities-popup` (gameTable.css:5981) NO: es el popup del BADGE del
+         contador, y el badge no se monta en móvil (decisión de MOV-1a que esta
+         tanda mantiene). Copiarla sería piel muerta.
+       · `.u3-popup::before` (embellecimiento.css:56) NO: es el recorrido
+         dorado de EMB-1, vive en otra hoja con su propio gate y queda fuera del
+         alcance de esta tanda. El aviso móvil sale sin ese barrido.
+     El ancho lo topa el token, igual que arriba; el alto lo pone el contenido
+     (medido: 252,28×104,42 en el peor caso, 220,38×59,73 en "agotadas"). */
+  .game-table-screen { --dsk-u3-popup-w: 260px; }
+
+  .u3-popup {
+    position: fixed;
+    z-index: calc(var(--dsk-u1-panel-z) + 1);
+    box-sizing: border-box;
+    max-width: var(--dsk-u3-popup-w);
+    padding: 10px 12px;
+    background: var(--surface-modal);
+    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .u3-popup p { margin: 0; }
+  .u3-popup p + p { margin-top: 4px; }
+  /* El mejor palo es la respuesta; el resto es contexto. La jerarquía la lleva
+     el tamaño y el color, no otro dorado — regla single-gold. */
+  .u3-titulo { font-size: 13px; }
+  .u3-titulo strong { font-weight: 700; }
+  .u3-resto { color: var(--text-secondary); }
+  .u3-nota  { color: var(--text-muted); font-size: 11px; }
+  /* El saldo restante se dice en el mismo acto de consultar: el usuario jamás
+     descubre el cobro después (v1.1 §3.5). */
+  .u3-saldo {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+  .u3-popup-agotadas .u3-resto { color: var(--text-muted); }
+
+  /* ── Tapetes ───────────────────────────────────────────────────────────────
+     La piel entera del panel es GLOBAL desde MOV-1b-a (tapetes.css se desanidó
+     al encender la función en móvil), así que en vertical no hace falta ni una
+     regla: el panel de 250×271 cabe en 375×812 y en 360×640, y la pinza de D6
+     lo confirma. Lo único propio de móvil es la disposición HORIZONTAL. */
+  @media (orientation: landscape) and (max-height: 600px) {
+    /* DISPOSICIÓN EN FILA (autorizada por Victor). En horizontal la banda libre
+       bajo el techo derivado son ~191px a 640×360 y ~203px a 812×375, y el
+       panel en rejilla 3×2 mide 271: no cabe por 80px. En FILA de cinco mide
+       ~153 de alto y entra con 38px de sobra en la celda peor.
+       ES UN SOLO TOKEN Y NINGUNA CAJA NUEVA: `--tap-cols` ya gobierna la
+       rejilla Y el ancho del panel, que es `calc()` derivado de él
+       (tapetes.css). Las cinco fichas conservan tamaño, hit y previsualización
+       —no se toca ni una— y el ancho pasa a 5×72 + 4×6 + 22 = 406, holgado bajo
+       el tope de `innerWidth − 16` (624 en la celda más estrecha).
+       El título se queda encima: es lo que deja la fila más baja. */
+    .tapetes-panel { --tap-cols: 5; }
   }
 }

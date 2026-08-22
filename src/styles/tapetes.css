@@ -115,344 +115,365 @@
   --tap-swatch-tricolor: linear-gradient(to bottom, #3c331b 0%, #1c2e45 50%, #3e191e 100%);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   1 · LOS CUATRO FIELTROS
-   Gate de escritorio: la MISMA media query que `DESKTOP_TABLE_MQ` en
-   GameTable.jsx, espejada literal (molde EMB-1). Es el segundo cinturón: el
-   atributo ya sólo se aplica cuando `useIsDesktopTable` es cierto, así que en
-   móvil el fieltro es verde aunque el `localStorage` traiga un tricolor. El
-   sello móvil se sostiene por construcción, y el arnés lo prueba con una
-   prueba NEGATIVA en vez de darlo por supuesto.
-   ═══════════════════════════════════════════════════════════════════════════ */
-@media (orientation: landscape) and (min-height: 601px) {
+/* ════════════════════════════════════════════════════════════════════════════
+   1 · LOS CUATRO FIELTROS Y LA PIEL DEL PANEL
 
-  /* ── Negro grafito · k = 0,68, S ≈ 7% ─────────────────────────────────────
-     Un gris no es un tono: la saturación se queda en el entorno del 7% y el H
-     apenas inclina el neutro hacia el frío, para que no lea como sepia. v1.1
-     baja además la escalera entera a k = 0,68 — es el más hondo de los cinco,
-     porque un gris a la L del verde lee como cemento y no como fieltro.
-     El H de estas paradas es RUIDO DE CUANTIZACIÓN (a S≈7% y 8 bits, un solo
-     nivel de rgb mueve el matiz decenas de grados): el dato que manda es S. */
-  body[data-tapete="grafito"] {
-    --green-abyss:   #0d0d0f;   /* S  7,1%  L  5,5% */
-    --green-darkest: #0f1012;   /* S  9,1%  L  6,5% */
-    --green-deep:    #202224;   /* S  5,9%  L 13,3% */
-    --green-base:    #282b2e;   /* S  7,0%  L 16,9% */
-    --green-bright:  #34373b;   /* S  6,3%  L 21,8% */
-    --surface-game:  rgba(40, 43, 46, 0.88);   /* = --green-base al alfa de hoy */
-    /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
-    --surface-area:       rgba(13, 13, 15, 0.45);
-    --surface-area-light: rgba(13, 13, 15, 0.30);
-  }
+   MOV-1b-a · ESTE BLOQUE DEJA DE ESTAR GATEADO. Hasta aquí vivió dentro de la
+   media query de escritorio, como SEGUNDO CINTURÓN del sello móvil: el atributo
+   `data-tapete` sólo se aplicaba con `useIsDesktopTable` cierto, y aun así estas
+   reglas garantizaban que en móvil el fieltro fuera verde aunque el
+   `localStorage` trajera un tricolor.
 
-  /* ── Azul profundo · H 214, k = 0,78 ──────────────────────────────────────
-     La escalera completa con la S intacta y la L del verde nuevo, parada por
-     parada: azul y verde comparten k, así que siguen siendo la misma
-     profundidad con dos matices. El azul a la misma L que el verde se percibe
-     algo más oscuro (la luminancia relativa del azul es menor a igual L de
-     HSL): eso es física del color, no una desviación — la profundidad TONAL,
-     que es lo que v1.0 §2 pide heredar, es la misma.                         */
-  body[data-tapete="azul"] {
-    --green-abyss:   #090f17;   /* H 214,3  S 43,8%  L  6,3% */
-    --green-darkest: #0b121c;   /* H 215,3  S 43,6%  L  7,6% */
-    --green-deep:    #152539;   /* H 213,3  S 46,2%  L 15,3% */
-    --green-base:    #1b2f48;   /* H 213,3  S 45,5%  L 19,4% */
-    --green-bright:  #233c5c;   /* H 213,7  S 44,9%  L 24,9% */
-    --surface-game:  rgba(27, 47, 72, 0.88);
-    /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
-    --surface-area:       rgba(9, 15, 23, 0.45);
-    --surface-area-light: rgba(9, 15, 23, 0.30);
-  }
+   Ese cinturón era correcto mientras Tapetes fuera una función de escritorio.
+   MOV-1b-a la enciende en móvil con autorización de Victor, y entonces se
+   vuelve justo lo contrario de un guardarraíl: dejaría al jugador elegir un
+   tapete, persistirlo y no ver NADA. Un sello que sobrevive a su motivo no
+   protege, estorba.
 
-  /* ── Vinotinto · H 344, S ≈ 64%, k = 0,86 ─────────────────────────────────
-     El rojo de vino, no el rojo de bandera: el H se queda del lado magenta del
-     rojo puro. v1.1 lo mueve de H 348 a H 344 y le sube la S del 45% al 64%
-     — es el único de los cinco que gana saturación, y el único con k > 0,8:
-     un burdeos apagado lee como marrón, y este tapete tiene referente. La
-     referencia sellada por Victor es la camiseta local 2026 de la selección
-     (burdeos intenso con detalles en oro).                                   */
-  body[data-tapete="vinotinto"] {
-    --green-abyss:   #1b080d;   /* H 344,2  S 54,3%  L  6,9% */
-    --green-darkest: #210910;   /* H 342,5  S 57,1%  L  8,2% */
-    --green-deep:    #470f1e;   /* H 343,9  S 65,1%  L 16,9% */
-    --green-base:    #5a1426;   /* H 344,6  S 63,6%  L 21,6% */
-    --green-bright:  #731931;   /* H 344,0  S 64,3%  L 27,5% */
-    --surface-game:  rgba(90, 20, 38, 0.88);
-    /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
-    --surface-area:       rgba(27, 8, 13, 0.45);
-    --surface-area-light: rgba(27, 8, 13, 0.30);
-  }
+   Por qué GLOBAL y no una segunda copia bajo la media query complemento: lo que
+   hay aquí son REDEFINICIONES DE TOKEN sobre `body[data-tapete=...]` más la piel
+   de una superficie que ahora existe en las dos ramas. Duplicarlas sería una
+   tercera piel que mantener a mano, y la deuda de dos ya está declarada en
+   `menuMovil.css`. El mismo criterio que §0 aplica a los discos del selector:
+   son DATO, no estilo gateado.
 
-  /* ── Tricolor · la pieza insignia ─────────────────────────────────────────
-     «La mesa VESTIDA de tricolor, no la bandera sobre la mesa» (v1.0 §2,
-     sellado 15-ago). Tres decisiones sostienen esa frase:
+   Δ=0 EN ESCRITORIO por construcción —las reglas siguen aplicando ahí igual— y
+   Δ=0 en móvil hasta que el panel se monta: ninguno de estos selectores existía
+   en el árbol móvil. La ÚNICA rama que móvil necesita aparte es la disposición
+   en FILA del horizontal, y vive en `menuMovil.css` como un solo token.
 
-     (1) La base es la familia AZUL al 85% de su saturación — el óvalo, el pozo
-         y todo lo que resuelve tokens caen en la banda central, así que la
-         mesa sigue siendo una superficie de juego coherente y no un mosaico.
-     (2) Las tres bandas van a L 17..19%, dentro de la envolvente de la escalera
-         verde (9,6..24,9), y a S 38..42% — MENOS saturadas que la bandera real
-         (que ronda S 100%). Son tonos de tapete, no de pabellón.
-     (3) Las transiciones ocupan ~30% del alto cada una: no hay un solo filo
-         duro en el degradado. Por eso lee como tratamiento y no como franja.
+   RECABLEADO DEL METRO (regla ARN-1): la prueba NEGATIVA del modo `tapetes` del
+   arnés medía justo este cinturón. Se actualiza en la MISMA tanda —pasa de
+   exigir verde en móvil a exigir que el tapete sembrado se PINTE—, que es lo
+   que ahora significa que el sistema esté sano.
+   ════════════════════════════════════════════════════════════════════════════ */
 
-     VIS-1b: el tricolor NO entra en la enmienda v1.1 — queda íntegro en sus
-     valores de v1.0, pendiente de la revisión de Victor. Consecuencia a la
-     vista: la frase (1) describía una relación con la familia AZUL que ya no se
-     sostiene numéricamente, porque el azul bajó a k = 0,78 y éste no. Se deja
-     escrita tal cual, como registro de lo que estas cifras QUERÍAN decir.     */
-  body[data-tapete="tricolor"] {
-    --green-abyss:   #0c131c;   /* H 214  S 42,5%  L  7,8% */
-    --green-darkest: #0f1722;   /* H 214  S 39,9%  L  9,6% */
-    --green-deep:    #1e2f46;   /* H 214  S 40,8%  L 19,6% */
-    --green-base:    #273c58;   /* H 214  S 38,1%  L 24,9% */
-    --green-bright:  #334d70;   /* H 214  S 37,0%  L 32,0% */
-    --surface-game:  rgba(39, 60, 88, 0.88);
-    /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
-    --surface-area:       rgba(12, 19, 28, 0.45);
-    --surface-area-light: rgba(12, 19, 28, 0.30);
-
-    /* Constantes de calibración del tricolor — LA PIEZA QUE MÁS VA A ITERAR.
-       Los tres tonos y las cuatro posiciones de banda, todos declarados: el
-       checkpoint de Victor mueve números aquí y nada más.
-       ZONA DE RIESGO #1 (v1.0 §2), fotografiada explícita por el arnés: las
-       fichas doradas viven arriba, sobre el amarillo. `--gold-brand` es
-       H 41,7 S 77,3% L 60,2%; el amarillo del tapete es H 44 S 38% L 17% —
-       mismo H, pero a 43 puntos de L y a la mitad de saturación. NO es un
-       segundo dorado, y la distancia está declarada, no confiada al ojo. */
-    --tap-tri-amarillo: #3c331b;   /* H  44  S 38%  L 17% */
-    --tap-tri-azul:     #1c2e45;   /* H 214  S 42%  L 19% */
-    --tap-tri-rojo:     #3e191e;   /* H 352  S 42%  L 17% */
-    --tap-tri-p1: 8%;    /* fin del amarillo pleno   */
-    --tap-tri-p2: 40%;   /* inicio del azul pleno    */
-    --tap-tri-p3: 62%;   /* fin del azul pleno       */
-    --tap-tri-p4: 92%;   /* inicio del rojo pleno    */
-    /* Las viñetas. La del fieltro es suave (la mesa se lee entera); la del
-       fondo es más honda, igual que hoy el fondo cae de `base` a `darkest`. */
-    --tap-tri-vineta-mesa:  0.26;
-    --tap-tri-vineta-fondo: 0.42;
-  }
-
-  /* Las bandas, sobre los DOS elementos que pintan fieltro. Especificidad
-     0,2,1 (atributo + clase + elemento) contra la 0,1,0 de gameTable.css: gana
-     sin `!important` y sin que la regla original cambie una coma. Sólo
-     `background` — ni una métrica.
-
-     Van en `.game-table` y no sólo en el fondo porque `--surface-game` es
-     opaco al 88%: la mesa TAPA el fondo casi por completo, así que el fieltro
-     que el jugador mira es éste. Pintar sólo el fondo habría dado un tricolor
-     invisible bajo una mesa lisa. */
-  body[data-tapete="tricolor"] .game-table {
-    background:
-      radial-gradient(ellipse at center,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, var(--tap-tri-vineta-mesa)) 100%),
-      linear-gradient(to bottom,
-        var(--tap-tri-amarillo) 0%,
-        var(--tap-tri-amarillo) var(--tap-tri-p1),
-        var(--tap-tri-azul)     var(--tap-tri-p2),
-        var(--tap-tri-azul)     var(--tap-tri-p3),
-        var(--tap-tri-rojo)     var(--tap-tri-p4),
-        var(--tap-tri-rojo)     100%);
-  }
-
-  /* El fondo repite las bandas con viñeta más honda para que la mesa siga
-     recortándose contra su entorno, como hace hoy el verde. La filigrana se
-     conserva PRIMERA en la lista, exactamente donde está en gameTable.css: es
-     motivo de identidad (Sistema v1.2 §2.2), no decoración de este tapete.
-     El vacío de los lados —lo que `body` pinta más allá de los 1126px de
-     `#root`— NO necesita regla: resuelve `var(--green-abyss)`, que arriba ya es
-     el azul abisal de esta familia. */
-  body[data-tapete="tricolor"] .game-table-screen {
-    background:
-      var(--filigrana),
-      radial-gradient(circle at center,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, var(--tap-tri-vineta-fondo)) 100%),
-      linear-gradient(to bottom,
-        var(--tap-tri-amarillo) 0%,
-        var(--tap-tri-amarillo) var(--tap-tri-p1),
-        var(--tap-tri-azul)     var(--tap-tri-p2),
-        var(--tap-tri-azul)     var(--tap-tri-p3),
-        var(--tap-tri-rojo)     var(--tap-tri-p4),
-        var(--tap-tri-rojo)     100%);
-  }
-
-  /* ═════════════════════════════════════════════════════════════════════════
-     2 · LA ENTRADA DEL ⋮ Y EL PANEL
-     ═════════════════════════════════════════════════════════════════════════ */
-
-  /* El godete hereda toda la caja de `.util-item` y `.util-ico` (gameTable.css,
-     intacto): la fila nueva no cuesta ni una línea allí. Sólo hay que darle su
-     alto, y se toma del token de su hermano — el icono propio de Mano Actual —
-     para que las dos siluetas SVG del panel midan lo mismo. */
-  .util-ico-godete {
-    height: var(--dsk-u1-card-h);
-    width: auto;
-    display: block;
-    color: var(--text-primary);
-  }
-
-  /* Panel · misma familia visual que `.utilities-panel` y `.u3-popup`
-     (superficie de sistema, filete de oro único, una sombra) porque nace del
-     mismo menú. Un peldaño por encima del panel de utilidades, igual que sus
-     hermanos. `fixed` y fuera de flujo estricto: Δ=0 de layout por
-     construcción, y el juego sigue corriendo detrás (v1.0 §4). */
-  .tapetes-panel {
-    --tap-cols: 3;          /* molde de --dsk-u2-cols: la rejilla de U2 */
-    --tap-gap: 6px;
-    --tap-tile-w: 72px;     /* ≥ 40px de estándar táctil de campaña, con holgura */
-    --tap-disco: 44px;
-    /* Ancho DERIVADO de la rejilla, no cableado: recompactar el panel no exige
-       recalcular nada a mano (lección U1b). */
-    --tap-panel-w: calc(var(--tap-cols) * var(--tap-tile-w)
-                    + (var(--tap-cols) - 1) * var(--tap-gap) + 22px);
-
-    position: fixed;
-    z-index: calc(var(--dsk-u1-panel-z) + 1);
-    box-sizing: border-box;
-    width: var(--tap-panel-w);
-    padding: 10px;
-    background: var(--surface-modal);
-    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
-    border-radius: 8px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-    color: var(--text-primary);
-    font-family: var(--font-base);
-  }
-
-  .tap-titulo {
-    margin: 0 0 8px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary);
-    text-align: center;
-  }
-
-  .tap-grid {
-    display: grid;
-    grid-template-columns: repeat(var(--tap-cols), var(--tap-tile-w));
-    gap: var(--tap-gap);
-    justify-content: center;
-  }
-
-  /* Baldosa: disco arriba, nombre debajo (v1.0 §4). La reserva de dos líneas de
-     nombre es fija para que la rejilla no dé un salto cuando el copy cambie —
-     y va a cambiar: los nombres son provisionales. */
-  .tap-swatch {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    width: var(--tap-tile-w);
-    padding: 6px 2px 5px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    color: inherit;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background-color 0.15s, border-color 0.15s;
-  }
-  .tap-swatch:hover { background: rgba(var(--gold-brand-rgb), 0.10); }
-
-  /* El disco es el color real del tapete. VIS-1b: el `background` lo pone el
-     JSX, pero ya no con un hex de catálogo sino con `var(--tap-swatch-<id>)`,
-     declarado arriba en §0. Aquí sólo su caja y su filete — sin tocar. */
-  .tap-disco {
-    width: var(--tap-disco);
-    height: var(--tap-disco);
-    border-radius: 50%;
-    border: 1px solid rgba(var(--gold-brand-rgb), 0.30);
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.45);
-    flex-shrink: 0;
-  }
-
-  .tap-nombre {
-    font-size: 11px;
-    line-height: 1.2;
-    text-align: center;
-    min-height: 26.4px;   /* dos líneas a 11px · reserva, no recorte */
-  }
-
-  /* Tres estados (v1.0 §4). El ACTIVO se resalta con el molde del chip "Tu
-     último" de NivelSelect: fondo dorado ⇒ texto oscuro, sin excepciones
-     (doctrina §45). Es el único oro sólido nuevo, y es un chip de estado —
-     el mismo papel que ya cumple en el lobby. */
-  .tap-swatch.is-activo {
-    background: rgba(var(--gold-brand-rgb), 0.12);
-    border-color: rgba(var(--gold-brand-rgb), 0.45);
-  }
-  .tap-chip {
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    border-radius: 999px;
-    padding: 1px 7px;
-    white-space: nowrap;
-    background: var(--gold-brand);
-    color: var(--text-dark);
-  }
-  /* COMPRADO · marca discreta y sin precio. Deliberadamente en texto tenue y no
-     en oro: la propiedad es un hecho consumado, no una llamada a la acción. */
-  .tap-marca {
-    font-size: 11px;
-    line-height: 1;
-    padding: 2px 0;
-    color: var(--text-muted);
-  }
-  /* NO COMPRADO · la etiqueta de precio es la única llamada del panel. */
-  .tap-precio {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.2px;
-    white-space: nowrap;
-    color: var(--gold-dim);
-  }
-
-  /* Diálogo de compra · se pinta DENTRO del panel, bajo la rejilla, porque la
-     vista previa ya está aplicada en la mesa y el jugador tiene que poder
-     verla: un modal centrado la habría tapado justo cuando importa. Separado
-     por el filete del sistema, como "Mano actual" del grupo en el panel. */
-  .tap-dialogo {
-    margin-top: 9px;
-    padding-top: 8px;
-    border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
-  }
-  .tap-dialogo-txt {
-    margin: 0 0 8px;
-    font-size: 12px;
-    line-height: 1.35;
-    text-align: center;
-  }
-  .tap-dialogo-txt strong { font-weight: 700; }
-  .tap-dialogo-acciones {
-    display: flex;
-    gap: 8px;
-  }
-  /* 40px de alto = estándar táctil de esta campaña (no WCAG), el mismo que
-     rige el disparador del ⋮. */
-  .tap-btn {
-    flex: 1;
-    box-sizing: border-box;
-    min-height: 40px;
-    border-radius: 8px;
-    border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
-    background: transparent;
-    color: var(--text-primary);
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background-color 0.15s;
-  }
-  .tap-btn-si {
-    background: var(--gold-brand);
-    color: var(--text-dark);
-    border-color: var(--gold-brand);
-  }
-  .tap-btn-si:hover { background: var(--gold-hover); border-color: var(--gold-hover); }
-  .tap-btn-no:hover { background: rgba(var(--gold-brand-rgb), 0.10); }
+/* ── Negro grafito · k = 0,68, S ≈ 7% ─────────────────────────────────────
+   Un gris no es un tono: la saturación se queda en el entorno del 7% y el H
+   apenas inclina el neutro hacia el frío, para que no lea como sepia. v1.1
+   baja además la escalera entera a k = 0,68 — es el más hondo de los cinco,
+   porque un gris a la L del verde lee como cemento y no como fieltro.
+   El H de estas paradas es RUIDO DE CUANTIZACIÓN (a S≈7% y 8 bits, un solo
+   nivel de rgb mueve el matiz decenas de grados): el dato que manda es S. */
+body[data-tapete="grafito"] {
+  --green-abyss:   #0d0d0f;   /* S  7,1%  L  5,5% */
+  --green-darkest: #0f1012;   /* S  9,1%  L  6,5% */
+  --green-deep:    #202224;   /* S  5,9%  L 13,3% */
+  --green-base:    #282b2e;   /* S  7,0%  L 16,9% */
+  --green-bright:  #34373b;   /* S  6,3%  L 21,8% */
+  --surface-game:  rgba(40, 43, 46, 0.88);   /* = --green-base al alfa de hoy */
+  /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
+  --surface-area:       rgba(13, 13, 15, 0.45);
+  --surface-area-light: rgba(13, 13, 15, 0.30);
 }
+
+/* ── Azul profundo · H 214, k = 0,78 ──────────────────────────────────────
+   La escalera completa con la S intacta y la L del verde nuevo, parada por
+   parada: azul y verde comparten k, así que siguen siendo la misma
+   profundidad con dos matices. El azul a la misma L que el verde se percibe
+   algo más oscuro (la luminancia relativa del azul es menor a igual L de
+   HSL): eso es física del color, no una desviación — la profundidad TONAL,
+   que es lo que v1.0 §2 pide heredar, es la misma.                         */
+body[data-tapete="azul"] {
+  --green-abyss:   #090f17;   /* H 214,3  S 43,8%  L  6,3% */
+  --green-darkest: #0b121c;   /* H 215,3  S 43,6%  L  7,6% */
+  --green-deep:    #152539;   /* H 213,3  S 46,2%  L 15,3% */
+  --green-base:    #1b2f48;   /* H 213,3  S 45,5%  L 19,4% */
+  --green-bright:  #233c5c;   /* H 213,7  S 44,9%  L 24,9% */
+  --surface-game:  rgba(27, 47, 72, 0.88);
+  /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
+  --surface-area:       rgba(9, 15, 23, 0.45);
+  --surface-area-light: rgba(9, 15, 23, 0.30);
+}
+
+/* ── Vinotinto · H 344, S ≈ 64%, k = 0,86 ─────────────────────────────────
+   El rojo de vino, no el rojo de bandera: el H se queda del lado magenta del
+   rojo puro. v1.1 lo mueve de H 348 a H 344 y le sube la S del 45% al 64%
+   — es el único de los cinco que gana saturación, y el único con k > 0,8:
+   un burdeos apagado lee como marrón, y este tapete tiene referente. La
+   referencia sellada por Victor es la camiseta local 2026 de la selección
+   (burdeos intenso con detalles en oro).                                   */
+body[data-tapete="vinotinto"] {
+  --green-abyss:   #1b080d;   /* H 344,2  S 54,3%  L  6,9% */
+  --green-darkest: #210910;   /* H 342,5  S 57,1%  L  8,2% */
+  --green-deep:    #470f1e;   /* H 343,9  S 65,1%  L 16,9% */
+  --green-base:    #5a1426;   /* H 344,6  S 63,6%  L 21,6% */
+  --green-bright:  #731931;   /* H 344,0  S 64,3%  L 27,5% */
+  --surface-game:  rgba(90, 20, 38, 0.88);
+  /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
+  --surface-area:       rgba(27, 8, 13, 0.45);
+  --surface-area-light: rgba(27, 8, 13, 0.30);
+}
+
+/* ── Tricolor · la pieza insignia ─────────────────────────────────────────
+   «La mesa VESTIDA de tricolor, no la bandera sobre la mesa» (v1.0 §2,
+   sellado 15-ago). Tres decisiones sostienen esa frase:
+
+   (1) La base es la familia AZUL al 85% de su saturación — el óvalo, el pozo
+       y todo lo que resuelve tokens caen en la banda central, así que la
+       mesa sigue siendo una superficie de juego coherente y no un mosaico.
+   (2) Las tres bandas van a L 17..19%, dentro de la envolvente de la escalera
+       verde (9,6..24,9), y a S 38..42% — MENOS saturadas que la bandera real
+       (que ronda S 100%). Son tonos de tapete, no de pabellón.
+   (3) Las transiciones ocupan ~30% del alto cada una: no hay un solo filo
+       duro en el degradado. Por eso lee como tratamiento y no como franja.
+
+   VIS-1b: el tricolor NO entra en la enmienda v1.1 — queda íntegro en sus
+   valores de v1.0, pendiente de la revisión de Victor. Consecuencia a la
+   vista: la frase (1) describía una relación con la familia AZUL que ya no se
+   sostiene numéricamente, porque el azul bajó a k = 0,78 y éste no. Se deja
+   escrita tal cual, como registro de lo que estas cifras QUERÍAN decir.     */
+body[data-tapete="tricolor"] {
+  --green-abyss:   #0c131c;   /* H 214  S 42,5%  L  7,8% */
+  --green-darkest: #0f1722;   /* H 214  S 39,9%  L  9,6% */
+  --green-deep:    #1e2f46;   /* H 214  S 40,8%  L 19,6% */
+  --green-base:    #273c58;   /* H 214  S 38,1%  L 24,9% */
+  --green-bright:  #334d70;   /* H 214  S 37,0%  L 32,0% */
+  --surface-game:  rgba(39, 60, 88, 0.88);
+  /* Tintas de zona · el rgb de --green-abyss de esta familia, alfas de hoy. */
+  --surface-area:       rgba(12, 19, 28, 0.45);
+  --surface-area-light: rgba(12, 19, 28, 0.30);
+
+  /* Constantes de calibración del tricolor — LA PIEZA QUE MÁS VA A ITERAR.
+     Los tres tonos y las cuatro posiciones de banda, todos declarados: el
+     checkpoint de Victor mueve números aquí y nada más.
+     ZONA DE RIESGO #1 (v1.0 §2), fotografiada explícita por el arnés: las
+     fichas doradas viven arriba, sobre el amarillo. `--gold-brand` es
+     H 41,7 S 77,3% L 60,2%; el amarillo del tapete es H 44 S 38% L 17% —
+     mismo H, pero a 43 puntos de L y a la mitad de saturación. NO es un
+     segundo dorado, y la distancia está declarada, no confiada al ojo. */
+  --tap-tri-amarillo: #3c331b;   /* H  44  S 38%  L 17% */
+  --tap-tri-azul:     #1c2e45;   /* H 214  S 42%  L 19% */
+  --tap-tri-rojo:     #3e191e;   /* H 352  S 42%  L 17% */
+  --tap-tri-p1: 8%;    /* fin del amarillo pleno   */
+  --tap-tri-p2: 40%;   /* inicio del azul pleno    */
+  --tap-tri-p3: 62%;   /* fin del azul pleno       */
+  --tap-tri-p4: 92%;   /* inicio del rojo pleno    */
+  /* Las viñetas. La del fieltro es suave (la mesa se lee entera); la del
+     fondo es más honda, igual que hoy el fondo cae de `base` a `darkest`. */
+  --tap-tri-vineta-mesa:  0.26;
+  --tap-tri-vineta-fondo: 0.42;
+}
+
+/* Las bandas, sobre los DOS elementos que pintan fieltro. Especificidad
+   0,2,1 (atributo + clase + elemento) contra la 0,1,0 de gameTable.css: gana
+   sin `!important` y sin que la regla original cambie una coma. Sólo
+   `background` — ni una métrica.
+
+   Van en `.game-table` y no sólo en el fondo porque `--surface-game` es
+   opaco al 88%: la mesa TAPA el fondo casi por completo, así que el fieltro
+   que el jugador mira es éste. Pintar sólo el fondo habría dado un tricolor
+   invisible bajo una mesa lisa. */
+body[data-tapete="tricolor"] .game-table {
+  background:
+    radial-gradient(ellipse at center,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, var(--tap-tri-vineta-mesa)) 100%),
+    linear-gradient(to bottom,
+      var(--tap-tri-amarillo) 0%,
+      var(--tap-tri-amarillo) var(--tap-tri-p1),
+      var(--tap-tri-azul)     var(--tap-tri-p2),
+      var(--tap-tri-azul)     var(--tap-tri-p3),
+      var(--tap-tri-rojo)     var(--tap-tri-p4),
+      var(--tap-tri-rojo)     100%);
+}
+
+/* El fondo repite las bandas con viñeta más honda para que la mesa siga
+   recortándose contra su entorno, como hace hoy el verde. La filigrana se
+   conserva PRIMERA en la lista, exactamente donde está en gameTable.css: es
+   motivo de identidad (Sistema v1.2 §2.2), no decoración de este tapete.
+   El vacío de los lados —lo que `body` pinta más allá de los 1126px de
+   `#root`— NO necesita regla: resuelve `var(--green-abyss)`, que arriba ya es
+   el azul abisal de esta familia. */
+body[data-tapete="tricolor"] .game-table-screen {
+  background:
+    var(--filigrana),
+    radial-gradient(circle at center,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, var(--tap-tri-vineta-fondo)) 100%),
+    linear-gradient(to bottom,
+      var(--tap-tri-amarillo) 0%,
+      var(--tap-tri-amarillo) var(--tap-tri-p1),
+      var(--tap-tri-azul)     var(--tap-tri-p2),
+      var(--tap-tri-azul)     var(--tap-tri-p3),
+      var(--tap-tri-rojo)     var(--tap-tri-p4),
+      var(--tap-tri-rojo)     100%);
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   2 · LA ENTRADA DEL ⋮ Y EL PANEL
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* El godete hereda toda la caja de `.util-item` y `.util-ico` (gameTable.css,
+   intacto): la fila nueva no cuesta ni una línea allí. Sólo hay que darle su
+   alto, y se toma del token de su hermano — el icono propio de Mano Actual —
+   para que las dos siluetas SVG del panel midan lo mismo. */
+.util-ico-godete {
+  height: var(--dsk-u1-card-h);
+  width: auto;
+  display: block;
+  color: var(--text-primary);
+}
+
+/* Panel · misma familia visual que `.utilities-panel` y `.u3-popup`
+   (superficie de sistema, filete de oro único, una sombra) porque nace del
+   mismo menú. Un peldaño por encima del panel de utilidades, igual que sus
+   hermanos. `fixed` y fuera de flujo estricto: Δ=0 de layout por
+   construcción, y el juego sigue corriendo detrás (v1.0 §4). */
+.tapetes-panel {
+  --tap-cols: 3;          /* molde de --dsk-u2-cols: la rejilla de U2 */
+  --tap-gap: 6px;
+  --tap-tile-w: 72px;     /* ≥ 40px de estándar táctil de campaña, con holgura */
+  --tap-disco: 44px;
+  /* Ancho DERIVADO de la rejilla, no cableado: recompactar el panel no exige
+     recalcular nada a mano (lección U1b). */
+  --tap-panel-w: calc(var(--tap-cols) * var(--tap-tile-w)
+                  + (var(--tap-cols) - 1) * var(--tap-gap) + 22px);
+
+  position: fixed;
+  z-index: calc(var(--dsk-u1-panel-z) + 1);
+  box-sizing: border-box;
+  width: var(--tap-panel-w);
+  padding: 10px;
+  background: var(--surface-modal);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+}
+
+.tap-titulo {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.tap-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--tap-cols), var(--tap-tile-w));
+  gap: var(--tap-gap);
+  justify-content: center;
+}
+
+/* Baldosa: disco arriba, nombre debajo (v1.0 §4). La reserva de dos líneas de
+   nombre es fija para que la rejilla no dé un salto cuando el copy cambie —
+   y va a cambiar: los nombres son provisionales. */
+.tap-swatch {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: var(--tap-tile-w);
+  padding: 6px 2px 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.tap-swatch:hover { background: rgba(var(--gold-brand-rgb), 0.10); }
+
+/* El disco es el color real del tapete. VIS-1b: el `background` lo pone el
+   JSX, pero ya no con un hex de catálogo sino con `var(--tap-swatch-<id>)`,
+   declarado arriba en §0. Aquí sólo su caja y su filete — sin tocar. */
+.tap-disco {
+  width: var(--tap-disco);
+  height: var(--tap-disco);
+  border-radius: 50%;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.30);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.45);
+  flex-shrink: 0;
+}
+
+.tap-nombre {
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  min-height: 26.4px;   /* dos líneas a 11px · reserva, no recorte */
+}
+
+/* Tres estados (v1.0 §4). El ACTIVO se resalta con el molde del chip "Tu
+   último" de NivelSelect: fondo dorado ⇒ texto oscuro, sin excepciones
+   (doctrina §45). Es el único oro sólido nuevo, y es un chip de estado —
+   el mismo papel que ya cumple en el lobby. */
+.tap-swatch.is-activo {
+  background: rgba(var(--gold-brand-rgb), 0.12);
+  border-color: rgba(var(--gold-brand-rgb), 0.45);
+}
+.tap-chip {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  background: var(--gold-brand);
+  color: var(--text-dark);
+}
+/* COMPRADO · marca discreta y sin precio. Deliberadamente en texto tenue y no
+   en oro: la propiedad es un hecho consumado, no una llamada a la acción. */
+.tap-marca {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 0;
+  color: var(--text-muted);
+}
+/* NO COMPRADO · la etiqueta de precio es la única llamada del panel. */
+.tap-precio {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  color: var(--gold-dim);
+}
+
+/* Diálogo de compra · se pinta DENTRO del panel, bajo la rejilla, porque la
+   vista previa ya está aplicada en la mesa y el jugador tiene que poder
+   verla: un modal centrado la habría tapado justo cuando importa. Separado
+   por el filete del sistema, como "Mano actual" del grupo en el panel. */
+.tap-dialogo {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+}
+.tap-dialogo-txt {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+.tap-dialogo-txt strong { font-weight: 700; }
+.tap-dialogo-acciones {
+  display: flex;
+  gap: 8px;
+}
+/* 40px de alto = estándar táctil de esta campaña (no WCAG), el mismo que
+   rige el disparador del ⋮. */
+.tap-btn {
+  flex: 1;
+  box-sizing: border-box;
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.tap-btn-si {
+  background: var(--gold-brand);
+  color: var(--text-dark);
+  border-color: var(--gold-brand);
+}
+.tap-btn-si:hover { background: var(--gold-hover); border-color: var(--gold-hover); }
+.tap-btn-no:hover { background: rgba(var(--gold-brand-rgb), 0.10); }
