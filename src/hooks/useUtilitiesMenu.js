@@ -36,6 +36,30 @@ const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 // 260px el panel quedaría clavado arriba y desbordaría, caso borde aceptado.
 const PANEL_H = 244
 const PANEL_MARGIN = 8   // aire mínimo a los filos del área segura
+
+// ── MOV-1a-c · La rama de colocación es por ORIENTACIÓN, nunca por ancho ─────
+// Espejo LITERAL de `LANDSCAPE_TABLE_MQ` (GameTable.jsx:66), que es la
+// orientación horizontal DENTRO del complemento de `DESKTOP_TABLE_MQ`: el
+// `max-height: 600px` es lo que deja fuera al escritorio, que también es
+// landscape y no debe moverse un píxel. Se espeja en vez de importarse porque
+// GameTable ya importa este hook y el ciclo sería peor que la copia; si alguien
+// mueve aquel corte, este de aquí va con él.
+const HORIZONTAL_MQ = '(orientation: landscape) and (max-height: 600px)'
+// ── Los obstáculos que el panel esquiva en horizontal ───────────────────────
+// D4.1 decía «a la izquierda de la columna de acción». MEDIDO, eso no basta:
+// entre el abanico del humano y esa columna hay 6px a 640x360 (mano hasta 472,
+// columna desde 478) y 38,8px a 812x375 — en ninguno de los dos cabe un panel
+// de 64. Colocarlo ahí libra los botones y aterriza sobre las cartas, que es el
+// otro invariante de la tanda y también es puerta.
+// Se toma el filo IZQUIERDO más pequeño de los dos, así que el panel queda a la
+// izquierda de la columna de acción *y* de la mano: la letra de D4.1 se cumple
+// de sobra, y el invariante también. El corredor que queda —entre el
+// temporizador (acaba en 60,8) y la primera carta— mide 85,2px a 640 y 118 a
+// 812; el panel usa 64 y sobran 21,2 y 54.
+// Se eligen CONTENEDORES y no los hijos (`.action-buttons`, `.card-slot-wrapper`)
+// porque aquéllos existen en todas las fases y éstos sólo con turno vivo: un
+// ancla que desaparece a media mano no es un ancla.
+const OBSTACULOS_H = ['.action-area', '.player-zone .cards-row']
 const TOP_MIN = `calc(${PANEL_MARGIN}px + env(safe-area-inset-top, 0px))`
 const TOP_MAX = `calc(100dvh - ${PANEL_H + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px))`
 
@@ -109,13 +133,39 @@ export function useUtilitiesMenu(enabled = true) {
       const el = triggerRef.current
       if (!el) return null
       const r = el.getBoundingClientRect()
-      // `left` sigue siendo un número (nunca ha necesitado pinza: el mínimo
-      // medido en las 16 celdas móviles es 236,4px). `top` sale ya como
-      // longitud CSS — ver la nota de la pinza arriba.
-      return {
-        left: r.right - PANEL_W,
-        top: `clamp(${TOP_MIN}, ${r.bottom + PANEL_GAP}px, ${TOP_MAX})`,
+      // `left` sigue siendo un número; `top` sale ya como longitud CSS con la
+      // pinza dentro — ver la nota de arriba.
+      const pinza = (px) => `clamp(${TOP_MIN}, ${px}px, ${TOP_MAX})`
+
+      // MOV-1a-c · D4.1 · en MÓVIL HORIZONTAL el panel no cuelga del
+      // disparador: se aparta a la izquierda de la columna de acción. Abajo no
+      // hay sitio y arriba faltan 41..53px, así que la única colocación que
+      // deja los controles del turno libres es ésta. Alineado por ARRIBA al
+      // disparador (no por abajo: en mesas 5 y 4 el disparador vive a media
+      // altura y colgarlo lo hundía en la fila de cartas).
+      if (window.matchMedia(HORIZONTAL_MQ).matches) {
+        // Se miden los obstáculos VIVOS en vez de cablear sus anchos: los 150px
+        // de la columna y los márgenes viven en gameTable.css, que es protegido,
+        // y una copia aquí envejecería en silencio la próxima vez que se muevan.
+        const filos = OBSTACULOS_H
+          .map(sel => document.querySelector(sel))
+          .filter(Boolean)
+          .map(el => el.getBoundingClientRect().left)
+        if (filos.length) {
+          const izq = Math.min(...filos) - PANEL_GAP - PANEL_W
+          // El techo, y no el filo del disparador. D4.1 pedía alinearlo con el
+          // disparador, pero el corredor libre no da para eso: el bloque de
+          // saldo del humano (`.player-bar-right`) arranca en y 253,7 a
+          // 360 de alto, y un panel de 244 sólo cabe por encima si empieza
+          // arriba del todo. Colgarlo del disparador lo hundía 4,3px dentro del
+          // saldo en mesas 3 y 2. Es el mismo `clamp()` de siempre —área segura
+          // incluida—, sólo que su tope inferior manda siempre.
+          return { left: Math.max(izq, PANEL_MARGIN), top: pinza(PANEL_MARGIN) }
+        }
+        // Sin obstáculos (GAME_OVER y pantallas terminales) no hay nada que
+        // esquivar: vale la colocación de siempre.
       }
+      return { left: r.right - PANEL_W, top: pinza(r.bottom + PANEL_GAP) }
     })
   }, [])
 
