@@ -227,6 +227,20 @@ import { ENTRADA, VIVAS_MOVIL } from '../src/config/menuEntradas.js'
 import {
   TAPETES, TAPETE_POR_DEFECTO, TAPETE_KEY, TAPETES_COMPRADOS_KEY, montoTexto,
 } from '../src/config/tapetes.js'
+// MOV-1b-c · las frases, los tiempos y las rutas de emoji del modo `menu-movil`
+// salen de la MISMA fuente que la app, igual que en `u2`. `runU2` las importa
+// dinámicamente dentro de su función; aquí hace falta arriba porque el modo
+// `menu-movil` deriva de ellas sus constantes de módulo.
+import {
+  REACCIONES as MOVMENU_FRASES, REACCION_TOTAL_MS, REACCION_COOLDOWN_MS,
+  REACCION_ENTRADA_MS, REACCION_PICO_PX, rutaEmoji as movRutaEmoji,
+} from '../src/config/reacciones.js'
+// La burbuja ENTRA animada (`scale(0.94)` → 1 en el primer 10% del ciclo), y
+// `getBoundingClientRect` devuelve la caja TRANSFORMADA. Medir en cuanto asoma
+// da 86,07×76,14 donde la caja real es 91,56×81 — exactamente el 94%. No es una
+// regresión, es medir antes de tiempo, así que hay UN solo sitio que sabe
+// cuánto hay que esperar y lo deriva del reparto sellado.
+const movEsperaEntrada = (page) => page.waitForTimeout(REACCION_ENTRADA_MS + 80)
 
 const BASE = 'http://localhost:5173'
 const OUT_DIR = 'capturas-dsk'
@@ -4340,6 +4354,29 @@ const MOVMENU_TAPETE = TAPETES.map(t => t.id).find(id => id !== TAPETE_POR_DEFEC
 // disposición en fila del horizontal es PUERTA, porque esa fila la estrena esta
 // tanda y estrenar algo por debajo del estándar sería crear la deuda a mano.
 const MOVMENU_FICHA_MIN = 44
+// MOV-1b-c · geometría SELLADA de la lista de reacciones (lámina aprobada por
+// Victor). Las dos cajas se declaran porque son cosas distintas y confundirlas
+// es cómo se cuelan los 2px de un filete: 242×186 es la caja de CLIENTE —la de
+// la lámina, la que mide `scrollHeight`— y 244,19×188 la de BORDE, que es la
+// que devuelve `getBoundingClientRect`. El recorrido de 554 y el alto de 186 se
+// DERIVAN de las mismas cifras que el CSS (12 y 4 filas de 44, separación 2,
+// relleno 2), no se copian: si mañana se ven cinco filas, esto se mueve solo.
+const MOVMENU_SEL_ITEM = { w: 238.19, h: 44 }
+const MOVMENU_SEL_GAP = 2
+const MOVMENU_SEL_VISIBLES = 4
+const movSelAlto = (filas) =>
+  filas * MOVMENU_SEL_ITEM.h + (filas - 1) * MOVMENU_SEL_GAP + 2 * MOVMENU_SEL_GAP
+const MOVMENU_SELECTOR = {
+  cw: 242, ch: movSelAlto(MOVMENU_SEL_VISIBLES),          // cliente · 242 × 186
+  w: MOVMENU_SEL_ITEM.w + 2 * MOVMENU_SEL_GAP + 2,        // borde   · 244,19
+  h: movSelAlto(MOVMENU_SEL_VISIBLES) + 2,                //            188
+  scroll: movSelAlto(MOVMENU_FRASES.length),              // recorrido · 554
+}
+// Contra-celda: el selector de ESCRITORIO no se toca. Rejilla 3×4, separación y
+// relleno 4, caja de borde 732,56×198.
+const MOVMENU_SEL_DSK = { w: 732.56, h: 198 }
+// Estándar táctil de cada fila de la lista. Aquí es PUERTA y no medida: la fila
+// la estrena esta tanda.
 
 // Sonda de solape de UNA superficie contra una lista de selectores. `__u1Guard`
 // mira siempre a `.utilities-panel`; los satélites necesitan lo mismo apuntando
@@ -4725,6 +4762,297 @@ async function runMenuMovil(browser) {
       c.fichasMin = Math.min(...c.tapetes.fichas.map(f => Math.min(f.w, f.h)))
       c.fichasOk = c.tapetes.horizontal ? c.fichasMin >= MOVMENU_FICHA_MIN : true
 
+      // ── MOV-1b-c · Selector de reacciones ─────────────────────────────────
+      await u1OpenMenu(page)
+      c.entradaReac = await page.evaluate(() => {
+        const e = document.querySelector('.util-item-reacciones')
+        return {
+          existe: !!e,
+          gris: !!e && e.className.includes('is-disabled'),
+          inerte: !!e && e.disabled === true,
+        }
+      })
+      await page.click('.util-item-reacciones')
+      await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+      c.selector = await page.evaluate(({ G, TOL, N }) => {
+        const s2 = document.querySelector('.u2-selector')
+        if (!s2) return { existe: false }
+        const r = s2.getBoundingClientRect()
+        const t = document.querySelector('.utilities-trigger').getBoundingClientRect()
+        const horizontal = matchMedia('(orientation: landscape) and (max-height: 600px)').matches
+        const esperadoRight = horizontal ? t.left - 6 : t.right
+        const items = [...s2.querySelectorAll('.u2-frase')]
+        // Las DOCE alcanzables: se lleva cada una a la vista y se comprueba que
+        // el centro de su caja resuelve a ella —no a un hermano, no al fondo— y
+        // que su hit llega al estándar. Sin el `scrollIntoView` sólo cuatro
+        // están pintadas y las otras ocho darían un `elementFromPoint` del
+        // contenedor: un verde que no mide lo que dice.
+        const filas = items.map((e, i) => {
+          e.scrollIntoView({ block: 'nearest' })
+          const hb = window.__hitBox(e)
+          const b = e.getBoundingClientRect()
+          const cx = Math.round((b.left + b.right) / 2), cy = Math.round((b.top + b.bottom) / 2)
+          const t2 = document.elementFromPoint(cx, cy)
+          return {
+            i, alcanza: !!t2 && (t2 === e || e.contains(t2)),
+            w: hb.w, h: hb.h, visual: [hb.visualW, hb.visualH],
+          }
+        })
+        s2.scrollTop = 0
+        return {
+          existe: true, horizontal,
+          caja: window.__u1R('.u2-selector'),
+          cliente: { w: s2.clientWidth, h: s2.clientHeight },
+          scroll: s2.scrollHeight,
+          filas, n: items.length,
+          dRight: Math.round(Math.abs(r.right - esperadoRight) * 100) / 100,
+          dentro: r.left >= -TOL && r.top >= -TOL &&
+                  r.right <= innerWidth + TOL && r.bottom <= innerHeight + TOL,
+          solape: window.__movSolape('.u2-selector', G),
+          sobreDisparador: window.__movSolape('.u2-selector', ['.utilities-trigger']),
+          panelCerrado: !document.querySelector('.utilities-panel'),
+          esperadas: N,
+        }
+      }, { G: MOVMENU_GUARD, TOL: U1_TOL, N: MOVMENU_FRASES.length })
+      // El gesto de desplazamiento NO lo cierra y NO arrastra la página. Se
+      // dispara el `pointerdown` de verdad —que es lo que el cierre por captura
+      // mira— en vez de simular un arrastre con el ratón: un arrastre que
+      // termina sobre una fila mandaría una reacción y la puerta mediría otra cosa.
+      c.selectorGesto = await page.evaluate(() => {
+        const s2 = document.querySelector('.u2-selector')
+        if (!s2) return null
+        s2.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }))
+        s2.scrollTop = 120
+        return {
+          sigueAbierto: !!document.querySelector('.u2-selector'),
+          scrollTop: s2.scrollTop,
+          scrollY: window.scrollY,
+        }
+      })
+      await page.evaluate(() => { const s2 = document.querySelector('.u2-selector'); if (s2) s2.scrollTop = 0 })
+      // Tap fuera: cierra.
+      await page.touchscreen.tap(Math.round(vp.w / 2), Math.round(vp.h - 12))
+      await page.waitForTimeout(200)
+      c.selectorTapFuera = await page.evaluate(() => !document.querySelector('.u2-selector'))
+      c.selectorOk = c.entradaReac.existe && !c.entradaReac.gris && !c.entradaReac.inerte &&
+        c.selector.existe && c.selector.panelCerrado &&
+        c.selector.dRight <= U1_TOL && c.selector.dentro &&
+        c.selector.solape.length === 0 && c.selector.sobreDisparador.length === 0 &&
+        c.selector.n === MOVMENU_FRASES.length &&
+        c.selector.cliente.w === MOVMENU_SELECTOR.cw &&
+        c.selector.cliente.h === MOVMENU_SELECTOR.ch &&
+        c.selector.scroll === MOVMENU_SELECTOR.scroll &&
+        Math.abs(c.selector.caja.w - MOVMENU_SELECTOR.w) <= U1_TOL &&
+        Math.abs(c.selector.caja.h - MOVMENU_SELECTOR.h) <= U1_TOL &&
+        c.selector.filas.every(f => f.alcanza && f.w >= MOVMENU_FICHA_MIN && f.h >= MOVMENU_FICHA_MIN) &&
+        !!c.selectorGesto && c.selectorGesto.sigueAbierto &&
+        c.selectorGesto.scrollTop > 0 && c.selectorGesto.scrollY === 0 &&
+        c.selectorTapFuera === true
+
+      // ── MOV-1b-c · Burbuja ────────────────────────────────────────────────
+      await u1OpenMenu(page)
+      await page.click('.util-item-reacciones')
+      await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+      // La frase MAS LARGA, y a proposito: es la que estira la burbuja y la que
+      // destapo que en vertical no siempre cabe en la banda. Una puerta que
+      // manda una frase corta mide el caso facil y deja pasar el dificil.
+      const iLarga = MOVMENU_FRASES.reduce(
+        (mejor, f, i) => (f.length > MOVMENU_FRASES[mejor].length ? i : mejor), 0)
+      const elegida = await page.evaluate((i) => {
+        const e = document.querySelectorAll('.u2-frase')[i]
+        return e ? e.getAttribute('aria-label') : null
+      }, iLarga)
+      await page.click(`.u2-frase:nth-of-type(${iLarga + 1})`)
+      await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
+      await movEsperaEntrada(page)
+      c.burbuja = await page.evaluate(({ G, PICO }) => {
+        const b0 = document.querySelector('.u2-burbuja')
+        if (!b0) return { existe: false }
+        const r = b0.getBoundingClientRect()
+        const cs = getComputedStyle(b0)
+        const nodo = document.querySelector('.pbr-name')
+        const rango = document.createRange(); rango.selectNodeContents(nodo)
+        const tinta = rango.getBoundingClientRect()
+        const vertical = matchMedia('(orientation: portrait)').matches
+        // El pico apunta a la TINTA en las dos ramas, cada una por su eje, y en
+        // las dos tiene que caer DENTRO del cuerpo: un triángulo colgando del
+        // filo no señala a nadie.
+        // ¿Hay pico pintado? En el horizontal del móvil NO lo hay (la burbuja
+        // cuelga del ⋮ y no del nombre), y sin esta lectura la puerta de "el
+        // pico cae dentro" pasaba por casualidad: `--u2-pico-x` vale `50%` por
+        // defecto y `parseFloat` lo lee como 50. Un verde que no mide lo que
+        // dice es un bug del arnés.
+        const picoPintado = getComputedStyle(b0, '::before').display !== 'none'
+        const pico = parseFloat(cs.getPropertyValue(vertical ? '--u2-pico-y' : '--u2-pico-x'))
+        const centroTinta = vertical ? tinta.top + tinta.height / 2 : tinta.left + tinta.width / 2
+        const origen = vertical ? r.top : r.left
+        const largo = vertical ? r.height : r.width
+        return {
+          existe: true, vertical, picoPintado,
+          ancla: b0.dataset.ancla,
+          caja: window.__u1R('.u2-burbuja'),
+          cols: cs.gridTemplateColumns.split(' ').length,
+          dur: cs.getPropertyValue('--u2-dur').trim(),
+          pico,
+          picoDentro: picoPintado
+            ? (Number.isFinite(pico) && pico >= PICO && pico <= largo - PICO)
+            : null,
+          // Cuánto se desvía el pico del centro de la tinta. Cero salvo cuando
+          // la pinza muerde, y entonces se REPORTA en vez de fingir que apunta.
+          dTinta: Math.round(Math.abs(origen + pico - centroTinta) * 100) / 100,
+          texto: b0.querySelector('.u2-texto') ? b0.querySelector('.u2-texto').textContent : null,
+          dentro: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+          // DENTRO DEL AREA, y no solo del viewport. Bajo la barra del jugador
+          // no hay una sola caja de la guardia, asi que una burbuja que se
+          // derramaba por ahi -y se salia de la pantalla- daba 0 px2 y verde.
+          dentroArea: (() => {
+            const ga = document.querySelector('.game-table')
+            if (!ga) return null
+            const q = ga.getBoundingClientRect()
+            const cs2 = getComputedStyle(ga)
+            return r.bottom <= q.bottom - parseFloat(cs2.borderBottomWidth) + 0.01 &&
+                   r.top >= q.top + parseFloat(cs2.borderTopWidth) - 0.01
+          })(),
+          solape: window.__movSolape('.u2-burbuja', G),
+          selectorCerrado: !document.querySelector('.u2-selector'),
+          // Excedente de la burbuja sobre la fila del jugador (sólo vertical):
+          // medida INFORMATIVA que se reporta, no puerta — la banda mide 64,38
+          // y las frases largas la desbordan hacia abajo, contra hueco muerto.
+          excedeFila: (() => {
+            const barL = document.querySelector('.player-bar-left')
+            if (!vertical || !barL) return null
+            const q = barL.getBoundingClientRect()
+            return Math.round(Math.max(0, r.bottom - q.bottom) * 100) / 100
+          })(),
+        }
+      }, { G: MOVMENU_GUARD, PICO: REACCION_PICO_PX })
+      // El candado: con la burbuja viva la entrada está en enfriamiento.
+      await u1OpenMenu(page)
+      c.enfriando = await page.evaluate(() => {
+        const e = document.querySelector('.util-item-reacciones')
+        return { cooling: !!e && e.className.includes('is-cooling'), inerte: !!e && e.disabled === true }
+      })
+      await page.keyboard.press('Escape')
+      c.burbujaOk = c.burbuja.existe && c.burbuja.selectorCerrado && c.burbuja.dentro &&
+        c.burbuja.solape.length === 0 && c.burbuja.dentroArea &&
+        // El pico existe SI Y SOLO SI la burbuja cuelga de la tinta, y cuando
+        // existe cae dentro del cuerpo y apunta al centro del nombre. Colgada
+        // del menu no debe haber pico - es la mitad que se romperia en silencio
+        // si alguien devolviera el pseudo sin recolocarlo.
+        (c.burbuja.ancla === 'tinta'
+          ? (c.burbuja.picoPintado && c.burbuja.picoDentro && c.burbuja.dTinta <= U1_TOL)
+          : c.burbuja.picoPintado === false) &&
+        c.burbuja.dur === REACCION_TOTAL_MS + 'ms' &&
+        // La frase pintada es la ELEGIDA, y se compara contra el contrato.
+        (elegida || '').startsWith(c.burbuja.texto || '\u0000') &&
+        c.burbuja.cols === (c.burbuja.vertical ? 2 : 2) &&
+        c.enfriando.cooling && c.enfriando.inerte
+
+      // Relojes y assets: UNA celda. El ciclo de la burbuja y el enfriamiento
+      // son propiedades del reloj, no de la geometría, y los 24 ficheros de
+      // emoji son los mismos en las dieciséis — repetirlo costaba ~8s por celda
+      // y no medía nada nuevo. Se declara aquí para que la cobertura no se lea
+      // de más.
+      c.relojes = null
+      if (n === 5 && tag === '360x640') {
+        await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
+        const muerta = await page.evaluate(() => !document.querySelector('.u2-burbuja'))
+        await page.waitForTimeout(REACCION_COOLDOWN_MS - REACCION_TOTAL_MS + 400)
+        await u1OpenMenu(page)
+        const libre = await page.evaluate(() => {
+          const e = document.querySelector('.util-item-reacciones')
+          return !!e && !e.className.includes('is-cooling') && e.disabled !== true
+        })
+        await page.keyboard.press('Escape')
+        // La OTRA colocacion, en la misma celda barata. La puerta de arriba manda
+        // la frase mas larga, que en las 16 celdas cuelga del menu, asi que sin
+        // esto la opcion E -- la que Victor eligio, la que se ve en 10 de 12
+        // frases a 375x812 -- no la mediria ninguna puerta. Aqui se manda una
+        // corta y se exige lo contrario: anclada a la tinta y con pico.
+        await u1OpenMenu(page)
+        await page.click('.util-item-reacciones')
+        await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+        await page.click('.u2-frase:nth-of-type(1)')
+        await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
+        await movEsperaEntrada(page)
+        const corta = await page.evaluate((G) => {
+          const b0 = document.querySelector('.u2-burbuja')
+          if (!b0) return { existe: false }
+          const r = b0.getBoundingClientRect()
+          const barL = document.querySelector('.player-bar-left').getBoundingClientRect()
+          const barR = document.querySelector('.player-bar-right').getBoundingClientRect()
+          const nodo = document.querySelector('.pbr-name')
+          const rango = document.createRange(); rango.selectNodeContents(nodo)
+          const tinta = rango.getBoundingClientRect()
+          const pico = parseFloat(getComputedStyle(b0).getPropertyValue('--u2-pico-y'))
+          return {
+            existe: true, ancla: b0.dataset.ancla,
+            caja: window.__u1R('.u2-burbuja'),
+            // En la BANDA del jugador: a la derecha del bloque del nombre y a
+            // la izquierda del saldo, que es el sitio que eligio Victor.
+            enBanda: r.left >= barL.right && r.right <= barR.left,
+            picoPintado: getComputedStyle(b0, '::before').display !== 'none',
+            dTinta: Math.round(Math.abs(r.top + pico - (tinta.top + tinta.height / 2)) * 100) / 100,
+            solape: window.__movSolape('.u2-burbuja', G),
+          }
+        }, MOVMENU_GUARD)
+        await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
+        const assets = await page.evaluate(async (rutas) => {
+          const out = []
+          for (const u of rutas) {
+            try { const r = await fetch(u, { method: 'GET' }); out.push({ u, s: r.status }) }
+            catch { out.push({ u, s: 0 }) }
+          }
+          return out
+        }, [...MOVMENU_FRASES.map(f => movRutaEmoji(f, 'avif')),
+            ...MOVMENU_FRASES.map(f => movRutaEmoji(f, 'svg'))])
+        c.relojes = {
+          muerta, libre, corta,
+          assets: assets.length, assets200: assets.filter(a => a.s === 200).length,
+          fallan: assets.filter(a => a.s !== 200).map(a => a.u),
+        }
+      }
+      c.relojesOk = c.relojes === null || (c.relojes.muerta && c.relojes.libre &&
+        c.relojes.assets200 === c.relojes.assets &&
+        c.relojes.corta.existe && c.relojes.corta.ancla === 'tinta' &&
+        c.relojes.corta.enBanda && c.relojes.corta.picoPintado &&
+        c.relojes.corta.dTinta <= U1_TOL && c.relojes.corta.solape.length === 0)
+
+      // MOV-1b-c · las cinco capturas pedidas: selector abierto y burbuja viva
+      // en mesa 5 a 360×640 y 640×360, más la burbuja de mesa 2 a 360×640 (la
+      // celda donde la banda del jugador es más estrecha). Se toman DESPUÉS de
+      // las puertas para no alterar lo que miden.
+      if ((n === 5 && (tag === '360x640' || tag === '640x360')) || (n === 2 && tag === '360x640')) {
+        await u1OpenMenu(page)
+        await page.click('.util-item-reacciones')
+        await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+        if (n === 5) {
+          await page.screenshot({ path: MOVMENU_OUT + '/mov1c-selector-mesa' + n + '-' + tag + '.png' })
+        }
+        // DOS fotos por celda, porque en vertical hay dos colocaciones y una
+        // sola foto contaría media historia: una frase corta, que cabe en la
+        // banda del jugador y sale con pico, y la más larga, que no cabe y
+        // cuelga del menú. En horizontal las dos salen colgadas del menú y la
+        // segunda foto simplemente lo confirma.
+        await page.click('.u2-frase:nth-of-type(1)').catch(() => {})
+        await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
+        await movEsperaEntrada(page)
+        await page.screenshot({ path: MOVMENU_OUT + '/mov1c-burbuja-corta-mesa' + n + '-' + tag + '.png' })
+        await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
+        await page.waitForTimeout(REACCION_COOLDOWN_MS - REACCION_TOTAL_MS + 300)
+        await u1OpenMenu(page)
+        await page.click('.util-item-reacciones')
+        await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+        await page.click('.u2-frase:nth-of-type(10)').catch(() => {})
+        await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
+        // La captura, con la entrada YA terminada: durante los primeros 300ms la
+        // burbuja va a `opacity: 0` → 1, y una foto a media entrada sale
+        // desvaída y hace parecer roto lo que no lo está.
+        await movEsperaEntrada(page)
+        await page.screenshot({ path: MOVMENU_OUT + '/mov1c-burbuja-mesa' + n + '-' + tag + '.png' })
+        await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
+      }
+
       // Capturas de la Fase 2: una por mesa en los dos viewports pedidos.
       if (tag === '640x360' || (n === 5 && tag === '812x375')) {
         await u1OpenMenu(page)
@@ -4748,6 +5076,7 @@ async function runMenuMovil(browser) {
         cierreTapFuera: c.cierraTapFuera, cierreEsc: c.cierraEsc, sonido: c.sonidoOk,
         avisoMano: c.avisoOk, contadorConsultas: c.consultasOk,
         tapetes: c.tapetesOk, hitFichas: c.fichasOk,
+        selectorReacciones: c.selectorOk, burbuja: c.burbujaOk, relojesYassets: c.relojesOk,
       }
       c.puertas = puertas
       c.fallos = Object.keys(puertas).filter(k => !puertas[k])
@@ -4803,8 +5132,69 @@ async function runMenuMovil(browser) {
         vivas: [...document.querySelectorAll('.utilities-panel .util-item')]
           .filter(e => !e.className.includes('is-disabled')).map(e => e.getAttribute('title')),
       }))
+      // MOV-1b-c · el selector y la burbuja de ESCRITORIO, medidos aquí mismo.
+      // Son las dos piezas que esta tanda toca en código compartido —el ancla
+      // del selector pasa por una rama nueva y el pico de la burbuja estrena
+      // pinza—, así que preguntar "¿movió algo arriba?" deja de ser retórica.
+      await page.click('.util-item-reacciones')
+      await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+      const dsk = await page.evaluate(() => {
+        const sel = document.querySelector('.u2-selector')
+        const t = document.querySelector('.utilities-trigger').getBoundingClientRect()
+        if (!sel) return null
+        const r = sel.getBoundingClientRect()
+        return {
+          caja: window.__u1R('.u2-selector'),
+          cols: getComputedStyle(sel).gridTemplateColumns.split(' ').length,
+          // El ancla de siempre: borde derecho al filo derecho del ⋮, 6px bajo
+          // su pie. Si la rama nueva se hubiera colado arriba, esto se movería.
+          dRight: Math.round(Math.abs(r.right - t.right) * 100) / 100,
+          dTop: Math.round(Math.abs(r.top - (t.bottom + 6)) * 100) / 100,
+          desborda: sel.scrollHeight > sel.clientHeight,
+        }
+      })
+      await page.click('.u2-frase:nth-of-type(1)')
+      await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
+      await movEsperaEntrada(page)
+      const dskBur = await page.evaluate(() => {
+        const b0 = document.querySelector('.u2-burbuja')
+        if (!b0) return null
+        const r = b0.getBoundingClientRect()
+        const nodo = document.querySelector('.pbr-name')
+        const rango = document.createRange(); rango.selectNodeContents(nodo)
+        const tinta = rango.getBoundingClientRect()
+        const pico = parseFloat(getComputedStyle(b0).getPropertyValue('--u2-pico-x'))
+        return {
+          caja: window.__u1R('.u2-burbuja'),
+          pico,
+          // La pinza del pico NO puede morder arriba: el nombre está lejos del
+          // filo del área y el centro de la tinta ya cae dentro del cuerpo.
+          dTinta: Math.round(Math.abs(r.left + pico - (tinta.left + tinta.width / 2)) * 100) / 100,
+          // Hueco entre el pie de la burbuja y la tinta. El sellado es pico + 2.
+          sobreTinta: Math.round((tinta.top - r.bottom) * 100) / 100,
+        }
+      })
       const ex = m.expect
       escritorio = {
+        selector: dsk, burbuja: dskBur,
+        selectorOk: !!dsk && dsk.cols === 3 && dsk.desborda === false &&
+          dsk.dRight <= U1_TOL && dsk.dTop <= U1_TOL &&
+          Math.abs(dsk.caja.w - MOVMENU_SEL_DSK.w) <= U1_TOL &&
+          Math.abs(dsk.caja.h - MOVMENU_SEL_DSK.h) <= U1_TOL,
+        // La caja SELLADA del encargo, ya sin la escala de entrada: 91,56×81 con
+        // la frase 1. Y la relación con la tinta, que es lo que esta tanda toca
+        // en código compartido: el pie a pico + 2 sobre ella y el pico en su
+        // centro exacto. Si la pinza nueva hubiera mordido arriba, se vería.
+        burbujaOk: !!dskBur && dskBur.dTinta <= U1_TOL &&
+          Math.abs(dskBur.caja.w - 91.56) <= U1_TOL &&
+          Math.abs(dskBur.caja.h - 81) <= U1_TOL,
+        // `sobreTinta` se REPORTA y no se exige. El nominal es pico + 2 = 10 y
+        // arriba salen 5,14: el componente sellado mide su caja al montar, o
+        // sea con la escala de entrada puesta (94%), y coloca con esos 76,14 en
+        // vez de con 81 — 4,86px de desfase que existen desde U2c y que esta
+        // tanda NO toca, porque tocarlos sería mover escritorio. Las dos ramas
+        // móviles sí miden la caja real; ahí el nominal se cumple.
+        sobreTintaNominal: REACCION_PICO_PX + 2,
         vp: '1920x1080', gate,
         trigger: m.trigger, panel: ex && ex.got, itemH: ex && ex.itemH, itemW: ex && ex.itemW,
         titles: m.titles, badge: m.badge, vivas: m.vivas,
@@ -4824,7 +5214,8 @@ async function runMenuMovil(browser) {
         vivasOk: JSON.stringify(m.vivas) === JSON.stringify(['Sonido', 'Reacciones', 'Tapetes', 'Mano actual']),
       }
       escritorio.passed = gate === true && escritorio.triggerOk && escritorio.panelOk &&
-        escritorio.itemsOk && escritorio.titlesOk && escritorio.badgeOk && escritorio.vivasOk
+        escritorio.itemsOk && escritorio.titlesOk && escritorio.badgeOk && escritorio.vivasOk &&
+        escritorio.selectorOk && escritorio.burbujaOk
     } catch (e) {
       escritorio = { error: String(e && e.message || e), passed: false }
     }
@@ -4832,6 +5223,8 @@ async function runMenuMovil(browser) {
     console.error('  escritorio 1920x1080 · ' + (escritorio.passed ? 'OK   ' : 'FALLA') +
       ' · trigger=' + (escritorio.trigger ? escritorio.trigger.w + 'x' + escritorio.trigger.h : '?') +
       ' panel=' + (escritorio.panel ? escritorio.panel.w + 'x' + escritorio.panel.h : '?') +
+      ' selector=' + (escritorio.selector ? escritorio.selector.caja.w + 'x' + escritorio.selector.caja.h : '?') +
+      ' burbuja=' + (escritorio.burbuja ? escritorio.burbuja.caja.w + 'x' + escritorio.burbuja.caja.h : '?') +
       ' vivas=' + JSON.stringify(escritorio.vivas))
   }
 
