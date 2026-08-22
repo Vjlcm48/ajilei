@@ -165,6 +165,28 @@
 //            launch al final): con las barras ocultas, la que aparece/desaparece
 //            por overflow desplazable NUNCA encoge el cliente y el saltito de
 //            15px es literalmente invisible al arnés.
+//   menu-movil → MOV-1a: el menú de utilidades en MÓVIL. 16 celdas (mesas
+//            5/4/3/2 × 375x812 · 360x640 · 812x375 · 640x360, los cuatro que
+//            MOV-0 canonizó) con una mano repartida y el menú abierto. Dieciocho
+//            puertas: la celda es móvil y coarse; caja del disparador Δ=0 contra
+//            la caja de la BOCINA medida por MOV-0 (40,61×32, y 32×28 en mesa 2
+//            horizontal, que fija el protegido) y `.mute-button` es él y no una
+//            bocina superviviente; hit 44×44 real con `elementFromPoint` en las
+//            cuatro esquinas del `::after`, sin robarle el suyo a la ✕ ni a la
+//            ficha de esquina de la IA; pinza vertical de D4 (`top` dentro de
+//            [8, H−252]) y encaje completo en el viewport; geometría por partida
+//            DOBLE —derivada del contenido vivo Y contra las cifras selladas de
+//            `u1` (64×244 · 62×44 · 5 filas)—, que es lo único que detecta que
+//            las dos pieles del menú se han separado; las cinco leyendas y su
+//            orden; Sonido viva y las otras cuatro grises E INERTES (`disabled`
+//            de verdad, no `pointer-events`); el badge del contador sin montar;
+//            guardia de contenido (0 px² contra botones, multiplicadores, timer
+//            y saldo del humano); z por encima del techo vivo ganando además el
+//            hit-test; fuera de flujo estricto (Δ=0 en las 11 anclas y scroll
+//            intacto al abrir); cierre por TAP fuera —con el dedo, que es el
+//            gesto real— y por Esc; y Sonido que alterna, cierra al ejecutar y
+//            persiste en la MISMA clave que escritorio. Args: [mesa] [WxH].
+//            Capturas a MOV1A_OUT (por defecto capturas-dsk/).
 // Salida: JSON a stdout y a scratchpad; PNGs a capturas-dsk/.
 import { register } from 'node:module'
 // El motor importa sin extensión y es archivo PROTEGIDO: el arnés se adapta
@@ -4212,6 +4234,384 @@ async function runU1(browser) {
   return { cells, hits, sound, passed }
 }
 
+// ── MOV-1a · modo `menu-movil` del arnés ─────────────────────────────────────
+// Documento rector: instrucción MOV-1a. Base de medida: informe MOV-0.
+//
+// El instrumento es el MISMO que el de escritorio: `u1Install` monta todas las
+// sondas (rects, Δ de anclas, scroll, censo de z, hit-test del panel, guardia
+// de contenido, dimensiones DERIVADAS del contenido vivo) y aquí sólo cambian
+// las celdas y las expectativas. Un segundo juego de sondas para el mismo menú
+// sería una segunda verdad, y las dos pieles ya son deuda bastante.
+//
+// LO QUE ESTE MODO DEBE ATRAPAR. El puerto móvil vive de dos hojas distintas
+// que nadie sincroniza automáticamente. Por eso la puerta de geometría no se
+// conforma con `__u1PanelExpect` —que deriva ancho y alto del contenido vivo y
+// por tanto sería verde aunque las dos pieles divergieran a la vez— sino que
+// además contrasta contra las MISMAS cifras selladas que `u1` exige arriba
+// (64×244 · 62×44 · 5 filas). Si una piel se desvía de la otra, sale en rojo.
+// Un verde que no mide lo que dice es un bug del arnés.
+const MOVMENU_VPS = [
+  { w: 375, h: 812 }, { w: 360, h: 640 },   // vertical
+  { w: 812, h: 375 }, { w: 640, h: 360 },   // horizontal
+]
+const MOVMENU_TABLES = [5, 4, 3, 2]
+// Los CUATRO viewports son los que MOV-0 canonizó, y no los que el arnés
+// arrastraba de antes (360×640 · 640×360 · 740×360 · 844×390). El motivo es la
+// puerta D5: la caja del disparador tiene que dar Δ=0 contra la caja de la
+// BOCINA, y esa medida sólo existe donde MOV-0 la tomó. Los dos que quedan
+// fuera —740×360 y 844×390— siguen sin baseline; MOV-0 0.7 ya los dejó
+// anotados como hueco abierto, y medirlos es tanda de arnés, no de producto.
+//
+// BASELINE PRE-TANDA · caja viva del botón de sonido en las 16 celdas, medida
+// por MOV-0 sobre HEAD 630ee6a. No colapsa a dos perfiles como la de `u1`: en
+// móvil la `y` cambia con la mesa (mesa 5 a 360×640 sube a 12 por su strip
+// absoluto) y la caja entera cambia en mesa 2 horizontal (32×28, que el
+// protegido fija en gameTable.css:3933-3937). Se guarda tal cual se midió.
+const MOVMENU_PRE = {
+  '5|375x812': { x: 274.77, y: 20, w: 40.61, h: 32 },
+  '5|360x640': { x: 259.77, y: 12, w: 40.61, h: 32 },
+  '5|812x375': { x: 750.39, y: 163.5, w: 40.61, h: 32 },
+  '5|640x360': { x: 578.39, y: 156, w: 40.61, h: 32 },
+  '4|375x812': { x: 274.77, y: 20, w: 40.61, h: 32 },
+  '4|360x640': { x: 259.77, y: 16, w: 40.61, h: 32 },
+  '4|812x375': { x: 750.39, y: 163.5, w: 40.61, h: 32 },
+  '4|640x360': { x: 578.39, y: 156, w: 40.61, h: 32 },
+  '3|375x812': { x: 274.77, y: 20, w: 40.61, h: 32 },
+  '3|360x640': { x: 259.77, y: 14, w: 40.61, h: 32 },
+  '3|812x375': { x: 715.77, y: 14, w: 40.61, h: 32 },
+  '3|640x360': { x: 543.77, y: 14, w: 40.61, h: 32 },
+  '2|375x812': { x: 274.77, y: 20, w: 40.61, h: 32 },
+  '2|360x640': { x: 259.77, y: 14, w: 40.61, h: 32 },
+  '2|812x375': { x: 723, y: 14, w: 32, h: 28 },
+  '2|640x360': { x: 551, y: 14, w: 32, h: 28 },
+}
+// D3 · el estándar del disparador SUBE a 44 en móvil (en escritorio la deuda B2
+// lo dejó en el 40 de campaña). Las filas del panel ya median 44 desde U1b.
+const MOVMENU_TAP = 44
+// D4 · caja y pinza del panel. `H − 252` es `H − 244 − 8`: alto del panel más el
+// margen al filo. El área segura entra por `env()` dentro del `clamp()`, así que
+// aquí se comprueba el caso sin muescas, que es el del navegador de prueba.
+const MOVMENU_PANEL = { w: 64, h: 244 }
+const MOVMENU_MARGIN = 8
+const MOVMENU_ITEM = { w: 62, h: 44 }
+// Los vecinos que el embaldosado del disparador NO puede desalojar. La ✕ está a
+// 8px y no lleva pseudo propio; la ficha de esquina de la IA es el control vivo
+// más cercano por la izquierda (a 0,8px en mesa 4 · 360×640, la celda apretada).
+const MOVMENU_VECINOS = ['.btn-leave', '.opp-corner-chip']
+// En esta tanda sólo Sonido está viva. Las otras cuatro salen en gris con el
+// tratamiento de Saldo: `is-disabled` MÁS `disabled` de verdad — no un
+// `pointer-events: none`, que pintaría igual y le mentiría al lector de pantalla.
+const MOVMENU_VIVAS = ['Sonido']
+const MOVMENU_OUT = process.env.MOV1A_OUT || OUT_DIR
+
+async function runMenuMovil(browser) {
+  const filtroMesa = Number(process.argv[3]) || null
+  const filtroVp = (process.argv[4] || '').includes('x') ? process.argv[4] : null
+  const celdas = []
+
+  for (const n of MOVMENU_TABLES) for (const vp of MOVMENU_VPS) {
+    const tag = vp.w + 'x' + vp.h
+    if (filtroMesa && filtroMesa !== n) continue
+    if (filtroVp && filtroVp !== tag) continue
+    const key = n + '|' + tag
+    // pointer:coarse: hasTouch + isMobile fuerza a Chromium a reportar coarse,
+    // igual que en `tactil`. Sin esto el `::after` de D3 no se monta y el modo
+    // mediría una piel que el teléfono nunca ve.
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, hasTouch: true, isMobile: true })
+    const c = { mesa: n, vp: tag }
+    try {
+      await gotoMesa(page, n)
+      await u1Install(page)
+      await installHitProbe(page)
+
+      c.gates = await page.evaluate(() => ({
+        desktop: matchMedia('(orientation: landscape) and (min-height: 601px)').matches,
+        coarse: matchMedia('(pointer: coarse)').matches,
+      }))
+      // (0) La celda es MÓVIL y es táctil. Si esto falla, todo lo de abajo mide
+      //     otra cosa y el verde sería mentira.
+      c.celdaOk = c.gates.desktop === false && c.gates.coarse === true
+
+      // Una mano repartida: la guardia de contenido necesita que los botones de
+      // acción y la fila de multiplicadores EXISTAN para poder no tocarlos.
+      await clickIf(page, 'button:has-text("Iniciar mano")')
+      // Espera POR ESTADO y no por reloj: la fase de apuesta llega cuando el
+      // reparto termina, y eso tarda distinto según la mesa. Un `waitForTimeout`
+      // fijo funcionaba en 15 celdas y en la decimosexta dejaba la guardia
+      // midiendo una pantalla sin botones — que es el verde vacuo de siempre.
+      await page.waitForSelector('.action-buttons button', { timeout: 20000 }).catch(() => {})
+      await page.mouse.move(5, 5)
+
+      // (1) D5 · caja del disparador = caja de la bocina de MOV-0.
+      const caja = await page.evaluate(() => window.__u1R('.utilities-trigger'))
+      const pre = MOVMENU_PRE[key]
+      c.caja = caja
+      c.cajaPre = pre
+      c.dCaja = caja && pre ? round(Math.max(...['x', 'y', 'w', 'h'].map(p => Math.abs(caja[p] - pre[p])))) : null
+      c.cajaOk = c.dCaja != null && c.dCaja <= U1_TOL
+      // El disparador HEREDA la clase `.mute-button` (así le siguen aplicando
+      // las reglas de posición por celda del protegido), así que sigue habiendo
+      // exactamente uno — y tiene que ser él, no una bocina superviviente.
+      c.esElDisparador = await page.evaluate(() =>
+        document.querySelectorAll('.mute-button').length === 1 &&
+        document.querySelector('.mute-button').classList.contains('utilities-trigger'))
+
+      // (2) D3 · hit 44×44 REAL, y (3) sin desalojar a los vecinos.
+      c.hit = await page.evaluate((VEC) => {
+        const t = document.querySelector('.utilities-trigger')
+        const hb = window.__hitBox(t)
+        // Las cuatro esquinas del hit medido tienen que seguir siendo del ⋮.
+        const esq = [[hb.left, hb.top], [hb.right, hb.top], [hb.left, hb.bottom], [hb.right, hb.bottom]]
+          .every(([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && (e === t || t.contains(e)) })
+        const vecinos = []
+        VEC.forEach(sel => document.querySelectorAll(sel).forEach(el => {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 || r.height === 0) return
+          const cs = getComputedStyle(el)
+          if (cs.visibility === 'hidden' || cs.display === 'none') return
+          const cx = Math.round((r.left + r.right) / 2), cy = Math.round((r.top + r.bottom) / 2)
+          const e = document.elementFromPoint(cx, cy)
+          vecinos.push({ sel, conserva: !!e && (e === el || el.contains(e)) })
+        }))
+        return Object.assign({}, hb, { esquinasOk: esq, vecinos })
+      }, MOVMENU_VECINOS)
+      c.hitOk = !c.hit.occluded && c.hit.w >= MOVMENU_TAP && c.hit.h >= MOVMENU_TAP && c.hit.esquinasOk
+      c.vecinosOk = c.hit.vecinos.every(v => v.conserva)
+
+      // (4..6, 9) Panel abierto: fuera de flujo, pinza, geometría, apilamiento,
+      //           guardia de contenido y hit-test de cada entrada.
+      const cerrado = await page.evaluate(() => ({ snap: window.__u1Snap(), scr: window.__u1Scroll() }))
+      await u1OpenMenu(page)
+      const abierto = await page.evaluate((cfg) => {
+        const p = document.querySelector('.utilities-panel')
+        const items = [...document.querySelectorAll('.utilities-panel .util-item')]
+        return {
+          snap: window.__u1Snap(), scr: window.__u1Scroll(),
+          panel: window.__u1Panel(), expect: window.__u1PanelExpect(),
+          titles: window.__u1Titles(), wins: window.__u1Wins(), maxZ: window.__u1MaxZ(),
+          panelZ: Number(getComputedStyle(p).zIndex),
+          guard: window.__u1Guard(cfg.G),
+          // Cuántos objetivos VIVOS tenía la guardia. Sin esto, "0 px² de
+          // solape" es indistinguible de "no había nada contra lo que chocar":
+          // la lista sale vacía en los dos casos y el modo pintaría verde por
+          // una pantalla en blanco. Es la trampa que el encargo llama «un verde
+          // que no mide lo que dice».
+          guardN: cfg.G.map(sel => ({ sel, n: document.querySelectorAll(sel).length })),
+          // Las cajas de los vecinos que mandan en la colocación. Un informe que
+          // dice "hay solape" y no dice DÓNDE obliga a repetir la corrida para
+          // poder arreglarlo.
+          cajas: {
+            trigger: window.__u1R('.utilities-trigger'),
+            actionArea: window.__u1R('.action-area'),
+            actionButtons: window.__u1R('.action-buttons'),
+            multRow: window.__u1R('.mult-row'),
+            playerBar: window.__u1R('.player-bar'),
+            cards: window.__u1R('.player-zone .cards-row'),
+          },
+          // Cada entrada gana el hit-test en su propio centro, y su estado es el
+          // que la tanda declara: Sonido viva, las otras cuatro grises E INERTES.
+          entradas: items.map(e => {
+            const r = e.getBoundingClientRect()
+            const t = document.elementFromPoint(Math.round((r.left + r.right) / 2), Math.round((r.top + r.bottom) / 2))
+            const propio = e.tagName === 'BUTTON' ? e : e.querySelector('button')
+            return {
+              title: e.getAttribute('title'),
+              gana: !!t && (t === e || e.contains(t)),
+              inerte: !!propio && (propio.disabled === true || propio.getAttribute('aria-disabled') === 'true'),
+              gris: e.className.includes('is-disabled'),
+              viva: cfg.VIVAS.includes(e.getAttribute('title')),
+            }
+          }),
+          // El badge del contador NO monta en móvil: es un control vivo y su
+          // popup vive en el bloque de escritorio, o sea que aquí no tendría piel.
+          badge: document.querySelectorAll('.utilities-panel .util-badge').length,
+          vpW: innerWidth, vpH: innerHeight,
+        }
+      }, { G: U1_GUARD, VIVAS: MOVMENU_VIVAS })
+
+      const pa = abierto.panel
+      c.panel = pa
+      // D4 · pinza vertical + encaje completo dentro del viewport.
+      c.pinza = {
+        min: MOVMENU_MARGIN, max: round(abierto.vpH - MOVMENU_PANEL.h - MOVMENU_MARGIN),
+        top: pa ? pa.y : null,
+        dentro: !!pa && pa.y >= MOVMENU_MARGIN - U1_TOL &&
+                pa.y <= abierto.vpH - MOVMENU_PANEL.h - MOVMENU_MARGIN + U1_TOL,
+        encaje: !!pa && pa.x >= 0 && pa.y >= 0 && pa.right <= abierto.vpW && pa.bottom <= abierto.vpH,
+      }
+      // Geometría: contra el contenido vivo Y contra la cifra sellada de u1.
+      const ex = abierto.expect
+      c.geom = {
+        n: ex ? ex.n : null, expW: ex ? ex.expW : null, expH: ex ? ex.expH : null,
+        got: ex ? ex.got : null, itemH: ex ? ex.itemH : null, itemW: ex ? ex.itemW : null,
+        derivadaOk: !!ex && ex.n === 5 &&
+          Math.abs(ex.got.w - ex.expW) <= U1_TOL && Math.abs(ex.got.h - ex.expH) <= U1_TOL,
+        selladaOk: !!ex && Math.abs(ex.got.w - MOVMENU_PANEL.w) <= U1_TOL &&
+          Math.abs(ex.got.h - MOVMENU_PANEL.h) <= U1_TOL &&
+          ex.itemH.every(h => Math.abs(h - MOVMENU_ITEM.h) <= U1_TOL) &&
+          ex.itemW.every(w => Math.abs(w - MOVMENU_ITEM.w) <= U1_TOL),
+      }
+      c.entradas = abierto.entradas
+      c.entradasOk = abierto.entradas.length === 5 &&
+        abierto.entradas.every(e => e.gana) &&
+        abierto.entradas.every(e => e.viva ? (!e.gris && !e.inerte) : (e.gris && e.inerte))
+      c.titlesOk = JSON.stringify(abierto.titles) === JSON.stringify(U1_ENTRADAS)
+      c.badgeOk = abierto.badge === 0
+      c.guard = abierto.guard
+      c.guardN = abierto.guardN
+      c.cajas = abierto.cajas
+      // Los botones de acción son el objetivo que SIEMPRE debe existir con una
+      // mano viva; los multiplicadores y el timer sólo en algunas fases, así que
+      // de ésos no se puede exigir presencia sin volver el modo caprichoso.
+      c.guardVivo = (abierto.guardN.find(g => g.sel === '.action-buttons .btn') || { n: 0 }).n > 0
+      c.guardOk = abierto.guard.length === 0 && c.guardVivo
+      c.zOk = abierto.wins === true && abierto.panelZ > abierto.maxZ.max
+      c.z = { panel: abierto.panelZ, maxVivo: abierto.maxZ }
+      // Fuera de flujo ESTRICTO: abrir no mueve un ancla ni cambia el scroll.
+      const dOpen = await page.evaluate((ab) => window.__u1Diff(ab[0], ab[1]), [cerrado.snap, abierto.snap])
+      c.dOpen = dOpen
+      c.dScroll = { h: abierto.scr.scrH - cerrado.scr.scrH, ovX: abierto.scr.ovX, ovY: abierto.scr.ovY }
+      c.flujoOk = dOpen.max <= U1_TOL && c.dScroll.h === 0
+
+      // (7) Tap FUERA cierra. Con el dedo, no con el ratón: es el gesto real.
+      await page.touchscreen.tap(Math.round(abierto.vpW / 2), Math.round(abierto.vpH / 2))
+      await page.waitForTimeout(160)
+      const trasTap = await page.evaluate(() => ({ open: window.__u1Open(), snap: window.__u1Snap() }))
+      c.cierraTapFuera = trasTap.open === false
+      c.dBack = await page.evaluate((ab) => window.__u1Diff(ab[0], ab[1]), [cerrado.snap, trasTap.snap])
+      // …y Esc también: es herencia del hook y el puerto no puede haberla perdido.
+      await u1OpenMenu(page)
+      await page.keyboard.press('Escape'); await page.waitForTimeout(120)
+      c.cierraEsc = await page.evaluate(() => window.__u1Open() === false)
+
+      // (8) Sonido alterna, cierra al ejecutar y persiste en la MISMA clave que
+      //     escritorio — que es el punto entero del puerto: no hay ajuste nuevo.
+      const lsAntes = await page.evaluate(() => localStorage.getItem('ajilei.sound'))
+      await u1OpenMenu(page)
+      const glifoAntes = await page.evaluate(() => window.__u1SoundEntry())
+      await page.click('.util-item-sound')
+      await page.waitForTimeout(160)
+      const lsTras = await page.evaluate(() => localStorage.getItem('ajilei.sound'))
+      const cerroAlEjecutar = await page.evaluate(() => window.__u1Open() === false)
+      await u1OpenMenu(page)
+      const glifoTras = await page.evaluate(() => window.__u1SoundEntry())
+      await page.keyboard.press('Escape'); await page.waitForTimeout(100)
+      c.sonido = { lsAntes, lsTras, glifoAntes, glifoTras, cerroAlEjecutar }
+      c.sonidoOk = lsTras === 'off' && lsTras !== lsAntes &&
+        glifoAntes.off === false && glifoTras.off === true && cerroAlEjecutar
+
+      // Capturas de la Fase 2: una por mesa en los dos viewports pedidos.
+      if (tag === '360x640' || tag === '640x360') {
+        await u1OpenMenu(page)
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: MOVMENU_OUT + '/mov1a-mesa' + n + '-' + tag + '.png' })
+        c.shot = 'mov1a-mesa' + n + '-' + tag + '.png'
+        await page.keyboard.press('Escape')
+      }
+
+      // Una lista con NOMBRE por puerta: un `every` desnudo dice que la celda
+      // falla y no cuál, y entonces hay que repetir la corrida para saberlo.
+      const puertas = {
+        celdaMovil: c.celdaOk, cajaD5: c.cajaOk, disparadorUnico: c.esElDisparador,
+        hit44: c.hitOk, vecinos: c.vecinosOk, guardiaConObjetivos: c.guardVivo,
+        pinzaD4: c.pinza.dentro, encajeViewport: c.pinza.encaje,
+        geomDerivada: c.geom.derivadaOk, geomSellada: c.geom.selladaOk,
+        entradas: c.entradasOk, leyendas: c.titlesOk, sinBadge: c.badgeOk,
+        guardiaLimpia: c.guardOk, apilamiento: c.zOk, fueraDeFlujo: c.flujoOk,
+        cierreTapFuera: c.cierraTapFuera, cierreEsc: c.cierraEsc, sonido: c.sonidoOk,
+      }
+      c.puertas = puertas
+      c.fallos = Object.keys(puertas).filter(k => !puertas[k])
+      c.passed = c.fallos.length === 0
+    } catch (e) {
+      c.error = String(e && e.message || e)
+      c.passed = false
+    }
+    await page.close().catch(() => {})
+    celdas.push(c)
+    console.error('  mesa ' + n + ' · ' + tag + ' · ' + (c.passed ? 'OK   ' : 'FALLA') +
+      ' · dCaja=' + c.dCaja + ' hit=' + (c.hit ? c.hit.w + 'x' + c.hit.h : '?') +
+      ' panel=' + (c.panel ? c.panel.w + 'x' + c.panel.h + '@y' + c.panel.y : '?') +
+      (c.fallos && c.fallos.length ? ' · fallan: ' + c.fallos.join(',') : '') +
+      (c.error ? ' · ' + c.error : ''))
+  }
+  // ── Contra-celda de ESCRITORIO ─────────────────────────────────────────────
+  // El puerto móvil comparte componente, hook y ancla con el de escritorio, así
+  // que la pregunta "¿movió algo arriba?" no es retórica: la pinza de D4 se
+  // aplica a las DOS pieles (es un `clamp()` en línea, no una rama), y su tope
+  // superior sólo deja de morder si el panel abre donde siempre. Se comprueba
+  // aquí y no en una sonda aparte para que quede medido cada vez que alguien
+  // corra el modo, en vez de una sola tarde. Es UNA celda a propósito:
+  // `gameTable.css` no se toca y las dos media queries son complementarias, así
+  // que lo único que podría haber movido escritorio es el JS compartido — y eso
+  // no depende del viewport.
+  let escritorio = null
+  if (!filtroMesa && !filtroVp) {
+    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
+    try {
+      await gotoMesa(page, 5)
+      await u1Install(page)
+      const gate = await page.evaluate(() => matchMedia('(orientation: landscape) and (min-height: 601px)').matches)
+      // Con una mano repartida, y no en WAITING: "Mano actual" sólo está
+      // habilitada en las fases consultables, así que sin cartas saldría en gris
+      // por motivos legítimos y la puerta de "las cuatro siguen vivas" —la que
+      // de verdad vigila que `soloSonido` no se haya escapado al gate de
+      // escritorio— no estaría midiendo nada.
+      await clickIf(page, 'button:has-text("Iniciar mano")')
+      // Espera POR ESTADO y no por reloj: la fase de apuesta llega cuando el
+      // reparto termina, y eso tarda distinto según la mesa. Un `waitForTimeout`
+      // fijo funcionaba en 15 celdas y en la decimosexta dejaba la guardia
+      // midiendo una pantalla sin botones — que es el verde vacuo de siempre.
+      await page.waitForSelector('.action-buttons button', { timeout: 20000 }).catch(() => {})
+      await page.mouse.move(5, 5)
+      await u1OpenMenu(page)
+      const m = await page.evaluate(() => ({
+        trigger: window.__u1R('.utilities-trigger'),
+        expect: window.__u1PanelExpect(),
+        titles: window.__u1Titles(),
+        badge: document.querySelectorAll('.utilities-panel .util-badge').length,
+        vivas: [...document.querySelectorAll('.utilities-panel .util-item')]
+          .filter(e => !e.className.includes('is-disabled')).map(e => e.getAttribute('title')),
+      }))
+      const ex = m.expect
+      escritorio = {
+        vp: '1920x1080', gate,
+        trigger: m.trigger, panel: ex && ex.got, itemH: ex && ex.itemH, itemW: ex && ex.itemW,
+        titles: m.titles, badge: m.badge, vivas: m.vivas,
+        // Las cifras selladas son las de MOV-0 0.1, que son las de u1.
+        triggerOk: !!m.trigger && Math.abs(m.trigger.w - U1_TRIGGER.w) <= U1_TOL &&
+          Math.abs(m.trigger.h - U1_TRIGGER.h) <= U1_TOL,
+        panelOk: !!ex && ex.n === 5 &&
+          Math.abs(ex.got.w - MOVMENU_PANEL.w) <= U1_TOL &&
+          Math.abs(ex.got.h - MOVMENU_PANEL.h) <= U1_TOL,
+        itemsOk: !!ex && ex.itemH.every(h => Math.abs(h - MOVMENU_ITEM.h) <= U1_TOL) &&
+          ex.itemW.every(w => Math.abs(w - MOVMENU_ITEM.w) <= U1_TOL),
+        titlesOk: JSON.stringify(m.titles) === JSON.stringify(U1_ENTRADAS),
+        // Arriba NO se aplica `soloSonido`: el badge sigue montado y las cuatro
+        // entradas vivas siguen vivas. Es la mitad que más fácil se rompería sin
+        // que nadie lo note, porque el puerto no la mira nunca.
+        badgeOk: m.badge === 1,
+        vivasOk: JSON.stringify(m.vivas) === JSON.stringify(['Sonido', 'Reacciones', 'Tapetes', 'Mano actual']),
+      }
+      escritorio.passed = gate === true && escritorio.triggerOk && escritorio.panelOk &&
+        escritorio.itemsOk && escritorio.titlesOk && escritorio.badgeOk && escritorio.vivasOk
+    } catch (e) {
+      escritorio = { error: String(e && e.message || e), passed: false }
+    }
+    await page.close().catch(() => {})
+    console.error('  escritorio 1920x1080 · ' + (escritorio.passed ? 'OK   ' : 'FALLA') +
+      ' · trigger=' + (escritorio.trigger ? escritorio.trigger.w + 'x' + escritorio.trigger.h : '?') +
+      ' panel=' + (escritorio.panel ? escritorio.panel.w + 'x' + escritorio.panel.h : '?') +
+      ' vivas=' + JSON.stringify(escritorio.vivas))
+  }
+
+  const verdes = celdas.filter(c => c.passed).length
+  return {
+    celdas, escritorio, verdes, total: celdas.length,
+    passed: verdes === celdas.length && (escritorio ? escritorio.passed : true),
+  }
+}
+
 // ── DSK-U2 · Reacciones entre jugadores ──────────────────────────────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.2.md.
 // Modo NUEVO, no extensión de u1: aquél valida el CONTENEDOR del menú (caja del
@@ -7585,6 +7985,7 @@ try {
   if (MODE === 'o2') report.o2 = await runO2(browser)
   if (MODE === 'a2') report.a2 = await runA2(browser)
   if (MODE === 'u1') report.u1 = await runU1(browser)
+  if (MODE === 'menu-movil') report.menuMovil = await runMenuMovil(browser)
   if (MODE === 'u2') report.u2 = await runU2(browser)
   if (MODE === 'u3') report.u3 = await runU3(browser)
   if (MODE === 'vc') report.vc = await runVC(browser)
