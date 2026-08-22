@@ -1039,9 +1039,38 @@
 }
 
 /* ── Shuffle fan animation ── */
+/* TAC-1 · El envoltorio del mazo dejaba de ser decorativo en el hit-test.
+   Es `position: relative` —y tiene que serlo: es el bloque contenedor de
+   `.shuffle-fan-card`, que es `absolute; inset: 0` justo debajo—, así que con
+   `z-index: auto` pinta en el paso 6 del orden de pintado (descendientes
+   posicionados con z auto) y va POR ENCIMA de sus hermanos `.card-slot-wrapper`,
+   que son `static`, sin importar el orden DOM. Es el mismo mecanismo que VIS-2d
+   encontró entre las ranuras de los paneles de IA.
+   Su caja se solapa con la de la PRIMERA carta del humano y en esa banda ganaba
+   `elementFromPoint`. MEDIDO en escritorio, reposo y descarte por igual:
+     1024x768 · 1280x720 · 1366x768   solape 56 x 113,97 px = 59,5% de la carta
+     1920x1080 mesa 5                 solape 63,5 x 137,98 px = 55,1%
+     1920x1080 mesa 2                 solape 63,5 x 117,16 px = 63,1%
+   El centro de la carta cae DENTRO de esa franja en las ocho celdas, y el
+   `onClick` de descarte vive en `.playing-card`: un toque en el centro de la
+   primera carta no la seleccionaba. Sólo respondía la franja derecha libre
+   (38,10 px a 1024/1280/1366).
+   NO SE REORDENA EL APILAMIENTO, y es deliberado: el envoltorio no pinta nada
+   —no tiene fondo y su único hijo va oculto—, así que el defecto es PURAMENTE de
+   hit-test. Subir las ranuras por encima (la cura de VIS-2d) taparía el abanico
+   de barajado con la primera carta, que es justo lo que este envoltorio existe
+   para mostrar.
+   NADA DENTRO NECESITA EL PUNTERO, así que no hay ningún `auto` que reponer:
+   `.deck-pile` ya declara `pointer-events: none`, `.shuffle-fan-card` es
+   decorativa y `deckRefs` se usa SÓLO para leer cajas (origen y destino de los
+   vuelos de descarte), nunca para eventos.
+   Va en la regla BASE para cubrir las cuatro bandas de una vez —escritorio,
+   portrait móvil, landscape móvil y el gemelo de las IAs—, porque el envoltorio
+   es decorativo en todas. */
 .deck-shuffle-wrapper {
   position: relative;
   flex-shrink: 0;
+  pointer-events: none;
 }
 
 .shuffle-fan-card {
