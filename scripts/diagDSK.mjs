@@ -217,7 +217,13 @@ const MODE = process.argv[2] || 'all'
 //     el propio JSON en vez de esconderse dentro de un Δ inexplicable.
 const ARNES = {
   tanda: 'ARN-1',
-  chromiumBaselines: '151.0.4129.86',   // Edge estable, 16-ago-2026
+  // Re-sellado en el cierre de la campaña VIS (2026-08-21/22), con autorización de
+  // Victor. NO es un ajuste cosmético para callar el aviso: la corrida completa
+  // de los 23 modos se hizo ENTERA con este Chromium y salió verde en todos los
+  // que emiten veredicto, así que las baselines quedan atribuidas a la versión
+  // con la que de verdad se comprobaron. La versión anterior era 151.0.4129.86
+  // (Edge estable, 16-ago-2026).
+  chromiumBaselines: '151.0.4129.93',   // Edge estable, leído en vivo el 21-ago-2026
 }
 
 // Ruta canónica: nivel y apuesta parametrizables, con los defaults del §0 de
