@@ -214,6 +214,12 @@ import { getBestSuitScore } from '../src/engine/handEvaluator.js'
 // para no clavar ni el orden de la rejilla ni los montos: los `id` son el
 // CONTRATO del producto y los rótulos son copy declarado provisional.
 import { NIVELES, NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
+// MOV-1b-a · las entradas del menú y qué está vivo en cada rama salen de la
+// MISMA fuente única que la app (mismo criterio que consultas.js, niveles.js y
+// tapetes.js). El modo `menu-movil` DERIVA de aquí lo que espera, así que
+// encender una entrada en MOV-1b-c mueve la puerta con ella y no hay que
+// acordarse de recablear una lista a mano.
+import { ENTRADA, VIVAS_MOVIL } from '../src/config/menuEntradas.js'
 // EMB-2 · el catálogo de tapetes y sus claves salen de la MISMA fuente única
 // que la app (mismo criterio que consultas.js y niveles.js): el modo `tapetes`
 // siembra el storage con la clave real y recorre los ids de contrato, así que
@@ -4317,11 +4323,46 @@ const MOVMENU_OBLIGATORIOS = ['.action-buttons .btn', '.player-zone .card-slot-w
 // cubrir, para el criterio visual de Victor.
 const MOVMENU_INFO = ['.opp-panel', '.ai-zone', '.center-zone', '.table-header',
   '.table-title', '.hand-badge', '.deck-shuffle-wrapper']
-// En esta tanda sólo Sonido está viva. Las otras cuatro salen en gris con el
-// tratamiento de Saldo: `is-disabled` MÁS `disabled` de verdad — no un
-// `pointer-events: none`, que pintaría igual y le mentiría al lector de pantalla.
-const MOVMENU_VIVAS = ['Sonido']
+// Qué está vivo en móvil NO se declara aquí: se importa de `config/menuEntradas`
+// y se compara contra el `data-entrada` que cada fila publica en el DOM. Antes
+// era una lista de RÓTULOS mantenida a mano, y los rótulos son copy declarado
+// provisional — la clase de puerta que se rompe con el próximo ajuste de
+// redacción, o peor, que sigue verde midiendo otra cosa.
+// Lo que NO está vivo sale en gris con el tratamiento de Saldo: `is-disabled`
+// MÁS `disabled` de verdad, no un `pointer-events: none` que pintaría igual y le
+// mentiría al lector de pantalla.
 const MOVMENU_OUT = process.env.MOV1A_OUT || OUT_DIR
+// El tapete que se presiona para probar que elegir un fieltro PINTA. Se toma el
+// primero que no sea el de por defecto, del catálogo vivo: no se cablea un id.
+const MOVMENU_TAPETE = TAPETES.map(t => t.id).find(id => id !== TAPETE_POR_DEFECTO)
+// Estándar táctil de las fichas del panel de tapetes. En vertical es MEDIDA que
+// se reporta (decisión de Victor: si no llega, se dice, no se corrige); en la
+// disposición en fila del horizontal es PUERTA, porque esa fila la estrena esta
+// tanda y estrenar algo por debajo del estándar sería crear la deuda a mano.
+const MOVMENU_FICHA_MIN = 44
+
+// Sonda de solape de UNA superficie contra una lista de selectores. `__u1Guard`
+// mira siempre a `.utilities-panel`; los satélites necesitan lo mismo apuntando
+// a otra caja, y duplicar la aritmética en tres sitios es cómo se separan.
+const MOVMENU_SONDA = `
+  window.__movSolape = (sel, sels) => {
+    const s = document.querySelector(sel)
+    if (!s) return null
+    const r = s.getBoundingClientRect()
+    const hits = []
+    sels.forEach(q => document.querySelectorAll(q).forEach(el => {
+      const b = el.getBoundingClientRect()
+      if (b.width === 0 || b.height === 0) return
+      const cs = getComputedStyle(el)
+      if (cs.visibility === 'hidden' || cs.display === 'none') return
+      const ox = Math.min(r.right, b.right) - Math.max(r.left, b.left)
+      const oy = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top)
+      if (ox > 0 && oy > 0) hits.push({ sel: q, area: Math.round(ox * oy * 100) / 100 })
+    }))
+    return hits
+  }
+`
+
 
 async function runMenuMovil(browser) {
   const filtroMesa = Number(process.argv[3]) || null
@@ -4342,6 +4383,7 @@ async function runMenuMovil(browser) {
       await gotoMesa(page, n)
       await u1Install(page)
       await installHitProbe(page)
+      await page.evaluate(MOVMENU_SONDA)
 
       c.gates = await page.evaluate(() => ({
         desktop: matchMedia('(orientation: landscape) and (min-height: 601px)').matches,
@@ -4455,11 +4497,12 @@ async function runMenuMovil(browser) {
             const t = document.elementFromPoint(Math.round((r.left + r.right) / 2), Math.round((r.top + r.bottom) / 2))
             const propio = e.tagName === 'BUTTON' ? e : e.querySelector('button')
             return {
+              id: e.dataset.entrada,
               title: e.getAttribute('title'),
               gana: !!t && (t === e || e.contains(t)),
               inerte: !!propio && (propio.disabled === true || propio.getAttribute('aria-disabled') === 'true'),
               gris: e.className.includes('is-disabled'),
-              viva: cfg.VIVAS.includes(e.getAttribute('title')),
+              viva: cfg.VIVAS.includes(e.dataset.entrada),
             }
           }),
           // El badge del contador NO monta en móvil: es un control vivo y su
@@ -4467,7 +4510,7 @@ async function runMenuMovil(browser) {
           badge: document.querySelectorAll('.utilities-panel .util-badge').length,
           vpW: innerWidth, vpH: innerHeight,
         }
-      }, { G: MOVMENU_GUARD, INFO: MOVMENU_INFO, VIVAS: MOVMENU_VIVAS })
+      }, { G: MOVMENU_GUARD, INFO: MOVMENU_INFO, VIVAS: VIVAS_MOVIL })
 
       const pa = abierto.panel
       c.panel = pa
@@ -4496,6 +4539,10 @@ async function runMenuMovil(browser) {
         abierto.entradas.every(e => e.gana) &&
         abierto.entradas.every(e => e.viva ? (!e.gris && !e.inerte) : (e.gris && e.inerte))
       c.titlesOk = JSON.stringify(abierto.titles) === JSON.stringify(U1_ENTRADAS)
+      // El orden y la identidad de las cinco filas, por CONTRATO y no por copy.
+      c.idsOk = JSON.stringify(abierto.entradas.map(e => e.id)) === JSON.stringify([
+        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.SALDO, ENTRADA.MANO,
+      ])
       c.badgeOk = abierto.badge === 0
       c.guard = abierto.guard
       c.guardN = abierto.guardN
@@ -4549,6 +4596,135 @@ async function runMenuMovil(browser) {
       c.sonidoOk = lsTras === 'off' && lsTras !== lsAntes &&
         glifoAntes.off === false && glifoTras.off === true && cerroAlEjecutar
 
+      // ── MOV-1b-a · Aviso de "Mano actual" ─────────────────────────────────
+      // Se abre desde su entrada, que CIERRA AL EJECUTAR: cuando el aviso se
+      // pinta el panel ya se desmontó, así que se ancla al ⋮ y no a él.
+      const saldoAntes = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
+      await u1OpenMenu(page)
+      await page.click('.util-item-mano .util-ico-slot')
+      await page.waitForSelector('.u3-popup', { timeout: 4000 }).catch(() => {})
+      c.aviso = await page.evaluate(({ G, TOL }) => {
+        const a = document.querySelector('.u3-popup')
+        if (!a) return { existe: false }
+        const r = a.getBoundingClientRect()
+        const t = document.querySelector('.utilities-trigger').getBoundingClientRect()
+        const horizontal = matchMedia('(orientation: landscape) and (max-height: 600px)').matches
+        // D6: en vertical el filo derecho del aviso coincide con el del ⋮; en
+        // horizontal queda a 6px a su izquierda.
+        const esperadoRight = horizontal ? t.left - 6 : t.right
+        return {
+          existe: true, horizontal,
+          caja: window.__u1R('.u3-popup'),
+          dRight: Math.round(Math.abs(r.right - esperadoRight) * 100) / 100,
+          dentro: r.left >= -TOL && r.top >= -TOL &&
+                  r.right <= innerWidth + TOL && r.bottom <= innerHeight + TOL,
+          solape: window.__movSolape('.u3-popup', G),
+          sobreDisparador: window.__movSolape('.u3-popup', ['.utilities-trigger']),
+          panelCerrado: !document.querySelector('.utilities-panel'),
+        }
+      }, { G: MOVMENU_GUARD, TOL: U1_TOL })
+      const retrato = n === 5 && (tag === '360x640' || tag === '640x360')
+      if (retrato) {
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: MOVMENU_OUT + '/mov1b-mano-mesa' + n + '-' + tag + '.png' })
+      }
+      const saldoTras = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
+      // Segunda consulta de la MISMA mano: es gratis por diseño (v1.1 §3.4), así
+      // que el saldo no puede volver a bajar. Es la mitad del sello que un
+      // "cobra una" ingenuo dejaría pasar.
+      await page.waitForSelector('.u3-popup', { state: 'detached', timeout: CONSULTA_POPUP_MS + 2000 }).catch(() => {})
+      c.avisoAutocierra = await page.evaluate(() => !document.querySelector('.u3-popup'))
+      await u1OpenMenu(page)
+      await page.click('.util-item-mano .util-ico-slot')
+      await page.waitForTimeout(250)
+      const saldoRepetida = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
+      await page.waitForSelector('.u3-popup', { state: 'detached', timeout: CONSULTA_POPUP_MS + 2000 }).catch(() => {})
+      // Persistencia end-to-end (recarga → volver a la mesa) en UNA celda y no
+      // en las dieciséis: es una propiedad del almacenamiento, no de la
+      // geometría, así que repetirla sixteen veces cuesta ~80s y no mide nada
+      // nuevo. Se declara aquí para que la cobertura no se lea de más.
+      let persistencia = null
+      if (n === 5 && tag === '360x640') {
+        await page.reload()
+        await volverALaMesa(page, n)
+        // La recarga se lleva por delante las sondas inyectadas: hay que volver
+        // a montarlas o lo que sigue mide sobre un `window` pelado.
+        await u1Install(page)
+        await installHitProbe(page)
+        await page.evaluate(MOVMENU_SONDA)
+        await clickIf(page, 'button:has-text("Iniciar mano")')
+        await page.waitForSelector('.action-buttons button', { timeout: 20000 }).catch(() => {})
+        await page.mouse.move(5, 5)
+        persistencia = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
+      }
+      c.consultas = {
+        antes: saldoAntes, tras: saldoTras, repetida: saldoRepetida,
+        gratis: CONSULTAS_GRATIS, persistencia,
+      }
+      c.avisoOk = c.aviso.existe && c.aviso.panelCerrado &&
+        c.aviso.dRight <= U1_TOL && c.aviso.dentro &&
+        c.aviso.solape.length === 0 && c.aviso.sobreDisparador.length === 0
+      c.consultasOk = saldoAntes === CONSULTAS_GRATIS && saldoTras === saldoAntes - 1 &&
+        saldoRepetida === saldoTras && c.avisoAutocierra &&
+        (persistencia === null || persistencia === saldoTras)
+
+      // ── MOV-1b-a · Tapetes ────────────────────────────────────────────────
+      const tapeteAntes = await page.evaluate(() => document.body.dataset.tapete ?? null)
+      await u1OpenMenu(page)
+      await page.click('.util-item-tapetes')
+      await page.waitForSelector('.tapetes-panel', { timeout: 4000 }).catch(() => {})
+      c.tapetes = await page.evaluate(({ G, TOL }) => {
+        const p2 = document.querySelector('.tapetes-panel')
+        if (!p2) return { existe: false }
+        const r = p2.getBoundingClientRect()
+        const t = document.querySelector('.utilities-trigger').getBoundingClientRect()
+        const horizontal = matchMedia('(orientation: landscape) and (max-height: 600px)').matches
+        const esperadoRight = horizontal ? t.left - 6 : t.right
+        return {
+          existe: true, horizontal,
+          caja: window.__u1R('.tapetes-panel'),
+          cols: getComputedStyle(p2).getPropertyValue('--tap-cols').trim(),
+          filas: [...p2.querySelectorAll('.tap-swatch')].length,
+          dRight: Math.round(Math.abs(r.right - esperadoRight) * 100) / 100,
+          dentro: r.left >= -TOL && r.top >= -TOL &&
+                  r.right <= innerWidth + TOL && r.bottom <= innerHeight + TOL,
+          solape: window.__movSolape('.tapetes-panel', G),
+          sobreDisparador: window.__movSolape('.tapetes-panel', ['.utilities-trigger']),
+          panelCerrado: !document.querySelector('.utilities-panel'),
+          // Hit REAL de cada ficha, por `elementFromPoint`.
+          fichas: [...p2.querySelectorAll('.tap-swatch')].map(e => {
+            const hb = window.__hitBox(e)
+            return { id: e.dataset.tap, w: hb.w, h: hb.h, visual: [hb.visualW, hb.visualH] }
+          }),
+        }
+      }, { G: MOVMENU_GUARD, TOL: U1_TOL })
+      if (retrato) {
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: MOVMENU_OUT + '/mov1b-tapetes-mesa' + n + '-' + tag + '.png' })
+      }
+      // Elegir un fieltro NO comprado: la mesa es el probador, así que el tapete
+      // se aplica en el acto (y el diálogo de compra se pinta encima).
+      await page.click('.tap-swatch[data-tap="' + MOVMENU_TAPETE + '"]').catch(() => {})
+      await page.waitForTimeout(220)
+      const tapeteTras = await page.evaluate(() => document.body.dataset.tapete ?? null)
+      // Tap FUERA: cierra y REVIERTE la previa (no se compró nada).
+      await page.touchscreen.tap(Math.round(vp.w / 2), Math.round(vp.h - 12))
+      await page.waitForTimeout(220)
+      const tapeteCerrado = await page.evaluate(() => ({
+        attr: document.body.dataset.tapete ?? null,
+        abierto: !!document.querySelector('.tapetes-panel'),
+      }))
+      c.tapete = { antes: tapeteAntes, tras: tapeteTras, cerrado: tapeteCerrado, probado: MOVMENU_TAPETE }
+      c.tapetesOk = c.tapetes.existe && c.tapetes.panelCerrado &&
+        c.tapetes.dRight <= U1_TOL && c.tapetes.dentro &&
+        c.tapetes.solape.length === 0 && c.tapetes.sobreDisparador.length === 0 &&
+        c.tapetes.filas === TAPETES.length &&
+        tapeteTras === MOVMENU_TAPETE && tapeteCerrado.attr === tapeteAntes &&
+        tapeteCerrado.abierto === false
+      // El hit de las fichas: PUERTA sólo en la fila que estrena el horizontal.
+      c.fichasMin = Math.min(...c.tapetes.fichas.map(f => Math.min(f.w, f.h)))
+      c.fichasOk = c.tapetes.horizontal ? c.fichasMin >= MOVMENU_FICHA_MIN : true
+
       // Capturas de la Fase 2: una por mesa en los dos viewports pedidos.
       if (tag === '640x360' || (n === 5 && tag === '812x375')) {
         await u1OpenMenu(page)
@@ -4565,10 +4741,13 @@ async function runMenuMovil(browser) {
         hit44: c.hitOk, vecinos: c.vecinosOk, guardiaConObjetivos: c.guardVivo,
         pinzaD4: c.pinza.dentro, encajeViewport: c.pinza.encaje,
         geomDerivada: c.geom.derivadaOk, geomSellada: c.geom.selladaOk,
-        entradas: c.entradasOk, leyendas: c.titlesOk, sinBadge: c.badgeOk,
+        entradas: c.entradasOk, leyendas: c.titlesOk, identidades: c.idsOk,
+        sinBadge: c.badgeOk,
         guardiaLimpia: c.guardOk, disparadorLibre: c.disparadorLibre,
         apilamiento: c.zOk, fueraDeFlujo: c.flujoOk,
         cierreTapFuera: c.cierraTapFuera, cierreEsc: c.cierraEsc, sonido: c.sonidoOk,
+        avisoMano: c.avisoOk, contadorConsultas: c.consultasOk,
+        tapetes: c.tapetesOk, hitFichas: c.fichasOk,
       }
       c.puertas = puertas
       c.fallos = Object.keys(puertas).filter(k => !puertas[k])
@@ -7064,9 +7243,10 @@ async function runMSG(browser) {
 // Y tres pruebas que no son por combinación:
 //   · El FLUJO DE COMPRA completo (previa · «No» revierte · cerrar el panel
 //     revierte · «Sí» registra y no cobra · persiste tras recarga).
-//   · La prueba NEGATIVA del gate: celda móvil con `tricolor` sembrado en
-//     localStorage → el fieltro renderiza verde. El sello móvil PROBADO por el
-//     instrumento, no prometido.
+//   · La celda MÓVIL con `tricolor` sembrado en localStorage → el fieltro lo
+//     PINTA. Hasta MOV-1b-a esta puerta era la negativa del sello móvil
+//     (exigía verde); al encenderse Tapetes en móvil se dio la vuelta, porque
+//     lo que antes probaba el sello ahora probaría un fallo.
 //   · Las capturas del peor caso llevan transitorios presentes (badge TURNO), y
 //     el tricolor añade la ZONA DE RIESGO #1 recortada: las fichas doradas
 //     sobre la banda amarilla, arriba, donde viven los oponentes.
@@ -7665,11 +7845,19 @@ async function runTapetes(browser) {
     // VIS-1c: "renderiza verde" se prueba contra `:root` vivo, no contra una
     // copia sellada de theme.css. Un solo verde en todo el producto significa
     // exactamente esto: fuera del gate, `body` no redefine nada.
+    // ── MOV-1b-a · RECABLEADO (regla ARN-1) ────────────────────────────────
+    // Esta puerta exigía lo contrario: que en móvil el fieltro saliera VERDE
+    // aunque el storage trajera un tricolor. Era correcta mientras Tapetes
+    // fuera función de escritorio, y medía el segundo cinturón —el bloque
+    // gateado de tapetes.css—. MOV-1b-a enciende Tapetes en móvil con
+    // autorización de Victor y desanida ese bloque, así que el verde de antes
+    // pasa a significar "el jugador eligió un tapete y no lo ve": el fallo, no
+    // el sello. La puerta se da la vuelta en la MISMA tanda que mueve la ruta.
     const esRaiz = TAP_TOKENS.every(p => t.tokens[p] === t.raiz[p])
-    const ok = ls === 'tricolor' && t.attr === null && esRaiz
+    const ok = ls === 'tricolor' && t.attr === 'tricolor' && !esRaiz
     movil.push({ vp, ls, attr: t.attr, tokens: t.tokens, raiz: t.raiz, esRaiz, ok })
     console.log('MÓVIL ' + vp.w + 'x' + vp.h + ' · storage "' + ls + '" · attr ' + t.attr +
-      ' · base ' + t.tokens['--green-base'] + ' · ' + (ok ? 'OK (verde, = :root)' : 'FAIL'))
+      ' · base ' + t.tokens['--green-base'] + ' · ' + (ok ? 'OK (pinta el tapete)' : 'FAIL'))
     await page.close()
   }
 
