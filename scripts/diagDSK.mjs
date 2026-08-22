@@ -4298,6 +4298,25 @@ const MOVMENU_ITEM = { w: 62, h: 44 }
 // 8px y no lleva pseudo propio; la ficha de esquina de la IA es el control vivo
 // más cercano por la izquierda (a 0,8px en mesa 4 · 360×640, la celda apretada).
 const MOVMENU_VECINOS = ['.btn-leave', '.opp-corner-chip']
+// MOV-1a-c · La guardia del puerto es la de escritorio MÁS LA MANO DEL JUGADOR.
+// Arriba nunca hizo falta —el panel cuelga de la cabecera y la mano está a
+// 460..582px— pero en horizontal el panel se aparta hacia el centro de la mesa,
+// que es justo donde vive el abanico. Sin esta línea la puerta sería ciega en el
+// único sitio donde puede fallar.
+// La BARRA del humano entra por sus hijos PINTADOS y no por `.player-bar`: en
+// landscape movil esa caja es `display: contents` (gameTable.css:2950-2952), o
+// sea 0x0, y una guardia que la mire directamente es ciega justo donde el panel
+// se aparta. Se descubrio viendo el saldo "4950" tapado en una captura que el
+// arnes daba por verde.
+const MOVMENU_GUARD = [...U1_GUARD, '.player-zone .card-slot-wrapper',
+  '.player-bar-left', '.player-bar-center', '.player-bar-right']
+// Los dos objetivos que SIEMPRE deben existir con una mano viva. Si la guardia
+// sale limpia sin ellos presentes, es que no había nada contra lo que chocar.
+const MOVMENU_OBLIGATORIOS = ['.action-buttons .btn', '.player-zone .card-slot-wrapper']
+// Medida INFORMATIVA (no puerta): qué cubre el panel de lo que sí es tolerable
+// cubrir, para el criterio visual de Victor.
+const MOVMENU_INFO = ['.opp-panel', '.ai-zone', '.center-zone', '.table-header',
+  '.table-title', '.hand-badge', '.deck-shuffle-wrapper']
 // En esta tanda sólo Sonido está viva. Las otras cuatro salen en gris con el
 // tratamiento de Saldo: `is-disabled` MÁS `disabled` de verdad — no un
 // `pointer-events: none`, que pintaría igual y le mentiría al lector de pantalla.
@@ -4391,6 +4410,23 @@ async function runMenuMovil(browser) {
           titles: window.__u1Titles(), wins: window.__u1Wins(), maxZ: window.__u1MaxZ(),
           panelZ: Number(getComputedStyle(p).zIndex),
           guard: window.__u1Guard(cfg.G),
+          // Lo que el panel cubre de lo tolerable, con su área. Informativo.
+          cubre: window.__u1Guard(cfg.INFO),
+          // Todas las cajas VIVAS de la guardia, para poder razonar sobre el
+          // sitio libre sin repetir la corrida.
+          guardRects: cfg.G.flatMap(sel => [...document.querySelectorAll(sel)]
+            .map(el => ({ sel, r: window.__u1R(el) }))
+            .filter(o => o.r && o.r.w > 0 && o.r.h > 0)),
+          // Solape panel↔disparador: el menú no puede taparse a sí mismo.
+          sobreDisparador: window.__u1Guard(['.utilities-trigger']),
+          // Distancia horizontal del disparador al panel (0 si se tocan).
+          distancia: (() => {
+            const t = document.querySelector('.utilities-trigger').getBoundingClientRect()
+            const b = document.querySelector('.utilities-panel').getBoundingClientRect()
+            if (b.right <= t.left) return Math.round((t.left - b.right) * 100) / 100
+            if (b.left >= t.right) return Math.round((b.left - t.right) * 100) / 100
+            return 0
+          })(),
           // Cuántos objetivos VIVOS tenía la guardia. Sin esto, "0 px² de
           // solape" es indistinguible de "no había nada contra lo que chocar":
           // la lista sale vacía en los dos casos y el modo pintaría verde por
@@ -4407,6 +4443,10 @@ async function runMenuMovil(browser) {
             multRow: window.__u1R('.mult-row'),
             playerBar: window.__u1R('.player-bar'),
             cards: window.__u1R('.player-zone .cards-row'),
+            timer: window.__u1R('.timer-display'),
+            scoreTag: window.__u1R('.score-tag-player'),
+            playerZone: window.__u1R('.player-zone'),
+            gameTable: window.__u1R('.game-table'),
           },
           // Cada entrada gana el hit-test en su propio centro, y su estado es el
           // que la tanda declara: Sonido viva, las otras cuatro grises E INERTES.
@@ -4427,7 +4467,7 @@ async function runMenuMovil(browser) {
           badge: document.querySelectorAll('.utilities-panel .util-badge').length,
           vpW: innerWidth, vpH: innerHeight,
         }
-      }, { G: U1_GUARD, VIVAS: MOVMENU_VIVAS })
+      }, { G: MOVMENU_GUARD, INFO: MOVMENU_INFO, VIVAS: MOVMENU_VIVAS })
 
       const pa = abierto.panel
       c.panel = pa
@@ -4463,8 +4503,17 @@ async function runMenuMovil(browser) {
       // Los botones de acción son el objetivo que SIEMPRE debe existir con una
       // mano viva; los multiplicadores y el timer sólo en algunas fases, así que
       // de ésos no se puede exigir presencia sin volver el modo caprichoso.
-      c.guardVivo = (abierto.guardN.find(g => g.sel === '.action-buttons .btn') || { n: 0 }).n > 0
+      c.guardVivo = MOVMENU_OBLIGATORIOS.every(sel =>
+        (abierto.guardN.find(g => g.sel === sel) || { n: 0 }).n > 0)
       c.guardOk = abierto.guard.length === 0 && c.guardVivo
+      // MOV-1a-c · el panel no puede taparse a sí mismo. En MOV-1a lo hacía en
+      // las cuatro celdas donde la pinza mordía (mesas 5 y 4 horizontales): el
+      // disparador quedaba debajo y sólo se podía cerrar por fuera o con Esc.
+      c.cubreDisparador = abierto.sobreDisparador
+      c.disparadorLibre = abierto.sobreDisparador.length === 0
+      c.distancia = abierto.distancia
+      c.cubre = abierto.cubre
+      c.guardRects = abierto.guardRects
       c.zOk = abierto.wins === true && abierto.panelZ > abierto.maxZ.max
       c.z = { panel: abierto.panelZ, maxVivo: abierto.maxZ }
       // Fuera de flujo ESTRICTO: abrir no mueve un ancla ni cambia el scroll.
@@ -4501,11 +4550,11 @@ async function runMenuMovil(browser) {
         glifoAntes.off === false && glifoTras.off === true && cerroAlEjecutar
 
       // Capturas de la Fase 2: una por mesa en los dos viewports pedidos.
-      if (tag === '360x640' || tag === '640x360') {
+      if (tag === '640x360' || (n === 5 && tag === '812x375')) {
         await u1OpenMenu(page)
         await page.mouse.move(5, 5)
-        await page.screenshot({ path: MOVMENU_OUT + '/mov1a-mesa' + n + '-' + tag + '.png' })
-        c.shot = 'mov1a-mesa' + n + '-' + tag + '.png'
+        await page.screenshot({ path: MOVMENU_OUT + '/mov1ac-mesa' + n + '-' + tag + '.png' })
+        c.shot = 'mov1ac-mesa' + n + '-' + tag + '.png'
         await page.keyboard.press('Escape')
       }
 
@@ -4517,7 +4566,8 @@ async function runMenuMovil(browser) {
         pinzaD4: c.pinza.dentro, encajeViewport: c.pinza.encaje,
         geomDerivada: c.geom.derivadaOk, geomSellada: c.geom.selladaOk,
         entradas: c.entradasOk, leyendas: c.titlesOk, sinBadge: c.badgeOk,
-        guardiaLimpia: c.guardOk, apilamiento: c.zOk, fueraDeFlujo: c.flujoOk,
+        guardiaLimpia: c.guardOk, disparadorLibre: c.disparadorLibre,
+        apilamiento: c.zOk, fueraDeFlujo: c.flujoOk,
         cierreTapFuera: c.cierraTapFuera, cierreEsc: c.cierraEsc, sonido: c.sonidoOk,
       }
       c.puertas = puertas
@@ -4531,7 +4581,8 @@ async function runMenuMovil(browser) {
     celdas.push(c)
     console.error('  mesa ' + n + ' · ' + tag + ' · ' + (c.passed ? 'OK   ' : 'FALLA') +
       ' · dCaja=' + c.dCaja + ' hit=' + (c.hit ? c.hit.w + 'x' + c.hit.h : '?') +
-      ' panel=' + (c.panel ? c.panel.w + 'x' + c.panel.h + '@y' + c.panel.y : '?') +
+      ' panel=' + (c.panel ? c.panel.w + 'x' + c.panel.h + '@' + c.panel.x + ',' + c.panel.y : '?') +
+      ' dist=' + c.distancia +
       (c.fallos && c.fallos.length ? ' · fallan: ' + c.fallos.join(',') : '') +
       (c.error ? ' · ' + c.error : ''))
   }
