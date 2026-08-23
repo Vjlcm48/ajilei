@@ -534,99 +534,18 @@
     }
   }
 
-  /* El pico, en DOS capas (filo + relleno), porque un triángulo de bordes no
-     admite `border` propio. La DIRECCIÓN la pone la orientación y cada rama
-     escribe su declaración completa: ninguna deshace a la otra. */
-  .u2-burbuja::before,
-  .u2-burbuja::after {
-    content: '';
-    position: absolute;
-    width: 0;
-    height: 0;
-    border: var(--u2-pico) solid transparent;
-  }
-
-  /* SIN PICO cuando la burbuja cuelga del ⋮ y no del nombre. Ocurre SIEMPRE en
-     horizontal —encima de la tinta quedan 10,41px con el reloj del turno vivo y
-     la burbuja más corta mide 76— y en vertical sólo cuando la frase no cabe en
-     la banda del jugador. Un pico que no alcanza la tinta apuntaría a otra cosa,
-     y eso miente más que no tenerlo.
-     Va por ATRIBUTO y no por media query porque la decisión la toma la MEDIDA:
-     dos frases distintas en la misma pantalla pueden colgar de sitios distintos,
-     y una media query no sabe de eso. */
-  .u2-burbuja[data-ancla="satelite"]::before,
-  .u2-burbuja[data-ancla="satelite"]::after { display: none; }
-
-  /* ── Vertical · OPCIÓN E (autorizada por Victor) ───────────────────────────
-     Encima del nombre no hay sitio y está medido: los botones del turno ocupan
-     la banda entera justo encima, y los 44px que quedan hasta la tinta son las
-     propias pastillas Mano/Pie, que en vertical van ENCIMA del nombre. La
-     burbuja mínima se comía 5 646 px² de la guardia en las ocho celdas.
-     El sitio que sí existe es la banda libre de la misma fila, entre el bloque
-     del nombre y el del saldo. Ahí la burbuja se tumba: emoji a la izquierda,
-     texto a la derecha, pico por el costado izquierdo a la altura de la tinta.
-     Ni el emoji ni el texto cambian de tamaño — la instrucción lo prohíbe y no
-     hizo falta: lo único que cede es el aire entre las dos columnas. */
-  @media (orientation: portrait) {
-    .game-table-screen {
-      /* 6 → 4. La banda de 360×640 mide 159,34 de ancho y cada píxel del aire
-         entre columnas es un píxel menos de texto; se baja el aire, que es lo
-         autorizado, y no la tipografía ni el emoji. */
-      --dsk-u2-emoji-gap: 4px;
-    }
-    .u2-burbuja {
-      /* DOS columnas, las que pidió Victor: emoji y texto. La ✕ NO es la
-         tercera — medido, una tercera columna cuesta 22px (18 + separación) de
-         los 159,34 que mide la banda a 360×640 y deja el texto en ~50, que es
-         donde las frases largas se van a cuatro y cinco renglones. */
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: center;
-      column-gap: var(--dsk-u2-emoji-gap);
-      row-gap: 0;
-    }
-    .u2-emoji {
-      grid-column: 1;
-      grid-row: 1;
-      justify-self: start;
-      align-self: center;
-    }
-    .u2-texto {
-      grid-column: 2;
-      grid-row: 1;
-      /* SIN `balance` aquí, y es una decisión medida, no una preferencia. El
-         repartidor de líneas ENCOGE la caja para igualar los renglones: con él
-         puesto, la burbuja usaba 130,98 de los 143,34 que la banda le daba a
-         360×640 y se iba a un renglón más. En escritorio y en el horizontal del
-         móvil sigue puesto: allí el ancho lo manda el corredor de las cartas y
-         un renglón colgando se nota; aquí el ancho es el recurso escaso. */
-      text-wrap: wrap;
-    }
-    /* La ✕ se apoya en el filo superior derecho, fuera de la rejilla. Su sitio
-       se lo reserva un flotante en el PRIMER renglón y sólo en él: así el
-       texto no se le mete debajo y los renglones siguientes usan el ancho
-       entero — un hueco de 20px en la línea 1 en vez de 22 en las cinco. */
-    .u2-cerrar {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      margin-top: 0;
-    }
-    .u2-texto::before {
-      content: '';
-      float: right;
-      width: 20px;
-      height: 1.3em;
-    }
-
-    .u2-burbuja::before,
-    .u2-burbuja::after {
-      top: var(--u2-pico-y);
-      transform: translateY(-50%);
-      border-left: 0;
-    }
-    .u2-burbuja::before { right: 100%; border-right-color: rgba(var(--text-primary-rgb), 0.22); }
-    .u2-burbuja::after  { right: calc(100% - 1px); border-right-color: var(--surface-modal); }
-  }
+  /* ── SIN PICO EN MÓVIL ─────────────────────────────────────────────────────
+     Aquí no hay una sola regla de pico, y la ausencia es la decisión: en móvil
+     la burbuja cuelga del ⋮ (MOV-1b-e) y un triángulo en su filo no alcanzaría
+     la tinta del nombre — señalaría a otra cosa, que miente más que no tenerlo.
+     Los pseudo-elementos del pico viven en el bloque DSK de gameTable.css, que
+     no aplica fuera de escritorio, así que basta con NO copiarlos: no hay nada
+     que apagar. `data-ancla` lo publica igual el componente, y es lo que el
+     arnés lee para exigir que arriba haya pico y aquí no.
+     La disposición de dos columnas de la opción E vivía en este hueco y se
+     retiró entera: la banda junto al nombre se estrecha a 131,92 con la mano
+     repartida y sólo cabían 4 de las 12 frases a 360×640. Las cifras completas
+     están en Reacciones.jsx. */
 
   /* Ciclo de vida · 0,3s entrada / 2,4s visible / 0,3s salida. La duración vive
      UNA sola vez, en config/reacciones.js, y llega como `--u2-dur`: este
