@@ -24,7 +24,7 @@ export function ManoActualPopup({ popup, saldo }) {
     return (
       <div className="u3-popup u3-popup-agotadas" role="status" style={estilo}>
         <p className="u3-titulo">Se acabaron tus consultas gratis</p>
-        <p className="u3-resto">Pronto podrás pagarlas con fichas.</p>
+        <p className="u3-resto">Pronto podrás pagarlas con Heptacoins.</p>
       </div>
     )
   }

@@ -1165,7 +1165,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   function runEliminationCeremony(next, elimSeats) {
     setCeremony({ seats: elimSeats })   // mesa = prev; el panel eliminado se desvanece
     const t1 = setTimeout(() => {
-      const text = `${next.eliminatedNames.join(', ')} ${next.eliminatedNames.length === 1 ? 'se quedó' : 'se quedaron'} sin fichas · la mesa ahora es de ${next.aliveCount}`
+      const text = `${next.eliminatedNames.join(', ')} ${next.eliminatedNames.length === 1 ? 'se quedó' : 'se quedaron'} sin Heptacoins · la mesa ahora es de ${next.aliveCount}`
       const id = Date.now()
       setElimNotice({ id, text })       // etapa 2: aviso (mesa aún en prev)
       const t2 = setTimeout(() => {
@@ -1309,7 +1309,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               Fase 0 no lo encontró montado en ninguna de las 11 celdas medidas
               (cornerChip lo sustituye en portrait, landscape y escritorio); se
               etiqueta igual para que el contrato no dependa de qué rama gane. */}
-          {!isPortraitTable && !isDesktopTable && <span className="ai-chips" data-coin-target={seat}><BalanceDisplay chips={saldoMostrado(seat, rival.chips)} size="compact" /> fichas</span>}
+          {!isPortraitTable && !isDesktopTable && <span className="ai-chips" data-coin-target={seat}><BalanceDisplay chips={saldoMostrado(seat, rival.chips)} size="compact" /> Heptacoins</span>}
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
@@ -1835,7 +1835,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               {/* VIS-3a · DESTINO del vuelo cuando gana el humano. El índice es el
                   del MOTOR (0 = humano), el mismo que `game.winner`, nunca una
                   posición ni un orden DOM. */}
-              <span className="pbr-chips" data-coin-target="0"><BalanceDisplay chips={saldoMostrado(0, human.chips)} size="full" /> <span className="pbr-fichas-word">fichas</span></span>
+              <span className="pbr-chips" data-coin-target="0"><BalanceDisplay chips={saldoMostrado(0, human.chips)} size="full" /> <span className="pbr-fichas-word">Heptacoins</span></span>
               <span className="pbr-sep"> · </span>
               <span className="pbr-mesa">Mesa {unit}</span>
             </span>
@@ -1991,18 +1991,18 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
       {bankruptModal && (
         <div className="bankrupt-overlay">
           <div className="bankrupt-modal">
-            <p className="bankrupt-title">Te quedaste sin fichas</p>
-            <p className="bankrupt-sub">Necesitas más fichas para seguir jugando.</p>
+            <p className="bankrupt-title">Te quedaste sin Heptacoins</p>
+            <p className="bankrupt-sub">Necesitas más Heptacoins para seguir jugando.</p>
             <div className="bankrupt-actions">
               <SoundButton className="btn btn-primary" onClick={onLeave}>
                 Volver al lobby
               </SoundButton>
               <button className="btn btn-soon" disabled>
-                Ver video por fichas
+                Ver video por Heptacoins
                 <span className="soon-tag">Próximamente</span>
               </button>
               <button className="btn btn-soon" disabled>
-                Comprar fichas
+                Comprar Heptacoins
                 <span className="soon-tag">Próximamente</span>
               </button>
             </div>

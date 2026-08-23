@@ -100,7 +100,7 @@ export function TapetesPanel({ ancla, activo, comprados, previa, dialogo, onPres
               {estado === 'activo'   && <span className="tap-chip">Puesto</span>}
               {estado === 'comprado' && <span className="tap-marca" aria-label="Comprado">✓</span>}
               {estado === 'no-comprado' && (
-                <span className="tap-precio">{montoTexto(t.precio)} fichas</span>
+                <span className="tap-precio">{montoTexto(t.precio)} Heptacoins</span>
               )}
             </button>
           )
@@ -112,7 +112,7 @@ export function TapetesPanel({ ancla, activo, comprados, previa, dialogo, onPres
       {compra && (
         <div className="tap-dialogo" role="alertdialog" aria-label="Confirmar compra">
           <p className="tap-dialogo-txt">
-            ¿Comprar <strong>{compra.nombre}</strong> por {montoTexto(compra.precio)} fichas?
+            ¿Comprar <strong>{compra.nombre}</strong> por {montoTexto(compra.precio)} Heptacoins?
           </p>
           <div className="tap-dialogo-acciones">
             <button type="button" className="tap-btn tap-btn-si" onClick={onConfirmar}>Sí</button>

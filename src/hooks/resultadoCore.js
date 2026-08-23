@@ -60,16 +60,16 @@ export function claseTono(tono) {
 // derrota pasa a neutro sobrio. Antes las dos se pintaban en el mismo oro.
 function finDePartida({ winner, players }) {
   if (winner === 0) {
-    return { texto: '¡Ganaste la mesa! Eres el último con fichas.', tono: 'oro' }
+    return { texto: '¡Ganaste la mesa! Eres el último con Heptacoins.', tono: 'oro' }
   }
   if (winner != null) {
-    return { texto: `${players[winner].name} gana la mesa. Te quedaste sin fichas.`, tono: 'neutro' }
+    return { texto: `${players[winner].name} gana la mesa. Te quedaste sin Heptacoins.`, tono: 'neutro' }
   }
   // Sin ganador: o no queda nadie en pie, o el humano quebró con la mesa viva.
   // El motor los distingue por su rama; aquí se deriva de los vivos, que es el
   // mismo hecho leído del estado en vez de heredado del mensaje.
   const vivos = players.filter(p => !p.eliminated).length
-  return { texto: vivos === 0 ? 'Mesa terminada.' : 'Te quedaste sin fichas.', tono: 'neutro' }
+  return { texto: vivos === 0 ? 'Mesa terminada.' : 'Te quedaste sin Heptacoins.', tono: 'neutro' }
 }
 
 // ── Manos ganadas por retiros ───────────────────────────────────────────────

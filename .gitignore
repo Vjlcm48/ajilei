@@ -63,3 +63,10 @@ scripts/screenshots/
 *.njsproj
 *.sln
 *.sw?
+
+# Salidas del arnés de renombre (scripts/verifyREN1.mjs). Aquí NO hay excepción
+# `evidencia/`: a diferencia de IDN-1, el "antes" no exige stashear el árbol —la
+# sonda sustituye la palabra en caliente en el MISMO elemento y mide las dos
+# versiones en la misma corrida—, así que todo lo que hay dentro es regenerable
+# con un `node scripts/verifyREN1.mjs`. La carpeta se crea sola (mkdirSync).
+capturas-ren1/

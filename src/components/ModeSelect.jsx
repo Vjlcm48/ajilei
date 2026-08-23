@@ -37,7 +37,7 @@ export default function ModeSelect({ nivel, onSelectMode, onBack }) {
         <div className="mode-balance" title="Tu saldo">
           <span className="mode-balance-label">SALDO:</span>
           <span className="mode-balance-value">
-            <BalanceDisplay chips={AJILEI_CONFIG.economy.saldoInicial} /> fichas
+            <BalanceDisplay chips={AJILEI_CONFIG.economy.saldoInicial} /> Heptacoins
           </span>
         </div>
 
@@ -47,7 +47,7 @@ export default function ModeSelect({ nivel, onSelectMode, onBack }) {
               y sin el rótulo no habría forma de saber por qué la oferta de
               montos es ésta y no otra. */}
           {nivelInfo && <span className="mode-nivel-chip">{nivelInfo.nombre}</span>}
-          Entrada de {apuestas[0]} a {apuestas[apuestas.length - 1]} fichas
+          Entrada de {apuestas[0]} a {apuestas[apuestas.length - 1]} Heptacoins
         </p>
 
         <svg className="mode-star-arc" viewBox="0 0 200 65" aria-hidden="true">
@@ -112,7 +112,7 @@ export default function ModeSelect({ nivel, onSelectMode, onBack }) {
                   style={{ animationDelay: `${60 + idx * 50}ms` }}
                 >
                   <span className="mode-stake-amount">{monto}</span>
-                  <span className="mode-stake-label">fichas</span>
+                  <span className="mode-stake-label">Heptacoins</span>
                 </SoundButton>
               ))}
             </div>

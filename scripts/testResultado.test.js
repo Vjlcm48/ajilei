@@ -256,8 +256,8 @@ describe('MSG-U1 · fin de partida · el oro es de la victoria', () => {
   })
 
   it('los TEXTOS no cambian', () => {
-    expect(fin(0).texto).toBe('¡Ganaste la mesa! Eres el último con fichas.')
-    expect(fin(1, 2, 3).texto).toBe('IA 1 gana la mesa. Te quedaste sin fichas.')
+    expect(fin(0).texto).toBe('¡Ganaste la mesa! Eres el último con Heptacoins.')
+    expect(fin(1, 2, 3).texto).toBe('IA 1 gana la mesa. Te quedaste sin Heptacoins.')
   })
 
   it('oro SÓLO en la victoria del humano; la derrota, neutro', () => {
@@ -267,7 +267,7 @@ describe('MSG-U1 · fin de partida · el oro es de la victoria', () => {
 
   it('sin ganador: se distingue por los vivos, no por el mensaje heredado', () => {
     expect(fin(null, 0, 2).texto).toBe('Mesa terminada.')
-    expect(fin(null, 2, 3).texto).toBe('Te quedaste sin fichas.')
+    expect(fin(null, 2, 3).texto).toBe('Te quedaste sin Heptacoins.')
     expect(fin(null, 2, 3).tono).toBe('neutro')
   })
 })

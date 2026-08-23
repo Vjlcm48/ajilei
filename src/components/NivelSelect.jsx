@@ -34,7 +34,7 @@ export default function NivelSelect({ preseleccionado, onSelect, onBack }) {
                 className={`nivel-btn${esPre ? ' nivel-btn-pre' : ''}`}
                 onClick={() => onSelect(id)}
                 style={{ animationDelay: `${100 + idx * 70}ms` }}
-                aria-label={`${nombre}. ${descripcion}. Entradas desde ${apuestas[0]} fichas`}
+                aria-label={`${nombre}. ${descripcion}. Entradas desde ${apuestas[0]} Heptacoins`}
               >
                 <span className="nivel-btn-head">
                   <span className="nivel-btn-nombre">{nombre}</span>
@@ -44,7 +44,7 @@ export default function NivelSelect({ preseleccionado, onSelect, onBack }) {
                 {/* El rango sale de la tabla del nivel, nunca de un literal:
                     config/niveles.js es la fuente única (v1.0 §3.3). */}
                 <span className="nivel-btn-rango">
-                  Entradas de {apuestas[0]} a {apuestas[apuestas.length - 1]} fichas
+                  Entradas de {apuestas[0]} a {apuestas[apuestas.length - 1]} Heptacoins
                 </span>
               </SoundButton>
             )

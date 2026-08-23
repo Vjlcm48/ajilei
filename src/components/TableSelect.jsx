@@ -7,7 +7,7 @@ export default function TableSelect({ onSelect, onBack }) {
     <main className="table-select-screen">
       <section className="table-select-card">
         <h2 className="select-title">Elige tu sala</h2>
-        <p className="select-subtitle">Fichas de entrada por jugador</p>
+        <p className="select-subtitle">Heptacoins de entrada por jugador</p>
 
         <div className="select-divider" aria-hidden="true" />
 
@@ -20,7 +20,7 @@ export default function TableSelect({ onSelect, onBack }) {
               style={{ animationDelay: `${100 + idx * 70}ms` }}
             >
               <span className="stake-amount">{stake}</span>
-              <span className="stake-label">fichas</span>
+              <span className="stake-label">Heptacoins</span>
             </SoundButton>
           ))}
         </div>

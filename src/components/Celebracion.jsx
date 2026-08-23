@@ -166,7 +166,7 @@ export function TarjetaResumen({ sesion, netas }) {
       <p className={`vc-netas${netas >= 0 ? '' : ' vc-netas-neg'}`}>
         <span className="vc-netas-ico"><ChipToken size="full" /></span>
         <span className="vc-netas-num">{signo}{valor}</span>
-        <span className="vc-netas-word">fichas</span>
+        <span className="vc-netas-word">Heptacoins</span>
       </p>
       <dl className="vc-detalle">
         <div><dt>Manos jugadas</dt><dd>{sesion.manosJugadas}</dd></div>

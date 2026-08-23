@@ -103,7 +103,7 @@ export default function OpponentPanel({
             Fase 0 no la encontró montada en ninguna de las 11 celdas medidas —la
             ficha de esquina la sustituye en portrait, landscape y escritorio—,
             pero se etiqueta igual: el contrato no debe depender de qué rama gane. */}
-        {!letterBadges && !cornerChip && <span className="opp-chips" data-coin-target={playerIndex}><BalanceDisplay chips={chipsVista} size="compact" /> fichas</span>}
+        {!letterBadges && !cornerChip && <span className="opp-chips" data-coin-target={playerIndex}><BalanceDisplay chips={chipsVista} size="compact" /> Heptacoins</span>}
       </div>
 
       <div className="opp-cards">
@@ -146,7 +146,7 @@ export default function OpponentPanel({
           última acción de la mano previa durante el barajado. */}
       <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}${isEliminating ? ' opp-status-elim' : ''}`}>
         {isEliminating
-          ? 'Sin fichas'
+          ? 'Sin Heptacoins'
           : resetting ? ' ' : (player.folded ? 'Se retiró' : (isTurn ? 'Pensando…' : (lastAction ?? ' ')))}
       </span>
 
