@@ -4849,104 +4849,108 @@ async function runMenuMovil(browser) {
         c.selectorGesto.scrollTop > 0 && c.selectorGesto.scrollY === 0 &&
         c.selectorTapFuera === true
 
-      // ── MOV-1b-c · Burbuja ────────────────────────────────────────────────
-      await u1OpenMenu(page)
-      await page.click('.util-item-reacciones')
-      await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
-      // La frase MAS LARGA, y a proposito: es la que estira la burbuja y la que
-      // destapo que en vertical no siempre cabe en la banda. Una puerta que
-      // manda una frase corta mide el caso facil y deja pasar el dificil.
-      const iLarga = MOVMENU_FRASES.reduce(
-        (mejor, f, i) => (f.length > MOVMENU_FRASES[mejor].length ? i : mejor), 0)
-      const elegida = await page.evaluate((i) => {
-        const e = document.querySelectorAll('.u2-frase')[i]
-        return e ? e.getAttribute('aria-label') : null
-      }, iLarga)
-      await page.click(`.u2-frase:nth-of-type(${iLarga + 1})`)
-      await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
-      await movEsperaEntrada(page)
-      c.burbuja = await page.evaluate(({ G, PICO }) => {
-        const b0 = document.querySelector('.u2-burbuja')
-        if (!b0) return { existe: false }
-        const r = b0.getBoundingClientRect()
-        const cs = getComputedStyle(b0)
-        const nodo = document.querySelector('.pbr-name')
-        const rango = document.createRange(); rango.selectNodeContents(nodo)
-        const tinta = rango.getBoundingClientRect()
-        const vertical = matchMedia('(orientation: portrait)').matches
-        // El pico apunta a la TINTA en las dos ramas, cada una por su eje, y en
-        // las dos tiene que caer DENTRO del cuerpo: un triángulo colgando del
-        // filo no señala a nadie.
-        // ¿Hay pico pintado? En el horizontal del móvil NO lo hay (la burbuja
-        // cuelga del ⋮ y no del nombre), y sin esta lectura la puerta de "el
-        // pico cae dentro" pasaba por casualidad: `--u2-pico-x` vale `50%` por
-        // defecto y `parseFloat` lo lee como 50. Un verde que no mide lo que
-        // dice es un bug del arnés.
-        const picoPintado = getComputedStyle(b0, '::before').display !== 'none'
-        const pico = parseFloat(cs.getPropertyValue(vertical ? '--u2-pico-y' : '--u2-pico-x'))
-        const centroTinta = vertical ? tinta.top + tinta.height / 2 : tinta.left + tinta.width / 2
-        const origen = vertical ? r.top : r.left
-        const largo = vertical ? r.height : r.width
-        return {
-          existe: true, vertical, picoPintado,
-          ancla: b0.dataset.ancla,
-          caja: window.__u1R('.u2-burbuja'),
-          cols: cs.gridTemplateColumns.split(' ').length,
-          dur: cs.getPropertyValue('--u2-dur').trim(),
-          pico,
-          picoDentro: picoPintado
-            ? (Number.isFinite(pico) && pico >= PICO && pico <= largo - PICO)
-            : null,
-          // Cuánto se desvía el pico del centro de la tinta. Cero salvo cuando
-          // la pinza muerde, y entonces se REPORTA en vez de fingir que apunta.
-          dTinta: Math.round(Math.abs(origen + pico - centroTinta) * 100) / 100,
-          texto: b0.querySelector('.u2-texto') ? b0.querySelector('.u2-texto').textContent : null,
-          dentro: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
-          // DENTRO DEL AREA, y no solo del viewport. Bajo la barra del jugador
-          // no hay una sola caja de la guardia, asi que una burbuja que se
-          // derramaba por ahi -y se salia de la pantalla- daba 0 px2 y verde.
-          dentroArea: (() => {
-            const ga = document.querySelector('.game-table')
-            if (!ga) return null
-            const q = ga.getBoundingClientRect()
-            const cs2 = getComputedStyle(ga)
-            return r.bottom <= q.bottom - parseFloat(cs2.borderBottomWidth) + 0.01 &&
-                   r.top >= q.top + parseFloat(cs2.borderTopWidth) - 0.01
-          })(),
-          solape: window.__movSolape('.u2-burbuja', G),
-          selectorCerrado: !document.querySelector('.u2-selector'),
-          // Excedente de la burbuja sobre la fila del jugador (sólo vertical):
-          // medida INFORMATIVA que se reporta, no puerta — la banda mide 64,38
-          // y las frases largas la desbordan hacia abajo, contra hueco muerto.
-          excedeFila: (() => {
-            const barL = document.querySelector('.player-bar-left')
-            if (!vertical || !barL) return null
-            const q = barL.getBoundingClientRect()
-            return Math.round(Math.max(0, r.bottom - q.bottom) * 100) / 100
-          })(),
+      // ── MOV-1b-e · Burbuja · UNA sola colocación ─────────────────────
+      // Las DOS frases extremas, en las 16 celdas. La larga estira la burbuja
+      // hasta su peor caso; la corta comprueba que la colocación es LA MISMA y
+      // no otra — que es exactamente lo que esta tanda viene a garantizar
+      // después de que 1b-c dejara dos colocaciones conviviendo según cupiera.
+      // Mandar sólo una de las dos era lo que permitía esa mezcla: la larga
+      // colgaba del ⋮ en las 16 y la puerta se quedaba tan verde.
+      const porLargo = MOVMENU_FRASES
+        .map((f, i2) => ({ i: i2, n: f.length }))
+        .sort((a, b) => a.n - b.n)
+      const iCorta = porLargo[0].i
+      const iLarga = porLargo[porLargo.length - 1].i
+      c.burbujas = {}
+      for (const [clave, idx] of [['corta', iCorta], ['larga', iLarga]]) {
+        await u1OpenMenu(page)
+        await page.click('.util-item-reacciones')
+        await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+        const dicha = await page.evaluate((i2) => {
+          const e = document.querySelectorAll('.u2-frase')[i2]
+          return e ? e.getAttribute('aria-label') : null
+        }, idx)
+        await page.click(`.u2-frase:nth-of-type(${idx + 1})`)
+        await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
+        await movEsperaEntrada(page)
+        const m = await page.evaluate(({ G, PICO }) => {
+          const b0 = document.querySelector('.u2-burbuja')
+          if (!b0) return { existe: false }
+          const r = b0.getBoundingClientRect()
+          const cs = getComputedStyle(b0)
+          const disp = document.querySelector('.utilities-trigger').getBoundingClientRect()
+          const nodo = document.querySelector('.pbr-name')
+          const rango = document.createRange(); rango.selectNodeContents(nodo)
+          const tinta = rango.getBoundingClientRect()
+          const horizontal = matchMedia('(orientation: landscape) and (max-height: 600px)').matches
+          // ¿Hay pico pintado? En móvil NO lo hay en ninguna orientación. Se
+          // mira `content` y no `display`: la piel móvil no APAGA el pseudo,
+          // simplemente no lo declara, y un pseudo sin `content` no se genera
+          // aunque su `display` diga `block`. Mirando `display` esta puerta
+          // habría pasado por casualidad, que es como se cuela un verde falso.
+          const csPico = getComputedStyle(b0, '::before')
+          const picoPintado = csPico.content !== 'none' && csPico.display !== 'none'
+          // D6: en vertical el filo derecho coincide con el del ⋮; en
+          // horizontal queda a 6px a su izquierda. La misma cuenta que ya
+          // exigen el aviso de "Mano actual", Tapetes y el selector.
+          const esperadoRight = horizontal ? disp.left - 6 : disp.right
+          return {
+            existe: true, horizontal, picoPintado,
+            ancla: b0.dataset.ancla,
+            caja: window.__u1R('.u2-burbuja'),
+            dRight: Math.round(Math.abs(r.right - esperadoRight) * 100) / 100,
+            dur: cs.getPropertyValue('--u2-dur').trim(),
+            texto: b0.querySelector('.u2-texto') ? b0.querySelector('.u2-texto').textContent : null,
+            dentro: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+            // DENTRO DEL ÁREA, y no sólo del viewport. Bajo la barra del
+            // jugador no hay una sola caja de la guardia, así que una burbuja
+            // que se derramaba por ahí —y se salía de la pantalla— daba 0 px²
+            // y verde. La puerta la estrenó 1b-c y aquí se queda.
+            dentroArea: (() => {
+              const ga = document.querySelector('.game-table')
+              if (!ga) return null
+              const q = ga.getBoundingClientRect()
+              const cs2 = getComputedStyle(ga)
+              return r.bottom <= q.bottom - parseFloat(cs2.borderBottomWidth) + 0.01 &&
+                     r.top >= q.top + parseFloat(cs2.borderTopWidth) - 0.01
+            })(),
+            solape: window.__movSolape('.u2-burbuja', G),
+            sobreDisparador: window.__movSolape('.u2-burbuja', ['.utilities-trigger']),
+            selectorCerrado: !document.querySelector('.u2-selector'),
+            // Distancia a la tinta del nombre. Ya no es puerta — la burbuja
+            // dejó de colgar de ella en móvil — pero se REPORTA: es la cifra
+            // que dice cuánto se alejó el mensaje de quién lo dice.
+            aLaTinta: Math.round(Math.abs(r.bottom - tinta.top) * 100) / 100,
+          }
+        }, { G: MOVMENU_GUARD, PICO: REACCION_PICO_PX })
+        c.burbujas[clave] = { ...m, dicha }
+        if (clave === 'corta') {
+          // El candado, comprobado con la burbuja viva: la entrada está en
+          // enfriamiento. Y el propio enfriamiento hace de espera para la
+          // segunda frase, así que no cuesta un segundo de más.
+          await u1OpenMenu(page)
+          c.enfriando = await page.evaluate(() => {
+            const e = document.querySelector('.util-item-reacciones')
+            return {
+              cooling: !!e && e.className.includes('is-cooling'),
+              inerte: !!e && e.disabled === true,
+            }
+          })
+          await page.keyboard.press('Escape')
+          await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
+          await page.waitForTimeout(REACCION_COOLDOWN_MS - REACCION_TOTAL_MS + 300)
         }
-      }, { G: MOVMENU_GUARD, PICO: REACCION_PICO_PX })
-      // El candado: con la burbuja viva la entrada está en enfriamiento.
-      await u1OpenMenu(page)
-      c.enfriando = await page.evaluate(() => {
-        const e = document.querySelector('.util-item-reacciones')
-        return { cooling: !!e && e.className.includes('is-cooling'), inerte: !!e && e.disabled === true }
-      })
-      await page.keyboard.press('Escape')
-      c.burbujaOk = c.burbuja.existe && c.burbuja.selectorCerrado && c.burbuja.dentro &&
-        c.burbuja.solape.length === 0 && c.burbuja.dentroArea &&
-        // El pico existe SI Y SOLO SI la burbuja cuelga de la tinta, y cuando
-        // existe cae dentro del cuerpo y apunta al centro del nombre. Colgada
-        // del menu no debe haber pico - es la mitad que se romperia en silencio
-        // si alguien devolviera el pseudo sin recolocarlo.
-        (c.burbuja.ancla === 'tinta'
-          ? (c.burbuja.picoPintado && c.burbuja.picoDentro && c.burbuja.dTinta <= U1_TOL)
-          : c.burbuja.picoPintado === false) &&
-        c.burbuja.dur === REACCION_TOTAL_MS + 'ms' &&
-        // La frase pintada es la ELEGIDA, y se compara contra el contrato.
-        (elegida || '').startsWith(c.burbuja.texto || '\u0000') &&
-        c.burbuja.cols === (c.burbuja.vertical ? 2 : 2) &&
+      }
+      const burbujaSana = (b) => !!b && b.existe && b.selectorCerrado && b.dentro &&
+        b.dentroArea && b.solape.length === 0 && b.sobreDisparador.length === 0 &&
+        b.dRight <= U1_TOL && b.ancla === 'satelite' && b.picoPintado === false &&
+        b.dur === REACCION_TOTAL_MS + 'ms' &&
+        (b.dicha || '').startsWith(b.texto || '\u0000')
+      c.burbujaOk = burbujaSana(c.burbujas.corta) && burbujaSana(c.burbujas.larga) &&
         c.enfriando.cooling && c.enfriando.inerte
+      // Se conserva la larga en el sitio de siempre para que el JSON y la
+      // consola no cambien de forma entre tandas.
+      c.burbuja = c.burbujas.larga
 
       // Relojes y assets: UNA celda. El ciclo de la burbuja y el enfriamiento
       // son propiedades del reloj, no de la geometría, y los 24 ficheros de
@@ -4964,39 +4968,6 @@ async function runMenuMovil(browser) {
           return !!e && !e.className.includes('is-cooling') && e.disabled !== true
         })
         await page.keyboard.press('Escape')
-        // La OTRA colocacion, en la misma celda barata. La puerta de arriba manda
-        // la frase mas larga, que en las 16 celdas cuelga del menu, asi que sin
-        // esto la opcion E -- la que Victor eligio, la que se ve en 10 de 12
-        // frases a 375x812 -- no la mediria ninguna puerta. Aqui se manda una
-        // corta y se exige lo contrario: anclada a la tinta y con pico.
-        await u1OpenMenu(page)
-        await page.click('.util-item-reacciones')
-        await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
-        await page.click('.u2-frase:nth-of-type(1)')
-        await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
-        await movEsperaEntrada(page)
-        const corta = await page.evaluate((G) => {
-          const b0 = document.querySelector('.u2-burbuja')
-          if (!b0) return { existe: false }
-          const r = b0.getBoundingClientRect()
-          const barL = document.querySelector('.player-bar-left').getBoundingClientRect()
-          const barR = document.querySelector('.player-bar-right').getBoundingClientRect()
-          const nodo = document.querySelector('.pbr-name')
-          const rango = document.createRange(); rango.selectNodeContents(nodo)
-          const tinta = rango.getBoundingClientRect()
-          const pico = parseFloat(getComputedStyle(b0).getPropertyValue('--u2-pico-y'))
-          return {
-            existe: true, ancla: b0.dataset.ancla,
-            caja: window.__u1R('.u2-burbuja'),
-            // En la BANDA del jugador: a la derecha del bloque del nombre y a
-            // la izquierda del saldo, que es el sitio que eligio Victor.
-            enBanda: r.left >= barL.right && r.right <= barR.left,
-            picoPintado: getComputedStyle(b0, '::before').display !== 'none',
-            dTinta: Math.round(Math.abs(r.top + pico - (tinta.top + tinta.height / 2)) * 100) / 100,
-            solape: window.__movSolape('.u2-burbuja', G),
-          }
-        }, MOVMENU_GUARD)
-        await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
         const assets = await page.evaluate(async (rutas) => {
           const out = []
           for (const u of rutas) {
@@ -5007,50 +4978,37 @@ async function runMenuMovil(browser) {
         }, [...MOVMENU_FRASES.map(f => movRutaEmoji(f, 'avif')),
             ...MOVMENU_FRASES.map(f => movRutaEmoji(f, 'svg'))])
         c.relojes = {
-          muerta, libre, corta,
+          muerta, libre,
           assets: assets.length, assets200: assets.filter(a => a.s === 200).length,
           fallan: assets.filter(a => a.s !== 200).map(a => a.u),
         }
       }
       c.relojesOk = c.relojes === null || (c.relojes.muerta && c.relojes.libre &&
-        c.relojes.assets200 === c.relojes.assets &&
-        c.relojes.corta.existe && c.relojes.corta.ancla === 'tinta' &&
-        c.relojes.corta.enBanda && c.relojes.corta.picoPintado &&
-        c.relojes.corta.dTinta <= U1_TOL && c.relojes.corta.solape.length === 0)
+        c.relojes.assets200 === c.relojes.assets)
 
-      // MOV-1b-c · las cinco capturas pedidas: selector abierto y burbuja viva
-      // en mesa 5 a 360×640 y 640×360, más la burbuja de mesa 2 a 360×640 (la
-      // celda donde la banda del jugador es más estrecha). Se toman DESPUÉS de
-      // las puertas para no alterar lo que miden.
-      if ((n === 5 && (tag === '360x640' || tag === '640x360')) || (n === 2 && tag === '360x640')) {
-        await u1OpenMenu(page)
-        await page.click('.util-item-reacciones')
-        await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
-        if (n === 5) {
-          await page.screenshot({ path: MOVMENU_OUT + '/mov1c-selector-mesa' + n + '-' + tag + '.png' })
+      // MOV-1b-e · las cuatro capturas pedidas: burbuja LARGA y CORTA colgando
+      // del ⋮, mesa 5 a 360×640 y 640×360. Más las dos del selector abierto, que
+      // vienen de 1b-c y siguen valiendo. Se toman DESPUÉS de las puertas para
+      // no alterar lo que miden, y con la entrada YA terminada: durante los
+      // primeros 300ms la burbuja va de `opacity: 0` a 1, y una foto a media
+      // entrada sale desvaída y hace parecer roto lo que no lo está.
+      if (n === 5 && (tag === '360x640' || tag === '640x360')) {
+        const foto = async (idx, nombre) => {
+          await u1OpenMenu(page)
+          await page.click('.util-item-reacciones')
+          await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
+          if (nombre === 'corta') {
+            await page.screenshot({ path: MOVMENU_OUT + '/mov1c-selector-mesa' + n + '-' + tag + '.png' })
+          }
+          await page.click(`.u2-frase:nth-of-type(${idx + 1})`).catch(() => {})
+          await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
+          await movEsperaEntrada(page)
+          await page.screenshot({ path: MOVMENU_OUT + '/mov1e-burbuja-' + nombre + '-mesa' + n + '-' + tag + '.png' })
+          await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
+          await page.waitForTimeout(REACCION_COOLDOWN_MS - REACCION_TOTAL_MS + 300)
         }
-        // DOS fotos por celda, porque en vertical hay dos colocaciones y una
-        // sola foto contaría media historia: una frase corta, que cabe en la
-        // banda del jugador y sale con pico, y la más larga, que no cabe y
-        // cuelga del menú. En horizontal las dos salen colgadas del menú y la
-        // segunda foto simplemente lo confirma.
-        await page.click('.u2-frase:nth-of-type(1)').catch(() => {})
-        await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
-        await movEsperaEntrada(page)
-        await page.screenshot({ path: MOVMENU_OUT + '/mov1c-burbuja-corta-mesa' + n + '-' + tag + '.png' })
-        await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
-        await page.waitForTimeout(REACCION_COOLDOWN_MS - REACCION_TOTAL_MS + 300)
-        await u1OpenMenu(page)
-        await page.click('.util-item-reacciones')
-        await page.waitForSelector('.u2-selector', { timeout: 4000 }).catch(() => {})
-        await page.click('.u2-frase:nth-of-type(10)').catch(() => {})
-        await page.waitForSelector('.u2-burbuja', { timeout: 4000 }).catch(() => {})
-        // La captura, con la entrada YA terminada: durante los primeros 300ms la
-        // burbuja va a `opacity: 0` → 1, y una foto a media entrada sale
-        // desvaída y hace parecer roto lo que no lo está.
-        await movEsperaEntrada(page)
-        await page.screenshot({ path: MOVMENU_OUT + '/mov1c-burbuja-mesa' + n + '-' + tag + '.png' })
-        await page.waitForSelector('.u2-burbuja', { state: 'detached', timeout: REACCION_TOTAL_MS + 2000 }).catch(() => {})
+        await foto(iCorta, 'corta')
+        await foto(iLarga, 'larga')
       }
 
       // Capturas de la Fase 2: una por mesa en los dos viewports pedidos.
