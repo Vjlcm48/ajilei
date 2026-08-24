@@ -70,3 +70,10 @@ scripts/screenshots/
 # versiones en la misma corrida—, así que todo lo que hay dentro es regenerable
 # con un `node scripts/verifyREN1.mjs`. La carpeta se crea sola (mkdirSync).
 capturas-ren1/
+
+# Taller de audio de la campaña CEL (scripts/audioCEL.mjs). Dentro viven los
+# cortes propuestos, la hoja de escucha y los JSON de medida: TODO regenerable
+# desde los originales con `node scripts/audioCEL.mjs cortar -20.0 -1.5`. Los
+# originales largos de Victor no estan aqui ni en el repo — se retiraron de
+# `public/sounds/` en CEL-A y viven en sus descargas.
+_audio_cel/
