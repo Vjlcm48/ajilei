@@ -15,6 +15,7 @@ import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore
 import { conNivel } from '../hooks/nivelCore'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { componeCronica } from '../hooks/cronicaCore'
+import { siembraCEL } from '../dev/siembraCEL'
 import {
   useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
   ALTO_SELECTOR_REACCIONES,
@@ -294,7 +295,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // presentación — que es como "Apuestas N Heptacoins." se pudo renombrar sin
   // abrir `gameEngine.js`, que está protegido.
   const [motor, setMotor] = useState(() => {
-    const inicial = conNivel(createInitialState(stake, numPlayers), nivel)
+    // CEL-0 · `siembraCEL` es la IDENTIDAD salvo en desarrollo y con `?cel` en
+    // la URL; ahí siembra a los rivales sin fichas para que la mesa cierre en
+    // el primer "Iniciar mano". No hay rama de render ni condición nueva: lo
+    // único que cambia es con cuánto saldo nacen los rivales.
+    const inicial = siembraCEL(conNivel(createInitialState(stake, numPlayers), nivel))
     return { game: inicial, cronica: componeCronica(null, inicial) }
   })
   const game    = motor.game
