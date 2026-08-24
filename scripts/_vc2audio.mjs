@@ -9,7 +9,10 @@ import { readFileSync, writeFileSync } from 'node:fs'
 
 const ARCHIVOS = ['chips-collect.mp3', 'ajilei-strum.mp3', 'table-knock.mp3']
 // Referencias de la casa, para situar los nuevos en el sobre existente.
-const REFS = ['coin-bet.mp3', 'win.mp3', 'card-shuffle.mp3', 'showdown.mp3']
+// CEL-A: `win.mp3` sale del repositorio. Se cae de las referencias porque esto
+// lo lee con readFileSync y un archivo que ya no esta no es una referencia, es
+// un ENOENT.
+const REFS = ['coin-bet.mp3', 'card-shuffle.mp3', 'showdown.mp3']
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true })
 const page = await browser.newPage()

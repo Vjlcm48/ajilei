@@ -22,10 +22,12 @@ const BASE = 'http://localhost:5173'
 const OUT  = '../_cel0'
 const round = (n) => (n == null ? null : Math.round(n * 100) / 100)
 
-// Los doce, tal como los registra src/hooks/useSounds.js.
+// Los once, tal como los registra src/hooks/useSounds.js. Eran doce hasta
+// CEL-A: `win.mp3` sale del registro y del repositorio en esa tanda, y pedirlo
+// aqui daria un 404 que no es un hallazgo, es una lista sin actualizar.
 const AUDIOS = [
   'card-deal.mp3', 'coin-bet.mp3', 'card-fold.mp3', 'card-shuffle.mp3',
-  'win.mp3', 'timer-warning.mp3', 'showdown.mp3', 'comodin.mp3',
+  'timer-warning.mp3', 'showdown.mp3', 'comodin.mp3',
   'button-click.mp3', 'chips-collect.mp3', 'ajilei-strum.mp3', 'table-knock.mp3',
 ]
 

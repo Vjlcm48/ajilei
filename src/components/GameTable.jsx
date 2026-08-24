@@ -687,8 +687,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // una mano, ajileiStrum para un AJILEI—, disparado por useCelebracion junto
   // con su dibujo: fichas que se deslizan y suenan a la vez, no una fanfarria
   // suelta. `showdown` se conserva EXACTO: es el sonido del volteo, no de la
-  // victoria, y suena igual gane quien gane. El archivo win.mp3 se queda en el
-  // repositorio sin uso (v1.0 §7): borrarlo es otra tanda.
+  // victoria, y suena igual gane quien gane. VC2 dejó `win.mp3` en el
+  // repositorio sin uso y anotó que borrarlo era otra tanda (v1.0 §7.2): esa
+  // tanda fue CEL-A, y el archivo y su entrada de registro ya no están.
   // DSK-VC2b: `showdown` deja de ser sólo un sonido y pasa a ser el PRIMER
   // TIEMPO de la secuencia de victoria — el viaje del pozo arranca en su final.
   // Por eso su asa se guarda: sin el {sound, id} no hay `end` al que engancharse.
