@@ -178,16 +178,86 @@ async function ruta(page, c) {
   }
 }
 
-// `.opp-status` sólo dice "Sin Heptacoins" durante la bancarrota de una IA, que
-// no se alcanza en una mesa recién repartida. Se inyecta la cadena REAL en el
+// `.opp-status` sólo dice su rótulo de bancarrota cuando una IA quiebra, que no
+// se alcanza en una mesa recién repartida. Se inyecta la cadena REAL en el
 // elemento REAL (mismas clases, mismo CSS, misma caja): lo que se mide es la
 // caja del producto, no una maqueta del arnés (lección IDN-1 F3).
+//
+// REN-2: la cadena ya no es "Sin Heptacoins" sino "Sin saldo" — la decisión de
+// Victor sobre el desborde que esta misma sonda cazó en móvil horizontal. Se
+// lee del JSX para que el arnés no se quede midiendo un rótulo retirado.
+const ROTULO_BANCARROTA = 'Sin saldo'
 async function inyectaEstado(page) {
-  await page.evaluate(() => {
-    for (const s of document.querySelectorAll('.opp-status')) s.textContent = 'Sin Heptacoins'
-  })
+  await page.evaluate((rotulo) => {
+    for (const s of document.querySelectorAll('.opp-status')) s.textContent = rotulo
+  }, ROTULO_BANCARROTA)
   await page.evaluate(() => new Promise(r => requestAnimationFrame(r)))
 }
+
+// ── Muestreo de la CRÓNICA (REN-2) ──────────────────────────────────────────
+// La equivalencia byte a byte contra el motor ya la prueba `testCronica`, que
+// recorre miles de transiciones. Esto es lo que un test de nodo no puede dar:
+// que la cadena llegue PINTADA al óvalo de la app real. Se juega una mesa 2, se
+// abre con una apuesta del humano —la línea que motivó la tanda— y se recogen
+// todos los textos distintos que pasan por `.game-message`, para leer de un
+// vistazo que ninguno se quedó con "fichas" ni se rompió por el camino.
+async function muestreoCronica(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 937 }, deviceScaleFactor: 2 })
+  const page = await ctx.newPage()
+  const fallos = []
+  page.on('pageerror', e => fallos.push(`cronica: ${e}`))
+  const vistos = new Set()
+  const lee = async () => {
+    const t = await page.evaluate(() => document.querySelector('.game-message')?.textContent?.trim() ?? null)
+    if (t) vistos.add(t)
+    return t
+  }
+  const out = { vistos: [], apuesta: null, saludo: null, aperturaBet1: null, fallos }
+  try {
+    await ruta(page, { hasta: 'mesa', mesa: 2 })
+    out.saludo = await lee()
+
+    await page.click('button:has-text("Iniciar mano")')
+    // El humano es Mano en la primera mano de toda sesión (pieIndex = N-1), así
+    // que BET_1 abre con su turno y la apuesta a cero: el botón "Apostar" existe.
+    await page.waitForSelector('.action-buttons button:has-text("Apostar")', { timeout: 20000 })
+    out.aperturaBet1 = await lee()
+    await recorteEn(page, '.game-message', 'cronica__1-apertura-bet1')
+
+    await page.click('.action-buttons button:has-text("Apostar")')
+    await page.waitForFunction(() => /^Apuestas /.test(document.querySelector('.game-message')?.textContent ?? ''), { timeout: 10000 })
+    out.apuesta = await lee()
+    await recorteEn(page, '.game-message', 'cronica__2-apuesta-mesa2')
+
+    // Y se sigue jugando en automático para que pasen por el óvalo el resto de
+    // voces: respuesta de la IA, "A las 3", descarte, resultado de mano.
+    const pulsa = async (sel) => {
+      const b = page.locator(sel).first()
+      if (await b.count() && await b.isVisible().catch(() => false)) { await b.click().catch(() => {}); return true }
+      return false
+    }
+    for (let i = 0; i < 260; i++) {
+      await lee()
+      if (await page.locator('.game-over-screen').count() > 0) break
+      await pulsa('.action-buttons button:has-text("Pasar")') ||
+        await pulsa('.action-buttons button:has-text("Igualar")')
+      await pulsa('button:has-text("Sin descartar")')
+      await pulsa('button:has-text("Siguiente mano")')
+      await pulsa('button:has-text("Iniciar mano")')
+      await page.waitForTimeout(150)
+    }
+    if (await page.locator('.game-over-msg').count() > 0) {
+      out.gameOver = await page.evaluate(() => document.querySelector('.game-over-msg')?.textContent?.trim())
+      await recorteEn(page, '.game-over-msg', 'cronica__3-game-over')
+    }
+  } catch (e) { fallos.push(`cronica: ${e.message}`) }
+  out.vistos = [...vistos].sort()
+  await ctx.close()
+  return out
+}
+
+// `recorte` necesita el nombre de celda; aquí basta el nombre pelado.
+const recorteEn = (page, sel, nombre) => recorte(page, sel, nombre)
 
 const informe = { tanda: 'REN-1', celdas: {} }
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true })
@@ -213,6 +283,9 @@ for (const c of CELDAS) {
   } catch (e) { errores.push(`${c.id}: ${e.message}`) }
   await ctx.close()
 }
+
+informe.cronica = await muestreoCronica(browser)
+errores.push(...informe.cronica.fallos)
 await browser.close()
 
 informe.errores = errores
@@ -238,3 +311,16 @@ for (const [celda, sels] of Object.entries(informe.celdas)) {
   }
 }
 console.log(`\nmediciones vivas: ${vivos} · desbordes NUEVOS: ${nuevos} · desbordes previos a la tanda: ${previos} · envuelven ahora y antes no: ${envuelven} · errores de página: ${errores.length ? errores.join(' | ') : 'ninguno'}`)
+
+// ── Crónica ─────────────────────────────────────────────────────────────────
+const cr = informe.cronica
+const okApuesta = /^Apuestas \d+ Heptacoins\.$/.test(cr.apuesta ?? '')
+console.log(`\n── crónica de mesa 2 ──`)
+console.log(`saludo:          ${JSON.stringify(cr.saludo)}`)
+console.log(`apertura BET_1:  ${JSON.stringify(cr.aperturaBet1)}`)
+console.log(`${okApuesta ? 'OK  ' : 'MAL '} apuesta humano: ${JSON.stringify(cr.apuesta)}`)
+if (cr.gameOver) console.log(`fin de partida:  ${JSON.stringify(cr.gameOver)}`)
+const conFichas = cr.vistos.filter(t => /fichas/i.test(t))
+console.log(`textos distintos por el óvalo (${cr.vistos.length}):`)
+cr.vistos.forEach(t => console.log(`   · ${t}`))
+console.log(`\ncadenas que aún dicen "fichas": ${conFichas.length ? conFichas.join(' | ') : 'ninguna'}`)

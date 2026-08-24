@@ -54,10 +54,17 @@ export function claseTono(tono) {
 }
 
 // ── Fin de partida ──────────────────────────────────────────────────────────
-// Los TEXTOS no cambian (decisión de Victor): se reproducen literales para que
-// también salgan del compositor y nadie tenga que pintar game.message nunca.
+// Los textos nacieron como copia literal de los del motor (decisión de Victor:
+// el TEXTO no cambia, sólo de dónde sale). Desde REN-2 ya NO son literales: la
+// moneda se dice "Heptacoins" aquí y "fichas" en `gameEngine.js`, que está
+// protegido y conserva las suyas como letra muerta interna. La divergencia es
+// deliberada y ésta es la copia viva — la que se pinta.
 // Lo que cambia es el tono: el oro de marca queda RESERVADO a la victoria; la
 // derrota pasa a neutro sobrio. Antes las dos se pintaban en el mismo oro.
+//
+// El resto de la voz —la crónica de fases y acciones, que este módulo nunca
+// cubrió— vive en su hermano `cronicaCore.js` desde REN-2. Entre los dos, nadie
+// pinta `game.message`.
 function finDePartida({ winner, players }) {
   if (winner === 0) {
     return { texto: '¡Ganaste la mesa! Eres el último con Heptacoins.', tono: 'oro' }

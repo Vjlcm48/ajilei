@@ -14,6 +14,7 @@ import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
+import { componeCronica } from '../hooks/cronicaCore'
 import {
   useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
   ALTO_SELECTOR_REACCIONES,
@@ -279,7 +280,32 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // El motor NO lo conoce: lo transporta a ciegas en sus spreads. `conNivel`
   // aplica el default 'basico' ante un nivel ausente o desconocido.
   // En esta tanda `aiPlayer` no lo lee: viaja INERTE, Δ=0 de conducta de juego.
-  const [game,         setGame]         = useState(() => conNivel(createInitialState(stake, numPlayers), nivel))
+  // ── MSG-U2 · El estado del motor y la CRÓNICA viajan juntos ───────────────
+  // Un solo `useState` para los dos y no dos hooks separados, porque la crónica
+  // no es un dato independiente: es una función de la TRANSICIÓN (prev → next),
+  // y el único sitio donde las dos puntas existen a la vez es dentro del
+  // updater. Componerla aquí la deja atómica —nunca hay un render con el estado
+  // nuevo y el texto viejo— y deja intactos los diez `setGame(...)` repartidos
+  // por el componente, incluidos los de forma funcional: `setGame` conserva su
+  // firma exacta y sigue aceptando valor o updater.
+  //
+  // Lo que esto compra (REN-2): el óvalo ya NO pinta `game.message`. La voz es
+  // `cronicaCore` + `resultadoCore`, y con ella la palabra de la moneda vive en
+  // presentación — que es como "Apuestas N Heptacoins." se pudo renombrar sin
+  // abrir `gameEngine.js`, que está protegido.
+  const [motor, setMotor] = useState(() => {
+    const inicial = conNivel(createInitialState(stake, numPlayers), nivel)
+    return { game: inicial, cronica: componeCronica(null, inicial) }
+  })
+  const game    = motor.game
+  const cronica = motor.cronica
+  const setGame = useCallback((arg) => {
+    setMotor(m => {
+      const next = typeof arg === 'function' ? arg(m.game) : arg
+      if (next === m.game) return m
+      return { game: next, cronica: componeCronica(m.game, next) }
+    })
+  }, [])
   const [betAmount,    setBetAmount]    = useState(stake)
   const [dealStep,     setDealStep]     = useState(0)
   const [flyingCards,  setFlyingCards]  = useState([])
@@ -348,8 +374,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   const { phase, currentBet } = game
   const human        = game.players[0]
   // MSG-U1 · El resultado se COMPONE desde el estado, no se hereda del motor.
-  // Vale null fuera de PAYOUT/GAME_OVER, y ahí el óvalo sigue pintando
-  // game.message como siempre: el interruptor es la fase, jamás el texto.
+  // Vale null fuera de PAYOUT/GAME_OVER, y ahí toma el relevo `cronica`
+  // (MSG-U2/REN-2): el interruptor sigue siendo la fase, jamás el texto.
   const resultado = composeResultado({
     phase,
     winner: game.winner,
@@ -1441,10 +1467,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   }
 
   function renderCenterZone() {
-    // MSG-U1 · en resultado manda el compositor; fuera de él, la crónica del
-    // motor con su estilo por tipo de acción (Tanda C4.3). Una sola función de
-    // clase para las dos rutas — el aviso del censo, saldado.
-    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? game.message)
+    // MSG-U1/MSG-U2 · en resultado manda `resultadoCore`; fuera de él, la
+    // crónica compuesta por `cronicaCore` con su estilo por tipo de acción
+    // (Tanda C4.3). Una sola función de clase para las dos rutas — el aviso del
+    // censo, saldado. Ninguna de las dos ramas lee ya `game.message`.
+    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? cronica)
     const actionKind = resultado ? null : messageActionKind(centerMsg)
     const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
@@ -1517,7 +1544,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
     // MSG-U1 · misma composición y misma función de clase que center-zone: esta
     // ruta sólo existe en mesa 2 landscape móvil, y la voz es una sola en todo
     // el juego (alcance multiplataforma deliberado, v1.0 §4).
-    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? game.message)
+    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? cronica)
     const actionKind = resultado ? null : messageActionKind(centerMsg)
     const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
@@ -1579,8 +1606,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
             reconstruir el tablero cuando el propio humano queda eliminado. */}
         {isGameOver ? (
           <div className="game-over-screen">
-            {/* MSG-U1 · el TEXTO no cambia (decisión de Victor) pero sale del
-                compositor, para que nadie pinte game.message en un resultado.
+            {/* MSG-U1 · el TEXTO sale del compositor, no del motor; desde
+                REN-2 tampoco el de la rama sin resultado (`cronica`).
                 Lo que cambia es el tono: el oro de marca queda RESERVADO a la
                 victoria; la derrota pasa a neutro sobrio. Antes las dos se
                 pintaban en el mismo oro, sin consultar winner para nada. */}
@@ -1588,7 +1615,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               className={`game-over-msg${resultado?.tono === 'neutro' ? ' game-over-msg-neutro' : ''}`}
               data-tono={resultado?.tono ?? ''}
             >
-              {resultado ? resultado.texto : game.message}
+              {resultado ? resultado.texto : cronica}
             </p>
             {/* DSK-VC2 · SÓLO la victoria evoluciona. La pantalla de derrota no
                 cambia ni un byte: el decisor devuelve 'partida' únicamente con
