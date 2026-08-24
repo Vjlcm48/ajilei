@@ -100,7 +100,7 @@ export function TapetesPanel({ ancla, activo, comprados, previa, dialogo, onPres
               {estado === 'activo'   && <span className="tap-chip">Puesto</span>}
               {estado === 'comprado' && <span className="tap-marca" aria-label="Comprado">✓</span>}
               {estado === 'no-comprado' && (
-                <span className="tap-precio">{montoTexto(t.precio)} Heptacoins</span>
+                <span className="tap-precio">{montoTexto(t.precio)}</span>
               )}
             </button>
           )

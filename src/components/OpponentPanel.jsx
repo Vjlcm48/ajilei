@@ -146,7 +146,7 @@ export default function OpponentPanel({
           última acción de la mano previa durante el barajado. */}
       <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}${isEliminating ? ' opp-status-elim' : ''}`}>
         {isEliminating
-          ? 'Sin Heptacoins'
+          ? 'Sin saldo'
           : resetting ? ' ' : (player.folded ? 'Se retiró' : (isTurn ? 'Pensando…' : (lastAction ?? ' ')))}
       </span>
 
