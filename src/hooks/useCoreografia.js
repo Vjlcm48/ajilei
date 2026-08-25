@@ -6,7 +6,8 @@ import { melodiaForzadaCEL } from '../dev/siembraCEL'
 import { marcaCEL, limpiaArcoCEL } from '../dev/arcoCEL'
 import {
   ANCLA_TOPE_MS, CALMA_MS, FADE_CORTE_MS,
-  duracionConteo, esperaRevienta, esperaFinMelodia, magnitudConteo,
+  TRASPASO_MS, ASIENTO_MS,
+  avanceDe, duracionCascada, duracionConteo, esperaRevienta, esperaFinMelodia,
 } from './coreografiaCore'
 import { MELODIA_MS } from '../config/melodiasCelebracion'
 
@@ -59,8 +60,19 @@ export function useCoreografia({ precedente, netas, saldo }) {
   const quietud = usePrefiereQuietud()
 
   const [fase, setFase] = useState('sobria')
-  const [progresoVivo, setProgreso] = useState(0)
   const [oculta, setOculta] = useState(false)
+
+  // ── CEL-2g · El relato de los números ─────────────────────────────────────
+  // Un segundo tiempo, DENTRO de la fiesta y con su propio reloj. El arco lo
+  // mide la melodía; esto lo miden las cifras, y por eso no comparten estado:
+  // la lluvia no debe esperar a que un contador termine, ni al revés.
+  // Con movimiento reducido nace en `fin`, que es "todo puesto desde el primer
+  // fotograma" — lo que pide la instrucción.
+  const [tramo, setTramo] = useState(() => (quietud ? 'fin' : 'espera'))
+  const [premioVivo, setPremioVivo] = useState(0)
+  const [saldoVivo, setSaldoVivo] = useState(0)
+  const [asiento, setAsiento] = useState(false)
+  const tramoRef = useRef('espera')
   // La pieza se sortea AL MONTAR LA PANTALLA, en el inicializador, exactamente
   // como CEL-1 sortea la frase: si el sorteo viviera en un efecto, el primer
   // render iría sin melodía y el atributo `data-melodia` aparecería un cuadro
@@ -81,6 +93,27 @@ export function useCoreografia({ precedente, netas, saldo }) {
   const vivoRef = useRef(true)
 
   const vaA = useCallback((f) => { faseRef.current = f; setFase(f) }, [])
+  const vaAlTramo = useCallback((t) => { tramoRef.current = t; setTramo(t) }, [])
+
+  // El motor de una cuenta, uno solo para los dos tramos: misma curva y —lo que
+  // importa— mismo acotado del delta, que es lo que hace que la pestaña oculta
+  // pause en vez de aterrizar de golpe al volver.
+  const cuenta = useCallback((dur, pinta, alAcabar) => {
+    let acumulado = 0
+    let ultimo = null
+    let id = 0
+    const paso = (t) => {
+      if (ultimo === null) ultimo = t
+      acumulado += Math.min(t - ultimo, 100)
+      ultimo = t
+      const p = Math.min(1, acumulado / dur)
+      pinta(p)
+      if (p < 1) { id = requestAnimationFrame(paso); return }
+      alAcabar()
+    }
+    id = requestAnimationFrame(paso)
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   // Desengancha la espera: el temporizador-red Y el listener `end` de Howler.
   // Sin quitar el listener, un `end` tardío reventaría una fiesta ya saltada.
@@ -179,6 +212,9 @@ export function useCoreografia({ precedente, netas, saldo }) {
       if (!vivoRef.current || saltadoRef.current || faseRef.current !== 'sobria') return
       marcaCEL('revienta')
       vaA('fiesta')
+      // Y con la fiesta arranca el relato de los números, salvo con movimiento
+      // reducido, donde ya estaba todo puesto.
+      vaAlTramo(quietud ? 'fin' : 'premio')
       // La red primero y la melodía después: si el archivo no llegara a sonar,
       // la fiesta dura los 12 s nominales igual y la pantalla no se queda
       // lloviendo para siempre.
@@ -209,49 +245,76 @@ export function useCoreografia({ precedente, netas, saldo }) {
     const cuadro = requestAnimationFrame(lanza)
     const red = setTimeout(lanza, ANCLA_TOPE_MS)
     return () => { cancelAnimationFrame(cuadro); clearTimeout(red) }
-  }, [precedente, arrancaMelodia, programaFinFiesta, soltarEspera, vaA])
+  }, [precedente, arrancaMelodia, programaFinFiesta, soltarEspera, vaA, vaAlTramo, quietud])
 
-  // ── Los contadores ────────────────────────────────────────────────────────
-  // Un solo reloj para los dos: suben juntos y aterrizan juntos. El progreso
-  // sale de aquí y la curva —easeOutCubic, sellada por VC2— la aplica la
-  // tarjeta con `valorConteo`, que ya existía y no se toca.
+  // ── El premio ─────────────────────────────────────────────────────────────
+  // La primera cuenta, y la única que corre sola: el saldo espera su turno.
   useEffect(() => {
-    if (fase !== 'fiesta') return undefined
+    if (tramo !== 'premio') return undefined
+    const dur = duracionConteo(Math.abs(netas))
+    marcaCEL('premio-ini', { dur })
+    return cuenta(dur, setPremioVivo, () => {
+      marcaCEL('premio-fin')
+      vaAlTramo('traspaso')
+    })
+  }, [tramo, netas, cuenta, vaAlTramo])
 
-    if (quietud) {
-      // Movimiento reducido: los valores finales, directos y sin cuenta. El 1 no
-      // se ESCRIBE en el estado, se deriva en el retorno del hook: un setState
-      // dentro del cuerpo de un efecto encadena renders, y aquí no hace ninguna
-      // falta porque el valor no depende de nada que cambie.
-      marcaCEL('conteo-fin', { directo: true })
-      return undefined
-    }
+  // ── El traspaso ───────────────────────────────────────────────────────────
+  // Lo cierra el ATERRIZAJE de la moneda, que la tarjeta avisa: el conteo del
+  // saldo no arranca por un cronómetro paralelo sino porque la moneda llegó, que
+  // es la misma doctrina con la que el estallido espera al `end` del toc-toc.
+  // El temporizador de aquí es la RED: si el `transitionend` no llegara —una
+  // geometría que no se pudo medir, un navegador que no lo dispara— el relato
+  // no se queda colgado a media tarjeta.
+  const aterrizaTraspaso = useCallback(() => {
+    if (tramoRef.current !== 'traspaso') return
+    marcaCEL('traspaso-fin')
+    vaAlTramo('saldo')
+  }, [vaAlTramo])
 
-    const dur = duracionConteo(magnitudConteo(netas, saldo))
-    marcaCEL('conteo-ini', { dur })
-    let acumulado = 0
-    let ultimo = null
-    let id = 0
-    const paso = (t) => {
-      if (ultimo === null) ultimo = t
-      // El delta va ACOTADO, y ahí está la pausa por pestaña oculta: con la
-      // pestaña en segundo plano el rAF no corre, y al volver el primer salto
-      // valdría los segundos enteros que estuvo fuera — el contador aterrizaría
-      // de golpe y el jugador se habría perdido justo lo que vino a ver.
-      // Acotando el paso, el tiempo que no se pintó tampoco cuenta.
-      acumulado += Math.min(t - ultimo, 100)
-      ultimo = t
-      const p = Math.min(1, acumulado / dur)
-      setProgreso(p)
-      if (p < 1) { id = requestAnimationFrame(paso); return }
-      // CEL-2c · aquí acababa la fiesta hasta la audición de Victor. Ya no: el
-      // contador aterriza y la lluvia sigue sonando la melodía entera. Lo único
-      // que queda es la marca, que es con la que el arnés mide la cuenta.
-      marcaCEL('conteo-fin')
-    }
-    id = requestAnimationFrame(paso)
-    return () => cancelAnimationFrame(id)
-  }, [fase, netas, saldo, quietud])
+  useEffect(() => {
+    if (tramo !== 'traspaso') return undefined
+    marcaCEL('traspaso-ini')
+    const t = setTimeout(() => {
+      marcaCEL('traspaso-red')
+      aterrizaTraspaso()
+    }, TRASPASO_MS + 300)
+    return () => clearTimeout(t)
+  }, [tramo, aterrizaTraspaso])
+
+  // ── El saldo ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (tramo !== 'saldo') return undefined
+    const dur = duracionConteo(Math.abs(saldo))
+    marcaCEL('saldo-ini', { dur })
+    return cuenta(dur, setSaldoVivo, () => {
+      marcaCEL('saldo-fin')
+      // El pulso de llegada se enciende AQUÍ y no se apaga: la animación tiene
+      // una sola iteración, así que el estado pegado es la garantía de que se
+      // dispara una vez y nada más. Un salto por toque no lo enciende — quien
+      // pide parar no quiere una celebración de propina.
+      setAsiento(true)
+      vaAlTramo('asiento')
+    })
+  }, [tramo, saldo, cuenta, vaAlTramo])
+
+  useEffect(() => {
+    if (tramo !== 'asiento') return undefined
+    const t = setTimeout(() => {
+      marcaCEL('cascada-ini')
+      vaAlTramo('rubros')
+    }, ASIENTO_MS)
+    return () => clearTimeout(t)
+  }, [tramo, vaAlTramo])
+
+  useEffect(() => {
+    if (tramo !== 'rubros') return undefined
+    const t = setTimeout(() => {
+      marcaCEL('relato-fin')
+      vaAlTramo('fin')
+    }, duracionCascada())
+    return () => clearTimeout(t)
+  }, [tramo, vaAlTramo])
 
   // ── De la calma al reposo ─────────────────────────────────────────────────
   // Lo que dura la calma es lo que tarda en caer la moneda más lenta: ni un ms
@@ -274,17 +337,19 @@ export function useCoreografia({ precedente, netas, saldo }) {
   const saltar = useCallback(() => {
     if (saltadoRef.current) return
     saltadoRef.current = true
-    marcaCEL('salto', { desde: faseRef.current })
+    marcaCEL('salto', { desde: faseRef.current, tramo: tramoRef.current })
     soltarEspera()
     soltarFiesta()
-    setProgreso(1)
+    // Todo al final, rubros incluidos. `fin` es el último tramo, así que las
+    // cifras y la cascada se derivan puestas sin tocar un estado por pieza.
+    vaAlTramo('fin')
     if (faseRef.current !== 'reposo') vaA('calma')
     const m = melodiaRef.current
     if (m && m.sonando != null) {
       m.howl.fade(m.howl.volume(), 0, FADE_CORTE_MS, m.sonando)
       setTimeout(() => { try { m.howl.stop(m.sonando) } catch { /* ya parada */ } }, FADE_CORTE_MS)
     }
-  }, [soltarEspera, soltarFiesta, vaA])
+  }, [soltarEspera, soltarFiesta, vaA, vaAlTramo])
 
   useEffect(() => {
     if (fase === 'reposo') return undefined
@@ -309,7 +374,21 @@ export function useCoreografia({ precedente, netas, saldo }) {
     soltarFiesta()
   }, [soltarEspera, soltarFiesta])
 
-  // Con movimiento reducido no hay cuenta: el progreso es 1 desde el principio.
-  const progreso = quietud ? 1 : progresoVivo
-  return { fase, progreso, melodia, oculta, quietud, saltar }
+  // Los progresos se DERIVAN del tramo, no se escriben: pasado el tramo de una
+  // cuenta, su progreso es 1 por definición. Eso hace que el salto por toque sea
+  // una sola línea (`fin`) y que el movimiento reducido sea otra (el último
+  // índice), sin un estado por cifra que haya que acordarse de poner.
+  const av = quietud ? avanceDe('fin') : avanceDe(tramo)
+  const numeros = {
+    tramo: quietud ? 'fin' : tramo,
+    premio: av >= 2 ? 1 : (av === 1 ? premioVivo : 0),
+    saldo: av >= 4 ? 1 : (av === 3 ? saldoVivo : 0),
+    // 'no' = invisibles con su sitio reservado · 'si' = entrando en cascada ·
+    // 'fin' = puestos, sin animación.
+    rubros: av >= 6 ? 'fin' : (av === 5 ? 'si' : 'no'),
+    asiento: asiento && !quietud,
+    pausada: oculta,
+    aterriza: aterrizaTraspaso,
+  }
+  return { fase, numeros, melodia, oculta, quietud, saltar }
 }

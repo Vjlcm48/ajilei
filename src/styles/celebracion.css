@@ -576,3 +576,82 @@ h1.cel-ajilei {
     opacity: 0;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CEL-2g · LA HISTORIA DE LOS NÚMEROS
+   Premio · traspaso · saldo · asiento · cascada de rubros.
+   El estado lo manda `data-cascada` en la lista y `data-asiento` en la cifra
+   del saldo, igual que `data-fase` manda el arco: un atributo, no seis clases.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* La tarjeta pasa a ser el bloque contenedor de la moneda que traspasa. Sus
+   coordenadas son relativas a esta caja, así que el centrado vertical de la
+   columna y el desplazamiento de móvil horizontal no la descolocan. */
+.cel-tarjeta { position: relative; }
+
+/* La moneda del traspaso. `margin` de medio lado para que el punto medido —el
+   centro de la moneda del premio, el centro de la cifra del saldo— sea el
+   centro de esta caja y no su esquina; y `line-height: 0` por lo mismo que en
+   `.vc-ficha`: un <img> en línea deja el hueco del descendente y la caja
+   dejaría de ser la de la moneda. */
+.cel-traspaso {
+  position: absolute;
+  z-index: 2;
+  margin: -8px 0 0 -8px;
+  line-height: 0;
+  pointer-events: none;
+}
+
+/* ── Los cuatro rubros ──────────────────────────────────────────────────────
+   INVISIBLES, NO AUSENTES. Es toda la razón de que sea `opacity` y no
+   `display`: su sitio está ocupado desde el primer fotograma, así que la
+   tarjeta mide lo mismo en la entrada sobria que en el reposo y nada se
+   recoloca cuando entran. La puerta del arnés compara las tres cajas. */
+.cel-detalle[data-cascada="no"] .cel-rubro { opacity: 0; }
+
+/* La cascada. El escalonado lo pone el índice de cada fila, no cuatro estados
+   de React: un solo render enciende las cuatro y la hoja las reparte en el
+   tiempo. `both` es lo que las mantiene invisibles ANTES de que les toque —sin
+   él, una fila con retraso se pintaría entera esperando su turno. */
+.cel-detalle[data-cascada="si"] .cel-rubro {
+  animation: cel-rubro-entra 380ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: calc(var(--rubro-i, 0) * 250ms);
+}
+
+/* Con la pestaña oculta, la cascada se congela como la lluvia: al volver sigue
+   por donde iba en vez de haber ocurrido a espaldas del jugador. */
+.cel-detalle[data-pausa="si"] .cel-rubro { animation-play-state: paused; }
+
+/* Entra elevada y CAE amortiguada: los 10 px de arriba, un rebasamiento de 1,5
+   px al llegar y el asentamiento. Nada de rebotes de juguete. */
+@keyframes cel-rubro-entra {
+  0%   { opacity: 0; transform: translateY(-10px); }
+  65%  { opacity: 1; transform: translateY(1.5px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ── El asiento del saldo ───────────────────────────────────────────────────
+   Un solo disparo, y el estado se queda pegado: la animación lleva una sola
+   iteración, así que lo que garantiza que no se repita es que el atributo no
+   se apaga nunca. Un salto por toque NO lo enciende — quien pide parar no
+   quiere una celebración de propina.
+   `transform-origin` a la derecha porque la cifra está alineada a ese lado:
+   escalando desde el centro, el número se movería al crecer. */
+.cel-detalle .cel-linea-alta dd[data-asiento="si"] {
+  transform-origin: right center;
+  animation: cel-asiento 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 1;
+}
+
+@keyframes cel-asiento {
+  0%   { transform: scale(1);    text-shadow: none; }
+  35%  { transform: scale(1.1);  text-shadow: 0 0 14px rgba(var(--gold-brand-rgb), 0.85); }
+  100% { transform: scale(1);    text-shadow: none; }
+}
+
+/* Movimiento reducido: los rubros puestos desde el primer fotograma y la cifra
+   sin pulso. El relato se cuenta igual —los números son los verdaderos— pero
+   no se mueve nada. */
+@media (prefers-reduced-motion: reduce) {
+  .cel-detalle .cel-rubro { opacity: 1; animation: none; }
+  .cel-detalle .cel-linea-alta dd[data-asiento="si"] { animation: none; }
+}

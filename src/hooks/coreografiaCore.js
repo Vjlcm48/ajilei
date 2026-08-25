@@ -1,4 +1,4 @@
-import { CONTEO_MS } from './sesionCore'
+import { CONTEO_MS, valorConteo } from './sesionCore'
 import { esperaPrecedente, ESPERA_MARGEN_MS } from './celebracionCore'
 import { MELODIA_MS } from '../config/melodiasCelebracion'
 
@@ -37,8 +37,16 @@ export const ANCLA_TOPE_MS = 500
 // las cifras pequeñas siguen contando exactamente como contaban. Lo que CEL-2
 // añade es el techo, para que un botín de cinco asientos no suba a la misma
 // velocidad que una ganancia de tres Heptacoins.
-export const CONTEO_MIN_MS = CONTEO_MS      // 1400
-export const CONTEO_MAX_MS = 1800
+// ── CEL-2g · El mando del ritmo ─────────────────────────────────────────────
+// Victor, tras jugar una partida entera: las dos cuentas al DOBLE. La escala por
+// magnitud no cambia —misma curva, mismas puntas planas—, se multiplica entera.
+// Un solo número manda, como el factor de la caída de la lluvia.
+export const CONTEO_FACTOR = 2
+const CONTEO_BASE_MIN_MS = CONTEO_MS        // 1400, el de VC2
+const CONTEO_BASE_MAX_MS = 1800             // el techo que puso CEL-2
+
+export const CONTEO_MIN_MS = CONTEO_BASE_MIN_MS * CONTEO_FACTOR   // 2800
+export const CONTEO_MAX_MS = CONTEO_BASE_MAX_MS * CONTEO_FACTOR   // 3600
 export const CONTEO_PISO = 1000             // hasta aquí, el mínimo entero
 export const CONTEO_TECHO = 25000           // 5 asientos × 5000: el mayor botín de hoy
 
@@ -52,11 +60,67 @@ export function duracionConteo(magnitud) {
   return Math.round(CONTEO_MIN_MS + t * (CONTEO_MAX_MS - CONTEO_MIN_MS))
 }
 
-// Los DOS contadores comparten reloj —suben juntos y aterrizan juntos—, así que
-// la magnitud que fija la duración es la mayor de las dos. Con el saldo en
-// 5.000 y unas netas de 0, manda el saldo: lo que se mira subir es él.
+// CEL-2g · Los dos contadores DEJARON de compartir reloj: el premio cuenta
+// primero y el saldo espera a que asiente. La función se conserva porque sigue
+// siendo la magnitud del relato entero —la mayor de las dos— y con ella se
+// dimensiona lo que dura la historia completa; cada cuenta pide la suya por
+// separado con `duracionConteo(Math.abs(...))`.
 export function magnitudConteo(netas, saldo) {
   return Math.max(Math.abs(Number(netas) || 0), Math.abs(Number(saldo) || 0))
+}
+
+// ── CEL-2g · El relato de los números, tramo a tramo ────────────────────────
+// El arco (sobria/fiesta/calma/reposo) manda sobre la PANTALLA; esto manda
+// sobre la TARJETA, y corre entero dentro de la fiesta. Se separan porque duran
+// cosas distintas: la fiesta la mide la melodía y el relato lo miden las cifras.
+//
+//   espera   · entrada sobria: premio en 0, saldo en su cifra de entrada y los
+//              cuatro rubros invisibles PERO con su sitio ocupado.
+//   premio   · sube "+N".
+//   traspaso · una moneda vuela de la fila del premio a la del saldo.
+//   saldo    · el aterrizaje lo dispara; sube de la cifra de entrada a la real.
+//   asiento  · pulso y destello sobre la cifra, un solo disparo.
+//   rubros   · los cuatro entran en cascada.
+//   fin      · todo puesto.
+//
+// El orden es un ARRAY y no una cadena de `if`: así "¿ya pasó el premio?" es
+// una comparación de índices, y el salto por toque es poner el último.
+export const TRAMOS = ['espera', 'premio', 'traspaso', 'saldo', 'asiento', 'rubros', 'fin']
+
+export function avanceDe(tramo) {
+  const i = TRAMOS.indexOf(tramo)
+  return i < 0 ? 0 : i
+}
+
+export const TRASPASO_MS = 520     // el vuelo de la moneda del premio al saldo
+export const ASIENTO_MS = 520      // el pulso de la cifra al llegar
+export const CASCADA_PASO_MS = 250 // entre rubro y rubro
+export const CASCADA_ENTRADA_MS = 380
+export const RUBROS = 4            // puntos · jugadas · ganadas · mejor mano
+
+export function duracionCascada(n = RUBROS) {
+  return Math.max(0, n - 1) * CASCADA_PASO_MS + CASCADA_ENTRADA_MS
+}
+
+// Lo que dura el relato entero, para el arnés y para poder afirmar que cabe
+// dentro de la fiesta: si algún día no cupiera, la cascada se vería empezar
+// sobre una pantalla que ya se apagó.
+export function duracionRelato(netas, saldo) {
+  return duracionConteo(Math.abs(Number(netas) || 0))
+    + TRASPASO_MS
+    + duracionConteo(Math.abs(Number(saldo) || 0))
+    + ASIENTO_MS
+    + duracionCascada()
+}
+
+// ── El saldo no cuenta desde cero ───────────────────────────────────────────
+// Cuenta desde la cifra con la que el jugador entró a la mesa hasta la que
+// tiene ahora. `valorConteo` —la curva sellada por VC2— interpola de 0 a un
+// destino, así que se le pasa el DELTA y se le suma el origen: la curva es la
+// misma, sin copiarla ni tocarla.
+export function valorEntre(desde, hasta, t) {
+  const a = Number(desde) || 0
+  return a + valorConteo((Number(hasta) || 0) - a, t)
 }
 
 // ── La lluvia ───────────────────────────────────────────────────────────────

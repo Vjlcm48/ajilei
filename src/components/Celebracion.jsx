@@ -3,6 +3,7 @@ import ChipToken from './ChipToken'
 import { Wordmark } from './Wordmark'
 import { VIAJE_MS, VIAJE_ESCALON_MS, VIAJE_DESVANECIDO_MS, llevaViaje, llevaPulso } from '../hooks/celebracionCore'
 import { valorConteo } from '../hooks/sesionCore'
+import { TRASPASO_MS, valorEntre } from '../hooks/coreografiaCore'
 import { useCoreografia } from '../hooks/useCoreografia'
 import { LluviaHeptacoins } from './LluviaHeptacoins'
 import { SoundButton } from './SoundButton'
@@ -140,19 +141,80 @@ export function AjileiOverlay({ activa }) {
 // ni tocada ni copiada. Dos relojes para dos cifras que tienen que aterrizar
 // juntas es exactamente cómo se desincronizan.
 //
-// `progreso = 1` por defecto: quien monte esta tarjeta sin arco —una prueba, un
-// resumen futuro en otro sitio— ve las cifras finales, jamás ceros.
-export function TarjetaResumen({ sesion, netas, saldo, puntos, progreso = 1 }) {
-  const valor = valorConteo(netas, progreso)
-  // "Saldo actual" ACOMPAÑA a las netas: mismo reloj, misma curva, misma
-  // llegada. Lo que sube no son dos números sueltos, es una sola cuenta.
-  const saldoVivo = valorConteo(saldo, progreso)
+// ── CEL-2g · La moneda del traspaso ─────────────────────────────────────────
+// MISMO MOLDE que `FichaViajera`, que es el vuelo del pozo: se pinta en el
+// origen, un rAF después se aplica el `translate` y la transición hace el resto.
+// Componente aparte y no aquélla porque el contrato es otro: el reguero del pozo
+// es "dispara y olvida" —siete monedas escalonadas que se desvanecen— y esto es
+// UNA moneda cuyo aterrizaje DISPARA la cuenta siguiente. La diferencia es
+// `onFin`, y meterlo en FichaViajera obligaría a que las siete lo llamasen.
+function MonedaTraspaso({ desde, hasta, onFin }) {
+  const [movida, setMovida] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMovida(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+  return (
+    <span
+      className="cel-traspaso"
+      aria-hidden="true"
+      style={{
+        left: desde.x, top: desde.y,
+        translate: movida ? `${hasta.x - desde.x}px ${hasta.y - desde.y}px` : '0 0',
+        // Sólo se transiciona `translate`, así que `transitionend` llega UNA vez
+        // y no hay que filtrar por propiedad para saber que aterrizó.
+        transition: movida ? `translate ${TRASPASO_MS}ms cubic-bezier(0.34, 0.02, 0.28, 1)` : 'none',
+      }}
+      onTransitionEnd={onFin}
+    >
+      <ChipToken size="icon" />
+    </span>
+  )
+}
+
+// Lo que ve quien monte esta tarjeta sin arco —una prueba, un resumen futuro en
+// otro sitio—: todo puesto, jamás ceros.
+const NUMEROS_QUIETOS = { tramo: 'fin', premio: 1, saldo: 1, rubros: 'fin', asiento: false, pausada: false, aterriza: () => {} }
+
+export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS_QUIETOS }) {
+  const valor = valorConteo(netas, numeros.premio)
+  // CEL-2g · el saldo NO cuenta desde cero: cuenta desde la cifra con la que el
+  // jugador entró a la mesa hasta la que tiene ahora. Y esa cifra de entrada no
+  // se importa de ninguna configuración — se DERIVA de las dos que la tarjeta ya
+  // recibe: `netas` es `chips - entrada`, luego `entrada` es `saldo - netas`.
+  // Una fuente menos que pueda desincronizarse.
+  const entrada = saldo - netas
+  const saldoVivo = valorEntre(entrada, saldo, numeros.saldo)
+
+  // El vuelo se MIDE en vivo, como el del pozo: dónde está la moneda del premio
+  // y dónde la cifra del saldo, en coordenadas de la tarjeta.
+  const tarjetaRef = useRef(null)
+  const monedaRef = useRef(null)
+  const saldoRef = useRef(null)
+  const [vuelo, setVuelo] = useState(null)
+  useEffect(() => {
+    if (numeros.tramo !== 'traspaso') return undefined
+    const id = requestAnimationFrame(() => {
+      const t = tarjetaRef.current, m = monedaRef.current, d = saldoRef.current
+      if (!t || !m || !d) return
+      const tr = t.getBoundingClientRect()
+      const centro = (r) => ({ x: r.x + r.width / 2 - tr.x, y: r.y + r.height / 2 - tr.y })
+      setVuelo({ desde: centro(m.getBoundingClientRect()), hasta: centro(d.getBoundingClientRect()) })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [numeros.tramo])
 
   const signo = valor > 0 ? '+' : ''
   return (
-    <div className="cel-tarjeta">
+    <div className="cel-tarjeta" ref={tarjetaRef}>
+      {/* La moneda vuela DENTRO de la tarjeta: su bloque contenedor es esta caja
+          y sus coordenadas son relativas a ella, así que ni el desplazamiento de
+          la columna en móvil horizontal ni el centrado vertical la descolocan. */}
+      {numeros.tramo === 'traspaso' && vuelo
+        ? <MonedaTraspaso desde={vuelo.desde} hasta={vuelo.hasta} onFin={numeros.aterriza} />
+        : null}
       <p className={`cel-netas${netas >= 0 ? '' : ' cel-netas-neg'}`}>
-        <span className="cel-netas-ico">
+        <span className="cel-netas-ico" ref={monedaRef}>
           <ChipToken size="hero" />
           {/* CEL-2e · la capa de luz de la moneda. Va en un nodo PROPIO y no en
               pseudos de `.cel-netas-ico` por una razón medida: recortar el
@@ -164,18 +226,31 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, progreso = 1 }) {
         <span className="cel-netas-num">{signo}{valor}</span>
         <span className="cel-netas-word">Heptacoins</span>
       </p>
-      <dl className="cel-detalle">
+      <dl className="cel-detalle" data-cascada={numeros.rubros} data-pausa={numeros.pausada ? 'si' : 'no'}>
         {/* CEL-1 · Las dos cifras nuevas van PRIMERO y destacadas: son las que
             la lámina quiere que se lean antes que la estadística.
             "Saldo actual" pinta `human.chips`, el dato VERDADERO del estado —
             jamás la fórmula 5000 + 5000×rivales. Coinciden hoy porque el humano
             se lo llevó todo, pero el día que la economía cambie (recompra,
             bono, premio escalado) la fórmula mentiría y el estado no. */}
-        <div className="cel-linea-alta"><dt>Saldo actual</dt><dd>{saldoVivo}</dd></div>
-        <div className="cel-linea-alta"><dt>Puntos obtenidos</dt><dd>{puntos}</dd></div>
-        <div><dt>Manos jugadas</dt><dd>{sesion.manosJugadas}</dd></div>
-        <div><dt>Manos ganadas</dt><dd>{sesion.manosGanadas}</dd></div>
-        <div>
+        {/* "Saldo actual" NO es un rubro: está desde el primer fotograma con su
+            cifra de entrada y es la única que se mira contar. `data-asiento` la
+            marca al llegar, y su animación tiene una sola iteración. */}
+        <div className="cel-linea-alta">
+          <dt>Saldo actual</dt>
+          <dd ref={saldoRef} data-asiento={numeros.asiento ? 'si' : 'no'}>{saldoVivo}</dd>
+        </div>
+        {/* Los CUATRO rubros de la cascada, en el orden que Victor selló. El
+            índice va como custom property y el escalonado lo pone la hoja con un
+            `animation-delay`: cuatro estados de React para lo mismo serían cuatro
+            renders donde basta con uno.
+            En móvil horizontal la tarjeta reparte estas filas en dos columnas
+            (CEL-1); el orden de entrada sigue siendo éste, el lógico, aunque la
+            geometría los ponga de dos en dos. */}
+        <div className="cel-linea-alta cel-rubro" style={{ '--rubro-i': 0 }}><dt>Puntos obtenidos</dt><dd>{puntos}</dd></div>
+        <div className="cel-rubro" style={{ '--rubro-i': 1 }}><dt>Manos jugadas</dt><dd>{sesion.manosJugadas}</dd></div>
+        <div className="cel-rubro" style={{ '--rubro-i': 2 }}><dt>Manos ganadas</dt><dd>{sesion.manosGanadas}</dd></div>
+        <div className="cel-rubro" style={{ '--rubro-i': 3 }}>
           <dt>Tu mejor mano</dt>
           <dd>{sesion.mejorMano ? `${sesion.mejorMano.palo}, ${sesion.mejorMano.pts} pts` : '—'}</dd>
         </div>
@@ -210,7 +285,7 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onL
   useEffect(() => { recuerdaFrase(eleccion.indice) }, [eleccion])
   // CEL-2 · El arco. `precedente` es el toc-toc que GameTable ya disparaba al
   // entrar en GAME_OVER: aquí no se dispara nada, se ESPERA a que termine.
-  const { fase, progreso, melodia, oculta, quietud } = useCoreografia({ precedente, netas, saldo })
+  const { fase, numeros, melodia, oculta, quietud } = useCoreografia({ precedente, netas, saldo })
 
   // ── CEL-2e · "Próximamente", bajo demanda ─────────────────────────────────
   // El control del ranking deja de nacer deshabilitado y con pastilla: ahora se
@@ -275,7 +350,7 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onL
 
       <p className="cel-frase">{frase}</p>
 
-      <TarjetaResumen sesion={sesion} netas={netas} saldo={saldo} puntos={puntos} progreso={progreso} />
+      <TarjetaResumen sesion={sesion} netas={netas} saldo={saldo} puntos={puntos} numeros={numeros} />
 
       {/* CEL-2e · Los dos controles, en un grupo propio. En escritorio y en
           móvil vertical el grupo es una columna con el MISMO hueco que la
