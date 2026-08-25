@@ -179,24 +179,63 @@ h1.cel-ajilei {
   border-bottom: 1px solid rgba(var(--gold-brand-rgb), 0.18);
 }
 
-/* ── 5 · El enlace de ranking ───────────────────────────────────────────────
-   `disabled` REAL, no un `pointer-events: none`: un botón deshabilitado no
-   recibe foco, no se pulsa con teclado y lo anuncia el lector de pantalla.
-   Mismo tratamiento que las entradas inertes del menú de utilidades.
-   La pastilla reutiliza `.soon-tag`, que ya vive en `gameTable.css` — se usa
-   por su nombre de clase, sin abrir la hoja (molde EMB-2). */
-.cel-ranking {
-  display: inline-flex;
+/* ── 4 y 5 · Los dos controles ──────────────────────────────────────────────
+   CEL-2e · El ranking deja de ser un rótulo inerte con pastilla y pasa a ser un
+   control secundario de verdad: se pulsa y contesta "Próximamente". El estado
+   `disabled` y la pastilla `.soon-tag` desaparecen — un control que responde no
+   puede anunciarse como deshabilitado.
+
+   El grupo. En escritorio y en móvil vertical es una COLUMNA con `gap: inherit`,
+   así que hereda el hueco de `.cel-screen` y los dos controles se ven
+   exactamente donde estaban. En móvil horizontal se vuelve fila. Un solo árbol
+   para las dos disposiciones.
+   Y es el bloque contenedor del aviso, que va fuera de flujo. */
+.cel-acciones {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  background: none;
-  border: 0;
-  padding: 4px 6px;
-  font-family: inherit;
+  gap: inherit;
+}
+
+/* El secundario: borde de marca, fondo transparente, texto oro. Reutiliza la
+   caja de `.btn` por su nombre de clase —sin abrir `gameTable.css`, molde
+   EMB-2—, así que su relleno, su radio y su tipografía son los del primario por
+   construcción y no por copia. El selector lleva al padre para ganarle a `.btn`
+   por especificidad y no por orden de carga, que es frágil. */
+.cel-acciones .cel-ranking {
+  background: transparent;
+  border: 1px solid var(--gold-brand);
+  color: var(--gold-brand);
+  cursor: pointer;
+}
+
+/* ── El aviso "Próximamente" ────────────────────────────────────────────────
+   FUERA DE FLUJO, y ésa es toda su geometría: aparece y desaparece sin mover un
+   píxel de la columna. Va encima del grupo y no debajo porque en móvil
+   horizontal los controles están pegados al filo inferior.
+   La región vive siempre en el árbol —lo exige `aria-live`— así que cuando está
+   vacía no debe pintar nada: sin texto, sin caja. */
+.cel-aviso {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--gold-brand);
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-muted);
-  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cel-aviso:empty { display: none; }
+
+.cel-aviso:not(:empty) {
+  padding: 6px 12px;
+  background: var(--surface-modal);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 
 /* ── Móvil vertical ─────────────────────────────────────────────────────── */
@@ -245,7 +284,6 @@ h1.cel-ajilei {
   .cel-frase { font-size: 18px; max-width: 34ch; line-height: 1.2; }
   .cel-tarjeta { padding: 8px 18px; }
   .cel-netas { margin-bottom: 4px; padding-bottom: 4px; }
-  .cel-ranking { padding: 2px 6px; }
   .cel-netas-num { font-size: 34px; }
   .cel-detalle > div { padding: 0; }
   .cel-detalle .cel-linea-alta dd { font-size: 20px; }
@@ -282,10 +320,10 @@ h1.cel-ajilei {
    hace falta el escalón de móvil, y en las dos consultas por separado porque
    no existe una que las una sin arrastrar escritorio. */
 @media (max-width: 767px) and (orientation: portrait) {
-  .cel-netas-ico .chip-token { width: 48px; height: 48px; }
+  .cel-netas-ico .chip-token { width: 60px; height: 60px; }
 }
 @media (orientation: landscape) and (max-height: 600px) {
-  .cel-netas-ico .chip-token { width: 48px; height: 48px; }
+  .cel-netas-ico .chip-token { width: 60px; height: 60px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -422,4 +460,119 @@ h1.cel-ajilei {
    desactivar de la coreografía. */
 @media (prefers-reduced-motion: reduce) {
   .cel-frase { transition: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CEL-2e · CINCO AJUSTES VISTOS EN VIVO
+   Decisiones de Victor sobre la fiesta ya corriendo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · Los dos controles, lado a lado en móvil horizontal ─────────────────
+   Sólo aquí: en escritorio y en vertical siguen apilados. La fila compra una
+   línea entera de alto, que es justo lo que la piel más apretada necesitaba
+   para poder subir la moneda un 25 %.
+   `align-items: stretch` + `min-height: 44px` dan lo pedido: mismo alto y área
+   de toque de 44, que es el mínimo de la casa para el táctil. */
+@media (orientation: landscape) and (max-height: 600px) {
+  .cel-acciones {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    gap: 12px;
+  }
+  .cel-acciones .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+}
+
+/* ── 5 · El brillo de la moneda ─────────────────────────────────────────────
+   Un lazo compuesto: un BARRIDO especular que cruza el disco y, al cerrar la
+   pasada, un DESTELLO puntual en el borde. Sólo `transform` y `opacity`; el
+   compositor lo resuelve sin tocar el layout, igual que la lluvia.
+
+   EL PERÍODO NO ESTÁ ESCRITO AQUÍ. Lo pone `Celebracion.jsx` leyendo el ciclo
+   resuelto del EMB-1 vivo (`--cel-moneda-ciclo`), y el desfase es medio ciclo
+   (`--cel-moneda-desfase`): el rótulo brilla, y a mitad de su reposo brilla la
+   moneda. Los valores de reserva son los de la calibración de hoy —4 s y 2 s—
+   y sólo entran si EMB-1 no estuviera vivo; si Victor recalibra el resplandor
+   del nombre, la armonía se conserva sola.
+
+   Más notorio que el del nombre, como pide la instrucción: allí la banda se
+   recorta a los trazos de las letras, aquí cruza el disco entero y además
+   remata con el destello. */
+.cel-netas-ico { position: relative; }
+
+.cel-moneda-luz {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* El barrido. La capa es más grande que el disco para que la banda inclinada lo
+   cruce entera, y el recorte a círculo lo pone el padre. */
+.cel-moneda-luz::before {
+  content: '';
+  position: absolute;
+  inset: -25%;
+  background: linear-gradient(105deg,
+    rgba(255, 246, 224, 0)    38%,
+    rgba(255, 246, 224, 0.85) 50%,
+    rgba(255, 246, 224, 0)    62%);
+  transform: translateX(-150%);
+  animation: cel-moneda-barrido var(--cel-moneda-ciclo, 4s) linear var(--cel-moneda-desfase, 2s) infinite;
+}
+
+/* El destello del borde, en el instante en que la banda sale por el otro lado.
+   Arriba a la derecha, que es de donde viene la luz del relieve de la HC-1. */
+.cel-moneda-luz::after {
+  content: '';
+  position: absolute;
+  top: 9%;
+  right: 11%;
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6e0 0%, rgba(255, 246, 224, 0) 70%);
+  opacity: 0;
+  animation: cel-moneda-destello var(--cel-moneda-ciclo, 4s) ease-out var(--cel-moneda-desfase, 2s) infinite;
+}
+
+/* La pasada ocupa el 30 % del ciclo —como el 30,7 % del barrido de EMB-1— y el
+   resto del tiempo la banda está aparcada fuera del disco. El salto de vuelta
+   ocurre con ella invisible, así que no hay destello de retorno. */
+@keyframes cel-moneda-barrido {
+  0%   { transform: translateX(-150%); }
+  30%  { transform: translateX(150%); }
+  100% { transform: translateX(150%); }
+}
+
+@keyframes cel-moneda-destello {
+  0%, 24% { opacity: 0; transform: scale(0.6); }
+  30%     { opacity: 1; transform: scale(1.15); }
+  40%     { opacity: 0; transform: scale(0.9); }
+  100%    { opacity: 0; transform: scale(0.6); }
+}
+
+/* En la entrada sobria la moneda no brilla, igual que el nombre: la fiesta
+   empieza cuando revienta y no antes. Y se PARA en su fotograma 0 —la banda
+   fuera del disco— en vez de desmontarse, por lo mismo que el rótulo: al
+   reanudar, la pasada entra desde su principio y no a mitad. */
+.cel-screen[data-fase="sobria"] .cel-moneda-luz::before,
+.cel-screen[data-fase="sobria"] .cel-moneda-luz::after {
+  animation-play-state: paused;
+}
+
+/* Movimiento reducido: moneda quieta. No hay brillo atenuado — la capa entera
+   se apaga, que es lo que hace EMB-1 con la suya. */
+@media (prefers-reduced-motion: reduce) {
+  .cel-moneda-luz::before,
+  .cel-moneda-luz::after {
+    animation: none;
+    opacity: 0;
+  }
 }

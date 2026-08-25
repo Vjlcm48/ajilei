@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import ChipToken from './ChipToken'
 import { Wordmark } from './Wordmark'
 import { VIAJE_MS, VIAJE_ESCALON_MS, VIAJE_DESVANECIDO_MS, llevaViaje, llevaPulso } from '../hooks/celebracionCore'
@@ -152,7 +152,15 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, progreso = 1 }) {
   return (
     <div className="cel-tarjeta">
       <p className={`cel-netas${netas >= 0 ? '' : ' cel-netas-neg'}`}>
-        <span className="cel-netas-ico"><ChipToken size="hero" /></span>
+        <span className="cel-netas-ico">
+          <ChipToken size="hero" />
+          {/* CEL-2e · la capa de luz de la moneda. Va en un nodo PROPIO y no en
+              pseudos de `.cel-netas-ico` por una razón medida: recortar el
+              brillo al disco pide `overflow: hidden`, y puesto en el envoltorio
+              recortaría también la sombra del ChipToken, que sobresale 2 px.
+              Con capa propia, el recorte alcanza sólo a la luz. */}
+          <span className="cel-moneda-luz" aria-hidden="true" />
+        </span>
         <span className="cel-netas-num">{signo}{valor}</span>
         <span className="cel-netas-word">Heptacoins</span>
       </p>
@@ -175,6 +183,9 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, progreso = 1 }) {
     </div>
   )
 }
+
+// CEL-2e · lo que dura el aviso "Próximamente" si nadie lo toca otra vez.
+const AVISO_MS = 3000
 
 // ── CEL-1 · La pantalla de victoria de mesa ─────────────────────────────────
 // Rector: lámina CEL-1, validada por Victor. Cinco piezas en columna sobre el
@@ -201,6 +212,45 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onL
   // entrar en GAME_OVER: aquí no se dispara nada, se ESPERA a que termine.
   const { fase, progreso, melodia, oculta, quietud } = useCoreografia({ precedente, netas, saldo })
 
+  // ── CEL-2e · "Próximamente", bajo demanda ─────────────────────────────────
+  // El control del ranking deja de nacer deshabilitado y con pastilla: ahora se
+  // pulsa y contesta. El aviso se retira solo a los 3 s, o antes con un segundo
+  // toque, y NUNCA navega a ningún sitio.
+  const [aviso, setAviso] = useState(false)
+  const avisoTimer = useRef(0)
+  const alternaAviso = useCallback(() => {
+    clearTimeout(avisoTimer.current)
+    setAviso(v => {
+      if (v) return false                 // segundo toque: se va antes de los 3 s
+      avisoTimer.current = setTimeout(() => setAviso(false), AVISO_MS)
+      return true
+    })
+  }, [])
+  useEffect(() => () => clearTimeout(avisoTimer.current), [])
+
+  // ── CEL-2e · El brillo de la moneda, en armonía con el del nombre ─────────
+  // El período NO se escribe aquí: se LEE del EMB-1 vivo. El resplandor del
+  // rótulo se calibra con `--brillo-recorrido` y `--brillo-pausa` en
+  // `embellecimiento.css`, y el día que Victor los mueva, la moneda tiene que
+  // seguirle sin que nadie se acuerde de tocar esta hoja. Copiar el 4s aquí
+  // sería una segunda fuente de verdad que envejece a la primera recalibración.
+  // El desfase es medio ciclo: el rótulo brilla, y a mitad de su reposo brilla
+  // la moneda. Nunca a la vez.
+  const pantallaRef = useRef(null)
+  const tituloRef = useRef(null)
+  useLayoutEffect(() => {
+    const t = tituloRef.current
+    const p = pantallaRef.current
+    if (!t || !p) return
+    // `animationDuration` del <h1> es el ciclo resuelto de EMB-1 ("4s"). Con
+    // movimiento reducido EMB-1 se apaga y esto vale 0: entonces no se toca
+    // nada y manda el valor de reserva de la hoja, que además está parado.
+    const ciclo = parseFloat(getComputedStyle(t).animationDuration)
+    if (!Number.isFinite(ciclo) || ciclo <= 0) return
+    p.style.setProperty('--cel-moneda-ciclo', `${ciclo}s`)
+    p.style.setProperty('--cel-moneda-desfase', `${ciclo / 2}s`)
+  }, [])
+
   return (
     // `data-fase` es el único mando de la coreografía visual: la hoja apaga el
     // resplandor y esconde la frase mientras dice `sobria`, y los enciende sin
@@ -208,7 +258,7 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onL
     // un atributo y no por seis clases sueltas es lo que hace que el arnés
     // pueda medir la secuencia — y que no exista un estado visual que el DOM no
     // declare.
-    <div className="cel-screen" data-fase={fase} data-melodia={melodia ?? ''}>
+    <div className="cel-screen" data-fase={fase} data-melodia={melodia ?? ''} ref={pantallaRef}>
       {/* La lluvia va DENTRO de la columna y detrás de ella (`z-index`), y
           nace en `fiesta`. Sigue montada en `calma` porque ahí ya no emite pero
           las monedas del aire tienen que terminar de caer.
@@ -221,23 +271,34 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onL
           de selectores de embellecimiento.css §2, no en una copia del efecto.
           `aria-label` porque el wordmark es un símbolo más "ILEI": sin él, la
           marca se vuelve invisible para quien no ve (IDN-1). */}
-      <h1 className="cel-ajilei" aria-label="AJILEI"><Wordmark /></h1>
+      <h1 className="cel-ajilei" aria-label="AJILEI" ref={tituloRef}><Wordmark /></h1>
 
       <p className="cel-frase">{frase}</p>
 
       <TarjetaResumen sesion={sesion} netas={netas} saldo={saldo} puntos={puntos} progreso={progreso} />
 
-      <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
+      {/* CEL-2e · Los dos controles, en un grupo propio. En escritorio y en
+          móvil vertical el grupo es una columna con el MISMO hueco que la
+          pantalla (`gap: inherit`), así que apilados se ven exactamente como
+          antes; en móvil horizontal el grupo se vuelve fila y los pone lado a
+          lado. Que exista el grupo es lo que permite las dos cosas sin dos
+          árboles distintos.
+          El grupo es también el bloque contenedor del aviso, que va fuera de
+          flujo: al aparecer no desplaza ni un píxel. */}
+      <div className="cel-acciones">
+        <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
 
-      {/* `disabled` REAL y no un `pointer-events: none`: así no recibe foco, no
-          se pulsa con teclado y el lector de pantalla lo anuncia. Mismo
-          tratamiento que las entradas inertes del menú de utilidades. Es
-          <button> y no <a> a propósito — `disabled` no existe en un enlace, y un
-          <a> sin href tampoco es un control. No navega a ningún sitio. */}
-      <button type="button" className="cel-ranking" disabled aria-disabled="true">
-        Ver tu nuevo ranking
-        <span className="soon-tag">Próximamente</span>
-      </button>
+        {/* Ya no nace deshabilitado ni lleva pastilla: es un control de verdad,
+            secundario (borde de marca, fondo transparente, texto oro). Sigue
+            siendo <button> y sigue sin `href` — no navega a ningún sitio, y
+            eso es puerta del arnés. */}
+        <SoundButton className="btn cel-ranking" onClick={alternaAviso}>Ver tu nuevo ranking</SoundButton>
+
+        {/* La región viva se monta SIEMPRE y lo que cambia es su texto. Un
+            `aria-live` que nace junto con su contenido no se anuncia: el lector
+            necesita la región presente para notar el cambio. */}
+        <span className="cel-aviso" role="status" aria-live="polite">{aviso ? 'Próximamente' : ''}</span>
+      </div>
     </div>
   )
 }

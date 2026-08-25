@@ -1494,10 +1494,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // AJ-1 · AJILEI + "Mano #N" — fuente ÚNICA, montada en la cabecera o dentro de
   // .table-mid según brandInMid. El markup es idéntico en ambos sitios: solo cambia
   // el padre, que es lo que decide contra qué caja se centran.
-  function renderBrand() {
+  // CEL-2e · `conMarca` lo apaga en la pantalla de victoria. El rótulo de mano
+  // se queda —es información de la partida, no adorno—; lo que se va es el
+  // wordmark pequeño de la esquina, que en una pantalla que ya enseña AJILEI en
+  // grande lo dice dos veces.
+  function renderBrand(conMarca = true) {
     return (
       <>
-        <h1 className="table-title" aria-label="AJILEI"><Wordmark /></h1>
+        {conMarca && <h1 className="table-title" aria-label="AJILEI"><Wordmark /></h1>}
         <div className="header-center">
           <span className="hand-badge" style={{ visibility: game.handCount > 0 ? 'visible' : 'hidden' }}>
             Mano #{game.handCount > 0 ? game.handCount : '—'}
@@ -1628,7 +1632,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
         <header className="table-header">
           {/* AJ-1 · en landscape mesa 5 este bloque se monta dentro de .table-mid
               (ver brandInMid); en cualquier otro caso vive aquí, como siempre. */}
-          {!brandInMid && renderBrand()}
+          {!brandInMid && renderBrand(!isGameOver)}
           <div className="header-right">
             {/* DSK-U1 · escritorio: la bocina se muda DENTRO del menú y su caja
                 pasa a ser el disparador ⋮.
@@ -1638,7 +1642,16 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
                 gameTable.css (flujo en la cabecera, absoluto al flanco del óvalo
                 en mesas 5/4 horizontales, 32×28 en mesa 2 horizontal) le siguen
                 aplicando sin tocar esa hoja, que es protegida. */}
-            <UtilitiesTrigger open={utilMenu.open} onToggle={utilMenu.toggle} registerTrigger={utilMenu.registerTrigger} />
+            {/* CEL-2e · el ⋮ no se monta en la pantalla de victoria. No se
+                oculta con CSS: se QUITA del árbol, que es la única forma de que
+                tampoco sea enfocable con el teclado. Lo que había dentro
+                —reacciones, tapetes, consultas— no tiene sentido sobre una mesa
+                que ya terminó, y las burbujas seguían vetadas desde CEL-1.
+                Sólo en GAME_OVER: durante el juego, la cabecera es la de
+                siempre, y eso lo prueba el control negativo del arnés. */}
+            {!isGameOver && (
+              <UtilitiesTrigger open={utilMenu.open} onToggle={utilMenu.toggle} registerTrigger={utilMenu.registerTrigger} />
+            )}
             <SoundButton className="btn-leave" onClick={() => setConfirmLeave(true)} title="Abandonar mesa">✕</SoundButton>
           </div>
         </header>
