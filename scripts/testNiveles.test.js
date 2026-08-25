@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  NIVELES, NIVEL_POR_DEFECTO, NIVEL_KEY, nivelPorId, apuestasDe,
+  NIVELES, NIVEL_POR_DEFECTO, NIVEL_KEY, nivelPorId, apuestasDe, puntosDe,
 } from '../src/config/niveles.js'
 import {
   esNivelValido, normalizarNivel, preseleccion, conNivel,
@@ -172,5 +172,42 @@ describe('5. Pasajero nivelIA', () => {
     for (const monto of apuestasDe('pro')) {
       expect(conNivel(createInitialState(monto, 5), 'pro').unit).toBe(monto)
     }
+  })
+})
+
+// ── 5. CEL-1 · Puntos de ranking por nivel ───────────────────────────────────
+// La tabla PLANA de `Modos_y_Asistencia_v1.0.md` §6.1, escrita a mano por la
+// misma razón que los doce montos de arriba: un test que la derive del módulo
+// no sella nada.
+describe('5. Puntos de ranking vs IA (§6.1)', () => {
+  it('la tabla sellada: Básico 1 · Avanzado 2 · Pro 3', () => {
+    expect(puntosDe('basico')).toBe(1)
+    expect(puntosDe('avanzado')).toBe(2)
+    expect(puntosDe('pro')).toBe(3)
+  })
+
+  it('es PLANA: no depende del tamaño de la mesa', () => {
+    // §6.1: "ganarle a cuatro IAs de Básico da lo mismo que ganarle a una".
+    // La función no recibe N y no puede, por construcción, mirarlo.
+    expect(puntosDe.length).toBe(1)
+  })
+
+  it('un id desconocido cae al nivel por defecto, jamás a undefined', () => {
+    for (const basura of [null, undefined, '', 'leyenda', 42]) {
+      expect(puntosDe(basura)).toBe(puntosDe(NIVEL_POR_DEFECTO))
+    }
+  })
+
+  it('los tres niveles declaran sus puntos, sin huecos', () => {
+    for (const n of NIVELES) expect(Number.isInteger(n.puntos)).toBe(true)
+  })
+
+  it('el cálculo de la pantalla: manos ganadas × puntos del nivel', () => {
+    // Lo que pinta "Puntos obtenidos" en la tarjeta de victoria.
+    const puntos = (ganadas, nivel) => ganadas * puntosDe(nivel)
+    expect(puntos(0, 'basico')).toBe(0)
+    expect(puntos(7, 'basico')).toBe(7)
+    expect(puntos(7, 'avanzado')).toBe(14)
+    expect(puntos(7, 'pro')).toBe(21)
   })
 })
