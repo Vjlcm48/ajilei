@@ -132,7 +132,7 @@ function sondaCajas({ sels, tokens }) {
 // ── Ruta con el molde puesto ────────────────────────────────────────────────
 // `?cel` viaja en la URL de entrada; la app es SPA y no navega, así que el
 // parámetro sigue ahí cuando GameTable monta y siembra su estado inicial.
-async function alaVictoria(page, mesa, semilla = '') {
+async function alaVictoria(page, mesa, semilla = '', opciones = {}) {
   await page.goto(`${BASE}/?cel${semilla}`, { waitUntil: 'networkidle' })
   await page.click('button:has-text("Jugar vs IA")')
   await page.waitForSelector('.nivel-grid button')
@@ -149,6 +149,15 @@ async function alaVictoria(page, mesa, semilla = '') {
   // dos porque su trabajo es llegar al final de la mesa, no juzgar cuál salió —
   // eso lo hace cada modo con sus puertas.
   await page.waitForSelector('.cel-screen, .game-over-screen', { timeout: 15000 })
+  // CEL-2 · la pantalla de victoria ya NO está quieta cuando aparece: arranca
+  // sobria y llega al reposo unos cinco segundos después. Todo lo que mide
+  // CAJAS —las puertas de CEL-1, el barrido de frases, el modo `diagnostico`—
+  // tiene que esperar a que se pare, o mediría un fotograma del arco.
+  // Quien quiera medir el arco EN MARCHA pasa `{ reposo: false }`, que es lo que
+  // hace la sección CEL-2 de este mismo archivo.
+  if (opciones.reposo !== false && await page.locator('.cel-screen').count() > 0) {
+    await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 20000 })
+  }
   await page.evaluate(() => Promise.all(
     document.getAnimations()
       .filter(a => a.effect && a.effect.getComputedTiming().iterations !== Infinity)
@@ -307,6 +316,378 @@ async function puertaReacciones(page) {
   return { ...estado, ...montado }
 }
 
+// ── CEL-2 · EL ARCO ─────────────────────────────────────────────────────────
+// Lo que esta sección mide no son cajas, son INSTANTES, y un instante no se
+// fotografía: cuando la captura llega, ya pasó. Así que se mide de dos maneras
+// a la vez y se cruzan:
+//   · desde DENTRO, con las marcas que el arco publica en `window.__AJILEI_ARCO`
+//     (dev-only, `src/dev/arcoCEL.js`) — dan el reloj exacto de cada tiempo;
+//   · desde FUERA, con observadores de DOM sobre `data-fase` y sobre los nodos
+//     de la lluvia — dan lo que de verdad se pintó.
+// Si las dos discreparan, una de las dos miente y eso también es un hallazgo.
+
+// Los siete nombres, escritos otra vez a propósito: si alguien renombra un asset
+// y actualiza el config, el arnés tiene que DISCREPAR, no seguirle.
+const MELODIAS_CEL = [
+  'celebracion-gaita-01', 'celebracion-joropo-01', 'celebracion-latinjazz-01',
+  'celebracion-percusion-01', 'celebracion-solemne-01',
+  'celebracion-brillante-01', 'celebracion-fiesta-01',
+]
+const GOTAS_TECHO = 18      // lámina CEL-2
+const TOC_MS = 1896         // duración medida de table-knock.mp3 (mapa de audio, CEL-0)
+
+// Observadores, instalados en cuanto la pantalla monta y antes de que reviente.
+function instalaSondaArco() {
+  const s = document.querySelector('.cel-screen')
+  if (!s) return false
+  const t0 = performance.now()
+  const ahora = () => Math.round(performance.now() - t0)
+  const reg = {
+    t0, fases: [{ fase: s.dataset.fase, t: 0 }],
+    nacidas: [], vivasMax: 0, cuadros: [], errores: [],
+  }
+  window.__CEL2 = reg
+
+  new MutationObserver(() => {
+    const f = s.dataset.fase
+    if (reg.fases[reg.fases.length - 1].fase !== f) reg.fases.push({ fase: f, t: ahora() })
+  }).observe(s, { attributes: true, attributeFilter: ['data-fase'] })
+
+  // Nacimientos de monedas. Se observa el SUBÁRBOL de la pantalla porque la capa
+  // de lluvia todavía no existe: nace con la fiesta.
+  //
+  // Y se cuentan también las monedas que llegan DENTRO del nodo añadido, no sólo
+  // las que se añaden sueltas. La primera corrida enseñó por qué: la capa se
+  // monta ya con su primera moneda dentro, así que `addedNodes` traía la CAPA y
+  // la moneda no se contaba — el informe decía 15 nacidas y 16 vivas a la vez,
+  // que es imposible. La contradicción es lo que delató el fallo de la sonda.
+  new MutationObserver(muts => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue
+        if (n.classList.contains('cel-gota')) { reg.nacidas.push(ahora()); continue }
+        const dentro = n.querySelectorAll ? n.querySelectorAll('.cel-gota').length : 0
+        for (let k = 0; k < dentro; k++) reg.nacidas.push(ahora())
+      }
+    }
+  }).observe(s, { childList: true, subtree: true })
+
+  // Vivas y cuadros, en el mismo rAF: el techo de 18 hay que cazarlo en vuelo, y
+  // el ritmo de cuadros es la medida que decide nodos contra canvas.
+  let ultimo = performance.now()
+  const tick = () => {
+    const t = performance.now()
+    const vivas = document.querySelectorAll('.cel-gota').length
+    if (vivas > reg.vivasMax) reg.vivasMax = vivas
+    if (vivas > 0) reg.cuadros.push(Math.round((t - ultimo) * 100) / 100)
+    ultimo = t
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+  return true
+}
+
+// Una foto del estado visible: los dos mandos del resplandor, la frase, las
+// cifras y cuántas monedas hay en el aire.
+function miraArco() {
+  const s = document.querySelector('.cel-screen')
+  const h1 = document.querySelector('h1.cel-ajilei')
+  const fr = document.querySelector('.cel-frase')
+  const dd = (rotulo) => {
+    for (const d of document.querySelectorAll('.cel-detalle > div')) {
+      const t = d.querySelector('dt')
+      if (t && t.textContent.trim() === rotulo) return d.querySelector('dd')?.textContent?.trim() ?? null
+    }
+    return null
+  }
+  const cs = h1 ? getComputedStyle(h1) : null
+  const capa = document.querySelector('.cel-lluvia')
+  const tarjeta = document.querySelector('.cel-tarjeta')
+  return {
+    fase: s?.dataset.fase ?? null,
+    melodia: s?.dataset.melodia ?? null,
+    // El resplandor de EMB-1 se apaga con estos dos mandos y con ningún otro.
+    bandaFrac: cs ? cs.getPropertyValue('--brillo-banda-frac').trim() : null,
+    animacion: cs ? cs.animationPlayState : null,
+    fraseOpacidad: fr ? getComputedStyle(fr).opacity : null,
+    saldo: dd('Saldo actual'),
+    netas: document.querySelector('.cel-netas-num')?.textContent?.trim() ?? null,
+    gotas: document.querySelectorAll('.cel-gota').length,
+    // El orden de pintado de la lluvia, medido por el MECANISMO que lo decide:
+    // dos hermanos posicionados en el mismo contexto de apilamiento se pintan
+    // por `z-index`. `elementFromPoint` no sirve aquí — la capa lleva
+    // `pointer-events: none` y el navegador la salta, así que devolvería la
+    // tarjeta aunque la lluvia estuviera delante.
+    z: capa && tarjeta ? {
+      capaPos: getComputedStyle(capa).position,
+      capaZ: getComputedStyle(capa).zIndex,
+      capaEventos: getComputedStyle(capa).pointerEvents,
+      tarjetaPos: getComputedStyle(tarjeta).position,
+      tarjetaZ: getComputedStyle(tarjeta).zIndex,
+    } : null,
+  }
+}
+
+function cosechaArco() {
+  const r = window.__CEL2 || {}
+  const c = (r.cuadros || []).slice().sort((a, b) => a - b)
+  const pct = (p) => (c.length ? c[Math.min(c.length - 1, Math.floor(c.length * p))] : null)
+  return {
+    fases: r.fases || [],
+    nacidas: r.nacidas || [],
+    vivasMax: r.vivasMax || 0,
+    cuadros: { n: c.length, p50: pct(0.5), p95: pct(0.95), peor: c.length ? c[c.length - 1] : null },
+    marcas: (window.__AJILEI_ARCO || []).slice(),
+  }
+}
+
+// Devuelve el instante de una marca del arco (la primera con ese nombre).
+const marcaDe = (marcas, nombre) => marcas.find(m => m.marca === nombre) ?? null
+
+async function arcoDeUnaCelda(browser, celda, fallos, opciones = {}) {
+  const { id, w, h, mesa = 5, capturas = false } = celda
+  const ctx = await browser.newContext({
+    viewport: { width: w, height: h },
+    deviceScaleFactor: 2,
+    ...(opciones.reducido ? { reducedMotion: 'reduce' } : {}),
+  })
+  if (opciones.mudo) {
+    await ctx.addInitScript(() => { try { window.localStorage.setItem('ajilei.sound', 'off') } catch { /* sin storage */ } })
+  }
+  const page = await ctx.newPage()
+  page.on('pageerror', e => fallos.push(`${id}: ${e}`))
+  // Las peticiones de melodía, que son la prueba INDEPENDIENTE del audio: las
+  // marcas del arco dicen "la mandé sonar", y esto dice si el archivo llegó de
+  // verdad. Un nombre mal escrito da 404 aquí y una victoria muda allí, sin un
+  // solo error en pantalla.
+  const pedidos = []
+  page.on('response', r => {
+    const u = r.url()
+    if (u.includes('/sounds/celebracion-')) pedidos.push({ archivo: u.split('/').pop(), http: r.status() })
+  })
+  const salida = { id, w, h, fotos: {}, pedidos }
+  try {
+    // SIN esperar al reposo: aquí se viene a ver el arco correr.
+    await alaVictoria(page, mesa, '', { reposo: false })
+    await page.evaluate(instalaSondaArco)
+    salida.fotos.sobria = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/arco-1sobria-${id}.png` })
+
+    if (opciones.rapido) {
+      // Con movimiento reducido la fiesta y la calma duran un cuadro cada una:
+      // esperarlas con `waitForSelector` sería pedirle al arnés que fotografíe
+      // un parpadeo. El ORDEN de los cuatro tiempos lo cuenta igual el
+      // observador de mutaciones, que no se pierde ninguna.
+      await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 15000 })
+      await page.waitForTimeout(150)
+      salida.fotos.reposo = await page.evaluate(miraArco)
+      Object.assign(salida, await page.evaluate(cosechaArco))
+      await ctx.close()
+      return salida
+    }
+    await page.waitForSelector('.cel-screen[data-fase="fiesta"]', { timeout: 10000 })
+    await page.waitForTimeout(350)
+    salida.fotos.fiesta = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/arco-2revienta-${id}.png` })
+
+    // Y otra a mitad de fiesta: la de arriba es el ESTALLIDO —tres o cuatro
+    // monedas recién nacidas— y la densidad de la lluvia sólo se juzga en
+    // régimen, con las catorce o quince en el aire.
+    if (capturas) {
+      await page.waitForTimeout(750)
+      salida.fotos.plena = await page.evaluate(miraArco)
+      await page.screenshot({ path: `${OUT}/arco-2b-fiesta-plena-${id}.png` })
+    }
+
+    await page.waitForSelector('.cel-screen[data-fase="calma"]', { timeout: 10000 })
+    salida.fotos.calma = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/arco-3calma-${id}.png` })
+
+    await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 10000 })
+    await page.waitForTimeout(150)
+    salida.fotos.reposo = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/arco-4reposo-${id}.png` })
+
+    Object.assign(salida, await page.evaluate(cosechaArco))
+  } catch (e) { fallos.push(`${id}: ${e.message}`) }
+  await ctx.close()
+  return salida
+}
+
+// Las puertas sobre una celda ya corrida. Se separan de la corrida para poder
+// aplicarles matices por modo (mudo, movimiento reducido) sin duplicar nada.
+function juzgaArco(a, fallos, opciones = {}) {
+  const { id, fotos = {}, fases = [], marcas = [] } = a
+  const orden = fases.map(f => f.fase)
+
+  // 1 · EL ORDEN. Los cuatro tiempos, en su sitio y sin saltarse ninguno.
+  if (orden.join('>') !== 'sobria>fiesta>calma>reposo') {
+    fallos.push(`${id}: el arco fue ${orden.join(' > ')} y debe ser sobria > fiesta > calma > reposo`)
+  }
+
+  // 2 · EL ENCADENADO. Que la fiesta empiece cuando el toc-toc TERMINA, y que
+  // lo haya hecho por el evento `end` y no por el temporizador-red: si mandara
+  // la red, el retraso sería el de la espera declarada (duración + margen), y
+  // aquí se exige que llegue ANTES de ese margen.
+  const ancla = marcaDe(marcas, 'ancla')
+  const revienta = marcaDe(marcas, 'revienta')
+  const suena = marcaDe(marcas, 'melodia-suena')
+  if (!ancla || !revienta) {
+    fallos.push(`${id}: faltan marcas del arco (ancla=${!!ancla}, revienta=${!!revienta})`)
+  } else {
+    const espera = revienta.t - ancla.t
+    a.esperaMedida = espera
+    if (opciones.mudo) {
+      if (ancla.encadenado !== false) fallos.push(`${id}: con el sonido apagado no debe haber encadenado`)
+      if (Math.abs(espera - TOC_MS) > 250) fallos.push(`${id}: sin sonido el arco esperó ${espera} ms y el reloj nominal es ${TOC_MS}`)
+    } else {
+      if (ancla.encadenado !== true) fallos.push(`${id}: la fiesta NO se encadenó al toc-toc (encadenado=${ancla.encadenado})`)
+      if (espera < TOC_MS - 250) fallos.push(`${id}: la fiesta reventó a los ${espera} ms, ANTES de que acabara el toc-toc (${TOC_MS} ms)`)
+      if (espera >= ancla.espera - 60) fallos.push(`${id}: mandó el temporizador-red (${espera} ms de ${ancla.espera}), no el 'end' de Howler`)
+      // 3 · Y la melodía, después. Jamás encima del toc-toc.
+      if (!suena) fallos.push(`${id}: la melodía no llegó a sonar`)
+      else if (suena.t < revienta.t) fallos.push(`${id}: la melodía sonó ${revienta.t - suena.t} ms ANTES del estallido`)
+    }
+  }
+
+  // 4 · LA MELODÍA es una de las siete (o ninguna, con el sonido apagado), y el
+  // archivo LLEGÓ. Lo segundo no se deduce de lo primero: el nombre puede estar
+  // en la bolsa y el asset no estar en disco, y eso en pantalla es silencio.
+  const mel = fotos.reposo?.melodia ?? ''
+  const pedidos = a.pedidos || []
+  if (opciones.mudo) {
+    if (mel !== '') fallos.push(`${id}: con el sonido apagado no debe cargarse melodía y hay "${mel}"`)
+    // Y no se descarga NADA: la carga perezosa tiene que ahorrarse los ~380 KB
+    // enteros cuando no hay nada que oír.
+    if (pedidos.length) fallos.push(`${id}: con el sonido apagado se pidieron ${pedidos.length} melodías (${pedidos.map(x => x.archivo).join(', ')})`)
+  } else {
+    if (!MELODIAS_CEL.includes(mel)) fallos.push(`${id}: la melodía "${mel}" no es una de las siete de CEL-A`)
+    const suya = pedidos.filter(x => x.archivo.startsWith(`${mel}.`))
+    if (!suya.length) fallos.push(`${id}: la melodía "${mel}" no se llegó a pedir`)
+    else if (!suya.some(x => x.http === 200 || x.http === 206)) {
+      fallos.push(`${id}: la melodía "${mel}" respondió ${suya.map(x => x.http).join('/')}`)
+    }
+    // Y sólo la suya: pedir las siete sería tirar 2,6 MB por una que suena.
+    const ajenas = pedidos.filter(x => !x.archivo.startsWith(`${mel}.`))
+    if (ajenas.length) fallos.push(`${id}: se pidieron melodías que no tocaban (${ajenas.map(x => x.archivo).join(', ')})`)
+  }
+
+  // 5 · EL RESPLANDOR. Apagado y PARADO en la entrada; encendido y corriendo en
+  // la fiesta. Con movimiento reducido, EMB-1 lo apaga por su cuenta y esta
+  // puerta no aplica (la banda vale 0 siempre, que es lo correcto).
+  if (!opciones.reducido) {
+    if (fotos.sobria?.bandaFrac !== '0') fallos.push(`${id}: AJILEI entra con resplandor (banda ${fotos.sobria?.bandaFrac})`)
+    if (fotos.sobria?.animacion !== 'paused') fallos.push(`${id}: el barrido del rótulo corre en la entrada sobria (${fotos.sobria?.animacion})`)
+    if (fotos.fiesta?.bandaFrac === '0') fallos.push(`${id}: el resplandor no se encendió en la fiesta`)
+    if (fotos.fiesta?.animacion !== 'running') fallos.push(`${id}: el barrido no arrancó en la fiesta (${fotos.fiesta?.animacion})`)
+  }
+
+  // 6 · LA FRASE aparece con el estallido y no antes.
+  if (Number(fotos.sobria?.fraseOpacidad) !== 0) fallos.push(`${id}: la frase se ve en la entrada sobria (opacidad ${fotos.sobria?.fraseOpacidad})`)
+  if (Number(fotos.reposo?.fraseOpacidad) !== 1) fallos.push(`${id}: la frase no acabó visible (opacidad ${fotos.reposo?.fraseOpacidad})`)
+
+  // 7 · LOS CONTADORES. Empiezan en 0 y aterrizan en los valores VERDADEROS.
+  // Con movimiento reducido no cuentan: llegan puestos, que es lo pedido.
+  if (opciones.reducido) {
+    if (fotos.sobria?.saldo !== String(SALDO_INICIAL)) fallos.push(`${id}: con movimiento reducido el saldo debe estar puesto desde el principio, y vale ${fotos.sobria?.saldo}`)
+  } else if (fotos.sobria?.saldo !== '0') {
+    fallos.push(`${id}: el saldo no arranca en 0 (${fotos.sobria?.saldo})`)
+  }
+  if (fotos.reposo?.saldo !== String(SALDO_INICIAL)) fallos.push(`${id}: el saldo no aterrizó en ${SALDO_INICIAL} (${fotos.reposo?.saldo})`)
+  const netasFin = Number.parseInt(String(fotos.reposo?.netas).replace('+', ''), 10)
+  if (String(fotos.reposo?.saldo) !== String(SALDO_INICIAL + netasFin)) {
+    fallos.push(`${id}: al terminar, saldo ${fotos.reposo?.saldo} no cuadra con netas ${fotos.reposo?.netas}`)
+  }
+
+  // 8 · LA LLUVIA.
+  const calma = fases.find(f => f.fase === 'calma')
+  const trasCalma = calma ? a.nacidas.filter(t => t > calma.t + 40).length : 0
+  a.nacidasTrasCalma = trasCalma
+  if (opciones.reducido) {
+    if (a.vivasMax !== 0 || a.nacidas.length !== 0) fallos.push(`${id}: con movimiento reducido NO debe llover, y nacieron ${a.nacidas.length}`)
+  } else {
+    if (!a.nacidas.length) fallos.push(`${id}: no llovió ni una moneda`)
+    if (a.vivasMax > GOTAS_TECHO) fallos.push(`${id}: hubo ${a.vivasMax} monedas vivas y el techo es ${GOTAS_TECHO}`)
+    if (trasCalma > 0) fallos.push(`${id}: nacieron ${trasCalma} monedas DESPUÉS de la calma`)
+    if (fotos.reposo?.gotas !== 0) fallos.push(`${id}: quedan ${fotos.reposo?.gotas} monedas en el reposo`)
+    const z = fotos.fiesta?.z
+    if (!z) fallos.push(`${id}: no se pudo medir el orden de pintado de la lluvia`)
+    else if (!(z.capaZ === '0' && z.tarjetaZ === '1' && z.capaPos === 'absolute' && z.tarjetaPos !== 'static')) {
+      fallos.push(`${id}: la lluvia no está detrás de la tarjeta (${JSON.stringify(z)})`)
+    } else if (z.capaEventos !== 'none') {
+      fallos.push(`${id}: la capa de lluvia recoge eventos y taparía el botón de salir`)
+    }
+  }
+}
+
+// ── La puerta del sorteo de melodías ────────────────────────────────────────
+// Cinco victorias seguidas EN LA MISMA pestaña: la memoria vive en
+// localStorage, así que sólo encadenando corridas se prueba que no repite.
+async function puertaMelodias(browser, fallos) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const page = await ctx.newPage()
+  const vistas = []
+  try {
+    for (let k = 0; k < 5; k++) {
+      // Basta con que la pantalla monte: la pieza se sortea al montar y viaja en
+      // el atributo. No hace falta esperar a que suene para saber cuál es.
+      await alaVictoria(page, 5, '', { reposo: false })
+      vistas.push(await page.getAttribute('.cel-screen', 'data-melodia'))
+    }
+  } catch (e) { fallos.push(`melodias: ${e.message}`) }
+  await ctx.close()
+  vistas.forEach((m, i) => {
+    if (!MELODIAS_CEL.includes(m)) fallos.push(`melodias: la corrida ${i + 1} sonó "${m}", que no es de la bolsa`)
+    if (i > 0 && m === vistas[i - 1]) fallos.push(`melodias: la corrida ${i + 1} REPITIÓ "${m}"`)
+  })
+  return vistas
+}
+
+// ── La puerta del salto por toque ───────────────────────────────────────────
+async function puertaSalto(browser, fallos) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const page = await ctx.newPage()
+  const r = { medio: null, tras: null, salida: null }
+  try {
+    await alaVictoria(page, 5, '', { reposo: false })
+    await page.evaluate(instalaSondaArco)
+    await page.waitForSelector('.cel-screen[data-fase="fiesta"]', { timeout: 10000 })
+    // A MITAD del conteo: ni recién empezado ni ya aterrizado.
+    await page.waitForTimeout(400)
+    r.medio = await page.evaluate(miraArco)
+    // El toque, lejos de cualquier control: lo que corta es el `pointerdown` en
+    // captura sobre el documento, no un clic sobre un botón.
+    await page.mouse.click(8, 400)
+    await page.waitForTimeout(150)
+    r.tras = await page.evaluate(miraArco)
+    r.cosecha = await page.evaluate(cosechaArco)
+    // Y el botón de salir responde, que es la promesa que acompaña al salto.
+    await page.click('.cel-screen .btn-primary')
+    await page.waitForSelector('.mode-select-card', { timeout: 5000 })
+    r.salida = true
+  } catch (e) { fallos.push(`salto: ${e.message}`); r.salida = false }
+  await ctx.close()
+
+  if (r.medio && Number(r.medio.saldo) >= SALDO_INICIAL) {
+    fallos.push(`salto: el conteo ya había terminado al tocar (saldo ${r.medio.saldo}); la puerta no probó nada`)
+  }
+  if (r.tras) {
+    if (r.tras.saldo !== String(SALDO_INICIAL)) fallos.push(`salto: el saldo no saltó a ${SALDO_INICIAL} (${r.tras.saldo})`)
+    if (!['calma', 'reposo'].includes(r.tras.fase)) fallos.push(`salto: tras el toque la fase es ${r.tras.fase}`)
+  }
+  if (r.cosecha) {
+    const salto = marcaDe(r.cosecha.marcas, 'salto')
+    const calma = r.cosecha.fases.find(f => f.fase === 'calma')
+    if (!salto) fallos.push('salto: el arco no registró el toque')
+    if (calma) {
+      const nuevas = r.cosecha.nacidas.filter(t => t > calma.t + 40).length
+      if (nuevas > 0) fallos.push(`salto: siguieron naciendo ${nuevas} monedas tras el toque`)
+    }
+  }
+  if (r.salida !== true) fallos.push('salto: el botón de salir NO respondió tras el toque')
+  return r
+}
+
 async function modoCelebracion(browser) {
   if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true })
   const CELDAS_CEL = [
@@ -327,9 +708,9 @@ async function modoCelebracion(browser) {
       try {
         await alaVictoria(page, mesa)
         await page.waitForSelector('.cel-screen', { timeout: 10000 })
-        // El conteo de VC2 sube durante 1,4 s: se le deja aterrizar para medir
-        // la cifra quieta y no a mitad de camino.
-        await page.waitForTimeout(1700)
+        // CEL-2 · la espera fija de 1,7 s que había aquí desapareció: ahora es
+        // `alaVictoria` quien deja la pantalla EN REPOSO antes de devolver, y
+        // esperar a un estado declarado siempre le gana a esperar un rato.
         const d = await page.evaluate(sondaPantalla)
         const piel = pielDe(c.w, c.h)
         d.piel = piel
@@ -438,6 +819,35 @@ async function modoCelebracion(browser) {
   inf.control = await controlNegativo(browser)
   if (inf.control.termina !== false || inf.control.error) fallos.push(`control negativo ROJO: ${JSON.stringify(inf.control)}`)
 
+  // ── CEL-2 · El arco, celda por celda ──────────────────────────────────────
+  inf.arco = {}
+  for (const c of [
+    { id: 'escritorio-1920x1080', w: 1920, h: 1080, capturas: true },
+    { id: 'movil-360x640',        w: 360,  h: 640,  capturas: true },
+    { id: 'movil-640x360',        w: 640,  h: 360,  capturas: true },
+    // La celda de CUADROS va sin capturas a propósito: `page.screenshot`
+    // congela el hilo de render y en la primera corrida metió un cuadro de
+    // 390 ms en la celda de 1920 — un pico del arnés, no de la lluvia. Ésta es
+    // la medida limpia, y en el móvil de referencia, que es donde la decisión
+    // nodos-contra-canvas se juega de verdad.
+    { id: 'cuadros-360x640',      w: 360,  h: 640 },
+  ]) {
+    const a = await arcoDeUnaCelda(browser, c, fallos)
+    juzgaArco(a, fallos)
+    inf.arco[c.id] = a
+  }
+  // Con el sonido apagado: el arco visual completo, con los mismos tiempos.
+  const mudo = await arcoDeUnaCelda(browser, { id: 'mudo-1280x800', w: 1280, h: 800 }, fallos, { mudo: true })
+  juzgaArco(mudo, fallos, { mudo: true })
+  inf.arco.mudo = mudo
+  // Con movimiento reducido: sin lluvia y con las cifras puestas.
+  const reducido = await arcoDeUnaCelda(browser, { id: 'reducido-1280x800', w: 1280, h: 800 }, fallos, { reducido: true, rapido: true })
+  juzgaArco(reducido, fallos, { reducido: true })
+  inf.arco.reducido = reducido
+  // Y las dos puertas que necesitan su propia pestaña.
+  inf.melodias = await puertaMelodias(browser, fallos)
+  inf.salto = await puertaSalto(browser, fallos)
+
   writeFileSync(`${OUT}/cel1.json`, JSON.stringify(inf, null, 2))
 
   console.log('-- CEL-1 - cajas contra la lamina --')
@@ -455,6 +865,17 @@ async function modoCelebracion(browser) {
   for (const [id, r] of Object.entries(inf.reacciones)) {
     console.log(`  ${id.padEnd(18)} disabled ${r.disabled} - selector ${r.selector} - burbuja ${r.burbuja}`)
   }
+  console.log('\n-- CEL-2 - el arco, tiempos MEDIDOS (ms desde que monta la pantalla) --')
+  for (const [id, a] of Object.entries(inf.arco)) {
+    const t = Object.fromEntries((a.fases || []).map(f => [f.fase, f.t]))
+    console.log(`  ${id.padEnd(22)} sobria 0 -> fiesta ${t.fiesta ?? '?'} -> calma ${t.calma ?? '?'} -> reposo ${t.reposo ?? '?'}`
+      + ` | espera al toc ${a.esperaMedida ?? '?'} | melodia ${a.fotos?.reposo?.melodia || '(ninguna)'}`)
+    console.log(`  ${''.padEnd(22)} lluvia: ${a.nacidas?.length ?? 0} monedas, ${a.vivasMax ?? 0} vivas como mucho, ${a.nacidasTrasCalma ?? 0} tras la calma`
+      + ` | cuadros p50 ${a.cuadros?.p50 ?? '?'} ms p95 ${a.cuadros?.p95 ?? '?'} ms peor ${a.cuadros?.peor ?? '?'} ms`)
+  }
+  console.log(`\n-- la bolsa de melodias, cinco victorias seguidas --\n  ${(inf.melodias || []).join('\n  ')}`)
+  const sl = inf.salto || {}
+  console.log(`\n-- el salto por toque --\n  saldo a mitad ${sl.medio?.saldo} -> tras el toque ${sl.tras?.saldo} (fase ${sl.tras?.fase}) - boton de salir ${sl.salida ? 'responde' : 'NO responde'}`)
   console.log(`\ncontrol negativo: ${inf.control.termina === false && !inf.control.error ? 'verde' : 'ROJO'}`)
   console.log(`\nFALLOS: ${fallos.length ? '\n  - ' + fallos.join('\n  - ') : 'ninguno'}`)
   console.log(`capturas y cifras en ${OUT}/`)
