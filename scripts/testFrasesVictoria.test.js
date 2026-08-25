@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  FRASES_VICTORIA, FRASE_KEY, eligeIndice, fraseDe, frasePara,
+  FRASES_VICTORIA, FRASE_KEY, eligeIndice, fraseDe, frasePara, recuerdaFrase,
 } from '../src/config/frasesVictoria.js'
 
 describe('1. El banco', () => {
@@ -101,13 +101,39 @@ describe('3. Índice → frase', () => {
 describe('4. La frase forzada del molde (?cel&frase=n)', () => {
   it('el parámetro es 1-based y devuelve exactamente esa frase', () => {
     for (let n = 1; n <= FRASES_VICTORIA.length; n++) {
-      expect(frasePara(n)).toBe(FRASES_VICTORIA[n - 1])
+      expect(frasePara(n).texto).toBe(FRASES_VICTORIA[n - 1])
     }
   })
 
   it('fuera de rango o ausente, sortea del banco', () => {
     for (const n of [0, 9, -3, null, undefined, 2.5]) {
-      expect(FRASES_VICTORIA).toContain(frasePara(n))
+      expect(FRASES_VICTORIA).toContain(frasePara(n).texto)
     }
+  })
+})
+
+describe('5. CEL-2c · Sortear y recordar, separados', () => {
+  // El defecto que esto cierra: el sorteo vivía en un inicializador de
+  // `useState`, que en desarrollo se invoca dos veces, y como escribía la
+  // memoria, la segunda invocación esquivaba a la primera y dejaba recordada
+  // una frase distinta de la mostrada. La siguiente victoria podía repetir la
+  // que el jugador acababa de leer.
+  it('el sorteo devuelve índice Y texto, y cuadran entre sí', () => {
+    for (let k = 0; k < 40; k++) {
+      const f = frasePara(null)
+      expect(Number.isInteger(f.indice)).toBe(true)
+      expect(f.indice).toBeGreaterThanOrEqual(0)
+      expect(f.indice).toBeLessThan(FRASES_VICTORIA.length)
+      expect(f.texto).toBe(fraseDe(f.indice))
+    }
+  })
+
+  it('la frase forzada llega SIN índice: no se recuerda', () => {
+    expect(frasePara(5)).toEqual({ indice: null, texto: FRASES_VICTORIA[4] })
+  })
+
+  it('recordar un índice imposible no hace nada y no revienta', () => {
+    expect(() => recuerdaFrase(null)).not.toThrow()
+    expect(() => recuerdaFrase('tres')).not.toThrow()
   })
 })

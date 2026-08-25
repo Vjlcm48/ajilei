@@ -19,9 +19,10 @@ import {
   FASES, TOC_NOMINAL_MS, ANCLA_TOPE_MS,
   CONTEO_MIN_MS, CONTEO_MAX_MS, CONTEO_PISO, CONTEO_TECHO,
   GOTAS_MAX, EMISION_MS, CAIDA_MIN_MS, CAIDA_MAX_MS, CALMA_MS, FADE_CORTE_MS,
-  LADO_MIN, LADO_MAX,
-  duracionConteo, magnitudConteo, esperaRevienta, perfilGota,
+  LADO_MIN, LADO_MAX, CAIDA_FACTOR, OPACIDAD_MIN, OPACIDAD_MAX, FIESTA_TOPE_MS,
+  duracionConteo, magnitudConteo, esperaRevienta, esperaFinMelodia, perfilGota,
 } from '../src/hooks/coreografiaCore.js'
+import { MELODIA_MS } from '../src/config/melodiasCelebracion.js'
 import { CONTEO_MS } from '../src/hooks/sesionCore.js'
 import { ESPERA_MARGEN_MS, ESPERA_TOPE_MS } from '../src/hooks/celebracionCore.js'
 
@@ -149,6 +150,60 @@ describe('5. La lluvia', () => {
   })
 })
 
+describe('5b. CEL-2c · La caída más lenta y el oro legible', () => {
+  it('el factor es el único mando, y las tres cifras salen de él', () => {
+    expect(CAIDA_FACTOR).toBe(1.4)
+    expect(CAIDA_MIN_MS).toBe(Math.round(1100 * CAIDA_FACTOR))   // 1540
+    expect(CAIDA_MAX_MS).toBe(Math.round(1500 * CAIDA_FACTOR))   // 2100
+    expect(EMISION_MS).toBe(Math.round(90 * CAIDA_FACTOR))       // 126
+  })
+
+  it('la DENSIDAD no cambia: la cadencia escala con la caída', () => {
+    // Ésta es la razón de que la emisión también se multiplique. La densidad de
+    // la lluvia es vida/cadencia; alargando sólo la vida, las monedas vivas
+    // pasarían de ~14 a ~20 y romperían el techo de 18 que la instrucción manda
+    // RESPETAR, no subir. Lo que Victor ve es la misma lluvia, más lenta.
+    const antes = 1100 / 90
+    const ahora = CAIDA_MIN_MS / EMISION_MS
+    expect(Math.abs(ahora - antes)).toBeLessThan(0.05)
+    expect(Math.ceil(CAIDA_MAX_MS / EMISION_MS)).toBeLessThanOrEqual(GOTAS_MAX)
+  })
+
+  it('el techo de opacidad baja a 0,7 y ninguna moneda lo pasa', () => {
+    expect(OPACIDAD_MIN).toBe(0.55)
+    expect(OPACIDAD_MAX).toBe(0.7)
+    for (let k = 0; k <= 100; k++) {
+      const v = k / 100
+      expect(perfilGota(() => v).opacidad).toBeLessThanOrEqual(OPACIDAD_MAX)
+    }
+  })
+})
+
+describe('5c. CEL-2c · La fiesta dura lo que la melodía', () => {
+  it('sin duración que leer, manda el reloj nominal de los 12 s de CEL-A', () => {
+    expect(esperaFinMelodia(0)).toBe(MELODIA_MS + ESPERA_MARGEN_MS)
+    expect(esperaFinMelodia(NaN)).toBe(MELODIA_MS + ESPERA_MARGEN_MS)
+    expect(esperaFinMelodia(undefined)).toBe(MELODIA_MS + ESPERA_MARGEN_MS)
+  })
+
+  it('con la duración real, la red va un margen por detrás del `end`', () => {
+    // 12,04 s es lo que declara el mp3 (12,000 de audio más el relleno de
+    // trama de LAME, informe CEL-A): la red cae después del evento, que es lo
+    // que la hace red y no reloj.
+    expect(esperaFinMelodia(12.04)).toBeCloseTo(12040 + ESPERA_MARGEN_MS, 6)
+    expect(esperaFinMelodia(12.04)).toBeGreaterThan(12040)
+  })
+
+  it('y tiene su propio tope, porque el de VC2 no vale aquí', () => {
+    // `ESPERA_TOPE_MS` son 3 s: correcto para esperar un volteo, absurdo para
+    // una pieza de 12. Si esta espera reutilizara aquél, la lluvia se cortaría
+    // a los 3 s en todas las victorias.
+    expect(FIESTA_TOPE_MS).toBeGreaterThan(MELODIA_MS)
+    expect(FIESTA_TOPE_MS).toBeGreaterThan(ESPERA_TOPE_MS)
+    expect(esperaFinMelodia(600)).toBe(FIESTA_TOPE_MS)
+  })
+})
+
 describe('6. El perfil de una moneda', () => {
   // Secuencia determinista: se barre el espacio del sorteo en vez de confiar en
   // un `Math.random` que en una corrida mala no visita las puntas.
@@ -167,8 +222,8 @@ describe('6. El perfil de una moneda', () => {
       expect(Math.abs(g.giro)).toBeGreaterThanOrEqual(900)
       expect(Math.abs(g.giro)).toBeLessThanOrEqual(1600)
       expect(Math.abs(g.deriva)).toBeLessThanOrEqual(40)
-      expect(g.opacidad).toBeGreaterThanOrEqual(0.55)
-      expect(g.opacidad).toBeLessThanOrEqual(1)
+      expect(g.opacidad).toBeGreaterThanOrEqual(OPACIDAD_MIN)
+      expect(g.opacidad).toBeLessThanOrEqual(OPACIDAD_MAX)
     }
   })
 

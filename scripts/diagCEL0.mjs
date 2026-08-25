@@ -26,7 +26,10 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 
 const BASE = 'http://localhost:5173'
 const MODO = process.argv[2] ?? 'diagnostico'
-const OUT  = MODO === 'celebracion' ? '../_cel1' : '../_cel0'
+// CEL-2c · el modo `celebracion` escribe en `_cel2`. Cada tanda de la campaña
+// deja su carpeta, fuera del repositorio: mezclarlas haría que una captura
+// vieja pasara por evidencia nueva.
+const OUT  = MODO === 'celebracion' ? '../_cel2' : '../_cel0'
 const round = (n) => (n == null ? null : Math.round(n * 100) / 100)
 
 // Los once, tal como los registra src/hooks/useSounds.js. Eran doce hasta
@@ -156,6 +159,14 @@ async function alaVictoria(page, mesa, semilla = '', opciones = {}) {
   // Quien quiera medir el arco EN MARCHA pasa `{ reposo: false }`, que es lo que
   // hace la sección CEL-2 de este mismo archivo.
   if (opciones.reposo !== false && await page.locator('.cel-screen').count() > 0) {
+    // CEL-2c · la fiesta pasó a durar los 12 s de la melodía, así que esperar al
+    // reposo natural cuesta ~16 s POR CORRIDA, y aquí hay treinta y siete que no
+    // vienen a medir el arco sino cajas quietas: diez minutos de espera que no
+    // miden nada. Se asienta con el gesto que el propio arco ofrece —un toque,
+    // que salta al reposo— y que tiene su puerta propia unas líneas más abajo.
+    // El estado final es el mismo: cifras finales, sin lluvia, fase `reposo`.
+    // Quien viene a ver el arco correr pasa `{ reposo: false }`.
+    await page.mouse.click(1, 1)
     await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 20000 })
   }
   await page.evaluate(() => Promise.all(
@@ -335,6 +346,13 @@ const MELODIAS_CEL = [
 ]
 const GOTAS_TECHO = 18      // lámina CEL-2
 const TOC_MS = 1896         // duración medida de table-knock.mp3 (mapa de audio, CEL-0)
+// CEL-2c · las cifras que Victor selló en vivo. Van escritas aquí y no
+// importadas del núcleo: si alguien recalibra el factor, el arnés tiene que
+// DISCREPAR y decirlo, no seguirle.
+const CAIDA_MIN_S = 1.54    // 1100 ms x 1,4
+const CAIDA_MAX_S = 2.10    // 1500 ms x 1,4
+const OPACIDAD_TECHO = 0.7
+const MELODIA_S = 12        // duración sellada por CEL-A
 
 // Observadores, instalados en cuanto la pantalla monta y antes de que reviente.
 function instalaSondaArco() {
@@ -413,6 +431,17 @@ function miraArco() {
     saldo: dd('Saldo actual'),
     netas: document.querySelector('.cel-netas-num')?.textContent?.trim() ?? null,
     gotas: document.querySelectorAll('.cel-gota').length,
+    // CEL-2c · el detalle de cada moneda VIVA: su duración de caída (la primera
+    // de las tres animaciones, que es `cel-caida`) y su opacidad. Lo primero es
+    // la medida del +40 %; lo segundo, la del techo de 0,7.
+    gotasDetalle: [...document.querySelectorAll('.cel-gota')].map(g => {
+      const c = getComputedStyle(g)
+      return {
+        caida: parseFloat(String(c.animationDuration).split(',')[0]),
+        crucero: parseFloat(c.getPropertyValue('--gota-opacidad')),
+        opacidad: parseFloat(c.opacity),
+      }
+    }),
     // El orden de pintado de la lluvia, medido por el MECANISMO que lo decide:
     // dos hermanos posicionados en el mismo contexto de apilamiento se pintan
     // por `z-index`. `elementFromPoint` no sirve aquí — la capa lleva
@@ -478,7 +507,7 @@ async function arcoDeUnaCelda(browser, celda, fallos, opciones = {}) {
       // esperarlas con `waitForSelector` sería pedirle al arnés que fotografíe
       // un parpadeo. El ORDEN de los cuatro tiempos lo cuenta igual el
       // observador de mutaciones, que no se pierde ninguna.
-      await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 15000 })
+      await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 25000 })
       await page.waitForTimeout(150)
       salida.fotos.reposo = await page.evaluate(miraArco)
       Object.assign(salida, await page.evaluate(cosechaArco))
@@ -490,20 +519,21 @@ async function arcoDeUnaCelda(browser, celda, fallos, opciones = {}) {
     salida.fotos.fiesta = await page.evaluate(miraArco)
     if (capturas) await page.screenshot({ path: `${OUT}/arco-2revienta-${id}.png` })
 
-    // Y otra a mitad de fiesta: la de arriba es el ESTALLIDO —tres o cuatro
-    // monedas recién nacidas— y la densidad de la lluvia sólo se juzga en
-    // régimen, con las catorce o quince en el aire.
-    if (capturas) {
-      await page.waitForTimeout(750)
-      salida.fotos.plena = await page.evaluate(miraArco)
-      await page.screenshot({ path: `${OUT}/arco-2b-fiesta-plena-${id}.png` })
-    }
+    // CEL-2c · LA FOTO DE LOS SEIS SEGUNDOS. Es la que prueba la decisión de
+    // Victor: con la lluvia atada al contador, a esta altura no quedaría ni una
+    // moneda —la puerta vieja habría dado cero— y ahora tiene que haber emisión
+    // viva. También es donde se mide la caída y la opacidad, con la lluvia en
+    // régimen y no con las cuatro monedas del estallido.
+    await page.waitForTimeout(5650)
+    salida.fotos.plena = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/arco-2b-fiesta-6s-${id}.png` })
 
-    await page.waitForSelector('.cel-screen[data-fase="calma"]', { timeout: 10000 })
+    // La fiesta dura ahora los 12 s de la melodía: las esperas se alargan.
+    await page.waitForSelector('.cel-screen[data-fase="calma"]', { timeout: 20000 })
     salida.fotos.calma = await page.evaluate(miraArco)
     if (capturas) await page.screenshot({ path: `${OUT}/arco-3calma-${id}.png` })
 
-    await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 10000 })
+    await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 20000 })
     await page.waitForTimeout(150)
     salida.fotos.reposo = await page.evaluate(miraArco)
     if (capturas) await page.screenshot({ path: `${OUT}/arco-4reposo-${id}.png` })
@@ -603,12 +633,48 @@ function juzgaArco(a, fallos, opciones = {}) {
   const calma = fases.find(f => f.fase === 'calma')
   const trasCalma = calma ? a.nacidas.filter(t => t > calma.t + 40).length : 0
   a.nacidasTrasCalma = trasCalma
+  const fiesta = fases.find(f => f.fase === 'fiesta')
   if (opciones.reducido) {
     if (a.vivasMax !== 0 || a.nacidas.length !== 0) fallos.push(`${id}: con movimiento reducido NO debe llover, y nacieron ${a.nacidas.length}`)
   } else {
     if (!a.nacidas.length) fallos.push(`${id}: no llovió ni una moneda`)
     if (a.vivasMax > GOTAS_TECHO) fallos.push(`${id}: hubo ${a.vivasMax} monedas vivas y el techo es ${GOTAS_TECHO}`)
     if (trasCalma > 0) fallos.push(`${id}: nacieron ${trasCalma} monedas DESPUÉS de la calma`)
+
+    // ── CEL-2c · LA VENTANA DE LLUVIA ES LA MELODÍA ─────────────────────────
+    // La puerta que prueba la decisión de Victor. Con la lluvia atada al
+    // contador, la fiesta duraba ~1,5 s: cualquiera de estas tres condiciones
+    // habría estado roja.
+    if (fiesta && calma) {
+      const ventana = calma.t - fiesta.t
+      a.ventanaLluvia = ventana
+      if (ventana < MELODIA_S * 1000 - 700 || ventana > MELODIA_S * 1000 + 1200) {
+        fallos.push(`${id}: la lluvia duró ${ventana} ms y la melodía dura ${MELODIA_S * 1000}`)
+      }
+      const tardias = a.nacidas.filter(t => t > fiesta.t + 5000).length
+      a.nacidasTrasSeisSegundos = tardias
+      if (tardias === 0) fallos.push(`${id}: a los 6 s de fiesta ya no nacían monedas`)
+    }
+    if (!fotos.plena?.gotas) fallos.push(`${id}: a los 6 s de fiesta no había ni una moneda en el aire`)
+
+    // ── CEL-2c · LA CAÍDA Y EL ORO ──────────────────────────────────────────
+    // Medidas sobre las monedas VIVAS a los 6 s, que es donde la lluvia está en
+    // régimen. La caída se lee del `animation-duration` resuelto: es el número
+    // que el navegador va a usar, no el que el CSS pretende.
+    const det = fotos.plena?.gotasDetalle || []
+    if (!det.length) fallos.push(`${id}: no se pudo medir ninguna moneda en régimen`)
+    else {
+      const caidas = det.map(d => d.caida)
+      a.caida = { min: Math.min(...caidas), max: Math.max(...caidas) }
+      if (a.caida.min < CAIDA_MIN_S - 0.02 || a.caida.max > CAIDA_MAX_S + 0.02) {
+        fallos.push(`${id}: caída medida ${a.caida.min}-${a.caida.max} s, sellada ${CAIDA_MIN_S}-${CAIDA_MAX_S}`)
+      }
+      const cruceros = det.map(d => d.crucero)
+      const opacidades = det.map(d => d.opacidad)
+      a.opacidad = { crucero: Math.max(...cruceros), pintada: Math.max(...opacidades) }
+      if (a.opacidad.crucero > OPACIDAD_TECHO + 0.001) fallos.push(`${id}: hay monedas a opacidad ${a.opacidad.crucero} y el techo es ${OPACIDAD_TECHO}`)
+      if (a.opacidad.pintada > OPACIDAD_TECHO + 0.01) fallos.push(`${id}: una moneda se pintó a ${a.opacidad.pintada}`)
+    }
     if (fotos.reposo?.gotas !== 0) fallos.push(`${id}: quedan ${fotos.reposo?.gotas} monedas en el reposo`)
     const z = fotos.fiesta?.z
     if (!z) fallos.push(`${id}: no se pudo medir el orden de pintado de la lluvia`)
@@ -641,6 +707,49 @@ async function puertaMelodias(browser, fallos) {
     if (i > 0 && m === vistas[i - 1]) fallos.push(`melodias: la corrida ${i + 1} REPITIÓ "${m}"`)
   })
   return vistas
+}
+
+// ── CEL-2c · La puerta del sorteo de frases ─────────────────────────────────
+// Lo que se comprueba es que la frase MOSTRADA y la RECORDADA sean la misma.
+// El defecto que esto cierra no se ve jamás en una pantalla: el sorteo vivía en
+// un inicializador de `useState` —invocado dos veces en desarrollo— y escribía
+// la memoria, así que quedaba guardada una frase distinta de la que se veía y
+// la victoria siguiente podía repetir la que el jugador acababa de leer.
+//
+// El banco se lee de la PÁGINA, con un `import()` dinámico del módulo real que
+// el servidor de desarrollo ya está sirviendo: ni se copian las ocho frases
+// aquí (envejecerían) ni se importa el módulo en Node (sus importaciones son
+// sin extensión, resueltas por Vite).
+async function puertaFrases(browser, fallos) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const page = await ctx.newPage()
+  const pares = []
+  try {
+    for (let k = 0; k < 6; k++) {
+      await alaVictoria(page, 5, '', { reposo: false })
+      await page.waitForSelector('.cel-screen', { timeout: 10000 })
+      pares.push(await page.evaluate(async () => {
+        const mod = await import('/src/config/frasesVictoria.js')
+        let guardado = null
+        try { guardado = window.localStorage.getItem(mod.FRASE_KEY) } catch { /* sin storage */ }
+        const i = Number.parseInt(guardado, 10)
+        return {
+          mostrada: document.querySelector('.cel-frase')?.textContent?.trim() ?? null,
+          indice: Number.isInteger(i) ? i : null,
+          recordada: Number.isInteger(i) ? (mod.FRASES_VICTORIA[i] ?? null) : null,
+        }
+      }))
+    }
+  } catch (e) { fallos.push(`frases: ${e.message}`) }
+  await ctx.close()
+  pares.forEach((par, k) => {
+    if (par.indice === null) fallos.push(`frases: la corrida ${k + 1} no recordó ninguna frase`)
+    else if (par.mostrada !== par.recordada) {
+      fallos.push(`frases: la corrida ${k + 1} mostró "${par.mostrada}" y recordó "${par.recordada}"`)
+    }
+    if (k > 0 && par.mostrada === pares[k - 1].mostrada) fallos.push(`frases: la corrida ${k + 1} REPITIÓ "${par.mostrada}"`)
+  })
+  return pares
 }
 
 // ── La puerta del salto por toque ───────────────────────────────────────────
@@ -846,6 +955,7 @@ async function modoCelebracion(browser) {
   inf.arco.reducido = reducido
   // Y las dos puertas que necesitan su propia pestaña.
   inf.melodias = await puertaMelodias(browser, fallos)
+  inf.frases2c = await puertaFrases(browser, fallos)
   inf.salto = await puertaSalto(browser, fallos)
 
   writeFileSync(`${OUT}/cel1.json`, JSON.stringify(inf, null, 2))
@@ -870,10 +980,16 @@ async function modoCelebracion(browser) {
     const t = Object.fromEntries((a.fases || []).map(f => [f.fase, f.t]))
     console.log(`  ${id.padEnd(22)} sobria 0 -> fiesta ${t.fiesta ?? '?'} -> calma ${t.calma ?? '?'} -> reposo ${t.reposo ?? '?'}`
       + ` | espera al toc ${a.esperaMedida ?? '?'} | melodia ${a.fotos?.reposo?.melodia || '(ninguna)'}`)
-    console.log(`  ${''.padEnd(22)} lluvia: ${a.nacidas?.length ?? 0} monedas, ${a.vivasMax ?? 0} vivas como mucho, ${a.nacidasTrasCalma ?? 0} tras la calma`
+    console.log(`  ${''.padEnd(22)} lluvia: ${a.nacidas?.length ?? 0} monedas en ${a.ventanaLluvia ?? '?'} ms, ${a.vivasMax ?? 0} vivas como mucho,`
+      + ` ${a.nacidasTrasSeisSegundos ?? 0} nacidas tras los 6 s, ${a.nacidasTrasCalma ?? 0} tras la calma`)
+    console.log(`  ${''.padEnd(22)} caida ${a.caida?.min ?? '?'}-${a.caida?.max ?? '?'} s | opacidad max ${a.opacidad?.crucero ?? '?'} (pintada ${a.opacidad?.pintada ?? '?'})`
       + ` | cuadros p50 ${a.cuadros?.p50 ?? '?'} ms p95 ${a.cuadros?.p95 ?? '?'} ms peor ${a.cuadros?.peor ?? '?'} ms`)
   }
   console.log(`\n-- la bolsa de melodias, cinco victorias seguidas --\n  ${(inf.melodias || []).join('\n  ')}`)
+  console.log(`\n-- el sorteo de frases: mostrada contra recordada --`)
+  for (const [k, par] of (inf.frases2c || []).entries()) {
+    console.log(`  ${k + 1}. ${par.mostrada === par.recordada ? 'cuadra' : 'DISCREPA'} - indice ${par.indice} - "${par.mostrada}"`)
+  }
   const sl = inf.salto || {}
   console.log(`\n-- el salto por toque --\n  saldo a mitad ${sl.medio?.saldo} -> tras el toque ${sl.tras?.saldo} (fase ${sl.tras?.fase}) - boton de salir ${sl.salida ? 'responde' : 'NO responde'}`)
   console.log(`\ncontrol negativo: ${inf.control.termina === false && !inf.control.error ? 'verde' : 'ROJO'}`)
