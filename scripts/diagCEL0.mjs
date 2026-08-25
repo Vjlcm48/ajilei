@@ -183,9 +183,11 @@ async function alaVictoria(page, mesa, semilla = '', opciones = {}) {
 // tolerancia de REDONDEO (0,6 px) y no de diseño — un 40 que sale 44 es rojo.
 const LAMINA = {
   // font-size de `h1.cel-ajilei` · `.cel-netas-num` · lado de la moneda · `.cel-frase`
-  escritorio:      { ajilei: 72, cifra: 40, moneda: 56, frase: 26 },
-  movilVertical:   { ajilei: 40, cifra: 34, moneda: 48, frase: 18 },
-  movilHorizontal: { ajilei: 32, cifra: 34, moneda: 48, frase: 18 },
+  // CEL-2e · la moneda sube un 25 %: 56 -> 70 y 48 -> 60. Los demás tamaños
+  // siguen sellados por la lámina de CEL-1 y no se han movido.
+  escritorio:      { ajilei: 72, cifra: 40, moneda: 70, frase: 26 },
+  movilVertical:   { ajilei: 40, cifra: 34, moneda: 60, frase: 18 },
+  movilHorizontal: { ajilei: 32, cifra: 34, moneda: 60, frase: 18 },
 }
 const TOL = 0.6
 const SALDO_INICIAL = 5000   // AJILEI_CONFIG.economy.saldoInicial
@@ -283,6 +285,48 @@ function sondaPantalla() {
     // La piel VIEJA no debe montar en victoria: si `.game-over-screen` sigue
     // ahí, la pantalla nueva no sustituyó nada — se le sumó.
     pielVieja: document.querySelectorAll('.game-over-screen').length,
+    // ── CEL-2e · LA CABECERA ─────────────────────────────────────────────
+    // Se cuenta lo que NO debe estar y lo que SÍ debe seguir. Y se mira que
+    // los ausentes tampoco sean enfocables: ocultar con CSS dejaría el ⋮ en el
+    // recorrido del tabulador, que es la trampa clásica.
+    cabecera: {
+      util: document.querySelectorAll('.utilities-trigger').length,
+      wordmark: document.querySelectorAll('h1.table-title').length,
+      panelUtil: document.querySelectorAll('.util-panel, .utilities-panel').length,
+      salir: document.querySelectorAll('.btn-leave').length,
+      mano: document.querySelectorAll('.hand-badge').length,
+      enfocables: [...document.querySelectorAll('.table-header button, .table-header a, .table-header [tabindex]')]
+        .map(e => e.className),
+    },
+    // ── CEL-2e · LOS DOS CONTROLES ───────────────────────────────────────
+    acciones: (() => {
+      const p = document.querySelector('.cel-acciones .btn-primary')
+      const r = document.querySelector('.cel-acciones .cel-ranking')
+      if (!p || !r) return null
+      const a = p.getBoundingClientRect(), b = r.getBoundingClientRect()
+      return {
+        primario: { x: a.x, y: a.y, w: a.width, h: a.height },
+        ranking: { x: b.x, y: b.y, w: b.width, h: b.height },
+        // "En fila" no es una clase que consultar: es que compartan banda
+        // vertical y no se solapen en horizontal.
+        enFila: Math.abs(a.y - b.y) <= 4 && (b.x >= a.x + a.width - 1 || a.x >= b.x + b.width - 1),
+        mismoAlto: Math.abs(a.height - b.height) <= 1,
+        dentro: a.bottom <= window.innerHeight + 1 && b.bottom <= window.innerHeight + 1
+          && a.left >= -1 && b.right <= window.innerWidth + 1,
+        rankingDisabled: r.disabled === true,
+        rankingHref: r.getAttribute('href'),
+        pastilla: document.querySelectorAll('.cel-acciones .soon-tag').length,
+      }
+    })(),
+    // La capa de luz tiene que cubrir la moneda, ni más ni menos: si el
+    // envoltorio no midiera lo que la moneda, el brillo saldría descentrado.
+    luz: (() => {
+      const l = document.querySelector('.cel-moneda-luz')
+      const m = document.querySelector('.cel-netas-ico .chip-token')
+      if (!l || !m) return null
+      const a = l.getBoundingClientRect(), b = m.getBoundingClientRect()
+      return { dx: Math.abs(a.x - b.x), dy: Math.abs(a.y - b.y), dw: Math.abs(a.width - b.width), dh: Math.abs(a.height - b.height) }
+    })(),
     // ── EL ENCAJE ────────────────────────────────────────────────────────
     // La puerta que faltaba en la primera corrida. Medir las cajas UNA A UNA
     // no dice nada sobre la SUMA: a 640x360 las cinco piezas daban sus cifras
@@ -308,23 +352,27 @@ function sondaPantalla() {
   }
 }
 
-// La puerta 6: con la mesa terminada no se puede lanzar una reacción.
-async function puertaReacciones(page) {
-  await page.click('.utilities-trigger')
-  await page.waitForSelector('.util-item-reacciones', { timeout: 5000 })
-  const estado = await page.evaluate(() => {
-    const b = document.querySelector('.util-item-reacciones')
-    return { disabled: b.disabled === true, clase: b.className }
-  })
-  // Se intenta pulsar de todas formas: un `disabled` que no bloquea el clic no
-  // es una puerta, es un adorno.
-  await page.click('.util-item-reacciones', { force: true }).catch(() => {})
-  await page.waitForTimeout(300)
+// La puerta 6, REESCRITA EN CEL-2e. Hasta aqui comprobaba que la entrada de
+// Reacciones estuviera deshabilitada dentro del menu; ahora ese menu no existe
+// en esta pantalla, asi que lo que hay que probar es que no hay por donde
+// entrar —ni con el raton ni con el TABULADOR— y que aun asi no se monta
+// ninguna burbuja: el veto de CEL-1 sigue vivo por debajo, y quitarlo porque
+// "ya no hay boton" seria quitarle el suelo.
+async function puertaSinMenu(page) {
+  const antes = await page.evaluate(() => ({
+    util: document.querySelectorAll('.utilities-trigger').length,
+    panel: document.querySelectorAll('.util-panel, .utilities-panel').length,
+  }))
+  const focos = []
+  for (let k = 0; k < 8; k++) {
+    await page.keyboard.press('Tab')
+    focos.push(await page.evaluate(() => document.activeElement?.className ?? ''))
+  }
   const montado = await page.evaluate(() => ({
     selector: document.querySelectorAll('.u2-selector').length,
     burbuja: document.querySelectorAll('.u2-burbuja').length,
   }))
-  return { ...estado, ...montado }
+  return { ...antes, focos, ...montado }
 }
 
 // ── CEL-2 · EL ARCO ─────────────────────────────────────────────────────────
@@ -442,6 +490,27 @@ function miraArco() {
         opacidad: parseFloat(c.opacity),
       }
     }),
+    // ── CEL-2e · EL BRILLO DE LA MONEDA, medido del CSSOM ────────────────
+    // Lo que hay que probar no es "brilla": es que su periodo sea EL MISMO que
+    // el del resplandor del nombre y que vaya medio ciclo por detras. Las dos
+    // cifras se leen resueltas del navegador, que es donde se ve si el JS que
+    // las ata funciono; si alguien las escribiera a mano en la hoja, esto
+    // seguiria verde hasta que Victor recalibrase EMB-1, y entonces cantaria.
+    brillo: (() => {
+      const luz = document.querySelector('.cel-moneda-luz')
+      const h1 = document.querySelector('h1.cel-ajilei')
+      if (!luz || !h1) return null
+      const emb = getComputedStyle(h1)
+      const bar = getComputedStyle(luz, '::before')
+      const des = getComputedStyle(luz, '::after')
+      const uno = (cs) => ({
+        nombre: cs.animationName,
+        dur: cs.animationDuration,
+        retraso: cs.animationDelay,
+        estado: cs.animationPlayState,
+      })
+      return { emb: uno(emb), barrido: uno(bar), destello: uno(des) }
+    })(),
     // El orden de pintado de la lluvia, medido por el MECANISMO que lo decide:
     // dos hermanos posicionados en el mismo contexto de apilamiento se pintan
     // por `z-index`. `elementFromPoint` no sirve aquí — la capa lleva
@@ -612,6 +681,51 @@ function juzgaArco(a, fallos, opciones = {}) {
     if (fotos.fiesta?.animacion !== 'running') fallos.push(`${id}: el barrido no arrancó en la fiesta (${fotos.fiesta?.animacion})`)
   }
 
+  // 5b · CEL-2e · EL BRILLO DE LA MONEDA, en armonia con el del nombre.
+  const seg = (v) => {
+    const n = parseFloat(String(v))
+    return Number.isFinite(n) ? n : null
+  }
+  for (const [cuando, foto] of [['fiesta', fotos.fiesta], ['reposo', fotos.reposo]]) {
+    const br = foto?.brillo
+    if (!br) { if (foto) fallos.push(`${id}: sin medida de brillo en ${cuando}`); continue }
+    if (opciones.reducido) {
+      // Movimiento reducido: la capa entera apagada, ni brillo atenuado ni
+      // banda aparcada encendida.
+      if (br.barrido.nombre !== 'none' || br.destello.nombre !== 'none') {
+        fallos.push(`${id}: con movimiento reducido la moneda sigue animada (${br.barrido.nombre}/${br.destello.nombre})`)
+      }
+      continue
+    }
+    if (br.barrido.estado !== 'running' || br.destello.estado !== 'running') {
+      fallos.push(`${id}: el brillo de la moneda no corre en ${cuando} (${br.barrido.estado}/${br.destello.estado})`)
+    }
+    const ciclo = seg(br.emb.dur)
+    const bar = seg(br.barrido.dur)
+    const des = seg(br.destello.dur)
+    const ret = seg(br.barrido.retraso)
+    a.brillo = { ciclo, periodo: bar, desfase: ret }
+    if (!ciclo) fallos.push(`${id}: no se pudo leer el ciclo de EMB-1`)
+    else {
+      if (Math.abs(bar - ciclo) > 0.01 || Math.abs(des - ciclo) > 0.01) {
+        fallos.push(`${id}: el periodo de la moneda (${bar}/${des}) no es el de EMB-1 (${ciclo}) en ${cuando}`)
+      }
+      if (Math.abs(ret - ciclo / 2) > 0.01) {
+        fallos.push(`${id}: el desfase es ${ret} y medio ciclo son ${ciclo / 2} en ${cuando}`)
+      }
+      if (Math.abs(seg(br.destello.retraso) - ret) > 0.01) {
+        fallos.push(`${id}: el destello y el barrido no van juntos (${br.destello.retraso} vs ${br.barrido.retraso})`)
+      }
+    }
+  }
+  // Y en la entrada sobria, parado: la moneda no brilla antes de la fiesta.
+  if (!opciones.reducido && fotos.sobria?.brillo) {
+    const b0 = fotos.sobria.brillo
+    if (b0.barrido.estado !== 'paused' || b0.destello.estado !== 'paused') {
+      fallos.push(`${id}: la moneda ya brilla en la entrada sobria (${b0.barrido.estado}/${b0.destello.estado})`)
+    }
+  }
+
   // 6 · LA FRASE aparece con el estallido y no antes.
   if (Number(fotos.sobria?.fraseOpacidad) !== 0) fallos.push(`${id}: la frase se ve en la entrada sobria (opacidad ${fotos.sobria?.fraseOpacidad})`)
   if (Number(fotos.reposo?.fraseOpacidad) !== 1) fallos.push(`${id}: la frase no acabó visible (opacidad ${fotos.reposo?.fraseOpacidad})`)
@@ -752,6 +866,96 @@ async function puertaFrases(browser, fallos) {
   return pares
 }
 
+// ── CEL-2e · La puerta del aviso "Proximamente" ─────────────────────────────
+// Cuatro cosas: que aparezca al tocar, que NO desplace nada (va fuera de flujo),
+// que se retire solo antes de 3,5 s, que un segundo toque lo quite antes, y que
+// no navegue a ningun sitio.
+async function puertaRanking(browser, fallos) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 })
+  const page = await ctx.newPage()
+  const r = {}
+  const geometria = () => page.evaluate(() => {
+    const caja = (sel) => {
+      const e = document.querySelector(sel)
+      if (!e) return null
+      const b = e.getBoundingClientRect()
+      return [Math.round(b.x * 100) / 100, Math.round(b.y * 100) / 100, Math.round(b.width * 100) / 100, Math.round(b.height * 100) / 100]
+    }
+    return {
+      titulo: caja('h1.cel-ajilei'), frase: caja('.cel-frase'), tarjeta: caja('.cel-tarjeta'),
+      primario: caja('.cel-acciones .btn-primary'), ranking: caja('.cel-acciones .cel-ranking'),
+    }
+  })
+  const aviso = () => page.evaluate(() => {
+    const e = document.querySelector('.cel-aviso')
+    if (!e) return null
+    const b = e.getBoundingClientRect()
+    const cs = getComputedStyle(e)
+    return {
+      texto: e.textContent.trim(),
+      vive: cs.display !== 'none' && b.width > 0 && b.height > 0,
+      viva: e.getAttribute('aria-live'),
+      papel: e.getAttribute('role'),
+      // Fuera de flujo: si fuera estatico, empujaria a sus hermanos.
+      posicion: cs.position,
+    }
+  })
+  try {
+    await alaVictoria(page, 5)     // asentada en reposo
+    r.url = page.url()
+    r.antes = await geometria()
+    r.avisoAntes = await aviso()
+
+    await page.click('.cel-acciones .cel-ranking')
+    // EL RATON SE APARTA ANTES DE MEDIR, y esto lo enseñó un rojo de la primera
+    // corrida: la puerta cantó "la columna se movió al aparecer el aviso" con un
+    // desplazamiento de 2 px del ranking. No era el aviso — era el `:hover` de la
+    // familia `.btn`, que levanta el botón 2 px y que el ranking heredó al pasar
+    // a ser un botón de verdad. Medido: con el ratón fuera, la caja es idéntica
+    // con y sin aviso; con el ratón encima, sube 2 px se toque o no se toque.
+    // Comparar geometría con el puntero posado sobre el control mide el hover,
+    // no el aviso.
+    await page.mouse.move(4, 4)
+    await page.waitForTimeout(150)
+    r.conAviso = await aviso()
+    r.despues = await geometria()
+    await page.screenshot({ path: `${OUT}/cel2e-proximamente.png` })
+
+    // Se retira solo. Se mira a los 3,5 s, que es el tope del encargo.
+    await page.waitForTimeout(3400)
+    r.trasEspera = await aviso()
+
+    // Y el segundo toque lo quita antes de los 3 s.
+    await page.click('.cel-acciones .cel-ranking')
+    await page.waitForTimeout(150)
+    r.segundoToque = await aviso()
+    await page.click('.cel-acciones .cel-ranking')
+    await page.waitForTimeout(150)
+    r.tercerToque = await aviso()
+    await page.mouse.move(4, 4)
+
+    r.urlFinal = page.url()
+    r.sigueEnPantalla = await page.locator('.cel-screen').count()
+  } catch (e) { fallos.push(`ranking: ${e.message}`) }
+  await ctx.close()
+
+  if (r.avisoAntes?.vive) fallos.push('ranking: el aviso se ve sin haberlo tocado')
+  if (r.avisoAntes?.viva !== 'polite') fallos.push(`ranking: la region viva no es polite (${r.avisoAntes?.viva})`)
+  if (r.avisoAntes?.papel !== 'status') fallos.push(`ranking: la region viva no tiene role=status (${r.avisoAntes?.papel})`)
+  if (!r.conAviso?.vive) fallos.push('ranking: el aviso NO aparecio al tocar')
+  if (r.conAviso?.texto !== 'Próximamente') fallos.push(`ranking: el aviso dice "${r.conAviso?.texto}"`)
+  if (r.conAviso?.posicion !== 'absolute') fallos.push(`ranking: el aviso esta en flujo (${r.conAviso?.posicion})`)
+  if (JSON.stringify(r.antes) !== JSON.stringify(r.despues)) {
+    fallos.push(`ranking: la columna se movio al aparecer el aviso\n      antes  ${JSON.stringify(r.antes)}\n      despues ${JSON.stringify(r.despues)}`)
+  }
+  if (r.trasEspera?.vive) fallos.push('ranking: el aviso sigue ahi pasados 3,5 s')
+  if (!r.segundoToque?.vive) fallos.push('ranking: el aviso no volvio con otro toque')
+  if (r.tercerToque?.vive) fallos.push('ranking: un segundo toque no lo quita')
+  if (r.url !== r.urlFinal) fallos.push(`ranking: NAVEGO de ${r.url} a ${r.urlFinal}`)
+  if (r.sigueEnPantalla !== 1) fallos.push('ranking: la pantalla de victoria se fue')
+  return r
+}
+
 // ── La puerta del salto por toque ───────────────────────────────────────────
 async function puertaSalto(browser, fallos) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
@@ -804,6 +1008,10 @@ async function modoCelebracion(browser) {
     { id: '375x812',   w: 375,  h: 812  },
     { id: '360x640',   w: 360,  h: 640  },
     { id: '640x360',   w: 640,  h: 360  },
+    // CEL-2e · la segunda celda horizontal del encargo. Es la más ancha de las
+    // dos y la que enseña la fila de botones con holgura; 640x360 sigue siendo
+    // la que aprieta.
+    { id: '812x375',   w: 812,  h: 375  },
   ]
   const inf = { tanda: 'CEL-1', chromium: browser.version(), celdas: {}, frases: {}, reacciones: {} }
   const fallos = []
@@ -859,10 +1067,44 @@ async function modoCelebracion(browser) {
         if (d.puntos !== '0')       fallos.push(`${id}: "Puntos obtenidos" ${d.puntos} != 0`)
 
         if (d.primarios !== 1)                  fallos.push(`${id}: ${d.primarios} botones primarios, debe haber 1`)
-        if (!d.ranking?.disabled)               fallos.push(`${id}: ranking sin disabled real`)
-        if (d.ranking?.ariaDisabled !== 'true') fallos.push(`${id}: ranking sin aria-disabled`)
-        if (!d.ranking?.pastilla)               fallos.push(`${id}: ranking sin pastilla Proximamente`)
-        if (d.ranking?.href != null)            fallos.push(`${id}: el ranking navega a ${d.ranking.href}`)
+        // CEL-2e · el ranking deja de ser inerte: ni `disabled`, ni pastilla, y
+        // sigue sin `href` — un control que contesta no puede anunciarse
+        // deshabilitado, y el que no navega no debe parecer un enlace.
+        if (d.acciones?.rankingDisabled)     fallos.push(`${id}: el ranking sigue deshabilitado`)
+        if (d.acciones?.pastilla !== 0)      fallos.push(`${id}: sigue habiendo pastilla "Proximamente" (${d.acciones?.pastilla})`)
+        if (d.acciones?.rankingHref != null) fallos.push(`${id}: el ranking navega a ${d.acciones.rankingHref}`)
+
+        // ── CEL-2e · LA CABECERA DE LA VICTORIA ─────────────────────────────
+        if (d.cabecera?.util !== 0)      fallos.push(`${id}: el menu de utilidades sigue montado en la victoria`)
+        if (d.cabecera?.wordmark !== 0)  fallos.push(`${id}: el wordmark pequeno sigue en la esquina`)
+        if (d.cabecera?.panelUtil !== 0) fallos.push(`${id}: el panel de utilidades quedo montado`)
+        // Y lo que SI se queda. Una puerta que solo mira lo que se fue no
+        // distingue "limpiaron la cabecera" de "borraron la cabecera".
+        if (d.cabecera?.salir !== 1)     fallos.push(`${id}: la equis de salir no esta (${d.cabecera?.salir})`)
+        if (d.cabecera?.mano !== 1)      fallos.push(`${id}: el rotulo de mano no esta (${d.cabecera?.mano})`)
+        const colados = (d.cabecera?.enfocables || []).filter(c => /utilities-trigger|mute-button/.test(c))
+        if (colados.length) fallos.push(`${id}: quedan enfocables en la cabecera: ${colados.join(' | ')}`)
+
+        // ── CEL-2e · LA FILA DE BOTONES, solo en movil horizontal ────────────
+        if (!d.acciones) fallos.push(`${id}: no se pudieron medir los dos controles`)
+        else if (piel === 'movilHorizontal') {
+          if (!d.acciones.enFila)    fallos.push(`${id}: los botones NO estan en fila (primario y=${round(d.acciones.primario.y)}, ranking y=${round(d.acciones.ranking.y)})`)
+          if (!d.acciones.mismoAlto) fallos.push(`${id}: los botones no tienen el mismo alto (${round(d.acciones.primario.h)} vs ${round(d.acciones.ranking.h)})`)
+          if (!d.acciones.dentro)    fallos.push(`${id}: algun boton se sale de la pantalla`)
+          for (const [n, c] of [['primario', d.acciones.primario], ['ranking', d.acciones.ranking]]) {
+            if (c.h < 44) fallos.push(`${id}: el ${n} mide ${round(c.h)} de alto y el minimo tactil es 44`)
+          }
+        } else if (d.acciones.enFila) {
+          // El complemento, y no es adorno: la fila es SOLO de horizontal, y
+          // sin esta puerta un `@media` mal escrito la colaria en escritorio.
+          fallos.push(`${id}: los botones salieron en fila fuera de movil horizontal`)
+        }
+
+        // La capa de luz cubre la moneda, ni mas ni menos.
+        if (!d.luz) fallos.push(`${id}: la moneda no tiene capa de luz`)
+        else if (Math.max(d.luz.dx, d.luz.dy, d.luz.dw, d.luz.dh) > 1) {
+          fallos.push(`${id}: la capa de luz no cuadra con la moneda (${JSON.stringify(d.luz)})`)
+        }
         if (d.pielVieja !== 0)                  fallos.push(`${id}: .game-over-screen sigue montada en victoria`)
         // Encaje: la última pieza de la columna tiene que verse. Si no se ve,
         // da igual que todas las cajas midan lo sellado.
@@ -875,11 +1117,14 @@ async function modoCelebracion(browser) {
         // La puerta de reacciones se corre en las celdas de mesa 5: no depende
         // del tamaño de la mesa y repetirla ocho veces sólo alarga la corrida.
         if (mesa === 5) {
-          const r = await puertaReacciones(page)
+          const r = await puertaSinMenu(page)
           inf.reacciones[id] = r
-          if (!r.disabled)      fallos.push(`${id}: Reacciones NO esta disabled en GAME_OVER`)
+          if (r.util !== 0)     fallos.push(`${id}: el menu de utilidades sigue ahi en GAME_OVER`)
+          if (r.panel !== 0)    fallos.push(`${id}: el panel de utilidades esta montado en GAME_OVER`)
           if (r.selector !== 0) fallos.push(`${id}: el selector de reacciones monto en GAME_OVER`)
           if (r.burbuja !== 0)  fallos.push(`${id}: se monto una burbuja en GAME_OVER`)
+          const colados = r.focos.filter(c => /utilities-trigger|mute-button/.test(c))
+          if (colados.length)   fallos.push(`${id}: el tabulador llega al menu de utilidades (${colados.join(' | ')})`)
         }
       } catch (e) { fallos.push(`${id}: ${e.message}`) }
       await ctx.close()
@@ -927,6 +1172,8 @@ async function modoCelebracion(browser) {
   // Control negativo: sin `?cel` la mesa no debe terminar sola.
   inf.control = await controlNegativo(browser)
   if (inf.control.termina !== false || inf.control.error) fallos.push(`control negativo ROJO: ${JSON.stringify(inf.control)}`)
+  if (inf.control.cabeceraEnJuego?.util !== 1) fallos.push(`control negativo: el menu de utilidades NO esta en una mesa viva (${inf.control.cabeceraEnJuego?.util})`)
+  if (inf.control.cabeceraEnJuego?.wordmark !== 1) fallos.push(`control negativo: el wordmark NO esta en una mesa viva (${inf.control.cabeceraEnJuego?.wordmark})`)
 
   // ── CEL-2 · El arco, celda por celda ──────────────────────────────────────
   inf.arco = {}
@@ -956,6 +1203,7 @@ async function modoCelebracion(browser) {
   // Y las dos puertas que necesitan su propia pestaña.
   inf.melodias = await puertaMelodias(browser, fallos)
   inf.frases2c = await puertaFrases(browser, fallos)
+  inf.ranking2e = await puertaRanking(browser, fallos)
   inf.salto = await puertaSalto(browser, fallos)
 
   writeFileSync(`${OUT}/cel1.json`, JSON.stringify(inf, null, 2))
@@ -990,6 +1238,12 @@ async function modoCelebracion(browser) {
   for (const [k, par] of (inf.frases2c || []).entries()) {
     console.log(`  ${k + 1}. ${par.mostrada === par.recordada ? 'cuadra' : 'DISCREPA'} - indice ${par.indice} - "${par.mostrada}"`)
   }
+  const rk = inf.ranking2e || {}
+  console.log(`\n-- el aviso "Proximamente" --`)
+  console.log(`  al tocar: ${rk.conAviso?.vive ? 'visible' : 'NO'} (${rk.conAviso?.posicion}) - tras 3,5 s: ${rk.trasEspera?.vive ? 'SIGUE' : 'se fue'}`
+    + ` - segundo toque: ${rk.tercerToque?.vive ? 'SIGUE' : 'lo quita'} - navegacion: ${rk.url === rk.urlFinal ? 'ninguna' : 'HUBO'}`)
+  const b0 = Object.values(inf.arco)[0]?.brillo
+  console.log(`\n-- el brillo de la moneda --\n  ciclo EMB-1 ${b0?.ciclo}s = periodo de la moneda ${b0?.periodo}s - desfase ${b0?.desfase}s (medio ciclo)`)
   const sl = inf.salto || {}
   console.log(`\n-- el salto por toque --\n  saldo a mitad ${sl.medio?.saldo} -> tras el toque ${sl.tras?.saldo} (fase ${sl.tras?.fase}) - boton de salir ${sl.salida ? 'responde' : 'NO responde'}`)
   console.log(`\ncontrol negativo: ${inf.control.termina === false && !inf.control.error ? 'verde' : 'ROJO'}`)
@@ -1059,6 +1313,14 @@ async function controlNegativo(browser) {
     })
     // El saldo del humano tras pagar UN ante: la prueba de que la mesa vive.
     r.saldoHumano = await page.evaluate(() => document.querySelector('.pbr-chips')?.textContent?.trim() ?? null)
+    // CEL-2e · Y EL CONTROL NEGATIVO DE LA CABECERA. La limpieza es SOLO de
+    // GAME_OVER: en una mesa viva el menu y el wordmark tienen que seguir donde
+    // estaban. Sin esta cuenta, "quitarlos siempre" pasaria todas las puertas de
+    // la victoria y rompería el juego entero sin que nadie se enterase.
+    r.cabeceraEnJuego = await page.evaluate(() => ({
+      util: document.querySelectorAll('.utilities-trigger').length,
+      wordmark: document.querySelectorAll('h1.table-title').length,
+    }))
   } catch (e) { r.error = e.message }
   await ctx.close()
   return r
