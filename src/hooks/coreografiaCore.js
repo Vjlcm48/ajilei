@@ -1,5 +1,6 @@
 import { CONTEO_MS } from './sesionCore'
-import { esperaPrecedente } from './celebracionCore'
+import { esperaPrecedente, ESPERA_MARGEN_MS } from './celebracionCore'
+import { MELODIA_MS } from '../config/melodiasCelebracion'
 
 // ── CEL-2 · El núcleo del arco de celebración ───────────────────────────────
 // Documento rector: lámina CEL-2, validada por Victor.
@@ -60,19 +61,53 @@ export function magnitudConteo(netas, saldo) {
 
 // ── La lluvia ───────────────────────────────────────────────────────────────
 // El techo de la lámina: 18 monedas vivas a la vez, jamás una más. La cadencia
-// sale de ahí y no al revés: con una vida media de 1,3 s, emitir cada 90 ms
-// deja ~14 en el aire en régimen —dentro del 12-18 pedido— y el tope de 18 sólo
-// actúa como tope.
+// sale de ahí y no al revés: con la vida media de una moneda, emitir cada
+// `EMISION_MS` deja ~14 en el aire en régimen —dentro del 12-18 pedido— y el
+// tope de 18 sólo actúa como tope.
 export const GOTAS_MAX = 18
-export const EMISION_MS = 90
-export const CAIDA_MIN_MS = 1100
-export const CAIDA_MAX_MS = 1500
+
+// ── CEL-2c · El mando de la caída ───────────────────────────────────────────
+// Victor, tras verlo en vivo: las monedas caen más lento. UN SOLO NÚMERO manda,
+// y de él salen las tres cifras que tienen que moverse juntas — si el factor se
+// recalibra otra vez, se toca aquí y nada más.
+//
+// La cadencia de emisión escala con el factor, y no es un detalle: la densidad
+// de la lluvia es vida/cadencia. Alargando la caída sin alargar la cadencia,
+// las monedas vivas pasarían de ~14 a ~20 y romperían el techo de 18 — que la
+// instrucción manda respetar, no subir. Escalando las dos, la densidad queda
+// EXACTAMENTE igual que la que Victor vio; lo único que cambia es la velocidad.
+export const CAIDA_FACTOR = 1.4
+const CAIDA_BASE_MIN_MS = 1100      // lo que medía en CEL-2
+const CAIDA_BASE_MAX_MS = 1500
+const EMISION_BASE_MS = 90
+
+export const CAIDA_MIN_MS = Math.round(CAIDA_BASE_MIN_MS * CAIDA_FACTOR)   // 1540
+export const CAIDA_MAX_MS = Math.round(CAIDA_BASE_MAX_MS * CAIDA_FACTOR)   // 2100
+export const EMISION_MS   = Math.round(EMISION_BASE_MS * CAIDA_FACTOR)     // 126
 
 // La calma dura exactamente lo que la caída MÁS LARGA. No es un número
 // aproximado que quede bonito: es la única cifra con la que se puede prometer
 // que ninguna moneda se desvanece a media caída, ni siquiera la que nació en el
 // último milisegundo de la fiesta.
 export const CALMA_MS = CAIDA_MAX_MS
+
+// ── CEL-2c · La lluvia dura lo que la melodía ───────────────────────────────
+// Segunda decisión de Victor en vivo, y sustituye a la de la lámina: la fiesta
+// ya NO termina cuando se para el contador —que aterrizaba a los ~1,5 s y
+// dejaba doce segundos de música sobre una pantalla quieta— sino cuando calla
+// la música.
+//
+// Y se encadena igual que el estallido: manda el `end` de Howler y el
+// temporizador es la red. Lo que no se puede reutilizar es `esperaPrecedente`,
+// porque su tope son 3 s —correcto para el volteo de VC2, absurdo para una
+// pieza de 12— así que esta espera tiene el suyo.
+export const FIESTA_TOPE_MS = 15000
+
+export function esperaFinMelodia(duracionSegundos) {
+  const ms = Number(duracionSegundos) * 1000
+  if (!Number.isFinite(ms) || ms <= 0) return MELODIA_MS + ESPERA_MARGEN_MS
+  return Math.min(FIESTA_TOPE_MS, ms + ESPERA_MARGEN_MS)
+}
 
 // El desvanecido de la melodía cuando el jugador toca para saltar al reposo.
 export const FADE_CORTE_MS = 300
@@ -104,6 +139,14 @@ export function esperaRevienta(audio) {
 export const LADO_MIN = 14
 export const LADO_MAX = 30
 
+// CEL-2c · El techo de opacidad baja de 1 a 0,7, con su motivo registrado: una
+// moneda a plena opacidad cruzando la frase del ganador es oro sobre oro, y
+// durante medio segundo la frase deja de leerse (capturado en
+// `arco-2b-fiesta-plena` de la corrida de CEL-2). Al 0,7 la moneda sigue siendo
+// una moneda y la frase sigue siendo legible. Constante única y ajustable.
+export const OPACIDAD_MIN = 0.55
+export const OPACIDAD_MAX = 0.7
+
 export function perfilGota(rnd) {
   const r = () => {
     const v = rnd()
@@ -123,6 +166,6 @@ export function perfilGota(rnd) {
     caida,
     giro: sentido * Math.round(900 + r() * 700),
     deriva: Math.round((r() * 2 - 1) * 40),
-    opacidad: Math.round((0.55 + cerca * 0.45) * 100) / 100,
+    opacidad: Math.round((OPACIDAD_MIN + cerca * (OPACIDAD_MAX - OPACIDAD_MIN)) * 100) / 100,
   }
 }

@@ -6,8 +6,9 @@ import { melodiaForzadaCEL } from '../dev/siembraCEL'
 import { marcaCEL, limpiaArcoCEL } from '../dev/arcoCEL'
 import {
   ANCLA_TOPE_MS, CALMA_MS, FADE_CORTE_MS,
-  duracionConteo, esperaRevienta, magnitudConteo,
+  duracionConteo, esperaRevienta, esperaFinMelodia, magnitudConteo,
 } from './coreografiaCore'
+import { MELODIA_MS } from '../config/melodiasCelebracion'
 
 // ── CEL-2 · El arco de la pantalla de victoria ──────────────────────────────
 // Documento rector: lámina CEL-2. El "cuánto dura" vive en `coreografiaCore.js`
@@ -73,7 +74,8 @@ export function useCoreografia({ precedente, netas, saldo }) {
 
   const faseRef = useRef('sobria')
   const melodiaRef = useRef(null)      // { howl, nombre, sonando }
-  const esperaRef = useRef(null)       // { sound, id, fin, timer }
+  const esperaRef = useRef(null)       // { sound, id, fin, timer } · sobria -> fiesta
+  const fiestaRef = useRef(null)       // { sound, id, fin, timer } · fiesta -> calma
   const arrancadoRef = useRef(false)
   const saltadoRef = useRef(false)
   const vivoRef = useRef(true)
@@ -90,6 +92,40 @@ export function useCoreografia({ precedente, netas, saldo }) {
     }
     esperaRef.current = null
   }, [])
+
+  // Lo mismo para el segundo encadenado, el que cierra la fiesta.
+  const soltarFiesta = useCallback(() => {
+    const e = fiestaRef.current
+    if (e) {
+      clearTimeout(e.timer)
+      if (e.sound && typeof e.sound.off === 'function') e.sound.off('end', e.fin, e.id)
+    }
+    fiestaRef.current = null
+  }, [])
+
+  // ── CEL-2c · La fiesta acaba cuando calla la música ───────────────────────
+  // Decisión de Victor en vivo, y sustituye a la de la lámina: la calma ya no se
+  // ancla al contador —que aterriza a los ~1,5 s y dejaba diez segundos de
+  // melodía sobre una pantalla quieta— sino al `end` de la melodía.
+  // Mismo molde que el estallido: manda el evento, el temporizador es la red.
+  // Se programa DOS VECES a propósito: una al reventar, con el reloj nominal de
+  // los 12 s sellados por CEL-A —que cubre el mute y la melodía que no carga—, y
+  // otra cuando la pieza arranca de verdad, ya contra su duración real. La
+  // segunda sustituye a la primera; sin eso, una melodía que empezara tarde se
+  // vería cortada por una red armada antes de que sonase.
+  const programaFinFiesta = useCallback((howl, id) => {
+    soltarFiesta()
+    const fin = () => {
+      soltarFiesta()
+      if (!vivoRef.current || saltadoRef.current || faseRef.current !== 'fiesta') return
+      marcaCEL('melodia-fin')
+      vaA('calma')
+    }
+    if (!howl) { fiestaRef.current = { timer: setTimeout(fin, MELODIA_MS) }; return }
+    const dur = typeof howl.duration === 'function' ? Number(howl.duration()) : 0
+    fiestaRef.current = { sound: howl, id, fin, timer: setTimeout(fin, esperaFinMelodia(dur)) }
+    howl.once('end', fin, id)
+  }, [soltarFiesta, vaA])
 
   // La pizarra del arnés, limpia por pantalla: unas marcas heredadas de la
   // celda anterior describirían un arco que no ocurrió. No-op fuera de `dev`.
@@ -127,11 +163,12 @@ export function useCoreografia({ precedente, netas, saldo }) {
       const mm = melodiaRef.current
       if (!mm || !vivoRef.current || saltadoRef.current || faseRef.current === 'reposo') return
       mm.sonando = mm.howl.play()
-      marcaCEL('melodia-suena', { melodia: mm.nombre })
+      marcaCEL('melodia-suena', { melodia: mm.nombre, dur: Math.round(Number(mm.howl.duration()) * 1000) })
+      programaFinFiesta(mm.howl, mm.sonando)
     }
     if (m.howl.state() === 'loaded') suena()
     else { marcaCEL('melodia-tarde', { estado: m.howl.state() }); m.howl.once('load', suena) }
-  }, [])
+  }, [programaFinFiesta])
 
   // ── El encadenado ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -142,6 +179,10 @@ export function useCoreografia({ precedente, netas, saldo }) {
       if (!vivoRef.current || saltadoRef.current || faseRef.current !== 'sobria') return
       marcaCEL('revienta')
       vaA('fiesta')
+      // La red primero y la melodía después: si el archivo no llegara a sonar,
+      // la fiesta dura los 12 s nominales igual y la pantalla no se queda
+      // lloviendo para siempre.
+      programaFinFiesta(null, null)
       arrancaMelodia()
     }
 
@@ -168,7 +209,7 @@ export function useCoreografia({ precedente, netas, saldo }) {
     const cuadro = requestAnimationFrame(lanza)
     const red = setTimeout(lanza, ANCLA_TOPE_MS)
     return () => { cancelAnimationFrame(cuadro); clearTimeout(red) }
-  }, [precedente, arrancaMelodia, soltarEspera, vaA])
+  }, [precedente, arrancaMelodia, programaFinFiesta, soltarEspera, vaA])
 
   // ── Los contadores ────────────────────────────────────────────────────────
   // Un solo reloj para los dos: suben juntos y aterrizan juntos. El progreso
@@ -182,13 +223,8 @@ export function useCoreografia({ precedente, netas, saldo }) {
       // se ESCRIBE en el estado, se deriva en el retorno del hook: un setState
       // dentro del cuerpo de un efecto encadena renders, y aquí no hace ninguna
       // falta porque el valor no depende de nada que cambie.
-      // El paso a `calma` se aplaza a la siguiente tarea por lo mismo: no es un
-      // rodeo, es la diferencia entre encadenar dos renders y hacer uno. Con el
-      // movimiento reducido la fiesta dura lo que dura ese aplazamiento, que es
-      // lo que se pide — valores finales y nada de coreografía.
       marcaCEL('conteo-fin', { directo: true })
-      const ya = setTimeout(() => vaA('calma'), 0)
-      return () => clearTimeout(ya)
+      return undefined
     }
 
     const dur = duracionConteo(magnitudConteo(netas, saldo))
@@ -208,12 +244,14 @@ export function useCoreografia({ precedente, netas, saldo }) {
       const p = Math.min(1, acumulado / dur)
       setProgreso(p)
       if (p < 1) { id = requestAnimationFrame(paso); return }
+      // CEL-2c · aquí acababa la fiesta hasta la audición de Victor. Ya no: el
+      // contador aterriza y la lluvia sigue sonando la melodía entera. Lo único
+      // que queda es la marca, que es con la que el arnés mide la cuenta.
       marcaCEL('conteo-fin')
-      vaA('calma')
     }
     id = requestAnimationFrame(paso)
     return () => cancelAnimationFrame(id)
-  }, [fase, netas, saldo, quietud, vaA])
+  }, [fase, netas, saldo, quietud])
 
   // ── De la calma al reposo ─────────────────────────────────────────────────
   // Lo que dura la calma es lo que tarda en caer la moneda más lenta: ni un ms
@@ -238,6 +276,7 @@ export function useCoreografia({ precedente, netas, saldo }) {
     saltadoRef.current = true
     marcaCEL('salto', { desde: faseRef.current })
     soltarEspera()
+    soltarFiesta()
     setProgreso(1)
     if (faseRef.current !== 'reposo') vaA('calma')
     const m = melodiaRef.current
@@ -245,7 +284,7 @@ export function useCoreografia({ precedente, netas, saldo }) {
       m.howl.fade(m.howl.volume(), 0, FADE_CORTE_MS, m.sonando)
       setTimeout(() => { try { m.howl.stop(m.sonando) } catch { /* ya parada */ } }, FADE_CORTE_MS)
     }
-  }, [soltarEspera, vaA])
+  }, [soltarEspera, soltarFiesta, vaA])
 
   useEffect(() => {
     if (fase === 'reposo') return undefined
@@ -267,7 +306,8 @@ export function useCoreografia({ precedente, netas, saldo }) {
   useEffect(() => () => {
     vivoRef.current = false
     soltarEspera()
-  }, [soltarEspera])
+    soltarFiesta()
+  }, [soltarEspera, soltarFiesta])
 
   // Con movimiento reducido no hay cuenta: el progreso es 1 desde el principio.
   const progreso = quietud ? 1 : progresoVivo

@@ -61,14 +61,32 @@ export function guardaUltima(indice) {
   guardaMemoria(FRASE_KEY, indice)
 }
 
-// La frase de esta pantalla. `forzada` (1-based, del molde de desarrollo) manda
-// sobre todo lo demás y NO toca la memoria: forzar una frase para medirla no
-// debe alterar qué ve el jugador en su próxima victoria real.
+// La frase de esta pantalla: sortea y devuelve `{ indice, texto }`.
+// `forzada` (1-based, del molde de desarrollo) manda sobre todo lo demás y llega
+// con `indice: null`, que es como se dice "esto no se recuerda": forzar una
+// frase para medirla no debe alterar qué ve el jugador en su próxima victoria.
+//
+// ── CEL-2c · Por qué SORTEAR y RECORDAR van separados ───────────────────────
+// Éste era el defecto latente que CEL-2 reportó y que Victor manda corregir.
+// El sorteo ocurre en un inicializador de `useState`, y React invoca esos
+// inicializadores DOS VECES en desarrollo (StrictMode). Cuando el sorteo escribía
+// la memoria, el segundo sorteo leía lo que el primero acababa de escribir y lo
+// esquivaba: quedaba recordada una frase DISTINTA de la que se veía en pantalla,
+// y la victoria siguiente podía repetir justo la que el jugador acababa de leer
+// —una de cada siete—. Devolviendo el índice y guardándolo desde un efecto, lo
+// que se recuerda es exactamente lo que se mostró.
+// Mismo patrón que la bolsa de melodías de CEL-2, ahora en las dos.
 export function frasePara(forzada) {
   if (Number.isInteger(forzada) && forzada >= 1 && forzada <= FRASES_VICTORIA.length) {
-    return fraseDe(forzada - 1)
+    return { indice: null, texto: fraseDe(forzada - 1) }
   }
   const i = eligeIndice(leeUltima(), Math.random())
-  guardaUltima(i)
-  return fraseDe(i)
+  return { indice: i, texto: fraseDe(i) }
+}
+
+// El segundo tiempo: recordar la que se mostró. Idempotente a propósito — en
+// desarrollo el efecto que la llama monta dos veces.
+export function recuerdaFrase(indice) {
+  if (!Number.isInteger(indice)) return
+  guardaUltima(indice)
 }

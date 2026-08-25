@@ -6,7 +6,7 @@ import { valorConteo } from '../hooks/sesionCore'
 import { useCoreografia } from '../hooks/useCoreografia'
 import { LluviaHeptacoins } from './LluviaHeptacoins'
 import { SoundButton } from './SoundButton'
-import { frasePara } from '../config/frasesVictoria'
+import { frasePara, recuerdaFrase } from '../config/frasesVictoria'
 import { fraseForzadaCEL } from '../dev/siembraCEL'
 import '../styles/celebracion.css'
 
@@ -191,7 +191,12 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, progreso = 1 }) {
 // La pantalla de DERROTA no pasa por aquí y no cambia ni un byte: sigue siendo
 // `.game-over-screen` con su mensaje. La frase es del ganador.
 export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onLeave }) {
-  const [frase] = useState(() => frasePara(fraseForzadaCEL()))
+  // CEL-2c · la frase se sortea al montar y se RECUERDA aparte, desde un efecto:
+  // así la que se ve y la que se guarda son siempre la misma, también bajo el
+  // doble montaje de StrictMode. Mismo molde que la bolsa de melodías.
+  const [eleccion] = useState(() => frasePara(fraseForzadaCEL()))
+  const frase = eleccion.texto
+  useEffect(() => { recuerdaFrase(eleccion.indice) }, [eleccion])
   // CEL-2 · El arco. `precedente` es el toc-toc que GameTable ya disparaba al
   // entrar en GAME_OVER: aquí no se dispara nada, se ESPERA a que termine.
   const { fase, progreso, melodia, oculta, quietud } = useCoreografia({ precedente, netas, saldo })
