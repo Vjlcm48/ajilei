@@ -287,3 +287,139 @@ h1.cel-ajilei {
 @media (orientation: landscape) and (max-height: 600px) {
   .cel-netas-ico .chip-token { width: 48px; height: 48px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CEL-2 · LA COREOGRAFÍA
+   Rector: lámina CEL-2, validada por Victor.
+
+   TODO se gobierna con UN atributo, `data-fase`, que la pantalla escribe en su
+   raíz: `sobria` → `fiesta` → `calma` → `reposo`. Ni una clase suelta, ni un
+   estilo en línea para lo que es piel. Así el arco se lee de un tirón aquí, y
+   un arnés puede medir la secuencia leyendo el mismo atributo que la manda.
+
+   Sigue sin haber un solo `!important` en esta hoja, y el bloque protegido de
+   `gameTable.css:272-443` sigue sin abrirse.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* La columna pasa a ser el bloque contenedor de la lluvia. Es la única razón:
+   la capa se posiciona contra ella, no contra el viewport. Y no es capricho —
+   una capa `fixed` dentro de un árbol con `transform` deja de ser `fixed` y
+   aterriza donde nadie la puso; VC2 aprendió eso y por eso sus overlays son
+   hermanos del área. Aquí no hace falta arriesgar: la lluvia cae sobre la
+   pantalla terminal, que es exactamente esta caja. */
+.cel-screen { position: relative; }
+
+/* Las cinco piezas, POR ENCIMA de la lluvia. Un elemento estático se pinta en
+   una capa inferior a la de cualquier posicionado, así que sin esto la lluvia
+   —que sí está posicionada— caería por delante de la tarjeta y del botón. */
+.cel-screen > * { position: relative; z-index: 1; }
+
+/* ── La lluvia ──────────────────────────────────────────────────────────────
+   DETRÁS de todo (`z-index: 0` contra el 1 de sus hermanas) y sin recoger un
+   solo evento: el botón de salir tiene que funcionar en todo momento, y una
+   capa que se traga el clic es justo lo que la lámina prohíbe.
+   Selector con el padre para ganarle al `z-index: 1` de la regla de arriba sin
+   `!important`: (0,2,0) contra (0,1,0). */
+.cel-screen > .cel-lluvia {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Una moneda. `left` la coloca; todo lo demás lo mueven `translate`, `rotate` y
+   `opacity`, que son las tres propiedades que el compositor resuelve sin tocar
+   el layout: 18 de éstas no provocan un solo reflow.
+   `line-height: 0` por lo mismo que en `.vc-ficha`: un <img> en línea deja el
+   hueco del descendente y la caja dejaría de ser la de la moneda. */
+.cel-gota {
+  position: absolute;
+  top: 0;
+  line-height: 0;
+  will-change: translate, rotate, opacity;
+  animation:
+    cel-caida var(--gota-caida, 1300ms) cubic-bezier(0.45, 0, 0.75, 0.55) forwards,
+    cel-giro  var(--gota-giro, 1200ms) linear infinite var(--gota-sentido, normal),
+    cel-vela  var(--gota-caida, 1300ms) linear forwards;
+}
+
+/* El calibre de cada gota pisa al atributo `width`/`height` del ChipToken, que
+   trae el 24 de `compact`. Es el mismo molde con el que `gameTable.css` achica
+   la moneda del pozo: la caja va en atributos justo para que una regla pueda. */
+.cel-gota .chip-token {
+  width: var(--gota-lado, 24px);
+  height: var(--gota-lado, 24px);
+}
+
+/* La pausa por pestaña oculta. Congela lo que hay en el aire en vez de
+   retirarlo: al volver, la moneda sigue su caída desde donde estaba. */
+.cel-lluvia-pausa .cel-gota { animation-play-state: paused; }
+
+/* La caída. Acelera —`cubic-bezier` de entrada, que es lo que hace la gravedad—
+   y arrastra una deriva lateral. Empieza y acaba fuera de la caja, así que
+   ninguna moneda aparece ni desaparece a la vista.
+   El viaje se mide en `vh` y no en `%`: un porcentaje en `translate` se
+   resuelve contra la caja del PROPIO elemento (24 px), no contra la capa. */
+@keyframes cel-caida {
+  from { translate: 0 calc(-1 * var(--gota-lado, 24px) - 8px); }
+  to   { translate: var(--gota-deriva, 0px) calc(100vh + var(--gota-lado, 24px)); }
+}
+
+/* El giro, a su propio reloj y lineal: una moneda que cae girando no acelera su
+   giro. Son propiedades independientes —`rotate` y `translate`, no un
+   `transform` compartido— justo para poder darles relojes distintos, que es el
+   mismo motivo por el que VC2 separó `translate` de `scale`. */
+@keyframes cel-giro {
+  from { rotate: 0deg; }
+  to   { rotate: 360deg; }
+}
+
+/* Entrada y salida de la moneda. En animación aparte porque necesita curva
+   LINEAL: metida en `cel-caida` como paradas intermedias, la curva de gravedad
+   se reiniciaría en cada parada y la caída saldría a trompicones.
+   La opacidad de crucero la fija el perfil: las pequeñas —las de detrás— van
+   más apagadas, y eso es toda la profundidad que hace falta. */
+@keyframes cel-vela {
+  0%   { opacity: 0; }
+  10%  { opacity: var(--gota-opacidad, 1); }
+  86%  { opacity: var(--gota-opacidad, 1); }
+  100% { opacity: 0; }
+}
+
+/* ── La entrada sobria ──────────────────────────────────────────────────────
+   AJILEI sin resplandor y la frase invisible. Todo lo demás —la tarjeta con su
+   estructura, el botón y el enlace— está ahí desde el primer fotograma: el que
+   acaba de ganar puede irse cuando quiera, sin esperar a nada.
+
+   EL RESPLANDOR NO SE DESMONTA, SE PARA. Dos declaraciones y ninguna copia del
+   efecto de EMB-1:
+     · `--brillo-banda-frac: 0` deja la banda con ancho cero, y una capa de 0 px
+       no se pinta — ni en el rótulo ni en el pseudo del isotipo, que consumen
+       la misma variable. Es exactamente el mecanismo con el que EMB-1 apaga la
+       luz en `prefers-reduced-motion`, no uno nuevo.
+     · `animation-play-state: paused` congela el recorrido en su fotograma 0,
+       que es la banda fuera del rótulo por la izquierda. Sin esto, al quitar el
+       gate la luz aparecería a mitad de barrido — un destello en medio de la
+       palabra en vez de una luz que entra.
+   Al pasar a `fiesta` caen las dos y el barrido arranca desde su principio:
+   1,5 s de luz cruzando la palabra, que es el «enciende su resplandor» de la
+   lámina, y después el ciclo lento de siempre — el brillo residual del reposo
+   no hay que construirlo, es EMB-1 haciendo lo que hace. */
+.cel-screen[data-fase="sobria"] h1.cel-ajilei {
+  --brillo-banda-frac: 0;
+  animation-play-state: paused;
+}
+
+/* La frase aparece con el estallido. Se atenúa, no se desmonta: si el nodo
+   entrara y saliera del árbol, la columna cambiaría de alto y las cinco piezas
+   se recolocarían justo en el instante en que empieza la fiesta. */
+.cel-frase { transition: opacity 420ms ease-out; }
+.cel-screen[data-fase="sobria"] .cel-frase { opacity: 0; }
+
+/* Movimiento reducido: la frase no se atenúa, está. Sin lluvia (no se monta) y
+   con los contadores en su valor final, esto es lo único que quedaba por
+   desactivar de la coreografía. */
+@media (prefers-reduced-motion: reduce) {
+  .cel-frase { transition: none; }
+}

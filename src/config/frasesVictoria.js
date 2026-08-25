@@ -1,3 +1,5 @@
+import { eligeSinRepetir, leeMemoria, guardaMemoria } from './sinRepetir'
+
 // ── CEL-1 · Banco de frases de victoria de mesa ─────────────────────────────
 // Documento rector: lámina CEL-1, validada por Victor.
 //
@@ -31,20 +33,14 @@ export const FRASE_KEY = 'ajilei.fraseVictoria'
 // dos mesas seguidas ve la misma frase con probabilidad 1/8 y la pantalla se
 // siente escrita por una máquina.
 //
-// Implementación: se sortea sobre las SIETE restantes y se corrige el índice,
-// en vez de sortear sobre ocho y repetir hasta que no coincida. Un bucle de
-// reintento no tiene cota superior; esto es una operación y siempre acierta.
-//
-// `ultima` fuera de rango (null, basura de un localStorage manipulado, un índice
-// de un banco más corto) se trata como "no hay última": se sortea sobre las
-// ocho. Nunca se devuelve un índice inválido.
+// CEL-2 · La regla dejó de vivir aquí y vive en `config/sinRepetir.js`, porque
+// la bolsa de melodías necesita EXACTAMENTE la misma y dos copias de una regla
+// son dos reglas. Esta función se conserva —sus pruebas la sellan por nombre y
+// es la que lee quien venga a entender las frases— y delega. El comportamiento
+// no cambia ni en un caso: `eligeSinRepetir` es el cuerpo que estaba aquí, con
+// el tamaño del banco como parámetro.
 export function eligeIndice(ultima, aleatorio) {
-  const n = FRASES_VICTORIA.length
-  const a = Math.min(Math.max(aleatorio, 0), 0.999999999)
-  const hayUltima = Number.isInteger(ultima) && ultima >= 0 && ultima < n
-  if (!hayUltima) return Math.floor(a * n)
-  const i = Math.floor(a * (n - 1))
-  return i >= ultima ? i + 1 : i
+  return eligeSinRepetir(FRASES_VICTORIA.length, ultima, aleatorio)
 }
 
 // Índice → frase, con el mismo criterio defensivo: un índice imposible cae a la
@@ -58,15 +54,11 @@ export function fraseDe(indice) {
 // corrupto se resuelven como "no hay memoria". Una frase de más no es un error
 // que justifique romper la pantalla.
 export function leeUltima() {
-  try {
-    const n = Number.parseInt(window.localStorage.getItem(FRASE_KEY), 10)
-    return Number.isInteger(n) ? n : null
-  } catch { return null }
+  return leeMemoria(FRASE_KEY)
 }
 
 export function guardaUltima(indice) {
-  try { window.localStorage.setItem(FRASE_KEY, String(indice)) }
-  catch { /* sin storage: la memoria dura lo que la sesión, y basta */ }
+  guardaMemoria(FRASE_KEY, indice)
 }
 
 // La frase de esta pantalla. `forzada` (1-based, del molde de desarrollo) manda

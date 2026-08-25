@@ -38,6 +38,7 @@
 //                 lotería. No toca la memoria de "última frase mostrada":
 //                 forzar una frase para medirla no debe cambiar la que el
 //                 jugador verá en su próxima victoria de verdad.
+//   &melodia=<n> → CEL-2. Lo mismo para la bolsa de melodías.
 //
 // SÓLO EN DESARROLLO. `import.meta.env.DEV` lo apaga en cualquier build de
 // producción: allí la función es la identidad y el parámetro no significa nada.
@@ -69,19 +70,26 @@ export function siembraCEL(estado) {
   }
 }
 
-// ── CEL-1 · La frase forzada ────────────────────────────────────────────────
+// ── CEL-1/CEL-2 · Los accesorios forzados del molde ─────────────────────────
 // Misma DOBLE PUERTA que la siembra —el gate del build Y la presencia del
-// parámetro—, y además exige `?cel`: `frase` es un accesorio del molde, no un
-// parámetro suelto. Devuelve `null` (= sortea) ante cualquier duda.
+// parámetro—, y además exigen `?cel`: son accesorios del molde, no parámetros
+// sueltos. Devuelven `null` (= sortea) ante cualquier duda.
 export const FRASE_PARAM = 'frase'
+// CEL-2 · `&melodia=<n>` fuerza la pieza n de la bolsa (1-based). Sirve para
+// auditar una melodía concreta sin recargar hasta que salga por sorteo, y —como
+// la frase— NO toca la memoria de "última sonada".
+export const MELODIA_PARAM = 'melodia'
 
-export function fraseForzadaCEL() {
+function forzadoCEL(param) {
   if (!import.meta.env.DEV) return null
   if (typeof window === 'undefined') return null
   try {
     const q = new URLSearchParams(window.location.search)
     if (q.get(CEL_PARAM) == null) return null
-    const n = Number.parseInt(q.get(FRASE_PARAM), 10)
+    const n = Number.parseInt(q.get(param), 10)
     return Number.isFinite(n) && n >= 1 ? n : null
   } catch { return null }
 }
+
+export function fraseForzadaCEL() { return forzadoCEL(FRASE_PARAM) }
+export function melodiaForzadaCEL() { return forzadoCEL(MELODIA_PARAM) }

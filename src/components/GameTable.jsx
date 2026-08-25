@@ -817,10 +817,24 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // mesa. Vive aparte de useCelebracion a propósito: 'partida' no es un overlay
   // efímero con techo de duración, es una pantalla terminal — no tiene ciclo de
   // vida que gobernar, sólo un sonido de entrada.
+  //
+  // CEL-2 · EL DISPARO NO CAMBIA. Sigue siendo éste, en este instante y una sola
+  // vez: la coreografía no estrena un segundo toc-toc, se ENCADENA a éste. Lo
+  // único que se añade es publicar el mando que `play()` ya devolvía desde VC2,
+  // para que la pantalla pueda escuchar su `end`.
+  // Viaja como GETTER sobre una ref, que es el molde que VC2b ya usa con
+  // `precedenteViaje` doce líneas más arriba: la pantalla no lee el sonido al
+  // montar —los efectos del hijo corren ANTES que los del padre y lo
+  // encontraría vacío— sino en el primer cuadro, cuando el disparo ya ocurrió.
+  // Con el sonido apagado `play()` devuelve null y aquí se guarda `{mudo:true}`:
+  // el disparo OCURRIÓ igual, sólo que sin nada que oír, y esa distinción es la
+  // que deja al arco visual correr con los mismos tiempos.
+  const tocPartidaRef = useRef(null)
+  const precedenteToc = useCallback(() => tocPartidaRef.current, [])
   useEffect(() => {
     if (phase !== PHASES.GAME_OVER) return
     if (decideCelebracion({ phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN }) !== 'partida') return
-    play('tableKnock')
+    tocPartidaRef.current = play('tableKnock') ?? { mudo: true }
   }, [phase]) // eslint-disable-line
 
   // ── AI auto-action ────────────────────────────────────────────────────────
@@ -1643,6 +1657,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
               netas={fichasNetas(human.chips)}
               saldo={human.chips}
               puntos={sesion.manosGanadas * puntosDe(game.nivelIA)}
+              precedente={precedenteToc}
               onLeave={onLeave}
             />
           ) : (

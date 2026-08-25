@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import ChipToken from './ChipToken'
 import { Wordmark } from './Wordmark'
 import { VIAJE_MS, VIAJE_ESCALON_MS, VIAJE_DESVANECIDO_MS, llevaViaje, llevaPulso } from '../hooks/celebracionCore'
-import { CONTEO_MS, valorConteo } from '../hooks/sesionCore'
+import { valorConteo } from '../hooks/sesionCore'
+import { useCoreografia } from '../hooks/useCoreografia'
+import { LluviaHeptacoins } from './LluviaHeptacoins'
 import { SoundButton } from './SoundButton'
 import { frasePara } from '../config/frasesVictoria'
 import { fraseForzadaCEL } from '../dev/siembraCEL'
@@ -130,39 +132,21 @@ export function AjileiOverlay({ activa }) {
 // existe —isGameOver lo sustituye por .game-over-screen—, así que la tarjeta
 // vive dentro de esa pantalla terminal, bajo el "¡Ganaste la mesa!" en oro que
 // se conserva intacto. Exenta del techo de duración: no interrumpe nada.
-// El corte NO se escribe en el estado del conteo: se DERIVA en el retorno. Así
-// no hay un setState síncrono dentro del efecto (que dispararía renders en
-// cascada), y el valor final aparece en el mismo frame del toque.
-function useConteo(destino, cortado) {
-  const [animado, setAnimado] = useState(0)
-  const rafRef = useRef(0)
-  useEffect(() => {
-    if (cortado) return
-    let inicio = null
-    const paso = (t) => {
-      if (inicio === null) inicio = t
-      const p = Math.min(1, (t - inicio) / CONTEO_MS)
-      setAnimado(valorConteo(destino, p))
-      if (p < 1) rafRef.current = requestAnimationFrame(paso)
-    }
-    rafRef.current = requestAnimationFrame(paso)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [destino, cortado])
-  return cortado ? destino : animado
-}
-
-export function TarjetaResumen({ sesion, netas, saldo, puntos }) {
-  const [cortado, setCortado] = useState(false)
-  const valor = useConteo(netas, cortado)
-
-  // El toque corta el conteo al valor final — mismo gesto que corta una
-  // celebración de mesa, misma vía: pointerdown en captura, sin overlay.
-  useEffect(() => {
-    if (cortado) return
-    const corta = () => setCortado(true)
-    document.addEventListener('pointerdown', corta, true)
-    return () => document.removeEventListener('pointerdown', corta, true)
-  }, [cortado])
+//
+// ── CEL-2 · El conteo dejó de ser suyo ──────────────────────────────────────
+// Hasta CEL-1 la tarjeta llevaba su propio rAF y su propio `pointerdown`. Ahora
+// hay UN arco con UN reloj —`useCoreografia`— y la tarjeta recibe `progreso`,
+// que es lo único que necesita: la curva sigue siendo `valorConteo`, la de VC2,
+// ni tocada ni copiada. Dos relojes para dos cifras que tienen que aterrizar
+// juntas es exactamente cómo se desincronizan.
+//
+// `progreso = 1` por defecto: quien monte esta tarjeta sin arco —una prueba, un
+// resumen futuro en otro sitio— ve las cifras finales, jamás ceros.
+export function TarjetaResumen({ sesion, netas, saldo, puntos, progreso = 1 }) {
+  const valor = valorConteo(netas, progreso)
+  // "Saldo actual" ACOMPAÑA a las netas: mismo reloj, misma curva, misma
+  // llegada. Lo que sube no son dos números sueltos, es una sola cuenta.
+  const saldoVivo = valorConteo(saldo, progreso)
 
   const signo = valor > 0 ? '+' : ''
   return (
@@ -179,7 +163,7 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos }) {
             jamás la fórmula 5000 + 5000×rivales. Coinciden hoy porque el humano
             se lo llevó todo, pero el día que la economía cambie (recompra,
             bono, premio escalado) la fórmula mentiría y el estado no. */}
-        <div className="cel-linea-alta"><dt>Saldo actual</dt><dd>{saldo}</dd></div>
+        <div className="cel-linea-alta"><dt>Saldo actual</dt><dd>{saldoVivo}</dd></div>
         <div className="cel-linea-alta"><dt>Puntos obtenidos</dt><dd>{puntos}</dd></div>
         <div><dt>Manos jugadas</dt><dd>{sesion.manosJugadas}</dd></div>
         <div><dt>Manos ganadas</dt><dd>{sesion.manosGanadas}</dd></div>
@@ -206,11 +190,28 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos }) {
 //
 // La pantalla de DERROTA no pasa por aquí y no cambia ni un byte: sigue siendo
 // `.game-over-screen` con su mensaje. La frase es del ganador.
-export function PantallaVictoria({ sesion, netas, saldo, puntos, onLeave }) {
+export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onLeave }) {
   const [frase] = useState(() => frasePara(fraseForzadaCEL()))
+  // CEL-2 · El arco. `precedente` es el toc-toc que GameTable ya disparaba al
+  // entrar en GAME_OVER: aquí no se dispara nada, se ESPERA a que termine.
+  const { fase, progreso, melodia, oculta, quietud } = useCoreografia({ precedente, netas, saldo })
 
   return (
-    <div className="cel-screen">
+    // `data-fase` es el único mando de la coreografía visual: la hoja apaga el
+    // resplandor y esconde la frase mientras dice `sobria`, y los enciende sin
+    // una línea de JS en cuanto dice `fiesta`. Que el estado del arco viaje por
+    // un atributo y no por seis clases sueltas es lo que hace que el arnés
+    // pueda medir la secuencia — y que no exista un estado visual que el DOM no
+    // declare.
+    <div className="cel-screen" data-fase={fase} data-melodia={melodia ?? ''}>
+      {/* La lluvia va DENTRO de la columna y detrás de ella (`z-index`), y
+          nace en `fiesta`. Sigue montada en `calma` porque ahí ya no emite pero
+          las monedas del aire tienen que terminar de caer.
+          Con movimiento reducido no se monta jamás: no hay lluvia atenuada, hay
+          lluvia o no la hay. */}
+      {!quietud && fase !== 'sobria'
+        ? <LluviaHeptacoins emitiendo={fase === 'fiesta'} pausada={oculta} />
+        : null}
       {/* El resplandor de portada, REUTILIZADO: este anfitrión está en la lista
           de selectores de embellecimiento.css §2, no en una copia del efecto.
           `aria-label` porque el wordmark es un símbolo más "ILEI": sin él, la
@@ -219,7 +220,7 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, onLeave }) {
 
       <p className="cel-frase">{frase}</p>
 
-      <TarjetaResumen sesion={sesion} netas={netas} saldo={saldo} puntos={puntos} />
+      <TarjetaResumen sesion={sesion} netas={netas} saldo={saldo} puntos={puntos} progreso={progreso} />
 
       <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
 
