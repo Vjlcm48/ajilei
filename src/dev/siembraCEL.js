@@ -33,6 +33,11 @@
 //                 (`n >= unit`), así que se juegan manos de verdad y la tarjeta
 //                 sale con cifras vividas. NO es determinista: una IA puede
 //                 ganar el pozo y estirar la partida, o ganar la mesa.
+//   &frase=<n>  → CEL-1. Fuerza la frase n del banco (1-based) en vez de
+//                 sortearla, para medir la más larga sin depender de la
+//                 lotería. No toca la memoria de "última frase mostrada":
+//                 forzar una frase para medirla no debe cambiar la que el
+//                 jugador verá en su próxima victoria de verdad.
 //
 // SÓLO EN DESARROLLO. `import.meta.env.DEV` lo apaga en cualquier build de
 // producción: allí la función es la identidad y el parámetro no significa nada.
@@ -62,4 +67,21 @@ export function siembraCEL(estado) {
     ...estado,
     players: estado.players.map((p, i) => (i === 0 ? p : { ...p, chips: fichas })),
   }
+}
+
+// ── CEL-1 · La frase forzada ────────────────────────────────────────────────
+// Misma DOBLE PUERTA que la siembra —el gate del build Y la presencia del
+// parámetro—, y además exige `?cel`: `frase` es un accesorio del molde, no un
+// parámetro suelto. Devuelve `null` (= sortea) ante cualquier duda.
+export const FRASE_PARAM = 'frase'
+
+export function fraseForzadaCEL() {
+  if (!import.meta.env.DEV) return null
+  if (typeof window === 'undefined') return null
+  try {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get(CEL_PARAM) == null) return null
+    const n = Number.parseInt(q.get(FRASE_PARAM), 10)
+    return Number.isFinite(n) && n >= 1 ? n : null
+  } catch { return null }
 }

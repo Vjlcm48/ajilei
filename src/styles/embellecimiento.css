@@ -149,7 +149,14 @@
    título INVISIBLE. Donde el recorte no exista, no entra nada y manda la regla
    original de welcome.css (dorado plano, legible).                             */
 @supports ((background-clip: text) or (-webkit-background-clip: text)) {
-  h1.welcome-title {
+  /* CEL-1 · `h1.cel-ajilei` se SUMA aqui en vez de copiar el efecto a
+     celebracion.css. La lamina pide "el resplandor de portada", no uno
+     parecido: dos definiciones del mismo brillo se desincronizan a la primera
+     calibracion de Victor que toque solo una. Misma especificidad (0,1,1) y
+     mismo bloque; lo unico que CEL-1 pone de su parte son el tamano y la traza,
+     que si son suyos y viven en su hoja. */
+  h1.welcome-title,
+  h1.cel-ajilei {
     /* ── VIS-4b · Tiempos ──────────────────────────────────────────────────
        El ciclo ya no es la constante: lo son el RECORRIDO y la PAUSA, y el
        ciclo se deriva sumándolos. Así "más lento" y "más frecuente" son dos
@@ -301,7 +308,8 @@
      el activo pesa 4054 B, justo por debajo del umbral de 4096 con que Vite
      inlinea, y un data URI borraría del build el nombre del archivo — que
      Identidad A §5.4 declara ID de contrato. */
-  h1.welcome-title .wm-slot::after {
+  h1.welcome-title .wm-slot::after,
+  h1.cel-ajilei .wm-slot::after {
     content: '';
     position: absolute;
     left: 0;
@@ -335,11 +343,13 @@
      luz de verdad: ancho de banda cero en el título (una capa de 0px no se
      pinta) y el pseudo del isotipo desmontado. */
   @media (prefers-reduced-motion: reduce) {
-    h1.welcome-title {
+    h1.welcome-title,
+    h1.cel-ajilei {
       animation: none;
       --brillo-banda: 0px;
     }
-    h1.welcome-title .wm-slot::after { display: none; }
+    h1.welcome-title .wm-slot::after,
+    h1.cel-ajilei .wm-slot::after { display: none; }
   }
 }
 
@@ -496,6 +506,10 @@
 h1.welcome-title  { --wm-track: 12px; }   /* welcome.css  .welcome-title      */
 h1.table-title    { --wm-track:  5px; }   /* gameTable.css .table-title       */
 span.vc-ajilei    { --wm-track: 0.23em; } /* gameTable.css .vc-ajilei (en em) */
+/* h1.cel-ajilei  -> su traza la fija celebracion.css (0.167em), que es donde
+   vive su tamano: es el unico anfitrion cuya hoja NO es protegida, asi que no
+   necesita que IDN-1 se la calce desde aqui. Se anota para que esta lista siga
+   siendo el mapa completo de anfitriones del wordmark.                      */
 
 @media (max-width: 680px) {
   h1.welcome-title { --wm-track: 8px; }   /* welcome.css @680                 */

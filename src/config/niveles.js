@@ -18,18 +18,21 @@ export const NIVELES = [
     // Copy PROVISIONAL (instrucción NIV-UI §0): Victor lo ajusta en su
     // checkpoint. Es texto, es barato.
     descripcion: 'El juego de siempre',
+    puntos: 1,   // ranking vs IA (Modos_y_Asistencia v1.0 §6.1)
     apuestas: [50, 100, 150, 250],
   },
   {
     id: 'avanzado',
     nombre: 'Avanzado',
     descripcion: 'Rivales que piensan más',
+    puntos: 2,   // ranking vs IA (Modos_y_Asistencia v1.0 §6.1)
     apuestas: [100, 200, 300, 500],   // las apuestas de hoy suben un peldaño (v1.0 §3.2)
   },
   {
     id: 'pro',
     nombre: 'Pro',
     descripcion: 'El reto mayor',
+    puntos: 3,   // ranking vs IA (Modos_y_Asistencia v1.0 §6.1)
     apuestas: [200, 400, 600, 1000],
   },
 ]
@@ -55,4 +58,20 @@ export function nivelPorId(id) {
 // devolver una lista vacía: una pantalla sin apuestas no es un error legible.
 export function apuestasDe(id) {
   return (nivelPorId(id) ?? nivelPorId(NIVEL_POR_DEFECTO)).apuestas
+}
+
+// Puntos de ranking por MANO GANADA contra IA de este nivel — la tabla plana de
+// `Modos_y_Asistencia_v1.0.md` §6.1: Básico 1 · Avanzado 2 · Pro 3. "Plano" es
+// la palabra del rector: no hay componente de mesa, ganarle a cuatro IAs de
+// Básico vale lo mismo que a una. Contra máquinas se puntúa A QUÉ máquina.
+//
+// La tabla de §6.2 —vs humanos, `ruleN + 3`— NO vive aquí a propósito: no hay
+// mesas humanas todavía, y el rector prohíbe expresamente la calculadora
+// paralela que recontaría asientos por su cuenta. Cuando llegue, su número sale
+// de `handRules`, no de este archivo.
+//
+// Mismo criterio defensivo que `apuestasDe`: un id desconocido cae al nivel por
+// defecto en vez de devolver `undefined` y pintar "NaN puntos".
+export function puntosDe(id) {
+  return (nivelPorId(id) ?? nivelPorId(NIVEL_POR_DEFECTO)).puntos
 }

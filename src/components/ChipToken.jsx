@@ -59,6 +59,11 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline';
 // aceptada explícitamente por Victor el 2026-08-20.
 
 const SIZES = {
+  // CEL-1 · la moneda de la pantalla de victoria de mesa. Es la única aparición
+  // "heroica" de la Heptacoin en toda la app: no acompaña a un saldo, ES el
+  // objeto de la pantalla. 56 en escritorio; celebracion.css la baja a 48 en
+  // las dos pieles de móvil.
+  hero:    56,
   full:    36,
   compact: 24,
   icon:    16,

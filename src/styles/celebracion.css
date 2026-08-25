@@ -1,0 +1,289 @@
+/* ── AJILEI · CEL-1 · La pantalla de victoria de mesa ────────────────────────
+   Rector: lámina CEL-1, validada por Victor.
+
+   HOJA ADITIVA, y por qué existe. La piel de esta pantalla vivía en
+   `gameTable.css:272-443`, que es archivo PROTEGIDO. En vez de abrirlo, los
+   componentes adoptan clases nuevas `cel-*` y toda la piel nueva vive aquí.
+   Las reglas `.vc-tarjeta` / `.vc-netas*` / `.vc-detalle` de aquella hoja
+   quedan como LETRA MUERTA: ningún nodo las lleva ya.
+
+   Lo que NO queda muerto de aquel bloque, y conviene tenerlo escrito para que
+   una tanda futura no lo borre creyendo que sí:
+     · `.game-over-screen` y `.game-over-msg` siguen vistiendo la pantalla de
+       DERROTA, que esta tanda no toca ni un byte.
+     · `.vc-ajilei` y `.vc-ajilei-capa` son el overlay de AJILEI EN MANO (VC2),
+       que no tiene nada que ver con esta pantalla.
+
+   ALCANCE MULTIPLATAFORMA. Base = escritorio; dos bloques de override con las
+   consultas que el proyecto ya usa (`GameTable.jsx:72-87`):
+     · móvil vertical   (max-width: 767px) and (orientation: portrait)
+     · móvil horizontal (orientation: landscape) and (max-height: 600px)
+   Sin `!important` en ninguna regla: la hoja es nueva y no compite con nadie.
+
+   SIN MOVIMIENTO. CEL-1 deja la pantalla en reposo — la coreografía (lluvia,
+   toc-toc, melodía) es CEL-2. Aquí no hay una sola `animation` propia. La única
+   luz que se mueve es la de EMB-1 sobre el rótulo, y es REUTILIZADA desde
+   `embellecimiento.css`, no una copia: allí `h1.cel-ajilei` se sumó a la lista
+   de anfitriones de la regla que ya existía.                                  */
+
+/* ── La columna ─────────────────────────────────────────────────────────────
+   Misma caja de flujo que `.game-over-screen` —flex, centrada, `flex: 1`— para
+   que la pantalla de victoria y la de derrota ocupen el área igual. El `gap`
+   baja de 22 a 18: la columna de CEL-1 tiene cinco piezas en vez de tres. */
+.cel-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+  padding: 24px;
+}
+
+/* Las cinco piezas NO se encogen. Un hijo de flex encoge por defecto, y en la
+   piel más apretada eso salía caro: al activar el `overflow` de móvil
+   horizontal, el navegador empezó a comprimir `.cel-frase` por debajo de su
+   contenido y el clamp de dos líneas la RECORTABA — ocho frases mutiladas que
+   el arnés cantó en la misma corrida. Que la columna se desplace si no cabe es
+   una decisión; que aplaste la frase para disimularlo, no. */
+.cel-screen > * { flex-shrink: 0; }
+
+/* ── 1 · AJILEI ─────────────────────────────────────────────────────────────
+   El resplandor de portada NO se define aquí. Vive en `embellecimiento.css`
+   §2, y este anfitrión se añadió a sus selectores. Aquí sólo van el tamaño y
+   la traza, que son lo que cambia por pantalla.
+
+   `--wm-track` es la traza que repone el letter-spacing del inline para el
+   wordmark (IDN-1). Va en `em` y no en px —a diferencia de los otros tres
+   anfitriones— para que siga sola a los tres tamaños de esta pantalla sin
+   tres reglas extra. 0.167em sobre 72px son los 12px de la portada.
+
+   `--emb-titulo-margen-base` es el margen inferior que la regla compartida de
+   EMB-1 espeja de su anfitrión; aquí lo manda el `gap` de la columna, así que
+   se pone a cero y el hueco lo pone el flex. */
+h1.cel-ajilei {
+  --wm-track: 0.167em;
+  --emb-titulo-margen-base: 0px;
+  color: var(--gold-brand);
+  font-size: 72px;
+  letter-spacing: 0.167em;
+  line-height: 1;
+  margin: 0;
+}
+
+/* ── 2 · La frase del ganador ───────────────────────────────────────────────
+   Tope de DOS líneas, y de verdad: `-webkit-line-clamp` recorta con elipsis si
+   una frase futura se pasara, en vez de empujar la tarjeta fuera de la
+   pantalla. Hoy ninguna de las ocho llega a tres líneas en ninguna celda —
+   está medido en el modo `celebracion` del arnés—, así que el clamp es red, no
+   herramienta de diario.
+   `max-width` en `ch` y no en px: la caja se mide en caracteres porque lo que
+   la llena es texto, y así acompaña al cuerpo en cada breakpoint. */
+.cel-frase {
+  margin: 0;
+  color: var(--gold-brand);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+  max-width: 24ch;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ── 3 · La tarjeta ─────────────────────────────────────────────────────────
+   Misma superficie que la de VC2 —filete dorado fino, radio 8, sombra: la
+   familia de los popups del menú— y el mismo `min(420px, 100%)` de ancho, que
+   la lámina conserva. */
+.cel-tarjeta {
+  box-sizing: border-box;
+  width: min(420px, 100%);
+  padding: 20px 22px;
+  background: var(--surface-modal);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+/* La cifra de la sesión: moneda + número + unidad, centrados y con filete
+   debajo. Tabular para que los dígitos no bailen mientras el conteo sube (el
+   conteo es de VC2 y se conserva; lo que CEL-1 no añade es movimiento nuevo). */
+.cel-netas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+}
+
+.cel-netas-ico { display: inline-flex; }
+
+.cel-netas-num {
+  color: var(--gold-brand);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Perder también se informa, sin adornos: la cifra en rojo y nada más. */
+.cel-netas-neg .cel-netas-num { color: var(--loss-red); }
+
+.cel-netas-word {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Las líneas de la tarjeta. Una sola rejilla para las cinco; lo que distingue
+   a las dos primeras es `.cel-linea-alta`, no una estructura aparte. */
+.cel-detalle { margin: 0; }
+
+.cel-detalle > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 0;
+}
+
+.cel-detalle dt { color: var(--text-secondary); font-size: 13px; }
+.cel-detalle dd { margin: 0; font-size: 14px; font-weight: 700; }
+
+/* "Saldo actual" y "Puntos obtenidos" · destacadas: el rótulo sube a
+   `--text-primary` (las otras tres se quedan en secundario) y el valor va en
+   oro y a 22px. Son las dos cifras que la lámina quiere que se lean primero. */
+.cel-detalle .cel-linea-alta dt {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.cel-detalle .cel-linea-alta dd {
+  color: var(--gold-brand);
+  font-size: 22px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Filete bajo el grupo destacado: separa las dos cifras nuevas de las tres
+   estadísticas de siempre sin meter otro contenedor en el árbol. */
+.cel-detalle .cel-linea-alta:last-of-type {
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(var(--gold-brand-rgb), 0.18);
+}
+
+/* ── 5 · El enlace de ranking ───────────────────────────────────────────────
+   `disabled` REAL, no un `pointer-events: none`: un botón deshabilitado no
+   recibe foco, no se pulsa con teclado y lo anuncia el lector de pantalla.
+   Mismo tratamiento que las entradas inertes del menú de utilidades.
+   La pastilla reutiliza `.soon-tag`, que ya vive en `gameTable.css` — se usa
+   por su nombre de clase, sin abrir la hoja (molde EMB-2). */
+.cel-ranking {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* ── Móvil vertical ─────────────────────────────────────────────────────── */
+@media (max-width: 767px) and (orientation: portrait) {
+  .cel-screen { gap: 14px; padding: 18px; }
+  h1.cel-ajilei { font-size: 40px; }
+  /* Sin tope en `ch`: a 18px, 20ch dejaban la caja en ~200px cuando la columna
+     ofrece 282, y las dos frases más largas del banco se iban a TRES renglones
+     y el clamp las recortaba (medido en el modo `celebracion`). Aquí manda el
+     ancho de la columna, que ya está acotado por su propio padding. */
+  .cel-frase { font-size: 18px; max-width: 100%; }
+  .cel-tarjeta { padding: 16px 18px; }
+  .cel-netas-num { font-size: 34px; }
+  .cel-detalle .cel-linea-alta dd { font-size: 20px; }
+}
+
+/* ── Móvil horizontal ───────────────────────────────────────────────────────
+   La pantalla más apretada de las cuatro: 360px de alto para cinco piezas. El
+   rótulo baja a 32 y los huecos se cierran; la tarjeta conserva su ancho y sus
+   cifras destacadas, que son el contenido. */
+@media (orientation: landscape) and (max-height: 600px) {
+  /* EL ENCAJE, que es el problema de esta piel y no de las otras dos. Medido a
+     640x360: la columna pedía 458 px de alto para un hueco de ~305 (360 menos
+     la cabecera), y la tarjeta salía CORTADA por abajo — botón y enlace de
+     ranking incluidos. Las cajas medían bien una por una; lo que fallaba era la
+     suma, y por eso el modo `celebracion` gana ahora una puerta de encaje.
+
+     Se recorta SÓLO lo que la lámina no sella —huecos, rellenos y el aire entre
+     renglones—; los tamaños sellados (AJILEI 32, frase 18, moneda 48, cifra 34,
+     destacadas 20) no se tocan ni un píxel. */
+  .cel-screen {
+    gap: 3px;
+    padding: 4px 18px 2px;
+    /* Y la red, para las alturas que ni así den: una pantalla terminal que se
+       desplaza es mala, pero una que esconde el botón de salir es peor. El
+       `min-height: 0` hace falta para que un hijo flex pueda encogerse por
+       debajo de su contenido; sin él, `overflow` no llega a activarse nunca. */
+    min-height: 0;
+    overflow-y: auto;
+  }
+  h1.cel-ajilei { font-size: 32px; }
+  /* La interlínea baja de 1,35 a 1,2 SÓLO aquí. La lámina sella el cuerpo (18),
+     no el interlineado, y con una frase de dos renglones la columna se pasaba
+     por 2 px del viewport de 360. Es el último ajuste que quedaba sin tocar un
+     tamaño sellado. */
+  .cel-frase { font-size: 18px; max-width: 34ch; line-height: 1.2; }
+  .cel-tarjeta { padding: 8px 18px; }
+  .cel-netas { margin-bottom: 4px; padding-bottom: 4px; }
+  .cel-ranking { padding: 2px 6px; }
+  .cel-netas-num { font-size: 34px; }
+  .cel-detalle > div { padding: 0; }
+  .cel-detalle .cel-linea-alta dd { font-size: 20px; }
+
+  /* LA ÚNICA DECISIÓN QUE LA LÁMINA NO CUBRE, y va declarada para que Victor
+     pueda vetarla. A 640x360 quedaban 310 px de hueco bajo la cabecera y la
+     columna pedía ~364 aun con todos los huecos recortados: la pantalla se
+     desplazaba y el botón de salir caía fuera. Recortar más habría exigido
+     tocar un tamaño SELLADO.
+     Así que lo que cambia no es ningún tamaño: son las cinco líneas de la
+     tarjeta, que pasan de cinco filas a tres repartiéndose en DOS columnas.
+     Se ahorran dos filas y el filete del grupo, y la columna entra. El orden de
+     lectura no cambia (el grid llena por filas), ni el contenido, ni la
+     composición de las cinco piezas — sólo cómo se acomoda la tarjeta por
+     dentro en la piel más apretada de las tres.
+     Alternativa si esto no convence: dejar que la pantalla se desplace. */
+  .cel-detalle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 22px;
+  }
+  /* El filete que separaba las dos destacadas de las tres estadísticas no
+     sobrevive a una rejilla —subrayaría media fila—, y aquí no hace falta: la
+     fila ya las agrupa. */
+  .cel-detalle .cel-linea-alta:last-of-type {
+    margin-bottom: 0;
+    padding-bottom: 1px;
+    border-bottom: 0;
+  }
+}
+
+/* La moneda a 48 en las dos pieles de móvil. El atributo `width`/`height` del
+   <img> lleva el 56 de escritorio (ChipToken `size="hero"`), así que aquí sólo
+   hace falta el escalón de móvil, y en las dos consultas por separado porque
+   no existe una que las una sin arrastrar escritorio. */
+@media (max-width: 767px) and (orientation: portrait) {
+  .cel-netas-ico .chip-token { width: 48px; height: 48px; }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .cel-netas-ico .chip-token { width: 48px; height: 48px; }
+}

@@ -7,12 +7,13 @@ import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { ManoActualPopup } from './ManoActual'
 import { TapetesPanel } from './TapetesPanel'
-import { CelebracionMesa, PulsoNombre, AjileiOverlay, TarjetaResumen } from './Celebracion'
+import { CelebracionMesa, PulsoNombre, AjileiOverlay, PantallaVictoria } from './Celebracion'
 import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
+import { puntosDe } from '../config/niveles'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { componeCronica } from '../hooks/cronicaCore'
 import { siembraCEL } from '../dev/siembraCEL'
@@ -717,6 +718,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // VC2b · AQUÍ, y no más arriba, por el orden de vaciado de efectos: el efecto
   // de showdown es hermano ANTERIOR, así que cuando el de useCelebracion corre,
   // showdownAudioRef ya trae el asa de ESTA mano. Al revés leería la anterior.
+  // CEL-1 · La condición que decidía inline si montaba la tarjeta, con nombre:
+  // ahora decide una PANTALLA entera, y una condición sin nombre repetida en un
+  // ternario de dos ramas se lee peor. Misma llamada, mismo decisor sellado.
+  const esVictoriaDeMesa = isGameOver && decideCelebracion({
+    phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN,
+  }) === 'partida'
+
   const celebracion = useCelebracion({
     enabled: true,
     phase,
@@ -737,7 +745,20 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // SIN COLA, y está razonado: una reacción encolada se dispararía cuando el
   // momento ya pasó, y eso es peor que no decir nada. Mismo criterio que VC §6
   // aplica al corte — no se resucita lo cortado.
-  const vcViva = !!celebracion.activa
+  // CEL-0 lo diagnosticó y CEL-1 lo salda: el silencio de VC2 NO cubría la
+  // pantalla terminal. `useCelebracion` devuelve pronto para el nivel 'partida'
+  // —no lleva vuelo—, así que `celebracion.activa` es null en GAME_OVER y con
+  // ella `vcViva` era false: se podía lanzar una reacción encima de la pantalla
+  // de victoria, sobre una mesa que ya no existe.
+  //
+  // Se salda POR LA VÍA QUE YA HABÍA, sin tocar la lógica sellada de VC2 en
+  // mano: `vcViva` es el interruptor único del veto —lo leen el `vetar` del
+  // hook (la regla), el `bloqueado` del selector (la cara visible) y el
+  // `reaccionesBloqueadas` del menú (la entrada `disabled`)—, así que sumarle
+  // la fase terminal apaga las tres cosas a la vez y no hay una cuarta puerta
+  // que recordar. El efecto hermano que retira la burbuja viva al activarse el
+  // veto tampoco cambia: entra en GAME_OVER por la misma dependencia.
+  const vcViva = !!celebracion.activa || isGameOver
 
   // ── VIS-3c · El saldo diferido y el pozo que se vacía al salir la primera ──
   //
@@ -1608,9 +1629,23 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           </div>
         </header>
 
-        {/* C4.4: GAME_OVER → vista terminal simple (mensaje + salir). Evita
-            reconstruir el tablero cuando el propio humano queda eliminado. */}
+        {/* C4.4: GAME_OVER → vista terminal simple. Evita reconstruir el
+            tablero cuando el propio humano queda eliminado.
+            CEL-1 · La VICTORIA se separa en su propia pantalla (`PantallaVictoria`,
+            clases `cel-*`, hoja `celebracion.css`). La DERROTA se queda
+            exactamente como estaba, con `.game-over-screen` y su mensaje: la
+            frase y la lámina son del ganador. Las dos ramas son excluyentes, así
+            que la de derrota no hereda una sola regla de la nueva. */}
         {isGameOver ? (
+          esVictoriaDeMesa ? (
+            <PantallaVictoria
+              sesion={sesion}
+              netas={fichasNetas(human.chips)}
+              saldo={human.chips}
+              puntos={sesion.manosGanadas * puntosDe(game.nivelIA)}
+              onLeave={onLeave}
+            />
+          ) : (
           <div className="game-over-screen">
             {/* MSG-U1 · el TEXTO sale del compositor, no del motor; desde
                 REN-2 tampoco el de la rama sin resultado (`cronica`).
@@ -1623,14 +1658,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
             >
               {resultado ? resultado.texto : cronica}
             </p>
-            {/* DSK-VC2 · SÓLO la victoria evoluciona. La pantalla de derrota no
-                cambia ni un byte: el decisor devuelve 'partida' únicamente con
-                winner === 0, y sin eso aquí no se monta nada. */}
-            {decideCelebracion({ phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN }) === 'partida' && (
-              <TarjetaResumen sesion={sesion} netas={fichasNetas(human.chips)} />
-            )}
             <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
           </div>
+          )
         ) : (
         <>
         {/* Rivals + Center — el layout sigue SIEMPRE al nº de jugadores VIVOS

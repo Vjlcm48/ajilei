@@ -3,6 +3,10 @@ import ChipToken from './ChipToken'
 import { Wordmark } from './Wordmark'
 import { VIAJE_MS, VIAJE_ESCALON_MS, VIAJE_DESVANECIDO_MS, llevaViaje, llevaPulso } from '../hooks/celebracionCore'
 import { CONTEO_MS, valorConteo } from '../hooks/sesionCore'
+import { SoundButton } from './SoundButton'
+import { frasePara } from '../config/frasesVictoria'
+import { fraseForzadaCEL } from '../dev/siembraCEL'
+import '../styles/celebracion.css'
 
 // ── DSK-VC2 · Superficies de la celebración ─────────────────────────────────
 // Documento rector: docs/AJILEI_Victory_Celebration_v1.0.md §3.
@@ -147,7 +151,7 @@ function useConteo(destino, cortado) {
   return cortado ? destino : animado
 }
 
-export function TarjetaResumen({ sesion, netas }) {
+export function TarjetaResumen({ sesion, netas, saldo, puntos }) {
   const [cortado, setCortado] = useState(false)
   const valor = useConteo(netas, cortado)
 
@@ -162,13 +166,21 @@ export function TarjetaResumen({ sesion, netas }) {
 
   const signo = valor > 0 ? '+' : ''
   return (
-    <div className="vc-tarjeta">
-      <p className={`vc-netas${netas >= 0 ? '' : ' vc-netas-neg'}`}>
-        <span className="vc-netas-ico"><ChipToken size="full" /></span>
-        <span className="vc-netas-num">{signo}{valor}</span>
-        <span className="vc-netas-word">Heptacoins</span>
+    <div className="cel-tarjeta">
+      <p className={`cel-netas${netas >= 0 ? '' : ' cel-netas-neg'}`}>
+        <span className="cel-netas-ico"><ChipToken size="hero" /></span>
+        <span className="cel-netas-num">{signo}{valor}</span>
+        <span className="cel-netas-word">Heptacoins</span>
       </p>
-      <dl className="vc-detalle">
+      <dl className="cel-detalle">
+        {/* CEL-1 · Las dos cifras nuevas van PRIMERO y destacadas: son las que
+            la lámina quiere que se lean antes que la estadística.
+            "Saldo actual" pinta `human.chips`, el dato VERDADERO del estado —
+            jamás la fórmula 5000 + 5000×rivales. Coinciden hoy porque el humano
+            se lo llevó todo, pero el día que la economía cambie (recompra,
+            bono, premio escalado) la fórmula mentiría y el estado no. */}
+        <div className="cel-linea-alta"><dt>Saldo actual</dt><dd>{saldo}</dd></div>
+        <div className="cel-linea-alta"><dt>Puntos obtenidos</dt><dd>{puntos}</dd></div>
         <div><dt>Manos jugadas</dt><dd>{sesion.manosJugadas}</dd></div>
         <div><dt>Manos ganadas</dt><dd>{sesion.manosGanadas}</dd></div>
         <div>
@@ -176,6 +188,50 @@ export function TarjetaResumen({ sesion, netas }) {
           <dd>{sesion.mejorMano ? `${sesion.mejorMano.palo}, ${sesion.mejorMano.pts} pts` : '—'}</dd>
         </div>
       </dl>
+    </div>
+  )
+}
+
+// ── CEL-1 · La pantalla de victoria de mesa ─────────────────────────────────
+// Rector: lámina CEL-1, validada por Victor. Cinco piezas en columna sobre el
+// fieltro: AJILEI, la frase del ganador, la tarjeta, un botón primario ÚNICO y
+// el enlace de ranking, inerte.
+//
+// ES UN COMPONENTE Y NO UNA RAMA MÁS DEL JSX DE GameTable, por una razón que no
+// es de orden: la frase se elige AL MONTAR LA PANTALLA. Con la elección dentro
+// de GameTable, el `useState` inicializador correría al montar la MESA —minutos
+// antes, y una sola vez para toda la sesión—, así que dos victorias seguidas
+// enseñarían la misma frase. Montando aquí, el inicializador corre exactamente
+// cuando la pantalla aparece, que es lo que la lámina pide.
+//
+// La pantalla de DERROTA no pasa por aquí y no cambia ni un byte: sigue siendo
+// `.game-over-screen` con su mensaje. La frase es del ganador.
+export function PantallaVictoria({ sesion, netas, saldo, puntos, onLeave }) {
+  const [frase] = useState(() => frasePara(fraseForzadaCEL()))
+
+  return (
+    <div className="cel-screen">
+      {/* El resplandor de portada, REUTILIZADO: este anfitrión está en la lista
+          de selectores de embellecimiento.css §2, no en una copia del efecto.
+          `aria-label` porque el wordmark es un símbolo más "ILEI": sin él, la
+          marca se vuelve invisible para quien no ve (IDN-1). */}
+      <h1 className="cel-ajilei" aria-label="AJILEI"><Wordmark /></h1>
+
+      <p className="cel-frase">{frase}</p>
+
+      <TarjetaResumen sesion={sesion} netas={netas} saldo={saldo} puntos={puntos} />
+
+      <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
+
+      {/* `disabled` REAL y no un `pointer-events: none`: así no recibe foco, no
+          se pulsa con teclado y el lector de pantalla lo anuncia. Mismo
+          tratamiento que las entradas inertes del menú de utilidades. Es
+          <button> y no <a> a propósito — `disabled` no existe en un enlace, y un
+          <a> sin href tampoco es un control. No navega a ningún sitio. */}
+      <button type="button" className="cel-ranking" disabled aria-disabled="true">
+        Ver tu nuevo ranking
+        <span className="soon-tag">Próximamente</span>
+      </button>
     </div>
   )
 }
