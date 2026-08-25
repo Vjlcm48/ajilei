@@ -401,6 +401,11 @@ const CAIDA_MIN_S = 1.54    // 1100 ms x 1,4
 const CAIDA_MAX_S = 2.10    // 1500 ms x 1,4
 const OPACIDAD_TECHO = 0.7
 const MELODIA_S = 12        // duración sellada por CEL-A
+// CEL-2g · el doble de lo que medían en CEL-2c, con la mesa del molde: el premio
+// no mueve nada (netas 0 -> mínimo) y el saldo va de 5000 a 5000 (magnitud 5000).
+const CONTEO_PREMIO_MS = 2800   // era 1400
+const CONTEO_SALDO_MS = 2933    // era 1467
+const CASCADA_ORDEN = ['Puntos obtenidos', 'Manos jugadas', 'Manos ganadas', 'Tu mejor mano']
 
 // Observadores, instalados en cuanto la pantalla monta y antes de que reviente.
 function instalaSondaArco() {
@@ -411,8 +416,25 @@ function instalaSondaArco() {
   const reg = {
     t0, fases: [{ fase: s.dataset.fase, t: 0 }],
     nacidas: [], vivasMax: 0, cuadros: [], errores: [],
+    // CEL-2g · el relato de los numeros
+    animaciones: [], traspasos: 0, vuelo: [], anclas: null,
   }
   window.__CEL2 = reg
+
+  // Las animaciones se anuncian solas. `animationstart` da el instante EXACTO en
+  // que a cada rubro le toca entrar —con su retraso ya aplicado— y cuantas veces
+  // se disparo el pulso del saldo, que tiene que ser una. Medir eso muestreando
+  // opacidades daria la misma respuesta con menos precision y mas codigo.
+  document.addEventListener('animationstart', (e) => {
+    if (e.animationName !== 'cel-asiento' && e.animationName !== 'cel-rubro-entra') return
+    const crudo = e.target && e.target.style ? e.target.style.getPropertyValue('--rubro-i') : ''
+    reg.animaciones.push({
+      nombre: e.animationName,
+      i: crudo === '' ? null : Number(crudo),
+      rotulo: e.target.querySelector ? (e.target.querySelector('dt')?.textContent?.trim() ?? null) : null,
+      t: ahora(),
+    })
+  }, true)
 
   new MutationObserver(() => {
     const f = s.dataset.fase
@@ -431,6 +453,7 @@ function instalaSondaArco() {
     for (const m of muts) {
       for (const n of m.addedNodes) {
         if (n.nodeType !== 1) continue
+        if (n.classList.contains('cel-traspaso')) { reg.traspasos++; continue }
         if (n.classList.contains('cel-gota')) { reg.nacidas.push(ahora()); continue }
         const dentro = n.querySelectorAll ? n.querySelectorAll('.cel-gota').length : 0
         for (let k = 0; k < dentro; k++) reg.nacidas.push(ahora())
@@ -441,8 +464,29 @@ function instalaSondaArco() {
   // Vivas y cuadros, en el mismo rAF: el techo de 18 hay que cazarlo en vuelo, y
   // el ritmo de cuadros es la medida que decide nodos contra canvas.
   let ultimo = performance.now()
+  const centro = (el) => {
+    if (!el) return null
+    const b = el.getBoundingClientRect()
+    return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }
+  }
+  const ddDe = (rotulo) => {
+    for (const d of document.querySelectorAll('.cel-detalle > div')) {
+      const t = d.querySelector('dt')
+      if (t && t.textContent.trim() === rotulo) return d.querySelector('dd')
+    }
+    return null
+  }
   const tick = () => {
     const t = performance.now()
+    // CEL-2g · la moneda del traspaso, fotograma a fotograma: de donde sale y a
+    // donde llega se comprueba contra los DOS anclas reales, no contra numeros.
+    const tr = document.querySelector('.cel-traspaso')
+    if (tr) {
+      if (!reg.anclas) {
+        reg.anclas = { moneda: centro(document.querySelector('.cel-netas-ico')), saldo: centro(ddDe('Saldo actual')) }
+      }
+      reg.vuelo.push({ t: ahora(), ...centro(tr) })
+    }
     const vivas = document.querySelectorAll('.cel-gota').length
     if (vivas > reg.vivasMax) reg.vivasMax = vivas
     if (vivas > 0) reg.cuadros.push(Math.round((t - ultimo) * 100) / 100)
@@ -479,6 +523,33 @@ function miraArco() {
     saldo: dd('Saldo actual'),
     netas: document.querySelector('.cel-netas-num')?.textContent?.trim() ?? null,
     gotas: document.querySelectorAll('.cel-gota').length,
+    // ── CEL-2g · el relato ───────────────────────────────────────────────
+    tramo: (() => {
+      const l = document.querySelector('.cel-detalle')
+      return l ? { cascada: l.dataset.cascada, pausa: l.dataset.pausa } : null
+    })(),
+    // La caja de la tarjeta, para probar que NO cambia en todo el arco: los
+    // rubros entran con opacidad, no ocupando sitio nuevo.
+    tarjetaCaja: (() => {
+      const t = document.querySelector('.cel-tarjeta')
+      if (!t) return null
+      const b = t.getBoundingClientRect()
+      return [Math.round(b.width * 100) / 100, Math.round(b.height * 100) / 100]
+    })(),
+    rubros: [...document.querySelectorAll('.cel-rubro')].map(e => {
+      const cs = getComputedStyle(e)
+      return {
+        i: Number(e.style.getPropertyValue('--rubro-i')),
+        rotulo: e.querySelector('dt')?.textContent?.trim() ?? null,
+        opacidad: Math.round(Number(cs.opacity) * 100) / 100,
+        // El escalonado RESUELTO. Es la medida exacta del paso de la cascada y
+        // no la afecta que el arnés congele el render para capturar, que es lo
+        // que sí le pasa a los tiempos de `animationstart`.
+        retraso: cs.animationDelay,
+        animacion: cs.animationName,
+      }
+    }),
+    asiento: document.querySelector('.cel-detalle .cel-linea-alta dd')?.dataset?.asiento ?? null,
     // CEL-2c · el detalle de cada moneda VIVA: su duración de caída (la primera
     // de las tres animaciones, que es `cel-caida`) y su opacidad. Lo primero es
     // la medida del +40 %; lo segundo, la del techo de 0,7.
@@ -534,6 +605,10 @@ function cosechaArco() {
     fases: r.fases || [],
     nacidas: r.nacidas || [],
     vivasMax: r.vivasMax || 0,
+    animaciones: r.animaciones || [],
+    traspasos: r.traspasos || 0,
+    vuelo: r.vuelo || [],
+    anclas: r.anclas || null,
     cuadros: { n: c.length, p50: pct(0.5), p95: pct(0.95), peor: c.length ? c[c.length - 1] : null },
     marcas: (window.__AJILEI_ARCO || []).slice(),
   }
@@ -563,7 +638,7 @@ async function arcoDeUnaCelda(browser, celda, fallos, opciones = {}) {
     const u = r.url()
     if (u.includes('/sounds/celebracion-')) pedidos.push({ archivo: u.split('/').pop(), http: r.status() })
   })
-  const salida = { id, w, h, fotos: {}, pedidos }
+  const salida = { id, w, h, capturas, fotos: {}, pedidos }
   try {
     // SIN esperar al reposo: aquí se viene a ver el arco correr.
     await alaVictoria(page, mesa, '', { reposo: false })
@@ -588,14 +663,40 @@ async function arcoDeUnaCelda(browser, celda, fallos, opciones = {}) {
     salida.fotos.fiesta = await page.evaluate(miraArco)
     if (capturas) await page.screenshot({ path: `${OUT}/arco-2revienta-${id}.png` })
 
+    // ── CEL-2g · UNA FOTO POR TRAMO DEL RELATO ──────────────────────────
+    // El premio contando, con el saldo quieto en su cifra de entrada.
+    await page.waitForTimeout(700)
+    salida.fotos.premio = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/relato-1premio-${id}.png` })
+
+    // El saldo contando, con el premio ya asentado. Se espera a la MARCA y no a
+    // un reloj: la duración del premio depende de la magnitud, así que un
+    // `waitForTimeout` aquí mediría bien sólo en la mesa del molde.
+    await page.waitForFunction(() => (window.__AJILEI_ARCO || []).some(m => m.marca === 'saldo-ini'), null, { timeout: 20000 })
+    await page.waitForTimeout(700)
+    salida.fotos.saldoContando = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/relato-2saldo-${id}.png` })
+
     // CEL-2c · LA FOTO DE LOS SEIS SEGUNDOS. Es la que prueba la decisión de
     // Victor: con la lluvia atada al contador, a esta altura no quedaría ni una
     // moneda —la puerta vieja habría dado cero— y ahora tiene que haber emisión
     // viva. También es donde se mide la caída y la opacidad, con la lluvia en
     // régimen y no con las cuatro monedas del estallido.
-    await page.waitForTimeout(5650)
+    // Los seis segundos se cuentan desde el ESTALLIDO, no desde aquí: entre
+    // medias hay dos esperas que dependen de las cifras de la partida.
+    await page.waitForFunction(() => {
+      const r = (window.__AJILEI_ARCO || []).find(m => m.marca === 'revienta')
+      return r && performance.now() - r.t >= 6000
+    }, null, { timeout: 25000 })
     salida.fotos.plena = await page.evaluate(miraArco)
     if (capturas) await page.screenshot({ path: `${OUT}/arco-2b-fiesta-6s-${id}.png` })
+
+    // La cascada a mitad: dos rubros dentro y dos fuera. A los 400 ms del
+    // arranque han entrado el 0 (sin retraso) y el 1 (a 250); el 2 entra a 500.
+    await page.waitForFunction(() => (window.__AJILEI_ARCO || []).some(m => m.marca === 'cascada-ini'), null, { timeout: 25000 })
+    await page.waitForTimeout(400)
+    salida.fotos.cascada = await page.evaluate(miraArco)
+    if (capturas) await page.screenshot({ path: `${OUT}/relato-3cascada-${id}.png` })
 
     // La fiesta dura ahora los 12 s de la melodía: las esperas se alargan.
     await page.waitForSelector('.cel-screen[data-fase="calma"]', { timeout: 20000 })
@@ -732,15 +833,129 @@ function juzgaArco(a, fallos, opciones = {}) {
 
   // 7 · LOS CONTADORES. Empiezan en 0 y aterrizan en los valores VERDADEROS.
   // Con movimiento reducido no cuentan: llegan puestos, que es lo pedido.
-  if (opciones.reducido) {
-    if (fotos.sobria?.saldo !== String(SALDO_INICIAL)) fallos.push(`${id}: con movimiento reducido el saldo debe estar puesto desde el principio, y vale ${fotos.sobria?.saldo}`)
-  } else if (fotos.sobria?.saldo !== '0') {
-    fallos.push(`${id}: el saldo no arranca en 0 (${fotos.sobria?.saldo})`)
-  }
+  // CEL-2g DEROGA la puerta de CEL-2c que exigía ver el saldo arrancar en 0: la
+  // decisión de Victor es justamente la contraria —"Saldo actual" está quieto en
+  // su cifra de entrada desde el primer fotograma y sólo se mueve cuando le toca
+  // su turno—. La comprobación no desaparece, se INVIERTE, y vive en el bloque
+  // del relato unas líneas más abajo.
   if (fotos.reposo?.saldo !== String(SALDO_INICIAL)) fallos.push(`${id}: el saldo no aterrizó en ${SALDO_INICIAL} (${fotos.reposo?.saldo})`)
   const netasFin = Number.parseInt(String(fotos.reposo?.netas).replace('+', ''), 10)
   if (String(fotos.reposo?.saldo) !== String(SALDO_INICIAL + netasFin)) {
     fallos.push(`${id}: al terminar, saldo ${fotos.reposo?.saldo} no cuadra con netas ${fotos.reposo?.netas}`)
+  }
+
+  // ── CEL-2g · EL RELATO DE LOS NÚMEROS ───────────────────────────────────
+  const mk = (n) => marcaDe(marcas, n)
+  const rubrosDe = (foto) => (foto?.rubros || []).filter(r => r.opacidad > 0.5).length
+
+  if (opciones.reducido) {
+    // Todo puesto desde el primer fotograma: ni cuenta, ni vuelo, ni cascada.
+    if (mk('premio-ini')) fallos.push(`${id}: con movimiento reducido no debe contarse el premio`)
+    if (a.traspasos) fallos.push(`${id}: con movimiento reducido voló una moneda de traspaso`)
+    const r0 = fotos.sobria?.rubros || []
+    if (r0.length !== 4) fallos.push(`${id}: no hay cuatro rubros (${r0.length})`)
+    if (r0.some(r => r.opacidad < 1)) fallos.push(`${id}: con movimiento reducido los rubros deben estar puestos desde el primer fotograma`)
+    if (fotos.sobria?.saldo !== String(SALDO_INICIAL)) fallos.push(`${id}: el saldo no está puesto en la entrada (${fotos.sobria?.saldo})`)
+  } else {
+    const pIni = mk('premio-ini'), pFin = mk('premio-fin')
+    const tIni = mk('traspaso-ini'), tFin = mk('traspaso-fin')
+    const sIni = mk('saldo-ini'), sFin = mk('saldo-fin')
+    const cIni = mk('cascada-ini'), rFin = mk('relato-fin')
+    const faltan = [['premio-ini', pIni], ['premio-fin', pFin], ['traspaso-ini', tIni], ['traspaso-fin', tFin],
+      ['saldo-ini', sIni], ['saldo-fin', sFin], ['cascada-ini', cIni], ['relato-fin', rFin]]
+      .filter(([, v]) => !v).map(([n]) => n)
+    if (faltan.length) fallos.push(`${id}: faltan marcas del relato: ${faltan.join(', ')}`)
+    else {
+      a.relato = {
+        premio: { dur: pIni.dur, medido: pFin.t - pIni.t },
+        traspaso: tFin.t - tIni.t,
+        saldo: { dur: sIni.dur, medido: sFin.t - sIni.t },
+        cascada: rFin.t - cIni.t,
+        total: rFin.t - pIni.t,
+      }
+      // EL ORDEN ESTRICTO, que es la decisión de Victor hecha puerta.
+      if (sIni.t < pFin.t) fallos.push(`${id}: el saldo arrancó ANTES de que el premio asentara (${sIni.t} < ${pFin.t})`)
+      if (sIni.t < tFin.t) fallos.push(`${id}: el saldo arrancó ANTES de que aterrizara la moneda (${sIni.t} < ${tFin.t})`)
+      if (cIni.t < sFin.t) fallos.push(`${id}: la cascada arrancó ANTES de que el saldo asentara`)
+      // Y las duraciones al doble. La tolerancia es mayor en las celdas que
+      // capturan: `page.screenshot` congela el render y el acotado del delta
+      // —que es lo que pausa con la pestaña oculta— se niega, con razón, a
+      // contar el tiempo que no se pintó.
+      const tol = a.capturas ? 1200 : 400
+      if (pIni.dur !== CONTEO_PREMIO_MS) fallos.push(`${id}: el premio pide ${pIni.dur} ms y el doble de CEL-2c son ${CONTEO_PREMIO_MS}`)
+      if (sIni.dur !== CONTEO_SALDO_MS) fallos.push(`${id}: el saldo pide ${sIni.dur} ms y el doble de CEL-2c son ${CONTEO_SALDO_MS}`)
+      if (Math.abs(a.relato.premio.medido - pIni.dur) > tol) fallos.push(`${id}: el premio duró ${a.relato.premio.medido} y pedía ${pIni.dur}`)
+      if (Math.abs(a.relato.saldo.medido - sIni.dur) > tol) fallos.push(`${id}: el saldo duró ${a.relato.saldo.medido} y pedía ${sIni.dur}`)
+    }
+    // EL TRASPASO: uno, y del premio al saldo. La red NO debe haber saltado —si
+    // saltó, el aterrizaje no disparó nada y el relato siguió por un cronómetro.
+    if (mk('traspaso-red')) fallos.push(`${id}: el traspaso lo cerró la RED, no el aterrizaje de la moneda`)
+    if (a.traspasos !== 1) fallos.push(`${id}: volaron ${a.traspasos} monedas de traspaso, debe ser 1`)
+    const v = a.vuelo || []
+    if (!v.length || !a.anclas) fallos.push(`${id}: no se pudo seguir la moneda del traspaso`)
+    else {
+      const dist = (p, q) => (p && q ? Math.round(Math.hypot(p.x - q.x, p.y - q.y)) : 9999)
+      a.vueloDe = dist(v[0], a.anclas.moneda)
+      a.vueloA = dist(v[v.length - 1], a.anclas.saldo)
+      if (a.vueloDe > 14) fallos.push(`${id}: la moneda no salió de la fila del premio (${a.vueloDe} px)`)
+      if (a.vueloA > 24) fallos.push(`${id}: la moneda no llegó a la fila del saldo (${a.vueloA} px)`)
+    }
+    // EL ASIENTO: un solo disparo.
+    const pulsos = (a.animaciones || []).filter(x => x.nombre === 'cel-asiento')
+    if (pulsos.length !== 1) fallos.push(`${id}: el pulso del saldo se disparó ${pulsos.length} veces`)
+    // LA CASCADA: los cuatro, en su orden y a su paso.
+    const entradas = (a.animaciones || []).filter(x => x.nombre === 'cel-rubro-entra')
+    a.cascada = entradas.map(x => ({ i: x.i, rotulo: x.rotulo, t: x.t }))
+    if (entradas.length !== 4) fallos.push(`${id}: entraron ${entradas.length} rubros, deben ser 4`)
+    else {
+      const orden = entradas.map(x => x.i)
+      if (orden.join(',') !== '0,1,2,3') fallos.push(`${id}: la cascada entró en el orden ${orden.join(',')}`)
+      const rotulos = entradas.map(x => x.rotulo)
+      if (rotulos.join(' | ') !== CASCADA_ORDEN.join(' | ')) fallos.push(`${id}: el orden de los rubros es ${rotulos.join(' | ')}`)
+      // El paso, POR RELOJ, sólo en las celdas que no capturan: `page.screenshot`
+      // congela el hilo de render y retrasa el `animationstart` del rubro que
+      // caiga dentro de la captura — medido, 410 ms entre el tercero y el cuarto
+      // en la celda de 1920. Eso es el arnés, no la cascada.
+      if (!a.capturas) {
+        for (let k = 1; k < entradas.length; k++) {
+          const paso = entradas[k].t - entradas[k - 1].t
+          if (Math.abs(paso - 250) > 130) fallos.push(`${id}: entre el rubro ${k - 1} y el ${k} pasaron ${paso} ms y no ~250`)
+        }
+      }
+    }
+    // Y el paso POR CSSOM, en todas las celdas: el retraso resuelto de cada
+    // rubro es su índice por 250 ms, lo mire el arnés cuando lo mire.
+    const escalones = (fotos.cascada?.rubros || [])
+    if (escalones.length === 4) {
+      for (const r of escalones) {
+        const esperado = `${r.i * 0.25}s`
+        if (r.retraso !== esperado) fallos.push(`${id}: el rubro ${r.i} entra con retraso ${r.retraso} y debía ser ${esperado}`)
+        if (r.animacion !== 'cel-rubro-entra') fallos.push(`${id}: el rubro ${r.i} no lleva la animación de entrada (${r.animacion})`)
+      }
+    }
+    // LAS CIFRAS DE CADA TRAMO.
+    if (fotos.sobria?.saldo !== String(SALDO_INICIAL)) {
+      fallos.push(`${id}: en la entrada sobria el saldo debe estar quieto en ${SALDO_INICIAL} y pinta ${fotos.sobria?.saldo}`)
+    }
+    if (fotos.premio?.saldo !== String(SALDO_INICIAL)) {
+      fallos.push(`${id}: mientras cuenta el premio, el saldo debe seguir quieto en ${SALDO_INICIAL} (pinta ${fotos.premio?.saldo})`)
+    }
+    if (rubrosDe(fotos.sobria) !== 0) fallos.push(`${id}: hay ${rubrosDe(fotos.sobria)} rubros visibles en la entrada sobria`)
+    if (rubrosDe(fotos.premio) !== 0) fallos.push(`${id}: hay rubros visibles mientras cuenta el premio`)
+    if (rubrosDe(fotos.cascada) !== 2) fallos.push(`${id}: a mitad de cascada hay ${rubrosDe(fotos.cascada)} rubros visibles y deben ser 2`)
+    if (rubrosDe(fotos.reposo) !== 4) fallos.push(`${id}: en el reposo hay ${rubrosDe(fotos.reposo)} rubros visibles y deben ser 4`)
+    if (fotos.reposo?.tramo?.cascada !== 'fin') fallos.push(`${id}: la cascada no acabó (${fotos.reposo?.tramo?.cascada})`)
+    if (fotos.reposo?.asiento !== 'si') fallos.push(`${id}: la cifra del saldo no quedó marcada como asentada`)
+  }
+
+  // LA CAJA DE LA TARJETA NO CAMBIA EN TODO EL ARCO. Es la promesa de que los
+  // rubros ocupan su sitio desde el primer fotograma aunque no se vean.
+  const cajas = [['sobria', fotos.sobria], ['fiesta', fotos.fiesta], ['reposo', fotos.reposo]]
+    .filter(([, f]) => f?.tarjetaCaja)
+  for (const [cuando, f] of cajas) {
+    if (JSON.stringify(f.tarjetaCaja) !== JSON.stringify(cajas[0][1].tarjetaCaja)) {
+      fallos.push(`${id}: la tarjeta cambia de caja entre ${cajas[0][0]} y ${cuando} (${JSON.stringify(cajas[0][1].tarjetaCaja)} vs ${JSON.stringify(f.tarjetaCaja)})`)
+    }
   }
 
   // 8 · LA LLUVIA.
@@ -965,8 +1180,8 @@ async function puertaSalto(browser, fallos) {
     await alaVictoria(page, 5, '', { reposo: false })
     await page.evaluate(instalaSondaArco)
     await page.waitForSelector('.cel-screen[data-fase="fiesta"]', { timeout: 10000 })
-    // A MITAD del conteo: ni recién empezado ni ya aterrizado.
-    await page.waitForTimeout(400)
+    // A MITAD del relato: el premio contando y los rubros todavía fuera.
+    await page.waitForTimeout(700)
     r.medio = await page.evaluate(miraArco)
     // El toque, lejos de cualquier control: lo que corta es el `pointerdown` en
     // captura sobre el documento, no un clic sobre un botón.
@@ -981,12 +1196,22 @@ async function puertaSalto(browser, fallos) {
   } catch (e) { fallos.push(`salto: ${e.message}`); r.salida = false }
   await ctx.close()
 
-  if (r.medio && Number(r.medio.saldo) >= SALDO_INICIAL) {
-    fallos.push(`salto: el conteo ya había terminado al tocar (saldo ${r.medio.saldo}); la puerta no probó nada`)
+  // CEL-2g · con la mesa del molde las dos cifras valen lo mismo al principio y
+  // al final (se gana la mesa sin ganarle un céntimo a nadie), así que "el
+  // conteo iba por la mitad" ya no se puede leer en el número. Lo que sí se lee
+  // —y es lo que la instrucción pide— es el TRAMO: al tocar, el relato estaba
+  // sin empezar la cascada; después, todo puesto y los cuatro rubros dentro.
+  const visibles = (f) => (f?.rubros || []).filter(x => x.opacidad > 0.5).length
+  if (r.medio) {
+    if (r.medio.tramo?.cascada !== 'no') fallos.push(`salto: al tocar, el relato ya iba por "${r.medio.tramo?.cascada}"; la puerta no probó nada`)
+    if (visibles(r.medio) !== 0) fallos.push(`salto: al tocar ya había ${visibles(r.medio)} rubros dentro`)
   }
   if (r.tras) {
     if (r.tras.saldo !== String(SALDO_INICIAL)) fallos.push(`salto: el saldo no saltó a ${SALDO_INICIAL} (${r.tras.saldo})`)
     if (!['calma', 'reposo'].includes(r.tras.fase)) fallos.push(`salto: tras el toque la fase es ${r.tras.fase}`)
+    if (r.tras.tramo?.cascada !== 'fin') fallos.push(`salto: el relato no saltó al final (${r.tras.tramo?.cascada})`)
+    if (visibles(r.tras) !== 4) fallos.push(`salto: tras el toque hay ${visibles(r.tras)} rubros visibles y deben ser los 4`)
+    if (r.tras.asiento === 'si') fallos.push('salto: el toque encendió el pulso del saldo, que es una celebración de propina')
   }
   if (r.cosecha) {
     const salto = marcaDe(r.cosecha.marcas, 'salto')
@@ -1238,6 +1463,14 @@ async function modoCelebracion(browser) {
   for (const [k, par] of (inf.frases2c || []).entries()) {
     console.log(`  ${k + 1}. ${par.mostrada === par.recordada ? 'cuadra' : 'DISCREPA'} - indice ${par.indice} - "${par.mostrada}"`)
   }
+  console.log('\n-- CEL-2g - el relato de los numeros (ms desde que monta la pantalla) --')
+  for (const [id, a] of Object.entries(inf.arco)) {
+    if (!a.relato) { console.log(`  ${id.padEnd(22)} sin relato (movimiento reducido)`); continue }
+    console.log(`  ${id.padEnd(22)} premio ${a.relato.premio.medido}/${a.relato.premio.dur} -> traspaso ${a.relato.traspaso} -> saldo ${a.relato.saldo.medido}/${a.relato.saldo.dur}`
+      + ` -> cascada ${a.relato.cascada} | total ${a.relato.total} ms`)
+    console.log(`  ${''.padEnd(22)} vuelo: 1 moneda, ${a.vueloDe} px del origen y ${a.vueloA} px del destino`
+      + ` | cascada ${(a.cascada || []).map(x => x.rotulo).join(' > ')}`)
+  }
   const rk = inf.ranking2e || {}
   console.log(`\n-- el aviso "Proximamente" --`)
   console.log(`  al tocar: ${rk.conAviso?.vive ? 'visible' : 'NO'} (${rk.conAviso?.posicion}) - tras 3,5 s: ${rk.trasEspera?.vive ? 'SIGUE' : 'se fue'}`
@@ -1245,7 +1478,7 @@ async function modoCelebracion(browser) {
   const b0 = Object.values(inf.arco)[0]?.brillo
   console.log(`\n-- el brillo de la moneda --\n  ciclo EMB-1 ${b0?.ciclo}s = periodo de la moneda ${b0?.periodo}s - desfase ${b0?.desfase}s (medio ciclo)`)
   const sl = inf.salto || {}
-  console.log(`\n-- el salto por toque --\n  saldo a mitad ${sl.medio?.saldo} -> tras el toque ${sl.tras?.saldo} (fase ${sl.tras?.fase}) - boton de salir ${sl.salida ? 'responde' : 'NO responde'}`)
+  console.log(`\n-- el salto por toque --\n  al tocar: tramo ${sl.medio?.tramo?.cascada}, rubros dentro ${(sl.medio?.rubros || []).filter(x => x.opacidad > 0.5).length} -> tras el toque: tramo ${sl.tras?.tramo?.cascada}, rubros ${(sl.tras?.rubros || []).filter(x => x.opacidad > 0.5).length}, saldo ${sl.tras?.saldo} (fase ${sl.tras?.fase}) - boton de salir ${sl.salida ? 'responde' : 'NO responde'}`)
   console.log(`\ncontrol negativo: ${inf.control.termina === false && !inf.control.error ? 'verde' : 'ROJO'}`)
   console.log(`\nFALLOS: ${fallos.length ? '\n  - ' + fallos.join('\n  - ') : 'ninguno'}`)
   console.log(`capturas y cifras en ${OUT}/`)

@@ -20,8 +20,11 @@ import {
   CONTEO_MIN_MS, CONTEO_MAX_MS, CONTEO_PISO, CONTEO_TECHO,
   GOTAS_MAX, EMISION_MS, CAIDA_MIN_MS, CAIDA_MAX_MS, CALMA_MS, FADE_CORTE_MS,
   LADO_MIN, LADO_MAX, CAIDA_FACTOR, OPACIDAD_MIN, OPACIDAD_MAX, FIESTA_TOPE_MS,
+  CONTEO_FACTOR, TRAMOS, TRASPASO_MS, ASIENTO_MS, CASCADA_PASO_MS, CASCADA_ENTRADA_MS, RUBROS,
+  avanceDe, duracionCascada, duracionRelato, valorEntre,
   duracionConteo, magnitudConteo, esperaRevienta, esperaFinMelodia, perfilGota,
 } from '../src/hooks/coreografiaCore.js'
+import { valorConteo } from '../src/hooks/sesionCore.js'
 import { MELODIA_MS } from '../src/config/melodiasCelebracion.js'
 import { CONTEO_MS } from '../src/hooks/sesionCore.js'
 import { ESPERA_MARGEN_MS, ESPERA_TOPE_MS } from '../src/hooks/celebracionCore.js'
@@ -31,11 +34,15 @@ describe('1. El arco', () => {
     expect(FASES).toEqual(['sobria', 'fiesta', 'calma', 'reposo'])
   })
 
-  it('el mínimo del conteo ES el de VC2, no una copia suya', () => {
-    // Si alguien recalibra `CONTEO_MS` en sesionCore, esta tanda le sigue.
-    expect(CONTEO_MIN_MS).toBe(CONTEO_MS)
-    expect(CONTEO_MIN_MS).toBe(1400)
-    expect(CONTEO_MAX_MS).toBe(1800)
+  it('el conteo sale del de VC2 por un FACTOR, no de un número nuevo', () => {
+    // CEL-2g · Victor pidió el doble. La escala sigue anclada a `CONTEO_MS`:
+    // si alguien recalibra aquella constante en sesionCore, esta tanda le sigue.
+    expect(CONTEO_FACTOR).toBe(2)
+    expect(CONTEO_MIN_MS).toBe(CONTEO_MS * CONTEO_FACTOR)
+    expect(CONTEO_MIN_MS).toBe(2800)
+    expect(CONTEO_MAX_MS).toBe(3600)
+    // Y el doble de verdad: la proporción entre las dos puntas no cambia.
+    expect(CONTEO_MAX_MS / CONTEO_MIN_MS).toBeCloseTo(1800 / 1400, 10)
   })
 })
 
@@ -61,7 +68,7 @@ describe('2. La duración del conteo', () => {
 
   it('el punto medio cae donde debe', () => {
     const medio = (CONTEO_PISO + CONTEO_TECHO) / 2
-    expect(duracionConteo(medio)).toBe(1600)
+    expect(duracionConteo(medio)).toBe(3200)   // 1600 x 2
   })
 
   it('el signo no cuenta: una pérdida grande tarda lo mismo que una ganancia grande', () => {
@@ -250,5 +257,79 @@ describe('6. El perfil de una moneda', () => {
     expect(Number.isFinite(g.lado)).toBe(true)
     expect(Number.isFinite(g.caida)).toBe(true)
     expect(Number.isFinite(g.izq)).toBe(true)
+  })
+})
+
+describe('7. CEL-2g · El relato de los números', () => {
+  it('los siete tramos, en el orden sellado', () => {
+    expect(TRAMOS).toEqual(['espera', 'premio', 'traspaso', 'saldo', 'asiento', 'rubros', 'fin'])
+  })
+
+  it('el avance es el índice, y un tramo desconocido no rompe el orden', () => {
+    TRAMOS.forEach((t, i) => expect(avanceDe(t)).toBe(i))
+    expect(avanceDe('lo-que-sea')).toBe(0)
+    expect(avanceDe(undefined)).toBe(0)
+  })
+
+  it('el premio va ANTES que el saldo, y el saldo antes que los rubros', () => {
+    // Es la decisión de Victor escrita como invariante: si alguien reordenara
+    // el array, esto lo dice antes de que se vea en pantalla.
+    expect(avanceDe('premio')).toBeLessThan(avanceDe('traspaso'))
+    expect(avanceDe('traspaso')).toBeLessThan(avanceDe('saldo'))
+    expect(avanceDe('saldo')).toBeLessThan(avanceDe('asiento'))
+    expect(avanceDe('asiento')).toBeLessThan(avanceDe('rubros'))
+    expect(avanceDe('rubros')).toBeLessThan(avanceDe('fin'))
+  })
+
+  it('la cascada son cuatro rubros a 250 ms, y dura lo que dura la última', () => {
+    expect(RUBROS).toBe(4)
+    expect(CASCADA_PASO_MS).toBe(250)
+    expect(duracionCascada()).toBe(3 * 250 + CASCADA_ENTRADA_MS)   // 1130
+    // Un solo rubro no tiene escalonado que esperar.
+    expect(duracionCascada(1)).toBe(CASCADA_ENTRADA_MS)
+    expect(duracionCascada(0)).toBe(CASCADA_ENTRADA_MS)
+  })
+
+  it('EL RELATO CABE DENTRO DE LA FIESTA, y con margen', () => {
+    // La puerta que importa de esta tanda: la lluvia dura los 12 s de la
+    // melodía y toda la historia de los números va DENTRO. Si un día no
+    // cupiera, la cascada empezaría sobre una pantalla que ya se apagó — y eso
+    // no se ve en una corrida buena, se ve en la peor.
+    const peor = duracionRelato(CONTEO_TECHO, CONTEO_TECHO)
+    expect(peor).toBe(CONTEO_MAX_MS + TRASPASO_MS + CONTEO_MAX_MS + ASIENTO_MS + duracionCascada())
+    expect(peor).toBeLessThan(MELODIA_MS)
+    // Y el caso del molde, que es el que se mide en pantalla.
+    expect(duracionRelato(0, 5000)).toBeLessThan(MELODIA_MS)
+  })
+
+  it('el saldo cuenta ENTRE dos cifras, con la curva de siempre', () => {
+    // No es una curva nueva: es `valorConteo` sobre el delta, más el origen.
+    for (let k = 0; k <= 10; k++) {
+      const t = k / 10
+      expect(valorEntre(5000, 25000, t)).toBe(5000 + valorConteo(20000, t))
+    }
+    expect(valorEntre(5000, 25000, 0)).toBe(5000)
+    expect(valorEntre(5000, 25000, 1)).toBe(25000)
+  })
+
+  it('y baja igual de bien que sube: perder también se cuenta', () => {
+    expect(valorEntre(5000, 3200, 0)).toBe(5000)
+    expect(valorEntre(5000, 3200, 1)).toBe(3200)
+    const medio = valorEntre(5000, 3200, 0.5)
+    expect(medio).toBeLessThan(5000)
+    expect(medio).toBeGreaterThan(3200)
+  })
+
+  it('sin movimiento, el saldo no se mueve: el caso del molde', () => {
+    // Con `?cel` el humano gana la mesa sin ganarle un céntimo a nadie: entra
+    // con 5000 y sale con 5000. La cuenta corre igual, pero no hay nada que
+    // ver — y eso no es un fallo, es la aritmética diciendo la verdad.
+    for (let k = 0; k <= 10; k++) expect(valorEntre(5000, 5000, k / 10)).toBe(5000)
+  })
+
+  it('cifras imposibles no pintan NaN en una pantalla terminal', () => {
+    expect(valorEntre(undefined, 900, 1)).toBe(900)
+    expect(valorEntre(900, undefined, 1)).toBe(0)
+    expect(Number.isFinite(valorEntre(null, null, 0.5))).toBe(true)
   })
 })
