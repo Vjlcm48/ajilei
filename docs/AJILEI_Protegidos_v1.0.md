@@ -1,7 +1,7 @@
-# AJILEI — Archivos protegidos · Lista canónica v1.2
+# AJILEI — Archivos protegidos · Lista canónica v1.3
 
 - **Archivo:** `docs/AJILEI_Protegidos_v1.0.md`
-- **Versión:** 1.2
+- **Versión:** 1.3
 - **Estado:** **LISTA CANÓNICA ÚNICA.** Sellado 2026-08-20 por Victor
   (HEPTACREATION LLC), al cierre de la campaña IDN-1.
 - **Actualización v1.1 (2026-08-26):** se cierra el hueco de reconstrucción
@@ -10,6 +10,9 @@
 - **Actualización v1.2 (2026-08-26):** refresco de la instantánea §3 tras
   VIS/TAC — dos filas vencidas por movimientos legítimos ya sellados. La
   lista de la §2 sigue sin cambiar; sólo se re-miden las cifras.
+- **Actualización v1.3 (2026-08-26):** la prosa de la §2 deja de llevar
+  cifras de líneas — envejecían con cada campaña. La medida vive donde se
+  mide: la instantánea de la §3.
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -54,9 +57,10 @@ mismo: son el **motor** (reglas del juego), la **IA** y la **geometría de
 asientos**. Tocarlos cambia lo que el juego *es*, no cómo se ve, y ninguna
 campaña de interfaz tiene por qué hacerlo.
 
-Los dos últimos son **hojas de estilo grandes y sedimentadas** —6260 y 1037
-líneas— donde viven constantes selladas por medición (las columnas de O1, el
-alto de `.rivals-zone`, los tokens `--dsk-*`). Su protección no es dogma: es que
+Los dos últimos son **hojas de estilo grandes y sedimentadas** —del orden de
+miles de líneas, con la cifra exacta en la instantánea de la §3— donde viven
+constantes selladas por medición (las columnas de O1, el alto de
+`.rivals-zone`, los tokens `--dsk-*`). Su protección no es dogma: es que
 una edición ahí puede romper en silencio una geometría que costó una campaña
 entera calibrar.
 
