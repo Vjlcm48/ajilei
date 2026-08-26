@@ -1,8 +1,9 @@
 # AJILEI — Sistema de Diseño Unificado
 
-**Versión:** 1.2
-**Fecha:** 2026-06-12
+**Versión:** 1.3
+**Fecha:** 2026-06-12 · última actualización 2026-08-26
 **Naturaleza:** Documento maestro de referencia permanente. Toda pantalla actual o futura de AJILEI debe diseñarse citando este documento.
+**Changelog v1.3 (2026-08-26):** Campaña ICO-1 — el icono de aplicación oficial entra al repo como activo sellado y se registra como motivo de identidad (sección 2). La tabla de tokens NO cambia: la rampa vinotinto del icono no es token y ninguna pantalla la consume.
 **Changelog v1.2:** Tandas 1, 2 y 3 completadas y verificadas — identidad visual unificada en toda la app. Deuda del dorado único SALDADA. Nuevos patrones registrados (secciones 3 y 9). Lección de contraste incorporada como regla (sección 5).
 
 ---
@@ -28,6 +29,7 @@ Patrón de referencia: la pantalla principal (`WelcomeScreen`).
 3. **Cartas propias decorativas** — Rey de Oros (`doce_oro.png`) y Caballo de Oros (`once_oro.png`), opacidad ~0.22, ocultas <680px.
 4. **Separador dorado fino** — línea 60px × 1px, `rgba(--gold-brand-rgb, 0.3)` (selección de sala). Para pantallas de paso donde el arco se repetiría.
 5. **Acento tricolor** — solo abstracto y solo si no hay otro guiño en la vista.
+6. **Icono de app oficial** — ver `AJILEI_Icono_v1.0.md`; rampa vinotinto como excepción documentada, solo dentro del activo. Vive fuera de las pantallas (pestaña, lanzador, manifest), así que no entra en la regla de un guiño por pantalla.
 
 **Regla de distribución de guiños:** un guiño por pantalla máximo; pantallas consecutivas no repiten el mismo motivo; en pantallas funcionales intensas (tablero), "ninguno" es válido y preferible — la filigrana de fondo ya es firma suficiente.
 
