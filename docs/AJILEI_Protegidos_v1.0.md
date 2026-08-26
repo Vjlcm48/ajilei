@@ -1,9 +1,12 @@
-# AJILEI — Archivos protegidos · Lista canónica v1.0
+# AJILEI — Archivos protegidos · Lista canónica v1.1
 
 - **Archivo:** `docs/AJILEI_Protegidos_v1.0.md`
-- **Versión:** 1.0
+- **Versión:** 1.1
 - **Estado:** **LISTA CANÓNICA ÚNICA.** Sellado 2026-08-20 por Victor
   (HEPTACREATION LLC), al cierre de la campaña IDN-1.
+- **Actualización v1.1 (2026-08-26):** se cierra el hueco de reconstrucción
+  de la §4 declarando que los «7» de EMB-2 incluían **sellados no-archivo**.
+  La lista de la §2 no cambia: siguen siendo los cinco evidenciados.
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -80,7 +83,7 @@ for f in src/engine/gameEngine.js src/engine/aiPlayer.js \
 done
 ```
 
-## 4. Pendiente de reconstrucción
+## 4. Reconstrucción CERRADA (v1.1)
 
 **La instrucción de EMB-2 refirió «los 7 protegidos/sellados» y esa enumeración
 completa no está versionada en el repositorio.** El documento de instrucción de
@@ -93,11 +96,22 @@ Se deja constancia en vez de completar la tabla a ojo: **inventar dos nombres
 para que cuadre un número sería peor que admitir el hueco**, porque produciría
 falsos protegidos que nadie podría desautorizar después.
 
-**Acción pendiente de Victor:** completar esta sección con los dos archivos que
-faltaban, o cerrarla declarando que la lista canónica son cinco y que el «7» de
-EMB-2 contaba también documentos u otros artefactos.
+**Cierre (decisión de Victor, 2026-08-26).** La referencia de EMB-2 a «7
+protegidos/sellados» mezclaba archivos protegidos con **constantes selladas
+no-archivo** (p. ej. las constantes del óvalo O1 y valores sellados
+equivalentes). Los dos elementos no identificados **no son archivos**: no
+existen en commits, docs ni scripts, y su búsqueda exhaustiva —la registrada
+más arriba en esta misma sección desde la v1.0— lo confirmó. Por decisión de
+Victor (2026-08-26) este hueco queda **CERRADO**: la lista canónica de archivos
+protegidos es y sigue siendo la de los **cinco** evidenciados en la §2.
+**Reabrir este punto requiere autorización explícita de Victor en este
+documento.**
 
-Hasta que eso se resuelva, **rige la tabla de §2: cinco archivos.**
+Los dos párrafos que abren esta sección se conservan tal como se escribieron
+en la v1.0: la constancia de la búsqueda es parte del valor del documento, y
+quien lea esta sección debe poder ver qué se buscó antes de aceptar el cierre.
+
+**Rige, como hasta ahora, la tabla de §2: cinco archivos.**
 
 ## 5. Cómo se mantiene
 
