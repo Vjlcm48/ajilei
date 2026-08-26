@@ -207,8 +207,8 @@ import {
   CONSULTAS_KEY as U3_KEY, CONSULTAS_GRATIS,
   CONSULTA_POPUP_MS, BADGE_POPUP_MS,
 } from '../src/config/consultas.js'
-import { VALUE_NAMES, getCardPoints } from '../src/engine/deck.js'
-import { getBestSuitScore } from '../src/engine/handEvaluator.js'
+import { VALUE_NAMES, getCardPoints, createDeck, shuffleDeck } from '../src/engine/deck.js'
+import { getBestSuitScore, isAjilei } from '../src/engine/handEvaluator.js'
 // ARN-1 · NIV-UI metió una pantalla de nivel en la ruta. El arnés lee los
 // niveles de la MISMA fuente única que la app (mismo criterio que consultas.js)
 // para no clavar ni el orden de la rejilla ni los montos: los `id` son el
@@ -7057,9 +7057,22 @@ const MSG_CELDAS = [
   { n: 2, vp: { w: 740, h: 360 }, gate: 'móvil landscape', movil: true },
 ]
 
-// Manos sintéticas para reconstruir el caso desde lo que la PÁGINA muestra. No
-// hace falta ver las cartas: una puntuación de 51 sólo la alcanza un AJILEI
-// natural y una de 52 sólo el de comodín — ninguna mano corriente llega ahí.
+// Manos CONSTRUIDAS para la matriz de P1 — y SÓLO para ella. P1 alimenta a
+// `composeResultado`, que es una función pura: ahí no hay nada observable que
+// estas cartas puedan estar suplantando, y construir el peor caso es la receta
+// O2 de siempre.
+//
+// ARN-3 · lo que murió aquí es su uso en P2. El comentario que las presidía
+// decía «no hace falta ver las cartas: una puntuación de 51 sólo la alcanza un
+// AJILEI natural y una de 52 sólo el de comodín», y esa premisa es FALSA en las
+// mesas con comodín: el AJILEI natural son 51 de UN palo y el de comodín son 41
+// de palo + 11, pero en mesa 5 un palo de 40 + los 11 del comodín también dan
+// 51 sin ser nada (y en mesa 4, 41 + 10 hace lo mismo). Con esa premisa el arnés
+// fabricaba una mano perfecta donde el producto tenía una corriente, componía
+// «¡AJILEI!…» y salía ROJO contra un producto sano — un rojo que no significaba
+// lo que decía. Medido en vivo por la caza dirigida de §P2b: mesa 5, mano
+// forzada de 4 Bastos (40) + 7 de Oros → banda «Bastos, 51 pts» y mensaje real
+// «¡Ganas con Bastos, 51 pts!». En P2 las cartas se LEEN del showdown.
 const MSG_AJILEI_NAT = [
   { palo: 'Oros', points: 11, value: 1 }, { palo: 'Oros', points: 10, value: 12 },
   { palo: 'Oros', points: 10, value: 11 }, { palo: 'Oros', points: 10, value: 10 },
@@ -7070,10 +7083,6 @@ const MSG_AJILEI_COM = [
   { palo: 'Espadas', points: 10, value: 11 }, { palo: 'Espadas', points: 10, value: 10 },
   { palo: 'Oros', points: 7, value: 7 },
 ]
-const MSG_NORMAL = [
-  { palo: 'Copas', points: 11, value: 1 }, { palo: 'Espadas', points: 10, value: 12 },
-]
-
 // Lo que la página muestra, sin leer una sola letra del mensaje para deducirlo:
 // puntuaciones por zona, quién lleva el chip de ganador, quién es la Mano.
 const msgLee = (page) => page.evaluate(() => {
@@ -7205,6 +7214,337 @@ const msgManoPorRotacion = (n, mano) => {
   return asiento === 0 ? 'Tú' : (n === 2 ? 'IA' : `IA ${asiento}`)
 }
 
+// ── ARN-3 · Las cartas se LEEN del showdown, no se fabrican ─────────────────
+// Hallazgo ➂ (reporte ARN-2), cerrado por esta tanda. El modo elegía la mano de
+// cada jugador con un umbral sobre la puntuación de la banda
+// (`pts >= 52 ? COM : pts >= 51 ? NAT : NORMAL`) y se la pasaba a
+// `composeResultado`, que recalcula el AJILEI con `isAjilei` (doctrina VC2). O
+// sea: el arnés inventaba el ÚNICO insumo del que depende la rama de mano
+// perfecta, pudiendo observarlo. Y el umbral era además aritméticamente falso
+// (ver el comentario de MSG_AJILEI_NAT): en mesa 5 hay manos de 51 puntos que no
+// son AJILEI, y contra ellas el arnés componía «¡AJILEI!…» y desmentía a un
+// producto sano.
+//
+// La fuente nueva es el propio showdown. El producto ya pone boca arriba lo que
+// hace falta y no hay que abrir `src/` para nada:
+//   · la mano humana está boca arriba desde el reparto (renderPlayerCards);
+//   · la ganadora la revela el showdown (GameTable.jsx:1283, `isPayoutPhase`);
+//   · las demás finalistas de mesas 3/4/5 están boca abajo por PROTOCOLO
+//     (`revealProtocolActive`, R1.c) y el producto las enseña donde él mismo lo
+//     ofrece: el tap sobre el nombre (Revelar Manos v1.0, R1/R3). Se usa esa
+//     puerta, no una trasera.
+// Los retirados no hacen falta: no llegaron a comparación, el motor les deja
+// `score` en null y `composeResultado` los ignora (`enJuego`).
+//
+// Cada carta boca arriba es un <img> con `alt` = "Sota de Bastos" (CardImage);
+// el dorso y el hueco van con `alt=""`, así que "lo que tiene alt" ES "lo que
+// está revelado" y no hay que interpretar clases para saberlo.
+const msgTexto = (page) => page.evaluate(() => {
+  const m = document.querySelector('.game-message')
+  return m ? m.textContent.trim() : null
+})
+
+const msgLeeCartasDom = (page) => page.evaluate(() => {
+  const txt = e => (e ? e.textContent.trim() : null)
+  const caras = raiz => [...raiz.querySelectorAll('.playing-card img[alt]')]
+    .map(i => ({ alt: i.getAttribute('alt'), src: i.getAttribute('src') || '' }))
+    .filter(c => c.alt)
+  const cuenta = raiz => ({
+    slots: raiz.querySelectorAll('.playing-card').length,
+    dorsos: raiz.querySelectorAll('.playing-card.card-back').length,
+    huecos: raiz.querySelectorAll('.playing-card.card-empty').length,
+  })
+  const zonas = []
+  const zHum = document.querySelector('.player-zone')
+  if (zHum) zonas.push({ nombre: 'Tú', via: 'player-zone', caras: caras(zHum), ...cuenta(zHum) })
+  document.querySelectorAll('.opp-panel').forEach(p => zonas.push({
+    nombre: txt(p.querySelector('.opp-name')), via: 'opp-panel', caras: caras(p), ...cuenta(p),
+  }))
+  document.querySelectorAll('.ai-zone').forEach(p => zonas.push({
+    nombre: txt(p.querySelector('.ai-name')), via: 'ai-zone', caras: caras(p), ...cuenta(p),
+  }))
+  // Señal de que la coreografía de canje (R2.b) sigue corriendo: mientras haya
+  // una clase `opp-reveal-*` en pantalla, `revealAnim !== null` y el producto
+  // IGNORA el siguiente tap (GameTable.jsx:1041). Sin esta espera el segundo
+  // rival no se destapaba nunca — medido.
+  return { zonas, coreografia: !!document.querySelector('[class*="opp-reveal-"]') }
+})
+
+// Del `alt` al objeto carta del motor, con el MISMO diccionario que ya usa `u3`
+// (VALUE_NAMES invertido) y los puntos de `getCardPoints`: ni una cifra de
+// puntuación se escribe en este archivo.
+const msgCartasDeCaras = (caras) => {
+  const cartas = []
+  for (const c of caras) {
+    const partes = c.alt.split(' de ')
+    if (partes.length !== 2) return { cartas: null, motivo: `alt ilegible "${c.alt}"` }
+    const value = U3_NOMBRE_A_VALOR[partes[0]]
+    if (value === undefined) return { cartas: null, motivo: `nombre desconocido "${partes[0]}"` }
+    cartas.push({ value, palo: partes[1], points: getCardPoints(value), name: partes[0] })
+  }
+  return { cartas, motivo: null }
+}
+
+// Reúne las manos de TODOS los que llegaron a comparación. Las que el protocolo
+// tiene boca abajo se piden por la puerta del producto (tap en el nombre) y se
+// espera a que la coreografía asiente — nunca se da por revelada una mano que
+// no se vio con sus cinco caras.
+async function msgRevelaYLee(page, nombres) {
+  const leidas = {}, taps = [], fallos = []
+  const registra = (zonas, como) => {
+    for (const z of zonas) {
+      if (!z.nombre || !nombres.includes(z.nombre) || leidas[z.nombre]) continue
+      if (z.caras.length === 0) continue
+      const p = msgCartasDeCaras(z.caras)
+      if (!p.cartas) { fallos.push(`${z.nombre}: ${p.motivo}`); continue }
+      leidas[z.nombre] = { cartas: p.cartas, via: z.via, como, dorsos: z.dorsos, huecos: z.huecos }
+    }
+  }
+  registra((await msgLeeCartasDom(page)).zonas, 'ya boca arriba')
+  for (const nombre of nombres) {
+    if (leidas[nombre]) continue
+    const t0 = Date.now()
+    const panel = page.locator('.opp-panel')
+      .filter({ has: page.locator('.opp-name', { hasText: new RegExp(`^${nombre}$`) }) })
+    try {
+      await panel.locator('.opp-name').first().click({ timeout: 2500 })
+    } catch (e) {
+      fallos.push(`${nombre}: el nombre no admitió el toque (${String(e && e.message || e).slice(0, 60)})`)
+      continue
+    }
+    let d = null
+    for (let k = 0; k < 40; k++) {
+      await page.waitForTimeout(100)
+      d = await msgLeeCartasDom(page)
+      const z = d.zonas.find(x => x.nombre === nombre)
+      if (z && z.caras.length === 5 && !d.coreografia) break
+    }
+    taps.push(`${nombre}:${Date.now() - t0}ms`)
+    registra(d ? d.zonas : [], 'destapada por tap')
+    if (!leidas[nombre]) fallos.push(`${nombre}: no llegó a mostrar sus cinco caras tras el toque`)
+  }
+  return { leidas, taps, fallos }
+}
+
+// ── ARN-3 · La auditoría de UNA mano, compartida por P2 y por la caza ───────
+// Sale de dentro del bucle de P2 sin cambiar una coma de lo que juzga: mismas
+// puertas, mismo instante de captura (`msgLee` PRIMERO — los taps mueven el
+// chip de ganador al panel destapado, así que leer después falsearía `idxGana`).
+// Lo único nuevo es de dónde salen las cartas y las dos puertas que eso añade.
+async function msgAuditaMano(page, n, mano, juego, dep) {
+  const l = await msgLee(page)
+  const conScore = l.zonas.filter(z => z.score)
+  const idxGana  = conScore.findIndex(z => z.gana)
+  const hayShowdown = conScore.length > 0 && idxGana >= 0
+  // ARN-2 · las dos lecturas de la Mano, la observada en vuelo y la derivada de
+  // la rotación. Se registran las dos SIEMPRE y se exige que concuerden.
+  const manoVista   = juego.manoVista
+  const manoRotada  = msgManoPorRotacion(n, mano)
+  // La pastilla en el SHOWDOWN — la vieja fuente. Donde el producto no la
+  // esconde debe decir lo mismo que se leyó en vuelo; donde la esconde (mesa 5
+  // portrait, mesa 2 landscape móvil) no hay nada que cruzar y se declara. Así
+  // el defecto de ARN-1 queda convertido en puerta.
+  const manoEnChapa = (l.zonas.find(z => z.mano) || {}).nombre ?? null
+
+  // ARN-3 · el insumo de cartas, DESPUÉS de juzgar el instante.
+  const lectura = hayShowdown
+    ? await msgRevelaYLee(page, conScore.map(z => z.nombre))
+    : { leidas: {}, taps: [], fallos: [] }
+  // Verificación cruzada barata y de verdad independiente: las cartas leídas,
+  // pasadas por el evaluador del motor con las reglas VIVAS del chip de comodín
+  // (mismo lector que `u3`), tienen que dar EXACTAMENTE el palo y los puntos que
+  // la banda de esa zona anuncia. Si se leyó de menos, de más o de otra mano, no
+  // cuadra. Contar cartas habría sido más barato y menos concluyente.
+  const reglas = hayShowdown ? await u3ReglasDelDom(page) : null
+  const cruce = hayShowdown ? conScore.map(z => {
+    const c = lectura.leidas[z.nombre]
+    if (!c) return { nombre: z.nombre, ok: false, n: 0, leido: null, banda: `${z.score.palo}, ${z.score.pts}` }
+    const sc = getBestSuitScore(c.cartas, reglas.ruleN, reglas.comodinEnabled)
+    return {
+      nombre: z.nombre, n: c.cartas.length, como: c.como, viaZona: c.via,
+      ok: c.cartas.length === 5 && sc.palo === z.score.palo && sc.points === z.score.pts,
+      leido: `${sc.palo}, ${sc.points}`, banda: `${z.score.palo}, ${z.score.pts}`,
+      mano: c.cartas.map(x => `${x.name} de ${x.palo}`).join(' + '),
+    }
+  }) : []
+  const cartasLeidas  = hayShowdown && conScore.every(z => lectura.leidas[z.nombre]?.cartas.length === 5)
+  const cartasCuadran = hayShowdown && cruce.every(c => c.ok)
+  // El toque destapa manos; no puede tocar lo que se juzga. Se comprueba en vez
+  // de suponerse.
+  const textoTrasLeer = lectura.taps.length ? await msgTexto(page) : l.texto
+
+  let esperado = null, via = 'plantilla'
+  if (hayShowdown) {
+    if (cartasLeidas && cartasCuadran) {
+      // Reconstrucción completa desde la página, ahora también las cartas.
+      via = 're-derivado'
+      const players = conScore.map((z, i) => ({
+        id: i, name: z.nombre, isHuman: z.quien === 'humano',
+        cards: lectura.leidas[z.nombre].cartas,
+        score: { palo: z.score.palo, points: z.score.pts }, eliminated: false,
+      }))
+      esperado = dep.composeResultado({
+        phase: dep.FASES.PAYOUT, winner: idxGana, players, numPlayers: n,
+        // El nombre del asiento Mano traducido al índice de `players`, que aquí
+        // es el de `conScore` —los que llegaron a comparación— y no el del
+        // asiento. Si la Mano se retiró no figura en conScore y esto da -1:
+        // nunca iguala a `winner`, que es exactamente la verdad (el ganador no
+        // es la Mano → «el más cercano a la Mano»).
+        manoIndex: conScore.findIndex(z => z.nombre === manoVista),
+        ruleN: n,
+      })
+    } else {
+      // Sin cartas fiables NO se compone nada: antes se rellenaba con una mano
+      // inventada y el veredicto salía igual de verde. Ahora falta el insumo y
+      // se dice.
+      via = 'sin-cartas'
+    }
+  }
+  const claseEsperada = dep.claseTono(l.tono)
+  const m = {
+    mano, ruta: l.ruta, via, texto: l.texto, tono: l.tono,
+    esperado: esperado ? esperado.texto : null,
+    // ARN-2 · trazabilidad del insumo, para que el registro de corridas pueda
+    // demostrar que la condición que mordía se ejercitó de verdad.
+    manoVista, manoRotada, manoEnChapa,
+    // Cuántas pastillas de Mano había en la lectura en vuelo. Se registra para
+    // que un `manoLeida` en falso diga POR QUÉ: 0 = no se alcanzó ninguna fase
+    // de apuesta limpia, >1 = dos asientos se declaran Mano (imposible con un
+    // solo manoSeat, y por eso mismo digno de verse).
+    manoCuantas: juego.manoCuantas,
+    chapaOculta: manoEnChapa === null,
+    ganaLaMano: !!(manoVista && conScore[idxGana] && conScore[idxGana].nombre === manoVista),
+    // El insumo de la Mano sólo LLEGA al texto por la vía del desempate: sin
+    // empate a puntos, resultadoCore.js:117 calcula `desempate` y no lo usa. Por
+    // eso la condición que mordía es la conjunción de tres cosas, y se registran
+    // las tres por separado para que el censo no exagere ni disimule.
+    hayEmpate: conScore.length > 1 &&
+      conScore.filter(z => z.score.pts === Math.max(...conScore.map(y => y.score.pts))).length > 1,
+    // Puerta 1: la Mano se LEYÓ. Sin dato no hay re-derivación honesta.
+    manoLeida: manoVista !== null,
+    // Puerta 2: observación y rotación determinista coinciden.
+    manoConcuerda: manoVista !== null && manoVista === manoRotada,
+    // Puerta 3 (cruce): donde la pastilla sobrevive al showdown, dice lo mismo.
+    manoCruce: manoEnChapa === null || manoEnChapa === manoVista,
+    // ARN-3 · el registro con el que se demuestra que el verde incluye cartas
+    // reales: qué se leyó, de qué zona, si hizo falta destapar y qué dijo el
+    // evaluador contra la banda.
+    cartas: cruce, cartasTaps: lectura.taps, cartasFallos: lectura.fallos,
+    cartasLeidas, cartasCuadran, reglas,
+    // Puerta 4 (ARN-3): destapar manos no puede mover lo que se juzga.
+    mensajeEstable: textoTrasLeer === l.texto,
+    // Ganadas por retiros: no hay puntuaciones que re-derivar, así que se
+    // comprueba pertenencia a las plantillas conservadas y coherencia de tono.
+    // Se DECLARA, no se disfraza de re-derivación. Y `sin-cartas` no coincide
+    // con nada: sin insumo no hay veredicto que dar.
+    coincide: via === 're-derivado'
+      ? l.texto === esperado.texto && l.tono === esperado.tono
+      : via === 'plantilla'
+        ? /Ganaste el pozo|gana el pozo|Los demás se retiran/.test(l.texto)
+        : false,
+    sinPierdes: !/Pierdes/.test(l.texto),
+    sinVozVieja: !/\(\d+ pts\)/.test(l.texto),
+    // MSG-U1b · y NADA en toda la pantalla habla la voz vieja: ni el mensaje,
+    // ni la banda del humano, ni las de los rivales.
+    vozVieja: l.vozVieja,
+    pantallaLimpia: l.vozVieja.length === 0,
+    // El color aplicado y el tono compuesto tienen que ser el mismo hecho.
+    tonoAplicado: l.clase.includes(claseEsperada.trim()) && !!l.tono,
+  }
+  // Las ocho puertas de ARN-1/ARN-2 conservan su significado exacto —la de
+  // lectura de la Mano sigue siendo indispensable: sin ese insumo, `coincide`
+  // compararía contra una frase inventada, y un verde así valdría menos que el
+  // rojo que sustituye—. ARN-3 suma dos, y por el mismo motivo. Las manos
+  // ganadas por retiros no tienen cartas que leer —no hubo volteo— y ahí
+  // `cartasOk` es cierto por AUSENCIA declarada, no por relleno.
+  m.cartasOk = via === 'plantilla' ? true : (cartasLeidas && cartasCuadran)
+  m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado && m.pantallaLimpia &&
+    m.manoLeida && m.manoConcuerda && m.manoCruce && m.cartasOk && m.mensajeEstable
+  return m
+}
+
+// Resumen de una línea del insumo de cartas, para el registro de corridas.
+const msgCartasResumen = (m) => m.via === 'plantilla'
+  ? 'cartas:—(retiros)'
+  : `cartas:${m.cartas.filter(c => c.ok).length}/${m.cartas.length}${m.cartasOk ? '✓' : '✗'}` +
+    `${m.cartasTaps.length ? ` toques=${m.cartasTaps.length}` : ''}` +
+    `${m.cartasOk ? '' : ` [${m.cartas.map(c => `${c.nombre} leído=${c.leido} banda=${c.banda}`).join(' · ')}${m.cartasFallos.length ? ' · ' + m.cartasFallos.join(' · ') : ''}]`}`
+
+// ── ARN-3 · Caza dirigida: forzar el reparto sin tocar el producto ───────────
+// Para ejercitar la rama de AJILEI hace falta un AJILEI, y uno natural cae con
+// probabilidad ~4·10⁻⁴ por mano: esperarlo no es una estrategia. El arnés no
+// fabrica la mano —eso es justo lo que esta tanda vino a matar— sino que fuerza
+// el BARAJADO y deja que el producto reparta, puntúe, decida y escriba: siembra
+// `Math.random` con un generador de semilla conocida justo antes del clic,
+// `shuffleDeck` (deck.js:44) consume sus 39 tiradas, y se restaura en cuanto las
+// dos primeras cartas asoman. Las cartas se siguen leyendo del DOM y la mano
+// forzada se VERIFICA contra la predicha: si el navegador hubiera gastado una
+// tirada antes del barajado, no coincidiría y la caza lo cantaría en vez de
+// creérselo.
+//
+// Qué asiento recibe qué: `startHand` reparte 2 cartas en ronda Mano→Pie
+// (gameEngine.js:421-431) y `DEAL_3` otras 3 igual (gameEngine.js:213-224). En
+// la mano 1 la Mano es el asiento 0 —el humano— porque `startHand` no rota en
+// handCount 0, así que le tocan los índices 0, N, 2N, 3N y 4N del mazo barajado.
+// Por eso cada intento estrena página: sólo la mano 1 tiene esa garantía.
+const msgPrng = (a) => () => {
+  a |= 0; a = a + 0x6D2B79F5 | 0
+  let t = Math.imul(a ^ a >>> 15, 1 | a)
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+  return ((t ^ t >>> 14) >>> 0) / 4294967296
+}
+const msgBarajaCon = (semilla) => {
+  const real = Math.random
+  Math.random = msgPrng(semilla)
+  try { return shuffleDeck(createDeck()) } finally { Math.random = real }
+}
+const msgManoDeLaCasa = (mazo, n) => [0, n, 2 * n, 3 * n, 4 * n].map(i => mazo[i])
+// La semilla más baja que le reparte al humano la mano que la caza pide.
+const msgBuscaSemilla = (quiere, n, desde, tope) => {
+  for (let s = desde; s <= tope; s++) {
+    const m = msgManoDeLaCasa(msgBarajaCon(s), n)
+    if (quiere(m)) return { semilla: s, mano: m }
+  }
+  return null
+}
+const msgClaveMano = (cartas) =>
+  cartas.map(c => `${c.name ?? VALUE_NAMES[c.value]} de ${c.palo}`).sort().join(' | ')
+
+// El generador vive en dos sitios —Node y el navegador— y una divergencia entre
+// las dos copias echaría a perder la caza en silencio. Antes de sembrar se
+// comprueba que la primera tirada es la misma en los dos lados.
+//
+// La siembra se AUTO-RETIRA en cuanto el barajado gasta sus tiradas: el azar
+// sembrado alcanza al mazo y a nada más, y las IAs deciden con el azar de
+// siempre. Nada de esto le llega al producto por dentro — es la misma
+// `Math.random` que cualquier página puede tener sembrada.
+async function msgSiembraAzar(page, semilla, tiradas) {
+  const eco = await page.evaluate(([s, k]) => {
+    const prng = (a) => () => {
+      a |= 0; a = a + 0x6D2B79F5 | 0
+      let t = Math.imul(a ^ a >>> 15, 1 | a)
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+      return ((t ^ t >>> 14) >>> 0) / 4294967296
+    }
+    const real = Math.random
+    const dado = prng(s)
+    window.__arn3N = 0
+    Math.random = () => {
+      // Al gastarse las tiradas del barajado el azar de la casa vuelve intacto, y
+      // el contador se queda en las que de verdad se sirvieron sembradas.
+      if (window.__arn3N >= k) { Math.random = real; return real() }
+      window.__arn3N++
+      return dado()
+    }
+    return prng(s)()          // tirada de control, de un generador aparte
+  }, [semilla, tiradas])
+  return eco === msgPrng(semilla)()
+}
+// Cuántas tiradas sembradas se sirvieron. Si no son exactamente las del
+// barajado, alguien más bebió del generador y la mano forzada no será la
+// predicha — que es precisamente lo que la caza comprueba contra el DOM.
+const msgCuentaAzar = (page) => page.evaluate(() => window.__arn3N ?? null)
+
 // Juega una mano completa pasando siempre y devuelve cuando el resultado está
 // en pantalla. Un clic por iteración con rechequeo (lección W1).
 // ARN-2 · devuelve además la Mano muestreada en vuelo. `false` sigue
@@ -7239,10 +7579,111 @@ async function msgJuegaUnaMano(page, primera) {
   return { jugada: false, manoVista, manoCuantas }
 }
 
+// ── ARN-3 · P2b · Caza dirigida: las dos caras del 51 ───────────────────────
+// La rama de mano perfecta de `resultadoCore` es la ÚNICA que consume cartas, y
+// es justo la que el arnés viejo alimentaba a ojo. Verificarla exige un AJILEI
+// en pantalla, y un AJILEI natural cae ~4·10⁻⁴ por mano: sin caza no hay
+// condición ejercitada, sólo un residuo perpetuo.
+//
+// Se cazan las DOS caras del mismo número, porque el hallazgo ➂ vive entre
+// ellas: un 51 que SÍ es AJILEI y un 51 que NO lo es. La primera prueba que la
+// rama se compone bien con cartas leídas; la segunda es el contraejemplo que
+// mató al umbral — el arnés viejo habría exigido «¡AJILEI!» y desmentido al
+// producto.
+const MSG_CAZAS = [
+  {
+    id: 'AJILEI natural', n: 2, vp: { w: 1366, h: 768 },
+    // Mesa 2 no tiene comodín (getComodinValue devuelve null), así que el único
+    // 51 posible es el AJILEI natural: cinco cartas de un palo que suman 51.
+    quiere: (m) => isAjilei(m, 2),
+    espera: 'la rama de mano perfecta, compuesta con las cartas leídas del showdown',
+    cumple: (m) => /AJILEI/.test(m.texto),
+  },
+  {
+    id: 'falso 51', n: 5, vp: { w: 1366, h: 768 },
+    // El contraejemplo: 40 de palo + los 11 del comodín dan 51 sin ser AJILEI
+    // (el de comodín exige 41 + 11). Aquí es donde el umbral `pts >= 51 → mano
+    // perfecta` componía «¡AJILEI!» contra un producto sano.
+    quiere: (m) => getBestSuitScore(m, 5, true).points === 51 && !isAjilei(m, 5),
+    espera: 'una victoria corriente de 51 pts — el arnés viejo habría exigido «¡AJILEI!»',
+    cumple: (m) => /51 pts/.test(m.texto) && !/AJILEI/.test(m.texto),
+  },
+]
+const MSG_CAZA_INTENTOS = 4
+const MSG_CAZA_TOPE_SEMILLA = 2000000
+
+async function msgCaza(browser, caza, dep) {
+  // Las tiradas del barajado no se clavan: son las del mazo real menos una
+  // (deck.js, Fisher-Yates de i=n-1 a 1). Si el mazo cambiara de tamaño, la
+  // siembra cambia con él.
+  const tiradas = createDeck().length - 1
+  const r = { id: caza.id, n: caza.n, vp: caza.vp, tiradas, intentos: [], ok: null, ejercitada: false, residuo: null }
+  let desde = 1
+  for (let intento = 1; intento <= MSG_CAZA_INTENTOS; intento++) {
+    const buscada = msgBuscaSemilla(caza.quiere, caza.n, desde, MSG_CAZA_TOPE_SEMILLA)
+    if (!buscada) { r.residuo = `sin semilla que reparta la mano pedida por debajo de ${MSG_CAZA_TOPE_SEMILLA}`; break }
+    desde = buscada.semilla + 1
+    const t = { intento, semilla: buscada.semilla, pedida: msgClaveMano(buscada.mano) }
+    const page = await browser.newPage({ viewport: { width: caza.vp.w, height: caza.vp.h } })
+    try {
+      await gotoMesa(page, caza.n)
+      t.mismoAzar = await msgSiembraAzar(page, buscada.semilla, tiradas)
+      if (!t.mismoAzar) {
+        t.motivo = 'el generador de Node y el del navegador no dieron la misma tirada'
+        r.residuo = t.motivo
+        r.intentos.push(t); await page.close(); break
+      }
+      const juego = await msgJuegaUnaMano(page, true)
+      t.tiradasServidas = await msgCuentaAzar(page)
+      if (!juego || !juego.jugada) { t.motivo = 'la mano no llegó a resultado'; r.intentos.push(t); await page.close(); continue }
+      // ¿Salió el reparto pedido? Se LEE de la zona humana, que está boca arriba
+      // desde el reparto, y se compara con lo predicho. Un desfase de tiradas se
+      // delata aquí en vez de colarse.
+      const zh = (await msgLeeCartasDom(page)).zonas.find(z => z.nombre === 'Tú')
+      const leida = msgCartasDeCaras(zh ? zh.caras : [])
+      t.repartida = leida.cartas && leida.cartas.length === 5 ? msgClaveMano(leida.cartas) : null
+      t.forzada = t.repartida !== null && t.repartida === t.pedida
+      if (!t.forzada) {
+        t.motivo = 'el reparto no coincidió con el predicho (¿tirada gastada antes del barajado?)'
+        r.intentos.push(t); await page.close(); continue
+      }
+      const m = await msgAuditaMano(page, caza.n, 1, juego, dep)
+      t.rama = caza.cumple(m) ? 'la pedida' : 'otra'
+      t.texto = m.texto
+      t.via = m.via
+      t.ok = m.ok
+      t.cartas = msgCartasResumen(m)
+      t.mano = m
+      r.intentos.push(t)
+      if (t.rama !== 'la pedida') { t.motivo = 'la mano forzada salió, pero el resultado no cayó en la rama buscada'; await page.close(); continue }
+      r.ok = m.ok
+      r.ejercitada = m.ok && m.via === 're-derivado'
+      await page.close()
+      break
+    } catch (e) {
+      t.error = String(e && e.message || e).slice(0, 200)
+      r.intentos.push(t)
+      await page.close().catch(() => {})
+    }
+  }
+  if (r.ok === null && !r.residuo) r.residuo = `no se logró forzar la condición en ${MSG_CAZA_INTENTOS} intentos`
+  const ult = r.intentos[r.intentos.length - 1]
+  const estado = r.ok === true ? 'VERDE' : r.ok === false ? 'ROJO' : 'RESIDUO'
+  console.log(`msg·ARN-3 caza «${caza.id}» T${caza.n} · ${estado} intentos=${r.intentos.length}` +
+    (r.ok === null
+      ? ` · ${r.residuo}${ult ? ` · último: semilla=${ult.semilla} pedida="${ult.pedida}" repartida="${ult.repartida ?? '—'}" ${ult.motivo ?? ult.error ?? ''}` : ''}`
+      : ` semilla=${ult.semilla} tiradas=${ult.tiradasServidas}/${tiradas} mano REPARTIDA POR EL PRODUCTO="${ult.repartida}" → "${ult.texto}" (${ult.via}) ${ult.cartas}` +
+        `${r.ok ? '' : ` ✗esperado="${ult.mano.esperado}"`}`))
+  return r
+}
+
 async function runMSG(browser) {
   const { composeResultado, claseTono } = await import('../src/hooks/resultadoCore.js')
   const { PHASES: FASES } = await import('../src/engine/gameEngine.js')
   const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
+  // ARN-3 · el compositor viaja en un solo bulto a la auditoría de mano, que es
+  // la misma para P2 y para la caza dirigida: un solo sitio que sabe qué se juzga.
+  const dep = { composeResultado, claseTono, FASES }
 
   // ── P1 · El compositor entero, CONSTRUIDO (receta O2) ─────────────────────
   // El peor caso no se juega: un doble AJILEI en las dos direcciones no cae ni
@@ -7347,88 +7788,7 @@ async function runMSG(browser) {
       for (let mano = 1; mano <= 3; mano++) {
         const juego = await msgJuegaUnaMano(page, mano === 1)
         if (!juego || !juego.jugada) break
-        const l = await msgLee(page)
-        const conScore = l.zonas.filter(z => z.score)
-        const idxGana  = conScore.findIndex(z => z.gana)
-        // ARN-2 · las dos lecturas de la Mano, la observada en vuelo y la
-        // derivada de la rotación. Se registran las dos SIEMPRE y se exige que
-        // concuerden: si el arnés y el motor discrepan sobre quién abre, no hay
-        // frase esperada que valga.
-        const manoVista = juego.manoVista
-        const manoRotada = msgManoPorRotacion(celda.n, mano)
-        // La pastilla en el SHOWDOWN — la vieja fuente. Donde el producto no la
-        // esconde debe decir lo mismo que se leyó en vuelo; donde la esconde
-        // (mesa 5 portrait, mesa 2 landscape móvil) no hay nada que cruzar y se
-        // declara. Así el defecto de ARN-1 queda convertido en puerta.
-        const manoEnChapa = (l.zonas.find(z => z.mano) || {}).nombre ?? null
-        let esperado = null, via = 'plantilla'
-        if (conScore.length && idxGana >= 0) {
-          // Reconstrucción completa desde la página.
-          via = 're-derivado'
-          const players = conScore.map((z, i) => ({
-            id: i, name: z.nombre, isHuman: z.quien === 'humano',
-            cards: z.score.pts >= 52 ? MSG_AJILEI_COM : z.score.pts >= 51 ? MSG_AJILEI_NAT : MSG_NORMAL,
-            score: { palo: z.score.palo, points: z.score.pts }, eliminated: false,
-          }))
-          esperado = composeResultado({
-            phase: FASES.PAYOUT, winner: idxGana, players, numPlayers: celda.n,
-            // El nombre del asiento Mano traducido al índice de `players`, que
-            // aquí es el de `conScore` —los que llegaron a comparación— y no el
-            // del asiento. Si la Mano se retiró no figura en conScore y esto da
-            // -1: nunca iguala a `winner`, que es exactamente la verdad (el
-            // ganador no es la Mano → «el más cercano a la Mano»).
-            manoIndex: conScore.findIndex(z => z.nombre === manoVista),
-            ruleN: celda.n,
-          })
-        }
-        const claseEsperada = claseTono(l.tono)
-        const m = {
-          mano, ruta: l.ruta, via, texto: l.texto, tono: l.tono,
-          esperado: esperado ? esperado.texto : null,
-          // ARN-2 · trazabilidad del insumo, para que el registro de corridas
-          // pueda demostrar que la condición que mordía se ejercitó de verdad.
-          manoVista, manoRotada, manoEnChapa,
-          // Cuántas pastillas de Mano había en la lectura en vuelo. Se registra
-          // para que un `manoLeida` en falso diga POR QUÉ: 0 = no se alcanzó
-          // ninguna fase de apuesta limpia, >1 = dos asientos se declaran Mano
-          // (imposible con un solo manoSeat, y por eso mismo digno de verse).
-          manoCuantas: juego.manoCuantas,
-          chapaOculta: manoEnChapa === null,
-          ganaLaMano: !!(manoVista && conScore[idxGana] && conScore[idxGana].nombre === manoVista),
-          // El insumo sólo LLEGA al texto por la vía del desempate: sin empate a
-          // puntos, resultadoCore.js:117 calcula `desempate` y no lo usa. Por eso
-          // la condición que mordía es la conjunción de tres cosas, y se registran
-          // las tres por separado para que el censo no exagere ni disimule.
-          hayEmpate: conScore.length > 1 &&
-            conScore.filter(z => z.score.pts === Math.max(...conScore.map(y => y.score.pts))).length > 1,
-          // Puerta 1: la Mano se LEYÓ. Sin dato no hay re-derivación honesta.
-          manoLeida: manoVista !== null,
-          // Puerta 2: observación y rotación determinista coinciden.
-          manoConcuerda: manoVista !== null && manoVista === manoRotada,
-          // Puerta 3 (cruce): donde la pastilla sobrevive al showdown, dice lo mismo.
-          manoCruce: manoEnChapa === null || manoEnChapa === manoVista,
-          // Ganadas por retiros: no hay puntuaciones que re-derivar, así que se
-          // comprueba pertenencia a las plantillas conservadas y coherencia de
-          // tono. Se DECLARA, no se disfraza de re-derivación.
-          coincide: esperado
-            ? l.texto === esperado.texto && l.tono === esperado.tono
-            : /Ganaste el pozo|gana el pozo|Los demás se retiran/.test(l.texto),
-          sinPierdes: !/Pierdes/.test(l.texto),
-          sinVozVieja: !/\(\d+ pts\)/.test(l.texto),
-          // MSG-U1b · y NADA en toda la pantalla habla la voz vieja: ni el
-          // mensaje, ni la banda del humano, ni las de los rivales.
-          vozVieja: l.vozVieja,
-          pantallaLimpia: l.vozVieja.length === 0,
-          // El color aplicado y el tono compuesto tienen que ser el mismo hecho.
-          tonoAplicado: l.clase.includes(claseEsperada.trim()) && !!l.tono,
-        }
-        // ARN-2 · las cinco puertas originales conservan su significado exacto;
-        // se suman las tres de la Mano. La de lectura es indispensable: sin el
-        // insumo, `coincide` compararía contra una frase inventada, y un verde
-        // así valdría menos que el rojo que sustituye.
-        m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado && m.pantallaLimpia &&
-          m.manoLeida && m.manoConcuerda && m.manoCruce
-        r.manos.push(m)
+        r.manos.push(await msgAuditaMano(page, celda.n, mano, juego, dep))
       }
       r.ok = r.manos.length > 0 && r.manos.every(m => m.ok)
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
@@ -7436,8 +7796,15 @@ async function runMSG(browser) {
     // ARN-2 · la Mano se imprime en cada mano junto con si su pastilla estaba
     // oculta y si el desempate lo ganó ella: ése es el registro con el que se
     // demuestra que la condición del hallazgo ① se ejercitó, y no un "confía".
-    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} ${msgCartasResumen(m)}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
+  }
+
+  // ── P2b · ARN-3 · Caza dirigida de la condición AJILEI ────────────────────
+  const cazas = []
+  for (const caza of MSG_CAZAS) {
+    if (tblFilter && caza.n !== tblFilter) continue
+    cazas.push(await msgCaza(browser, caza, dep))
   }
 
   // ── P3 · Fin de partida: el oro es de la victoria ─────────────────────────
@@ -7565,9 +7932,42 @@ async function runMSG(browser) {
   console.log(`msg·ARN-2 insumo distinto del viejo (oculta + gana la Mano) ${condicion.insumoDistinto.length}: ${condicion.insumoDistinto.join(' | ') || '—'}`)
   console.log(`msg·ARN-2 → CONDICIÓN COMPLETA EJERCITADA ${condicion.ejercitada.length} vez(ces)${condicion.ejercitada.length ? ':\n   · ' + condicion.ejercitada.join('\n   · ') : ' — residuo declarado, ver reporte'}`)
 
-  const passed = p1 && jugado.every(r => r.ok) && finales.every(f => f.p3) && anchuras.every(r => r.ok)
-  console.log(`\n── MSG: compositor ${p1 ? 'OK' : 'FALLA'} (${matriz.length} casos) · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · fin ${finales.filter(f => f.p3).length}/${finales.length} · Δ larga ${anchuras.filter(r => r.ok).length}/${anchuras.length} · ${passed ? 'VERDE' : 'ROJO'}`)
-  return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, finales, anchuras, condicionARN2: condicion, passed }
+  // ── ARN-3 · Censo del insumo de cartas ────────────────────────────────────
+  // El equivalente del censo de arriba para el hallazgo ➂: cuántas manos se
+  // juzgaron con cartas LEÍDAS del showdown, cuántas hubo que destapar por la
+  // puerta del producto y en cuántas se ejercitó la rama que consume cartas.
+  // Igual que allí, nada aquí es una puerta: es el registro con el que el verde
+  // se demuestra en vez de creerse.
+  const conCartas = manosTodas.filter(m => m.via === 're-derivado')
+  const insumo = {
+    manos_n: manosTodas.length,
+    conCartasLeidas_n: conCartas.length,
+    porRetiros_n: manosTodas.filter(m => m.via === 'plantilla').length,
+    sinCartas_n: manosTodas.filter(m => m.via === 'sin-cartas').length,
+    destapadas_n: manosTodas.reduce((a, m) => a + (m.cartasTaps ? m.cartasTaps.length : 0), 0),
+    cruceEvaluador_n: conCartas.filter(m => m.cartasCuadran).length,
+    cazas: cazas.map(c => ({
+      id: c.id, n: c.n, estado: c.ok === true ? 'VERDE' : c.ok === false ? 'ROJO' : 'RESIDUO',
+      ejercitada: c.ejercitada, residuo: c.residuo,
+      intentos: c.intentos.length,
+      forzada: (c.intentos[c.intentos.length - 1] || {}).repartida ?? null,
+      texto: (c.intentos[c.intentos.length - 1] || {}).texto ?? null,
+    })),
+  }
+  console.log(`msg·ARN-3 insumo de cartas · manos=${insumo.manos_n} · re-derivadas con cartas leídas=${insumo.conCartasLeidas_n} · por retiros (sin cartas)=${insumo.porRetiros_n} · sin cartas fiables=${insumo.sinCartas_n} · manos destapadas por tap=${insumo.destapadas_n} · cruce con el evaluador=${insumo.cruceEvaluador_n}/${insumo.conCartasLeidas_n}`)
+  const cazasHechas = cazas.filter(c => c.ejercitada)
+  console.log(`msg·ARN-3 → CONDICIÓN AJILEI EJERCITADA ${cazasHechas.length}/${cazas.length}${cazasHechas.length ? ':\n   · ' + cazasHechas.map(c => `${c.id} T${c.n}: "${(c.intentos[c.intentos.length - 1] || {}).repartida}" → "${(c.intentos[c.intentos.length - 1] || {}).texto}"`).join('\n   · ') : ' — residuo declarado, ver reporte'}`)
+
+  // Una caza que no logra forzar la condición NO pinta el modo de rojo: no es un
+  // fallo del producto ni del lector, es una condición que no se dejó cazar, y
+  // un rojo tiene que significar lo que dice. Se declara como residuo y la
+  // sentencia es de Victor. Una caza que SÍ forzó la condición y luego no cuadra
+  // sí es roja: ahí el instrumento tiene delante lo que buscaba.
+  const passed = p1 && jugado.every(r => r.ok) && finales.every(f => f.p3) && anchuras.every(r => r.ok) &&
+    cazas.every(c => c.ok !== false)
+  const residuos = cazas.filter(c => c.ok === null)
+  console.log(`\n── MSG: compositor ${p1 ? 'OK' : 'FALLA'} (${matriz.length} casos) · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · fin ${finales.filter(f => f.p3).length}/${finales.length} · Δ larga ${anchuras.filter(r => r.ok).length}/${anchuras.length} · caza ${cazas.filter(c => c.ok === true).length}/${cazas.length}${residuos.length ? ` (+${residuos.length} residuo)` : ''} · ${passed ? 'VERDE' : 'ROJO'}`)
+  return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, cazas, finales, anchuras, condicionARN2: condicion, insumoARN3: insumo, passed }
 }
 
 
