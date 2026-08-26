@@ -1,12 +1,15 @@
-# AJILEI — Archivos protegidos · Lista canónica v1.1
+# AJILEI — Archivos protegidos · Lista canónica v1.2
 
 - **Archivo:** `docs/AJILEI_Protegidos_v1.0.md`
-- **Versión:** 1.1
+- **Versión:** 1.2
 - **Estado:** **LISTA CANÓNICA ÚNICA.** Sellado 2026-08-20 por Victor
   (HEPTACREATION LLC), al cierre de la campaña IDN-1.
 - **Actualización v1.1 (2026-08-26):** se cierra el hueco de reconstrucción
   de la §4 declarando que los «7» de EMB-2 incluían **sellados no-archivo**.
   La lista de la §2 no cambia: siguen siendo los cinco evidenciados.
+- **Actualización v1.2 (2026-08-26):** refresco de la instantánea §3 tras
+  VIS/TAC — dos filas vencidas por movimientos legítimos ya sellados. La
+  lista de la §2 sigue sin cambiar; sólo se re-miden las cifras.
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -57,18 +60,37 @@ alto de `.rivals-zone`, los tokens `--dsk-*`). Su protección no es dogma: es qu
 una edición ahí puede romper en silencio una geometría que costó una campaña
 entera calibrar.
 
-## 3. Instantánea de sellado (2026-08-20)
+## 3. Instantánea (sellado 2026-08-20 · refresco 2026-08-26)
 
-Estado exacto en el momento de sellar esta lista, para que cualquier
-"byte-idéntico" futuro sea auditable contra algo y no contra un recuerdo.
+Estado exacto de cada archivo, para que cualquier "byte-idéntico" futuro sea
+auditable contra algo y no contra un recuerdo. Tres filas siguen siendo las del
+sellado; las dos de estilos se refrescaron el 2026-08-26 —el envejecimiento que
+el aviso de más abajo anuncia—, con su causa en la nota al pie de la tabla.
 
 | Archivo | blob git | sha256 (16) | líneas | último commit que lo tocó |
 |---|---|---|---|---|
 | `src/engine/gameEngine.js` | `6ddadd536eb8` | `cad9af74e51e474e` | 548 | `fe8bbd2` (2026-07-21) |
 | `src/engine/aiPlayer.js` | `0860812af936` | `9135fe06d0a5d2c0` | 908 | `92774ee` (2026-08-15) |
 | `src/config/seatLayouts.js` | `0d1bb8ea66a8` | `0049051fd4b8b891` | 59 | `4721511` (2026-06-16) |
-| `src/styles/opponentPanel.css` | `207f9b0d5d0a` | `71aecfdb59e30594` | 1037 | `1dc56a2` (2026-07-10) |
-| `src/styles/gameTable.css` | `c8680f68e890` | `7ba731a4ca20e840` | 6260 | `8da6a89` (2026-08-14) |
+| `src/styles/opponentPanel.css` | `3ce6383eec0d` | `50c98d51a91c3994` | 1084 | `9f7dd13` (2026-08-21) |
+| `src/styles/gameTable.css` | `1e21371c8543` | `149591867769ad91` | 6289 | `726733c` (2026-08-21) |
+
+**Refresco 2026-08-26 (v1.2) — qué movió a quién.** La tabla no tiene columna de
+causa, así que las dos filas refrescadas la declaran aquí. Ninguna de las dos es
+una incidencia: son campañas selladas que tenían autorización para tocar su
+archivo.
+
+- `src/styles/opponentPanel.css` — **VIS-2d** (`9f7dd13`, 2026-08-21), la ranura
+  vacía que dejó de pintar sobre la carta vecina.
+- `src/styles/gameTable.css` — **VIS-2b** (`9945335`, el reverso oficial R-2) y
+  **TAC-1** (`726733c`, 2026-08-21, el envoltorio del mazo que se comía el toque
+  de la primera carta). La fila registra el último, que es lo que la columna pide.
+
+Las otras tres filas se re-midieron en el mismo barrido y salieron idénticas a lo
+ya declarado, así que **no se reescribieron**. Las cinco cifras se recalcularon en
+vivo contra HEAD con los mismos comandos que levantaron la instantánea original
+(`git hash-object` · `sha256sum` · `wc -l` · `git log -1`): este documento
+registra lo medido, nunca lo citado de un reporte.
 
 **Es una instantánea, no un contrato.** Estas cifras envejecen en cuanto Victor
 autorice un cambio, y eso es normal. Lo que no envejece es la comprobación, que
