@@ -230,6 +230,35 @@ commit;
 --                ('dieciseis_chars_')) as t(v);
 --   -- Esperado: false, false, true, false (la tilde no entra), false (16).
 --
+-- ── Grupo A' · Las mismas nueve, en una sola pegada y autoevaluadas ───────
+-- Las dos consultas de arriba obligan a comparar a ojo, y el SQL Editor solo
+-- muestra la tabla del ÚLTIMO statement de un lote — así que pegadas juntas
+-- se ve una y se pierde la otra. Esta versión las funde en una consulta que
+-- se juzga sola: nueve filas, columna `veredicto`, todas deben decir OK.
+-- La comparación es contra texto, de ahí el `::text` sobre los booleanos.
+--
+--   select prueba, obtenido, esperado,
+--          case when obtenido = esperado then 'OK' else '<<< MAL' end as veredicto
+--   from (
+--     select 'A1 · norm p3nd3j0'        as prueba, public.normalizar_username('p3nd3j0')       as obtenido, 'pendejo'  as esperado
+--     union all select 'A2 · norm p_e_n_d_e_j_o', public.normalizar_username('p_e_n_d_e_j_o'), 'pendejo'
+--     union all select 'A3 · norm Panita7',       public.normalizar_username('Panita7'),       'panitat'
+--     union all select 'A4 · norm mi_panita',     public.normalizar_username('mi_panita'),     'mipanita'
+--     union all select 'A5 · fmt corto',            ('corto'            ~ '^[A-Za-z0-9_]{6,15}$')::text, 'false'
+--     union all select 'A6 · fmt con espacio',      ('con espacio'      ~ '^[A-Za-z0-9_]{6,15}$')::text, 'false'
+--     union all select 'A7 · fmt Panita7',          ('Panita7'          ~ '^[A-Za-z0-9_]{6,15}$')::text, 'true'
+--     union all select 'A8 · fmt Ramón12',          ('Ramón12'          ~ '^[A-Za-z0-9_]{6,15}$')::text, 'false'
+--     union all select 'A9 · fmt dieciseis_chars_', ('dieciseis_chars_' ~ '^[A-Za-z0-9_]{6,15}$')::text, 'false'
+--   ) t
+--   order by prueba;
+--
+-- La fila que más vale mirar es A2: `p_e_n_d_e_j_o` colapsa al mismo
+-- `pendejo` que A1, y esa es toda la razón de que la normalización borre el
+-- guion bajo. Si alguien deshace ese borrado, A2 es la primera en ponerse
+-- roja — antes incluso que la prueba 7 del Grupo B.
+--
+-- CORRIDA REAL · 2026-08-27, contra el proyecto: 9/9 OK.
+--
 -- ── Grupo B · Las siete pruebas de verdad, contra la tabla ────────────────
 -- Van dentro de begin/rollback y crean dos usuarios de prueba que NO
 -- sobreviven al bloque: al terminar, la base queda exactamente como estaba.
