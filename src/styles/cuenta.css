@@ -1,0 +1,102 @@
+/* ── SUP-2b · Panel de Cuenta, satélite del ⋮ ────────────────────────────────
+   Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.5.
+
+   HOJA GLOBAL Y NO ANIDADA, molde exacto de tapetes.css: el panel es el mismo
+   objeto en las dos pieles del menú, y `gameTable.css` —donde vive toda la piel
+   de escritorio del ⋮— es archivo protegido. La lección de EMB-2: los cinco
+   fieltros entraron por hoja propia sin abrirlo, y esto entra igual.
+
+   Todas las reglas cuelgan de `.cuenta-*`, clases que no existían antes de esta
+   tanda: ni una regla nueva alcanza a la mesa, al lobby ni a la celebración.
+
+   ── El z, y por qué lleva respaldo ─────────────────────────────────────────
+   `calc(var(--dsk-u1-panel-z) + 1)` es la expresión literal de sus hermanos
+   (tapetes.css:334): un peldaño por encima del panel que lo abre. El token se
+   declara dentro de los bloques con puerta de las dos pieles, así que fuera de
+   ellos no existe — y un `var()` sin resolver invalida la propiedad ENTERA, que
+   dejaría el panel en `z-index: auto`, por debajo de las cartas voladoras. El
+   respaldo `, 30` es el mismo valor que declaran las dos hojas y sólo se usa si
+   ninguna de las dos ha hablado.                                              */
+.cuenta-panel {
+  position: fixed;
+  z-index: calc(var(--dsk-u1-panel-z, 30) + 1);
+  box-sizing: border-box;
+  width: 208px;
+  padding: 12px;
+  background: var(--surface-modal);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+}
+
+.cuenta-rotulo {
+  margin: 0 0 2px;
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* El nombre es el dato de la superficie y por eso es lo único que sube de peso.
+   No va en oro: el oro de la mesa está repartido y añadir uno más aquí lo
+   abarataría — el rector del sistema es explícito con el dorado único. */
+.cuenta-nombre {
+  margin: 0 0 10px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.25;
+  /* 15 caracteres es el tope del username, pero un nombre largo con mayúsculas
+     se acerca al filo del panel: que parta antes que desbordar. */
+  overflow-wrap: anywhere;
+}
+
+/* ── Las dos acciones ───────────────────────────────────────────────────────
+   44px de alto, que es EXACTAMENTE el estándar táctil de las filas del ⋮
+   (`--dsk-u1-item-h`): la superficie que nace del menú no puede tener un área
+   de toque más pobre que el menú que la abrió. Se escribe el número en vez de
+   consumir el token por la misma razón que el z lleva respaldo — el token vive
+   dentro de bloques con puerta, y esta hoja es global.                        */
+.cuenta-accion {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.28);
+  border-radius: 6px;
+  background: var(--surface-area);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.cuenta-accion:first-of-type { margin-top: 0; }
+.cuenta-accion:hover { background: rgba(var(--gold-brand-rgb), 0.10); }
+
+/* Salir se pinta con el rojo semántico del sistema, no con el oro: es la única
+   acción del panel que deshace algo. Tenue en reposo —no es un botón de peligro
+   que haya que esquivar—, declarado al pasar por encima. */
+.cuenta-accion.is-salir {
+  border-color: rgba(var(--loss-red-rgb), 0.40);
+  color: var(--lose-red);
+}
+.cuenta-accion.is-salir:hover { background: rgba(var(--loss-red-rgb), 0.14); }
+
+/* ── El aviso de la mano en curso ───────────────────────────────────────────
+   Sólo cuando el panel se abre DESDE LA MESA. Cerrar sesión ahí destruye la
+   mano —igual que "Abandonar mesa", que por eso pide confirmación—, y decirlo
+   con una línea cuesta menos que un segundo diálogo encima de un satélite.
+   Va SIEMPRE presente en esa variante, nunca aparece al pulsar: un texto que
+   nace bajo el dedo es exactamente lo que O1 prohíbe.                         */
+.cuenta-nota {
+  margin: 8px 0 0;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  color: var(--text-faint);
+}

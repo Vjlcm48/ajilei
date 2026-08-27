@@ -17,10 +17,18 @@ const PANEL_W = 64
 const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 
 // ── MOV-1a · D4 · Pinza vertical del panel ───────────────────────────────────
-// El alto del panel es CONSTANTE en las dos pieles (5 filas de 44 + filete 6 +
-// padding 8+8 + bordes 1+1 = 244) y lo espejan `--dsk-u1-item-h` y
-// `--dsk-u1-sep-gap` en ambas hojas. Aquí se declara porque el ancla se calcula
+// El alto del panel es CONSTANTE en las dos pieles y lo espejan `--dsk-u1-item-h`
+// y `--dsk-u1-sep-gap` en ambas hojas. Aquí se declara porque el ancla se calcula
 // ANTES de que el panel exista: no hay caja que medir todavía.
+//
+// SUP-2b · la cuenta pasa de 5 filas a 6 con la entrada "Cuenta":
+//   6 × 44 (filas) + 6 (filete que separa "Mano actual") + 8 + 8 (relleno)
+//   + 1 + 1 (bordes) = 288
+// Ninguna de las dos hojas declara este alto —sólo el ancho—, así que la sexta
+// fila se pinta sola y `gameTable.css`, que es protegido, no se abre. Lo único
+// que había que mover es este espejo, porque de él sale la pinza vertical del
+// móvil horizontal: con 244 el panel se habría creído 44px más corto de lo que
+// mide y su pie se habría metido en la fila de juego.
 //
 // POR QUÉ LA PINZA VIVE EN UNA CADENA CSS Y NO EN ARITMÉTICA DE JS.
 // El área segura sólo se conoce desde CSS (`env(safe-area-inset-*)`); JS no
@@ -34,7 +42,7 @@ const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 // no toca su geometría; la celda 1920×1080 de la Fase 2 lo prueba en lugar de
 // suponerlo. `clamp(a,b,c)` es `max(a, min(b,c))`: si el viewport bajara de
 // 260px el panel quedaría clavado arriba y desbordaría, caso borde aceptado.
-const PANEL_H = 244
+const PANEL_H = 288
 const PANEL_MARGIN = 8   // aire mínimo a los filos del área segura
 
 // ── MOV-1a-c · La rama de colocación es por ORIENTACIÓN, nunca por ancho ─────
@@ -66,6 +74,17 @@ const TOP_MIN = `calc(${PANEL_MARGIN}px + env(safe-area-inset-top, 0px))`
 const topeInferior = (alto) =>
   `calc(100dvh - ${alto + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px))`
 const TOP_MAX = topeInferior(PANEL_H)
+
+// ── SUP-2b · El alto en MÓVIL HORIZONTAL es OTRO ───────────────────────
+// Allí el panel no mide 288 sino 244, porque la entrada "Cuenta" NO MONTA en esa
+// piel: el corredor izquierdo sólo deja 245,72px libres en la celda peor
+// (640×360) antes del bloque de saldo del humano, y seis filas son 288. El
+// porqué completo, con las dos medidas y con la alternativa descartada, vive en
+// `PRESENTES_MOVIL_HORIZONTAL` (config/menuEntradas.js).
+// La cifra se espeja aquí —y no se deriva— por la misma razón que `PANEL_H`: la
+// pinza se calcula ANTES de que el panel exista.
+const PANEL_H_HORIZONTAL = 244
+const TOP_MAX_HORIZONTAL = topeInferior(PANEL_H_HORIZONTAL)
 
 // ── MOV-1b-a · D6 · Satélites del ⋮ ──────────────────────────────────────────
 // El aviso de "Mano actual" y el panel de Tapetes (y en MOV-1b-c el selector de
@@ -139,9 +158,17 @@ export function anclaSatelite(rect, alto) {
 //     otras ocho se alcanzan desplazando. Un alto sellado es también la única
 //     forma de que el techo derivado no cambie con la longitud de las frases,
 //     que son copy declarado provisional.
+//   · Panel de Cuenta (SUP-2b): 220, MEDIDO sobre la caja viva y no calculado
+//     —el cálculo a mano daba 190 y se quedaba 29,92 corto, que es justo el
+//     error que un techo derivado no perdona (misma lección que la fila de
+//     Tapetes)—. El peor caso es el de ESCRITORIO, 219,92; en móvil horizontal
+//     mide 196,94 porque el aviso de la mano cabe en un renglón menos. Su
+//     contenido es fijo salvo el propio nombre, y el nombre no puede pasar de 15
+//     caracteres (CHECK de SUP-2a), así que no hay peor caso que no esté dentro.
 export const ALTO_AVISO_MANO = 105
 export const ALTO_TAPETES = { v: 271, h: 162 }
 export const ALTO_SELECTOR_REACCIONES = 186
+export const ALTO_CUENTA = 220
 
 // ── Contador de consultas de "Mano actual" (v1.1 §3.4 y §3.6) ───────────────
 // Infraestructura, no lógica: la clave se crea con las 20 gratis y se lee para
@@ -215,7 +242,7 @@ export function useUtilitiesMenu(enabled = true) {
       const r = el.getBoundingClientRect()
       // `left` sigue siendo un número; `top` sale ya como longitud CSS con la
       // pinza dentro — ver la nota de arriba.
-      const pinza = (px) => `clamp(${TOP_MIN}, ${px}px, ${TOP_MAX})`
+      const pinza = (px, tope = TOP_MAX) => `clamp(${TOP_MIN}, ${px}px, ${tope})`
 
       // MOV-1a-c · D4.1 · en MÓVIL HORIZONTAL el panel no cuelga del
       // disparador: se aparta a la izquierda de la columna de acción. Abajo no
@@ -236,11 +263,18 @@ export function useUtilitiesMenu(enabled = true) {
           // El techo, y no el filo del disparador. D4.1 pedía alinearlo con el
           // disparador, pero el corredor libre no da para eso: el bloque de
           // saldo del humano (`.player-bar-right`) arranca en y 253,7 a
-          // 360 de alto, y un panel de 244 sólo cabe por encima si empieza
+          // 360 de alto, y un panel de 244 sólo cabía por encima si empezaba
           // arriba del todo. Colgarlo del disparador lo hundía 4,3px dentro del
           // saldo en mesas 3 y 2. Es el mismo `clamp()` de siempre —área segura
           // incluida—, sólo que su tope inferior manda siempre.
-          return { left: Math.max(izq, PANEL_MARGIN), top: pinza(PANEL_MARGIN) }
+          //
+          // SUP-2b · la nota sigue valiendo TAL CUAL, y la medición de esta
+          // tanda la confirmó: el bloque de saldo va de x 12 a 92,77, o sea que
+          // invade el corredor donde vive el panel, y con seis filas éste le
+          // habría tapado 514,17px² a 812×375 y 709,04 a 640×360. Por eso en
+          // esta piel "Cuenta" no monta y el panel se queda en 244 —y por eso
+          // la pinza de aquí usa ese alto y no el de escritorio.
+          return { left: Math.max(izq, PANEL_MARGIN), top: pinza(PANEL_MARGIN, TOP_MAX_HORIZONTAL) }
         }
         // Sin obstáculos (GAME_OVER y pantallas terminales) no hay nada que
         // esquivar: vale la colocación de siempre.

@@ -1,0 +1,87 @@
+/* ── SUP-2b · Piel propia de la pantalla Entrada ─────────────────────────────
+   Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.3.
+   Lo COMPARTIDO con el Bautizo vive en puerta.css; aquí sólo lo que es de esta
+   pantalla y de ninguna otra. Cero hex sueltos: todo sale de theme.css.        */
+
+/* ── El cuerpo de alto reservado · O1 ───────────────────────────────────────
+   Los dos pasos —correo y código— tienen contenidos de distinto alto, y sin
+   reserva la tarjeta daría un salto justo en el momento en que el jugador está
+   leyendo a dónde le llegó el código. Se reserva el ALTO DEL PASO MÁS ALTO, que
+   es el del código en las pantallas anchas y el del CORREO en las angostas —el
+   lema de la primera pantalla es más largo y a 375 se le va a un renglón más—,
+   así que la reserva es el máximo de los dos y no el de un paso elegido a ojo.
+   LAS CIFRAS ESTÁN MEDIDAS, NO CALCULADAS. El cálculo a mano daba 266 y se
+   quedaba 52,13 corto: la tarjeta subía 21,91px al pasar al código a 1440×850 y
+   18,8 a 640×360, que es exactamente el salto que O1 prohíbe. Medido sobre la
+   caja viva en tres celdas, y REMEDIDAS después de darle al lema el aire que el
+   descuelgue del isótipo exige (ver `.puerta-lema` en puerta.css):
+       1440×850   correo 334,22 · código 356,13   → reserva 357
+        375×812   correo 328,39 · código 325,86   → |
+        640×360   correo 307,06 · código 325,86   → reserva 329 (cubre las dos)
+   Con ellas el Δ de alto entre pasos es 0 en las tres. */
+.entrada-cuerpo {
+  min-height: 357px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+/* La etiqueta del campo es visible y no `sr-only`: un formulario de una sola
+   casilla en el que el marcador de posición hace de rótulo pierde el rótulo en
+   cuanto se escribe la primera letra. */
+.entrada-etiqueta {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+/* El correo en eco: el dato que el jugador tiene que reconocer de un vistazo
+   para saber si se equivocó al teclearlo. Va en el primario, un peldaño por
+   encima del resto del lema, y NO en oro — el oro de esta pantalla es el botón. */
+.entrada-correo-eco {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-weight: 700;
+  /* Un correo largo no puede empujar la tarjeta: parte por donde haga falta. */
+  overflow-wrap: anywhere;
+}
+
+/* Ancho RESERVADO de la cuenta regresiva: sin él, al llegar a cero el rótulo
+   encoge y arrastra a "Cambiar correo" hacia la izquierda.
+   MEDIDO, y la cifra pasó por dos correcciones que vale la pena dejar escritas:
+     · 4,2em (calculado a ojo) se quedaba CORTO —el contenido medía más que la
+       reserva y el hueco no servía de nada—;
+     · 5em se pasaba tanto que a 375×812 empujaba la fila de enlaces a DOS
+       renglones, y con ella la tarjeta crecía 25,86px al pasar de paso —otra vez
+       lo que O1 prohíbe, ahora por exceso de celo—.
+   La medida de verdad de "(60 s)" es 2,56em (37,73px a 14,76 y 33,55 a 13,12).
+   2,8em la cubre con holgura para el ancho de dígito de una tipografía de
+   respaldo, y deja la fila en un solo renglón en las tres celdas.
+   `text-align: left` y no centrado: el número aparece pegado al rótulo, como si
+   fuera parte de la misma frase. */
+.entrada-cuenta {
+  display: inline-block;
+  min-width: 2.8em;
+  text-align: left;
+}
+
+/* El hueco de SUP-3, dicho con palabras. Mismo peldaño de discreción que el
+   crédito CC BY de la Bienvenida: acredita —aquí, anuncia— sin competir. */
+.entrada-proximamente {
+  margin: 16px 0 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+@media (max-width: 680px) {
+  /* La tarjeta encoge sus relleno y radio en puerta.css, y el rótulo baja de 72
+     a 56; el cuerpo reservado baja con ellos. 329 es el máximo medido de las dos
+     celdas angostas —328,39 del correo a 375×812—, no una estimación. */
+  .entrada-cuerpo { min-height: 329px; }
+}

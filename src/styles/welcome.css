@@ -172,9 +172,64 @@ body {
   animation: deco-fade 0.8s ease-out 0.35s both;
 }
 
+/* ── SUP-2b · Acceso a la cuenta ───────────────────────────────────
+   Documento rector: adenda de OK de Fase 1, decisión 1.2.
+   FUERA DE FLUJO por mandato de O1: `absolute` contra `.welcome-screen`, así que
+   montarlo o no montarlo deja el panel central exactamente donde estaba. Con el
+   bypass de desarrollo no se monta —y por tanto la Bienvenida que ven los 20
+   arneses es la de siempre, no una parecida.
+   El z es 2: por encima del panel (z 1) y de las cartas decorativas (z 0). El
+   panel no llega a la esquina en ningún viewport —mide 560 como máximo y va
+   centrado—, así que el orden sólo importa contra las cartas.
+   Discreción: gris del sistema, 0,72 rem, sin oro. El único oro de esta pantalla
+   sigue siendo la marca y el botón de jugar, y este acceso no compite con ellos
+   ni por color ni por tamaño.                                                 */
+.welcome-cuenta {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  animation: deco-fade 0.8s ease-out 0.45s both;
+}
+
+.welcome-cuenta-nombre {
+  color: var(--text-secondary);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Botón de verdad con piel de enlace: lo que hace es una acción, no una
+   navegación, y un <a> sin href no sería enfocable. Área de toque holgada por
+   el relleno —el estándar táctil de la casa son 40px y este control vive en una
+   pantalla sin nada más alrededor— sin que el texto crezca. */
+.welcome-cuenta-salir {
+  border: none;
+  background: none;
+  padding: 8px 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.welcome-cuenta-salir:hover { color: var(--gold-brand); }
+
 /* Hide on narrow screens — no room to peek elegantly */
 @media (max-width: 680px) {
   .deco-card { display: none; }
+
+  /* El acceso se queda: es la ÚNICA salida de la sesión en el lobby y esconderlo
+     en angosto sería dejar sin puerta justo al terreno donde más se juega.
+     Encoge y se pega un poco más al filo, nada más. */
+  .welcome-cuenta { top: 10px; right: 12px; gap: 8px; font-size: 0.68rem; }
 
   .welcome-card {
     padding: 40px 24px 36px;

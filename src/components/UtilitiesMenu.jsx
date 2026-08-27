@@ -46,6 +46,32 @@ function CardQueryIcon() {
   )
 }
 
+// SUP-2b · Silueta de jugador — icono propio de "Cuenta". Mismo molde que
+// CardQueryIcon (U1b) y GodeteIcon (EMB-2): SVG en línea, monocromo, trazo en
+// `currentColor` para heredar --text-primary de la entrada, sin un solo relleno
+// de color. Se descartó el emoji 👤: los dos emoji que quedan en el panel (🔊 y
+// 💬) son de las entradas que ya los tenían, y la costumbre desde U1b es que
+// todo icono NUEVO sea SVG de la casa. Single-gold intacto — el único oro sólido
+// del panel sigue siendo la ficha de Saldo.
+function CuentaIcon() {
+  return (
+    <svg
+      className="util-ico util-ico-cuenta"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="8" r="3.9" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      {/* Hombros abiertos y no un óvalo cerrado: cerrado se lee como ficha, que
+          es justo el glifo que ya ocupa Saldo dos filas más abajo. */}
+      <path
+        d="M4.6 20.4c0-3.9 3.3-6.4 7.4-6.4s7.4 2.5 7.4 6.4"
+        fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 // Disparador — hereda la clase .mute-button para conservar borde, radio, color y
 // transición EXACTOS del botón de hoy; .utilities-trigger sólo añade la reserva
 // de caja y el glifo. La reserva de badge de notificación (v1.0 §5) sigue sin
@@ -81,9 +107,14 @@ const INERTES = [
 // lector de pantalla, que anunciaría entradas accionables que no hacen nada.
 export function UtilitiesPanel({
   anchor, onClose, onReacciones, reaccionesBloqueadas,
-  consultas, manoDisponible, onManoActual, onTapetes, vivas = VIVAS_ESCRITORIO,
+  consultas, manoDisponible, onManoActual, onTapetes, onCuenta,
+  vivas = VIVAS_ESCRITORIO, presentes = null,
 }) {
   const viva = (id) => vivas.includes(id)
+  // SUP-2b · el segundo eje del panel: quién MONTA, distinto de quién está viva.
+  // `null` = todas, que es el caso de siempre y el valor por defecto —así
+  // escritorio y móvil vertical no cambian ni una línea de render.
+  const presente = (id) => !presentes || presentes.includes(id)
   const { soundEnabled, toggle: toggleSound } = useSoundContext()
   // DSK-U3 · el saldo de consultas SUBE a useConsultas. Ya no puede vivir en un
   // useState local: el consumo lo mueve desde fuera y el popup del valor se
@@ -190,6 +221,34 @@ export function UtilitiesPanel({
           <GodeteIcon />
         </button>
 
+        {/* SUP-2b · Cuenta · CUARTA entrada viva. Va aquí, cerrando el grupo de
+            las vivas y por delante de la inerte, porque el orden del panel
+            agrupa por estado (vivas → inertes → premium) y no por antigüedad —
+            la misma razón por la que Tapetes se puso delante de Saldo en EMB-2.
+            Cierra al ejecutar, como sus tres hermanas (v1.1 §1.3.1): el panel de
+            cuenta toma el relevo y no tiene sentido sostener dos superficies del
+            mismo menú a la vez. */}
+        {/* NO MONTA en móvil horizontal, y es la primera entrada del panel que
+            deja de montar en una piel. Se QUITA del árbol en vez de ocultarse
+            con CSS —misma doctrina que el ⋮ en la pantalla de victoria (CEL-2e):
+            es la única forma de que tampoco sea enfocable con el teclado, y
+            además es lo único que le devuelve al panel sus 244 de alto—. El
+            porqué medido vive en la lista, en config/menuEntradas.js. */}
+        {presente(ENTRADA.CUENTA) && (
+          <button
+            type="button"
+            role="menuitem"
+            className={`util-item util-item-cuenta${viva(ENTRADA.CUENTA) ? '' : ' is-disabled'}`}
+            data-entrada={ENTRADA.CUENTA}
+            onClick={() => { onClose(); onCuenta() }}
+            disabled={!viva(ENTRADA.CUENTA)}
+            aria-disabled={viva(ENTRADA.CUENTA) ? undefined : 'true'}
+            title="Cuenta"
+          >
+            <CuentaIcon />
+          </button>
+        )}
+
         {INERTES.map(e => (
           <button
             key={e.key}
@@ -223,7 +282,13 @@ export function UtilitiesPanel({
             es el MISMO —una sola clave, un solo contador— y la cifra se dice al
             consultar, en la última línea del aviso. No cuesta geometría:
             `.util-badge` es `position: absolute` (gameTable.css:5940-5942),
-            luego el panel sigue midiendo 64×244 con badge y sin él. */}
+            luego el panel mide lo mismo con badge y sin él.
+            SUP-2b · esa medida pasa a ser 64×288: la entrada "Cuenta" añade una
+            sexta fila de 44 y el panel crece con ella. El alto no está declarado
+            en ninguna de las dos hojas —sólo el ancho lo está—, así que la fila
+            se pinta sola y `gameTable.css` no se abre; lo que sí se actualiza es
+            el espejo `PANEL_H` de useUtilitiesMenu.js, que es de donde sale la
+            pinza vertical del móvil horizontal. */}
         <div
           className={`util-item util-item-mano${manoDisponible && viva(ENTRADA.MANO) ? '' : ' is-disabled'}`}
           data-entrada={ENTRADA.MANO}

@@ -1,0 +1,52 @@
+/* ── SUP-2b · Piel propia de la pantalla Bautizo ─────────────────────────────
+   Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.4 y §1.5.
+   Lo COMPARTIDO con la Entrada vive en puerta.css; aquí sólo lo suyo. El modo
+   edición no tiene una piel aparte: es la misma tarjeta con `is-edicion`, que
+   cambia el encabezado y nada más — dos pieles para el mismo formulario era
+   pedir que se separaran a la primera calibración.                            */
+
+.bautizo-card { max-width: 460px; }
+
+/* Encabezado del modo edición. NO lleva el wordmark: la marca ya está en la
+   cabecera de la mesa que hay debajo, y repetirla en el modal la abarataría.
+   El oro aquí es tipográfico y plano —el mismo `--gold-brand` de siempre—, sin
+   el resplandor de EMB-1, que es tratamiento de portada y no de diálogo. */
+.bautizo-titulo {
+  margin: 0 0 20px;
+  color: var(--gold-brand);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.bautizo-etiqueta {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+/* ── La regla, que es contrato y no aviso ───────────────────────────────────
+   Vive FUERA de `.puerta-aviso` a propósito: aquella ranura se ocupa y se vacía
+   con lo que responda la base, y la regla tiene que estar siempre. Alto propio y
+   fijo, así que cuando llega un error se pinta debajo sin desplazarla.
+   El texto es el del §1.4, palabra por palabra: es el mismo contrato que el
+   CHECK `profiles_username_formato_chk` de SUP-2a, dicho en castellano. */
+.bautizo-regla {
+  margin: 8px 0 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--text-faint);
+}
+
+/* En el modal la caja es más apretada: sobre la mesa hay menos aire que sobre el
+   lienzo del lobby, y el velo ya hace el trabajo de separar del fondo. */
+.bautizo-card.is-edicion { padding: 30px 30px 26px; }
+
+@media (max-width: 680px) {
+  .bautizo-titulo { font-size: 1.2rem; margin-bottom: 16px; }
+  .bautizo-card.is-edicion { padding: 24px 20px 20px; }
+}

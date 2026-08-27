@@ -7,6 +7,8 @@ import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { ManoActualPopup } from './ManoActual'
 import { TapetesPanel } from './TapetesPanel'
+import { CuentaPanel } from './CuentaPanel'
+import Bautizo from '../screens/Bautizo'
 import { CelebracionMesa, PulsoNombre, AjileiOverlay, PantallaVictoria } from './Celebracion'
 import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
@@ -19,13 +21,13 @@ import { componeCronica } from '../hooks/cronicaCore'
 import { siembraCEL } from '../dev/siembraCEL'
 import {
   useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
-  ALTO_SELECTOR_REACCIONES,
+  ALTO_SELECTOR_REACCIONES, ALTO_CUENTA,
 } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
 import { useTapetes } from '../hooks/useTapetes'
 import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
-import { VIVAS_ESCRITORIO, VIVAS_MOVIL } from '../config/menuEntradas'
+import { VIVAS_ESCRITORIO, VIVAS_MOVIL, PRESENTES_MOVIL_HORIZONTAL } from '../config/menuEntradas'
 import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
@@ -274,7 +276,7 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) 
 }
 
 // ── GameTable ─────────────────────────────────────────────────────────────────
-export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
+export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuenta }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -406,6 +408,17 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
   // El cierre por `resize` que el hook ya traía cubre el cambio de orientación
   // sin una línea nueva: girar el teléfono cierra el panel.
   const utilMenu = useUtilitiesMenu()
+  // SUP-2b · Cuenta. Dos estados locales y ningún hook nuevo: el panel es un
+  // satélite sin memoria (sólo su ancla) y el modal de cambiar nombre es un
+  // booleano. Se queda aquí y no sube a un hook de la familia porque no hay nada
+  // que decidir —ni persistencia, ni gate, ni enfriamiento—: crear un
+  // `useCuenta` para dos `useState` sería ceremonia, no arquitectura.
+  const [cuentaAncla, setCuentaAncla] = useState(null)
+  const [editandoNombre, setEditandoNombre] = useState(false)
+  // El setter va en las dependencias aunque React garantice que es estable: el
+  // compilador de React infiere la lista real y con `[]` marca la memoización
+  // como no preservable, que en este repo es un error de lint y no un aviso.
+  const cerrarCuenta = useCallback(() => setCuentaAncla(null), [setCuentaAncla])
   // DSK-U2 · circuito de reacciones.
   // MOV-1b-c · sin gate: Reacciones se enciende en móvil con la MISMA lógica
   // —una burbuja a la vez, enfriamiento de 5s inmune a la ✕, veto durante la
@@ -1975,8 +1988,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
           Sonido y nada más: Reacciones, Tapetes y Mano actual salen en gris con
           el tratamiento exacto de Saldo (`is-disabled` + `disabled`) porque sus
           hooks y sus superficies siguen gateados a escritorio. Se encienden en
-          MOV-1b; hasta entonces la geometría del panel es la misma —64×244, las
-          cinco filas de 44— para que el puerto no cambie de forma dos veces. */}
+          MOV-1b; hasta entonces la geometría del panel es la misma para que el
+          puerto no cambie de forma dos veces.
+          SUP-2b · esa geometría pasa a 64×288: seis filas de 44 desde que
+          "Cuenta" entra en las dos listas de vivas. El alto no lo declara
+          ninguna de las dos hojas —sólo el ancho—, así que la fila se pinta sola
+          y `gameTable.css` no se abre; el espejo que sí se mueve es `PANEL_H`. */}
       <UtilitiesPanel
         anchor={utilMenu.anchor}
         onClose={utilMenu.close}
@@ -1995,8 +2012,48 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave }) {
         manoDisponible={manoDisponible}
         onManoActual={pedirManoActual}
         onTapetes={() => tapetes.abrir(anclaSatelite(utilMenu.triggerRect(), ALTO_TAPETES))}
+        onCuenta={() => setCuentaAncla(anclaSatelite(utilMenu.triggerRect(), ALTO_CUENTA))}
         vivas={isDesktopTable ? VIVAS_ESCRITORIO : VIVAS_MOVIL}
+        // El CSS no puede elegir QUÉ componente monta React —la doctrina que
+        // abre este archivo en su hook de orientación—, así que la ausencia de
+        // "Cuenta" en móvil horizontal se decide aquí, con la MISMA media query
+        // que usa el bloque landscape de las hojas. `undefined` = montan todas.
+        presentes={isLandscapeTable ? PRESENTES_MOVIL_HORIZONTAL : undefined}
       />
+
+      {/* SUP-2b · panel de Cuenta. Vive AQUÍ por la misma razón que sus tres
+          hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se
+          pinta el panel de utilidades ya se desmontó con su ancla. Overlay puro,
+          Δ=0, y el juego sigue corriendo detrás. Monta en las dos pieles —su
+          colocación la pone D6 y su piel es una hoja global, molde de tapetes.css.
+          `cuenta` llega SIEMPRE, también con el bypass —ahí el nombre es
+          "DevLocal" y las dos acciones responden que no hay cuenta real—: una
+          entrada viva en el menú que no abriera nada sería el menu mintiéndole al
+          jugador. La guarda se conserva para que el componente no dependa de que
+          nadie se olvide de pasar la prop. */}
+      {cuenta && (
+        <CuentaPanel
+          ancla={cuentaAncla}
+          username={cuenta.username}
+          onCerrar={cerrarCuenta}
+          onCambiarNombre={() => { cerrarCuenta(); setEditandoNombre(true) }}
+          onCerrarSesion={() => { cerrarCuenta(); cuenta.cerrarSesion() }}
+          avisoMano
+        />
+      )}
+
+      {/* El Bautizo en modo edición (§1.5): la MISMA pantalla, el mismo campo y
+          la misma traducción de los tres códigos de SUP-2a, vestida de modal
+          sobre la mesa. A diferencia del panel que lo abre, esto SÍ es modal:
+          pide un dato y espera. */}
+      {cuenta && editandoNombre && (
+        <Bautizo
+          modo="edicion"
+          actual={cuenta.username}
+          onConfirmar={cuenta.cambiarNombre}
+          onCancelar={() => setEditandoNombre(false)}
+        />
+      )}
 
       {/* EMB-2 · panel de tapetes. Vive AQUÍ por la misma razón que sus
           hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se

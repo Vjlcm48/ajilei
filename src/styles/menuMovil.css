@@ -19,7 +19,8 @@
    reglas de :5821-5935 y :6228-6245. Mientras la fusión no exista —desanidar el
    bloque DSK es abrir el protegido, y eso lo decide Victor— el arnés es el
    único guardián: el modo `menu-movil` contrasta la caja del panel y de las
-   entradas contra las MISMAS cifras que `u1` exige en escritorio (64×244, 62×44),
+   entradas contra las MISMAS cifras que `u1` exige en escritorio (64×288 desde
+   SUP-2b, que suma la sexta fila "Cuenta"; 62×44 la entrada),
    así que una piel que se desvíe de la otra sale en rojo y no en silencio.
 
    ── EL COMPLEMENTO, LITERAL Y POR QUÉ ASÍ ──────────────────────────────────
@@ -260,7 +261,8 @@
      entrada esté inerte— no se atenúe con ella, y aquí el badge no monta. Sin
      badge, la fila se atenúa entera y queda EXACTAMENTE como Saldo, que es el
      tratamiento que pide la tanda. La geometría no se entera: el filete y el
-     aire son los mismos, así que el panel sigue midiendo 64×244. */
+     aire son los mismos, así que el panel sigue midiendo lo que mide en la otra
+     piel — 64×288 desde SUP-2b, con la sexta fila de "Cuenta" dentro. */
   .util-item-mano {
     margin-top: var(--dsk-u1-sep-gap);
     border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
@@ -340,6 +342,16 @@
        el tope de `innerWidth − 16` (624 en la celda más estrecha).
        El título se queda encima: es lo que deja la fila más baja. */
     .tapetes-panel { --tap-cols: 5; }
+
+    /* ── SUP-2b · EL PANEL NO CRECE EN HORIZONTAL ─────────────────────
+       Y no hace falta ni una regla para conseguirlo: la entrada "Cuenta" NO
+       MONTA en esta piel (config/menuEntradas.js · PRESENTES_MOVIL_HORIZONTAL),
+       así que el panel sigue teniendo cinco filas y midiendo 64×244, exactamente
+       lo que medía antes de esta tanda.
+       Queda anotado aquí —sin código— porque este bloque es donde alguien
+       vendría a buscar el porqué de que las dos pieles tengan distinto alto: el
+       corredor izquierdo de horizontal sólo deja 245,72px libres a 640×360 antes
+       del bloque de saldo del humano, y seis filas son 288. */
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════

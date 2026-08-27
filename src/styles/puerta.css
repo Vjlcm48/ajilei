@@ -1,0 +1,282 @@
+/* ── SUP-2b · Lenguaje común de la puerta ────────────────────────────────────
+   Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.3 y §1.4.
+   Autoridad visual: docs/AJILEI_Sistema_Diseno_v1.2.md — oro ÚNICO
+   (`--gold-brand` y sus variaciones de luminosidad de EMB-1), verde de fieltro
+   de la rampa de VIS-1b, tipografía y superficies de theme.css. Ni un hex
+   suelto en toda la hoja.
+
+   POR QUÉ UNA TERCERA HOJA Y NO DOS. Entrada y Bautizo son la misma pieza de
+   composición con dos contenidos: el mismo lienzo, la misma tarjeta, el mismo
+   campo, el mismo botón dorado y la misma ranura de mensaje. Duplicar eso en
+   `entrada.css` y `bautizo.css` garantizaba que a la tercera calibración de
+   Victor una de las dos se quedara atrás. Aquí vive lo COMPARTIDO; cada
+   pantalla conserva su hoja propia para lo suyo, que es lo que pide el rector.
+
+   NADA DE ESTA HOJA SE APLICA A LA APP DE HOY: todos los selectores cuelgan de
+   `.puerta-*`, clases que no existían antes de esta tanda. La mesa, el lobby y
+   la celebración no ven una sola regla nueva.
+
+   ── O1 en esta hoja ────────────────────────────────────────────────────────
+   Dos sitios cambian de contenido sin cambiar de caja, y los dos reservan su
+   espacio por adelantado en vez de crecer cuando el texto llega:
+     · `.puerta-aviso` — la ranura de mensajes de error tiene alto mínimo
+       SIEMPRE, esté vacía o llena. Sin él, el primer error empujaría el botón
+       hacia abajo justo cuando el dedo va a pulsarlo otra vez.
+     · `.puerta-btn`   — el botón conserva su ancho mínimo mientras el rótulo
+       pasa de "Enviar código" a "Enviando…". Un botón que encoge al pulsarse es
+       el defecto que O1 nombra.                                              */
+
+/* ── El lienzo ──────────────────────────────────────────────────────────────
+   Mismo fondo EXACTO que `.welcome-screen` (welcome.css): filigrana sobre el
+   radial de la rampa verde. Se repite la declaración en vez de reutilizar la
+   clase porque `.welcome-screen` trae además las cartas decorativas y su
+   `overflow: hidden` — y esto no es la Bienvenida disfrazada, es su antesala. */
+.puerta-screen {
+  /* `box-sizing: border-box` y no el `content-box` por defecto: sin él, el
+     relleno de 24 se SUMA a los 100vh y la pantalla nace con 48px de barra de
+     desplazamiento en cuanto la tarjeta cabe de sobra —medido: scrollY 48 a
+     1440×850 y a 375×812—. Con él, el desplazamiento aparece sólo cuando la
+     tarjeta de verdad no cabe (640×360), que es cuando debe aparecer. */
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  background:
+    var(--filigrana),
+    radial-gradient(ellipse at 42% 38%, var(--green-bright) 0%, var(--green-deep) 50%, var(--green-abyss) 100%);
+}
+
+/* ── La tarjeta ─────────────────────────────────────────────────────────────
+   Hermana de `.welcome-card`: mismos filete, radio, superficie y sombra, con la
+   caja más angosta porque aquí no hay dos botones en fila, hay un formulario.
+   La animación de entrada es `panel-enter`, y se REDECLARA al final de esta hoja
+   siguiendo la costumbre de la casa —welcome, nivelSelect, modeSelect y
+   tableSelect la declaran cada una— por la razón que nivelSelect.css dejó
+   escrita: cada hoja debe poder cargarse sola. */
+.puerta-card {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 44px 36px 38px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 32px;
+  background: var(--surface-panel);
+  box-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(var(--gold-brand-rgb), 0.07),
+    inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.13);
+  max-width: 520px;
+  width: 100%;
+  animation: panel-enter 0.55s ease-out both;
+}
+
+/* El rótulo NO se redimensiona. `h1.welcome-title` conserva su tamaño, su traza
+   (`--wm-track: 12px`, embellecimiento.css:506) y su resplandor de EMB-1 tal
+   cual: es la misma marca y debe ser el mismo objeto. Tocarle el `font-size`
+   aquí obligaría a tocarle también la traza —el número que reponen `--wm-track`
+   y `letter-spacing` es el mismo— y esa es exactamente la desincronización que
+   IDN-1 dejó anotada con el nombre del dueño al lado. */
+
+/* ── El lema, y los 38px que parecen de más y no lo son ──────────────────
+   EL ISÓTIPO CUELGA POR DEBAJO DE SU CAJA DE LÍNEA. Es la técnica FL-1 de IDN-1:
+   la ranura `.wm-slot` es un `inline` no reemplazado que sólo reserva el ANCHO, y
+   el <img> vive absoluto dentro de ella —así el símbolo no dispara la caja de
+   línea de 26px a ~76 y no arrastra todo lo de abajo—. El precio es que su
+   dibujo INVADE lo que venga después.
+   MEDIDO: el pie del isótipo cae 24,8px por debajo del techo del elemento
+   siguiente a 1000 de ancho y 13,13 a 375. En la Bienvenida eso no se ve porque
+   quien viene detrás es el arco de estrellas, cuyo tercio superior está vacío
+   (su trazado arranca en y 28 de un viewBox de 65) — la holgura allí es la misma
+   −24,8, y nadie lo había notado nunca. Aquí detrás hay TEXTO, y el símbolo se
+   le sentaba encima.
+   Se corrige con aire y no tocando el isótipo: mover su descuelgue sería
+   recalibrar la marca en las cuatro pantallas donde vive, por un problema que es
+   sólo de esta. 38 = 24,8 de descuelgue + 13,2 de respiro. */
+.puerta-lema {
+  margin: 38px 0 26px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* ── El campo ───────────────────────────────────────────────────────────────
+   Terreno virgen: a HEAD 108c972 no había un solo <input> en `src/`. Se
+   construye con los mismos materiales que el resto —superficie de área, filete
+   dorado tenue, texto primario— para que no se lea como un control prestado de
+   otro producto. */
+.puerta-campo {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 16px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.28);
+  border-radius: 12px;
+  background: var(--surface-area);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-size: 1rem;
+  text-align: center;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.puerta-campo::placeholder { color: var(--text-faint); }
+
+.puerta-campo:focus {
+  outline: none;
+  border-color: rgba(var(--gold-brand-rgb), 0.72);
+  box-shadow: 0 0 0 3px rgba(var(--gold-brand-rgb), 0.14);
+}
+
+.puerta-campo:disabled { opacity: 0.55; cursor: default; }
+
+/* Estado de error del propio campo: el filete se tiñe con el rojo semántico del
+   sistema (`--loss-red`), NUNCA con un oro apagado — el oro en esta casa
+   significa marca, no alarma. */
+.puerta-campo.is-error { border-color: rgba(var(--loss-red-rgb), 0.75); }
+
+/* Variante del código: seis dígitos leídos de un vistazo. Campo único y no seis
+   casillas —el rector deja la elección a criterio— porque seis campos con su
+   propio foco, su propio pegado y su propio retroceso son seis maneras de que
+   un lector de pantalla anuncie "campo de texto" seis veces para un solo dato. */
+.puerta-campo-codigo {
+  font-size: 1.7rem;
+  letter-spacing: 0.5em;
+  /* La traza sobra al final del texto y descentraría el conjunto medio espacio
+     a la izquierda; el sangrado la devuelve. */
+  text-indent: 0.5em;
+  font-weight: 700;
+  padding: 15px 16px;
+}
+
+/* ── La ranura de mensajes · O1 ─────────────────────────────────────────────
+   Reserva su alto SIEMPRE. Es una sola línea a 0.82rem con interlínea 1.35 más
+   el margen superior: 8 + 15 = 23px, redondeados a 24 para que un segundo
+   renglón en pantallas angostas empuje una sola vez y no en cada error. */
+.puerta-aviso {
+  min-height: 24px;
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--lose-red);
+}
+
+/* La misma ranura sirve para decir cosas que no son errores (a dónde se envió el
+   código, la cuenta regresiva del reenvío): cambia el color, nunca la caja. */
+.puerta-aviso.is-info { color: var(--text-muted); }
+
+/* ── El botón dorado ────────────────────────────────────────────────────────
+   Único oro sólido de la pantalla, y por tanto el único sitio al que va la
+   mirada. Gradiente de las variaciones de luminosidad de EMB-1 (mismo tono,
+   distinta L): sigue siendo UN dorado. */
+.puerta-btn {
+  display: block;
+  width: 100%;
+  min-width: 180px;
+  box-sizing: border-box;
+  margin-top: 18px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--gold-hover) 0%, var(--gold-brand) 55%, var(--gold-dim) 100%);
+  color: var(--text-dark);
+  font-family: var(--font-base);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(var(--gold-brand-hi-rgb), 0.55);
+  transition: filter 0.18s ease, transform 0.12s ease;
+}
+
+.puerta-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.puerta-btn:active:not(:disabled) { transform: translateY(1px); }
+
+/* Deshabilitado DE VERDAD (`disabled` + atenuación), nunca `pointer-events: none`:
+   la lección de U1b — una entrada que se pinta muerta y se anuncia viva le
+   miente al lector de pantalla. */
+.puerta-btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+
+/* ── Enlaces secundarios ────────────────────────────────────────────────────
+   Botones de verdad con piel de enlace: lo que hacen es una acción, no una
+   navegación, y un <a> sin href no es enfocable. */
+.puerta-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin-top: 18px;
+}
+
+.puerta-link {
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  color: var(--text-muted);
+  font-family: var(--font-base);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.puerta-link:hover:not(:disabled) { color: var(--gold-brand); }
+.puerta-link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
+
+/* ── El overlay del cambio de nombre desde la mesa (§1.5) ───────────────────
+   El Bautizo en modo edición se pinta ENCIMA de la mesa, y ahí sí es modal: a
+   diferencia del panel de utilidades —que vive DURANTE la mano y no la pausa—,
+   esto pide un dato y espera. `fixed` sin ancestro con `transform`, así que
+   ancla al viewport y no necesita portal (ensayo E3b de U1). */
+.puerta-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.62);
+  animation: puerta-velo 0.2s ease-out both;
+}
+
+@keyframes puerta-velo { from { opacity: 0 } to { opacity: 1 } }
+
+/* En overlay la tarjeta no necesita el lienzo, pero sí un tope de alto: sobre un
+   móvil horizontal de 360px de alto una tarjeta de 400 se sale por arriba y por
+   abajo a la vez. */
+.puerta-overlay .puerta-card {
+  max-width: 420px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puerta-card,
+  .puerta-overlay { animation: none; }
+}
+
+/* ── Angosto ────────────────────────────────────────────────────────────────
+   El corte es el MISMO 680px de welcome.css, donde el rótulo baja de 72 a 56 y
+   su traza de 12 a 8: la tarjeta tiene que respirar en el mismo sitio en que la
+   marca encoge, o el aire de arriba y el de los lados dejan de corresponderse. */
+@media (max-width: 680px) {
+  .puerta-card { padding: 34px 22px 30px; border-radius: 26px; }
+  /* El rótulo baja de 72 a 56 y el descuelgue del isótipo con él: 13,13 medidos
+     a 375×812. 28 = 13,13 + casi 15 de respiro, el mismo aire proporcional. */
+  .puerta-lema { margin-top: 28px; }
+  .puerta-campo-codigo { font-size: 1.45rem; letter-spacing: 0.38em; text-indent: 0.38em; }
+}
+
+/* `panel-enter` ya existe en las cuatro hojas hermanas; se redeclara por la
+   misma razón que nivelSelect.css dejó anotada — esta hoja debe poder cargarse
+   sola. Idéntica a la de welcome.css:197: sólo transform y opacity, cero
+   reflow. */
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}

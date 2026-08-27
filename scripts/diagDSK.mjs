@@ -174,10 +174,10 @@
 //            bocina superviviente; hit 44×44 real con `elementFromPoint` en las
 //            cuatro esquinas del `::after`, sin robarle el suyo a la ✕ ni a la
 //            ficha de esquina de la IA; pinza vertical de D4 (`top` dentro de
-//            [8, H−252]) y encaje completo en el viewport; geometría por partida
+//            [8, H−296]) y encaje completo en el viewport; geometría por partida
 //            DOBLE —derivada del contenido vivo Y contra las cifras selladas de
-//            `u1` (64×244 · 62×44 · 5 filas)—, que es lo único que detecta que
-//            las dos pieles del menú se han separado; las cinco leyendas y su
+//            `u1` (64×288 · 62×44 · 6 filas)—, que es lo único que detecta que
+//            las dos pieles del menú se han separado; las seis leyendas y su
 //            orden; Sonido viva y las otras cuatro grises E INERTES (`disabled`
 //            de verdad, no `pointer-events`); el badge del contador sin montar;
 //            guardia de contenido (0 px² contra botones, multiplicadores, timer
@@ -242,7 +242,12 @@ import {
 // cuánto hay que esperar y lo deriva del reparto sellado.
 const movEsperaEntrada = (page) => page.waitForTimeout(REACCION_ENTRADA_MS + 80)
 
-const BASE = 'http://localhost:5173'
+// SUP-2b · el destino deja de estar clavado. La puerta de entrada obliga a que
+// el arnés corra contra un servidor con `VITE_AUTH_BYPASS=1`, y ése no tiene por
+// qué ser el 5173 de siempre —durante el desarrollo de una tanda conviven el
+// servidor de Victor y el de la medición—. El valor por defecto NO cambia: sin
+// la variable, esto sigue apuntando a donde apuntaba.
+const BASE = process.env.AJILEI_BASE || 'http://localhost:5173'
 const OUT_DIR = 'capturas-dsk'
 const MODE = process.argv[2] || 'all'
 
@@ -3773,7 +3778,26 @@ const U1_ITEM_MIN = 44
 // depender de índices, que es el defecto de fondo que ARN-2 desmontó en `msg`:
 // una puerta atada a una posición se rompe la próxima vez que alguien inserte
 // algo en medio, y lo hace en silencio.
-const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Tapetes', 'Saldo', 'Mano actual']
+// ── SUP-2b · recableado del metro (regla ARN-1) ──────────────────────────
+// «Quien mueve la ruta, recablea el metro.» SUP-2b mete "Cuenta" en el ⋮ —cuarta
+// entrada viva, delante de la inerte, porque el panel agrupa por estado— y con
+// ella suben un escalón la lista y el alto sellados:
+//   · U1_ENTRADAS          5 → 6 leyendas, "Cuenta" tras "Tapetes" — salvo en
+//                          móvil HORIZONTAL, donde sigue habiendo 5 porque ahí
+//                          la entrada no monta (U1_ENTRADAS_H)
+//   · MOVMENU_PANEL.h      244 → 288 en vertical; 244 intacto en horizontal
+//   · la pinza vertical    [8, H−252] → [8, H−296] donde el panel mide 288
+//   · `entradasOk`/`idsOk` 5 → 6, y la lista de IDs gana ENTRADA.CUENTA
+//   · `vivasOk` del móvil  4 → 5 vivas (bloque de escritorio del modo)
+// Contabilidad: viejo 5 entradas · nuevo 6 entradas · movedor SUP-2b.
+// El recableado no relaja nada: sigue sellando la lista COMPLETA y su orden.
+const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Tapetes', 'Cuenta', 'Saldo', 'Mano actual']
+// …y su variante de MÓVIL HORIZONTAL, donde "Cuenta" no monta (el corredor
+// izquierdo no da para seis filas sin taparle el saldo al jugador — el porqué
+// medido vive en config/menuEntradas.js). Se deriva de la lista de arriba en vez
+// de escribirse a mano: así no puede quedarse atrás cuando la otra se mueva.
+const U1_ENTRADAS_H = U1_ENTRADAS.filter(t => t !== 'Cuenta')
+const entradasSelladas = (vp) => (vp.w > vp.h && vp.h <= 600 ? U1_ENTRADAS_H : U1_ENTRADAS)
 
 async function u1Install(page) {
   await page.evaluate(({ ANCHORS }) => {
@@ -3870,8 +3894,19 @@ async function u1Install(page) {
       return {
         n: items.length,
         expW: parseFloat(cs.getPropertyValue('--dsk-u1-panel-w')),
-        expH: rnd(sum + mt + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) +
+        // SUP-2b · el alto derivado es el del CONTENIDO; si la piel lo capa
+        // (`max-height`, como hace menuMovil.css en horizontal desde esta tanda)
+        // la caja real es el mínimo de los dos. Sin esto la puerta derivada
+        // saldría en rojo por un tope deliberado, que es un bug del arnés.
+        expH: (() => {
+          const alto = sum + mt + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) +
+            parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth)
+          const tope = parseFloat(cs.maxHeight)
+          return rnd(Number.isFinite(tope) ? Math.min(alto, tope) : alto)
+        })(),
+        expHContenido: rnd(sum + mt + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) +
           parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth)),
+        tope: Number.isFinite(parseFloat(cs.maxHeight)) ? rnd(parseFloat(cs.maxHeight)) : null,
         got: window.__u1R('.utilities-panel'),
         itemH: items.map(e => rnd(e.getBoundingClientRect().height)),
         itemW: items.map(e => rnd(e.getBoundingClientRect().width)),
@@ -4268,7 +4303,7 @@ async function runU1(browser) {
 // conforma con `__u1PanelExpect` —que deriva ancho y alto del contenido vivo y
 // por tanto sería verde aunque las dos pieles divergieran a la vez— sino que
 // además contrasta contra las MISMAS cifras selladas que `u1` exige arriba
-// (64×244 · 62×44 · 5 filas). Si una piel se desvía de la otra, sale en rojo.
+// (64×288 · 62×44 · 6 filas). Si una piel se desvía de la otra, sale en rojo.
 // Un verde que no mide lo que dice es un bug del arnés.
 const MOVMENU_VPS = [
   { w: 375, h: 812 }, { w: 360, h: 640 },   // vertical
@@ -4308,10 +4343,17 @@ const MOVMENU_PRE = {
 // D3 · el estándar del disparador SUBE a 44 en móvil (en escritorio la deuda B2
 // lo dejó en el 40 de campaña). Las filas del panel ya median 44 desde U1b.
 const MOVMENU_TAP = 44
-// D4 · caja y pinza del panel. `H − 252` es `H − 244 − 8`: alto del panel más el
+// D4 · caja y pinza del panel. `H − 296` es `H − 288 − 8`: alto del panel más el
 // margen al filo. El área segura entra por `env()` dentro del `clamp()`, así que
 // aquí se comprueba el caso sin muescas, que es el del navegador de prueba.
-const MOVMENU_PANEL = { w: 64, h: 244 }
+// SUP-2b · el alto sellado deja de ser uno solo. En vertical el panel mide sus
+// seis filas (288); en HORIZONTAL menuMovil.css lo capa a cinco visibles con
+// desplazamiento y vuelve a medir 244 —exactamente lo que medía antes de esta
+// tanda—, porque el corredor izquierdo sólo tiene 245,72px libres en 640×360
+// antes del bloque de saldo del humano. Dos cifras, no una relajación: cada
+// orientación se sella contra la suya.
+const MOVMENU_PANEL = { w: 64, h: 288, hHorizontal: 244 }
+const altoSellado = (vp) => (vp.w > vp.h && vp.h <= 600 ? MOVMENU_PANEL.hHorizontal : MOVMENU_PANEL.h)
 const MOVMENU_MARGIN = 8
 const MOVMENU_ITEM = { w: 62, h: 44 }
 // Los vecinos que el embaldosado del disparador NO puede desalojar. La ✕ está a
@@ -4553,10 +4595,10 @@ async function runMenuMovil(browser) {
       c.panel = pa
       // D4 · pinza vertical + encaje completo dentro del viewport.
       c.pinza = {
-        min: MOVMENU_MARGIN, max: round(abierto.vpH - MOVMENU_PANEL.h - MOVMENU_MARGIN),
+        min: MOVMENU_MARGIN, max: round(abierto.vpH - altoSellado(vp) - MOVMENU_MARGIN),
         top: pa ? pa.y : null,
         dentro: !!pa && pa.y >= MOVMENU_MARGIN - U1_TOL &&
-                pa.y <= abierto.vpH - MOVMENU_PANEL.h - MOVMENU_MARGIN + U1_TOL,
+                pa.y <= abierto.vpH - altoSellado(vp) - MOVMENU_MARGIN + U1_TOL,
         encaje: !!pa && pa.x >= 0 && pa.y >= 0 && pa.right <= abierto.vpW && pa.bottom <= abierto.vpH,
       }
       // Geometría: contra el contenido vivo Y contra la cifra sellada de u1.
@@ -4564,22 +4606,26 @@ async function runMenuMovil(browser) {
       c.geom = {
         n: ex ? ex.n : null, expW: ex ? ex.expW : null, expH: ex ? ex.expH : null,
         got: ex ? ex.got : null, itemH: ex ? ex.itemH : null, itemW: ex ? ex.itemW : null,
-        derivadaOk: !!ex && ex.n === 5 &&
+        derivadaOk: !!ex && ex.n === entradasSelladas(vp).length &&
           Math.abs(ex.got.w - ex.expW) <= U1_TOL && Math.abs(ex.got.h - ex.expH) <= U1_TOL,
         selladaOk: !!ex && Math.abs(ex.got.w - MOVMENU_PANEL.w) <= U1_TOL &&
-          Math.abs(ex.got.h - MOVMENU_PANEL.h) <= U1_TOL &&
+          Math.abs(ex.got.h - altoSellado(vp)) <= U1_TOL &&
           ex.itemH.every(h => Math.abs(h - MOVMENU_ITEM.h) <= U1_TOL) &&
           ex.itemW.every(w => Math.abs(w - MOVMENU_ITEM.w) <= U1_TOL),
       }
       c.entradas = abierto.entradas
-      c.entradasOk = abierto.entradas.length === 5 &&
+      c.entradasOk = abierto.entradas.length === entradasSelladas(vp).length &&
         abierto.entradas.every(e => e.gana) &&
         abierto.entradas.every(e => e.viva ? (!e.gris && !e.inerte) : (e.gris && e.inerte))
-      c.titlesOk = JSON.stringify(abierto.titles) === JSON.stringify(U1_ENTRADAS)
-      // El orden y la identidad de las cinco filas, por CONTRATO y no por copy.
-      c.idsOk = JSON.stringify(abierto.entradas.map(e => e.id)) === JSON.stringify([
-        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.SALDO, ENTRADA.MANO,
-      ])
+      c.titlesOk = JSON.stringify(abierto.titles) === JSON.stringify(entradasSelladas(vp))
+      // El orden y la identidad de las filas, por CONTRATO y no por copy. La
+      // lista de IDs se filtra por la misma piel que la de leyendas, para que las
+      // dos no puedan discrepar.
+      const IDS_SELLADOS = [
+        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.CUENTA,
+        ENTRADA.SALDO, ENTRADA.MANO,
+      ].filter(id => id !== ENTRADA.CUENTA || entradasSelladas(vp).includes('Cuenta'))
+      c.idsOk = JSON.stringify(abierto.entradas.map(e => e.id)) === JSON.stringify(IDS_SELLADOS)
       c.badgeOk = abierto.badge === 0
       c.guard = abierto.guard
       c.guardN = abierto.guardN
@@ -5159,17 +5205,19 @@ async function runMenuMovil(browser) {
         // Las cifras selladas son las de MOV-0 0.1, que son las de u1.
         triggerOk: !!m.trigger && Math.abs(m.trigger.w - U1_TRIGGER.w) <= U1_TOL &&
           Math.abs(m.trigger.h - U1_TRIGGER.h) <= U1_TOL,
-        panelOk: !!ex && ex.n === 5 &&
+        panelOk: !!ex && ex.n === 6 &&
           Math.abs(ex.got.w - MOVMENU_PANEL.w) <= U1_TOL &&
+          // Bloque de ESCRITORIO dentro del modo móvil: ahí no hay tope y el
+          // panel mide sus seis filas enteras.
           Math.abs(ex.got.h - MOVMENU_PANEL.h) <= U1_TOL,
         itemsOk: !!ex && ex.itemH.every(h => Math.abs(h - MOVMENU_ITEM.h) <= U1_TOL) &&
           ex.itemW.every(w => Math.abs(w - MOVMENU_ITEM.w) <= U1_TOL),
         titlesOk: JSON.stringify(m.titles) === JSON.stringify(U1_ENTRADAS),
-        // Arriba NO se aplica `soloSonido`: el badge sigue montado y las cuatro
+        // Arriba NO se aplica `soloSonido`: el badge sigue montado y las cinco
         // entradas vivas siguen vivas. Es la mitad que más fácil se rompería sin
         // que nadie lo note, porque el puerto no la mira nunca.
         badgeOk: m.badge === 1,
-        vivasOk: JSON.stringify(m.vivas) === JSON.stringify(['Sonido', 'Reacciones', 'Tapetes', 'Mano actual']),
+        vivasOk: JSON.stringify(m.vivas) === JSON.stringify(['Sonido', 'Reacciones', 'Tapetes', 'Cuenta', 'Mano actual']),
       }
       escritorio.passed = gate === true && escritorio.triggerOk && escritorio.panelOk &&
         escritorio.itemsOk && escritorio.titlesOk && escritorio.badgeOk && escritorio.vivasOk &&

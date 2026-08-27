@@ -4,9 +4,30 @@ import { Wordmark } from './Wordmark'
 import reyOroUrl     from '../assets/cards/doce_oro.png?url'
 import caballoOroUrl from '../assets/cards/once_oro.png?url'
 
-function WelcomeScreen({ onSelectMode }) {
+// SUP-2b · `cuenta` es OPCIONAL y su ausencia es un estado legítimo, no un
+// olvido: no llega con el bypass de desarrollo activo (la adenda de Fase 1 lo
+// exige literalmente, para que los 20 arneses vean la Bienvenida byte-idéntica a
+// la de hoy) y no puede llegar sin sesión, porque sin sesión no se llega a esta
+// pantalla. Cuando no llega, no se monta nada.
+function WelcomeScreen({ onSelectMode, cuenta }) {
   return (
     <main className="welcome-screen">
+      {/* El acceso a la cuenta, periférico y FUERA DE FLUJO. Es `absolute`
+          contra `.welcome-screen` a propósito y no un bloque del panel: así su
+          presencia o su ausencia no mueven un píxel del resto —ni del wordmark,
+          ni del arco de estrellas, ni de los dos botones—, que es lo que O1 pide
+          de la manera más barata posible. No compite con la marca ni con el CTA:
+          vive en la esquina, en el gris del sistema, con el nombre como único
+          dato y una sola acción. */}
+      {cuenta && (
+        <div className="welcome-cuenta">
+          <span className="welcome-cuenta-nombre">{cuenta.username}</span>
+          <button type="button" className="welcome-cuenta-salir" onClick={cuenta.cerrarSesion}>
+            Cerrar sesión
+          </button>
+        </div>
+      )}
+
       <img className="deco-card deco-left"  src={reyOroUrl}     alt="" aria-hidden="true" />
       <img className="deco-card deco-right" src={caballoOroUrl} alt="" aria-hidden="true" />
 
