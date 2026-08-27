@@ -1,0 +1,23 @@
+# AJILEI — GIT-1: finales de línea sellados (LF) · 2026-08-26
+#
+# La ley viaja en el REPO, no en la configuración de cada máquina: esto manda
+# sobre core.autocrlf, aquí y en cualquier clon futuro. El árbol ya vive en LF;
+# lo que faltaba era escribirlo. Sin esta regla, un checkout con autocrlf=true
+# renormaliza archivos a mitad de tanda — le pasó a scripts/diagDSK.mjs durante
+# ARN-3, y de ahí sale esta tanda.
+* text=auto eol=lf
+
+# binarios (nunca convertir)
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.mp3  binary
+*.wav  binary
+*.ogg  binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.zip  binary
