@@ -191,6 +191,13 @@ const LAMINA = {
 }
 const TOL = 0.6
 const SALDO_INICIAL = 5000   // AJILEI_CONFIG.economy.saldoInicial
+// CEL-1b · el hueco fijo entre la moneda de aterrizaje y la cifra del saldo.
+// Constante LOCAL declarada en celebracion.css §CEL-1b: el Sistema de Diseno
+// v1.2 no define escala de espaciado, asi que no hay token que citar. Vive aqui
+// para que el arnes mida contra el numero de la instruccion y no contra el CSS
+// —comprobar una hoja contra si misma no comprueba nada.
+const HUECO_MONEDA = 8
+const LADO_MONEDA = 16       // ChipToken `size="icon"`, el del cornerChip de mesa
 
 // Qué piel toca en cada celda, con las MISMAS consultas que usan el JSX y la
 // hoja (`GameTable.jsx:72-87`). Se derivan aquí en vez de leerlas del CSS a
@@ -251,6 +258,61 @@ function sondaPantalla() {
       return b.left >= p.left - 0.5 && b.right <= p.right + 0.5 && b.bottom <= p.bottom + 0.5
     })() : null,
     saldo: dd('Saldo actual'),
+    // CEL-1b · la moneda de aterrizaje, en las TRES pieles. Aqui la pantalla
+    // esta quieta y ya en reposo, asi que lo que se mide es la composicion: que
+    // la moneda exista, que su caja sea su tinta y que el hueco sea el fijo.
+    // El movil horizontal es la celda que importa: ahi la tarjeta reparte sus
+    // lineas en dos columnas y la fila del saldo vive en media tarjeta.
+    monedaSaldo: (() => {
+      const m = uno('.cel-saldo-moneda')
+      const n = uno('.cel-saldo-num')
+      if (!m || !n) return null
+      const mb = m.getBoundingClientRect(), nb = n.getBoundingClientRect()
+      const fila = m.closest('.cel-linea-alta')
+      const fb = fila ? fila.getBoundingClientRect() : null
+      const r2 = (v) => Math.round(v * 100) / 100
+      return {
+        w: r2(mb.width), h: r2(mb.height),
+        hueco: r2(nb.left - mb.right),
+        // El grupo alineado a la DERECHA de la fila: el borde derecho de la
+        // cifra tiene que ser el de la fila. Si algun dia se alineara a la
+        // izquierda, el hueco seguiria siendo 8 y esto seria lo unico que lo
+        // delataria.
+        margenDerecho: fb ? r2(fb.right - nb.right) : null,
+        // Y la fila entera dentro de su columna: es la puerta del movil
+        // horizontal, donde los 24 px que anade el grupo pueden desbordar.
+        desborda: fila ? fila.scrollWidth > fila.clientWidth + 0.5 : null,
+        // ── El comportamiento adaptativo, MEDIDO ─────────────────────────
+        // La instruccion pide que con cifras de distinta longitud el hueco siga
+        // fijo y el grupo crezca hacia la IZQUIERDA. Con el molde `?cel` el
+        // saldo es siempre 5000, asi que medirlo sobre la pantalla tal cual no
+        // comprobaria nada: seria un verde que no mide lo que declara.
+        // Se hace por SONDA DE DOM y no sembrando estado: se escribe la cifra,
+        // se fuerza el reflujo, se mide y se DEVUELVE el texto original en el
+        // mismo tick. La pantalla esta en reposo, asi que no hay render de React
+        // que atropelle la medida, y lo que se prueba es geometria de CSS —que
+        // es exactamente de quien depende el hueco.
+        longitudes: (() => {
+          const antes = n.textContent
+          const filas = ['999', '25000', '1250000'].map((t) => {
+            n.textContent = t
+            void document.body.offsetWidth
+            const mb2 = m.getBoundingClientRect(), nb2 = n.getBoundingClientRect()
+            const fb2 = fila ? fila.getBoundingClientRect() : null
+            return {
+              cifra: t,
+              hueco: r2(nb2.left - mb2.right),
+              monedaX: r2(mb2.left),
+              margenDerecho: fb2 ? r2(fb2.right - nb2.right) : null,
+              desborda: fila ? fila.scrollWidth > fila.clientWidth + 0.5 : null,
+            }
+          })
+          n.textContent = antes
+          void document.body.offsetWidth
+          return filas
+        })(),
+      }
+    })(),
     puntos: dd('Puntos obtenidos'),
     manosGanadas: dd('Manos ganadas'),
     // La cifra de sesión, para cruzarla con el saldo: `fichasNetas` es
@@ -425,8 +487,11 @@ function instalaSondaArco() {
   // que a cada rubro le toca entrar —con su retraso ya aplicado— y cuantas veces
   // se disparo el pulso del saldo, que tiene que ser una. Medir eso muestreando
   // opacidades daria la misma respuesta con menos precision y mas codigo.
+  // CEL-1b · `cel-posada` entra en el mismo censo: el micro-pulso de la moneda
+  // de aterrizaje tiene que dispararse UNA vez, igual que el de la cifra.
+  const ANIMS = ['cel-asiento', 'cel-rubro-entra', 'cel-posada']
   document.addEventListener('animationstart', (e) => {
-    if (e.animationName !== 'cel-asiento' && e.animationName !== 'cel-rubro-entra') return
+    if (!ANIMS.includes(e.animationName)) return
     const crudo = e.target && e.target.style ? e.target.style.getPropertyValue('--rubro-i') : ''
     reg.animaciones.push({
       nombre: e.animationName,
@@ -483,7 +548,17 @@ function instalaSondaArco() {
     const tr = document.querySelector('.cel-traspaso')
     if (tr) {
       if (!reg.anclas) {
-        reg.anclas = { moneda: centro(document.querySelector('.cel-netas-ico')), saldo: centro(ddDe('Saldo actual')) }
+        // CEL-1b · el ancla de llegada deja de ser la CAJA DE LA CIFRA y pasa a
+        // ser la TINTA de la moneda de aterrizaje. `.cel-saldo-moneda` es un
+        // contenedor flex con `line-height: 0`, asi que su caja es la de la
+        // imagen —16x16— y su centro es el centro del dibujo.
+        // Se deja tambien el centro del <dd> para poder REPORTAR a que distancia
+        // quedo del punto viejo: es la medida del recableo.
+        reg.anclas = {
+          moneda: centro(document.querySelector('.cel-netas-ico')),
+          saldo: centro(document.querySelector('.cel-saldo-moneda')),
+          cifra: centro(ddDe('Saldo actual')),
+        }
       }
       reg.vuelo.push({ t: ahora(), ...centro(tr) })
     }
@@ -550,6 +625,25 @@ function miraArco() {
       }
     }),
     asiento: document.querySelector('.cel-detalle .cel-linea-alta dd')?.dataset?.asiento ?? null,
+    // ── CEL-1b · la moneda de aterrizaje ─────────────────────────────────
+    // Se fotografia en CADA tramo, y eso es lo que permite afirmar la doctrina
+    // O1: la moneda no aparece al aterrizar, esta desde el primer fotograma.
+    // El hueco se mide entre CAJAS —borde derecho de la moneda contra borde
+    // izquierdo de la cifra— y no se lee del CSS: un `gap` declarado que la
+    // rejilla de movil horizontal aplastara seguiria diciendo 8.
+    monedaSaldo: (() => {
+      const m = document.querySelector('.cel-saldo-moneda')
+      const n = document.querySelector('.cel-saldo-num')
+      if (!m || !n) return null
+      const mb = m.getBoundingClientRect(), nb = n.getBoundingClientRect()
+      const r2 = (v) => Math.round(v * 100) / 100
+      return {
+        w: r2(mb.width), h: r2(mb.height),
+        hueco: r2(nb.left - mb.right),
+        posada: m.dataset.posada ?? null,
+        animacion: getComputedStyle(m).animationName,
+      }
+    })(),
     // CEL-2c · el detalle de cada moneda VIVA: su duración de caída (la primera
     // de las tres animaciones, que es `cel-caida`) y su opacidad. Lo primero es
     // la medida del +40 %; lo segundo, la del techo de 0,7.
@@ -897,12 +991,84 @@ function juzgaArco(a, fallos, opciones = {}) {
       const dist = (p, q) => (p && q ? Math.round(Math.hypot(p.x - q.x, p.y - q.y)) : 9999)
       a.vueloDe = dist(v[0], a.anclas.moneda)
       a.vueloA = dist(v[v.length - 1], a.anclas.saldo)
+      a.vueloACifra = dist(v[v.length - 1], a.anclas.cifra)
       if (a.vueloDe > 14) fallos.push(`${id}: la moneda no salió de la fila del premio (${a.vueloDe} px)`)
-      if (a.vueloA > 24) fallos.push(`${id}: la moneda no llegó a la fila del saldo (${a.vueloA} px)`)
+      // CEL-1b · LA PUERTA SE APRIETA PORQUE AHORA MIDE OTRA COSA. Los 24 px de
+      // CEL-2g eran la tolerancia contra el centro de una CAJA DE CIFRA de ~60
+      // px de ancho: sobre una moneda de 16 px esa misma puerta pasaria en verde
+      // aunque el vuelo aterrizara encima del numero, que es justo lo que esta
+      // tanda vino a cambiar. 8 px es medio lado de la moneda: dentro de la
+      // tinta o rojo. El resto de holgura es el muestreo —el ultimo fotograma
+      // capturado no es el ultimo de la transicion— y con esta curva vale <1 px.
+      if (a.vueloA > 8) fallos.push(`${id}: la moneda no aterrizó sobre la tinta de la moneda del saldo (${a.vueloA} px)`)
     }
     // EL ASIENTO: un solo disparo.
     const pulsos = (a.animaciones || []).filter(x => x.nombre === 'cel-asiento')
     if (pulsos.length !== 1) fallos.push(`${id}: el pulso del saldo se disparó ${pulsos.length} veces`)
+
+    // ── CEL-1b · LA MONEDA DE ATERRIZAJE ──────────────────────────────────
+    // Tres puertas, y las tres miden lo que declaran.
+    //
+    // (a) O1 · esta DESDE EL PRIMER RENDER. Por eso se mira en la entrada sobria
+    //     y mientras cuenta el premio —los dos tramos ANTERIORES al vuelo— y no
+    //     sólo al final: una moneda que apareciera al aterrizar pasaria una
+    //     comprobacion hecha en el reposo.
+    // (b) EL HUECO ES FIJO. Se compara contra los 8 px declarados y, sobre todo,
+    //     CONSIGO MISMO a lo largo del arco: entre la entrada sobria y el reposo
+    //     el saldo ha cambiado de cifra, y si entre moneda y numero hubiera un
+    //     espacio elastico, ahi es donde se veria.
+    //     Se excluye a proposito la foto de `saldoContando`: ahi el micro-pulso
+    //     esta corriendo y `getBoundingClientRect` devuelve la caja ESCALADA.
+    // (c) EL MICRO-PULSO ES UNO.
+    const conMoneda = [['sobria', fotos.sobria], ['premio', fotos.premio], ['reposo', fotos.reposo]]
+      .filter(([, f]) => f)
+    for (const [cuando, f] of conMoneda) {
+      if (!f.monedaSaldo) { fallos.push(`${id}: no hay moneda de aterrizaje en el tramo ${cuando}`); continue }
+      if (Math.abs(f.monedaSaldo.w - LADO_MONEDA) > TOL) {
+        fallos.push(`${id}: la moneda de aterrizaje mide ${f.monedaSaldo.w} y no ${LADO_MONEDA} (${cuando})`)
+      }
+      // La caja tiene que ser CUADRADA: si no lo fuera, sobraria el hueco del
+      // descendente de la linea y el centro medido no seria el de la tinta —el
+      // fallo exacto que VIS-3 documento en `.vc-ficha`.
+      if (Math.abs(f.monedaSaldo.w - f.monedaSaldo.h) > TOL) {
+        fallos.push(`${id}: la caja de la moneda de aterrizaje no es su tinta (${f.monedaSaldo.w}x${f.monedaSaldo.h}, ${cuando})`)
+      }
+      if (Math.abs(f.monedaSaldo.hueco - HUECO_MONEDA) > TOL) {
+        fallos.push(`${id}: el hueco moneda-cifra es ${f.monedaSaldo.hueco} y no ${HUECO_MONEDA} (${cuando})`)
+      }
+    }
+    const huecos = conMoneda.filter(([, f]) => f.monedaSaldo).map(([c, f]) => `${c}:${f.monedaSaldo.hueco}`)
+    if (new Set(huecos.map(h => h.split(':')[1])).size > 1) {
+      fallos.push(`${id}: el hueco moneda-cifra se estira con la cifra (${huecos.join(' ')})`)
+    }
+    a.moneda = { hueco: fotos.reposo?.monedaSaldo?.hueco ?? null, lado: fotos.reposo?.monedaSaldo?.w ?? null }
+    const posadas = (a.animaciones || []).filter(x => x.nombre === 'cel-posada')
+    if (posadas.length !== 1) fallos.push(`${id}: el micro-pulso de aterrizaje se disparó ${posadas.length} veces`)
+    // Y CAE EN EL ATERRIZAJE, no en cualquier momento del relato. Se mide contra
+    // el pulso de la cifra y no contra la marca `traspaso-fin`, y ahí hay una
+    // lección que la primera corrida cobró en rojo: `marcaCEL` y `animationstart`
+    // llevan RELOJES DISTINTOS —el de las marcas nace al montar la pantalla y el
+    // de la sonda al instalarse, unos 3,6 s después—, así que restar uno del otro
+    // no mide nada. Dentro del reloj de la sonda sí se puede afirmar la relación
+    // que importa: entre el aterrizaje y el asiento de la cifra hay exactamente
+    // una cuenta de saldo, así que el micro-pulso precede al asiento y lo hace
+    // por lo que dura esa cuenta.
+    const asientos = pulsos
+    if (posadas.length === 1 && asientos.length === 1) {
+      const entre = asientos[0].t - posadas[0].t
+      a.pulsoAntesDelAsiento = entre
+      if (entre <= 0) {
+        fallos.push(`${id}: el micro-pulso de aterrizaje no precede al asiento de la cifra (${entre} ms)`)
+      } else if (!a.capturas && a.relato?.saldo?.dur) {
+        // Misma puerta abierta que la del paso de la cascada: en las celdas que
+        // capturan, `page.screenshot` congela el hilo de render y retrasa el
+        // `animationstart` que caiga dentro de la captura. Eso es el arnés.
+        const dur = a.relato.saldo.dur
+        if (Math.abs(entre - dur) > 400) {
+          fallos.push(`${id}: entre el micro-pulso y el asiento pasaron ${entre} ms y el saldo cuenta ${dur} — el pulso no cae en el aterrizaje`)
+        }
+      }
+    }
     // LA CASCADA: los cuatro, en su orden y a su paso.
     const entradas = (a.animaciones || []).filter(x => x.nombre === 'cel-rubro-entra')
     a.cascada = entradas.map(x => ({ i: x.i, rotulo: x.rotulo, t: x.t }))
@@ -1286,6 +1452,38 @@ async function modoCelebracion(browser) {
         }
         // Y con el molde determinista, el saldo es exactamente el inicial.
         if (d.saldo !== String(SALDO_INICIAL)) fallos.push(`${id}: con ?cel el saldo debe ser ${SALDO_INICIAL}, no ${d.saldo}`)
+
+        // CEL-1b · LA MONEDA DE ATERRIZAJE, en la composicion quieta de las tres
+        // pieles. La medida del arco (O1, hueco a lo largo del relato, pulso
+        // unico) vive en el modo `arco`; esto es la geometria.
+        if (!d.monedaSaldo) fallos.push(`${id}: no hay moneda de aterrizaje en la fila del saldo`)
+        else {
+          const m = d.monedaSaldo
+          if (!cerca(m.w, LADO_MONEDA))       fallos.push(`${id}: moneda de aterrizaje ${m.w} != ${LADO_MONEDA}`)
+          if (!cerca(m.w, m.h))               fallos.push(`${id}: la caja de la moneda de aterrizaje no es su tinta (${m.w}x${m.h})`)
+          if (!cerca(m.hueco, HUECO_MONEDA))  fallos.push(`${id}: hueco moneda-cifra ${m.hueco} != ${HUECO_MONEDA}`)
+          if (!cerca(m.margenDerecho, 0))     fallos.push(`${id}: el grupo moneda+cifra no está alineado a la derecha (sobran ${m.margenDerecho} px)`)
+          if (m.desborda)                     fallos.push(`${id}: la fila del saldo desborda su columna con la moneda`)
+
+          // EL COMPORTAMIENTO ADAPTATIVO. Tres cosas, y la tercera es la que la
+          // instrucción llama "la moneda acompaña a la cifra": si entre las dos
+          // hubiera un espacio elástico, al crecer el número la moneda se
+          // quedaría clavada en su sitio en vez de retroceder con él.
+          const L = m.longitudes || []
+          for (const f of L) {
+            if (!cerca(f.hueco, HUECO_MONEDA)) {
+              fallos.push(`${id}: con la cifra ${f.cifra} el hueco moneda-cifra es ${f.hueco} y no ${HUECO_MONEDA}`)
+            }
+            if (!cerca(f.margenDerecho, 0)) {
+              fallos.push(`${id}: con la cifra ${f.cifra} el grupo se despega de la derecha (${f.margenDerecho} px)`)
+            }
+          }
+          for (let k = 1; k < L.length; k++) {
+            if (!(L[k].monedaX < L[k - 1].monedaX)) {
+              fallos.push(`${id}: al pasar de ${L[k - 1].cifra} a ${L[k].cifra} la moneda no retrocedió (${L[k - 1].monedaX} -> ${L[k].monedaX})`)
+            }
+          }
+        }
         // Con `?cel` no se juega ninguna mano: 0 ganadas -> 0 puntos, gane el
         // nivel que gane. La multiplicación la sellan las aserciones de unidad.
         if (d.manosGanadas !== '0') fallos.push(`${id}: manos ganadas ${d.manosGanadas} != 0`)
@@ -1435,7 +1633,12 @@ async function modoCelebracion(browser) {
 
   console.log('-- CEL-1 - cajas contra la lamina --')
   for (const [id, d] of Object.entries(inf.celdas)) {
-    console.log(`  ${id.padEnd(18)} ${String(d.piel).padEnd(15)} AJILEI ${round(d.ajilei?.fontSize)} - cifra ${round(d.cifra?.fontSize)} - moneda ${round(d.moneda?.w)} - frase ${round(d.frase?.fontSize)} (${d.renglonesFrase} rgl) - tarjeta ${round(d.tarjeta?.w)} - saldo ${d.saldo} - puntos ${d.puntos} - encaje ${d.encaje?.altoColumna}/${d.encaje?.huecoDisponible} ${d.encaje?.ultimaPiezaDentro ? 'CABE' : 'NO CABE'}`)
+    const L = d.monedaSaldo?.longitudes || []
+    if (L.length) {
+      console.log(`  ${''.padEnd(18)} moneda de aterrizaje: `
+        + L.map(f => `${f.cifra} -> hueco ${f.hueco}, x ${f.monedaX}${f.desborda ? ' DESBORDA' : ''}`).join(' | '))
+    }
+    console.log(`  ${id.padEnd(18)} ${String(d.piel).padEnd(15)} AJILEI ${round(d.ajilei?.fontSize)} - cifra ${round(d.cifra?.fontSize)} - moneda ${round(d.moneda?.w)} - frase ${round(d.frase?.fontSize)} (${d.renglonesFrase} rgl) - tarjeta ${round(d.tarjeta?.w)} - saldo ${d.saldo} (moneda ${round(d.monedaSaldo?.w)} + hueco ${round(d.monedaSaldo?.hueco)}) - puntos ${d.puntos} - encaje ${d.encaje?.altoColumna}/${d.encaje?.huecoDisponible} ${d.encaje?.ultimaPiezaDentro ? 'CABE' : 'NO CABE'}`)
   }
   console.log('\n-- las ocho frases --')
   for (const [piel] of PIELES) {
@@ -1468,7 +1671,11 @@ async function modoCelebracion(browser) {
     if (!a.relato) { console.log(`  ${id.padEnd(22)} sin relato (movimiento reducido)`); continue }
     console.log(`  ${id.padEnd(22)} premio ${a.relato.premio.medido}/${a.relato.premio.dur} -> traspaso ${a.relato.traspaso} -> saldo ${a.relato.saldo.medido}/${a.relato.saldo.dur}`
       + ` -> cascada ${a.relato.cascada} | total ${a.relato.total} ms`)
-    console.log(`  ${''.padEnd(22)} vuelo: 1 moneda, ${a.vueloDe} px del origen y ${a.vueloA} px del destino`
+    console.log(`  ${''.padEnd(22)} vuelo: 1 moneda, ${a.vueloDe} px del origen y ${a.vueloA} px de la tinta de la moneda de aterrizaje`
+      + ` (${a.vueloACifra} px del centro de la cifra, que era el destino hasta CEL-1b)`)
+    console.log(`  ${''.padEnd(22)} aterrizaje: moneda ${a.moneda?.lado} px, hueco ${a.moneda?.hueco} px,`
+      + ` micro-pulso ${a.pulsoAntesDelAsiento} ms antes del asiento (el saldo cuenta ${a.relato.saldo.dur})`)
+    console.log(`  ${''.padEnd(22)}`
       + ` | cascada ${(a.cascada || []).map(x => x.rotulo).join(' > ')}`)
   }
   const rk = inf.ranking2e || {}

@@ -655,3 +655,81 @@ h1.cel-ajilei {
   .cel-detalle .cel-rubro { opacity: 1; animation: none; }
   .cel-detalle .cel-linea-alta dd[data-asiento="si"] { animation: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CEL-1b · LA MONEDA DE ATERRIZAJE
+   Rector: AJILEI_CEL-1b_Moneda_Aterrizaje_v1.0.md. Delta sobre la composición
+   sellada de CEL-1; no reabre ninguna otra decisión de aquella lámina.
+
+   Una Heptacoin pequeña —la del cornerChip, `size="icon"`— a la izquierda de la
+   cifra de "Saldo actual", presente DESDE EL PRIMER RENDER (doctrina O1: nada
+   aparece a mitad de evento) y punto final del vuelo del traspaso.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* EL GRUPO. El <dd> pasa de bloque a fila flex, y ahí está la única sutileza de
+   todo el bloque: la fila padre (`.cel-detalle > div`) alinea `dt` y `dd` POR
+   LÍNEA BASE, y la línea base de un contenedor flex la da su primer ítem que
+   participe en alineación por línea base. Con la moneda en `align-self: center`
+   la moneda NO participa, así que la línea base del grupo sigue siendo la de la
+   cifra — exactamente donde estaba antes de que existiera la moneda. Con
+   `align-items: center` aquí, en cambio, ningún ítem participaría, el navegador
+   sintetizaría la línea base desde el borde inferior de la caja y el rótulo
+   "Saldo actual" se descolgaría. La fila no se mueve ni un píxel: sólo el grupo
+   crece 24 px hacia la izquierda.
+
+   El hueco es FIJO por construcción y no un espacio elástico: es el `gap` del
+   grupo, no un `space-between`. Gane o pierda dígitos el saldo, la moneda va
+   pegada a su cifra y el grupo entero se desplaza a la izquierda.
+   Los 8 px son constante LOCAL declarada: el Sistema de Diseño v1.2 no define
+   escala de espaciado, así que no hay token que reutilizar — y esta hoja ya usa
+   8/10/16 en el mismo registro. */
+.cel-detalle .cel-linea-alta dd.cel-saldo-grupo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* LA MONEDA. `display: flex` + `line-height: 0` es la lección de `.vc-ficha` y
+   `.cel-traspaso`, aquí por un motivo que además se MIDE: la caja de este
+   envoltorio es el ancla del vuelo, y un <img> en línea le añadiría el hueco del
+   descendente por abajo — el centro de la caja quedaría bajo el centro de la
+   tinta y la moneda del traspaso aterrizaría descentrada. En flex no hay cajas
+   de línea, así que la caja del envoltorio ES la de la imagen: 16 × 16.
+
+   `flex: none` para que en la piel más apretada —móvil horizontal, donde la
+   tarjeta reparte sus líneas en dos columnas— la moneda no se aplaste: quien
+   cede es el hueco de la fila, nunca el dibujo. */
+.cel-saldo-moneda {
+  display: flex;
+  align-self: center;
+  flex: none;
+  line-height: 0;
+}
+
+/* EL MICRO-PULSO DE ATERRIZAJE. Mismo lenguaje visual que el asiento del Saldo
+   Vivo en su variante ganancia —pulso y halo dorado breve, misma curva y misma
+   duración (los 520 ms de `ASIENTO_MS`)—, una sola vez y sin bucle.
+   Vive en `transform` y `filter`, así que no toca el layout: la caja reservada
+   de la moneda no cambia de tamaño y la cifra no se mueve al pulsar.
+   El estado se queda PEGADO y la animación lleva una sola iteración: eso es lo
+   que garantiza el disparo único, sin un temporizador que lo apague.
+   Y no hay pulso huérfano: `data-posada` sólo se enciende con el `transitionend`
+   de la moneda del traspaso, así que una entrada sin vuelo —movimiento reducido,
+   una tarjeta montada sin arco— deja la moneda quieta.
+   El halo va en `filter` sobre el envoltorio y no toca el `drop-shadow` propio
+   de `.chip-token`, que sigue siendo la sombra de la pieza. */
+.cel-saldo-moneda[data-posada="si"] {
+  animation: cel-posada 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 1;
+}
+
+@keyframes cel-posada {
+  0%   { transform: scale(1);    filter: none; }
+  35%  { transform: scale(1.1);  filter: drop-shadow(0 0 10px rgba(var(--gold-brand-rgb), 0.85)); }
+  100% { transform: scale(1);    filter: none; }
+}
+
+/* Movimiento reducido: la moneda está —su sitio no depende de que algo se
+   mueva— pero no pulsa. Misma regla que la cifra de al lado. */
+@media (prefers-reduced-motion: reduce) {
+  .cel-saldo-moneda[data-posada="si"] { animation: none; }
+}

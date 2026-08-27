@@ -187,15 +187,23 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
   const saldoVivo = valorEntre(entrada, saldo, numeros.saldo)
 
   // El vuelo se MIDE en vivo, como el del pozo: dónde está la moneda del premio
-  // y dónde la cifra del saldo, en coordenadas de la tarjeta.
+  // y dónde la MONEDA DE ATERRIZAJE del saldo, en coordenadas de la tarjeta.
+  //
+  // ── CEL-1b · El destino dejó de ser la cifra ──────────────────────────────
+  // Hasta aquí `posadaRef` colgaba del <dd> y el vuelo terminaba en el centro
+  // de la CAJA DE LA CIFRA — un punto que se mueve solo cuando el saldo gana un
+  // dígito, y que no es ningún objeto que el jugador pueda ver. Ahora cuelga de
+  // la moneda de aterrizaje, cuya caja ES su tinta (`display: flex` +
+  // `line-height: 0`, la lección de `.vc-ficha`): moneda que vuela contra
+  // moneda que espera, que es lo que la lámina pide.
   const tarjetaRef = useRef(null)
   const monedaRef = useRef(null)
-  const saldoRef = useRef(null)
+  const posadaRef = useRef(null)
   const [vuelo, setVuelo] = useState(null)
   useEffect(() => {
     if (numeros.tramo !== 'traspaso') return undefined
     const id = requestAnimationFrame(() => {
-      const t = tarjetaRef.current, m = monedaRef.current, d = saldoRef.current
+      const t = tarjetaRef.current, m = monedaRef.current, d = posadaRef.current
       if (!t || !m || !d) return
       const tr = t.getBoundingClientRect()
       const centro = (r) => ({ x: r.x + r.width / 2 - tr.x, y: r.y + r.height / 2 - tr.y })
@@ -204,6 +212,28 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
     return () => cancelAnimationFrame(id)
   }, [numeros.tramo])
 
+  // ── CEL-1b · El micro-pulso de aterrizaje ─────────────────────────────────
+  // Molde `data-asiento` al pie de la letra: el estado se enciende una vez y se
+  // queda PEGADO, y lo que garantiza que el pulso no se repita es que la
+  // animación lleva una sola iteración. Un booleano que se apagara solo pediría
+  // un temporizador más, y un temporizador más es una cosa más que puede
+  // desincronizarse.
+  //
+  // Lo enciende el ATERRIZAJE REAL —el `transitionend` de la moneda— y no el
+  // avance de tramo. La diferencia importa: si el `transitionend` no llegara, el
+  // relato sigue por la RED de `useCoreografia` y el tramo avanza igual, pero
+  // entonces nadie vio aterrizar nada. Un pulso ahí sería huérfano.
+  // La dependencia es `numeros.aterriza` y no `numeros`: el objeto es nuevo en
+  // cada render —se deriva del tramo— y la función de dentro es la misma
+  // siempre (`aterrizaTraspaso`, un `useCallback` del hook). Con el objeto en la
+  // lista, este envoltorio cambiaría de identidad sesenta veces por segundo.
+  const alAterrizar = numeros.aterriza
+  const [posada, setPosada] = useState(false)
+  const aterriza = useCallback(() => {
+    setPosada(true)
+    alAterrizar()
+  }, [alAterrizar])
+
   const signo = valor > 0 ? '+' : ''
   return (
     <div className="cel-tarjeta" ref={tarjetaRef}>
@@ -211,7 +241,7 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
           y sus coordenadas son relativas a ella, así que ni el desplazamiento de
           la columna en móvil horizontal ni el centrado vertical la descolocan. */}
       {numeros.tramo === 'traspaso' && vuelo
-        ? <MonedaTraspaso desde={vuelo.desde} hasta={vuelo.hasta} onFin={numeros.aterriza} />
+        ? <MonedaTraspaso desde={vuelo.desde} hasta={vuelo.hasta} onFin={aterriza} />
         : null}
       <p className={`cel-netas${netas >= 0 ? '' : ' cel-netas-neg'}`}>
         <span className="cel-netas-ico" ref={monedaRef}>
@@ -236,9 +266,24 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
         {/* "Saldo actual" NO es un rubro: está desde el primer fotograma con su
             cifra de entrada y es la única que se mira contar. `data-asiento` la
             marca al llegar, y su animación tiene una sola iteración. */}
+        {/* CEL-1b · La MONEDA DE ATERRIZAJE. Va DENTRO del <dd> y no como
+            hermana suya en la fila por dos razones, una de HTML y otra de
+            geometría: un <span> suelto entre <dt> y <dd> no es contenido válido
+            de una lista de definiciones, y el <dd> ya es el elemento que la fila
+            empuja a la derecha — metiendo la moneda dentro, el grupo entero
+            crece hacia la izquierda cuando el saldo gana un dígito y el hueco
+            moneda-cifra no se estira jamás. La etiqueta no se mueve.
+            Es la hermana pequeña del cornerChip de mesa (`size="icon"`, 16px),
+            no una segunda HC-1: la heroica de 70px es la del contador de premio
+            y en esta pantalla no puede haber dos protagonistas. */}
         <div className="cel-linea-alta">
           <dt>Saldo actual</dt>
-          <dd ref={saldoRef} data-asiento={numeros.asiento ? 'si' : 'no'}>{saldoVivo}</dd>
+          <dd className="cel-saldo-grupo" data-asiento={numeros.asiento ? 'si' : 'no'}>
+            <span className="cel-saldo-moneda" ref={posadaRef} data-posada={posada ? 'si' : 'no'}>
+              <ChipToken size="icon" />
+            </span>
+            <span className="cel-saldo-num">{saldoVivo}</span>
+          </dd>
         </div>
         {/* Los CUATRO rubros de la cascada, en el orden que Victor selló. El
             índice va como custom property y el escalonado lo pone la hoja con un
