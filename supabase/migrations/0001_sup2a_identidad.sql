@@ -260,80 +260,96 @@ commit;
 -- CORRIDA REAL · 2026-08-27, contra el proyecto: 9/9 OK.
 --
 -- ── Grupo B · Las siete pruebas de verdad, contra la tabla ────────────────
--- Van dentro de begin/rollback y crean dos usuarios de prueba que NO
--- sobreviven al bloque: al terminar, la base queda exactamente como estaba.
+-- Se pega ENTERO, de una vez. Devuelve ocho filas —las siete pruebas más la
+-- limpieza— y todas deben decir OK.
 --
---   begin;
+-- Por qué tiene esta forma y no una lista de inserts con savepoints, que es
+-- lo primero que uno escribe: el SQL Editor manda el texto como UN LOTE, y el
+-- primer error aborta lo que queda. Como aquí seis de las siete pruebas
+-- consisten precisamente en fallar, esa versión se detenía en la prueba 1 y
+-- nunca llegaba a las demás. El `exception when others` de abajo convierte
+-- cada fallo esperado en un DATO (`sqlstate`) en vez de en un abort, y el
+-- bucle garantiza el orden — que importa, porque la 5 y la 7 necesitan que la
+-- 6 ya haya dejado su fila con la que chocar.
 --
---   insert into auth.users (id, instance_id, aud, role, email,
---                           encrypted_password, created_at, updated_at,
---                           raw_app_meta_data, raw_user_meta_data)
---   values
---     ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000',
---      'authenticated', 'authenticated', 'sup2a_uno@prueba.local', '', now(), now(), '{}', '{}'),
---     ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000',
---      'authenticated', 'authenticated', 'sup2a_dos@prueba.local', '', now(), now(), '{}', '{}');
+-- Y es seguro: el bloque `do` es un único statement, así que corre en su
+-- propia transacción implícita. Si algo revienta a mitad se revierte entero y
+-- no quedan usuarios de prueba sueltos — por eso no hace falta envolverlo en
+-- begin/rollback. Si sale bien, se limpia solo borrando las dos cuentas, y el
+-- cascade se lleva el perfil de la prueba 6: la fila `limpieza` del resultado
+-- confirma que `profiles` quedó en cero, de modo que el `on delete cascade`
+-- queda probado de paso.
 --
---   -- 6 · EL ÚNICO QUE DEBE PASAR. Va primero porque las pruebas 5 y 7
---   --     necesitan que ya exista una fila con la que chocar.
---   insert into public.profiles (id, username)
---   values ('11111111-1111-1111-1111-111111111111', 'Panita7');
---   -- ✅ Esperado: INSERT 0 1.
+--   do $sup2a$
+--   declare
+--     UNO uuid := '11111111-1111-1111-1111-111111111111';
+--     DOS uuid := '22222222-2222-2222-2222-222222222222';
+--     c   record;
+--     got text;
+--   begin
+--     drop table if exists _sup2a_res;
+--     create temp table _sup2a_res (orden int, n int, entrada text, esperado text, obtenido text);
 --
---   -- Las seis siguientes deben FALLAR, cada una a su manera. En cuanto una
---   -- falla, la transacción queda abortada y las demás dirían «current
---   -- transaction is aborted» — por eso cada una va envuelta en su savepoint,
---   -- que permite encadenarlas sin reiniciar el bloque.
+--     insert into auth.users (id, instance_id, aud, role, email,
+--                             encrypted_password, created_at, updated_at,
+--                             raw_app_meta_data, raw_user_meta_data)
+--     values
+--       (UNO, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+--        'sup2a_uno@prueba.local', '', now(), now(), '{}', '{}'),
+--       (DOS, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+--        'sup2a_dos@prueba.local', '', now(), now(), '{}', '{}');
 --
---   -- 1 · Cinco caracteres → corto.
---   savepoint s1;
---   insert into public.profiles (id, username)
---   values ('22222222-2222-2222-2222-222222222222', 'Panit');
---   rollback to s1;
---   -- ❌ Esperado: 23514 · profiles_username_formato_chk
+--     -- La 6 va primero: deja la fila con la que chocan la 5 y la 7.
+--     --   6 · el ÚNICO que debe pasar
+--     --   1 · cinco caracteres           → 23514 formato
+--     --   2 · con espacio                → 23514 formato
+--     --   3 · vedado de la casa          → P0001 (capitalización no disfraza)
+--     --   4 · vedado en dígitos          → P0001 (lo caza la normalización)
+--     --   5 · duplicado en otra caja     → 23505 (el índice sobre lower())
+--     --   7 · EL GUARDIÁN DEL HUECO      → P0001
+--     -- La 7 existe porque `p_e_n_d_e_j_o` solo cae si normalizar_username()
+--     -- BORRA el guion bajo. Si alguien retoca esa función y quita el borrado,
+--     -- todo lo demás sigue en verde y solo esta se pone roja. No borrar.
+--     for c in
+--       select * from (values
+--         (1, 6, 'Panita7',       'PASA'),
+--         (2, 1, 'Panit',         '23514'),
+--         (3, 2, 'Pana Nita',     '23514'),
+--         (4, 3, 'AdminAjilei',   'P0001'),
+--         (5, 4, 'p3nd3j0x',      'P0001'),
+--         (6, 5, 'PANITA7',       '23505'),
+--         (7, 7, 'p_e_n_d_e_j_o', 'P0001')
+--       ) as t(orden, n, entrada, esperado) order by orden
+--     loop
+--       begin
+--         insert into public.profiles (id, username)
+--         values (case when c.n = 6 then UNO else DOS end, c.entrada);
+--         got := 'PASA';
+--       exception when others then
+--         got := sqlstate;
+--       end;
+--       insert into _sup2a_res values (c.orden, c.n, c.entrada, c.esperado, got);
+--     end loop;
 --
---   -- 2 · Con espacio.
---   savepoint s2;
---   insert into public.profiles (id, username)
---   values ('22222222-2222-2222-2222-222222222222', 'Pana Nita');
---   rollback to s2;
---   -- ❌ Esperado: 23514 · profiles_username_formato_chk
+--     delete from auth.users where id in (UNO, DOS);
+--   end
+--   $sup2a$;
 --
---   -- 3 · Vedado de la casa, con capitalización de disfraz.
---   savepoint s3;
---   insert into public.profiles (id, username)
---   values ('22222222-2222-2222-2222-222222222222', 'AdminAjilei');
---   rollback to s3;
---   -- ❌ Esperado: P0001 · «...contiene un termino reservado o inapropiado»
+--   select prueba, entrada, esperado, obtenido, veredicto from (
+--     select orden, n::text as prueba, entrada, esperado, obtenido,
+--            case when obtenido = esperado then 'OK' else '<<< MAL' end as veredicto
+--     from _sup2a_res
+--     union all
+--     select 99, 'limpieza', '(tras el borrado)', '0',
+--            (select count(*)::text from public.profiles),
+--            case when (select count(*) from public.profiles) = 0 then 'OK' else '<<< MAL' end
+--   ) t order by orden;
 --
---   -- 4 · Vedado disfrazado de dígitos — lo que caza la normalización.
---   savepoint s4;
---   insert into public.profiles (id, username)
---   values ('22222222-2222-2222-2222-222222222222', 'p3nd3j0x');
---   rollback to s4;
---   -- ❌ Esperado: P0001
+-- El punto frágil es el `insert into auth.users`: esas columnas las define
+-- Supabase y cambian entre versiones de GoTrue. Si un día falla ahí, lo que
+-- está en cuestión es el andamio de la prueba, no el esquema — el Grupo A lo
+-- valida entero sin tocar auth.
 --
---   -- 5 · Duplicado con otra capitalización. Aquí se ve la decisión de fondo:
---   --     el formato lo acepta, pero el índice sobre lower() no.
---   savepoint s5;
---   insert into public.profiles (id, username)
---   values ('22222222-2222-2222-2222-222222222222', 'PANITA7');
---   rollback to s5;
---   -- ❌ Esperado: 23505 · profiles_username_lower_uniq
---
---   -- 7 · EL GUARDIÁN DEL HUECO. `p_e_n_d_e_j_o` normaliza a `pendejo` solo
---   --     porque normalizar_username() BORRA el guion bajo. Si alguien
---   --     retoca esa función y quita el borrado, TODO lo demás sigue en
---   --     verde y solo esta prueba se pone en rojo. No borrar.
---   savepoint s7;
---   insert into public.profiles (id, username)
---   values ('22222222-2222-2222-2222-222222222222', 'p_e_n_d_e_j_o');
---   rollback to s7;
---   -- ❌ Esperado: P0001
---
---   rollback;   -- ← IMPRESCINDIBLE: deshace los usuarios y el perfil de prueba.
---
---   -- Comprobación final de que no quedó rastro (fuera de la transacción):
---   select count(*) as debe_ser_cero from public.profiles;
+-- CORRIDA REAL · 2026-08-27, contra el proyecto: 8/8 OK, limpieza en 0.
 --
 -- ═══════════════════════════════════════════════════════════════════════════
