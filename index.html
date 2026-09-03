@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <!-- ICO-1 · el icono oficial entra por el MAESTRO en SVG: nítido en
@@ -15,7 +15,62 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0a1e10" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-    <title>ajilei</title>
+
+    <!-- ══ PUE-1.1 · La primera línea que alguien lee de AJILEI ═══════════════
+         El título y la descripción son los de la lámina v1.7, palabra por
+         palabra: es lo que Victor selló y es lo que sale en la pestaña, en el
+         resultado de búsqueda y bajo el enlace compartido. -->
+    <title>AJILEI — La mesa te espera</title>
+    <meta
+      name="description"
+      content="AJILEI, el juego de cartas venezolano. Gratis y sin descargas: entra con tu correo y juega."
+    />
+
+    <!-- ══ Open Graph · la tarjeta del enlace compartido ═════════════════════
+         `og:url` y `og:image` van ABSOLUTAS a propósito: la especificación las
+         pide así y los rastreadores de WhatsApp, Facebook y X no resuelven
+         rutas relativas de forma fiable. El origen canónico es `ajilei.io`, y
+         sólo ése: el `.com` homónimo que nombran las fichas de identidad es de
+         un tercero desde junio de 2026 y apuntar ahí una tarjeta sería regalarle
+         el enlace. Son TRES líneas —`og:url`, `og:image` y `twitter:image`— y
+         las tres dicen el mismo origen a propósito.
+
+         La imagen NO es un derivado con hash de Vite: vive en `public/` con
+         nombre estable porque un rastreador la cachea por URL, y una URL que
+         cambia en cada build es una tarjeta que se rompe sola. La escribe
+         `node scripts/gen-portada-assets.mjs` desde `PUE_mesah_demo.jpg`. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AJILEI" />
+    <meta property="og:locale" content="es_VE" />
+    <meta property="og:title" content="AJILEI — La mesa te espera" />
+    <meta
+      property="og:description"
+      content="AJILEI, el juego de cartas venezolano. Gratis y sin descargas: entra con tu correo y juega."
+    />
+    <meta property="og:url" content="https://ajilei.io/" />
+    <meta property="og:image" content="https://ajilei.io/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="La mesa de AJILEI con las cartas repartidas." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AJILEI — La mesa te espera" />
+    <meta
+      name="twitter:description"
+      content="AJILEI, el juego de cartas venezolano. Gratis y sin descargas: entra con tu correo y juega."
+    />
+    <meta name="twitter:image" content="https://ajilei.io/og-image.jpg" />
+
+    <!-- ══ El seguro de una línea del standalone en iOS (Fase 0 §3.4) ════════
+         Safari NO lee `display: standalone` del manifest: para iOS la señal
+         sigue siendo esta meta. Sin ella, «Añadir a pantalla de inicio» abre
+         AJILEI dentro de Safari con su barra de direcciones encima; con ella,
+         a pantalla completa. `black-translucent` deja que el verde abismo del
+         body llegue hasta la barra de estado en vez de dejar una franja negra.
+         El título de la meta es el nombre corto que iOS pone bajo el icono. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AJILEI" />
+    <meta name="mobile-web-app-capable" content="yes" />
   </head>
   <body>
     <div id="root"></div>
