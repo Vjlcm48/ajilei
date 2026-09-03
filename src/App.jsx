@@ -3,7 +3,7 @@ import WelcomeScreen from './components/WelcomeScreen'
 import NivelSelect from './components/NivelSelect'
 import ModeSelect from './components/ModeSelect'
 import GameTable from './components/GameTable'
-import Entrada from './screens/Entrada'
+import Portada from './screens/Portada'
 import Bautizo from './screens/Bautizo'
 import { readNivel, writeNivel } from './hooks/useNivel'
 import { useAuth, AUTH_BYPASS, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
@@ -69,8 +69,13 @@ function App() {
   // peor: parpadearía en el 99% de los arranques, que resuelven de inmediato.
   if (auth.estado === CARGANDO) return null
 
+  // ── PUE · `SIN_SESION` deja de ser la Entrada y pasa a ser la PORTADA ──────
+  // El contrato NO cambia: las mismas dos funciones, el mismo estado, el mismo
+  // sitio en la cascada. Lo que cambia es la cara. `screens/Entrada.jsx` sigue
+  // en el árbol —borrar es otra tanda— y comparte con la portada el MISMO
+  // formulario, extraído a `components/FormularioPuerta.jsx`.
   if (auth.estado === SIN_SESION) {
-    return <Entrada onEnviarCodigo={auth.enviarCodigo} onVerificar={auth.verificarCodigo} />
+    return <Portada onEnviarCodigo={auth.enviarCodigo} onVerificar={auth.verificarCodigo} />
   }
 
   if (auth.estado === SESION_SIN_PERFIL) {

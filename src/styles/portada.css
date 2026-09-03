@@ -1,0 +1,894 @@
+/* ── PUE · La piel de la Portada-Entrada ────────────────────────────────────
+   Documento rector: la lámina `PUE_lamina_v1.7.html`, contrato visual sellado
+   por Victor el 31-ago, con los CINCO DELTAS de AJILEI_PUE_Fase1_v1.0, que
+   mandan sobre ella donde difieran. Cada delta lleva su bloque marcado abajo.
+
+   ── POR QUÉ TODO LLEVA `pue-` Y TODO CUELGA DE `.portada-lienzo` ───────────
+   Vite funde las hojas en UNA sola: no hay CSS de módulo aquí, así que cada
+   regla es global aunque su archivo lo importe una sola pantalla. La lámina usa
+   nombres de andar por casa —`.mano`, `.carta`, `.frase`, `.boton`, `.pie`— que
+   en un proyecto con una mesa de cartas es pedir una colisión. Se prefijan los
+   SELECTORES y también los KEYFRAMES: `@keyframes subir` habría entrado en el
+   espacio de nombres global junto a `panel-enter` y compañía.
+   Las dos excepciones son deliberadas: `h1.welcome-title` y `.wm-slot` son el
+   contrato del wordmark y tienen que seguir siendo el MISMO objeto.
+
+   ── NI UN HEX FUERA DE theme.css ───────────────────────────────────────────
+   Con dos excepciones declaradas por la ficha: las banderas provisionales del
+   selector de idioma (comentadas como tales; IDI trae los SVG oficiales) y el
+   `#fff6e0` de la banda especular, que es color de casa ya sellado en EMB-1.   */
+
+/* ══ La jaula de 1126px se EXCEPCIONA, no se demuele ════════════════════════
+   `src/index.css` es la hoja del andamiaje de Vite y esta campaña NO la abre.
+   La portada monta `portada-activa` en el <body> y la excepción se declara con
+   alcance: `body.portada-activa #root` tiene especificidad 0,2,1 contra el
+   0,1,0 de `#root`… que en realidad es 1,0,0 por el id — y aun así gana, porque
+   añade una clase Y un elemento al mismo id. Sin un solo `!important`, y muere
+   en cuanto la portada se desmonta.
+   `text-align` también se repone: `#root` centra por defecto y el hero de la
+   portada se alinea a la izquierda en escritorio.                            */
+body.portada-activa #root {
+  width: 100%;
+  max-width: none;
+  border-inline: 0;
+  text-align: left;
+}
+
+/* ══ El reset de caja que la lámina daba por hecho ═════════════════════════
+   La lámina abre con `*{box-sizing:border-box}` y producción NO tiene ese reset:
+   `index.css` sólo lo pone en `#root`. Sin él, `max-width: 500px` sobre la
+   tarjeta acota su CONTENIDO y el relleno de 38 se suma por fuera — MEDIDO:
+   574,41px de caja donde la lámina da 496,41, con 74 píxeles de tarjeta que
+   nadie pidió y un formulario 74 más ancho de aquel en que se midieron las
+   reservas de O1. Se repone con ALCANCE DE PORTADA, que es lo que un reset
+   global habría hecho sin preguntar: fuera de `.pue-lienzo` no cambia una sola
+   caja del juego.                                                            */
+.pue-lienzo,
+.pue-lienzo *,
+.pue-lienzo *::before,
+.pue-lienzo *::after { box-sizing: border-box; }
+
+/* ══ Lienzo · calcado de .puerta-screen ════════════════════════════════════ */
+.pue-lienzo {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: 24px 24px 12px;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  background:
+    var(--filigrana),
+    radial-gradient(ellipse at 42% 38%,
+      var(--green-bright) 0%, var(--green-deep) 50%, var(--green-abyss) 100%);
+}
+
+/* ── SIN `z-index` AQUÍ, Y ES LO QUE ARREGLA LA HOJA MÓVIL ─────────────────
+   La lámina pone `z-index: 1` en esta rejilla y en el pie, por encima del
+   fondo. Parece inofensivo y NO LO ES: un `z-index` distinto de `auto` sobre un
+   elemento posicionado crea un CONTEXTO DE APILADO, y dentro de él el
+   `z-index: 5` de la tarjeta deja de compararse con el mundo — sólo compite con
+   sus hermanos. La tarjeta quedaba encerrada en una capa que vale 1, y el velo,
+   que vale 4 y vive fuera, le pasaba por encima.
+   MEDIDO con `elementFromPoint` sobre el centro del campo de correo y sobre el
+   botón, con la hoja abierta: los dos devolvían `pue-velo`. El formulario era
+   INUSABLE en móvil vertical, y el defecto viene heredado de la lámina — la
+   auditoría sondeó el punto (195, 80), que cae fuera de la tarjeta, y por eso
+   pasó en verde.
+   La cura es quitar el contexto, no subir números: el fondo se pinta sobre
+   `.pue-lienzo`, y el fondo de un elemento va SIEMPRE por debajo del contenido
+   de sus descendientes, posicionados o no. El `z-index` no protegía de nada. */
+.pue-escena-grid {
+  position: relative;
+  width: min(1240px, 100%);
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+
+.pue-hero { min-width: 0; }
+.pue-marca-wrap { display: block; }
+
+/* ══ DELTA 5 · La escalera del wordmark de la PORTADA ══════════════════════
+   La portada mantiene los 72px en TODOS los anchos —incluido el corte de 680px
+   donde `welcome.css` baja el rótulo a 56 y `embellecimiento.css` la traza a 8—
+   y sólo encoge en el escalón COMPACTO DE ALTURA, que es donde la lámina lo
+   pide: teléfono vertical de 700px o menos, a 46px con traza de 6.
+   Se implementa como override CON ALCANCE DE PORTADA y no tocando welcome.css:
+   la Bienvenida, el corte de 680 y las pantallas del juego quedan intactos.
+   Especificidad: `.portada-lienzo h1.welcome-title` = 0,2,1 contra el 0,1,1 del
+   selector base y el 0,1,1 dentro del media query de welcome.css. Gana sin
+   `!important` y sin abrir una hoja que no es de esta campaña.               */
+.portada-lienzo h1.welcome-title {
+  color: var(--gold-brand);
+  font-size: 72px;
+  letter-spacing: 12px;
+  --wm-track: 12px;
+  margin: 0 0 14px;
+}
+
+/* ══ Copy fijo ════════════════════════════════════════════════════════════
+   Los 38px de margen no son capricho: el pie del isótipo CUELGA por debajo de
+   su caja de línea (técnica FL-1) y se sentaría sobre el lema. Es el mismo
+   número y el mismo motivo que `.puerta-lema` documenta en puerta.css.       */
+.portada-lienzo .pue-lema-grande {
+  margin: 38px 0 0;
+  font-size: clamp(21px, 2.3vw, 31px);
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+.portada-lienzo .pue-lema-categoria {
+  margin: 10px 0 0;
+  font-size: clamp(14px, 1.1vw, 16px);
+  color: var(--text-secondary);
+}
+
+/* ══ Escenario rotativo ═══════════════════════════════════════════════════ */
+.portada-lienzo .pue-escenario {
+  position: relative;
+  margin-top: clamp(28px, 4vh, 44px);
+  height: clamp(210px, 28vh, 300px);
+  perspective: 900px;
+}
+.portada-lienzo .pue-esc {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  pointer-events: none;
+}
+.portada-lienzo .pue-esc.pue-activa { opacity: 1; }
+
+/* O1: dos líneas reservadas. Y es EL ANCLA DEL EJE — cada escena comparte
+   centro con su frase, que es lo que la v1.2 selló.
+   ── DELTA 3 · holgura tinta↔frase ≥10px en todo el censo ──────────────────
+   La auditoría midió 3,6px en la escena 5 a 1920: el teléfono, rotado −3°,
+   asoma por debajo de la caja del escenario y se come el aire. El margen sube
+   de 14 a 22px, que reparte holgura a las cinco escenas de una vez en lugar de
+   recolocar cinco piezas para arreglar una. La cifra final la certifica el
+   arnés, no esta nota.                                                       */
+.portada-lienzo .pue-frase {
+  margin: 22px 0 0;
+  text-align: center;
+  min-height: 2.6em;
+  font-size: clamp(15px, 1.15vw, 17px);
+  line-height: 1.3;
+  color: var(--text-secondary);
+  transition: opacity 0.35s ease;
+}
+.portada-lienzo .pue-frase.pue-oculta { opacity: 0; }
+
+/* ── Escena 1 · la baraja ─────────────────────────────────────────────────
+   v1.3: fuera la flotación perpetua. Las cartas quedan QUIETAS tras el reparto
+   — la ley §5 vuelve a regir sin excepciones.                                */
+.portada-lienzo .pue-abanico { position: absolute; inset: 0; }
+.portada-lienzo .pue-abanico img {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  width: clamp(112px, 10.5vw, 150px);
+  aspect-ratio: 910 / 1420;
+  height: auto;
+  transform-origin: 50% 130%;
+  transform: translateX(-50%) rotate(var(--r));
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
+  opacity: 0;
+}
+.portada-lienzo .pue-abanico img:nth-child(1) { --r: -26deg; }
+.portada-lienzo .pue-abanico img:nth-child(2) { --r: -13deg; }
+.portada-lienzo .pue-abanico img:nth-child(3) { --r: 0deg; }
+.portada-lienzo .pue-abanico img:nth-child(4) { --r: 13deg; }
+.portada-lienzo .pue-abanico img:nth-child(5) { --r: 26deg; }
+.portada-lienzo .pue-activa .pue-abanico img { animation: pue-repartir 0.5s ease-out forwards; }
+.portada-lienzo .pue-activa .pue-abanico img:nth-child(1) { animation-delay: 0.22s; }
+.portada-lienzo .pue-activa .pue-abanico img:nth-child(2) { animation-delay: 0.30s; }
+.portada-lienzo .pue-activa .pue-abanico img:nth-child(3) { animation-delay: 0.38s; }
+.portada-lienzo .pue-activa .pue-abanico img:nth-child(4) { animation-delay: 0.46s; }
+.portada-lienzo .pue-activa .pue-abanico img:nth-child(5) { animation-delay: 0.54s; }
+@keyframes pue-repartir {
+  from { opacity: 0; transform: translateX(-50%) rotate(calc(var(--r) * 0.3)) translateY(30px); }
+  to   { opacity: 1; transform: translateX(-50%) rotate(var(--r)) translateY(0); }
+}
+
+/* ── Escena 2 · el AJILEI de 51 ───────────────────────────────────────────
+   ══ DELTA 1 · EL GESTO DEL GANADOR HABLA EL IDIOMA DE LA MESA ═════════════
+   La lámina traía una APROXIMACIÓN: un halo con filete de 1px y
+   `animation: halo-pulso 2s infinite alternate`. Fuera. En su lugar entra el
+   pulso REAL del juego, transcrito de `gameTable.css:337-357` (`.vc-pulso` +
+   `@keyframes vcPulso`) — 900ms, `ease-out`, UN ciclo, `both`; box-shadow de
+   0 a 18px 2px al 70 % y de ahí a 26px 6px al 0 %; opacidad 0→1→0. **Sin
+   filete. Sin `infinite`.**
+
+   SE TRANSCRIBE, NO SE IMPORTA NI SE TOCA. `gameTable.css` es archivo
+   protegido (`AJILEI_Protegidos_v1.0.md` §2, fila 5): se lee y se cita, y ni un
+   byte se escribe en él. Tampoco se importa desde aquí — arrastrar una hoja de
+   miles de líneas a la puerta para heredar veinte sería peor negocio que
+   copiarlas con su procedencia al lado. El mismo trato que IDN-1 le dio al
+   wordmark.
+
+   Y SE DISPARA UNA VEZ POR ACTIVACIÓN, no en bucle: el elemento `.pue-vc-pulso`
+   se MONTA en el instante del «51» con una `key` que cambia en cada entrada a la
+   escena. Sin nodo no hay animación que reiniciar, que es la manera limpia de
+   que un `animation-iteration-count: 1` vuelva a sonar. */
+.portada-lienzo .pue-mano {
+  position: absolute;
+  left: 50%;
+  bottom: 52px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  transition: gap 0.3s ease-out;
+}
+
+/* El énfasis REAL del showdown, también transcrito: la ganadora escala un 20 %
+   (`.card-slot-wrapper.card-slot-winner`, gameTable.css:957-961) y las
+   adyacentes ganan margen para que las cartas crecidas no se solapen — allí 18px
+   sobre cartas de 94, que es exactamente el 0,2·ancho que el escalado reclama.
+   Aquí el aire sellado son 10px de `gap`, así que sube a 20 por el mismo
+   cálculo. Se anima en 300ms en vez de saltar: en la mesa las cartas APARECEN ya
+   escaladas al revelarse, y aquí llevan tres segundos a la vista — un salto del
+   20 % sobre algo que ya se está mirando se lee como un fallo de pintura. */
+.portada-lienzo .pue-mano.pue-gana { gap: 20px; }
+.portada-lienzo .pue-mano.pue-gana .pue-carta { transform: scale(1.2); z-index: 5; }
+
+.portada-lienzo .pue-carta {
+  position: relative;
+  width: clamp(58px, 6.4vw, 94px);
+  aspect-ratio: 1055 / 1491;
+  perspective: 800px;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.45));
+  transform-origin: 50% 100%;
+  transition: transform 0.3s ease-out;
+}
+.portada-lienzo .pue-carta-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateY(0deg);
+}
+.portada-lienzo .pue-activa .pue-carta-inner {
+  animation: pue-voltear 0.45s ease-in-out forwards;
+  animation-delay: calc(0.3s + var(--i) * 0.28s);
+}
+@keyframes pue-voltear { to { transform: rotateY(180deg); } }
+.portada-lienzo .pue-cara,
+.portada-lienzo .pue-dorso {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: var(--green-darkest);
+}
+.portada-lienzo .pue-cara { transform: rotateY(180deg); }
+.portada-lienzo .pue-cara img,
+.portada-lienzo .pue-dorso img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.portada-lienzo .pue-marcador {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  text-align: center;
+  font-size: clamp(17px, 1.5vw, 21px);
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+/* La caja del pulso. Igual que `.pbr-name` en la mesa: `relative` y sin caja
+   propia, para que el hermano absoluto que pinta el halo no toque el flujo. */
+.portada-lienzo .pue-marcador-caja { position: relative; display: inline-block; }
+.portada-lienzo .pue-marcador b { font-weight: bold; font-size: 1.35em; color: var(--text-primary); }
+.portada-lienzo .pue-ajilei-tag {
+  display: inline-block;
+  margin-left: 0.6em;
+  font-weight: bold;
+  letter-spacing: 0.14em;
+  background-image: linear-gradient(180deg,
+    var(--gold-brand-hi) 0%, var(--gold-brand) 52%, var(--gold-brand-deep) 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.portada-lienzo .pue-ajilei-tag.pue-visible { opacity: 1; transform: translateY(0); }
+
+.portada-lienzo .pue-vc-pulso {
+  position: absolute;
+  inset: -6px -10px;
+  border-radius: 8px;
+  pointer-events: none;
+  animation: pue-vcPulso 900ms ease-out 1 both;
+}
+@keyframes pue-vcPulso {
+  0%   { opacity: 0; box-shadow: 0 0 0 0 rgba(var(--gold-brand-rgb), 0.00); }
+  25%  { opacity: 1; box-shadow: 0 0 18px 2px rgba(var(--gold-brand-rgb), 0.70); }
+  100% { opacity: 0; box-shadow: 0 0 26px 6px rgba(var(--gold-brand-rgb), 0.00); }
+}
+
+/* ── Escena 3 · la enseñanza · «un dos por tres» ──────────────────────────── */
+.portada-lienzo .pue-pregunta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6%;
+  text-align: center;
+  font-size: clamp(19px, 1.9vw, 27px);
+  line-height: 1.25;
+  color: var(--text-primary);
+  font-weight: bold;
+}
+.portada-lienzo .pue-pregunta span { display: block; opacity: 0; }
+.portada-lienzo .pue-activa .pue-p1 { animation: pue-subir 0.5s ease-out 0.15s forwards; }
+.portada-lienzo .pue-activa .pue-p2 { animation: pue-subir 0.5s ease-out 0.75s forwards; }
+.portada-lienzo .pue-trio {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+}
+.portada-lienzo .pue-trio img {
+  width: clamp(62px, 6.6vw, 92px);
+  aspect-ratio: 910 / 1420;
+  height: auto;
+  transform: rotate(var(--r));
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.45));
+  opacity: 0;
+}
+.portada-lienzo .pue-trio img:nth-child(1) { --r: -10deg; }
+.portada-lienzo .pue-trio img:nth-child(2) { --r: 0deg; }
+.portada-lienzo .pue-trio img:nth-child(3) { --r: 10deg; }
+.portada-lienzo .pue-activa .pue-trio img { animation: pue-golpe 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+.portada-lienzo .pue-activa .pue-trio img:nth-child(1) { animation-delay: 1.9s; }
+.portada-lienzo .pue-activa .pue-trio img:nth-child(2) { animation-delay: 2.25s; }
+.portada-lienzo .pue-activa .pue-trio img:nth-child(3) { animation-delay: 2.6s; }
+@keyframes pue-golpe {
+  0%   { opacity: 0; transform: rotate(var(--r)) translateY(-46px) scale(1.18); }
+  70%  { opacity: 1; transform: rotate(var(--r)) translateY(4px) scale(0.98); }
+  100% { opacity: 1; transform: rotate(var(--r)) translateY(0) scale(1); }
+}
+
+/* ── Escena 4 · Heptacoins ─────────────────────────────────────────────────
+   ══ DELTA 2 · EJE RECENTRADO ══════════════════════════════════════════════
+   La auditoría midió el centro de la TINTA 13,70px a la derecha del centro de
+   la frase a 1920. La causa es aritmética y se puede seguir a mano: con la caja
+   de 440px, la pila (Ø100 sobre `left:24%`) abarca 55,6..155,6 y la héroe
+   (Ø190 sobre `left:72%`) 221,8..411,8 — caja de tinta 55,6..411,8, centro
+   233,7 contra los 220 del contenedor. Diferencia: 13,7. Exacto.
+   Se corrige moviendo LAS DOS piezas el mismo 3,11 % (13,7 de 440), que
+   conserva la separación sellada entre pila y héroe: 24 → 20,9 y 72 → 68,9.
+   Comprobado también a 900, donde los `clamp` dan otros diámetros: el desfase
+   queda en −0,8px. La cifra final la certifica el arnés.                      */
+.portada-lienzo .pue-mesa-monedas {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(440px, 92%);
+  height: 100%;
+}
+.portada-lienzo .pue-moneda {
+  position: absolute;
+  left: 50%;
+  width: var(--d);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  opacity: 0;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.5));
+}
+.portada-lienzo .pue-moneda img { width: 100%; height: 100%; display: block; position: relative; z-index: 1; }
+.portada-lienzo .pue-pila { --d: clamp(72px, 7vw, 100px); left: 20.9%; }
+.portada-lienzo .pue-disco {
+  position: relative;
+  isolation: isolate;
+  transform: scaleY(0.34);
+  transform-origin: 50% 100%;
+}
+.portada-lienzo .pue-disco::after {
+  content: '';
+  position: absolute;
+  left: 3%; right: 3%; top: 9%; bottom: -8%;
+  background: var(--gold-brand-deep);
+  border-radius: 50%;
+  z-index: -1;
+}
+.portada-lienzo .pue-pila-1 { bottom: 28px; }
+.portada-lienzo .pue-pila-2 { bottom: 34px; }
+.portada-lienzo .pue-pila-3 { bottom: 40px; }
+.portada-lienzo .pue-pila-4 { bottom: 46px; }
+.portada-lienzo .pue-pila-5 { bottom: 52px; }
+.portada-lienzo .pue-pila-6 { bottom: 58px; }
+.portada-lienzo .pue-pila-7 { bottom: 64px; }
+.portada-lienzo .pue-activa .pue-pila { animation: pue-caer 0.45s ease-out forwards; }
+.portada-lienzo .pue-activa .pue-pila-1 { animation-delay: 0.10s; }
+.portada-lienzo .pue-activa .pue-pila-2 { animation-delay: 0.32s; }
+.portada-lienzo .pue-activa .pue-pila-3 { animation-delay: 0.54s; }
+.portada-lienzo .pue-activa .pue-pila-4 { animation-delay: 0.76s; }
+.portada-lienzo .pue-activa .pue-pila-5 { animation-delay: 0.98s; }
+.portada-lienzo .pue-activa .pue-pila-6 { animation-delay: 1.20s; }
+.portada-lienzo .pue-activa .pue-pila-7 { animation-delay: 1.42s; }
+@keyframes pue-caer {
+  0%   { opacity: 0; transform: translate(-50%, -170px); }
+  70%  { opacity: 1; transform: translate(-50%, 0); }
+  84%  { transform: translate(-50%, -5px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+/* La héroe: cae firme al nivel de la mesa — UN rebote corto, sin aplastarse. */
+.portada-lienzo .pue-heroe { --d: clamp(140px, 13vw, 190px); left: 68.9%; bottom: 22px; }
+.portada-lienzo .pue-activa .pue-heroe { animation: pue-firme 0.9s ease-out 2s forwards; }
+@keyframes pue-firme {
+  0%   { opacity: 0; transform: translate(-50%, -240px); }
+  58%  { opacity: 1; transform: translate(-50%, 0); }
+  74%  { transform: translate(-50%, -12px); }
+  88%  { transform: translate(-50%, 0); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+/* El brillo de la casa · ciclo 1,5s + 2,5s · recorte circular, sin máscara. */
+.portada-lienzo .pue-heroe::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  clip-path: circle(46% at 50% 50%);
+  background-image: linear-gradient(100deg,
+    rgba(255, 246, 224, 0) 0%, #fff6e0 50%, rgba(255, 246, 224, 0) 100%);
+  background-size: 38% 100%;
+  background-repeat: no-repeat;
+  background-position-x: -60%;
+  opacity: 0.85;
+}
+.portada-lienzo .pue-activa .pue-heroe::after { animation: pue-brillo-moneda 4s linear 3s infinite; }
+/* 37,5 % = 1,5 / (1,5 + 2,5) — la misma parada del wordmark. */
+@keyframes pue-brillo-moneda {
+  0%    { background-position-x: -60%; }
+  37.5% { background-position-x: 160%; }
+  100%  { background-position-x: 160%; }
+}
+
+/* ── Escena 5 · la mesa real ───────────────────────────────────────────────
+   ══ DELTA 2 · EJE RECENTRADO (segunda mitad) ══════════════════════════════
+   Aquí la aritmética no sale a mano como en la escena 4: el ancho de la laptop
+   lo decide un `aspect-ratio` sobre una altura en porcentaje, y el del teléfono,
+   una rotación de −3°. Así que la corrección se MIDE. El arnés dio **15,83px**
+   de desfase a 1920 —la auditoría había medido 14,71 sobre la lámina; la
+   diferencia es el `bottom: 6px` que el teléfono ganó con el delta 3—, y 15,83
+   sobre la caja de 560 son **2,83 %**: 36 → 33,17 y 86 → 83,17, las dos piezas
+   el mismo paso para no tocar la separación sellada.
+   Por debajo de 900px las dos vuelven a `left: 50%` y el eje ya salía a 0,00. */
+.portada-lienzo .pue-duo {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(560px, 100%);
+  height: 100%;
+}
+.portada-lienzo .pue-laptop {
+  position: absolute;
+  left: 33.17%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  height: 68%;
+  opacity: 0;
+}
+.portada-lienzo .pue-activa .pue-laptop { animation: pue-alzar-pc 0.55s ease-out 0.1s forwards; }
+@keyframes pue-esfumar { to { opacity: 0; } }
+@keyframes pue-alzar-pc {
+  0%   { opacity: 0; transform: translate(-50%, 26px); }
+  60%  { opacity: 1; transform: translate(-50%, -8px); }
+  80%  { transform: translate(-50%, 2px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.portada-lienzo .pue-laptop-pantalla {
+  height: calc(100% - 10px);
+  aspect-ratio: 16 / 9;
+  padding: 7px 7px 9px;
+  box-sizing: border-box;
+  background: var(--green-darkest);
+  border: 1px solid rgba(var(--gold-dim-rgb), 0.35);
+  border-radius: 12px 12px 4px 4px;
+  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.5);
+}
+.portada-lienzo .pue-laptop-pantalla img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  border-radius: 6px; background: var(--green-abyss);
+}
+.portada-lienzo .pue-laptop-base {
+  height: 10px;
+  width: 116%;
+  margin-left: -8%;
+  background: linear-gradient(180deg, var(--green-deep), var(--green-darkest));
+  border: 1px solid rgba(var(--gold-dim-rgb), 0.3);
+  border-top: 0;
+  border-radius: 2px 2px 10px 10px;
+  box-sizing: border-box;
+}
+.portada-lienzo .pue-telefono {
+  position: absolute;
+  left: 83.17%;
+  bottom: 6px;
+  z-index: 2;
+  height: 88%;
+  padding: 7px;
+  border-radius: 26px;
+  background: var(--green-darkest);
+  border: 1px solid rgba(var(--gold-dim-rgb), 0.35);
+  box-shadow: 0 24px 44px rgba(0, 0, 0, 0.55);
+  transform: translateX(-50%) rotate(-3deg);
+  opacity: 0;
+}
+.portada-lienzo .pue-activa .pue-telefono { animation: pue-alzar 0.55s ease-out 0.45s forwards; }
+@keyframes pue-alzar {
+  0%   { opacity: 0; transform: translate(-50%, 26px) rotate(-3deg); }
+  60%  { opacity: 1; transform: translate(-50%, -8px) rotate(-3deg); }
+  80%  { transform: translate(-50%, 2px) rotate(-3deg); }
+  100% { opacity: 1; transform: translate(-50%, 0) rotate(-3deg); }
+}
+.portada-lienzo .pue-pantalla {
+  position: relative;
+  height: 100%;
+  /* El derivado `mesav.webp` YA viene recortado por gen-portada-assets.mjs: la
+     caja del juego se detecta buscando el filete dorado de la mesa, así que
+     aquí no hay que volver a esconder ninguna barra del sistema con un
+     desplazamiento negativo — la proporción es la del propio archivo. */
+  aspect-ratio: 340 / 679;
+  overflow: hidden;
+  border-radius: 19px;
+  background: var(--green-abyss);
+}
+.portada-lienzo .pue-pantalla img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ══ Tarjeta de entrada ═══════════════════════════════════════════════════
+   El FORMULARIO de dentro no lo viste esta hoja: llega con su propia piel de
+   `puerta.css` + `entrada.css`, que es lo que significa «no se reescribe, se
+   reubica». Por eso la tarjeta centra su texto igual que `.puerta-card`: es la
+   caja en la que esas reglas se midieron.                                    */
+.portada-lienzo .pue-tarjeta {
+  justify-self: center;
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+  background: var(--surface-panel);
+  border: 1px solid rgba(var(--gold-dim-rgb), 0.28);
+  border-radius: 32px;
+  padding: 44px 38px 38px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+}
+.portada-lienzo .pue-tarjeta-titulo {
+  margin: 0 0 10px;
+  font-family: var(--font-base);
+  font-weight: bold;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+/* El lema de la tarjeta arranca pegado al título: aquí no hay isótipo colgando
+   encima, así que los 38px que `puerta.css` reserva para su descuelgue sobran. */
+.portada-lienzo .pue-tarjeta .puerta-lema { margin-top: 0; }
+
+/* ══ O1 · las reservas del cuerpo, RE-MEDIDAS para esta caja (ficha §2.4) ══
+   `entrada.css` reserva 357 y 329, y son buenas cifras… para la tarjeta de la
+   Entrada. Aquí la caja es otra: 496,41px contra 520, relleno de 38 contra 36, y
+   sin los 38px de margen que allí reserva el descuelgue del isótipo. Así que se
+   vuelven a MEDIR, que es lo que la ficha pide con esa palabra, y con el método
+   de la casa: se anula la reserva, se deja que cada paso tome su alto natural y
+   se lee la caja viva en seis celdas (arnés, bloque 2.4).
+
+       1920×1080 · 1440×850   correo 296,00 · código 318,00  → reserva 318
+        390×844 · 375×812     correo 279,00 · código 298,00  → |
+        360×640               correo 279,00 · código 298,00  → | reserva 300
+        320×568               correo 300,00 · código 298,00  → ┘
+
+   El máximo cambia de paso según el ancho: en las anchas manda el CÓDIGO (dos
+   enlaces en fila) y a 320 manda el CORREO, porque el lema se le va a un renglón
+   más. La reserva es el máximo de los dos, no el de un paso elegido a ojo — que
+   es exactamente la lección que `entrada.css` dejó escrita.
+   Con estas dos cifras el Δ de alto entre pasos es 0 en las seis celdas. */
+.portada-lienzo .entrada-cuerpo { min-height: 318px; }
+
+@media (max-width: 680px) {
+  .portada-lienzo .entrada-cuerpo { min-height: 300px; }
+}
+
+/* ══ CTA móvil · JUGAR (patrón hoja) ══════════════════════════════════════ */
+.portada-lienzo .pue-cta-movil {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  margin-top: clamp(18px, 3vh, 26px);
+}
+.portada-lienzo .pue-btn-jugar {
+  position: relative;
+  overflow: hidden;
+  width: min(320px, 86%);
+  padding: 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--gold-brand);
+  color: var(--text-dark);
+  font-family: var(--font-base);
+  font-size: 17px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4), 0 0 26px rgba(var(--gold-brand-rgb), 0.28);
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+/* La banda de la casa sobre el oro: destello de metal pulido, mismo compás
+   1,5 + 2,5 del wordmark. Descartada la línea de borde en loop: uniforme de
+   otra tribu (veredicto de la v1.4). */
+.portada-lienzo .pue-btn-jugar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(100deg,
+    rgba(255, 246, 224, 0) 0%, rgba(255, 246, 224, 0.55) 50%, rgba(255, 246, 224, 0) 100%);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  background-position-x: -60%;
+  animation: pue-brillo-boton 4s linear 1.2s infinite;
+}
+@keyframes pue-brillo-boton {
+  0%    { background-position-x: -60%; }
+  37.5% { background-position-x: 160%; }
+  100%  { background-position-x: 160%; }
+}
+.portada-lienzo .pue-btn-jugar:hover { background: var(--gold-hover); }
+.portada-lienzo .pue-btn-jugar:active { transform: translateY(1px); }
+.portada-lienzo .pue-btn-jugar:focus-visible { outline: 2px solid var(--gold-hover); outline-offset: 3px; }
+.portada-lienzo .pue-cta-vacuna { margin: 10px 0 0; font-size: 12.5px; color: var(--text-muted); }
+.pue-velo { display: none; }
+
+/* ══ Selector de idioma ═══════════════════════════════════════════════════ */
+.portada-lienzo .pue-idioma { position: absolute; top: 14px; right: 14px; z-index: 3; }
+.portada-lienzo .pue-idioma-globo {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid rgba(var(--gold-dim-rgb), 0.35);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  font-size: 18px; cursor: pointer;
+  display: grid; place-items: center;
+}
+.portada-lienzo .pue-idioma-globo:hover { color: var(--gold-hover); border-color: var(--gold-brand); }
+.portada-lienzo .pue-idioma-globo:focus-visible { outline: 2px solid var(--gold-hover); outline-offset: 3px; }
+.portada-lienzo .pue-idioma-lista {
+  position: absolute; top: 48px; right: 0; min-width: 190px;
+  background: var(--surface-modal);
+  border: 1px solid rgba(var(--gold-dim-rgb), 0.3);
+  border-radius: 14px; padding: 8px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  display: none;
+}
+.portada-lienzo .pue-idioma.pue-abierta .pue-idioma-lista { display: block; }
+.portada-lienzo .pue-idioma-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border: 0; border-radius: 9px; background: none;
+  color: var(--text-primary);
+  font-family: var(--font-base); font-size: 14px;
+  cursor: pointer; text-align: left;
+}
+.portada-lienzo .pue-idioma-item:hover:not(:disabled) { background: var(--surface-card); }
+/* Los cuatro idiomas que aún no existen se anuncian DESHABILITADOS de verdad, no
+   sólo pintados de gris: la lección de U1b — una entrada que se pinta muerta y
+   se anuncia viva le miente al lector de pantalla. */
+.portada-lienzo .pue-idioma-item:disabled { cursor: default; color: var(--text-muted); }
+.portada-lienzo .pue-bandera {
+  width: 21px; height: 14px; border-radius: 2.5px; flex: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+/* Banderas PROVISIONALES de lámina — excepción declarada a «ni un hex fuera de
+   theme.css». La campaña IDI trae los SVG oficiales y este bloque se retira
+   entero. El tricolor sí sale de tokens: es identidad, no ilustración. */
+.pue-bandera.b-ve {
+  background: linear-gradient(180deg,
+    var(--flag-yellow) 0 33.4%, var(--flag-blue) 33.4% 66.7%, var(--flag-red) 66.7%);
+}
+.pue-bandera.b-us { position: relative; background: repeating-linear-gradient(180deg, #b22234 0 2px, #fff 2px 4px); }
+.pue-bandera.b-us::after { content: ''; position: absolute; left: 0; top: 0; width: 45%; height: 50%; background: #3c3b6e; }
+.pue-bandera.b-br { position: relative; background: #009c3b; }
+.pue-bandera.b-br::after { content: ''; position: absolute; inset: 2px 3px; background: #ffdf00; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.pue-bandera.b-fr { background: linear-gradient(90deg, #0055a4 0 33.4%, #fff 33.4% 66.7%, #ef4135 66.7%); }
+.pue-bandera.b-it { background: linear-gradient(90deg, #009246 0 33.4%, #fff 33.4% 66.7%, #ce2b37 66.7%); }
+.portada-lienzo .pue-idioma-check { margin-left: auto; color: var(--gold-brand); font-weight: bold; }
+.portada-lienzo .pue-idioma-pronto { margin-left: auto; font-size: 11px; color: var(--text-faint); letter-spacing: 0.04em; }
+
+/* ══ Pie de casa ══════════════════════════════════════════════════════════ */
+.portada-lienzo .pue-pie-casa {
+  /* Sin `z-index` por lo mismo que la rejilla: con él, el pie ganaba a la hoja
+     abierta y «by HEPTACREATION» se pintaba ENCIMA de la tarjeta. */
+  position: relative;
+  padding: 10px 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}
+.portada-lienzo .pue-casa { margin-left: 0.5em; letter-spacing: 0.24em; color: var(--text-secondary); }
+
+/* ══ Entrada en escena · una vez · <1 s ═══════════════════════════════════ */
+.portada-lienzo .pue-sube { animation: pue-subir 0.5s ease-out backwards; }
+.portada-lienzo .pue-marca-wrap { animation-delay: 0.05s; }
+.portada-lienzo .pue-lema-grande { animation-delay: 0.12s; }
+.portada-lienzo .pue-lema-categoria { animation-delay: 0.18s; }
+.portada-lienzo .pue-cta-movil { animation-delay: 0.28s; }
+.portada-lienzo .pue-tarjeta { animation: pue-subir 0.55s ease-out 0.2s backwards; }
+.portada-lienzo .pue-by { animation-delay: 0.45s; }
+.portada-lienzo .pue-casa { animation-delay: 0.58s; }
+@keyframes pue-subir {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ══ Apilado: tableta y teléfono vertical ═════════════════════════════════ */
+@media (max-width: 900px) {
+  .portada-lienzo .pue-escena-grid { grid-template-columns: 1fr; gap: 34px; justify-items: center; }
+  .portada-lienzo .pue-hero { text-align: center; display: flex; flex-direction: column; align-items: center; width: 100%; }
+  .portada-lienzo .pue-escenario { width: 100%; height: clamp(150px, 18vh, 200px); }
+  .portada-lienzo .pue-abanico img { width: clamp(92px, 21vw, 124px); }
+  .portada-lienzo .pue-carta { width: clamp(46px, 12vw, 62px); }
+  .portada-lienzo .pue-mano { bottom: 44px; gap: 7px; }
+  .portada-lienzo .pue-mano.pue-gana { gap: 14px; }
+  .portada-lienzo .pue-mesa-monedas { width: min(320px, 94%); }
+  /* DELTA 2 · el eje se recentra POR ESCALÓN, y hubo que aprenderlo midiendo.
+     El desfase no es una constante: depende de la DIFERENCIA de diámetros entre
+     pila y héroe, y los dos son `clamp` que saturan distinto en cada escalón.
+     Despejando el centro de la caja de tinta:
+         L_pila = 0,26 − (d_héroe − d_pila) / (4·W)
+     con la separación sellada de 48 puntos entre las dos piezas. Aplicar el
+     20,9 % del escritorio aquí daba 3,98px a 390 y 4,79 a 360 — el arnés los
+     cantó en rojo, que es exactamente para lo que está. */
+  .portada-lienzo .pue-pila { --d: clamp(54px, 14vw, 70px); left: 21.65%; }
+  .portada-lienzo .pue-heroe { --d: clamp(104px, 26vw, 132px); left: 69.65%; }
+  .portada-lienzo .pue-duo { width: min(320px, 94%); }
+  .portada-lienzo .pue-telefono { left: 50%; height: 100%; }
+  .portada-lienzo .pue-laptop { left: 50%; height: 88%; }
+  .portada-lienzo .pue-pregunta { font-size: clamp(17px, 4.4vw, 21px); top: 2%; }
+  .portada-lienzo .pue-trio { gap: 10px; bottom: 2px; }
+  .portada-lienzo .pue-trio img { width: clamp(46px, 12vw, 62px); }
+  /* Relevo móvil: el teléfono entra primero, a los 2s se esfuma y la laptop
+     aparece con su rebote. En escritorio siguen juntos. */
+  .portada-lienzo .pue-activa .pue-telefono {
+    animation: pue-alzar 0.55s ease-out 0.1s forwards, pue-esfumar 0.4s ease 2s forwards;
+  }
+  .portada-lienzo .pue-activa .pue-laptop { animation: pue-alzar-pc 0.55s ease-out 2.2s forwards; }
+}
+
+@media (max-width: 680px) {
+  .portada-lienzo .pue-lema-grande { font-size: 20px; margin-top: 28px; }
+  .portada-lienzo .pue-tarjeta { padding: 34px 22px 30px; border-radius: 26px; }
+}
+
+/* ══ Móvil vertical · patrón JUGAR + hoja ═════════════════════════════════
+   La hoja es OPACA (`--surface-modal`), no translúcida: la transparencia de la
+   v1.6 era el token de escritorio colándose en un sitio donde detrás hay una
+   escena en movimiento. Y con la hoja abierta, escenas y frase se ESCONDEN —
+   nadie escribe su correo con cartas volando por detrás.                      */
+@media (max-width: 900px) and (orientation: portrait) {
+  .portada-lienzo .pue-cta-movil { display: flex; }
+  .portada-lienzo .pue-tarjeta {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 5;
+    background: var(--surface-modal);
+    max-width: none;
+    border-radius: 26px 26px 0 0;
+    transform: translateY(105%);
+    transition: transform 0.35s ease;
+    animation: none;
+    box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.55);
+    max-height: 86vh;
+    overflow: auto;
+  }
+  body.hoja-abierta .portada-lienzo .pue-tarjeta { transform: translateY(0); }
+  .portada-lienzo .pue-tarjeta::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    border-radius: 2px;
+    background: var(--text-faint);
+    margin: 0 auto 16px;
+  }
+  .pue-velo {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  body.hoja-abierta .pue-velo { opacity: 1; pointer-events: auto; }
+  body.hoja-abierta .portada-lienzo .pue-escenario,
+  body.hoja-abierta .portada-lienzo .pue-frase { visibility: hidden; }
+}
+
+/* ══ Teléfono vertical compacto ═══════════════════════════════════════════
+   Todo se encoge en proporción y cabe sin desplazamiento hasta 320×568. Es el
+   ÚNICO escalón donde el wordmark de la portada baja de 72 (delta 5).        */
+@media (orientation: portrait) and (max-height: 700px) {
+  .portada-lienzo h1.welcome-title { font-size: 46px; letter-spacing: 6px; --wm-track: 6px; }
+  .portada-lienzo .pue-lema-grande { font-size: 18px; margin-top: 22px; }
+  .portada-lienzo .pue-lema-categoria { font-size: 13px; }
+  .portada-lienzo .pue-escenario { height: 132px; margin-top: 20px; }
+  .portada-lienzo .pue-frase { min-height: 2.4em; font-size: 14px; margin-top: 16px; }
+  .portada-lienzo .pue-cta-movil { margin-top: 14px; }
+  .portada-lienzo .pue-abanico img { width: clamp(72px, 16vw, 84px); bottom: 26px; }
+  .portada-lienzo .pue-carta { width: clamp(38px, 9.6vw, 50px); }
+  .portada-lienzo .pue-mano { bottom: 42px; gap: 6px; }
+  .portada-lienzo .pue-mano.pue-gana { gap: 12px; }
+  .portada-lienzo .pue-marcador { bottom: 2px; font-size: 15px; }
+  .portada-lienzo .pue-mesa-monedas { width: min(280px, 94%); }
+  .portada-lienzo .pue-pila { --d: clamp(42px, 10.5vw, 54px); left: 22.4%; }
+  .portada-lienzo .pue-heroe { --d: clamp(80px, 19vw, 98px); left: 70.4%; }
+  .portada-lienzo .pue-pregunta { font-size: 15px; top: 0; }
+  .portada-lienzo .pue-trio { bottom: 2px; gap: 8px; }
+  .portada-lienzo .pue-trio img { width: clamp(38px, 9.6vw, 50px); }
+  .portada-lienzo .pue-telefono { height: 100%; }
+  .portada-lienzo .pue-laptop { height: 82%; }
+}
+
+/* Teléfono vertical mínimo: las escenas se retiran, el héroe y JUGAR mandan. */
+@media (orientation: portrait) and (max-height: 520px) {
+  .portada-lienzo .pue-escenario,
+  .portada-lienzo .pue-frase { display: none; }
+  .portada-lienzo .pue-escena-grid { gap: 26px; }
+}
+
+/* Teléfono horizontal (restricción 3 del informe de Fase 0). */
+@media (orientation: landscape) and (max-height: 540px) {
+  .pue-lienzo { padding: 14px; }
+  .portada-lienzo .pue-escena-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px; }
+  .portada-lienzo .pue-hero { text-align: left; }
+  .portada-lienzo .pue-escenario,
+  .portada-lienzo .pue-frase,
+  .portada-lienzo .pue-pie-casa { display: none; }
+  .portada-lienzo .pue-lema-grande { font-size: 17px; margin-top: 22px; }
+  .portada-lienzo .pue-lema-categoria { font-size: 13px; }
+  .portada-lienzo .pue-tarjeta { padding: 22px 20px 18px; border-radius: 22px; }
+  .portada-lienzo .pue-tarjeta .puerta-lema { margin-bottom: 14px; font-size: 13px; }
+  .portada-lienzo .entrada-cuerpo { min-height: 0; }
+  .portada-lienzo .entrada-proximamente { display: none; }
+}
+
+/* ══ DELTA 4 · Movimiento reducido alcanza a los PSEUDOS ══════════════════
+   `.esc *` no cubre `::before` ni `::after`: un selector universal empareja
+   ELEMENTOS, y un pseudo-elemento no lo es. La lámina lo daba por hecho y por
+   eso el brillo de la héroe y la banda del botón JUGAR seguían corriendo con
+   `prefers-reduced-motion: reduce` puesto. Se nombran uno a uno, y la lista
+   crece con cualquier pseudo animado que la producción añada.                */
+@media (prefers-reduced-motion: reduce) {
+  .portada-lienzo .pue-sube,
+  .portada-lienzo .pue-tarjeta,
+  .portada-lienzo .pue-esc *,
+  .portada-lienzo .pue-activa * { animation: none; }
+
+  .portada-lienzo .pue-heroe::after,
+  .portada-lienzo .pue-disco::after,
+  .portada-lienzo .pue-btn-jugar::after,
+  .portada-lienzo .pue-vc-pulso { animation: none; }
+
+  /* Y lo que la quietud tiene que DEJAR VISIBLE: sin animación, todo lo que
+     arranca en `opacity: 0` se quedaría invisible para siempre. */
+  .portada-lienzo .pue-abanico img { opacity: 1; }
+  .portada-lienzo .pue-btn-jugar::after { display: none; }
+  .portada-lienzo .pue-vc-pulso { display: none; }
+  .portada-lienzo .pue-carta,
+  .portada-lienzo .pue-mano { transition: none; }
+  .portada-lienzo .pue-tarjeta { transition: none; }
+}
