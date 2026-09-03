@@ -77,3 +77,14 @@ capturas-ren1/
 # originales largos de Victor no estan aqui ni en el repo — se retiraron de
 # `public/sounds/` en CEL-A y viven en sus descargas.
 _audio_cel/
+laminas/mon1/render/png/
+laminas/mon1/_calib/
+laminas/mon1/_humo/
+ __pycache__/
+ 
+# PUE · salidas del arnés de la Portada-Entrada (scripts/diagPUE.mjs). Mismo
+# criterio que capturas-dsk y capturas-ren1: son REGENERABLES —cualquier modo
+# del arnés las vuelve a escribir— y llegaron a pesar decenas de MB sin
+# rastrear. La carpeta NO se borra: el arnés escribe en ella y sin el
+# directorio revienta.
+capturas-pue/
