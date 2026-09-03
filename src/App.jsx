@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import WelcomeScreen from './components/WelcomeScreen'
 import NivelSelect from './components/NivelSelect'
 import ModeSelect from './components/ModeSelect'
@@ -7,6 +7,7 @@ import Entrada from './screens/Entrada'
 import Bautizo from './screens/Bautizo'
 import { readNivel, writeNivel } from './hooks/useNivel'
 import { useAuth, AUTH_BYPASS, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
+import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 
 // ── NIV-UI · Recorrido del lobby ─────────────────────────────────────────────
 // Rector: docs/AJILEI_Modos_y_Asistencia_v1.0.md §4.1.
@@ -46,6 +47,21 @@ function App() {
   // dificultad y jamás la salta (v1.0 §4.2): `screen` arranca en 'welcome' y el
   // único camino a la mesa pasa por elegir, aunque ya haya un nivel recordado.
   const [nivel, setNivel] = useState(() => readNivel())
+
+  // ── PUE-1.2 · La mesa precarga sus efectos al ENCAMINARSE a la mesa ────────
+  // Desde esta campaña los `Howl` nacen perezosos: en la puerta no baja un solo
+  // byte de audio de juego (era el hallazgo de la Fase 0 — 525,7 KiB de 706,2).
+  // El precio de aplazar es que la primera reproducción llegaría tarde, así que
+  // quien va a necesitarlos los pide antes.
+  //
+  // Y se piden aquí, al salir de la Bienvenida, en vez de al montar la mesa: el
+  // recorrido dificultad → mesa+apuesta son varios segundos de margen, y el
+  // primer `cardDeal` cae a los pocos fotogramas de que la mesa exista. Pedirlos
+  // en `GameTable` sería llegar a la vez que el reparto.
+  // No pinta nada y no toca el layout: Δ=0 en las tres pantallas del lobby.
+  useEffect(() => {
+    if (screen !== 'welcome') precargarSonidos(SONIDOS_MESA)
+  }, [screen])
 
   // CARGANDO no pinta: pinta NADA. El fondo del documento ya es el verde abismo
   // (welcome.css:1-6), así que el hueco de uno o dos fotogramas se ve como la

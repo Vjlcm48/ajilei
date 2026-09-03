@@ -1,24 +1,74 @@
 import { Howl } from 'howler'
 import { useSoundContext } from '../context/SoundContext'
 
-const sounds = {
-  cardDeal:     new Howl({ src: ['/sounds/card-deal.mp3'],     volume: 0.6 }),
-  coinBet:      new Howl({ src: ['/sounds/coin-bet.mp3'],      volume: 0.7 }),
-  cardFold:     new Howl({ src: ['/sounds/card-fold.mp3'],     volume: 0.5 }),
-  cardShuffle:  new Howl({ src: ['/sounds/card-shuffle.mp3'],  volume: 0.6 }),
-  timerWarning: new Howl({ src: ['/sounds/timer-warning.mp3'], volume: 0.5 }),
-  showdown:     new Howl({ src: ['/sounds/showdown.mp3'],      volume: 0.7 }),
-  comodin:      new Howl({ src: ['/sounds/comodin.mp3'],       volume: 0.8 }),
-  buttonClick:  new Howl({ src: ['/sounds/button-click.mp3'],  volume: 0.4 }),
+// ── PUE-1.2 · El audio deja de viajar en el arranque ────────────────────────
+// Documento rector: AJILEI_PUE_Fase1_v1.0 §1.2, sobre el hallazgo de la Fase 0
+// §4.4: los once `Howl` se construían a NIVEL DE MÓDULO, y Howler precarga por
+// defecto. Resultado medido: **525,7 KiB de audio** bajando antes de que la
+// portada pintara, de un camino crítico de 706,2 — audio que nadie oye en la
+// puerta, en el terreno declarado de datos móviles.
+//
+// EL CAMBIO ES DÓNDE SE CONSTRUYE, NO CÓMO SUENA. La tabla de abajo es la misma
+// de siempre —mismas rutas, mismos volúmenes, mismas notas de licencia— pero
+// vive como DATOS. El `Howl` nace la primera vez que alguien pide ese sonido, o
+// cuando una pantalla lo precarga a propósito. Es el molde de `useCoreografia`,
+// que ya difiere sus ~380 KB de melodía al montar la pantalla de victoria.
+//
+// Y POR ESO EXISTE `precargar`. Howler encola un `play()` sobre un `Howl` que
+// aún carga y lo dispara al terminar: no se pierde el sonido, pero el primer
+// `cardDeal` llegaría tarde. Así que quien sabe que va a necesitar un sonido lo
+// pide antes de necesitarlo — la mesa, sus efectos al encaminarse a la mesa; la
+// portada, sólo su rasgueo. Nadie más descarga nada.
+const FUENTES = {
+  cardDeal:     { src: ['/sounds/card-deal.mp3'],     volume: 0.6 },
+  coinBet:      { src: ['/sounds/coin-bet.mp3'],      volume: 0.7 },
+  cardFold:     { src: ['/sounds/card-fold.mp3'],     volume: 0.5 },
+  cardShuffle:  { src: ['/sounds/card-shuffle.mp3'],  volume: 0.6 },
+  timerWarning: { src: ['/sounds/timer-warning.mp3'], volume: 0.5 },
+  showdown:     { src: ['/sounds/showdown.mp3'],      volume: 0.7 },
+  comodin:      { src: ['/sounds/comodin.mp3'],       volume: 0.8 },
+  buttonClick:  { src: ['/sounds/button-click.mp3'],  volume: 0.4 },
   // ── DSK-VC2 · Victory Celebration ──────────────────────────────────────────
   // Los tres son Pixabay Content License (IDs 96121, 85867, 504874); ver
   // docs/AJILEI_Victory_Celebration_v1.0.md §7. Volúmenes elegidos contra el
   // PICO MEDIDO de cada archivo, no a ojo: knock 0,383 (el más fuerte de los
   // tres, dos golpes secos no deben sobresaltar), chips 0,249, strum 0,188 (el
   // más flojo y el momento héroe). Los tres dentro del rango de la casa 0,4-0,8.
-  chipsCollect: new Howl({ src: ['/sounds/chips-collect.mp3'], volume: 0.7 }),
-  ajileiStrum:  new Howl({ src: ['/sounds/ajilei-strum.mp3'],  volume: 0.8 }),
-  tableKnock:   new Howl({ src: ['/sounds/table-knock.mp3'],   volume: 0.6 }),
+  chipsCollect: { src: ['/sounds/chips-collect.mp3'], volume: 0.7 },
+  ajileiStrum:  { src: ['/sounds/ajilei-strum.mp3'],  volume: 0.8 },
+  tableKnock:   { src: ['/sounds/table-knock.mp3'],   volume: 0.6 },
+}
+
+// Los `Howl` ya construidos. Módulo y no `useRef`: el juego monta y desmonta
+// pantallas, y un sonido descargado no tiene por qué volver a descargarse
+// porque alguien salió de la mesa y entró otra vez.
+const vivos = {}
+
+function obtener(nombre) {
+  const receta = FUENTES[nombre]
+  if (!receta) return null
+  if (!vivos[nombre]) vivos[nombre] = new Howl({ ...receta, preload: true })
+  return vivos[nombre]
+}
+
+// ── Los dos grupos que alguien precarga a propósito ─────────────────────────
+// LA PORTADA NO PRECARGA LOS DE LA MESA, y es el punto entero de esta tanda:
+// en la puerta el único sonido posible es el rasgueo del primer toque.
+export const SONIDOS_PORTADA = ['ajileiStrum']
+
+// La mesa sí precarga los suyos: el primer `cardDeal` cae a los pocos
+// fotogramas de montar y tiene que sonar en su instante. `ajileiStrum`,
+// `chipsCollect` y `tableKnock` NO entran aquí — son de la celebración, que
+// llega minutos después y tiene su propio momento para pedirlos.
+export const SONIDOS_MESA = [
+  'cardDeal', 'coinBet', 'cardFold', 'cardShuffle',
+  'timerWarning', 'showdown', 'comodin', 'buttonClick',
+]
+
+/** Construye y arranca la descarga de los sonidos nombrados. Idempotente. */
+export function precargarSonidos(nombres) {
+  if (!Array.isArray(nombres)) return
+  nombres.forEach(obtener)
 }
 
 // ── Recorte del rasgueo, en reproducción ────────────────────────────────────
@@ -31,8 +81,8 @@ const sounds = {
 // usa aquí abajo desde su tanda, no requiere herramienta externa (no hay ffmpeg
 // en el entorno) y deja el archivo licenciado exactamente como Pixabay lo
 // distribuye — que para una licencia es lo preferible, no un mal menor.
-const STRUM_CORTE_MS = 1300   // antes del segundo rasgueo (1,59s)
-const STRUM_FADE_MS  = 130    // misma cortina que cardShuffle
+export const STRUM_CORTE_MS = 1300   // antes del segundo rasgueo (1,59s)
+export const STRUM_FADE_MS  = 130    // misma cortina que cardShuffle
 
 export function useSounds() {
   const { soundEnabled } = useSoundContext()
@@ -43,7 +93,7 @@ export function useSounds() {
   // llamadas anteriores— no se entera.
   const play = (soundName) => {
     if (!soundEnabled) return null
-    const sound = sounds[soundName]
+    const sound = obtener(soundName)
     if (!sound) return null
 
     if (soundName === 'ajileiStrum') {
@@ -57,6 +107,11 @@ export function useSounds() {
 
     if (soundName === 'cardShuffle') {
       const id = sound.play()
+      // `duration()` es 0 mientras el archivo no ha llegado — y desde esta
+      // tanda eso puede pasar de verdad en la PRIMERA reproducción, no sólo en
+      // teoría. La guarda de `> 0` ya existía y ahora es la que trabaja: sin
+      // duración no hay recorte, y el barajado suena entero esa vez. Es la
+      // degradación correcta: nunca un silencio, como mucho un segundo de más.
       const totalMs = sound.duration() * 1000
       if (totalMs > 0) {
         const fadeLen = 130
