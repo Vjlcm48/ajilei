@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run scripts/"
+    "test": "vitest run scripts/ src/"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
