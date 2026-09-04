@@ -26,6 +26,7 @@ import {
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
 import { useTapetes } from '../hooks/useTapetes'
+import { useCongelado } from '../hooks/useCongelado'
 import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
 import { VIVAS_ESCRITORIO, VIVAS_MOVIL, PRESENTES_MOVIL_HORIZONTAL } from '../config/menuEntradas'
 import { getBestSuitScore } from '../engine/handEvaluator'
@@ -338,6 +339,19 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   const [openChipSeat,  setOpenChipSeat]  = useState(null) // H4: IA con el toggle de saldo abierto (uno a la vez)
   const { play } = useSounds()
 
+  // ── FRZ-1 · El freeze de visibilidad ──────────────────────────────────────
+  // Rector: AJILEI_FRZ1_Fase1_v1.0, arquitectura (c) con (a) dentro. El hook no
+  // sabe nada de la partida: silencia el audio, dice si estamos a oscuras y
+  // sostiene UN slot de continuación. Quien decide qué se congela son las cinco
+  // guardas de abajo (§2.1-2.5), y todas viven AQUÍ — que es lo que hace que las
+  // dos vías de render (OpponentPanel en 5/4/3 y .ai-zone en la mesa de 2)
+  // queden cubiertas por construcción, sin una línea por camino.
+  //
+  // `congelado` es para las DEPENDENCIAS de los efectos que deben rearmarse al
+  // volver; `congeladoRef` es para leer la verdad DENTRO de un timer o un
+  // manejador, donde el valor capturado sería el de otro render.
+  const { congelado, congeladoRef, diferir } = useCongelado()
+
   // Position refs: one 5-slot row + one deck anchor per seat
   const slotRefs = useRef(null)
   if (!slotRefs.current) {
@@ -355,6 +369,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   const chipTimerRef = useRef(null)   // H4: autocierre del toggle de saldo
   const gameRef = useRef(game)
   const prevPotRef = useRef(game.pot)
+  // FRZ-1 §2.4 · los dos únicos relojes del arranque de mano que ESTA tanda
+  // saca de la cola de "sin handle": la guarda de mano nueva los necesita
+  // cancelables. Los otros siete quedan declarados en la cola GT-HIG.
+  const barajaTimerRef = useRef(null)     // 1950 ms: baraja → dispara el reparto
+  const siguienteManoTimerRef = useRef(null)  // 300 ms: "Siguiente mano" → beginHand
 
   // Clear pending discard / ceremony / reveal timers if the table unmounts mid-animation
   useEffect(() => () => {
@@ -362,6 +381,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     ceremonyTimersRef.current.forEach(clearTimeout)
     revealTimersRef.current.forEach(clearTimeout)
     clearTimeout(chipTimerRef.current)
+    clearTimeout(barajaTimerRef.current)
+    clearTimeout(siguienteManoTimerRef.current)
   }, [])
 
   // ── Pozo: pulso + "+N" flotante al aumentar (Tanda C4.3) ──────────────────
@@ -671,7 +692,18 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     if (isPlayerTurnEarly || phase === PHASES.DISCARD) setTimeLeft(TURN_TIME)
   }, [phase, game.activePlayerIndex]) // eslint-disable-line
 
+  // FRZ-1 §2.1 · El reloj de turno del humano NO corre a oscuras. Medido en la
+  // Fase 0 (corrida C): con audio, Chrome no estrangula nada y los 20 segundos
+  // se consumían a tiempo real en segundo plano — el jugador volvía retirado.
+  //
+  // El mecanismo es la lista de dependencias, no un temporizador nuevo:
+  // ocultarse cambia `congelado`, el cleanup limpia el tick pendiente y el
+  // efecto sale por aquí. `timeLeft` NO se toca, así que volver reprograma
+  // desde el MISMO segundo. Y como el tick pendiente se limpió, ni los avisos
+  // de ≤5 ni el auto-pasar de 0 pueden disparar durante la ausencia ni
+  // duplicarse al volver: en cualquier instante hay como mucho un timer vivo.
   useEffect(() => {
+    if (congelado) return
     if (!isPlayerTurnEarly && !isDiscardTimerActive) return
     if (timeLeft <= 0) return
     const t = setTimeout(() => {
@@ -688,7 +720,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
       }
     }, 1000)
     return () => clearTimeout(t)
-  }, [isPlayerTurnEarly, isDiscardTimerActive, timeLeft]) // eslint-disable-line
+  }, [isPlayerTurnEarly, isDiscardTimerActive, timeLeft, congelado]) // eslint-disable-line
 
   // ── Sonidos de cierre de mano: showdown + victoria ────────────────────────
   // showdown: la mano llegó a comparación (el ganador tiene score → cartas
@@ -853,7 +885,16 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   // ── AI auto-action ────────────────────────────────────────────────────────
   // C4.4.1: una IA RETIRADA (folded) no recibe turno de "pensar" — se excluye
   // aquí y se salta en silencio en el efecto siguiente.
+  //
+  // FRZ-1 §2.2 · Y no piensa a oscuras. La guarda es una CONDICIÓN DE ENTRADA,
+  // no un cancelar/reprogramar en bucle: mientras `congelado` valga true el
+  // efecto sale en la primera línea y no programa nada, y `congelado` solo
+  // cambia cuando cambia la visibilidad de verdad — no hay ciclo posible.
+  // Al volver se reprograma ENTERA (los 1125 ms completos) y lee
+  // `gameRef.current` fresco, así que no hay jugada obsoleta ni doble. Es la
+  // propiedad que la Fase 0 verificó en §2.4 y sobre la que se apoya todo esto.
   useEffect(() => {
+    if (congelado) return
     const isBet = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
     const active = game.players[game.activePlayerIndex]
     if (isBet && game.activePlayerIndex !== 0 && !active.folded) {
@@ -869,30 +910,46 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
       }, AI_ACTION_MS)
       return () => clearTimeout(t)
     }
-  }, [phase, game.activePlayerIndex]) // eslint-disable-line
+  }, [phase, game.activePlayerIndex, congelado]) // eslint-disable-line
 
   // ── Saltar en silencio a un jugador activo RETIRADO (C4.4.1) ──────────────
   // Puede ocurrir al iniciar BET_2/BET_3 si la Mano se retiró en una ronda
   // previa (el motor reinicia activePlayerIndex = manoIndex). Sin "pensando" ni
   // retardo: se avanza el turno de inmediato vía la API del motor (sin tocarlo).
+  //
+  // FRZ-1 §2.3 · Transición de UN paso, así que va al slot en vez de a las
+  // dependencias: si estamos a oscuras se DIFIERE y la vuelta la ejecuta. Se
+  // hace así y no con `congelado` en las deps a propósito — con las dos vías
+  // vivas, volver ejecutaría el slot Y rearmaría el efecto, dos caminos para un
+  // solo salto. El cuerpo ya relee `gameRef.current` y se autoprotege con su
+  // guarda de `folded`, así que la continuación diferida es la misma decisión,
+  // tomada más tarde y sobre el estado de entonces.
   useEffect(() => {
     const isBet = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
     if (!isBet) return
     const active = game.players[game.activePlayerIndex]
     if (!active || !active.folded) return
-    const t = setTimeout(() => {
+    const salta = () => {
       const prev = gameRef.current
       const cur  = prev.players[prev.activePlayerIndex]
       if (!cur || !cur.folded) return
       setGame(prev.activePlayerIndex === 0 ? applyPlayerBetAction(prev, 'pasar') : applyAIBetAction(prev))
-    }, 0)
+    }
+    if (congeladoRef.current) { diferir(salta); return }
+    const t = setTimeout(salta, 0)
     return () => clearTimeout(t)
   }, [phase, game.activePlayerIndex]) // eslint-disable-line
 
   // Human folded during DISCARD (N≥3): rivals discard on their own
+  // FRZ-1 §2.3 · Mismo trato que el salto de retirado: si estamos a oscuras, al
+  // slot. El precio declarado es que la vuelta arranca el descarte en el acto en
+  // vez de tras el compás de 1125 ms — y solo en el caso raro de ocultarse
+  // dentro de esa ventana, estando el humano retirado.
   useEffect(() => {
     if (phase === PHASES.DISCARD && human.folded && !discardAnim) {
-      const t = setTimeout(() => startDiscardAnim(gameRef.current, []), AI_ACTION_MS)
+      const arranca = () => startDiscardAnim(gameRef.current, [])
+      if (congeladoRef.current) { diferir(arranca); return }
+      const t = setTimeout(arranca, AI_ACTION_MS)
       return () => clearTimeout(t)
     }
   }, [phase]) // eslint-disable-line
@@ -968,6 +1025,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     }
   }
 
+  // FRZ-1 §2.5: secuencia en vuelo, se deja terminar; estado ya sentenciado.
   function startDiscardAnim(g, humanDiscardIndices) {
     const nextGame = applyDiscard(g, humanDiscardIndices)
     discardNextRef.current = nextGame
@@ -1242,6 +1300,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   //   3) el aviso se desvanece
   //   4) ENTONCES el tablero se reacomoda (settle + destello del comodín al
   //      cambiar `game` → aliveN). El reflujo ya no coincide con el aviso.
+  // FRZ-1 §2.5: secuencia en vuelo, se deja terminar; estado ya sentenciado.
   function runEliminationCeremony(next, elimSeats) {
     setCeremony({ seats: elimSeats })   // mesa = prev; el panel eliminado se desvanece
     const t1 = setTimeout(() => {
@@ -1266,10 +1325,20 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     commitNewHand(next)
   }
 
+  // FRZ-1 §2.4 · Aquí está el disparo del reparto: apagar `isShuffling` es lo que
+  // pone en marcha la mano nueva. Dos cambios y ninguno más — el reloj gana
+  // handle (era uno de los nueve sin él, y la guarda lo exige cancelable) y, si
+  // al vencer estamos a oscuras, el disparo se DIFIERE. La duración del barajado
+  // no se toca: la baraja sigue durando sus 1950 ms.
   function commitNewHand(next) {
     setGame(next)            // cobro del ante visible (saldos descontados, pozo armado)
     setIsShuffling(true)     // baraja sobre el estado ya cobrado
-    setTimeout(() => setIsShuffling(false), 1950)
+    clearTimeout(barajaTimerRef.current)
+    barajaTimerRef.current = setTimeout(() => {
+      const reparte = () => setIsShuffling(false)
+      if (congeladoRef.current) { diferir(reparte); return }
+      reparte()
+    }, 1950)
   }
 
   // ── Card render helpers ───────────────────────────────────────────────────
@@ -1914,12 +1983,24 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
                   no se ofrece "Siguiente mano" — la mesa no continúa. */}
               {isPayoutPhase && !isClearing && !isShuffling && !ceremony && !bankruptModal && (
                 <div className="action-area">
+                  {/* FRZ-1 §2.4 · El otro extremo del arranque de mano. Handle
+                      para poder cancelarlo, y si al vencer estamos a oscuras la
+                      mano nueva se difiere ENTERA —`isClearing` incluido— para
+                      que la mesa no vuelva a ofrecer el botón en segundo plano.
+                      Solo alcanzable ocultándose dentro de los 300 ms
+                      siguientes al clic; se guarda igual porque la ventana
+                      existe. */}
                   <SoundButton className="btn btn-primary" onClick={() => {
                     setIsClearing(true)
                     setGame(prev => ({ ...prev, message: '', winner: null }))
-                    setTimeout(() => {
-                      setIsClearing(false)
-                      beginHand()
+                    clearTimeout(siguienteManoTimerRef.current)
+                    siguienteManoTimerRef.current = setTimeout(() => {
+                      const sigue = () => {
+                        setIsClearing(false)
+                        beginHand()
+                      }
+                      if (congeladoRef.current) { diferir(sigue); return }
+                      sigue()
                     }, 300)
                   }}>
                     Siguiente mano
