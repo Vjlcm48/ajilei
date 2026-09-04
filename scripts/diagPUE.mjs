@@ -678,6 +678,17 @@ if (hacer('2.5')) {
   // que suene una vez y no en bucle.
   await esperarEscena(page, 1, 200)
   const antes = await page.evaluate(`document.querySelectorAll('.pue-vc-pulso').length`)
+  // POR-FID · el halo de la lámina, ANTES del «51»: apagado, y la caja de la mano.
+  const HALO = `(() => {
+    const m = document.querySelector('.pue-mano');
+    if (!m) return null;
+    const cs = getComputedStyle(m, '::before');
+    const r = m.getBoundingClientRect();
+    return { opacity: cs.opacity, borde: cs.borderTopWidth, colorBorde: cs.borderTopColor,
+             sombra: cs.boxShadow, anim: cs.animationName, iter: cs.animationIterationCount,
+             caja: [r.left, r.top, r.width, r.height].map(n => Math.round(n * 100) / 100) };
+  })()`
+  const haloAntes = await page.evaluate(HALO)
 
   // El «51» cae en 0,3 + 4×0,28 + 0,5 = 1,92 s desde que la escena se activa.
   await page.waitForTimeout(1900)
@@ -734,6 +745,39 @@ if (hacer('2.5')) {
   const escaladas = cartasFin.filter(v => v !== null && Math.abs(v - 1.2) < 0.01).length
   anota('2.5f las cinco cartas a scale(1.2)', escaladas === 5 && pulso.gana,
     `escalas ${cartasFin.map(v => v === null ? '—' : v.toFixed(3)).join('/')} · .pue-gana=${pulso.gana}`)
+
+  // ── POR-FID · el halo de la lámina (PUE_lamina_v1.7.html:360-370), medido ──
+  // Apagado antes del «51»; al ganar, opacidad 1 (o respirando hacia 0,65),
+  // filete de 1px al 55 % del oro de marca y dos sombras doradas; respira en
+  // bucle (`pue-halo-pulso`, infinite). O1: la caja de `.pue-mano` no cambia
+  // ni un píxel entre antes y después. Oro único: el filete NO es oro sólido
+  // — su alfa se lee del color computado y tiene que ser menor que 1.
+  const haloDespues = await page.evaluate(HALO)
+  // O1 se mide CON Y SIN el pseudo en el MISMO estado (ganando): la caja de la
+  // mano cambia legítimamente al ganar por el `gap` 10→20 del DELTA 1, así que
+  // comparar antes/después del «51» mediría el delta, no el halo. Se apaga el
+  // pseudo con una regla inyectada, se mide, y se retira la regla.
+  const haloApagado = await page.evaluate(`(() => {
+    const st = document.createElement('style'); st.id = 'sin-halo';
+    st.textContent = '.portada-lienzo .pue-mano::before { display: none; }';
+    document.head.appendChild(st);
+    const m = document.querySelector('.pue-mano'); const r = m.getBoundingClientRect();
+    const cs = getComputedStyle(m, '::before'); const display = cs.display;
+    st.remove();
+    return { display, caja: [r.left, r.top, r.width, r.height].map(n => Math.round(n * 100) / 100) };
+  })()`)
+  const alfaBorde = haloDespues ? parseFloat((haloDespues.colorBorde.match(/,\s*([\d.]+)\)$/) || [, '1'])[1]) : null
+  const haloOk = !!haloAntes && !!haloDespues
+    && parseFloat(haloAntes.opacity) === 0
+    && parseFloat(haloDespues.opacity) >= 0.65
+    && haloDespues.borde === '1px' && haloDespues.sombra !== 'none'
+    && haloDespues.anim === 'pue-halo-pulso' && haloDespues.iter === 'infinite'
+  anota('2.5h el halo de la lámina envuelve la mano al ganar (1:1, respirando)', haloOk,
+    haloDespues ? `opacity ${haloAntes && haloAntes.opacity}→${haloDespues.opacity} · filete ${haloDespues.borde} · anim ${haloDespues.anim}×${haloDespues.iter} · sombra ${haloDespues.sombra.slice(0, 60)}…` : 'sin .pue-mano')
+  anota('2.5i O1 · la caja de la mano es la misma con el halo y sin él', !!haloDespues && haloApagado.display === 'none' && JSON.stringify(haloApagado.caja) === JSON.stringify(haloDespues.caja),
+    haloDespues ? `con halo ${JSON.stringify(haloDespues.caja)} · sin halo ${JSON.stringify(haloApagado.caja)}` : '—')
+  anota('2.5j oro único · el filete del halo no es oro sólido', alfaBorde !== null && alfaBorde < 1,
+    `border-top-color = ${haloDespues ? haloDespues.colorBorde : '—'} (alfa ${alfaBorde})`)
 
   // Y no se repite: al volver a la escena 2 tiene que nacer OTRA vez, no seguir.
   await esperarEscena(page, 0, 100)

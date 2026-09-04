@@ -239,6 +239,38 @@ body.portada-activa #root {
 .portada-lienzo .pue-mano.pue-gana { gap: 20px; }
 .portada-lienzo .pue-mano.pue-gana .pue-carta { transform: scale(1.2); z-index: 5; }
 
+/* ── POR-FID · EL HALO DE LA LÁMINA VUELVE, 1:1 ────────────────────────────
+   El DELTA 1 de arriba lo retiró («Fuera») al transcribir el pulso del juego.
+   Victor, validando la producción contra la lámina v1.7 sellada (03-sep),
+   pidió el resplandor dorado que envuelve el grupo de cartas por fuera: la
+   lámina es el contrato. Receta clonada de PUE_lamina_v1.7.html:360-370 —
+   `::before` con `inset:-16px -18px`, radio 18, filete de 1px al 55 % del oro
+   de marca, dos sombras (34px/8px al 38 % y 90px/22px al 16 %), opacidad 0→1
+   en 0,5 s al ganar, y RESPIRA: `halo-pulso 2s ease-in-out .5s infinite
+   alternate` entre 1 y 0,65. Convive con el gesto del DELTA 1 (gap + scale +
+   pulso VC): el rector restaura el halo, no deshace el delta.
+   O1: es un pseudo absoluto —cero caja, cero layout—; la tinta que el arnés
+   mide en la escena 2 son las imágenes, y no se mueven. Oro único: el filete
+   es rgba al 55 % y las sombras luz difusa — no hay oro SÓLIDO nuevo; el
+   arnés lo mide (2.5h). Con quietud el pseudo entra en la lista del DELTA 4. */
+.portada-lienzo .pue-mano::before {
+  content: '';
+  position: absolute;
+  inset: -16px -18px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.55);
+  box-shadow: 0 0 34px 8px rgba(var(--gold-brand-rgb), 0.38),
+              0 0 90px 22px rgba(var(--gold-brand-rgb), 0.16);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.portada-lienzo .pue-mano.pue-gana::before {
+  opacity: 1;
+  animation: pue-halo-pulso 2s ease-in-out 0.5s infinite alternate;
+}
+@keyframes pue-halo-pulso { from { opacity: 1; } to { opacity: 0.65; } }
+
 .portada-lienzo .pue-carta {
   position: relative;
   width: clamp(58px, 6.4vw, 94px);
@@ -881,6 +913,7 @@ body.portada-activa #root {
   .portada-lienzo .pue-heroe::after,
   .portada-lienzo .pue-disco::after,
   .portada-lienzo .pue-btn-jugar::after,
+  .portada-lienzo .pue-mano::before,
   .portada-lienzo .pue-vc-pulso { animation: none; }
 
   /* Y lo que la quietud tiene que DEJAR VISIBLE: sin animación, todo lo que
