@@ -15,6 +15,12 @@ import diezUrl from '../assets/portada/diez_copa.webp'
 import doceUrl from '../assets/portada/doce_copa.webp'
 import mesavUrl from '../assets/portada/mesav.webp'
 import mesapcUrl from '../assets/portada/mesapc.webp'
+// MON-2.1 · los dos assets de la moneda dejan `public/` y pasan por Vite, que
+// les pone hash de contenido. Sin hash no pueden entrar en la zona `immutable`
+// de `public/_headers`, y la Fase 0 midió lo que costaba: una revalidación
+// bloqueante por visita para un archivo de 1 040 KB que nunca cambia.
+import heptacoinUrl from '../assets/heptacoin.webp?url'
+import heptacoinPosterUrl from '../assets/heptacoin-poster.webp?url'
 
 // ── PUE · La Portada-Entrada ────────────────────────────────────────────────
 // Documento rector: la lámina `PUE_lamina_v1.7.html`, contrato visual sellado
@@ -75,19 +81,38 @@ const ESPERA_PESADAS_MS = 2500
 // MON-1 horneó el fondo de la portada dentro del video y MON-INT/POR-FID
 // intentaron coser ese telón con máscaras: descartado por Victor y el rector.
 // El render viaja ahora CON CANAL ALFA como WebP animado —un solo asset,
-// Safari no reproduce VP9 con alfa—, 135 cuadros a 30 fps = 4,500 s, la
-// ventana EXACTA de la escena, y lo que hay detrás de las monedas es la propia
-// portada: su degradado y su filigrana, sin capa intermedia. La sombra de
+// Safari no reproduce VP9 con alfa—, y lo que hay detrás de las monedas es la
+// propia portada: su degradado y su filigrana, sin capa intermedia. La sombra de
 // contacto viene del render (shadow catcher), no de CSS. Sin bucle en el asset
 // (loop=1): el cuadro 0 es un vacío sin monedas y el 134 el reposo; la portada
 // rebobina por código. El póster ES el cuadro 134 con alfa — si el animado no
 // llega (datos, batería, quietud), lo que queda es la escena terminada.
-// Ambos viven en `public/` con nombre estable y sin hash (como og-image.jpg).
+//
+// ── Lo que el archivo publicado es de verdad (medido en MON-2.1 Fase 0) ─────
+// Aquí decía «135 cuadros a 30 fps». Eso describe el RENDER de origen, no el
+// asset: `empaquetar.py` remuestrea y el codificador funde cuadros idénticos
+// consecutivos. Lo que se publica son **87 cuadros** con duraciones de 50, 100
+// y 150 ms —~19,3 fps de media— que suman los 4 500 ms exactos de la ventana,
+// a **616×346**, que es la escala 0,70 del render de 880×495. El peso son los
+// 87 sub-cuadros con alfa (99,9 % del archivo), no la calidad del color:
+// recodificarlo más bajo lo deja MÁS pesado, medido.
 const ESCENA_RENDER = 3
 const RENDER_HEPTACOIN = {
-  animado: '/heptacoin.webp',
-  poster: '/heptacoin-poster.webp',
+  animado: heptacoinUrl,
+  poster: heptacoinPosterUrl,
 }
+
+// ── MON-2.1 · Dónde la escena 4 NO existe ───────────────────────────────────
+// Estas dos condiciones son copia LITERAL de `portada.css` —la de vertical
+// mínimo (:919) y la de teléfono horizontal (:927)—, que en ambos casos ponen
+// `.pue-escenario { display: none }`. Se REPLICAN aquí en vez de moverlas: la
+// hoja manda sobre lo que se pinta y este módulo sólo pregunta.
+//
+// Y se pregunta porque la Fase 0 midió lo que costaba no preguntar: en móvil
+// apaisado la caja del <img> mide 0×0 y el megabyte se descargaba igual. Es el
+// 69 % de la Portada para un aparato que nunca enseña la escena.
+const ESCENA_OCULTA =
+  '(orientation: portrait) and (max-height: 520px), (orientation: landscape) and (max-height: 540px)'
 
 // El selector de idioma se ESTRENA visible — decisión sellada de Victor. El
 // interruptor queda documentado para que la campaña IDI lo herede: cuando haya
@@ -117,8 +142,28 @@ function usePrefiereQuietud() {
   return quieto
 }
 
+// MON-2.1 · Mismo molde que la quietud, y a propósito: son dos condiciones
+// independientes que apagan lo mismo, y ninguna sustituye a la otra. Reactiva
+// al giro del aparato, que es el caso que importa: quien abre la Portada en
+// apaisado y gira a vertical tiene que ver la escena 4 entera.
+function useEscenaOculta() {
+  const [oculta, setOculta] = useState(() => {
+    try { return window.matchMedia(ESCENA_OCULTA).matches }
+    catch { return false }
+  })
+  useEffect(() => {
+    let mq
+    try { mq = window.matchMedia(ESCENA_OCULTA) } catch { return undefined }
+    const f = (e) => setOculta(e.matches)
+    mq.addEventListener('change', f)
+    return () => mq.removeEventListener('change', f)
+  }, [])
+  return oculta
+}
+
 export default function Portada({ onEnviarCodigo, onVerificar }) {
   const quieto = usePrefiereQuietud()
+  const escenaOculta = useEscenaOculta()
   const { play } = useSounds()
 
   // ── Todo lo que depende de la escena se DERIVA, no se resetea ─────────────
@@ -283,15 +328,27 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
   // queda en memoria hasta que la escena lo pida. El marcado no lleva el
   // animado en ningún `src` hasta la activación: ni un byte antes del primer
   // pintado ni fuera de la banda de los 2,5 s. Con quietud no se baja nunca.
+  //
+  // ── MON-2.1 · y no se baja donde la escena no existe ──────────────────────
+  // `escenaOculta` es la TERCERA condición que apaga, y se compone con las dos
+  // que ya había: ninguna sustituye a otra. Al girar el aparato el efecto se
+  // rearma solo —`escenaOculta` está en las dependencias— así que pasar de
+  // apaisado a vertical dispara aquí la misma política de las pesadas, sin un
+  // camino aparte que mantener. Al revés no hace nada: si ya está en memoria,
+  // `animado.current` corta en la primera línea.
+  // El único caso que el rearme sí toca es girar A oculto con la descarga en
+  // vuelo: el `abort` del cleanup la corta, y al volver se pide entera otra
+  // vez. Se deja así —cortar lo que ya no se va a ver es lo correcto— y queda
+  // declarado, que es más de lo que costaría esconderlo.
   useEffect(() => {
-    if (!pesadas || quieto || animado.current) return undefined
+    if (!pesadas || quieto || escenaOculta || animado.current) return undefined
     const ctrl = new AbortController()
     fetch(RENDER_HEPTACOIN.animado, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((blob) => { animado.current = blob })
       .catch(() => {})
     return () => ctrl.abort()
-  }, [pesadas, quieto])
+  }, [pesadas, quieto, escenaOculta])
 
   const alFallarElAnimado = useCallback((e) => {
     const img = e.currentTarget
