@@ -1,0 +1,15 @@
+# ── CAR-1 / GOV-3 · caché de assets ─────────────────────────────────────────
+# Rector: AJILEI_CAR1_Fase1_v1.0 §4. Medido en Fase 0 §3: Cloudflare servía
+# TODO con `public, max-age=0, must-revalidate`, incluidos los assets a los que
+# Vite ya pone hash de contenido. Resultado: 40 idas y vueltas condicionales
+# (304) antes de poder pintar una baraja que ya estaba en disco.
+#
+# Aquí es seguro porque el nombre cambia cuando cambia el contenido.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Y sólo aquí. Lo que NO lleva regla es deliberado: `index.html`,
+# `manifest.webmanifest`, `icons.svg`, `heptacoin.webp` y su póster,
+# `og-image.jpg`, los sonidos — todo lo de `public/` viaja SIN hash, con nombre
+# estable, y tiene que seguir revalidando. Darles `immutable` sería dejar una
+# versión vieja cacheada un año tras cada despliegue, sin forma de desalojarla.
