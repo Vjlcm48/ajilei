@@ -166,3 +166,51 @@ Todo valor vive en `src/styles/theme.css` (primer import de `main.jsx`). Nada nu
 - Decisiones estéticas nuevas → se incorporan aquí (v1.3...).
 - Conflicto entre instrucción puntual y este sistema → preguntar antes de implementar.
 - Toda pantalla nueva comienza con: *"Diseñar conforme a `AJILEI_Sistema_Diseno.md`"*.
+
+---
+
+## 12. NOTA DE CORRECCIÓN — DOS CAMINOS DE RENDER Y REVERSO (2026-09-05, DOC-2b)
+
+Tres etiquetas que circulaban por la cadena de instrucciones quedaron demostradas
+incompletas o incorrectas durante la campaña CAR-1. Se corrigen **aquí**, en el
+documento maestro, y no en las fichas e informes donde nacieron: un documento
+cerrado es registro histórico y no se reescribe.
+
+**1 · Los dos caminos de render del rival dependen de la ORIENTACIÓN, no sólo de
+la mesa.** Medido el 2026-09-05 sobre `807b63b`, showdown, contenedor real del
+`<img>` de la carta del rival:
+
+| Mesa | Escritorio 1440×850 | Móvil vertical 390×844 | Móvil apaisado 780×360 |
+|---|---|---|---|
+| **2** | `.ai-zone` | `.ai-zone` | **`.opp-panel` dentro de `.rivals-zone`** |
+| **5/4/3** | `.opp-panel` | `.opp-panel` | `.opp-panel` |
+
+En cada celda, la sección de la otra vía está **ausente del DOM**, no oculta: son
+dos ramas de JSX excluyentes, no dos capas superpuestas. La fuente está declarada
+en [GameTable.jsx:71](../src/components/GameTable.jsx#L71) —«panel compacto
+(`.opp-panel`) en landscape y espejo (`.ai-zone`) en portrait»— y se ejerce en las
+dos ramas de 1780 y 1789; `renderTwoPlayerRival` (1424) es la que pinta `.ai-zone`.
+
+Consecuencia práctica: **«mesa 2 vía `.ai-zone`» es cierto en dos de tres
+viewports y falso en el tercero.** La forma corta que sí aguanta es «mesa 2 usa
+`.ai-zone` salvo en apaisado». Quien verifique los dos caminos tiene que cubrir
+las **dos orientaciones**, que es exactamente lo que ya pedía
+`AJILEI_Tapetes_v1.0.md:38` («cinco fondos × dos caminos × dos orientaciones»);
+lo que faltaba en esa línea es que la segunda orientación **cambia la vía**, no
+sólo la caja. `AJILEI_Menu_Utilidades_v1.5.md:186` ya lo tenía correcto y es la
+redacción de referencia.
+
+**2 · El reverso viaja por las DOS rutas, no sólo por CSS.** Es `<img>` en
+[PlayingCard.jsx:3](../src/components/PlayingCard.jsx#L3)
+(`reverso_carta.svg?no-inline`, dentro de `opp-card-slot`) y también en
+[Portada.jsx:10](../src/screens/Portada.jsx#L10); y es `background: url(...)` en
+`gameTable.css` **642, 664 y 1080** (mazo y carta voladora). Decir «el reverso es
+un `background-image`» deja fuera la mitad. Sigue siendo un solo SVG de 6 994 B y
+ninguna de las dos rutas cambió en CAR-1.
+
+**3 · La matriz de `diagDSK.mjs gate` son SEIS celdas, no cuatro:** 640×360,
+360×640, 844×390, 1024×768, 1366×768, 1920×937. El «matriz 4/4» de
+`AJILEI_CAR1_Cierre_Commits_v1.0.md` §5 y Paso 2.5 nació de contar líneas sobre
+una salida truncada; el arnés escupe JSON y hay que parsearlo, no contarlo.
+Léase **6/6** en las dos apariciones. La cifra correcta ya consta en
+`docs/reportes/AJILEI_CAR1_Cierre_Reporte_v1.0.md` y en los informes de FRZ-1.
