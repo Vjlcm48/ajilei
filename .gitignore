@@ -77,11 +77,18 @@ capturas-ren1/
 # originales largos de Victor no estan aqui ni en el repo — se retiraron de
 # `public/sounds/` en CEL-A y viven en sus descargas.
 _audio_cel/
-laminas/mon1/render/png/
+
+# Talleres de render 3D (laminas/mon1 · laminas/mon2). Viajan los SCRIPTS —son
+# la fuente de verdad del asset publicado— y NO sus salidas: los 135 PNG RGBA
+# del maestro (127 MB), los intermedios y el WebP literal de la escalera se
+# regeneran desde el pipeline (`heptacoin_alfa.py -- animar` + `empaquetar.py`).
+# Las sondas de calibración (`_calib/`, `_humo/`) y el bytecode de Python, igual.
+laminas/mon1/render/
+laminas/mon2/render/
 laminas/mon1/_calib/
 laminas/mon1/_humo/
- __pycache__/
- 
+__pycache__/
+
 # PUE · salidas del arnés de la Portada-Entrada (scripts/diagPUE.mjs). Mismo
 # criterio que capturas-dsk y capturas-ren1: son REGENERABLES —cualquier modo
 # del arnés las vuelve a escribir— y llegaron a pesar decenas de MB sin
