@@ -8,6 +8,7 @@ import Bautizo from './screens/Bautizo'
 import { readNivel, writeNivel } from './hooks/useNivel'
 import { useAuth, AUTH_BYPASS, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
+import { precargarBaraja } from './lib/precargaBaraja'
 
 // ── NIV-UI · Recorrido del lobby ─────────────────────────────────────────────
 // Rector: docs/AJILEI_Modos_y_Asistencia_v1.0.md §4.1.
@@ -61,6 +62,9 @@ function App() {
   // No pinta nada y no toca el layout: Δ=0 en las tres pantallas del lobby.
   useEffect(() => {
     if (screen !== 'welcome') precargarSonidos(SONIDOS_MESA)
+    // CAR-1 §3.2 · y la baraja con ellos, por la misma razón y en el mismo
+    // momento: 0,57 MB de WebP contra los 24,28 MB de PNG que ya no viajan.
+    if (screen !== 'welcome') precargarBaraja()
   }, [screen])
 
   // CARGANDO no pinta: pinta NADA. El fondo del documento ya es el verde abismo
