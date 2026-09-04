@@ -1,8 +1,11 @@
 import '../styles/welcome.css'
 import { SoundButton } from './SoundButton'
 import { Wordmark } from './Wordmark'
-import reyOroUrl     from '../assets/cards/doce_oro.png?url'
-import caballoOroUrl from '../assets/cards/once_oro.png?url'
+// CAR-1 §2.2 · las dos decorativas usan el MISMO derivado de 320 que la mesa:
+// se pintan a 150x212 CSS (450x636 fisicos a DPR 3) y al 22 % de opacidad, y
+// costaban 1,79 MB antes de repartir una sola carta (Fase 0 §1).
+import reyOroUrl     from '../assets/cards/webp/doce_oro.webp?url'
+import caballoOroUrl from '../assets/cards/webp/once_oro.webp?url'
 
 // SUP-2b · `cuenta` es OPCIONAL y su ausencia es un estado legítimo, no un
 // olvido: no llega con el bypass de desarrollo activo (la adenda de Fase 1 lo
