@@ -214,3 +214,51 @@ ninguna de las dos rutas cambió en CAR-1.
 una salida truncada; el arnés escupe JSON y hay que parsearlo, no contarlo.
 Léase **6/6** en las dos apariciones. La cifra correcta ya consta en
 `docs/reportes/AJILEI_CAR1_Cierre_Reporte_v1.0.md` y en los informes de FRZ-1.
+
+**4 · No existe maestro vectorial de la baraja (2026-09-05, VEC-1).** Retirados
+en `cdc996a` los dos pliegos que llevaban años en el árbol sin que nadie mirara
+qué eran:
+
+| Archivo | Bytes | md5 |
+|---|---|---|
+| `src/assets/baraja.svg` | 1 267 756 | `37d1757505d867ed418d29685ab6dbd3` |
+| `src/assets/baraja2.svg` | 4 098 052 | `59c8b27e1e3b697efb15410386b7415c` |
+
+Entraron los dos en `819e276` (2026-06-12), el volcado inicial, el mismo commit
+que los 40 PNG — coincidencia que no probaba nada porque entró todo a la vez.
+
+**Veredicto medido.** Son vectores reales —0 % base64, 1 538 y 3 299 trazados,
+limpios al 400 %— pero de **otra baraja**: el pliego libre «NAIPES LIBRES», con
+la cabeza del ñu de GNU en las monedas y el lema «LIBERTAD ES ORO», sin autor ni
+licencia declarados en su `<metadata>`. Y ni siquiera está completa: entre los
+dos dan las pipas 1-9 y las figuras 10 y 12, pero **el 11 —el caballo— está en
+blanco en los cuatro palos de los dos pliegos**, y sobran el 8 y el 9, que la
+baraja española del juego no usa.
+
+> **No existe maestro vectorial de la baraja de AJILEI, ni fuera del repo ni
+> dentro.** Los 40 PNG de `src/assets/cards/` son la fuente y son el techo: todo
+> derivado —los WebP de CAR-1 incluidos— se transcodifica desde ellos, y ninguna
+> regeneración degrada nada porque siempre se parte del mismo origen.
+
+Se retiraron del árbol, no del historial. Para recuperar cualquiera de los dos:
+
+```
+git show 819e276:src/assets/baraja2.svg > baraja2.svg
+```
+
+Con ellos cayeron sus tres únicas herramientas —`scripts/analyze_baraja2.py`,
+`scripts/find_all_cards.py`, `scripts/find_ids.mjs`, las tres apuntando al
+pliego por ruta absoluta— y dos SVG de plantilla sin referencias, `vite.svg` y
+`react.svg`. Ninguna de las siete rutas salía al build: verificado por el hash
+agregado de `dist/`, idéntico antes y después del retiro.
+
+**`heptacoin.svg` fue evaluado en la misma pasada y NO es candidato.** Es maestro
+vivo: `ChipToken.jsx:17` lo importa con `?no-inline` y de ahí cuelgan
+`BalanceDisplay`, `Celebracion` y `GameTable`; sale al build; `Identidad_A_v1.1`
+§5.4 lo declara ID de activo de contrato; y `laminas/mon1/heptacoin.py` lee sus
+constantes para generar el 3D de la Portada. Lo que MON-1/MON-2 sustituyó fue la
+moneda **de la escena 4**, no la del juego.
+
+*La comparación 1:1 del pliego contra `doce_oro.png` no se archiva aquí: pesa
+263,5 KB y el tope de esta pasada eran 150 KB. Vive en el informe de Fase 0 de
+VEC-1.*
