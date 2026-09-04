@@ -262,3 +262,54 @@ moneda **de la escena 4**, no la del juego.
 *La comparación 1:1 del pliego contra `doce_oro.png` no se archiva aquí: pesa
 263,5 KB y el tope de esta pasada eran 150 KB. Vive en el informe de Fase 0 de
 VEC-1.*
+
+**5 · La moneda de la Portada no se descarga donde la escena no existe
+(2026-09-05, MON-2.1).** `heptacoin.webp` pesa 1 040 KB —87 cuadros con alfa a
+616×346— y es el **69,4 % de todo lo que la Portada baja** (1 499,0 KB con ella,
+458,4 KB sin ella, medido en Fast 4G). La Fase 0 encontró que se bajaba entera
+en los dos escalones donde `portada.css` pone `.pue-escenario { display: none }`:
+`(orientation: portrait) and (max-height: 520px)` y `(orientation: landscape)
+and (max-height: 540px)`. En móvil apaisado la caja del `<img>` mide 0×0 y el
+megabyte viajaba igual.
+
+`Portada.jsx` replica esas dos condiciones en un `matchMedia` (`ESCENA_OCULTA`)
+y las compone con la de `prefers-reduced-motion` que ya existía: **tres
+condiciones que apagan la descarga, ninguna sustituye a otra**. Las condiciones
+se copian, no se mueven: la hoja sigue mandando sobre lo que se pinta y el
+módulo sólo pregunta. Es reactiva al giro, que es el caso que importa — quien
+abre en apaisado y gira a vertical ve la escena 4 entera.
+
+**Los dos assets se mudaron de `public/` a `src/assets/`** para que Vite les
+ponga hash de contenido. No es cosmética: sin hash no pueden entrar en la zona
+`immutable` de `public/_headers`, y sin ella revalidaban en cada visita —un
+viaje de ida y vuelta bloqueante por visita para un archivo que no cambia. La
+mudanza no recodifica nada: los md5 de `dist/assets/` son idénticos a los de
+origen (`f0d99f58e6e76456…` y `bf923fd4119d63fe…`).
+
+**Lo que NO se tocó, y por qué.** El peso del archivo. La Fase 0 midió que no
+sobra resolución —en un teléfono DPR 3 el navegador **amplía** la moneda un
+12 %— ni calidad de color: recodificarla más baja la deja **más pesada**, porque
+deshace la limpieza Bayer y la estabilización entre cuadros de `empaquetar.py`.
+La única palanca real es **menos fotogramas**, y la sombra de vuelo
+(`heptacoin_alfa.py:133-142`, mancha rectangular con la solución probada y sin
+sellar) exige volver a Blender. Las dos juntas son **MON-3**.
+
+**Dónde vive el origen.** Los 135 PNG RGBA de 880×495 están en
+`laminas/mon2/render/png/`, que está en `.gitignore`: **no viajan en el repo**.
+Copia de respaldo en `Downloads\AJILEI\mon2_render_2026-09-05`, **verificada el
+2026-09-05: los 135 byte a byte idénticos al original**. Sin ellos, cualquier
+reempaquetado exige Blender.
+
+*Cabo suelto anotado, no tocado:* `laminas/mon2/empaquetar.py --publicar` sigue
+escribiendo en `public/`. Cuando MON-3 regenere el asset tendrá que apuntar a
+`src/assets/`; hasta entonces, publicar desde el taller deja el archivo en el
+sitio equivocado —sin hash y fuera de la zona `immutable`— sin que nada avise.
+
+*Dos verdes falsos que la mudanza estuvo a punto de crear, y se cerraron en la
+misma tanda.* El arnés `diagPUE.mjs` comparaba la ruta del póster por igualdad
+literal y filtraba el animado con `/heptacoin\.webp/`: con el hash de Vite
+ninguna de las dos casa, y `mon.1`, `mon.6` y `1.6f` habrían medido una ruta
+inexistente **en verde**. Ahora reconocen por nombre base, que es lo estable. Y
+el comentario de `public/_headers` ponía `heptacoin.webp` de ejemplo de fichero
+sin hash; se cambió por los iconos de `icons/`, que sí siguen en `public/`.
+Ninguna regla cambió.
