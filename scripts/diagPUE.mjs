@@ -20,9 +20,10 @@
 //       node scripts/diagPUE.mjs            (todo)
 //       node scripts/diagPUE.mjs 1.8        (un punto suelto)
 //       node scripts/diagPUE.mjs puerta     (la puerta: el visitante anónimo llega a la portada)
+//       node scripts/diagPUE.mjs mon        (MON-2: el render 3D con alfa de la escena 4 obedece al rotor)
 import { chromium } from 'playwright-core'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { gzipSync } from 'node:zlib'
+import { gzipSync, inflateSync } from 'node:zlib'
 
 const BASE = process.env.PUE_BASE || 'http://localhost:4173'
 const URL_LAMINA = `${BASE}/`
@@ -94,7 +95,9 @@ const TINTA_ESCENA = `(() => {
   for (const p of piezas) {
     if (!p.checkVisibility({ opacityProperty: true, visibilityProperty: true,
                              contentVisibilityAuto: true })) continue;
-    const r = p.getBoundingClientRect();
+    let r = p.getBoundingClientRect();
+    // MON-2 · el <img> de la escena 4 es el cuadro 16:9 exacto: su caja de
+    // elemento ES el cuadro pintado, no hace falta descontar letterbox.
     if (r.width < 1 || r.height < 1) continue;
     x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top);
     x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom); n++;
@@ -460,6 +463,8 @@ if (hacer('1.6')) {
     viewport: { width: 1920, height: 1080 }, reducedMotion: 'reduce',
   })
   const page = await ctx.newPage()
+  const pedidosAnimado = []
+  page.on('request', r => { if (/heptacoin\.webp/.test(r.url())) pedidosAnimado.push(r.url()) })
   await page.goto(URL_LAMINA, { waitUntil: 'networkidle' })
   await page.waitForTimeout(2500)
 
@@ -481,6 +486,14 @@ if (hacer('1.6')) {
       imgs, brilloBoton: brillo,
       indiceActiva: ${INDICE_ACTIVA},
       perezosasCargadas: document.querySelectorAll('img[data-src]').length === 0,
+      // MON-2 · el render de la escena 4 con quietud: el póster puesto (con
+      // quietud lo pesado entra YA) y pintado; el animado ni se pide.
+      render: (() => {
+        const i = document.querySelector('img.pue-heptacoin');
+        if (!i) return null;
+        return { src: (i.getAttribute('src') || '').replace(location.origin, ''), display: getComputedStyle(i).display,
+                 complete: i.complete, nw: i.naturalWidth, nh: i.naturalHeight };
+      })(),
     };
   })()`)
   await page.screenshot({ path: `${SALIDA}/reducido-1920x1080.png` })
@@ -494,6 +507,12 @@ if (hacer('1.6')) {
     `activa=${rm.esc1Activa} opacity=${rm.esc1Opacity} · 5 cartas con opacity=${rm.imgs.map(i => i.opacity).join('/')}`)
   anota('1.6d el brillo del botón no se pinta', sinBrillo, `.btn-jugar::after display=${rm.brilloBoton}`)
   anota('1.6e el rotor no avanza', rm.indiceActiva === 0, `índice tras 2,5s = ${rm.indiceActiva}`)
+  // MON-2 · con quietud sólo el póster: puesto, decodificado y pintado; el
+  // animado no viaja (ni un byte: la precarga se salta con quietud).
+  const v = rm.render
+  const renderQuieto = !!v && v.src === '/heptacoin-poster.webp' && v.complete && v.nw > 0 && v.display !== 'none' && pedidosAnimado.length === 0
+  anota('1.6f el render de la escena 4 no anima: póster quieto, animado sin pedir', renderQuieto,
+    v ? `src=${v.src} · complete=${v.complete} · ${v.nw}×${v.nh} · display=${v.display} · peticiones del animado=${pedidosAnimado.length}` : 'sin <img>')
 
   resultados.bloques['1.6'] = rm
   await ctx.close()
@@ -789,6 +808,175 @@ if (hacer('2.5')) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// mon · MON-2 · el render 3D con alfa de la escena 4 obedece al rotor
+// ════════════════════════════════════════════════════════════════════════════
+// El asset es un <img> con un WebP animado (alfa real), no un <video>: no hay
+// play(), ni currentTime, ni `ended`. Lo que hay es lo que el compositor pinta,
+// y eso se mide con PÍXELES: un punto del cuadro donde la héroe reposa (oro
+// sólo desde el cuadro ~87) y otro en la base de la pila (oro desde el ~12).
+// Con ellos se distingue «cuadro 0» (verde de la portada en los dos), «corre»
+// (pila en oro, héroe en verde), «reposo» (los dos en oro) y «póster» (los dos
+// en oro con la escena fuera). Las cifras de la geometría vienen de BANDA ::
+// (heptacoin_alfa.py): pila x 0,24–0,49 · y 0,41–0,85 desde abajo; héroe en
+// reposo x 0,475–0,765 · y 0,10–0,39 desde abajo.
+// Y la sonda de fondo único, que es el criterio de Victor: en la escena 4
+// activa, un píxel pegado al límite del cuadro POR DENTRO, en zona sin moneda,
+// y el pegado POR FUERA deben ser idénticos — y, para que la filigrana de la
+// portada (que hace distintos dos píxeles vecinos aunque no haya asset) no
+// falsee el veredicto, se mide además que el asset no cambie NINGUNO de los
+// dos: mismo píxel con el <img> puesto y con el <img> oculto.
+const pixel1x1 = (buf) => {
+  const idat = []; let o = 8
+  while (o < buf.length) {
+    const len = buf.readUInt32BE(o); const t = buf.toString('latin1', o + 4, o + 8)
+    if (t === 'IDAT') idat.push(buf.subarray(o + 8, o + 8 + len)); o += 12 + len
+  }
+  const raw = inflateSync(Buffer.concat(idat)); return [raw[1], raw[2], raw[3]]
+}
+// Oro o su brillo bajo el barrido (213,213,129): rojo alto y azul muy por debajo.
+// El verde de la portada (25,68,41) y el póster vacío nunca cumplen las dos.
+const esOro = ([r, g, b]) => r >= 150 && r - b >= 50
+const esVerde = ([r, g, b]) => g > r && g > b
+if (hacer('mon')) {
+  console.log('\n── mon · el render con alfa de la escena 4 y el rotor (1920×1080) ──')
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
+  const page = await ctx.newPage()
+  const red = []
+  let t0 = Date.now()
+  page.on('request', r => { if (/heptacoin/.test(r.url())) red.push({ url: r.url().replace(BASE, ''), t: Date.now() - t0 }) })
+  await page.goto(URL_LAMINA, { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+
+  const CAJAS = `(() => {
+    const c = (s) => { const e = document.querySelector(s); if (!e) return null;
+      const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(n => Math.round(n * 100) / 100); };
+    return { escenario: c('.pue-escenario'), frase: c('.pue-frase'), hero: c('.pue-hero'),
+             tarjeta: c('.pue-tarjeta') || c('.pue-btn-jugar'), render: c('.pue-render-monedas'), cuadro: c('img.pue-heptacoin') };
+  })()`
+  const IMG = `(() => {
+    const i = document.querySelector('img.pue-heptacoin');
+    if (!i) return null;
+    const r = i.getBoundingClientRect();
+    return { tag: i.tagName, src: (i.getAttribute('src') || '').replace(location.origin, ''), alt: i.getAttribute('alt'),
+             oculta: i.getAttribute('aria-hidden'), decoding: i.getAttribute('decoding'), complete: i.complete,
+             nw: i.naturalWidth, nh: i.naturalHeight, caja: [r.left, r.top, r.width, r.height].map(n => Math.round(n * 100) / 100) };
+  })()`
+  const animados = () => red.filter(r => /heptacoin\.webp/.test(r.url))
+  const px = async (x, y) => pixel1x1(await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } }))
+  const puntos = (caja) => {
+    const [x, y, w, h] = caja
+    return { pila: [x + 0.365 * w, y + (1 - 0.45) * h], heroe: [x + 0.62 * w, y + (1 - 0.246) * h] }
+  }
+
+  const antes = await page.evaluate(CAJAS)
+  const enReposo = await page.evaluate(IMG)
+  anota('mon.0 el <img> existe: alt vacío, aria-hidden, decoding async, y sin fuente antes de la política de lo pesado',
+    !!enReposo && enReposo.tag === 'IMG' && enReposo.alt === '' && enReposo.oculta === 'true' && enReposo.decoding === 'async' && enReposo.src === '',
+    enReposo ? `alt="${enReposo.alt}" aria-hidden=${enReposo.oculta} decoding=${enReposo.decoding} src="${enReposo.src}" a 0,9 s` : 'sin <img>')
+
+  // ── La precarga de los 2,5 s ──────────────────────────────────────────────
+  await page.waitForTimeout(3000)   // 0,9 + 3,0 ≈ 3,9 s: la precarga ya salió
+  const precarga = animados()
+  const conPoster = await page.evaluate(IMG)
+  anota('mon.1 el animado se pide en la banda de los 2,5 s, una sola vez, y el póster ya está puesto',
+    precarga.length === 1 && precarga[0].t >= 2400 && !!conPoster && conPoster.src === '/heptacoin-poster.webp',
+    `${precarga.map(r => `${r.url}@${r.t}ms`).join(' · ') || 'ninguna petición del animado'} · src=${conPoster && conPoster.src} · ${conPoster && conPoster.nw}×${conPoster && conPoster.nh}`)
+
+  // ── Primera activación ────────────────────────────────────────────────────
+  await esperarEscena(page, 3, 0)
+  const tActiva = Date.now() - t0
+  const alActivar = await page.evaluate(IMG)
+  anota('mon.3 al activarse la escena el <img> ya lleva el animado precargado (blob), sin nueva petición',
+    !!alActivar && /^blob:/.test(alActivar.src) && animados().length === 1,
+    alActivar ? `src=${alActivar.src.slice(0, 40)} · peticiones del animado hasta la activación (${tActiva}ms): ${animados().length}` : 'sin <img>')
+  const P = puntos(alActivar.caja)
+  await page.waitForTimeout(150)
+  const c0 = { pila: await px(...P.pila), heroe: await px(...P.heroe) }
+  anota('mon.2a arranca desde el cuadro 0: a +0,15 s el cuadro está vacío (ni pila ni héroe)',
+    esVerde(c0.pila) && esVerde(c0.heroe) && !esOro(c0.pila) && !esOro(c0.heroe),
+    `pila=${c0.pila} · héroe=${c0.heroe}`)
+  await page.waitForTimeout(1050)
+  const c1 = { pila: await px(...P.pila), heroe: await px(...P.heroe) }
+  anota('mon.2b corre: a +1,2 s la pila ya está y la héroe aún no', esOro(c1.pila) && !esOro(c1.heroe),
+    `pila=${c1.pila} · héroe=${c1.heroe}`)
+  const durante = await page.evaluate(CAJAS)
+  const alCorrer = await page.evaluate(IMG)
+  // El asset nace a 616×346: el peldaño de escala de la escalera de peso (Bloque
+  // 0.4 de MON-2), 1,4× el ancho CSS del cuadro en escritorio y 2,7× en móvil.
+  // Se exige 16:9 exacto en la caja y en el asset, y que el asset nunca se
+  // AMPLÍE: al menos el ancho CSS de la caja más grande (440 px).
+  anota('mon.4 la caja del <img> es el cuadro 16:9 exacto y el asset (16:9) no se amplía (≥ el ancho de la caja)',
+    !!alCorrer && Math.abs(alCorrer.caja[2] / alCorrer.caja[3] - 16 / 9) < 0.01 && Math.abs(alCorrer.nw / alCorrer.nh - 16 / 9) < 0.01 && alCorrer.nw >= alCorrer.caja[2],
+    alCorrer ? `caja=${JSON.stringify(alCorrer.caja)} · natural ${alCorrer.nw}×${alCorrer.nh} (${(alCorrer.nw / alCorrer.caja[2]).toFixed(2)}×)` : '—')
+
+  // ── Reposo y fin de la ventana ────────────────────────────────────────────
+  // tiempos.json (MON-1): reposo en el cuadro 87 = 2,9 s; el tramo D es el
+  // barrido sobre la moneda quieta. A +3,1 s la héroe tiene que estar de cara.
+  await page.waitForTimeout(1900)   // 0,15 + 1,05 + 1,9 = 3,1 s
+  const c2 = { pila: await px(...P.pila), heroe: await px(...P.heroe) }
+  anota('mon.5 a +3,1 s la moneda está en reposo, de cara (≥ 2,9 s)', esOro(c2.pila) && esOro(c2.heroe),
+    `pila=${c2.pila} · héroe=${c2.heroe}`)
+
+  // ── Sonda de fondo único ──────────────────────────────────────────────────
+  // Seis puntos pegados al límite del cuadro por DENTRO (2px) en zonas sin
+  // moneda, y sus vecinos por FUERA (2px). Con el <img> puesto y oculto.
+  const [cx, cy, cw, ch] = alCorrer.caja
+  const pares = {
+    'sup-izq': [[cx + cw * 0.10, cy + 2], [cx + cw * 0.10, cy - 2]],
+    'sup-der': [[cx + cw * 0.90, cy + 2], [cx + cw * 0.90, cy - 2]],
+    'der-medio': [[cx + cw - 2, cy + ch * 0.5], [cx + cw + 2, cy + ch * 0.5]],
+    'inf-der': [[cx + cw * 0.90, cy + ch - 2], [cx + cw * 0.90, cy + ch + 2]],
+    'inf-izq': [[cx + cw * 0.10, cy + ch - 2], [cx + cw * 0.10, cy + ch + 2]],
+    'izq-medio': [[cx + 2, cy + ch * 0.5], [cx - 2, cy + ch * 0.5]],
+  }
+  const conAsset = {}
+  for (const [k, [d, f]] of Object.entries(pares)) conAsset[k] = [await px(...d), await px(...f)]
+  await page.evaluate(`document.querySelector('img.pue-heptacoin').style.visibility = 'hidden'`)
+  const sinAsset = {}
+  for (const [k, [d, f]] of Object.entries(pares)) sinAsset[k] = [await px(...d), await px(...f)]
+  await page.evaluate(`document.querySelector('img.pue-heptacoin').style.visibility = ''`)
+  const dmax = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])))
+  const fondoUnico = Object.keys(pares).every(k => dmax(conAsset[k][0], sinAsset[k][0]) === 0 && dmax(conAsset[k][1], sinAsset[k][1]) === 0)
+  const paresIguales = Object.keys(pares).filter(k => dmax(conAsset[k][0], conAsset[k][1]) === 0).length
+  anota('mon.10 fondo único: el asset no cambia ni un píxel pegado a su límite, por dentro ni por fuera (6 puntos)', fondoUnico,
+    Object.keys(pares).map(k => `${k}: dentro ${conAsset[k][0]} / fuera ${conAsset[k][1]} (Δ asset ${dmax(conAsset[k][0], sinAsset[k][0])}/${dmax(conAsset[k][1], sinAsset[k][1])})`).join(' · ')
+    + ` · pares dentro=fuera idénticos: ${paresIguales}/6 (los demás difieren por la filigrana, medido sin asset)`)
+
+  const indiceTras = await page.evaluate(INDICE_ACTIVA)
+  await esperarEscena(page, 4, 200)
+  const fuera = await page.evaluate(IMG)
+  anota('mon.6 fuera de la escena vuelve al póster', !!fuera && fuera.src === '/heptacoin-poster.webp',
+    fuera ? `src=${fuera.src} · escena activa tras la sonda: ${indiceTras}` : '—')
+  const despues = await page.evaluate(CAJAS)
+
+  // ── O1: nada se movió ─────────────────────────────────────────────────────
+  const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  const quietas = ['escenario', 'frase', 'hero', 'tarjeta', 'render'].every(k => igual(antes[k], durante[k]) && igual(antes[k], despues[k]))
+  anota('mon.7 O1 · escenario, frase, héroe, tarjeta y caja del render no se mueven antes/durante/después', quietas,
+    ['escenario', 'frase', 'hero', 'tarjeta', 'render'].map(k => `${k}=${JSON.stringify(antes[k])}${igual(antes[k], durante[k]) && igual(antes[k], despues[k]) ? '' : ' ≠ ' + JSON.stringify(durante[k]) + '/' + JSON.stringify(despues[k])}`).join(' · '))
+
+  // ── Segunda activación: rebobina ──────────────────────────────────────────
+  await esperarEscena(page, 0, 0)
+  await esperarEscena(page, 3, 0)
+  const t2 = Date.now() - t0
+  const segunda = await page.evaluate(IMG)
+  await page.waitForTimeout(150)
+  const c3 = { pila: await px(...P.pila), heroe: await px(...P.heroe) }
+  await page.waitForTimeout(1050)
+  const c4 = { pila: await px(...P.pila), heroe: await px(...P.heroe) }
+  anota('mon.8 en la segunda activación rebobina al cuadro 0 con una URL de objeto nueva y vuelve a correr',
+    !!segunda && /^blob:/.test(segunda.src) && segunda.src !== alActivar.src && esVerde(c3.pila) && !esOro(c3.pila) && !esOro(c3.heroe) && esOro(c4.pila) && !esOro(c4.heroe),
+    `src=${segunda && segunda.src.slice(0, 40)} (≠ primera: ${!!segunda && segunda.src !== alActivar.src}) · +0,15 s pila=${c3.pila} héroe=${c3.heroe} · +1,2 s pila=${c4.pila} héroe=${c4.heroe} (activación 2 a ${t2}ms)`)
+  const pedidosTotal = animados()
+  anota('mon.9 una sola petición del animado en dos ciclos: ni al activar ni al rebobinar', pedidosTotal.length === 1,
+    pedidosTotal.map(r => `${r.url}@${r.t}ms`).join(' · ') || 'ninguna')
+
+  await page.screenshot({ path: `${SALIDA}/mon-esc4-1920x1080.png` })
+  resultados.bloques.mon = { antes, durante, despues, enReposo, conPoster, alActivar, c0, c1, c2, c3, c4, conAsset, sinAsset, fuera, segunda, red, tActiva, t2 }
+  await ctx.close()
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // 1.8 · Bitácora de red · arranque en frío
 // ════════════════════════════════════════════════════════════════════════════
 if (hacer('1.8')) {
@@ -842,13 +1030,30 @@ if (hacer('1.8')) {
   })()`)
   const corte = fcp === null ? 2000 : fcp
 
-  const perezosas = bitacora.filter(b => /uno_copa|tres_copa|cinco_copa|diez_copa|doce_copa|mesapc|mesav/.test(b.url))
+  // MON-INT · el póster del render entra en la lista de lo perezoso: viaja con
+  // la política de los 2,5 s, igual que las caras y las capturas de mesa.
+  const perezosas = bitacora.filter(b => /uno_copa|tres_copa|cinco_copa|diez_copa|doce_copa|mesapc|mesav|heptacoin-poster/.test(b.url))
   const criticas = bitacora.filter(b => b.tPeticion <= corte)
   const despues = bitacora.filter(b => b.tPeticion > corte && !perezosas.includes(b))
 
   const todasPerezosas = perezosas.length > 0 && perezosas.every(b => b.tPeticion >= 2400)
-  anota('1.8a las caras y las capturas llegan perezosas', todasPerezosas,
+  anota('1.8a las caras, las capturas y el póster llegan perezosos', todasPerezosas,
     perezosas.map(b => `${corto(b.url).split('/').pop()}@${b.tPeticion}ms`).join(' · ') || 'ninguna pedida')
+
+  // MON-2 · ni un byte del animado antes del primer pintado: no está en ningún
+  // `src` del marcado; sólo lo pide la precarga de los 2,5 s. Se listan las
+  // peticiones que hubiera, con su instante, para que el rojo diga cuándo.
+  const videos = bitacora.filter(b => /heptacoin\.webp/.test(b.url))
+  const videosCriticos = videos.filter(b => b.tPeticion <= corte)
+  anota('1.8d el WebP animado no viaja antes del primer pintado', videosCriticos.length === 0,
+    videos.length ? videos.map(b => `${corto(b.url).split('/').pop()}@${b.tPeticion}ms`).join(' · ')
+                  : `ninguna petición del animado en ${5000}ms (FCP=${fcp}ms)`)
+  // La precarga sellada (POR-FID, heredada por MON-2): UNA petición del
+  // animado, en la banda de los 2,5 s (≥2400 ms, como las caras y el póster).
+  anota('1.8e el animado se precarga en la banda de los 2,5 s, una sola vez',
+    videos.length === 1 && videos[0].tPeticion >= 2400,
+    videos.length ? videos.map(b => `${corto(b.url).split('/').pop()}@${b.tPeticion}ms · ${(b.cable / 1024).toFixed(1)} KiB`).join(' · ')
+                  : 'ninguna petición del animado en 5000ms')
 
   const suma = (lista, campo) => lista.reduce((acc, b) => acc + (b[campo] > 0 ? b[campo] : 0), 0)
   const criticoCable = suma(criticas, 'cable')

@@ -492,6 +492,45 @@ body.portada-activa #root {
   100%  { background-position-x: 160%; }
 }
 
+/* ── MON-2 · El render 3D con alfa toma la caja de los vectores ────────────
+   Misma anchura que `.pue-mesa-monedas` (440 · 320 · 280 por escalón) y el
+   MISMO piso que la héroe (22px sobre el borde del escenario): el escenario no
+   cambia de alto —es la reserva O1— y nada fuera de él se mueve.
+   Sin `background`, sin máscara, sin penumbra: el asset viaja con canal alfa
+   y lo que hay detrás de las monedas es la portada misma. La costura de
+   MON-INT/POR-FID (elipse con charco, variantes A/B/C por `?esc4`) se retiró
+   entera: el telón no era un defecto de CSS sino el fondo horneado del render.
+   Las reglas de `.pue-moneda`/`.pue-pila`/`.pue-heroe` de arriba quedan sin
+   consumidor: se desconectan, no se borran — su retiro se decide al sellar.
+
+   EL CUADRO ES EXACTO. El contenedor se declara `container-type: size` y el
+   <img> se dimensiona a 16:9 EXACTO con lo que quepa —`min(100%, 100cqh·16/9)`—
+   pegado abajo y centrado: la caja del elemento ES el cuadro pintado en
+   cualquier escalón (las cajas que certificó mon.7 no cambian). `cover` ahí
+   dentro es identidad (mismo ratio); evita una fila de 1px por redondeo.     */
+.portada-lienzo .pue-render-monedas {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 22px;
+  transform: translateX(-50%);
+  width: min(440px, 92%);
+  container-type: size;
+}
+.portada-lienzo .pue-heptacoin {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  aspect-ratio: 16 / 9;
+  width: min(100%, calc(100cqh * 16 / 9));
+  height: auto;
+  display: block;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Escena 5 · la mesa real ───────────────────────────────────────────────
    ══ DELTA 2 · EJE RECENTRADO (segunda mitad) ══════════════════════════════
    Aquí la aritmética no sale a mano como en la escena 4: el ancho de la laptop
@@ -786,6 +825,7 @@ body.portada-activa #root {
      cantó en rojo, que es exactamente para lo que está. */
   .portada-lienzo .pue-pila { --d: clamp(54px, 14vw, 70px); left: 21.65%; }
   .portada-lienzo .pue-heroe { --d: clamp(104px, 26vw, 132px); left: 69.65%; }
+  .portada-lienzo .pue-render-monedas { width: min(320px, 94%); }   /* MON-2 */
   .portada-lienzo .pue-duo { width: min(320px, 94%); }
   .portada-lienzo .pue-telefono { left: 50%; height: 100%; }
   .portada-lienzo .pue-laptop { left: 50%; height: 88%; }
@@ -868,6 +908,7 @@ body.portada-activa #root {
   .portada-lienzo .pue-mesa-monedas { width: min(280px, 94%); }
   .portada-lienzo .pue-pila { --d: clamp(42px, 10.5vw, 54px); left: 22.4%; }
   .portada-lienzo .pue-heroe { --d: clamp(80px, 19vw, 98px); left: 70.4%; }
+  .portada-lienzo .pue-render-monedas { width: min(280px, 94%); }   /* MON-2 */
   .portada-lienzo .pue-pregunta { font-size: 15px; top: 0; }
   .portada-lienzo .pue-trio { bottom: 2px; gap: 8px; }
   .portada-lienzo .pue-trio img { width: clamp(38px, 9.6vw, 50px); }

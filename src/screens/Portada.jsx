@@ -8,7 +8,6 @@ import { LEMA_PORTADA } from '../config/textosPuerta'
 import { useSounds, precargarSonidos, SONIDOS_PORTADA } from '../hooks/useSounds'
 
 import reversoUrl from '../assets/cards/reverso_carta.svg'
-import heptacoinUrl from '../assets/heptacoin.svg'
 import unoUrl from '../assets/portada/uno_copa.webp'
 import tresUrl from '../assets/portada/tres_copa.webp'
 import cincoUrl from '../assets/portada/cinco_copa.webp'
@@ -71,6 +70,24 @@ const VOLTEO_MEDIO_MS = 220
 // A los 2,5 s: el patrón que la bitácora 1.8 midió: el formulario ya es usable y
 // lo pesado entra sin competir por el ancho de banda del primer pintado.
 const ESPERA_PESADAS_MS = 2500
+
+// ── MON-2 · El render 3D de la Heptacoin en la escena 4, con alfa real ──────
+// MON-1 horneó el fondo de la portada dentro del video y MON-INT/POR-FID
+// intentaron coser ese telón con máscaras: descartado por Victor y el rector.
+// El render viaja ahora CON CANAL ALFA como WebP animado —un solo asset,
+// Safari no reproduce VP9 con alfa—, 135 cuadros a 30 fps = 4,500 s, la
+// ventana EXACTA de la escena, y lo que hay detrás de las monedas es la propia
+// portada: su degradado y su filigrana, sin capa intermedia. La sombra de
+// contacto viene del render (shadow catcher), no de CSS. Sin bucle en el asset
+// (loop=1): el cuadro 0 es un vacío sin monedas y el 134 el reposo; la portada
+// rebobina por código. El póster ES el cuadro 134 con alfa — si el animado no
+// llega (datos, batería, quietud), lo que queda es la escena terminada.
+// Ambos viven en `public/` con nombre estable y sin hash (como og-image.jpg).
+const ESCENA_RENDER = 3
+const RENDER_HEPTACOIN = {
+  animado: '/heptacoin.webp',
+  poster: '/heptacoin-poster.webp',
+}
 
 // El selector de idioma se ESTRENA visible — decisión sellada de Victor. El
 // interruptor queda documentado para que la campaña IDI lo herede: cuando haya
@@ -135,6 +152,8 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
   const pausada = useRef(false)
   const relojes = useRef([])
   const cajaIdioma = useRef(null)
+  const render = useRef(null)    // MON-2 · el <img> de la escena 4
+  const animado = useRef(null)   // MON-2 · el WebP animado ya bajado (Blob)
 
   const programa = useCallback((fn, ms) => {
     relojes.current.push(setTimeout(fn, ms))
@@ -234,6 +253,50 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
     }
     return limpia
   }, [escenaViva, quieto, limpia, programa])
+
+  // ── MON-2 · El animado obedece al rotor ───────────────────────────────────
+  // Un <img> no tiene play(): «arrancar desde el cuadro 0» significa que el
+  // navegador abra una PETICIÓN DE IMAGEN NUEVA. Reasignar el mismo `src` no
+  // la abre —la lista de imágenes disponibles la sirve de caché y, en
+  // Chromium, la animación sigue por donde iba—, así que en cada activación se
+  // crea un object URL NUEVO sobre el MISMO blob: URL distinta → decodificación
+  // nueva → cuadro 0, sin un byte de red. Al salir la escena vuelve el póster y
+  // se revoca la URL. Con quietud la escena 4 nunca es la viva (escenaViva se
+  // clava en 0), así que aquí no se asigna jamás el animado. Si el blob aún no
+  // llegó cuando la escena entra, el póster se queda ese ciclo: no se cambia
+  // de fuente a mitad. Fallo silencioso: si el animado no decodifica, el
+  // `onError` del elemento repone el póster.
+  useEffect(() => {
+    const img = render.current
+    if (!img || quieto || escenaViva !== ESCENA_RENDER || !animado.current) return undefined
+    const url = URL.createObjectURL(animado.current)
+    img.src = url
+    return () => {
+      img.src = RENDER_HEPTACOIN.poster
+      URL.revokeObjectURL(url)
+    }
+  }, [escenaViva, quieto])
+
+  // ── MON-2 · El animado entra en la política de los 2,5 s ─────────────────
+  // Sellado por el rector en POR-FID y heredado aquí: el animado se baja UNA
+  // vez, como blob, con la misma política que trae el póster y las caras, y
+  // queda en memoria hasta que la escena lo pida. El marcado no lleva el
+  // animado en ningún `src` hasta la activación: ni un byte antes del primer
+  // pintado ni fuera de la banda de los 2,5 s. Con quietud no se baja nunca.
+  useEffect(() => {
+    if (!pesadas || quieto || animado.current) return undefined
+    const ctrl = new AbortController()
+    fetch(RENDER_HEPTACOIN.animado, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((blob) => { animado.current = blob })
+      .catch(() => {})
+    return () => ctrl.abort()
+  }, [pesadas, quieto])
+
+  const alFallarElAnimado = useCallback((e) => {
+    const img = e.currentTarget
+    if (img.getAttribute('src') !== RENDER_HEPTACOIN.poster) img.src = RENDER_HEPTACOIN.poster
+  }, [])
 
   useEffect(() => {
     if (!listaIdioma) return undefined
@@ -341,15 +404,29 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
                 </div>
               </div>
 
-              {/* 4 · Heptacoins · siete se apilan y la héroe cae firme */}
-              <div className={esc(3)}>
-                <div className="pue-mesa-monedas">
-                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                    <div className={`pue-moneda pue-pila pue-pila-${n}`} key={n}>
-                      <div className="pue-disco"><img src={heptacoinUrl} alt="" /></div>
-                    </div>
-                  ))}
-                  <div className="pue-moneda pue-heroe"><img src={heptacoinUrl} alt="" /></div>
+              {/* 4 · Heptacoins · el render 3D con alfa (MON-2): siete se apilan,
+                  la héroe cae de canto, rebota, se vuelca de cara y recibe el
+                  barrido, sobre el verde de la propia portada y con su sombra.
+                  Los vectores 2D de la lámina (.pue-mesa-monedas / .pue-pila /
+                  .pue-heroe) quedan desconectados de la escena; sus reglas siguen
+                  en portada.css y su retiro se decide al sellar. */}
+              <div className={esc(ESCENA_RENDER)}>
+                <div className="pue-render-monedas">
+                  {/* El <img> es el cuadro 16:9 EXACTO que cabe en el contenedor
+                      (mismas cajas que certificó mon.7). El póster entra con la
+                      política de lo pesado (2,5 s): antes de eso el elemento es
+                      una caja vacía del mismo tamaño, y la escena 4 no se ve
+                      hasta los 12,5 s. `alt=""` + aria-hidden: es ornamento. */}
+                  <img
+                    ref={render}
+                    className="pue-heptacoin"
+                    src={pesadas ? RENDER_HEPTACOIN.poster : undefined}
+                    alt=""
+                    aria-hidden="true"
+                    decoding="async"
+                    draggable={false}
+                    onError={alFallarElAnimado}
+                  />
                 </div>
               </div>
 
