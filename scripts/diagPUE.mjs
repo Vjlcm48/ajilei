@@ -28,6 +28,15 @@ import { gzipSync, inflateSync } from 'node:zlib'
 const BASE = process.env.PUE_BASE || 'http://localhost:4173'
 const URL_LAMINA = `${BASE}/`
 const SALIDA = 'capturas-pue'
+
+// ── MON-2.1 · los dos assets de la moneda ya no viven en `public/` ──────────
+// Pasaron a `src/assets/`, así que Vite les pone hash de contenido y ninguna
+// ruta literal vale: `/heptacoin-poster.webp` es ahora
+// `/assets/heptacoin-poster-XXXXXXXX.webp`. Se reconocen por su nombre base,
+// que es lo estable. Un arnés que compara contra una ruta que ya no existe no
+// falla: da VERDE en falso, que es peor.
+const ES_POSTER  = (u) => /heptacoin-poster(-[A-Za-z0-9_-]+)?\.webp/.test(u || '')
+const ES_ANIMADO = (u) => /heptacoin(-[A-Za-z0-9_-]+)?\.webp/.test(u || '') && !ES_POSTER(u)
 mkdirSync(SALIDA, { recursive: true })
 
 // El censo de la instrucción. `etiqueta` es el nombre del archivo de captura.
@@ -464,7 +473,7 @@ if (hacer('1.6')) {
   })
   const page = await ctx.newPage()
   const pedidosAnimado = []
-  page.on('request', r => { if (/heptacoin\.webp/.test(r.url())) pedidosAnimado.push(r.url()) })
+  page.on('request', r => { if (ES_ANIMADO(r.url())) pedidosAnimado.push(r.url()) })
   await page.goto(URL_LAMINA, { waitUntil: 'networkidle' })
   await page.waitForTimeout(2500)
 
@@ -510,7 +519,7 @@ if (hacer('1.6')) {
   // MON-2 · con quietud sólo el póster: puesto, decodificado y pintado; el
   // animado no viaja (ni un byte: la precarga se salta con quietud).
   const v = rm.render
-  const renderQuieto = !!v && v.src === '/heptacoin-poster.webp' && v.complete && v.nw > 0 && v.display !== 'none' && pedidosAnimado.length === 0
+  const renderQuieto = !!v && ES_POSTER(v.src) && v.complete && v.nw > 0 && v.display !== 'none' && pedidosAnimado.length === 0
   anota('1.6f el render de la escena 4 no anima: póster quieto, animado sin pedir', renderQuieto,
     v ? `src=${v.src} · complete=${v.complete} · ${v.nw}×${v.nh} · display=${v.display} · peticiones del animado=${pedidosAnimado.length}` : 'sin <img>')
 
@@ -861,7 +870,7 @@ if (hacer('mon')) {
              oculta: i.getAttribute('aria-hidden'), decoding: i.getAttribute('decoding'), complete: i.complete,
              nw: i.naturalWidth, nh: i.naturalHeight, caja: [r.left, r.top, r.width, r.height].map(n => Math.round(n * 100) / 100) };
   })()`
-  const animados = () => red.filter(r => /heptacoin\.webp/.test(r.url))
+  const animados = () => red.filter(r => ES_ANIMADO(r.url))
   const px = async (x, y) => pixel1x1(await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } }))
   const puntos = (caja) => {
     const [x, y, w, h] = caja
@@ -879,7 +888,7 @@ if (hacer('mon')) {
   const precarga = animados()
   const conPoster = await page.evaluate(IMG)
   anota('mon.1 el animado se pide en la banda de los 2,5 s, una sola vez, y el póster ya está puesto',
-    precarga.length === 1 && precarga[0].t >= 2400 && !!conPoster && conPoster.src === '/heptacoin-poster.webp',
+    precarga.length === 1 && precarga[0].t >= 2400 && !!conPoster && ES_POSTER(conPoster.src),
     `${precarga.map(r => `${r.url}@${r.t}ms`).join(' · ') || 'ninguna petición del animado'} · src=${conPoster && conPoster.src} · ${conPoster && conPoster.nw}×${conPoster && conPoster.nh}`)
 
   // ── Primera activación ────────────────────────────────────────────────────
@@ -945,7 +954,7 @@ if (hacer('mon')) {
   const indiceTras = await page.evaluate(INDICE_ACTIVA)
   await esperarEscena(page, 4, 200)
   const fuera = await page.evaluate(IMG)
-  anota('mon.6 fuera de la escena vuelve al póster', !!fuera && fuera.src === '/heptacoin-poster.webp',
+  anota('mon.6 fuera de la escena vuelve al póster', !!fuera && ES_POSTER(fuera.src),
     fuera ? `src=${fuera.src} · escena activa tras la sonda: ${indiceTras}` : '—')
   const despues = await page.evaluate(CAJAS)
 
@@ -1043,7 +1052,7 @@ if (hacer('1.8')) {
   // MON-2 · ni un byte del animado antes del primer pintado: no está en ningún
   // `src` del marcado; sólo lo pide la precarga de los 2,5 s. Se listan las
   // peticiones que hubiera, con su instante, para que el rojo diga cuándo.
-  const videos = bitacora.filter(b => /heptacoin\.webp/.test(b.url))
+  const videos = bitacora.filter(b => ES_ANIMADO(b.url))
   const videosCriticos = videos.filter(b => b.tPeticion <= corte)
   anota('1.8d el WebP animado no viaja antes del primer pintado', videosCriticos.length === 0,
     videos.length ? videos.map(b => `${corto(b.url).split('/').pop()}@${b.tPeticion}ms`).join(' · ')
