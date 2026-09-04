@@ -1,0 +1,1147 @@
+<!doctype html>
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  AJILEI — Campaña PUE (Portada-Entrada) · LÁMINA v1.7 · 31-ago-2026
+  ═══════════════════════════════════════════════════════════════════
+  Maqueta 1:1 para validación visual. NO es producción.
+
+  CÓMO ABRIRLA
+  · Guardar en la RAÍZ del repo ajilei (junto a index.html) y doble clic.
+    Rutas relativas: src/assets/…, PUE_mesav_demo.jpg. También sirve
+    `npm run dev` → http://localhost:5173/PUE_lamina_v1.7.html
+  · Para el S25: `npm run dev -- --host` y la IP del PC desde el teléfono.
+
+  QUÉ TRAE LA v1.7 (veredicto de Victor, 31-ago)
+  · Modo hoja (móvil): tarjeta OPACA con el token modal de la casa
+    (--surface-modal) y escenas + frase ocultas mientras la hoja está
+    abierta. La transparencia era el token de escritorio colándose.
+  · Selector de idioma diseñado y sellado: globo arriba-derecha, lista con
+    tricolor + Español activo y EN/PT/FR/IT con «Pronto». Banderas
+    provisionales en CSS (IDI trae SVG oficiales). Interruptor
+    MOSTRAR_IDIOMA documenta el estreno en producción.
+
+  QUÉ CORRIGE LA v1.6.2 (hallazgo de Victor a 360×640)
+  · Traje compacto: el marcador «51 AJILEI» quedaba a 8px de las cartas;
+    la mano sube para dejar 18px de aire. Los demás escalones, intactos.
+  · La esquina superior derecha queda reservada para el selector de idioma
+    (campaña IDI); no se pinta hasta que tenga idiomas que ofrecer.
+
+  QUÉ CORRIGE LA v1.6.1 (hallazgo de Victor a 360×640)
+  · El escalón de "teléfono muy corto" escondía las escenas bajo 640px de
+    alto (herencia del formulario en pantalla). Ahora hay traje compacto:
+    todo se encoge en proporción y cabe hasta en 320×568. Solo bajo 520px
+    de alto las escenas se retiran.
+
+  QUÉ TRAE LA v1.6 (sellado por Victor, 31-ago)
+  · Quinta escena: LA ENSEÑANZA, tras el AJILEI. La pregunta se revela en
+    dos tiempos — «¿No sabes jugar…» «…o no te acuerdas?» — y tres reversos
+    caen con golpe seco al ritmo de «un, dos, tres» mientras entra la
+    respuesta: «Tranquilo — te lo enseñamos en un dos por tres.»
+  · Compás de la moneda: 4,5s. Ciclo: baraja 4 · AJILEI 4 · enseñanza 4,5
+    · monedas 4,5 · mesa 4 = 21s.
+  · La frase de esta escena espera su momento (data-frase-espera): entra
+    con el primer golpe de carta, no antes.
+
+  QUÉ CORRIGE LA v1.5 (sellado por Victor, 31-ago)
+  · Ritmo por escena: baraja 4s · AJILEI 4s · monedas 4,5s · mesa 4s
+    (recorte de 1s a todas menos monedas, que cede 0,5s).
+  · Escena 4 en móvil: relevo — el teléfono entra primero, a los 2s se
+    esfuma y la laptop aparece con su rebote. En escritorio siguen juntos.
+
+  QUÉ CORRIGE LA v1.4 (sellado por Victor, 31-ago)
+  · Ritmo: 5s por escena (ciclo de 20s); monedas compactadas para que el
+    primer brillo de la héroe complete antes del fundido.
+  · Escena 2: volteo a la mitad — cadencia 0,28s, giro 0,45s; marcador y
+    halo sincronizados.
+  · Escena 4: laptop y teléfono separados con aire; entrada con rebote
+    corto — laptop primero, teléfono después.
+  · Botón JUGAR: la banda #fff6e0 de la casa barre su cara con el ciclo
+    1,5s + 2,5s (destello de metal pulido) + halo dorado tenue en reposo.
+    Descartada la línea de borde en loop: uniforme de otra tribu.
+
+  QUÉ CORRIGE LA v1.3 (sellado por Victor, 31-ago)
+  · Escena 1: fuera la flotación perpetua — las cartas quedan quietas tras
+    el reparto. La ley §5 vuelve a regir sin excepciones.
+  · Escena 3: brillo de la héroe a prueba de balas (recorte circular, sin
+    máscara) y con el ciclo de la casa: 1,5s de viaje + 2,5s de reposo,
+    infinito mientras la moneda descansa.
+  · Ritmo: 6s por escena (ciclo completo: 24s).
+  · Patrón adaptativo sellado: escritorio con tarjeta visible; móvil
+    vertical con botón JUGAR + línea de vacuna, y la tarjeta sube como
+    hoja al toque (correo enfocado). El velo cierra al tocar fuera.
+  · Escena 4: escritorio muestra laptop (PUE_mesapc_demo.png) + teléfono;
+    móvil, teléfono solo. Frase oficial actualizada.
+
+  QUÉ CORRIGE LA v1.2 (veredicto de Victor, 30-ago)
+  · Eje único: cada escena y su frase comparten centro — la frase, ahora
+    centrada, es el ancla. El encabezado sigue a la izquierda en escritorio.
+  · Escena 1: abanico elevado y compactado; la tinta ya no toca la frase.
+  · Escena 2: cartas lado a lado (10px de aire) + halo dorado del ganador
+    al revelar el Rey (APROXIMACIÓN de casa; la regla exacta se clona en la
+    ronda de auditoría, mismo trato que el wordmark).
+  · Escena 3: SIETE monedas se apilan (hepta) con canto visible; la héroe
+    cae firme — un solo rebote corto, sin aplastarse — más grande, y la
+    recorre la banda #fff6e0 de la casa. El guion de MON-1 queda actualizado
+    a esta coreografía.
+
+  QUÉ TRAE RESPECTO A LA v1.0
+  · Wordmark: clon 1:1 del real (Extracción v1.0 §1.3) — system-ui 500,
+    FL-1 inline, EMB-1 con @property, script de medición. Sin constantes
+    mías. Incluye la herencia de index.css, con su corte a 1024px.
+  · Copy sellado: lema nuevo de la tarjeta.
+  · Cuatro escenas rotativas (8 s, fundido, pausa al tocar el formulario,
+    quietas con reduced-motion): baraja → AJILEI de 51 → Heptacoins → mesa.
+  · Escena 2: As·3·5·Sota·Rey de copas (AJILEI natural, certificado).
+  · Escena 3: gemela CSS+SVG del guion de MON-1 (el render 3D la sustituye).
+  · Escena 4: PUE_mesav_demo.jpg dentro de un marco, barras recortadas.
+  · Pie «by HEPTACREATION» con entrada escalonada dentro del segundo.
+  · Fondo: filigrana + radial calcados de .puerta-screen.
+
+  DOCTRINA
+  · Un solo oro sólido: el botón. El wordmark y el «51» son texto recortado.
+  · O1: ranura de aviso, cuerpo del formulario y caja de frase reservan alto.
+    Las cifras de producción se MIDEN en su fase.
+  · Las caras de las cartas y la captura cargan perezosas (data-src) — el
+    patrón que producción hereda con derivados WebP.
+  · Escenas mudas. Solo el strum del primer toque, con corte VC2.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AJILEI — La mesa te espera</title>
+<meta name="description" content="AJILEI, el juego de cartas venezolano. Gratis y sin descargas: entra con tu correo y juega.">
+<style>
+/* ═══ Tokens · calcados de theme.css (Fase 0 §1.6 / Extracción §1.3) ═══ */
+:root{
+  --gold-brand:#e8b84b;      --gold-brand-rgb:232,184,75;
+  --gold-hover:#f5cc6a;
+  --gold-dim:#c9973a;        --gold-dim-rgb:201,151,58;
+  --gold-brand-hi:#f5dfae;
+  --gold-brand-deep:#ac7e16;
+  --green-abyss:#09170e;
+  --green-darkest:#0b1c11;
+  --green-deep:#153922;
+  --green-base:#1b482c;
+  --green-bright:#235c38;
+  --surface-panel:rgba(9,21,13,.75);
+  --surface-card:rgba(9,23,14,.55);
+  --surface-modal:#0c1d13;
+  --flag-yellow:#ffcc00;
+  --flag-blue:#003893;
+  --flag-red:#cf142b;
+  --text-primary:#f5edd8;
+  --text-secondary:rgba(245,237,216,.72);
+  --text-muted:rgba(245,237,216,.55);
+  --text-faint:rgba(245,237,216,.25);
+  --text-dark:#1a1a0e;
+  --lose-red:#ef5350;
+  --font-base:Arial, sans-serif;
+  --filigrana:
+    repeating-linear-gradient(45deg,
+      transparent 0px, transparent 28px,
+      rgba(var(--gold-dim-rgb),.05) 28px, rgba(var(--gold-dim-rgb),.05) 29px),
+    repeating-linear-gradient(-45deg,
+      transparent 0px, transparent 28px,
+      rgba(var(--gold-dim-rgb),.05) 28px, rgba(var(--gold-dim-rgb),.05) 29px);
+  /* IDN-1 · métricas medidas sobre Segoe UI */
+  --wm-cap:0.7002em;
+  --wm-desc:0.25em;
+}
+
+/* ═══ La herencia de index.css que alcanza al <h1> (Extracción §1.2.0) ═══ */
+:root{
+  font:18px/145% system-ui,'Segoe UI',Roboto,sans-serif;
+  letter-spacing:.18px;
+  color-scheme:light dark;
+}
+@media (max-width:1024px){ :root{font-size:16px} }
+h1,h2{ font-family:system-ui,'Segoe UI',Roboto,sans-serif; font-weight:500; }
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  min-height:100vh;
+  background:var(--green-abyss);
+  color:var(--text-primary);
+  font-family:var(--font-base);
+}
+
+/* ═══ Lienzo · calcado de .puerta-screen ═══ */
+.lienzo{
+  position:relative;
+  min-height:100vh;
+  min-height:100svh;
+  display:grid;
+  grid-template-rows:1fr auto;
+  place-items:center;
+  padding:24px 24px 12px;
+  overflow:hidden;
+  background:
+    var(--filigrana),
+    radial-gradient(ellipse at 42% 38%,
+      var(--green-bright) 0%, var(--green-deep) 50%, var(--green-abyss) 100%);
+}
+.escena-grid{
+  position:relative;z-index:1;
+  width:min(1240px,100%);
+  display:grid;
+  grid-template-columns:1.15fr .85fr;
+  gap:clamp(32px,5vw,72px);
+  align-items:center;
+}
+
+/* ═══ Hero ═══ */
+.hero{min-width:0}
+.marca-wrap{display:block}
+
+/* ── Wordmark · clon 1:1 (Extracción §1.3) ─────────────────────────── */
+.welcome-title{
+  color:var(--gold-brand);
+  font-size:72px;
+  letter-spacing:12px;
+  margin:0 0 14px;
+}
+.wm-slot{
+  position:relative;
+  display:inline;                      /* NO inline-block · §1.2.3 */
+  padding-left:var(--wm-cap);
+  margin-right:var(--wm-track,0px);
+}
+.wm-iso{
+  position:absolute;left:0;
+  bottom:calc(var(--wm-desc) - 0.4167 * var(--wm-cap));
+  width:var(--wm-cap);
+  height:calc(1.5 * var(--wm-cap));
+  pointer-events:none;
+}
+h1.welcome-title{--wm-track:12px}
+
+@property --brillo-x{ syntax:'<length>'; inherits:true; initial-value:0px; }
+
+@supports ((background-clip:text) or (-webkit-background-clip:text)){
+  h1.welcome-title{
+    --brillo-recorrido:1.5s;
+    --brillo-pausa:2.5s;
+    --brillo-banda-frac:.35;
+    --brillo-banda:calc(var(--brillo-ancho) * var(--brillo-banda-frac));
+    --brillo-ancho:0px;
+    --brillo-slot-dx:0px;
+    --emb-titulo-banda:#fff6e0;
+    --emb-titulo-aire:0.55em;
+    --emb-titulo-margen-base:14px;
+
+    padding-top:var(--emb-titulo-aire);
+    padding-bottom:var(--emb-titulo-aire);
+    margin-top:calc(-1 * var(--emb-titulo-aire));
+    margin-bottom:calc(var(--emb-titulo-margen-base) - var(--emb-titulo-aire));
+
+    background-image:
+      linear-gradient(100deg,
+        rgba(255,246,224,0) 0%, var(--emb-titulo-banda) 50%, rgba(255,246,224,0) 100%),
+      linear-gradient(180deg,
+        var(--gold-brand-hi) 0%, var(--gold-brand) 52%, var(--gold-brand-deep) 100%);
+    background-size:var(--brillo-banda) 3em, 100% 1em;
+    background-repeat:no-repeat;
+    background-position-x:calc(var(--brillo-x) + var(--brillo-slot-dx)), 0px;
+    background-position-y:center, center;
+
+    -webkit-background-clip:text;
+            background-clip:text;
+    color:transparent;
+    -webkit-text-fill-color:transparent;
+
+    animation:emb-brillo calc(var(--brillo-recorrido) + var(--brillo-pausa)) linear infinite;
+  }
+  h1.welcome-title .wm-slot::after{
+    content:'';position:absolute;left:0;
+    bottom:calc(var(--wm-desc) - 0.4167 * var(--wm-cap));
+    width:var(--wm-cap);
+    height:calc(1.5 * var(--wm-cap));
+    pointer-events:none;
+    background-image:linear-gradient(100deg,
+      rgba(255,246,224,0) 0%, var(--emb-titulo-banda) 50%, rgba(255,246,224,0) 100%);
+    background-size:var(--brillo-banda) 100%;
+    background-repeat:no-repeat;
+    background-position-x:var(--brillo-x);
+    background-position-y:center;
+    -webkit-mask-image:url('src/assets/ajilei-isotipo.svg');
+            mask-image:url('src/assets/ajilei-isotipo.svg');
+    -webkit-mask-size:100% 100%;   mask-size:100% 100%;
+    -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+  }
+  @media (prefers-reduced-motion:reduce){
+    h1.welcome-title{animation:none;--brillo-banda:0px}
+    h1.welcome-title .wm-slot::after{display:none}
+  }
+}
+/* 37,5 % = 1,5 / (1,5 + 2,5). Si se mueven los tokens de tiempo, se mueve la parada. */
+@keyframes emb-brillo{
+  0%   {--brillo-x:calc(-1 * var(--brillo-banda))}
+  37.5%{--brillo-x:var(--brillo-ancho)}
+  100% {--brillo-x:var(--brillo-ancho)}
+}
+
+/* ── Copy fijo ─────────────────────────────────────────────────────── */
+.lema-grande{
+  margin:38px 0 0;                     /* compensa el pie colgante FL-1 (precedente puerta-lema) */
+  font-size:clamp(21px,2.3vw,31px);
+  line-height:1.3;
+  color:var(--text-primary);
+}
+.lema-categoria{
+  margin:10px 0 0;
+  font-size:clamp(14px,1.1vw,16px);
+  color:var(--text-secondary);
+}
+
+/* ═══ Escenario rotativo ═══ */
+.escenario{
+  position:relative;
+  margin-top:clamp(28px,4vh,44px);
+  height:clamp(210px,28vh,300px);
+  perspective:900px;
+}
+.esc{
+  position:absolute;inset:0;
+  opacity:0;
+  transition:opacity .7s ease;
+  pointer-events:none;
+}
+.esc.activa{opacity:1}
+.frase{                                /* O1: dos líneas reservadas · el ancla del eje */
+  margin:14px 0 0;
+  text-align:center;
+  min-height:2.6em;
+  font-size:clamp(15px,1.15vw,17px);
+  line-height:1.3;
+  color:var(--text-secondary);
+  transition:opacity .35s ease;
+}
+.frase.oculta{opacity:0}
+
+/* ── Escena 1 · la baraja ──────────────────────────────────────────── */
+.abanico{position:absolute;inset:0}
+.abanico img{
+  position:absolute;left:50%;bottom:40px;
+  width:clamp(112px,10.5vw,150px);
+  aspect-ratio:910/1420;height:auto;
+  transform-origin:50% 130%;
+  transform:translateX(-50%) rotate(var(--r));
+  filter:drop-shadow(0 18px 28px rgba(0,0,0,.45));
+  opacity:0;
+}
+.abanico img:nth-child(1){--r:-26deg}
+.abanico img:nth-child(2){--r:-13deg}
+.abanico img:nth-child(3){--r:0deg}
+.abanico img:nth-child(4){--r:13deg}
+.abanico img:nth-child(5){--r:26deg}
+.esc.activa .abanico img{animation:repartir .5s ease-out forwards}
+.esc.activa .abanico img:nth-child(1){animation-delay:.22s}
+.esc.activa .abanico img:nth-child(2){animation-delay:.30s}
+.esc.activa .abanico img:nth-child(3){animation-delay:.38s}
+.esc.activa .abanico img:nth-child(4){animation-delay:.46s}
+.esc.activa .abanico img:nth-child(5){animation-delay:.54s}
+@keyframes repartir{
+  from{opacity:0;transform:translateX(-50%) rotate(calc(var(--r)*.3)) translateY(30px)}
+  to  {opacity:1;transform:translateX(-50%) rotate(var(--r)) translateY(0)}
+}
+/* v1.3 · flotación perpetua eliminada por veredicto: quietud tras el reparto */
+
+/* ── Escena 2 · el AJILEI de 51 ────────────────────────────────────── */
+.mano{
+  position:absolute;left:50%;bottom:52px;
+  transform:translateX(-50%);
+  display:flex;align-items:flex-end;
+  gap:10px;
+}
+/* Halo del ganador — APROXIMACIÓN de casa; la regla exacta del juego se
+   clona en la ronda de auditoría (mismo trato que el wordmark). */
+.mano::before{
+  content:'';position:absolute;inset:-16px -18px;
+  border-radius:18px;
+  border:1px solid rgba(var(--gold-brand-rgb),.55);
+  box-shadow:0 0 34px 8px rgba(var(--gold-brand-rgb),.38),
+             0 0 90px 22px rgba(var(--gold-brand-rgb),.16);
+  opacity:0;transition:opacity .5s ease;
+  pointer-events:none;
+}
+.mano.gana::before{opacity:1;animation:halo-pulso 2s ease-in-out .5s infinite alternate}
+@keyframes halo-pulso{from{opacity:1}to{opacity:.65}}
+.carta{
+  width:clamp(58px,6.4vw,94px);
+  aspect-ratio:1055/1491;
+  perspective:800px;
+  filter:drop-shadow(0 12px 18px rgba(0,0,0,.45));
+}
+.carta-inner{
+  position:relative;width:100%;height:100%;
+  transform-style:preserve-3d;
+  transform:rotateY(0deg);
+}
+.esc.activa .carta-inner{animation:voltear .45s ease-in-out forwards;animation-delay:calc(.3s + var(--i) * .28s)}
+@keyframes voltear{to{transform:rotateY(180deg)}}
+.cara,.dorso{
+  position:absolute;inset:0;
+  border-radius:8px;overflow:hidden;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:var(--green-darkest);
+}
+.cara{transform:rotateY(180deg)}
+.cara img,.dorso img{width:100%;height:100%;object-fit:cover;display:block}
+.marcador{
+  position:absolute;left:0;right:0;bottom:0;
+  text-align:center;
+  font-size:clamp(17px,1.5vw,21px);
+  letter-spacing:.06em;
+  color:var(--text-secondary);
+}
+.marcador b{
+  font-weight:bold;
+  font-size:1.35em;
+  color:var(--text-primary);
+}
+.marcador .ajilei-tag{
+  display:inline-block;margin-left:.6em;
+  font-weight:bold;letter-spacing:.14em;
+  background-image:linear-gradient(180deg,var(--gold-brand-hi) 0%,var(--gold-brand) 52%,var(--gold-brand-deep) 100%);
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .4s ease,transform .4s ease;
+}
+.marcador .ajilei-tag.visible{opacity:1;transform:translateY(0)}
+
+/* ── Escena 3 · la enseñanza · «un dos por tres» ────────────────────── */
+.pregunta{
+  position:absolute;left:0;right:0;top:6%;
+  text-align:center;
+  font-size:clamp(19px,1.9vw,27px);
+  line-height:1.25;
+  color:var(--text-primary);
+  font-weight:bold;
+}
+.pregunta span{display:block;opacity:0}
+.esc.activa .pregunta .p1{animation:subir .5s ease-out .15s forwards}
+.esc.activa .pregunta .p2{animation:subir .5s ease-out .75s forwards}
+.trio{
+  position:absolute;left:50%;bottom:6px;
+  transform:translateX(-50%);
+  display:flex;gap:14px;align-items:flex-end;
+}
+.trio img{
+  width:clamp(62px,6.6vw,92px);
+  aspect-ratio:910/1420;height:auto;
+  transform:rotate(var(--r));
+  filter:drop-shadow(0 12px 20px rgba(0,0,0,.45));
+  opacity:0;
+}
+.trio img:nth-child(1){--r:-10deg}
+.trio img:nth-child(2){--r:0deg}
+.trio img:nth-child(3){--r:10deg}
+.esc.activa .trio img{animation:golpe .4s cubic-bezier(.2,1.4,.4,1) forwards}
+.esc.activa .trio img:nth-child(1){animation-delay:1.9s}
+.esc.activa .trio img:nth-child(2){animation-delay:2.25s}
+.esc.activa .trio img:nth-child(3){animation-delay:2.6s}
+@keyframes golpe{
+  0%  {opacity:0;transform:rotate(var(--r)) translateY(-46px) scale(1.18)}
+  70% {opacity:1;transform:rotate(var(--r)) translateY(4px) scale(.98)}
+  100%{opacity:1;transform:rotate(var(--r)) translateY(0) scale(1)}
+}
+
+/* ── Escena 4 · Heptacoins (gemela del guion MON-1 · v2 firme) ──────── */
+.mesa-monedas{
+  position:absolute;left:50%;bottom:0;
+  transform:translateX(-50%);
+  width:min(440px,92%);height:100%;
+}
+.moneda{
+  position:absolute;left:50%;
+  width:var(--d);aspect-ratio:1;
+  transform:translateX(-50%);
+  opacity:0;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.5));
+}
+.moneda img{width:100%;height:100%;display:block;position:relative;z-index:1}
+/* La pila: SIETE monedas (hepta) con canto visible */
+.pila{--d:clamp(72px,7vw,100px);left:24%}
+.pila .disco{position:relative;isolation:isolate;transform:scaleY(.34);transform-origin:50% 100%}
+.pila .disco::after{
+  content:'';position:absolute;left:3%;right:3%;top:9%;bottom:-8%;
+  background:var(--gold-brand-deep);border-radius:50%;z-index:-1;
+}
+.pila-1{bottom:28px}.pila-2{bottom:34px}.pila-3{bottom:40px}.pila-4{bottom:46px}
+.pila-5{bottom:52px}.pila-6{bottom:58px}.pila-7{bottom:64px}
+.esc.activa .pila{animation:caer .45s ease-out forwards}
+.esc.activa .pila-1{animation-delay:.10s}
+.esc.activa .pila-2{animation-delay:.32s}
+.esc.activa .pila-3{animation-delay:.54s}
+.esc.activa .pila-4{animation-delay:.76s}
+.esc.activa .pila-5{animation-delay:.98s}
+.esc.activa .pila-6{animation-delay:1.20s}
+.esc.activa .pila-7{animation-delay:1.42s}
+@keyframes caer{
+  0%  {opacity:0;transform:translate(-50%,-170px)}
+  70% {opacity:1;transform:translate(-50%,0)}
+  84% {transform:translate(-50%,-5px)}
+  100%{opacity:1;transform:translate(-50%,0)}
+}
+/* La héroe: cae firme al nivel de la mesa — UN rebote corto, sin aplastarse */
+.heroe{--d:clamp(140px,13vw,190px);left:72%;bottom:22px}
+.esc.activa .heroe{animation:firme .9s ease-out 2s forwards}
+@keyframes firme{
+  0%  {opacity:0;transform:translate(-50%,-240px)}
+  58% {opacity:1;transform:translate(-50%,0)}
+  74% {transform:translate(-50%,-12px)}
+  88% {transform:translate(-50%,0)}
+  100%{opacity:1;transform:translate(-50%,0)}
+}
+.heroe::after{                          /* el brillo de la casa · ciclo 1,5s + 2,5s · recorte circular */
+  content:'';position:absolute;inset:0;z-index:2;
+  clip-path:circle(46% at 50% 50%);
+  background-image:linear-gradient(100deg,
+    rgba(255,246,224,0) 0%, #fff6e0 50%, rgba(255,246,224,0) 100%);
+  background-size:38% 100%;
+  background-repeat:no-repeat;
+  background-position-x:-60%;
+  opacity:.85;
+}
+.esc.activa .heroe::after{animation:brillo-moneda 4s linear 3s infinite}
+/* 37,5 % = 1,5 / (1,5 + 2,5) — la misma parada del wordmark */
+@keyframes brillo-moneda{
+  0%   {background-position-x:-60%}
+  37.5%{background-position-x:160%}
+  100% {background-position-x:160%}
+}
+
+/* ── Escena 5 · la mesa real · escritorio: laptop + teléfono · móvil: teléfono ── */
+.duo{
+  position:absolute;left:50%;bottom:0;
+  transform:translateX(-50%);
+  width:min(560px,100%);height:100%;
+}
+.laptop{
+  position:absolute;left:36%;bottom:6px;
+  transform:translateX(-50%);
+  height:68%;
+  opacity:0;
+}
+.esc.activa .laptop{animation:alzar-pc .55s ease-out .1s forwards}
+@keyframes esfumar{to{opacity:0}}
+@keyframes alzar-pc{
+  0%  {opacity:0;transform:translate(-50%,26px)}
+  60% {opacity:1;transform:translate(-50%,-8px)}
+  80% {transform:translate(-50%,2px)}
+  100%{opacity:1;transform:translate(-50%,0)}
+}
+.laptop-pantalla{
+  height:calc(100% - 10px);
+  aspect-ratio:16/9;
+  padding:7px 7px 9px;
+  box-sizing:border-box;
+  background:var(--green-darkest);
+  border:1px solid rgba(var(--gold-dim-rgb),.35);
+  border-radius:12px 12px 4px 4px;
+  box-shadow:0 22px 40px rgba(0,0,0,.5);
+}
+.laptop-pantalla img{width:100%;height:100%;object-fit:cover;display:block;border-radius:6px;background:var(--green-abyss)}
+.laptop-base{
+  height:10px;
+  width:116%;
+  margin-left:-8%;
+  background:linear-gradient(180deg,var(--green-deep),var(--green-darkest));
+  border:1px solid rgba(var(--gold-dim-rgb),.3);
+  border-top:0;
+  border-radius:2px 2px 10px 10px;
+  box-sizing:border-box;
+}
+.telefono{
+  position:absolute;left:86%;bottom:0;z-index:2;
+  height:88%;
+  padding:7px;
+  border-radius:26px;
+  background:var(--green-darkest);
+  border:1px solid rgba(var(--gold-dim-rgb),.35);
+  box-shadow:0 24px 44px rgba(0,0,0,.55);
+  transform:translateX(-50%) rotate(-3deg);
+  opacity:0;
+}
+.esc.activa .telefono{animation:alzar .55s ease-out .45s forwards}
+@keyframes alzar{
+  0%  {opacity:0;transform:translate(-50%,26px) rotate(-3deg)}
+  60% {opacity:1;transform:translate(-50%,-8px) rotate(-3deg)}
+  80% {transform:translate(-50%,2px) rotate(-3deg)}
+  100%{opacity:1;transform:translate(-50%,0) rotate(-3deg)}
+}
+.pantalla{
+  position:relative;height:100%;
+  aspect-ratio:1080/2110;               /* 2340 − barra de estado 100 − barra de navegación 130 */
+  overflow:hidden;
+  border-radius:19px;
+  background:var(--green-abyss);
+}
+.pantalla img{
+  position:absolute;left:0;top:-4.74%;  /* recorta la barra de estado; el resto cae fuera abajo */
+  width:100%;height:auto;display:block;
+}
+
+/* ═══ Tarjeta de entrada ═══ */
+.tarjeta{
+  justify-self:center;
+  width:100%;max-width:500px;
+  background:var(--surface-panel);
+  border:1px solid rgba(var(--gold-dim-rgb),.28);
+  border-radius:32px;
+  padding:44px 38px 38px;
+  box-shadow:0 30px 70px rgba(0,0,0,.5);
+}
+.tarjeta-titulo{
+  margin:0 0 10px;
+  font-family:var(--font-base);font-weight:bold;
+  font-size:20px;letter-spacing:.04em;
+  color:var(--text-primary);
+}
+.tarjeta-lema{margin:0 0 24px;font-size:15px;line-height:1.55;color:var(--text-secondary)}
+.tarjeta-lema b{color:var(--text-primary);font-weight:bold}
+.cuerpo{min-height:236px}              /* O1 · cifra de lámina, producción la mide */
+.campo-etiqueta{display:block;margin:0 0 8px;font-size:13px;letter-spacing:.06em;color:var(--text-secondary)}
+.campo{
+  width:100%;
+  background:var(--surface-card);
+  border:1px solid rgba(var(--gold-dim-rgb),.35);
+  border-radius:14px;
+  padding:15px 16px;
+  font-family:var(--font-base);
+  font-size:16px;                      /* 16px evita el zoom de iOS */
+  color:var(--text-primary);
+}
+.campo::placeholder{color:var(--text-faint)}
+.campo:focus{outline:none;border-color:var(--gold-brand);box-shadow:0 0 0 3px rgba(var(--gold-brand-rgb),.18)}
+.campo-codigo{font-size:1.7rem;letter-spacing:.55em;text-align:center}
+.aviso{min-height:24px;margin:10px 0 0;font-size:13px;color:var(--lose-red)}   /* O1 */
+.boton{                                /* EL oro sólido de la pantalla */
+  width:100%;margin-top:14px;
+  padding:15px;border:0;border-radius:14px;
+  background:var(--gold-brand);color:var(--text-dark);
+  font-family:var(--font-base);font-size:16px;font-weight:bold;letter-spacing:.03em;
+  cursor:pointer;
+  transition:background .15s ease,transform .12s ease;
+}
+.boton:hover{background:var(--gold-hover)}
+.boton:active{transform:translateY(1px)}
+.confianza{margin:16px 0 0;text-align:center;font-size:13px;color:var(--text-muted)}
+.enlaces{margin:18px 0 0;display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.enlace{background:none;border:0;padding:0;font-family:var(--font-base);font-size:13px;color:var(--text-secondary);cursor:pointer}
+.enlace:hover{color:var(--gold-hover)}
+.enlace[disabled]{color:var(--text-faint);cursor:default}
+.pie{margin:22px 0 0;text-align:center;font-size:13px;color:var(--text-faint)}
+:is(.boton,.enlace):focus-visible{outline:2px solid var(--gold-hover);outline-offset:3px}
+
+/* ═══ CTA móvil · JUGAR (patrón hoja, sellado punto 4) ═══ */
+.cta-movil{
+  display:none;
+  flex-direction:column;align-items:center;
+  margin-top:clamp(18px,3vh,26px);
+}
+.btn-jugar{
+  position:relative;overflow:hidden;
+  width:min(320px,86%);
+  padding:16px;border:0;border-radius:16px;
+  background:var(--gold-brand);color:var(--text-dark);
+  font-family:var(--font-base);font-size:17px;font-weight:bold;letter-spacing:.08em;
+  cursor:pointer;
+  box-shadow:0 14px 34px rgba(0,0,0,.4), 0 0 26px rgba(var(--gold-brand-rgb),.28);
+  transition:background .15s ease,transform .12s ease;
+}
+.btn-jugar::after{                      /* la banda de la casa sobre el oro: metal pulido */
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(100deg,
+    rgba(255,246,224,0) 0%, rgba(255,246,224,.55) 50%, rgba(255,246,224,0) 100%);
+  background-size:40% 100%;
+  background-repeat:no-repeat;
+  background-position-x:-60%;
+  animation:brillo-boton 4s linear 1.2s infinite;
+}
+@keyframes brillo-boton{
+  0%   {background-position-x:-60%}
+  37.5%{background-position-x:160%}
+  100% {background-position-x:160%}
+}
+.btn-jugar:hover{background:var(--gold-hover)}
+.btn-jugar:active{transform:translateY(1px)}
+.btn-jugar:focus-visible{outline:2px solid var(--gold-hover);outline-offset:3px}
+.cta-vacuna{margin:10px 0 0;font-size:12.5px;color:var(--text-muted)}
+.velo{display:none}
+
+/* ═══ Selector de idioma · diseño sellado (producción: gobernado por IDI) ═══ */
+.idioma{position:absolute;top:14px;right:14px;z-index:3}
+.idioma-globo{
+  width:40px;height:40px;border-radius:50%;
+  border:1px solid rgba(var(--gold-dim-rgb),.35);
+  background:var(--surface-card);color:var(--text-secondary);
+  font-size:18px;cursor:pointer;display:grid;place-items:center;
+}
+.idioma-globo:hover{color:var(--gold-hover);border-color:var(--gold-brand)}
+.idioma-globo:focus-visible{outline:2px solid var(--gold-hover);outline-offset:3px}
+.idioma-lista{
+  position:absolute;top:48px;right:0;min-width:190px;
+  background:var(--surface-modal);
+  border:1px solid rgba(var(--gold-dim-rgb),.3);
+  border-radius:14px;padding:8px;
+  box-shadow:0 18px 44px rgba(0,0,0,.55);
+  display:none;
+}
+.idioma.abierta .idioma-lista{display:block}
+.idioma-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:9px 10px;border:0;border-radius:9px;background:none;
+  color:var(--text-primary);font-family:var(--font-base);font-size:14px;
+  cursor:pointer;text-align:left;
+}
+.idioma-item:hover{background:var(--surface-card)}
+.bandera{width:21px;height:14px;border-radius:2.5px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+/* banderas provisionales de lámina — IDI trae los SVG oficiales */
+.b-ve{background:linear-gradient(180deg,var(--flag-yellow) 0 33.4%,var(--flag-blue) 33.4% 66.7%,var(--flag-red) 66.7%)}
+.b-us{position:relative;background:repeating-linear-gradient(180deg,#b22234 0 2px,#fff 2px 4px)}
+.b-us::after{content:'';position:absolute;left:0;top:0;width:45%;height:50%;background:#3c3b6e}
+.b-br{position:relative;background:#009c3b}
+.b-br::after{content:'';position:absolute;inset:2px 3px;background:#ffdf00;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.b-fr{background:linear-gradient(90deg,#0055a4 0 33.4%,#fff 33.4% 66.7%,#ef4135 66.7%)}
+.b-it{background:linear-gradient(90deg,#009246 0 33.4%,#fff 33.4% 66.7%,#ce2b37 66.7%)}
+.idioma-check{margin-left:auto;color:var(--gold-brand);font-weight:bold}
+.idioma-pronto{margin-left:auto;font-size:11px;color:var(--text-faint);letter-spacing:.04em}
+
+/* ═══ Pie de casa ═══ */
+.pie-casa{
+  position:relative;z-index:1;
+  padding:10px 0 4px;
+  font-size:12px;
+  color:var(--text-muted);
+  letter-spacing:.06em;
+}
+.pie-casa .casa{
+  margin-left:.5em;
+  letter-spacing:.24em;
+  color:var(--text-secondary);
+}
+
+/* ═══ Entrada en escena · una vez · <1 s ═══ */
+.sube{animation:subir .5s ease-out backwards}
+.marca-wrap{animation-delay:.05s}
+.lema-grande{animation-delay:.12s}
+.lema-categoria{animation-delay:.18s}
+.cta-movil{animation-delay:.28s}
+.tarjeta{animation:subir .55s ease-out .2s backwards}
+.pie-casa .by{animation-delay:.45s}
+.pie-casa .casa{animation-delay:.58s}
+@keyframes subir{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+.nota-lamina{
+  position:fixed;left:12px;bottom:8px;z-index:2;
+  font-size:11px;color:var(--text-faint);
+  font-family:var(--font-base);
+}
+.nota-lamina b{color:var(--text-muted);font-weight:normal}
+.rota{background:rgba(var(--gold-dim-rgb),.08);border:1px dashed rgba(var(--gold-brand-rgb),.4);border-radius:10px}
+
+/* ═══ Apilado: tableta y teléfono vertical ═══ */
+@media (max-width:900px){
+  .escena-grid{grid-template-columns:1fr;gap:34px;justify-items:center}
+  .hero{text-align:center;display:flex;flex-direction:column;align-items:center;width:100%}
+  .escenario{width:100%;height:clamp(150px,18vh,200px)}
+  .abanico img{width:clamp(92px,21vw,124px)}
+  .carta{width:clamp(46px,12vw,62px)}
+  .mano{bottom:44px;gap:7px}
+  .mesa-monedas{width:min(320px,94%)}
+  .pila{--d:clamp(54px,14vw,70px)}
+  .heroe{--d:clamp(104px,26vw,132px)}
+  .duo{width:min(320px,94%)}
+  .telefono{left:50%;height:100%}
+  .laptop{left:50%;height:88%}
+  .pregunta{font-size:clamp(17px,4.4vw,21px);top:2%}
+  .trio{gap:10px;bottom:2px}
+  .trio img{width:clamp(46px,12vw,62px)}
+  /* Relevo móvil (ajuste 2, v1.5): teléfono 2s → se esfuma → laptop */
+  .esc.activa .telefono{animation:alzar .55s ease-out .1s forwards, esfumar .4s ease 2s forwards}
+  .esc.activa .laptop{animation:alzar-pc .55s ease-out 2.2s forwards}
+}
+@media (max-width:680px){
+  .lema-grande{font-size:20px;margin-top:28px}
+  .tarjeta{padding:34px 22px 30px;border-radius:26px}
+}
+/* Móvil vertical · patrón JUGAR + hoja (sellado punto 4) */
+@media (max-width:900px) and (orientation:portrait){
+  .cta-movil{display:flex}
+  .tarjeta{
+    position:fixed;left:0;right:0;bottom:0;z-index:5;
+    background:var(--surface-modal);
+    max-width:none;border-radius:26px 26px 0 0;
+    transform:translateY(105%);
+    transition:transform .35s ease;
+    animation:none;
+    box-shadow:0 -20px 60px rgba(0,0,0,.55);
+    max-height:86vh;overflow:auto;
+  }
+  body.hoja-abierta .tarjeta{transform:translateY(0)}
+  .tarjeta::before{content:'';display:block;width:40px;height:4px;border-radius:2px;background:var(--text-faint);margin:0 auto 16px}
+  .velo{display:block;position:fixed;inset:0;z-index:4;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s ease}
+  body.hoja-abierta .velo{opacity:1;pointer-events:auto}
+  body.hoja-abierta .escenario,
+  body.hoja-abierta .frase{visibility:hidden}
+}
+/* Teléfono vertical compacto: todo se encoge en proporción y cabe sin scroll */
+@media (orientation:portrait) and (max-height:700px){
+  .welcome-title{font-size:46px;letter-spacing:6px}
+  h1.welcome-title{--wm-track:6px}
+  .lema-grande{font-size:18px;margin-top:22px}
+  .lema-categoria{font-size:13px}
+  .escenario{height:132px;margin-top:20px}
+  .frase{min-height:2.4em;font-size:14px}
+  .cta-movil{margin-top:14px}
+  .abanico img{width:clamp(72px,16vw,84px);bottom:26px}
+  .carta{width:clamp(38px,9.6vw,50px)}
+  .mano{bottom:42px;gap:6px}
+  .marcador{bottom:2px;font-size:15px}
+  .mesa-monedas{width:min(280px,94%)}
+  .pila{--d:clamp(42px,10.5vw,54px)}
+  .heroe{--d:clamp(80px,19vw,98px)}
+  .pregunta{font-size:15px;top:0}
+  .trio{bottom:2px;gap:8px}
+  .trio img{width:clamp(38px,9.6vw,50px)}
+  .telefono{height:100%}
+  .laptop{height:82%}
+}
+/* Teléfono vertical mínimo: las escenas se retiran, el héroe y JUGAR mandan */
+@media (orientation:portrait) and (max-height:520px){
+  .escenario,.frase{display:none}
+  .escena-grid{gap:26px}
+}
+/* Teléfono horizontal (restricción 3 del informe) */
+@media (orientation:landscape) and (max-height:540px){
+  .lienzo{padding:14px}
+  .escena-grid{grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:24px}
+  .hero{text-align:left}
+  .escenario,.frase,.pie-casa{display:none}
+  .lema-grande{font-size:17px;margin-top:22px}
+  .lema-categoria{font-size:13px}
+  .tarjeta{padding:22px 20px 18px;border-radius:22px}
+  .tarjeta-lema{margin-bottom:14px;font-size:13px}
+  .cuerpo{min-height:0}
+  .pie{display:none}
+}
+/* Movimiento reducido: todo quieto, escena 1 visible */
+@media (prefers-reduced-motion:reduce){
+  .sube,.tarjeta,.esc *,.esc.activa *{animation:none !important}
+  .abanico img{opacity:1}
+  .btn-jugar::after{display:none}
+}
+</style>
+</head>
+<body>
+<main class="lienzo">
+  <div class="idioma" id="idioma">
+    <button class="idioma-globo" type="button" aria-label="Idioma" title="Idioma">🌐</button>
+    <div class="idioma-lista">
+      <button class="idioma-item" type="button"><span class="bandera b-ve"></span>Español<span class="idioma-check">✓</span></button>
+      <button class="idioma-item" type="button"><span class="bandera b-us"></span>English<span class="idioma-pronto">Pronto</span></button>
+      <button class="idioma-item" type="button"><span class="bandera b-br"></span>Português<span class="idioma-pronto">Pronto</span></button>
+      <button class="idioma-item" type="button"><span class="bandera b-fr"></span>Français<span class="idioma-pronto">Pronto</span></button>
+      <button class="idioma-item" type="button"><span class="bandera b-it"></span>Italiano<span class="idioma-pronto">Pronto</span></button>
+    </div>
+  </div>
+
+  <div class="escena-grid">
+
+    <section class="hero">
+      <div class="marca-wrap sube">
+        <!-- aria-label del anfitrión: sin él la marca se lee "ILEI" -->
+        <h1 class="welcome-title" aria-label="AJILEI"><span class="wm-slot"><img
+          class="wm-iso" src="src/assets/ajilei-isotipo.svg" alt="" aria-hidden="true"
+          draggable="false" onerror="avisoRoto()"></span><span class="wm-ilei">ILEI</span></h1>
+      </div>
+      <p class="lema-grande sube">La mesa te espera.</p>
+      <p class="lema-categoria sube">El juego de cartas venezolano — gratis y sin descargas.</p>
+
+      <div class="escenario" aria-hidden="true">
+
+        <!-- 1 · la baraja -->
+        <div class="esc activa" data-frase="La baraja de tu casa, estés donde estés.">
+          <div class="abanico">
+            <img src="src/assets/cards/reverso_carta.svg" alt="" onerror="this.classList.add('rota');avisoRoto()">
+            <img src="src/assets/cards/reverso_carta.svg" alt="">
+            <img src="src/assets/cards/reverso_carta.svg" alt="">
+            <img src="src/assets/cards/reverso_carta.svg" alt="">
+            <img src="src/assets/cards/reverso_carta.svg" alt="">
+          </div>
+        </div>
+
+        <!-- 2 · el AJILEI de 51 · As·3·5·Sota·Rey de copas (certificado) -->
+        <div class="esc" data-frase="51 exactos. Eso es un AJILEI. ¿Te atreves?" data-reveal>
+          <div class="mano">
+            <div class="carta" style="--i:0"><div class="carta-inner">
+              <div class="dorso"><img src="src/assets/cards/reverso_carta.svg" alt=""></div>
+              <div class="cara"><img data-src="src/assets/cards/uno_copa.png" alt=""></div></div></div>
+            <div class="carta" style="--i:1"><div class="carta-inner">
+              <div class="dorso"><img src="src/assets/cards/reverso_carta.svg" alt=""></div>
+              <div class="cara"><img data-src="src/assets/cards/tres_copa.png" alt=""></div></div></div>
+            <div class="carta" style="--i:2"><div class="carta-inner">
+              <div class="dorso"><img src="src/assets/cards/reverso_carta.svg" alt=""></div>
+              <div class="cara"><img data-src="src/assets/cards/cinco_copa.png" alt=""></div></div></div>
+            <div class="carta" style="--i:3"><div class="carta-inner">
+              <div class="dorso"><img src="src/assets/cards/reverso_carta.svg" alt=""></div>
+              <div class="cara"><img data-src="src/assets/cards/diez_copa.png" alt=""></div></div></div>
+            <div class="carta" style="--i:4"><div class="carta-inner">
+              <div class="dorso"><img src="src/assets/cards/reverso_carta.svg" alt=""></div>
+              <div class="cara"><img data-src="src/assets/cards/doce_copa.png" alt=""></div></div></div>
+          </div>
+          <div class="marcador"><b id="suma">0</b><span class="ajilei-tag" id="tag">AJILEI</span></div>
+        </div>
+
+        <!-- 3 · la enseñanza · «un dos por tres» -->
+        <div class="esc" data-frase="Tranquilo — te lo enseñamos en un dos por tres." data-frase-espera="2000">
+          <div class="pregunta"><span class="p1">¿No sabes jugar…</span><span class="p2">…o no te acuerdas?</span></div>
+          <div class="trio" aria-hidden="true">
+            <img src="src/assets/cards/reverso_carta.svg" alt="">
+            <img src="src/assets/cards/reverso_carta.svg" alt="">
+            <img src="src/assets/cards/reverso_carta.svg" alt="">
+          </div>
+        </div>
+
+        <!-- 4 · Heptacoins · gemela del guion MON-1 (v2: siete + caída firme) -->
+        <div class="esc" data-frase="Gana Heptacoins. Toda la emoción, sin gastar un real.">
+          <div class="mesa-monedas">
+            <div class="moneda pila pila-1"><div class="disco"><img src="src/assets/heptacoin.svg" alt="" onerror="this.closest('.moneda').classList.add('rota')"></div></div>
+            <div class="moneda pila pila-2"><div class="disco"><img src="src/assets/heptacoin.svg" alt=""></div></div>
+            <div class="moneda pila pila-3"><div class="disco"><img src="src/assets/heptacoin.svg" alt=""></div></div>
+            <div class="moneda pila pila-4"><div class="disco"><img src="src/assets/heptacoin.svg" alt=""></div></div>
+            <div class="moneda pila pila-5"><div class="disco"><img src="src/assets/heptacoin.svg" alt=""></div></div>
+            <div class="moneda pila pila-6"><div class="disco"><img src="src/assets/heptacoin.svg" alt=""></div></div>
+            <div class="moneda pila pila-7"><div class="disco"><img src="src/assets/heptacoin.svg" alt=""></div></div>
+            <div class="moneda heroe"><img src="src/assets/heptacoin.svg" alt=""></div>
+          </div>
+        </div>
+
+        <!-- 5 · la mesa real · escritorio: laptop + teléfono · móvil: teléfono -->
+        <div class="esc" data-frase="En tu teléfono o en tu computadora — entras y juegas, sin instalar nada.">
+          <div class="duo">
+            <div class="laptop">
+              <div class="laptop-pantalla"><img data-src="PUE_mesapc_demo.png" alt="" onerror="this.classList.add('rota');avisoRoto()"></div>
+              <div class="laptop-base"></div>
+            </div>
+            <div class="telefono"><div class="pantalla">
+              <img data-src="PUE_mesav_demo.jpg" alt="" onerror="this.classList.add('rota');avisoRoto()">
+            </div></div>
+          </div>
+        </div>
+
+      </div>
+      <p class="frase" id="frase">La baraja de tu casa, estés donde estés.</p>
+
+      <div class="cta-movil sube">
+        <button class="btn-jugar" id="btnJugar" type="button">JUGAR</button>
+        <p class="cta-vacuna">Gratis · Sin descargas · Solo tu correo</p>
+      </div>
+    </section>
+
+    <section class="tarjeta" aria-label="Entrar a la mesa">
+      <h2 class="tarjeta-titulo">Entra a la mesa</h2>
+
+      <div id="paso1">
+        <p class="tarjeta-lema">Entra con tu correo. Te enviaremos un código de 6 dígitos — fácil, sin contraseñas.</p>
+        <div class="cuerpo">
+          <label class="campo-etiqueta" for="correo">Correo</label>
+          <input class="campo" id="correo" type="email" inputmode="email"
+                 autocomplete="email" placeholder="tucorreo@ejemplo.com">
+          <p class="aviso" id="aviso1"></p>
+          <button class="boton" id="btnEnviar" type="button">Enviar código</button>
+          <p class="confianza">Sin descargas · Sin tarjeta · Solo tu correo</p>
+        </div>
+        <p class="pie">Entrar con Google, próximamente</p>
+      </div>
+
+      <div id="paso2" hidden>
+        <p class="tarjeta-lema">Te enviamos un código a<br><b id="ecoCorreo"></b></p>
+        <div class="cuerpo">
+          <label class="campo-etiqueta" for="codigo">Código</label>
+          <input class="campo campo-codigo" id="codigo" type="text" inputmode="numeric"
+                 autocomplete="one-time-code" maxlength="6" placeholder="······">
+          <p class="aviso" id="aviso2"></p>
+          <button class="boton" type="button">Entrar</button>
+          <div class="enlaces">
+            <button class="enlace" id="btnReenviar" type="button" disabled>Reenviar código (60 s)</button>
+            <button class="enlace" id="btnCambiar" type="button">Cambiar correo</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="pie-casa"><span class="by sube">by</span><span class="casa sube">HEPTACREATION</span></footer>
+</main>
+
+<div class="velo" id="velo"></div>
+
+<p class="nota-lamina" id="notaLamina">Lámina PUE v1.7 · maqueta de validación — no es producción</p>
+
+<script>
+/* ── Wordmark · clon de useMedidaDelConjunto (Wordmark.jsx:66-107) ─────── */
+(function(){
+  var host=document.querySelector('h1.welcome-title');
+  var slot=host&&host.querySelector('.wm-slot');
+  var ilei=host&&host.querySelector('.wm-ilei');
+  if(!host||!slot||!ilei)return;
+  function medir(){
+    var s=slot.getBoundingClientRect(),i=ilei.getBoundingClientRect(),h=host.getBoundingClientRect();
+    var cs=getComputedStyle(host);
+    var origenX=h.left+parseFloat(cs.borderLeftWidth||0);
+    host.style.setProperty('--brillo-ancho',(i.right-s.left)+'px');
+    host.style.setProperty('--brillo-slot-dx',(s.left-origenX)+'px');
+    nota();
+  }
+  medir();
+  new ResizeObserver(medir).observe(host);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(medir);
+  function nota(){
+    var n=document.getElementById('notaLamina');
+    if(n&&!n.dataset.rota){
+      var a=parseFloat(host.style.getPropertyValue('--brillo-ancho'))||0;
+      n.textContent='Lámina PUE v1.7 · maqueta de validación — no es producción · wordmark '+a.toFixed(1)+'px (esperado ≈224,8 a escritorio · ≈168,2 a ≤680)';
+    }
+  }
+})();
+
+/* ── Escenas · rotación ambiente ──────────────────────────────────────── */
+(function(){
+  var reducido=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var escenas=[].slice.call(document.querySelectorAll('.esc'));
+  var frase=document.getElementById('frase');
+  var suma=document.getElementById('suma'),tag=document.getElementById('tag');
+  var idx=0,pausada=false,temporizadores=[],rotor=null;
+  var DURACIONES=[4000,4000,4500,4500,4000]; /* baraja · AJILEI · enseñanza · monedas · mesa */
+
+  function cargarPerezosas(){
+    [].forEach.call(document.querySelectorAll('img[data-src]'),function(im){
+      im.src=im.getAttribute('data-src');im.removeAttribute('data-src');
+    });
+  }
+  function limpiar(){temporizadores.forEach(clearTimeout);temporizadores=[];}
+  var mano=document.querySelector('.mano');
+  function marcador(){
+    /* mismos instantes que el CSS: .3s + i×.28s, más medio volteo */
+    var valores=[11,21,31,41,51];
+    suma.textContent='0';tag.classList.remove('visible');mano.classList.remove('gana');
+    valores.forEach(function(v,i){
+      temporizadores.push(setTimeout(function(){suma.textContent=v;},300+i*280+220));
+    });
+    temporizadores.push(setTimeout(function(){
+      tag.classList.add('visible');mano.classList.add('gana');
+    },300+4*280+500));
+  }
+  function activar(i){
+    limpiar();
+    mano.classList.remove('gana');
+    escenas.forEach(function(e,k){e.classList.toggle('activa',k===i);});
+    if(escenas[i].hasAttribute('data-reveal'))marcador();
+    frase.classList.add('oculta');
+    var espera=parseInt(escenas[i].getAttribute('data-frase-espera')||'350',10);
+    temporizadores.push(setTimeout(function(){
+      frase.textContent=escenas[i].getAttribute('data-frase');
+      frase.classList.remove('oculta');
+    },espera));
+  }
+  function siguiente(){idx=(idx+1)%escenas.length;activar(idx);}
+
+  if(reducido){cargarPerezosas();return;}
+  setTimeout(cargarPerezosas,2500);      /* después de que el formulario ya es usable */
+  (function armar(){
+    rotor=setTimeout(function(){
+      if(!pausada&&!document.hidden)siguiente();
+      armar();
+    },DURACIONES[idx]);
+  })();
+
+  var tarjeta=document.querySelector('.tarjeta');
+  tarjeta.addEventListener('focusin',function(){pausada=true;});
+  tarjeta.addEventListener('focusout',function(){pausada=false;});
+})();
+
+/* ── Formulario · alterna los dos pasos, sin red ──────────────────────── */
+(function(){
+  var paso1=document.getElementById('paso1'),paso2=document.getElementById('paso2'),
+      correo=document.getElementById('correo'),aviso1=document.getElementById('aviso1'),
+      eco=document.getElementById('ecoCorreo'),reenviar=document.getElementById('btnReenviar'),
+      reloj=null;
+  document.getElementById('btnEnviar').addEventListener('click',function(){
+    var v=correo.value.trim();
+    if(!v){aviso1.textContent='Escribe tu correo';return}
+    aviso1.textContent='';eco.textContent=v;
+    paso1.hidden=true;paso2.hidden=false;
+    document.getElementById('codigo').focus();
+    cuenta(60);
+  });
+  document.getElementById('btnCambiar').addEventListener('click',function(){
+    paso2.hidden=true;paso1.hidden=false;clearInterval(reloj);correo.focus();
+  });
+  reenviar.addEventListener('click',function(){if(!reenviar.disabled)cuenta(60);});
+  function cuenta(n){
+    clearInterval(reloj);reenviar.disabled=true;
+    var pinta=function(){reenviar.textContent='Reenviar código ('+n+' s)';};
+    pinta();
+    reloj=setInterval(function(){
+      n--;
+      if(n<=0){clearInterval(reloj);reenviar.disabled=false;reenviar.textContent='Reenviar código';return}
+      pinta();
+    },1000);
+  }
+})();
+
+/* ── Strum al primer toque · corte 1300 ms, cortina 130 ms (VC2) ──────── */
+(function(){
+  var rutas=['public/sounds/ajilei-strum.mp3','sounds/ajilei-strum.mp3'];
+  function strum(i){
+    i=i||0;if(i>=rutas.length)return;
+    var a=new Audio(rutas[i]);a.volume=.8;
+    a.play().then(function(){
+      setTimeout(function(){
+        var v0=a.volume,t0=performance.now();
+        (function baja(){
+          var k=(performance.now()-t0)/130;
+          if(k>=1){a.pause();}else{a.volume=v0*(1-k);requestAnimationFrame(baja);}
+        })();
+      },1300);
+    }).catch(function(){strum(i+1);});
+  }
+  addEventListener('pointerdown',function(){strum(0);},{once:true});
+})();
+
+/* ── Selector de idioma · maqueta (producción lo gobierna IDI) ────────── */
+var MOSTRAR_IDIOMA=true;   /* producción: true solo cuando IDI ofrezca >1 idioma — decisión de Victor */
+(function(){
+  var caja=document.getElementById('idioma');
+  if(!caja)return;
+  if(!MOSTRAR_IDIOMA){caja.style.display='none';return}
+  var globo=caja.querySelector('.idioma-globo');
+  globo.addEventListener('click',function(e){e.stopPropagation();caja.classList.toggle('abierta');});
+  document.addEventListener('click',function(e){if(!caja.contains(e.target))caja.classList.remove('abierta');});
+})();
+
+/* ── Hoja móvil · botón JUGAR ─────────────────────────────────────────── */
+(function(){
+  var b=document.getElementById('btnJugar'),v=document.getElementById('velo');
+  if(!b||!v)return;
+  b.addEventListener('click',function(){
+    document.body.classList.add('hoja-abierta');
+    setTimeout(function(){document.getElementById('correo').focus();},380);
+  });
+  v.addEventListener('click',function(){document.body.classList.remove('hoja-abierta');});
+})();
+
+function avisoRoto(){
+  var n=document.getElementById('notaLamina');
+  n.dataset.rota='1';
+  n.innerHTML='<b>Vectores o capturas no encontrados</b> — guarda esta lámina en la raíz del repo ajilei, junto a index.html y a PUE_mesav_demo.jpg';
+}
+</script>
+</body>
+</html>
