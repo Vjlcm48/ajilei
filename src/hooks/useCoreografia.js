@@ -91,6 +91,11 @@ export function useCoreografia({ precedente, netas, saldo }) {
   const arrancadoRef = useRef(false)
   const saltadoRef = useRef(false)
   const vivoRef = useRef(true)
+  // GT-HIG · El apagado del fundido de corte, uno de los nueve sin handle del
+  // censo de FRZ-1 §1.3. Se cancela donde la melodía se descarga: un `stop()`
+  // sobre un Howl ya soltado no rompe, pero es un reloj que sobrevive a la
+  // pantalla sin razón alguna.
+  const corteRef = useRef(null)
 
   const vaA = useCallback((f) => { faseRef.current = f; setFase(f) }, [])
   const vaAlTramo = useCallback((t) => { tramoRef.current = t; setTramo(t) }, [])
@@ -180,6 +185,8 @@ export function useCoreografia({ precedente, netas, saldo }) {
     melodiaRef.current = { howl, nombre: melodia, sonando: null }
     marcaCEL('melodia-elegida', { melodia })
     return () => {
+      clearTimeout(corteRef.current)
+      corteRef.current = null
       try { howl.stop(); howl.unload() } catch { /* Howler ya la soltó */ }
       melodiaRef.current = null
     }
@@ -347,7 +354,8 @@ export function useCoreografia({ precedente, netas, saldo }) {
     const m = melodiaRef.current
     if (m && m.sonando != null) {
       m.howl.fade(m.howl.volume(), 0, FADE_CORTE_MS, m.sonando)
-      setTimeout(() => { try { m.howl.stop(m.sonando) } catch { /* ya parada */ } }, FADE_CORTE_MS)
+      clearTimeout(corteRef.current)
+      corteRef.current = setTimeout(() => { try { m.howl.stop(m.sonando) } catch { /* ya parada */ } }, FADE_CORTE_MS)
     }
   }, [soltarEspera, soltarFiesta, vaA, vaAlTramo])
 

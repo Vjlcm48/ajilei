@@ -84,6 +84,48 @@ export function precargarSonidos(nombres) {
 export const STRUM_CORTE_MS = 1300   // antes del segundo rasgueo (1,59s)
 export const STRUM_FADE_MS  = 130    // misma cortina que cardShuffle
 
+// ── GT-HIG · handle para los cuatro relojes del recorte ─────────────────────
+// Los dos relojes de cada recorte —la espera hasta el corte y el apagado tras
+// la cortina— eran cuatro de los nueve sin handle del censo de FRZ-1 §1.3.
+//
+// AQUÍ "DESMONTAR" NO EXISTE: `vivos` es caché de módulo y no se descarga
+// nunca a propósito (es la decisión de PUE-1.2, aquí arriba). Así que el punto
+// de cancelación correcto no es el desmontaje sino la REENTRADA: volver a
+// disparar el mismo sonido antes de que venza su recorte anterior.
+//
+// Y al cancelar se para la instancia anterior EN EL MISMO GESTO. Cancelar el
+// reloj a secas dejaría a la anterior sonando entera —el segundo racimo del
+// rasgueo en 1,59 s—, que es exactamente el defecto que el recorte existe para
+// quitar. Cancelar sin parar no sería higiene: sería devolver el defecto.
+//
+// En el juego los dos sonidos no se solapan (el barajado va uno por mano, el
+// rasgueo uno por celebración), así que este camino no se recorre hoy: lo que
+// cambia es que ahora SE PUEDE cancelar.
+const recortes = {}
+
+function cancelaRecorte(nombre) {
+  const r = recortes[nombre]
+  if (!r) return
+  clearTimeout(r.corte)
+  clearTimeout(r.apagado)
+  try { r.sound.stop(r.id) } catch { /* esa instancia ya no existe */ }
+  recortes[nombre] = null
+}
+
+/** Programa el recorte de esta instancia y cancela el de la anterior, si la hay. */
+function programaRecorte(nombre, sound, id, esperaMs, fadeMs) {
+  cancelaRecorte(nombre)
+  const r = { sound, id, corte: null, apagado: null }
+  r.corte = setTimeout(() => {
+    sound.fade(sound.volume(), 0, fadeMs, id)
+    r.apagado = setTimeout(() => {
+      sound.stop(id)
+      if (recortes[nombre] === r) recortes[nombre] = null
+    }, fadeMs)
+  }, esperaMs)
+  recortes[nombre] = r
+}
+
 export function useSounds() {
   const { soundEnabled } = useSoundContext()
 
@@ -98,10 +140,7 @@ export function useSounds() {
 
     if (soundName === 'ajileiStrum') {
       const id = sound.play()
-      setTimeout(() => {
-        sound.fade(sound.volume(), 0, STRUM_FADE_MS, id)
-        setTimeout(() => sound.stop(id), STRUM_FADE_MS)
-      }, STRUM_CORTE_MS)
+      programaRecorte(soundName, sound, id, STRUM_CORTE_MS, STRUM_FADE_MS)
       return { sound, id }
     }
 
@@ -116,10 +155,7 @@ export function useSounds() {
       if (totalMs > 0) {
         const fadeLen = 130
         const triggerAt = totalMs * 0.49 - fadeLen
-        setTimeout(() => {
-          sound.fade(sound.volume(), 0, fadeLen, id)
-          setTimeout(() => sound.stop(id), fadeLen)
-        }, Math.max(0, triggerAt))
+        programaRecorte(soundName, sound, id, Math.max(0, triggerAt), fadeLen)
       }
       return { sound, id }
     }

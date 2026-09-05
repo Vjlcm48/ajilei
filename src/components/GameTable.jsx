@@ -371,9 +371,17 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   const prevPotRef = useRef(game.pot)
   // FRZ-1 §2.4 · los dos únicos relojes del arranque de mano que ESTA tanda
   // saca de la cola de "sin handle": la guarda de mano nueva los necesita
-  // cancelables. Los otros siete quedan declarados en la cola GT-HIG.
+  // cancelables. Los otros siete los cerró GT-HIG; dos de ellos, aquí abajo.
   const barajaTimerRef = useRef(null)     // 1950 ms: baraja → dispara el reparto
   const siguienteManoTimerRef = useRef(null)  // 300 ms: "Siguiente mano" → beginHand
+  // GT-HIG · Los dos relojes que este archivo dejaba sin handle en el censo
+  // de FRZ-1 §1.3. `refillTimersRef` es una LISTA y no un handle suelto a
+  // propósito: el humano repone hasta cinco cartas y cada una programa su
+  // propio revelado, todos en vuelo a la vez. Cancelar "el anterior" antes de
+  // programar el nuevo —la regla que sirve para los demás— aquí dejaría ver
+  // sólo la última carta repuesta.
+  const refillTimersRef = useRef([])      // 350 ms ×N: revelado de la carta repuesta
+  const reflowTimerRef = useRef(null)     // 600 ms: apaga `reflowing` tras la ceremonia
 
   // Clear pending discard / ceremony / reveal timers if the table unmounts mid-animation
   useEffect(() => () => {
@@ -383,6 +391,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     clearTimeout(chipTimerRef.current)
     clearTimeout(barajaTimerRef.current)
     clearTimeout(siguienteManoTimerRef.current)
+    refillTimersRef.current.forEach(clearTimeout)
+    clearTimeout(reflowTimerRef.current)
   }, [])
 
   // ── Pozo: pulso + "+N" flotante al aumentar (Tanda C4.3) ──────────────────
@@ -1016,12 +1026,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     const key = `${seat}:${idx}`
     setDiscardAnim(prev => prev && ({ ...prev, refilled: new Set(prev.refilled).add(key) }))
     if (seat === 0) {
-      setTimeout(() => {
+      refillTimersRef.current.push(setTimeout(() => {
         setDiscardAnim(prev => prev && ({ ...prev, revealed: new Set(prev.revealed).add(key) }))
         // El flip de la reposición es el volteo: si la carta repuesta del
         // humano es el comodín, suena (leído del ref, no del updater).
         if (comodinActive && isComodin(discardNextRef.current?.players[0].cards[idx])) play('comodin')
-      }, 350)
+      }, 350))
     }
   }
 
@@ -1029,6 +1039,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   function startDiscardAnim(g, humanDiscardIndices) {
     const nextGame = applyDiscard(g, humanDiscardIndices)
     discardNextRef.current = nextGame
+    // La reentrada se cancela por SECUENCIA, no por carta: una tanda nueva de
+    // descartes deja sin sentido los revelados pendientes de la anterior, que
+    // escribirían su clave vieja sobre el `revealed` del estado recién creado.
+    refillTimersRef.current.forEach(clearTimeout)
+    refillTimersRef.current = []
     const plan     = buildDiscardPlan(g, nextGame)
     const allKeys  = new Set(plan.flatMap(p => p.indices.map(i => `${p.seat}:${i}`)))
     setDiscardAnim({ nextGame, allKeys, emptied: new Set(), refilled: new Set(), revealed: new Set() })
@@ -1321,7 +1336,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   // dispara el destello del chip de comodín). Mismo manejo aprobado en C4.5.
   function commitReflow(next) {
     setReflowing(true)
-    setTimeout(() => setReflowing(false), 600)
+    clearTimeout(reflowTimerRef.current)
+    reflowTimerRef.current = setTimeout(() => setReflowing(false), 600)
     commitNewHand(next)
   }
 
