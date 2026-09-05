@@ -137,7 +137,10 @@ function sondaCajas({ sels, tokens }) {
 // parámetro sigue ahí cuando GameTable monta y siembra su estado inicial.
 async function alaVictoria(page, mesa, semilla = '', opciones = {}) {
   await page.goto(`${BASE}/?cel${semilla}`, { waitUntil: 'networkidle' })
-  await page.click('button:has-text("Jugar vs IA")')
+  // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo: el
+  // texto sale ahora de un diccionario (IDI-0) y cambiará con el idioma.
+  await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+  await page.click('[data-accion="jugar-ia"]')
   await page.waitForSelector('.nivel-grid button')
   await page.click('.nivel-grid button:nth-of-type(1)')
   await page.waitForSelector('.mode-select-card')
@@ -1736,7 +1739,10 @@ async function controlNegativo(browser) {
   const r = { termina: null, saldoRival: null, error: null }
   try {
     await page.goto(BASE, { waitUntil: 'networkidle' })   // SIN ?cel
-    await page.click('button:has-text("Jugar vs IA")')
+    // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo: el
+    // texto sale ahora de un diccionario (IDI-0) y cambiará con el idioma.
+    await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+    await page.click('[data-accion="jugar-ia"]')
     await page.waitForSelector('.nivel-grid button')
     await page.click('.nivel-grid button:nth-of-type(1)')
     await page.waitForSelector('.mode-select-card')

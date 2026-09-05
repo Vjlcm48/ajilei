@@ -183,6 +183,10 @@ if (hacer('puerta')) {
       activa: document.querySelectorAll('.pue-esc.pue-activa').length,
       cta: !!q('.pue-btn-jugar'),
       bienvenida: !!q('main.welcome-screen'),
+      // LOB-1 · el lobby es la pantalla NUEVA del otro lado de la puerta. Se
+      // mira aquí por la misma razón que la Bienvenida vieja: lo que este bloque
+      // demuestra es que un visitante ANÓNIMO no ve nada de lo que hay dentro.
+      lobby: !!q('main.lobby'),
       entrada: !!q('.entrada-screen'),
       bautizo: !!q('.bautizo-card'),
       textoViejo: /cl\u00e1sico juego de cartas venezolano/.test(document.body.innerText),
@@ -197,9 +201,17 @@ if (hacer('puerta')) {
     `${R.escenas}/${NOMBRES_ESC.length} escenas · ${R.activa} activa`)
   anota('puerta.3 la Bienvenida vieja NO captura al visitante', !R.bienvenida && !R.textoViejo,
     `main.welcome-screen=${R.bienvenida} · texto «El clásico juego…»=${R.textoViejo}`)
-  anota('puerta.4 ni la Entrada ni el Bautizo se cuelan', !R.entrada && !R.bautizo,
+  // ── LOB-1 · el punto que la campaña añade ────────────────────────────────
+  // `puerta.3` sigue midiendo lo que decía y no cambia: el lobby NO reutiliza
+  // `main.welcome-screen` ni el lema «El clásico juego de cartas venezolano»
+  // (verificado en Fase 1). Pero desde LOB-1 hay una pantalla MÁS al otro lado
+  // de la puerta, y una aserción que sólo vigila la que ya no se usa vigila el
+  // pasado. Éste mira la que sí existe.
+  anota('puerta.4 el lobby NO captura al visitante anónimo', !R.lobby,
+    `main.lobby=${R.lobby}`)
+  anota('puerta.5 ni la Entrada ni el Bautizo se cuelan', !R.entrada && !R.bautizo,
     `.entrada-screen=${R.entrada} · .bautizo-card=${R.bautizo}`)
-  anota('puerta.5 consola limpia al cruzar la puerta', consola.length === 0,
+  anota('puerta.6 consola limpia al cruzar la puerta', consola.length === 0,
     consola.length ? consola.slice(0, 3).join(' | ') : 'sin errores')
 
   resultados.bloques.puerta = { ...R, consola }
@@ -247,8 +259,18 @@ if (hacer('1.1') || hacer('1.2') || hacer('1.3') || hacer('1.9')) {
     }
 
     // ── 1.2 · el wordmark se auto-verifica ──────────────────────────────────
+    // GUARDA DE NULO (LOB-1). Hasta esta tanda la línea siguiente hacía
+    // `getComputedStyle(h)` sobre el resultado crudo del `querySelector`: si el
+    // wordmark desaparecía de la Portada, el modo entero moría con un
+    // `TypeError` y no con un veredicto rojo — o sea, la campaña que rompiera el
+    // contrato del wordmark se enteraría por una traza, no por una medida.
+    // Es la única edición de esta fase fuera de lo estrictamente LOB-1, y se
+    // justifica porque LOB-1 toca ese contrato: `h1.welcome-title` deja de estar
+    // en la primera pantalla post-login y la hoja que lo define (`welcome.css`)
+    // pasa a colgar de un import que ya no es el de su dueño original.
     const wm = await page.evaluate(`(() => {
       const h = document.querySelector('h1.welcome-title');
+      if (!h) return { ausente: true };
       const cs = getComputedStyle(h);
       return {
         ancho: parseFloat(h.style.getPropertyValue('--brillo-ancho')) || null,
@@ -263,6 +285,13 @@ if (hacer('1.1') || hacer('1.2') || hacer('1.3') || hacer('1.9')) {
     })()`)
     // Esperado ≈224,84 a 72px y ≈168,22 a 56px → la razón medida/fuente ronda
     // 3,12 y 3,00. Para el escalón compacto de 46px se extrapola proporcional.
+    if (wm.ausente) {
+      // Rojo con mensaje, que es lo que un arnés debe dar: la Portada SIN
+      // wordmark es un defecto medible, no una excepción de JavaScript.
+      R['1.2'] = { ausente: true, veredicto: false }
+      anota(`1.2 ${vp.etiqueta}`, false,
+        'h1.welcome-title NO existe en la Portada — el contrato del wordmark se rompió')
+    } else {
     const ESPERADO = { 72: 224.84, 56: 168.22 }
     const esperado = ESPERADO[Math.round(wm.fontSize)] ?? (wm.fontSize * (168.22 / 56))
     const deltaPct = wm.ancho ? Math.abs(wm.ancho - esperado) / esperado * 100 : null
@@ -270,6 +299,7 @@ if (hacer('1.1') || hacer('1.2') || hacer('1.3') || hacer('1.9')) {
     R['1.2'].veredicto = deltaPct !== null && deltaPct <= 6
     anota(`1.2 ${vp.etiqueta}`, R['1.2'].veredicto,
       `fs=${wm.fontSize}px track=${wm.wmTrack} · --brillo-ancho=${wm.ancho ? wm.ancho.toFixed(2) : '—'}px (esperado ≈${esperado.toFixed(2)}, Δ=${deltaPct === null ? '—' : deltaPct.toFixed(2) + '%'}) · slot-dx=${wm.slotDx ? wm.slotDx.toFixed(2) : '—'}px · ${wm.fontFamily.split(',')[0]} ${wm.fontWeight}`)
+    }
 
     // ── 1.3 · geometría de las cinco escenas ────────────────────────────────
     const hayEscenario = await page.evaluate(`(() => {

@@ -5,8 +5,24 @@
 //   d3     → matriz de 4 viewports: bbox de mesa/óvalo/paneles/mazos/abanico/botones + overflow
 //   bug    → reproduce la revelación finalista y mide el reflow del panel ganador
 //   shots  → capturas de los 4 viewports (+ la del bug si 'bug' corre antes)
-//   all    → d1d2 + d3 + bug + shots
+//   all    → d1d2 + d3 + bug + shots + lob
 //   gate [tag] → DSK-G1: matriz matchMedia del gate + capturas WAITING (diff)
+//   lob    → LOB-1: el lobby post-login, en los 6 viewports de `gate`. OCHO
+//            puntos por celda: (1) `main.lobby` está y `main.welcome-screen` no;
+//            (2) el CTA es alcanzable —dentro del viewport, ≥44px de alto—;
+//            (3) píldora de saldo, ⚙ y los tres de la barra inferior visibles y
+//            dentro; (3b) SIMETRÍA: los seis iconos de acción (⚙, trofeo, tienda,
+//            libro, avatar, moneda del saldo) miden lo mismo ±1px, el CTA está
+//            centrado ±2px y su ancho no pasa de 64 u —los glifos de línea del
+//            candado y el `+` quedan fuera, se miden en `em`—; (4) IDI-0 sin
+//            claves rotas (`⟦…⟧` en `innerText`) y `<html lang>` puesto; (5) la
+//            marca: sin `h1.welcome-title`, isotipo con la proporción 2:3 del
+//            MAESTRO —no cuadrado— y `src` apuntando a `ajilei-isotipo`; (6) la
+//            hoja ⚙ abre ANCLADA BAJO EL ENGRANAJE (borde superior por debajo de
+//            él, borde derecho a plomo ±2px), «Acerca de» despliega el CC BY y
+//            los créditos Pixabay, y `Escape` cierra; (7) el CTA lleva a
+//            `.nivel-grid`. Deja capturas en `capturas-lob/`. Consola limpia
+//            entra en el veredicto.
 //   b1     → DSK-B1: presupuesto vertical por fila + overflow por viewport
 //   tactil → verificación táctil coarse: hit-boxes REALES (::after, vía
 //            elementFromPoint) validados ≥40px (estándar campaña, NO WCAG) +
@@ -249,6 +265,11 @@ const movEsperaEntrada = (page) => page.waitForTimeout(REACCION_ENTRADA_MS + 80)
 // la variable, esto sigue apuntando a donde apuntaba.
 const BASE = process.env.AJILEI_BASE || 'http://localhost:5173'
 const OUT_DIR = 'capturas-dsk'
+// LOB-1 · las capturas del lobby van a su propia carpeta y no a `capturas-dsk`,
+// que es de la mesa: mezclarlas obligaría a distinguirlas por el nombre del
+// archivo en una carpeta que ya guarda cientos. `capturas-lob/` está ignorada en
+// `.gitignore` con el mismo criterio que `capturas-pue/` — son regenerables.
+const LOB_OUT_DIR = 'capturas-lob'
 const MODE = process.argv[2] || 'all'
 
 // ── Metadatos del instrumento (ARN-1) ────────────────────────────────────────
@@ -309,14 +330,24 @@ let RUTA_USADA = null
 // nadie se enteró hasta EMB-1. Un arnés a oscuras es peor que no tenerlo: da
 // rojos que no significan nada y entrena a ignorarlos.
 //
-// RUTA CANÓNICA (desde NIV-UI):
-//   Welcome → «Jugar vs IA» → NivelSelect → nivel → ModeSelect → «Mesa de N» → apuesta
+// RUTA CANÓNICA (desde LOB-1):
+//   Lobby → CTA «Jugar contra la IA» → NivelSelect → nivel → ModeSelect → «Mesa de N» → apuesta
 //
 // Nivel y apuesta se eligen por ÍNDICE DERIVADO de `config/niveles.js`, jamás
 // por el rótulo visible: los `id` son el contrato del producto («no se renombran
 // nunca») mientras que los nombres son copy que Victor declaró provisional. Un
 // arnés colgado del texto se rompe con el próximo ajuste de copy — que es
 // justo la clase de avería que esta tanda viene a reparar.
+//
+// ── LOB-1 · Y EL PRIMER CLIC DEJA DE COLGAR DEL TEXTO ───────────────────────
+// Hasta esta tanda el primer paso era `button:has-text("Jugar vs IA")`: el único
+// clic de la ruta canónica que seguía atado a un rótulo, justo lo que el párrafo
+// de arriba prohíbe para los otros dos. Pasa a `[data-accion="jugar-ia"]`, que es
+// contrato del marcado y NO cambia con el idioma — lo cual importa ya, porque
+// IDI-0 nace en esta misma campaña y el rótulo del CTA sale de un diccionario:
+// en cuanto exista `textos.en.js`, un arnés colgado del texto se rompería otra
+// vez y por la misma causa. `data-accion` viaja en los trece controles del lobby
+// y es lo que consume el modo `lob`.
 async function gotoMesa(page, n = 5, nivel = ARNES_NIVEL, stakeIdx = ARNES_STAKE_IDX) {
   const iNivel = NIVELES.findIndex(x => x.id === nivel)
   if (iNivel < 0) throw new Error(`gotoMesa: nivel desconocido "${nivel}"`)
@@ -335,7 +366,9 @@ const gotoMesa5 = (page) => gotoMesa(page, 5)
 // para que exista UN SOLO sitio que sepa cómo se llega a la mesa: la avería de
 // NIV-UI se coló, entre otras cosas, porque `runU1` tenía su propia copia.
 async function recorrerRuta(page, n, iNivel, stakeIdx) {
-  await page.click('button:has-text("Jugar vs IA")')
+  // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo.
+  await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+  await page.click('[data-accion="jugar-ia"]')
   // Pantalla 1 · nivel. `nth-of-type` sobre la rejilla: los hijos de
   // `.nivel-grid` son los tres <button>, en el orden de NIVELES.
   await page.waitForSelector('.nivel-grid button')
@@ -713,6 +746,329 @@ async function runGate(browser, tag = 'after') {
     await page.close()
   }
   return { matrix, matrixOk: matrix.every(m => m.ok), shots }
+}
+
+// ── LOB-1 · El lobby post-login ──────────────────────────────────────────────
+// Documento rector: AJILEI_LOB1_Fase1_v1.1.md §5.1. Autoridad visual:
+// AJILEI_LOB1_lamina_v1.3.html.
+//
+// PRIMER MODO DE ESTE ARNÉS QUE NO MIDE LA MESA. Hasta LOB-1 el lobby era sólo
+// el camino —tres clics que había que atravesar para llegar a medir otra cosa— y
+// eso es precisamente cómo se coló la avería de NIV-UI: nadie miraba la pantalla
+// por la que todos pasaban. Ahora tiene sus propios siete puntos.
+//
+// Corre en los SEIS viewports de `gate`, que son los que ya definen el terreno
+// de la campaña: los tres de móvil (fuera del gate de escritorio) y los tres de
+// escritorio. El lobby vive en los seis —no está gateado— así que los seis
+// tienen que salir verdes.
+const LOB_VIEWPORTS = [
+  { w: 640, h: 360, note: 'móvil landscape' },
+  { w: 360, h: 640, note: 'portrait' },
+  { w: 844, h: 390, note: 'móvil landscape' },
+  { w: 1024, h: 768, note: 'desktop' },
+  { w: 1366, h: 768, note: 'desktop' },
+  { w: 1920, h: 937, note: 'desktop' },
+]
+
+// La proporción del isotipo maestro: `viewBox="15 30 60 90"` → 60/90 = 0,667.
+// NO ES CUADRADO, y la ficha de Fase 1 lo daba por cuadrado en su punto 5. Se
+// mide contra el maestro, que es la autoridad: forzarlo a 1:1 sería exigir que
+// la letra doble estuviera deformada.
+const LOB_ISO_RATIO = 60 / 90
+
+// Los puntos del modo, en un solo sitio: el veredicto de celda y la lista de
+// fallos se derivan de aquí, así que añadir uno no puede olvidarse en el otro.
+const LOB_PUNTOS = ['lob.1', 'lob.2', 'lob.3', 'lob.3b', 'lob.3c', 'lob.4', 'lob.5', 'lob.6', 'lob.7']
+
+async function runLob(browser) {
+  const celdas = []
+
+  for (const vp of LOB_VIEWPORTS) {
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    const consola = []
+    page.on('pageerror', e => consola.push(`pageerror: ${e.message}`))
+    await page.goto(BASE)
+    await page.waitForSelector('main.lobby')
+    // Que asiente el primer fotograma: la marca entra con `respira` y el CTA
+    // tiene transición. Medir antes daría cajas de mitad de animación.
+    await page.waitForTimeout(400)
+    await page.mouse.move(5, 5)
+
+    const c = { vp: `${vp.w}x${vp.h}`, note: vp.note }
+
+    // ── lob.1 · el lobby está, la Bienvenida no ────────────────────────────
+    // La segunda mitad no es redundante: `WelcomeScreen.jsx` SIGUE en el árbol
+    // (borrar es otra tanda) y basta un import olvidado para que vuelva.
+    const p1 = await page.evaluate(`(() => ({
+      lobby: !!document.querySelector('main.lobby'),
+      bienvenida: !!document.querySelector('main.welcome-screen'),
+      lema: /cl\\u00e1sico juego de cartas venezolano/.test(document.body.innerText),
+    }))()`)
+    c['lob.1'] = { ...p1, ok: p1.lobby && !p1.bienvenida && !p1.lema }
+
+    // ── lob.2 · el CTA es alcanzable ───────────────────────────────────────
+    // Dentro del viewport y ≥44px de alto: el estándar táctil de la campaña
+    // (DSK usa 40px como piso propio; aquí se exige el de la casa grande porque
+    // es el único botón que abre la mesa).
+    const p2 = await page.evaluate(`(() => {
+      const b = document.querySelector('[data-accion="jugar-ia"]');
+      if (!b) return { existe: false };
+      const r = b.getBoundingClientRect();
+      const cs = getComputedStyle(b);
+      return {
+        existe: true, top: r.top, bottom: r.bottom, left: r.left, right: r.right,
+        h: r.height, w: r.width, visible: cs.visibility !== 'hidden' && cs.display !== 'none',
+        dentro: r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth,
+        texto: b.textContent.trim(),
+      };
+    })()`)
+    c['lob.2'] = { ...p2, ok: !!p2.existe && p2.visible && p2.dentro && p2.h >= 44 }
+
+    // ── lob.3 · los cinco controles periféricos ────────────────────────────
+    // Píldora de saldo, ⚙ y los tres de la barra inferior. Todos visibles y
+    // todos dentro del viewport: es lo que el traje compacto tiene que sostener
+    // a 360×640 y a 640×360, que son las dos celdas donde algo se sale primero.
+    const p3 = await page.evaluate(`(() => {
+      const sel = {
+        saldo: '.lob-pildora',
+        ajustes: '[data-accion="ajustes"]',
+        rankings: '[data-accion="rankings"]',
+        tienda: '.lob-nav [data-accion="tienda"]',
+        reglas: '[data-accion="reglas"]',
+      };
+      const out = {};
+      for (const k in sel) {
+        const el = document.querySelector(sel[k]);
+        if (!el) { out[k] = { existe: false }; continue; }
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        out[k] = {
+          existe: true,
+          visible: cs.visibility !== 'hidden' && cs.display !== 'none' && r.width > 0 && r.height > 0,
+          dentro: r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight + 0.5 && r.right <= innerWidth + 0.5,
+          box: { w: +r.width.toFixed(2), h: +r.height.toFixed(2), top: +r.top.toFixed(2), bottom: +r.bottom.toFixed(2) },
+        };
+      }
+      return out;
+    })()`)
+    c['lob.3'] = { ...p3, ok: Object.values(p3).every(v => v.existe && v.visible && v.dentro) }
+
+    // ── lob.3b · la simetría de los iconos y el CTA centrado ───────────────
+    // Los SEIS iconos de ACCIÓN —⚙, trofeo, tienda, libro, silueta del avatar y
+    // moneda del saldo— tienen que medir lo mismo, y lo mismo en cada viewport.
+    // Hasta la v1.4 cada uno traía su cifra suelta (8,5 u el avatar, 6 los de la
+    // barra, 16 px fijos la moneda) y la simetría existía sólo por disciplina:
+    // un token nuevo la rompía en un tamaño de pantalla y no en otro, que es
+    // exactamente la clase de avería que nadie ve hasta que Victor la ve.
+    //
+    // Los GLIFOS DE LÍNEA quedan fuera a propósito (candado del PvP, `+` de la
+    // píldora): se miden en `em` con su texto, no con la rejilla de controles.
+    // Medirlos aquí sería exigir que un signo de puntuación midiera lo mismo que
+    // un botón.
+    const p3b = await page.evaluate(`(() => {
+      const sel = {
+        ajustes:  '[data-accion="ajustes"] svg',
+        trofeo:   '[data-accion="rankings"] svg',
+        tienda:   '.lob-nav [data-accion="tienda"] svg',
+        libro:    '[data-accion="reglas"] svg',
+        avatar:   '.lob-top .lob-avatar svg',
+        moneda:   '.lob-moneda .chip-token',
+      };
+      const cajas = {};
+      for (const k in sel) {
+        const el = document.querySelector(sel[k]);
+        cajas[k] = el ? { w: +el.getBoundingClientRect().width.toFixed(2), h: +el.getBoundingClientRect().height.toFixed(2) } : null;
+      }
+      const vivos = Object.values(cajas).filter(Boolean);
+      const anchos = vivos.map(b => b.w), altos = vivos.map(b => b.h);
+      // La unidad óptica se DERIVA del icono medido (--ico = 6·u), en vez de
+      // leer --u: getPropertyValue devuelve el clamp() sin resolver.
+      const u = cajas.ajustes ? cajas.ajustes.w / 6 : null;
+      const cta = document.querySelector('[data-accion="jugar-ia"]').getBoundingClientRect();
+      const acc = document.querySelector('.lob-accion').getBoundingClientRect();
+      // El traje apaisado reparte el centro en dos columnas (marca | acción), así
+      // que ahí «centrado» sólo puede querer decir centrado en SU columna. Fuera
+      // de él, centrado en el viewport, que es lo que pide la ficha.
+      const dosColumnas = matchMedia('(orientation: landscape) and (max-height: 520px)').matches;
+      return {
+        cajas, faltan: Object.keys(sel).filter(k => !cajas[k]),
+        deltaAncho: +(Math.max(...anchos) - Math.min(...anchos)).toFixed(2),
+        deltaAlto: +(Math.max(...altos) - Math.min(...altos)).toFixed(2),
+        u: u === null ? null : +u.toFixed(3),
+        ctaW: +cta.width.toFixed(2),
+        techoCta: u === null ? null : +(u * 64).toFixed(2),
+        dosColumnas,
+        dxViewport: +Math.abs((cta.left + cta.right) / 2 - innerWidth / 2).toFixed(2),
+        dxColumna: +Math.abs((cta.left + cta.right) / 2 - (acc.left + acc.right) / 2).toFixed(2),
+      };
+    })()`)
+    const dxCta = p3b.dosColumnas ? p3b.dxColumna : p3b.dxViewport
+    c['lob.3b'] = {
+      ...p3b, dxUsado: dxCta,
+      ok: p3b.faltan.length === 0 && p3b.deltaAncho <= 1 && p3b.deltaAlto <= 1
+          && dxCta <= 2 && p3b.techoCta !== null && p3b.ctaW <= p3b.techoCta + 1,
+    }
+
+    // ── lob.3c · el `+` de la píldora se VE ────────────────────────────────
+    // A1. El glifo de línea queda fuera de la simetría de 3b, y por eso nadie lo
+    // medía: el disco dorado existía, el signo dentro no. Dos cosas de fábrica
+    // del `<button>` lo habían encogido —`font: 13.333px Arial`, que colgaba el
+    // `1.5em` del `em` equivocado, y `padding: 1px 6px`, que hacía que el 62 %
+    // midiera contra una caja de contenido de 8×18— y el resultado era un palito
+    // de 4,95×11,16 px en un disco de 20: invisible en la pantalla y verde en el
+    // arnés.
+    //
+    // Se mide lo que hace falta para que eso no vuelva a pasar callado: que el
+    // glifo ocupe de verdad su disco (≥ 50 % en los dos ejes, la lámina pide
+    // 62 %) y que el trazo NO sea del color del fondo que tiene detrás —el otro
+    // modo de perder un icono es pintarlo del color del disco—.
+    const p3c = await page.evaluate(`(() => {
+      const b = document.querySelector('.lob-pildora [data-accion="tienda"]');
+      if (!b) return { ausente: true };
+      const s = b.querySelector('svg');
+      if (!s) return { ausenteSvg: true };
+      const cb = getComputedStyle(b), cs = getComputedStyle(s);
+      const rb = b.getBoundingClientRect(), rs = s.getBoundingClientRect();
+      const visible = el => { const c = getComputedStyle(el);
+        return c.visibility !== 'hidden' && c.display !== 'none' && +c.opacity > 0; };
+      return {
+        btn: { w: +rb.width.toFixed(2), h: +rb.height.toFixed(2), bg: cb.backgroundColor, fs: cb.fontSize },
+        svg: { w: +rs.width.toFixed(2), h: +rs.height.toFixed(2), stroke: cs.stroke },
+        razonW: rb.width ? +(rs.width / rb.width).toFixed(3) : null,
+        razonH: rb.height ? +(rs.height / rb.height).toFixed(3) : null,
+        trazoDistinto: cs.stroke !== cb.backgroundColor,
+        visibles: visible(b) && visible(s) && rb.width > 0 && rs.width > 0,
+      };
+    })()`)
+    c['lob.3c'] = {
+      ...p3c,
+      ok: !p3c.ausente && !p3c.ausenteSvg && p3c.visibles && p3c.trazoDistinto
+          && p3c.razonW >= 0.5 && p3c.razonH >= 0.5,
+    }
+
+    // ── lob.4 · IDI-0 · ninguna clave sin traducir ─────────────────────────
+    // `t()` devuelve `⟦clave⟧` cuando falta una entrada, a propósito y no vacío:
+    // así una traducción olvidada sale ROJA aquí en vez de dejar un botón mudo
+    // en producción. Se mira el texto renderizado, no el diccionario — es la
+    // única forma de cazar una clave mal escrita en el JSX.
+    const p4 = await page.evaluate(`(() => {
+      const txt = document.body.innerText;
+      const rotas = (txt.match(/\\u27E6[^\\u27E7]*\\u27E7/g) || []);
+      return { rotas, lang: document.documentElement.lang };
+    })()`)
+    c['lob.4'] = { ...p4, ok: p4.rotas.length === 0 && p4.lang === 'es' }
+
+    // ── lob.5 · la marca ───────────────────────────────────────────────────
+    // El lobby NO tiene `h1.welcome-title`: ese selector es contrato de la
+    // Bienvenida, la Portada, la mesa y la celebración, y duplicarlo aquí
+    // habría metido al lobby dentro del mecanismo del wordmark sin necesidad.
+    // El isotipo se mide contra la proporción del MAESTRO (2:3), no contra un
+    // cuadrado, y se comprueba que el `src` es el activo sellado y no otro.
+    const p5 = await page.evaluate(`(() => {
+      const viejo = document.querySelector('main.lobby h1.welcome-title');
+      const img = document.querySelector('.lob-iso');
+      if (!img) return { welcomeTitle: !!viejo, existe: false };
+      const r = img.getBoundingClientRect();
+      return {
+        welcomeTitle: !!viejo,
+        existe: true,
+        w: +r.width.toFixed(2), h: +r.height.toFixed(2),
+        ratio: r.height ? +(r.width / r.height).toFixed(4) : null,
+        src: img.getAttribute('src') || '',
+        alt: img.getAttribute('alt') || '',
+        completa: img.complete && img.naturalWidth > 0,
+      };
+    })()`)
+    const ratioOk = p5.ratio != null && Math.abs(p5.ratio - LOB_ISO_RATIO) <= 0.01
+    c['lob.5'] = {
+      ...p5, ratioEsperado: +LOB_ISO_RATIO.toFixed(4),
+      ok: !p5.welcomeTitle && p5.existe && ratioOk && /ajilei-isotipo/.test(p5.src)
+          && p5.completa && p5.alt === 'AJILEI',
+    }
+
+    // ── lob.6 · la hoja ⚙ abre, informa y cierra ───────────────────────────
+    // Los tres gestos en un solo punto porque son un solo contrato: si abre y no
+    // cierra, o cierra y no informa, el jugador se queda encerrado o sin la
+    // licencia. El bloque «Acerca de» es donde vive el CC BY que la Bienvenida
+    // se lleva al salir: si esto sale rojo, AJILEI está incumpliendo una licencia.
+    await page.click('[data-accion="ajustes"]')
+    await page.waitForTimeout(320)
+    const abierta = await page.evaluate(`!!document.querySelector('.lob-hoja.is-on')`)
+    // Y DÓNDE abre. Desde la v1.4 la hoja tiene UNA sola conducta en los seis
+    // viewports: nace del engranaje y cae. Eso es comprobable —su borde superior
+    // por debajo del ⚙ y su borde derecho a plomo con él— y comprobarlo es lo
+    // que impide que un día vuelva a haber dos colocaciones sin que nadie lo note.
+    const anclaje = await page.evaluate(`(() => {
+      const h = document.querySelector('.lob-hoja');
+      const g = document.querySelector('[data-accion="ajustes"]');
+      if (!h || !g) return { medible: false };
+      const rh = h.getBoundingClientRect(), rg = g.getBoundingClientRect();
+      return {
+        medible: true,
+        debajo: rh.top >= rg.bottom,
+        holgura: +(rh.top - rg.bottom).toFixed(2),
+        dxDerecha: +Math.abs(rh.right - rg.right).toFixed(2),
+        dentro: rh.top >= 0 && rh.right <= innerWidth + 0.5 && rh.left >= -0.5,
+      };
+    })()`)
+    await page.click('[data-accion="acerca"]')
+    await page.waitForTimeout(220)
+    const acerca = await page.evaluate(`(() => {
+      const b = document.querySelector('.lob-acerca');
+      if (!b || b.hidden) return { desplegado: false, texto: '' };
+      return { desplegado: true, texto: b.innerText, enlaces: b.querySelectorAll('a[href]').length };
+    })()`)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(320)
+    const cerrada = await page.evaluate(`!document.querySelector('.lob-hoja.is-on')`)
+    c['lob.6'] = {
+      abre: abierta, cierraConEscape: cerrada,
+      anclaje,
+      acercaDesplegado: acerca.desplegado,
+      ccby: /CC BY/.test(acerca.texto),
+      pixabay: /Pixabay/.test(acerca.texto),
+      enlaces: acerca.enlaces ?? 0,
+      ok: abierta && cerrada && acerca.desplegado && /CC BY/.test(acerca.texto)
+          && /Pixabay/.test(acerca.texto) && (acerca.enlaces ?? 0) >= 1
+          && anclaje.medible && anclaje.debajo && anclaje.dxDerecha <= 2 && anclaje.dentro,
+    }
+
+    // ── lob.7 · el CTA lleva a la selección de nivel ───────────────────────
+    // El punto que reemplaza a lo que el arnés daba por sentado: que desde la
+    // primera pantalla se llega a `NivelSelect` de un clic. Con la hoja ya
+    // cerrada, para que el clic sea el del lobby y no el del velo.
+    let nivelOk = false
+    try {
+      await page.click('[data-accion="jugar-ia"]')
+      await page.waitForSelector('.nivel-grid button', { timeout: 4000 })
+      nivelOk = true
+    } catch { /* queda en false y el veredicto lo canta */ }
+    c['lob.7'] = { llegaANivelSelect: nivelOk, ok: nivelOk }
+
+    c.consola = consola
+    c.ok = LOB_PUNTOS.every(k => c[k].ok) && consola.length === 0
+
+    // Captura del lobby en cada viewport, para que Victor valide contra la
+    // lámina sin tener que abrir seis ventanas. Se toma antes de navegar, así
+    // que se rehace la carga: cuesta un segundo y evita fotografiar NivelSelect.
+    await page.goto(BASE)
+    await page.waitForSelector('main.lobby')
+    await page.waitForTimeout(500)
+    await page.mouse.move(5, 5)
+    c.shot = `${LOB_OUT_DIR}/lob_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shot })
+
+    celdas.push(c)
+    await page.close()
+  }
+
+  const ok = celdas.every(c => c.ok)
+  console.log(`\n── lob · el lobby post-login ── ${celdas.filter(c => c.ok).length}/${celdas.length} celdas`)
+  for (const c of celdas) {
+    const fallos = LOB_PUNTOS.filter(k => !c[k].ok)
+    console.log(`  ${c.ok ? 'OK  ' : 'FALLA'} ${c.vp} (${c.note})${fallos.length ? ' · ' + fallos.join(', ') : ''}${c.consola.length ? ' · consola: ' + c.consola[0] : ''}`)
+  }
+  return { celdas, ok }
 }
 
 // ── DSK-B1 · Presupuesto vertical de la columna central (mesa 5) ──────────────
@@ -9008,6 +9364,11 @@ try {
   if (MODE === 'bug' || MODE === 'all') report.bug = await runBug(browser)
   if (MODE === 'shots' || MODE === 'all') report.shots = await runShots(browser)
   if (MODE === 'gate') report.gate = await runGate(browser, process.argv[3] || 'after')
+  // LOB-1 · entra en `all` porque es la pantalla por la que pasan TODOS los
+  // demás modos: si el lobby se rompe, los otros 27 salen rojos sin decir por
+  // qué. Que este punto caiga primero es lo que convierte esa cascada en un
+  // diagnóstico. Es barato: seis viewports sin llegar a la mesa.
+  if (MODE === 'lob' || MODE === 'all') report.lob = await runLob(browser)
   if (MODE === 'b1') report.b1 = await runB1(browser)
   if (MODE === 'tactil') report.tactil = await runTactil(browser)
   if (MODE === 'p1') report.p1 = await runP1(browser)
