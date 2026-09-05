@@ -65,6 +65,24 @@ export const SONIDOS_MESA = [
   'timerWarning', 'showdown', 'comodin', 'buttonClick',
 ]
 
+// LOB-1 · El lobby precarga UNO, y es el que él mismo dispara: el golpe de mesa
+// del CTA. `tableKnock` ya estaba en la tabla —lo trajo DSK-VC2 para la
+// celebración— y aquí estrena un segundo consumidor sin cambiar una cifra suya.
+//
+// UNO Y NO NUEVE. La tentación era adelantar aquí `SONIDOS_MESA`, ya que del
+// lobby se sale hacia la mesa; sería deshacer PUE-1.2 por la puerta de atrás.
+// El lobby es la primera pantalla que ve alguien que ya entró, y bajarle 380 KiB
+// de audio de partida para un jugador que quizá sólo viene a mirar su saldo es
+// exactamente el gasto que aquella tanda quitó del arranque. Los de la mesa se
+// piden donde se pedían: al ENCAMINARSE a la mesa (App.jsx), que sigue siendo el
+// mismo instante que antes de esta campaña.
+//
+// `buttonClick` tampoco entra: lo usa `SoundButton` en los diez controles
+// secundarios del lobby, pero son 16 896 B y ninguno de ellos es un momento
+// crítico — si el primer clic de «Rankings» suena un pelo tarde, no pasa nada.
+// El golpe de mesa sí lo es: cae en el mismo fotograma en que la pantalla cambia.
+export const SONIDOS_LOBBY = ['tableKnock']
+
 /** Construye y arranca la descarga de los sonidos nombrados. Idempotente. */
 export function precargarSonidos(nombres) {
   if (!Array.isArray(nombres)) return

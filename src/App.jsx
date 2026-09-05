@@ -1,22 +1,40 @@
 import { useState, useEffect } from 'react'
-import WelcomeScreen from './components/WelcomeScreen'
+// ── LOB-1 · `Lobby` releva a `WelcomeScreen` en la casilla de `COMPLETO` ─────
+// `components/WelcomeScreen.jsx` sigue en el árbol —borrar es otra tanda, igual
+// que con `TableSelect` y `Entrada`— pero deja de importarse desde aquí, así que
+// deja de renderizarse y pasa a ser código muerto declarado.
+import Lobby from './screens/Lobby'
 import NivelSelect from './components/NivelSelect'
 import ModeSelect from './components/ModeSelect'
 import GameTable from './components/GameTable'
 import Portada from './screens/Portada'
 import Bautizo from './screens/Bautizo'
 import { readNivel, writeNivel } from './hooks/useNivel'
-import { useAuth, AUTH_BYPASS, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
+// `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
+// `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
+// sigue viva y exportada en el hook, que es donde trabaja.
+import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
 
 // ── NIV-UI · Recorrido del lobby ─────────────────────────────────────────────
 // Rector: docs/AJILEI_Modos_y_Asistencia_v1.0.md §4.1.
-//   [Bienvenida] "Jugar vs IA" → (1) dificultad → (2) mesa + apuesta → [Mesa]
+//   [Lobby] "Jugar contra la IA" → (1) dificultad → (2) mesa + apuesta → [Mesa]
 // La pantalla de apuesta deja de existir como paso propio: se integró en la de
 // mesa. `TableSelect` queda fuera del recorrido y sin usar; NO se borra en esta
 // tanda —borrar es otra tanda— y su hoja de estilo sigue siendo la fuente del
 // look de las tarjetas de apuesta a pantalla completa.
+//
+// ── LOB-1 · La Bienvenida sale del recorrido ────────────────────────────────
+// Rector: AJILEI_LOB1_Fase1_v1.1.md §4. `screens/Lobby.jsx` ocupa la MISMA
+// casilla que ocupaba `WelcomeScreen`: el destino de `COMPLETO`, que en este
+// archivo no es un `return` con nombre sino la caída de la cascada. Ni la forma
+// de la cascada ni el contrato de arranque de partida cambian.
+//
+// El único valor de `screen` que se movió es `'welcome'` → `'lobby'`, y se
+// recablearon sus cuatro consumidores: el estado inicial, las dos guardas de la
+// precarga y el `onBack` de `NivelSelect`. El nombre viejo no sobrevive en
+// ninguna parte de `src/`.
 //
 // El paso de pantallas se mantiene con el MISMO patrón que ya usaba el
 // proyecto: un `screen` en estado local, sin router. No se reorganizan rutas
@@ -41,11 +59,11 @@ function App() {
   // por la que `useAuth` abre la función y los `useState` del lobby se declaran
   // aunque la puerta esté a punto de devolver otra pantalla.
   const auth = useAuth()
-  const [screen, setScreen] = useState('welcome') // 'welcome' | 'nivel-select' | 'mode-select' | 'table'
+  const [screen, setScreen] = useState('lobby') // 'lobby' | 'nivel-select' | 'mode-select' | 'table'
   const [stake, setStake] = useState(null)
   const [playerCount, setPlayerCount] = useState(2)
   // La preferencia se lee UNA vez al arrancar. Preselecciona la pantalla de
-  // dificultad y jamás la salta (v1.0 §4.2): `screen` arranca en 'welcome' y el
+  // dificultad y jamás la salta (v1.0 §4.2): `screen` arranca en 'lobby' y el
   // único camino a la mesa pasa por elegir, aunque ya haya un nivel recordado.
   const [nivel, setNivel] = useState(() => readNivel())
 
@@ -55,16 +73,24 @@ function App() {
   // El precio de aplazar es que la primera reproducción llegaría tarde, así que
   // quien va a necesitarlos los pide antes.
   //
-  // Y se piden aquí, al salir de la Bienvenida, en vez de al montar la mesa: el
+  // Y se piden aquí, al salir del lobby, en vez de al montar la mesa: el
   // recorrido dificultad → mesa+apuesta son varios segundos de margen, y el
   // primer `cardDeal` cae a los pocos fotogramas de que la mesa exista. Pedirlos
   // en `GameTable` sería llegar a la vez que el reparto.
   // No pinta nada y no toca el layout: Δ=0 en las tres pantallas del lobby.
+  //
+  // LOB-1 · La guarda dice `!== 'lobby'` y no `!== 'welcome'`, y ese cambio de
+  // nombre es lo único que hacía falta: `Lobby` entra en la MISMA casilla que
+  // ocupaba la Bienvenida —no delante de ella—, así que el instante de la
+  // precarga es el mismo que antes de esta campaña. Si el lobby hubiera nacido
+  // como un `screen` NUEVO por delante de `'welcome'`, esta línea habría
+  // disparado 380 KiB de audio y 0,57 MB de baraja al entrar al lobby, que es
+  // exactamente lo que PUE-1.2 y CAR-1 sacaron del arranque.
   useEffect(() => {
-    if (screen !== 'welcome') precargarSonidos(SONIDOS_MESA)
+    if (screen !== 'lobby') precargarSonidos(SONIDOS_MESA)
     // CAR-1 §3.2 · y la baraja con ellos, por la misma razón y en el mismo
     // momento: 0,57 MB de WebP contra los 24,28 MB de PNG que ya no viajan.
-    if (screen !== 'welcome') precargarBaraja()
+    if (screen !== 'lobby') precargarBaraja()
   }, [screen])
 
   // CARGANDO no pinta: pinta NADA. El fondo del documento ya es el verde abismo
@@ -91,19 +117,28 @@ function App() {
   // (ver la cabecera del hook). Con el bypass activo el nombre es "DevLocal" y
   // las dos acciones responden diciendo que no hay cuenta real detrás — el hook
   // las corta antes de tocar la red.
+  //
+  // LOB-1 · Entra `correo`. La hoja ⚙ del lobby enseña con QUÉ cuenta se entró,
+  // enmascarado (`c•••@gmail.com`), y `useAuth` ya lo devolvía sin que nadie lo
+  // consumiera. Es un campo más en el mismo paquete: `GameTable`, que recibe
+  // este mismo objeto, no se entera. Con el bypass es `null` y la línea del
+  // correo se apaga reservando su caja (O1), en vez de desaparecer.
   const cuenta = {
     username: auth.perfil?.username ?? '',
+    correo: auth.correo ?? '',
     cambiarNombre: auth.cambiarNombre,
     cerrarSesion: auth.cerrarSesion,
   }
 
-  // EL BYPASS APAGA EL ACCESO DE LA BIENVENIDA, Y SÓLO ÉSE. Es lo que la adenda
-  // pide con esas palabras, y su razón es una sola: que los 20 arneses vean la
-  // Bienvenida byte-idéntica a la de hoy. El ⋮ de la mesa NO entra en ese trato
-  // —su entrada "Cuenta" está viva en las dos listas y su panel forma parte de
-  // lo que esta tanda tiene que poder medir—, y una entrada viva que no abriera
-  // nada sería además una mentira del propio menú.
-  const cuentaLobby = AUTH_BYPASS ? null : cuenta
+  // ── LOB-1 · `cuentaLobby` se retira ────────────────────────────────────────
+  // Existía para un trato concreto: que el bypass apagara el acceso de cuenta de
+  // la BIENVENIDA y sólo ése, para que los arneses la vieran byte-idéntica. Esa
+  // pantalla ya no se renderiza, así que la excepción protegía a un ausente.
+  //
+  // El lobby recibe la cuenta SIEMPRE, también con bypass, y por dos razones: su
+  // bloque de perfil es parte de la cara que Victor selló —un lobby sin nombre no
+  // es el lobby de la lámina— y el arnés tiene que poder medirlo. Lo que en el
+  // bypass no hay es correo, y para eso está la reserva de caja de O1.
 
   if (screen === 'table') {
     return (
@@ -136,12 +171,20 @@ function App() {
       <NivelSelect
         preseleccionado={nivel}
         onSelect={(id) => { setNivel(id); writeNivel(id); setScreen('mode-select') }}
-        onBack={() => setScreen('welcome')}
+        onBack={() => setScreen('lobby')}
       />
     )
   }
 
-  return <WelcomeScreen onSelectMode={() => setScreen('nivel-select')} cuenta={cuentaLobby} />
+  // La caída de la cascada sigue siendo el destino de `COMPLETO`. Tres props y
+  // ninguna más: el lobby no conoce `screen`, ni Supabase, ni la mesa.
+  return (
+    <Lobby
+      cuenta={cuenta}
+      onJugarIA={() => setScreen('nivel-select')}
+      onCerrarSesion={auth.cerrarSesion}
+    />
+  )
 }
 
 export default App

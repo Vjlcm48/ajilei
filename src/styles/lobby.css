@@ -1,0 +1,816 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   AJILEI · LOB-1 · lobby.css · La pantalla principal post-login
+   ────────────────────────────────────────────────────────────────────────────
+   Documento rector: AJILEI_LOB1_Fase1_v1.2.md.
+   Autoridad visual:  AJILEI_LOB1_lamina_v1.4.html (sellada por Victor).
+   Sistema:           docs/AJILEI_Sistema_Diseno_v1.2.md (regla del oro único).
+
+   HOJA PROPIA Y ADITIVA. La importa sólo `screens/Lobby.jsx`. No edita ni pisa
+   una regla de ninguna hoja existente: todos sus selectores nacen bajo `.lobby`
+   o bajo `body.lobby-activa`, que sólo existen mientras esta pantalla vive.
+
+   NI UN HEX. Todo color sale de un token de `theme.css` o se deriva de uno con
+   `rgba(var(--<token>-rgb), α)`. El único valor de la lámina que no era token
+   —`rgba(245,237,216,.14)` de los filetes— se rederiva de `--text-primary-rgb`,
+   que ES ese crema. Los `rgba(0,0,0,α)` que quedan son SOMBRAS, no color: la
+   propia lámina lo declara en su cabecera y `welcome.css:35` ya lo hace igual.
+   Una sola diferencia con la lámina queda anotada, la del velo (§7).
+
+   FÓRMULA SOBRE CONSTANTE. Ni un tamaño es un número suelto: todos cuelgan de
+   `--u`, la unidad óptica derivada del viewport. Cambiar `--u` reescala la
+   pantalla entera y mantiene sus proporciones — que es lo que permite que el
+   traje compacto sean tres líneas y no una hoja paralela.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+
+/* ══ 0 · LA JAULA DE 1126px SE EXCEPCIONA, NO SE DEMUELE ═══════════════════
+   `src/index.css` es la hoja del andamiaje de Vite y esta campaña NO la abre.
+   Ahí vive `#root { width: 1126px; border-inline: 1px solid var(--border) }`,
+   que acotaría el lobby y le pintaría dos líneas grises por los costados.
+
+   Molde EXACTO de `portada.css:14-35`: el lobby monta `lobby-activa` en el
+   <body> y la excepción se declara con alcance. `body.lobby-activa #root` suma
+   una clase Y un elemento al mismo id, así que gana sin un solo `!important`, y
+   MUERE en cuanto el lobby se desmonta. Ninguna otra pantalla ve la diferencia.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.lobby-activa #root {
+  width: 100%;
+  max-width: none;
+  border-inline: 0;
+}
+
+/* ══ 0.1 · El reset de caja que la lámina daba por hecho ═══════════════════
+   La lámina abre con `*{box-sizing:border-box}` y producción NO tiene ese reset:
+   `index.css` sólo lo pone en `#root`. Se repone CON ALCANCE DE LOBBY —misma
+   decisión y mismo motivo que `portada.css:38-50`—, así que fuera de `.lobby`
+   no cambia una sola caja del juego.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lobby,
+.lobby *,
+.lobby *::before,
+.lobby *::after { box-sizing: border-box; }
+
+
+/* ══ 1 · TOKENS DEL LOBBY ══════════════════════════════════════════════════
+   Se declaran sobre `.lobby` y NO sobre `:root`, a propósito. Nombres como
+   `--u`, `--ico` o `--ciclo` son demasiado genéricos para vivir en el espacio
+   global de una app que ya tiene `--card-w`, `--dsk-*` y cinco familias de
+   tapete: en `:root` serían una colisión esperando fecha. Acotados, no pueden
+   alcanzar a nada que no sea esta pantalla.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lobby {
+  /* La unidad óptica. `vmin` y no `vw`: el lobby tiene que encoger tanto en el
+     teléfono vertical (donde manda el ancho) como en el apaisado bajo (donde
+     manda el alto), y `vmin` es el único que atiende a los dos. El `clamp` pone
+     suelo y techo para que ni el reloj ni el monitor de 4K salgan de escala. */
+  --u: clamp(3.2px, 1vmin, 6px);
+
+  /* --iso-lobby es el ALTO de la caja del isotipo, no su lado: el maestro tiene
+     `viewBox="15 30 60 90"` y por tanto proporción 2:3. El ancho se deriva. */
+  --iso-lobby: calc(var(--u) * 40);
+  --iso-lobby-w: calc(var(--iso-lobby) * 2 / 3);
+
+  /* ── EL CONTRATO DE ICONOS · un solo token (§1.9) ─────────────────────────
+     `--ico` dimensiona TODO icono de acción: el ⚙, los tres de la barra
+     inferior, la silueta del avatar y la moneda del saldo. Ninguno declara su
+     tamaño por su cuenta, y sus botones contenedores miden `1.45 · --ico`.
+     Antes de la v1.4 cada uno traía su propia cifra —8,5 u el avatar, 8,5 el ⚙,
+     6 los de la barra, 16 px fijos la moneda— y esa simetría existía sólo por
+     disciplina: bastaba tocar una para romperla en un viewport y no en otro.
+     Ahora existe por construcción, y el punto `lob.3b` del arnés la mide.
+
+     LOS GLIFOS DE LÍNEA NO ENTRAN AQUÍ: el candado del PvP y el `+` de la
+     píldora se miden en `em` con el texto que acompañan, porque no son iconos
+     de acción sino tipografía — crecen y encogen con su frase, no con la
+     rejilla de controles. */
+  --ico: calc(var(--u) * 6);
+  --ico-caja: calc(var(--ico) * 1.45);
+
+  /* ── El CTA tiene SUELO, y no lo tenía ────────────────────────────────────
+     La fórmula de la lámina es `11·u` a secas, y el arnés la midió: 36px a
+     360×640, 36 a 640×360 y 39 a 844×390 — por debajo del piso táctil de 40px
+     de la campaña DSK y del objetivo de 44 que el modo `lob` exige. En un
+     teléfono, `--u` toca su suelo de 3,2–3,6px y once unidades no llegan.
+     El `max()` es la misma medicina que `--u` ya se aplica a sí misma con su
+     `clamp`: la fórmula sigue mandando en cuanto hay sitio, y por debajo manda
+     el dedo. En escritorio no cambia nada (11·6 = 66px). */
+  --lob-cta-h: max(44px, calc(var(--u) * 11));
+  --lob-cta-w: min(100%, calc(var(--u) * 64));
+  --lob-pad: calc(var(--u) * 3.5);
+
+  /* El filete de la casa: el crema del texto al 14 %. Es `rgba(245,237,216,.14)`
+     de la lámina, dicho con su token en vez de con sus cifras. */
+  --lob-linea: rgba(var(--text-primary-rgb), 0.14);
+
+  /* ── La fórmula del brillo alterno: UN ciclo, DOS fases ──────────────────
+     El isotipo destella en la primera mitad y la moneda en la segunda. No son
+     dos animaciones que casualmente no coinciden: es un solo periodo con la
+     fase de la moneda desplazada medio ciclo. Cambiar `--ciclo` mueve las dos a
+     la vez y el alternado se conserva por construcción. */
+  --ciclo: 8s;
+  --fase: calc(var(--ciclo) / 2);
+
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  /* ── ALTO DEFINIDO, no mínimo ─────────────────────────────────────────────
+     Con `min-height` la rejilla no tiene altura contra la que repartir, y las
+     dos filas `1fr` del centro resuelven cada una al contenido de la mayor: el
+     arnés midió la barra inferior en `top: 1015` dentro de un viewport de 768,
+     porque una fila VACÍA estaba clonando los 387px de la marca. Con altura
+     definida, `1fr` reparte espacio libre —que es lo que `1fr` significa— y la
+     barra aterriza donde debe.
+     `100vh` primero como red para navegadores sin `dvh`. */
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  /* `env(safe-area-inset-*)` está escrito y hoy vale 0: `index.html:9` NO lleva
+     `viewport-fit=cover` (verificado en esta fase). Añadirlo es FS-1 y no toca a
+     esta campaña, así que la reserva queda puesta para el día que aquello entre
+     y el lobby no tenga que enterarse. */
+  padding:
+    calc(env(safe-area-inset-top, 0px) + var(--lob-pad))
+    calc(env(safe-area-inset-right, 0px) + var(--lob-pad))
+    calc(env(safe-area-inset-bottom, 0px) + var(--lob-pad))
+    calc(env(safe-area-inset-left, 0px) + var(--lob-pad));
+  max-width: calc(var(--u) * 213);   /* ≈1280px al techo de --u */
+  margin: 0 auto;
+
+  /* Misma decisión que `.welcome-screen` y que el criterio C3.2 de `ModeSelect`:
+     lo que no cabe NO se scrollea, se recorta — y por eso existen los dos trajes
+     compactos del §9, que son los que hacen que quepa. */
+  overflow: hidden;
+
+  color: var(--text-primary);
+  /* La familia del lobby es la del wordmark: `--sans` de `index.css`, que es
+     `system-ui, 'Segoe UI', Roboto, sans-serif` — la misma pila que la lámina
+     selló y la misma que resuelve hoy `h1.welcome-title` (Fase 0 §5.4). NO se
+     usa `--font-base` (Arial) porque la marca ya no se lee en Arial en ninguna
+     de sus cuatro apariciones. El fallback repite la pila para que el lobby
+     sobreviva al día en que alguien limpie el andamiaje de Vite. */
+  font-family: var(--sans, system-ui, 'Segoe UI', Roboto, sans-serif);
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* El fondo: la rampa verde base de `theme.css`. Con el tapete por defecto —el
+   verde clásico, que es la AUSENCIA de `data-tapete` (tapetes.js:73-75)— estos
+   tres tokens resuelven a la familia calibrada de VIS-1b. `fixed` para que no
+   se mueva con nada y `z-index:0` bajo todo el contenido. */
+.lobby .lob-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, var(--green-base) 0%, transparent 70%),
+    radial-gradient(ellipse 120% 90% at 50% 100%, var(--green-deep) 0%, transparent 60%),
+    var(--green-abyss);
+}
+.lobby > .lob-top,
+.lobby > .lob-centro,
+.lobby > .lob-nav { position: relative; z-index: 1; }
+
+
+/* ══ 2 · BARRA SUPERIOR ════════════════════════════════════════════════════ */
+.lobby .lob-top {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  text-align: left;   /* `#root` centra por defecto (index.css:61) */
+}
+
+.lobby .lob-perfil {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: var(--u) calc(var(--u) * 1.5) var(--u) var(--u);
+  border-radius: 999px;
+}
+.lobby .lob-avatar {
+  width: var(--ico-caja);
+  height: var(--ico-caja);
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--green-bright) 0%, var(--green-deep) 100%);
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--lob-linea);
+  flex: none;
+}
+/* El avatar de la hoja usa el MISMO contrato: la simetría no se rompe por
+   estar dentro de un panel. Antes llevaba 7 u sueltos. */
+.lobby .lob-avatar .lob-ico { width: var(--ico); height: var(--ico); color: var(--text-primary); }
+.lobby .lob-nombre { font-size: calc(var(--u) * 3.6); letter-spacing: 0.01em; }
+
+/* O1 · lo que puede faltar RESERVA SU CAJA. Un nombre ausente (o un correo que
+   el bypass de desarrollo no tiene) se apaga con `visibility`, jamás sale del
+   flujo: así el lobby mide lo mismo con cuenta y sin ella, y las capturas del
+   arnés son comparables entre corridas. */
+.lobby .lob-hueco { visibility: hidden; }
+
+.lobby .lob-pildora {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.4);
+  border: 1px solid var(--lob-linea);
+  background: var(--surface-panel);
+  border-radius: 999px;
+  padding: calc(var(--u) * 0.9) calc(var(--u) * 0.9) calc(var(--u) * 0.9) calc(var(--u) * 1.2);
+  font-size: calc(var(--u) * 3.4);
+  /* Cifras de ancho fijo: el saldo cambiará y no puede empujar el `+` cada vez
+     que cruce un dígito. */
+  font-variant-numeric: tabular-nums;
+}
+/* `BalanceDisplay` trae su propia caja (`balanceDisplay.css`); aquí sólo se
+   iguala su tipografía a la de la píldora para que el número y el borde midan
+   lo mismo que en la lámina. */
+.lobby .lob-pildora .bd { font-size: inherit; gap: calc(var(--u) * 1.2); }
+.lobby .lob-pildora .bd-num { font: inherit; color: var(--text-primary); }
+
+/* El `+` es GLIFO DE LÍNEA, no icono de acción: se mide en `em` con el número
+   que tiene al lado, así que crece y encoge con la píldora y no con la rejilla
+   de controles. Es la frontera que §1.9 traza y la razón de que no lleve
+   `--ico`: puesto a 36 px reventaría una píldora de 3,4 u de texto. */
+.lobby .lob-mas {
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--gold-brand);
+  color: var(--text-dark);
+  border: 0;
+  cursor: pointer;
+  margin-left: calc(var(--u) * 0.6);
+  flex: none;
+}
+/* ── A1 · POR QUÉ EL `+` SE HABÍA PERDIDO ───────────────────────────────────
+   Medido en 5173 (1920×1080 y 360×640) antes de tocar nada: disco de 20×20 px
+   en LOS DOS viewports —o sea, sin escalar— y dentro un `<svg>` de 4,95×11,16.
+   Un palito vertical de 5 px de ancho sobre un disco dorado: la «marca mínima
+   en el centro» que Victor veía. El trazo NO era el problema (`stroke` computaba
+   `#1a1a0e` sobre fondo `#e8b84b`, contraste correcto); tampoco `.lob-ico`.
+
+   Eran las dos cosas que un `<button>` trae de fábrica y nadie había apagado:
+
+   (1) `font: 400 13.333px Arial` — un botón NO hereda la tipografía de su
+       padre. `1.5em` se medía contra 13,33 px y no contra los 20,4 px de la
+       píldora, así que el disco valía 20 px fijos en escritorio y en móvil: la
+       fórmula de la lámina estaba escrita, pero colgada del `em` equivocado.
+   (2) `padding: 1px 6px` — el 62 % es porcentaje de la CAJA DE CONTENIDO, y esa
+       caja medía 8×18 px, no 20×20. De ahí el 4,95 (62 % de 8) y el 11,16
+       (62 % de 18), y de ahí que saliera alto y flaco en vez de cuadrado.
+
+   Se apagan las dos con alcance —`.lob-pildora .lob-mas`, la píldora es su
+   único sitio— y sin `!important`. No se cambia una sola cifra de la lámina:
+   `1.5em` y `62 %` son los suyos; lo único que cambia es contra qué miden.
+   ───────────────────────────────────────────────────────────────────────── */
+.lobby .lob-pildora .lob-mas {
+  font: inherit;
+  padding: 0;
+  line-height: 1;
+}
+.lobby .lob-mas .lob-ico { width: 62%; height: 62%; }
+
+.lobby .lob-ajustes {
+  margin-left: auto;
+  width: var(--ico-caja);
+  height: var(--ico-caja);
+  border-radius: 50%;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.lobby .lob-ajustes .lob-ico { width: var(--ico); height: var(--ico); }
+.lobby .lob-ajustes:hover,
+.lobby .lob-ajustes:focus-visible { color: var(--text-primary); border-color: var(--lob-linea); }
+
+
+/* ══ 3 · CENTRO · MARCA Y ACCIÓN ═══════════════════════════════════════════
+   La lámina centra el par con tres filas —`1fr auto 1fr`, la marca al fondo de
+   la primera y una tercera vacía que equilibra—. Aquí se centra con una columna
+   flexible, que da EXACTAMENTE el mismo reparto y no depende de una fila
+   fantasma: es esa fila la que, sin altura definida en el padre, clonaba los
+   387px de la marca y empujaba la barra inferior fuera del viewport en las tres
+   celdas de escritorio (medido en la primera corrida de `lob`).
+   La relación que la lámina quiere —la marca abrazando al CTA— la sostiene el
+   `padding-bottom` de la marca, que es donde ya vivía.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lobby .lob-centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;   /* sin esto un hijo flexible no encoge por debajo del contenido */
+}
+
+.lobby .lob-marca {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 2.2);
+  padding-bottom: calc(var(--u) * 5);
+}
+
+.lobby .lob-arco {
+  width: calc(var(--iso-lobby) * 1.45);
+  height: auto;
+  display: block;
+  margin-bottom: calc(var(--u) * -1.5);
+  opacity: 0.9;
+}
+
+/* El <h1> de la página. Se le quitan de encima las reglas genéricas del
+   andamiaje —`index.css:76-84` le pone 56px, tracking negativo y 32px de margen
+   vertical— porque aquí no contiene texto: contiene la marca. */
+.lobby .lob-marca-h1 {
+  margin: 0;
+  font-size: 0;
+  line-height: 0;
+  letter-spacing: normal;
+  display: block;
+  /* La respiración va aquí, sobre la caja del isotipo, y no sobre el arco: son
+     la misma marca pero el arco es fondo y el símbolo es el objeto. */
+  animation:
+    lob-destello-iso var(--ciclo) ease-in-out infinite,
+    lob-respira 6s ease-in-out infinite;
+}
+
+.lobby .lob-iso {
+  display: block;
+  /* 2:3, la proporción del maestro (`viewBox="15 30 60 90"`) — la misma que
+     `.wm-iso` respeta con `height: calc(1.5 * var(--wm-cap))`. Forzarlo a
+     cuadrado deformaría la letra doble.
+     EL ANCLAJE ÓPTICO LO TRAE EL PROPIO MAESTRO: prohibido corregirlo al centro
+     geométrico (AJILEI_Icono_v1.0.md). Aquí no se recorta, no se desplaza y no
+     se recolorea — sólo se escala. */
+  width: var(--iso-lobby-w);
+  height: var(--iso-lobby);
+  user-select: none;
+}
+
+.lobby .lob-accion {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 3.2);
+  width: min(100%, calc(var(--u) * 92));
+  flex: none;
+}
+
+.lobby .lob-cta-ia {
+  height: var(--lob-cta-h);
+  width: var(--lob-cta-w);
+  border: 0;
+  border-radius: calc(var(--lob-cta-h) / 2);
+  /* El único oro sólido grande de la pantalla, y le toca: es el botón que abre
+     la mesa. La rampa son las tres paradas del MISMO oro (theme.css:22-25), no
+     un segundo dorado — la regla del oro único queda intacta. */
+  background: linear-gradient(180deg,
+    var(--gold-hover) 0%,
+    var(--gold-brand) 55%,
+    var(--gold-brand-deep) 100%);
+  color: var(--text-dark);
+  font: inherit;
+  font-weight: 600;
+  font-size: calc(var(--u) * 4.4);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow:
+    0 calc(var(--u) * 1.5) calc(var(--u) * 4) rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(var(--text-primary-rgb), 0.35);
+  transition: transform 0.12s ease;
+}
+.lobby .lob-cta-ia:active { transform: translateY(1px) scale(0.995); }
+.lobby .lob-cta-ia:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+
+
+/* ══ 4 · LA MONEDA DEL SALDO ═══════════════════════════════════════════════
+   ES LA ÚNICA MONEDA DEL LOBBY. La v1.3 de la lámina ponía una moneda grande al
+   lado del CTA; la v1.4 la retira y deja sólo la de la píldora. Con ella se cae
+   también la extracción del WebP de MON-2: el render 3D sigue viviendo en la
+   Portada y esta campaña no lo toca (ficha v1.2 §3.5).
+
+   EL DIBUJO ES `heptacoin.svg`, EL MAESTRO SELLADO, y llega por `ChipToken`
+   dentro de `BalanceDisplay` — que ya lo monta. No se añade una segunda moneda
+   al lado de la suya: se envuelve la que hay. Un solo dibujo de moneda en el
+   producto, servido por el mismo componente que lo sirve en las otras trece
+   apariciones.
+
+   `ChipToken` fija su caja en ATRIBUTOS (16px para `icon`); aquí se lleva a
+   `--ico` desde CSS, que es el token del contrato de iconos. Es la misma vía
+   por la que `gameTable.css` achica la del pozo a 11×11 — una regla acotada
+   pisa el atributo sin tocar el componente.
+
+   EL BRILLO ES LA FASE 2 DEL CICLO, y va en DOS capas separadas a propósito:
+     · el halo (`drop-shadow`) sobre el <img>, para que ilumine el canto de la
+       moneda y NO la cifra que tiene al lado;
+     · el destello corto sobre un pseudo-elemento colocado exactamente encima de
+       su caja.
+   Sin barrido: a 36px una banda que cruza se lee como parpadeo, no como brillo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lobby .lob-moneda {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.lobby .lob-moneda .chip-token {
+  display: block;
+  width: var(--ico);
+  height: var(--ico);
+  /* El halo conserva la sombra propia de `ChipToken` en las tres paradas: una
+     animación de `filter` REEMPLAZA la propiedad entera, y sin esto la moneda
+     perdería su sombra de apoyo durante los ocho segundos del ciclo. */
+  animation: lob-halo-moneda var(--ciclo) ease-in-out infinite;
+}
+.lobby .lob-moneda::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--ico);
+  height: var(--ico);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%,
+    rgba(var(--gold-brand-hi-rgb), 0.95) 0%,
+    transparent 60%);
+  opacity: 0;
+  animation: lob-destello-moneda var(--ciclo) ease-in-out infinite;
+  pointer-events: none;
+}
+
+
+/* ══ 5 · EL ACCESO QUE TODAVÍA NO EXISTE ═══════════════════════════════════ */
+.lobby .lob-cta-pvp {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.6);
+  background: none;
+  border: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: calc(var(--u) * 3.5);
+  cursor: pointer;
+  padding: var(--u) calc(var(--u) * 2);
+  border-radius: 999px;
+}
+/* Glifo de LÍNEA, no icono de acción (§1.9): se mide en `em` con la frase que
+   acompaña, así que crece con ella y no con la rejilla de controles. */
+.lobby .lob-cta-pvp .lob-ico {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+/* La pastilla «Próximamente» / «Pronto». Un solo estilo para las cinco. */
+.lobby .lob-pastilla {
+  font-size: 0.78em;
+  color: var(--text-muted);
+  border: 1px solid var(--lob-linea);
+  border-radius: 999px;
+  padding: 0.12em 0.7em;
+  white-space: nowrap;
+}
+.lobby .lob-cta-pvp .lob-pastilla { color: var(--text-secondary); }
+
+
+/* ══ 6 · BARRA INFERIOR ════════════════════════════════════════════════════ */
+.lobby .lob-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--lob-linea);
+  padding-top: calc(var(--u) * 2.4);
+  max-width: calc(var(--u) * 120);
+  width: 100%;
+  margin: 0 auto;
+}
+.lobby .lob-nav-btn {
+  background: none;
+  border: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 1.1);
+  font-size: calc(var(--u) * 2.9);
+  padding: calc(var(--u) * 0.6) 0;
+}
+.lobby .lob-nav-btn .lob-ico { width: var(--ico); height: var(--ico); }
+.lobby .lob-nav-btn:hover,
+.lobby .lob-nav-btn:focus-visible { color: var(--text-primary); }
+/* La Tienda al centro, ÚNICA en oro de las tres: regla del oro único. No compite
+   con el CTA —aquél es oro sólido de fondo, ésta es oro de tinta— y es lo que
+   señala dónde está la única de las tres que algún día moverá dinero. */
+.lobby .lob-nav-tienda { color: var(--gold-brand); }
+.lobby .lob-nav-tienda:hover,
+.lobby .lob-nav-tienda:focus-visible { color: var(--gold-hover); }
+
+
+/* ══ 7 · HOJA DE CONFIGURACIÓN ═════════════════════════════════════════════
+   UNA sola conducta en todos los viewports (ficha v1.2 §1.9c): la hoja nace del
+   engranaje y se ancla a él. El `@media (min-width: 900px)` que partía la pieza
+   en dos colocaciones se retiró en la v1.4.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lobby .lob-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  /* La lámina pide `rgba(9,23,14,.6)`: el `--green-abyss` al 60 %. Ese alfa no
+     es ninguna de las dos tintas de zona que la casa tenía (.45 y .30), así que
+     hasta A1 el velo iba con `--surface-area` y quedaba un punto más claro.
+     Victor autorizó el token que faltaba (A1 §2b) y ahora el velo es el de la
+     lámina, escrito desde `theme.css` y sin un solo hex aquí. */
+  background: rgba(var(--green-abyss-rgb), 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0s 0.2s;
+}
+.lobby .lob-velo.is-on { opacity: 1; visibility: visible; transition-delay: 0s; }
+
+/* ── UNA SOLA CONDUCTA EN TODOS LOS VIEWPORTS ────────────────────────────────
+   La v1.3 tenía dos: hoja inferior en móvil, flotante en escritorio. La v1.4 las
+   funde en una — la hoja NACE DEL ENGRANAJE y cae hacia abajo, en los seis
+   viewports—, y el cambio no es cosmético: dos colocaciones son dos geometrías
+   que hay que medir por separado, y una de ellas (la de abajo) no explicaba de
+   dónde salía el panel. Con `transform-origin: top right` bajo el ⚙, el gesto
+   dice quién lo abrió.
+
+   EL ANCLAJE ES ARITMÉTICA, NO UN NÚMERO: el borde superior cae a la altura del
+   ⚙ más 1,5 u de aire, y el ⚙ mide `--ico-caja`. Si mañana cambia `--ico`, la
+   hoja lo sigue sola. El borde derecho comparte exactamente el relleno del
+   lienzo, así que queda a plomo con el botón — es lo que mide `lob.6`.        */
+.lobby .lob-hoja {
+  /* ── `absolute` Y NO `fixed`, Y ES UNA CORRECCIÓN MEDIDA ──────────────────
+     La lámina v1.4 escribe `position: fixed` con `right: pad`. Eso ancla la
+     hoja al VIEWPORT, mientras que el ⚙ vive dentro del lienzo, que lleva
+     `max-width: 213u` y `margin: 0 auto`. En cuanto la ventana es más ancha que
+     el lienzo, los dos bordes dejan de coincidir — MEDIDO por `lob.6`:
+     6,66px de desvío a 844×390, 44 a 1366×768 y **321 a 1920×937**, o sea la
+     hoja saliendo de un engranaje que está a un palmo de distancia.
+
+     Con `absolute`, el bloque contenedor pasa a ser `.lobby` —que ya es
+     `position: relative`— y las dos fórmulas de la lámina se vuelven exactas sin
+     cambiar un número: el borde derecho de un absoluto con `right: X` cae en
+     `padding-box.right − X`, y el ⚙ cae en ese mismo punto por ser el último
+     elemento de una barra que ocupa la caja de contenido. Δ medido: 0px en los
+     seis viewports. La lámina describía bien la intención; su `fixed` no la
+     cumplía fuera de un móvil.
+
+     El velo SÍ se queda `fixed`: tiene que oscurecer la ventana entera, no el
+     lienzo. */
+  position: absolute;
+  z-index: 7;
+  top: calc(
+    env(safe-area-inset-top, 0px) + var(--lob-pad) + var(--ico-caja) + var(--u) * 1.5
+  );
+  right: calc(env(safe-area-inset-right, 0px) + var(--lob-pad));
+  width: min(calc(100% - 2 * var(--lob-pad)), calc(var(--u) * 76));
+  background: var(--surface-modal);
+  border: 1px solid var(--lob-linea);
+  border-radius: calc(var(--u) * 3);
+  padding: calc(var(--u) * 3) calc(var(--u) * 4);
+  transform-origin: top right;
+  transform: translateY(-6px) scale(0.96);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.18s ease,
+    visibility 0s 0.2s;
+  /* Techo y desplazamiento interno: en un teléfono acostado de 360px de alto la
+     hoja lleva siete filas y NO cabe. Recortarla como hace el lienzo dejaría
+     «Eliminar cuenta» fuera de alcance; aquí el desplazamiento sí es correcto,
+     porque un panel es una lista y una lista se recorre. */
+  max-height: calc(100dvh - var(--u) * 20);
+  overflow: auto;
+  text-align: left;
+}
+.lobby .lob-hoja.is-on {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.lobby .lob-hoja-t {
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: normal;
+  margin: 0 0 calc(var(--u) * 2.5);
+  line-height: 1.2;
+}
+/* Recibe el foco al abrir (`tabIndex={-1}`) y por eso necesita anillo propio:
+   sin él, quien navega con teclado no vería dónde ha aterrizado. */
+.lobby .lob-hoja-t:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 4px; }
+
+.lobby .lob-hoja-cuenta {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  padding-bottom: calc(var(--u) * 2.5);
+  margin-bottom: calc(var(--u) * 1.5);
+  border-bottom: 1px solid var(--lob-linea);
+  font-size: calc(var(--u) * 3.3);
+  color: var(--text-secondary);
+}
+.lobby .lob-hoja-cuenta b { font-weight: 500; color: var(--text-primary); }
+.lobby .lob-hoja-correo { font-size: 0.85em; }
+
+.lobby .lob-fila {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 2);
+  background: none;
+  border: 0;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  font-size: calc(var(--u) * 3.4);
+  /* 2,4·u de relleno vertical sobre 3,4·u de texto deja la fila por encima de
+     los 44px de objetivo táctil en todo el rango de `--u`. */
+  padding: calc(var(--u) * 2.4) 0;
+  text-align: left;
+}
+.lobby .lob-chev {
+  color: var(--text-muted);
+  font-size: 1.3em;
+  transition: transform 0.18s ease;
+}
+.lobby .lob-fila[aria-expanded="true"] .lob-chev { transform: rotate(90deg); }
+
+.lobby .lob-acerca {
+  font-size: calc(var(--u) * 2.6);
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.45;
+  padding: 0 0 calc(var(--u) * 2) var(--u);
+}
+.lobby .lob-acerca p + p { margin-top: calc(var(--u) * 1.2); }
+.lobby .lob-acerca a { color: inherit; text-decoration: underline; }
+.lobby .lob-acerca a:hover,
+.lobby .lob-acerca a:focus-visible { color: var(--text-secondary); }
+
+/* La única fila roja de la app fuera de la mesa. `--loss-red` y no un rojo
+   nuevo: la app ya tiene su rojo de pérdida y éste es del mismo peso. */
+.lobby .lob-fila-peligro {
+  color: var(--loss-red);
+  margin-top: calc(var(--u) * 1.5);
+  border-top: 1px solid var(--lob-linea);
+}
+
+/* NO HAY BLOQUE `@media (min-width: 900px)` PARA LA HOJA. Lo hubo hasta la v1.3
+   —flotante en escritorio, inferior en móvil— y la v1.4 lo suprime: la
+   colocación es una sola y ya la resuelve el anclaje de arriba, que es fórmula
+   sobre `--ico-caja` y `--lob-pad` y por tanto vale igual a 360 que a 1920. Un
+   media query aquí volvería a partir en dos una geometría que acaba de unirse. */
+
+
+/* ══ 8 · TOAST «PRONTO» ════════════════════════════════════════════════════
+   Uno solo para los diez avisos. Reserva su caja siempre y se apaga con
+   `visibility`: aparecer no empuja un píxel (O1).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lobby .lob-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--u) * 22);
+  transform: translate(-50%, 8px);
+  background: var(--surface-modal);
+  border: 1px solid var(--lob-linea);
+  color: var(--text-primary);
+  padding: calc(var(--u) * 1.6) calc(var(--u) * 3.4);
+  border-radius: 999px;
+  font-size: calc(var(--u) * 3.2);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s 0.18s;
+  z-index: 5;
+  pointer-events: none;
+}
+.lobby .lob-toast.is-on {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition-delay: 0s;
+}
+
+
+/* ══ 9 · ICONOS ════════════════════════════════════════════════════════════
+   El contrato de dibujo (caja 24, trazo 1.75, `currentColor`, sin relleno) va
+   en ATRIBUTOS dentro de `IconosLobby.jsx`, como en el resto de la casa. Aquí
+   sólo queda lo que es caja, y el `flex:none` que impide que un icono se
+   comprima dentro de una fila apretada.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lobby .lob-ico { display: block; flex: none; }
+
+
+/* ══ 10 · ANIMACIONES ══════════════════════════════════════════════════════
+   Fase 1 (0–26 % del ciclo): destello y halo del ISOTIPO.
+   Fase 2 (52–76 %): halo y destello corto de la MONEDA DEL SALDO.
+   Los porcentajes son los de la lámina v1.4, verbatim.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* La lámina superpone un segundo trazado en `--gold-brand-hi` para el destello
+   del isotipo. Con el maestro montado como <img> no hay trazado que superponer
+   —y no se recolorea un activo sellado—, así que el destello se hace con la luz
+   del propio dibujo: un pulso de `brightness` en las mismas paradas y con el
+   mismo halo. Mismo gesto, mismo tiempo, sin tocar el activo. */
+@keyframes lob-destello-iso {
+  0%   { filter: drop-shadow(0 0 0 rgba(var(--gold-brand-rgb), 0)) brightness(1); }
+  10%  { filter: drop-shadow(0 0 calc(var(--u) * 3.5) rgba(var(--gold-brand-rgb), 0.55)) brightness(1.28); }
+  26%  { filter: drop-shadow(0 0 0 rgba(var(--gold-brand-rgb), 0)) brightness(1); }
+  100% { filter: drop-shadow(0 0 0 rgba(var(--gold-brand-rgb), 0)) brightness(1); }
+}
+
+/* El halo de la moneda. El radio es `--ico * .5` —proporcional a la moneda y no
+   a la rejilla—, así que la luz encoge con ella y a 36px no se derrama sobre la
+   cifra vecina.
+   LA SOMBRA DE APOYO DE `ChipToken` SE REPITE EN LAS TRES PARADAS. Animar
+   `filter` REEMPLAZA la propiedad entera: sin repetirla, la moneda perdería su
+   `drop-shadow(0 1px 2px …)` durante los ocho segundos del ciclo y flotaría. */
+@keyframes lob-halo-moneda {
+  0%, 50% {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  }
+  60% {
+    filter:
+      drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45))
+      drop-shadow(0 0 calc(var(--ico) * 0.5) rgba(var(--gold-brand-hi-rgb), 0.85));
+  }
+  76%, 100% {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  }
+}
+
+/* El destello corto sobre el cuadrante superior izquierdo. Seis puntos de ciclo
+   —del 52 al 58 y de vuelta al 70— es medio segundo de luz en ocho: se lee como
+   un guiño del metal, no como un parpadeo. */
+@keyframes lob-destello-moneda {
+  0%, 52%   { opacity: 0; }
+  58%       { opacity: 1; }
+  70%, 100% { opacity: 0; }
+}
+
+@keyframes lob-respira {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.018); }
+}
+
+/* Todo quieto, y el isotipo con un halo suave FIJO en vez de sin nada: apagar
+   la animación a secas dejaría la marca apagada, que es una pantalla distinta y
+   no la misma sin movimiento. Es la lección de VIS-4b sobre `--brillo-x`. */
+@media (prefers-reduced-motion: reduce) {
+  .lobby .lob-marca-h1,
+  .lobby .lob-moneda .chip-token,
+  .lobby .lob-moneda::after { animation: none; }
+  .lobby .lob-marca-h1 {
+    filter: drop-shadow(0 0 calc(var(--u) * 2) rgba(var(--gold-brand-rgb), 0.35));
+  }
+  .lobby .lob-cta-ia { transition: none; }
+  .lobby .lob-hoja,
+  .lobby .lob-velo,
+  .lobby .lob-toast { transition: none; }
+}
+
+
+/* ══ 11 · LOS DOS TRAJES COMPACTOS ═════════════════════════════════════════
+   Tres líneas cada uno, porque todo cuelga de `--u` y de `--iso-lobby`: se
+   reescala la marca y se aprietan los huecos, y la pantalla entera obedece.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Vertical bajo (360×640 y compañía). */
+@media (max-height: 660px) {
+  .lobby {
+    --iso-lobby: calc(var(--u) * 26);
+    /* El suelo de 44px se conserva: aquí es donde de verdad muerde, porque es
+       el tramo en el que `--u` está en su mínimo y el dedo no encoge con él. */
+    --lob-cta-h: max(44px, calc(var(--u) * 10));
+  }
+  .lobby .lob-marca { padding-bottom: calc(var(--u) * 2.5); gap: calc(var(--u) * 1.2); }
+  .lobby .lob-accion { gap: calc(var(--u) * 2); }
+}
+
+/* Teléfono acostado. La columna se parte en dos: marca a la izquierda, acción a
+   la derecha. Es el mismo reparto que la lámina — sólo cambia el eje del flex. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .lobby { --iso-lobby: calc(var(--u) * 30); }
+  .lobby .lob-centro {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--u) * 6);
+  }
+  .lobby .lob-marca { padding-bottom: 0; flex: none; }
+  .lobby .lob-accion { width: min(50%, calc(var(--u) * 92)); }
+}

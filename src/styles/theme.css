@@ -40,6 +40,11 @@
      cambio alcanza a móvil por construcción. Ningún archivo móvil se toca; su
      render sí cambia, y está decidido que así sea. */
   --green-abyss:   #09170e;
+  /* LOB-1 · A1 §2b, autorizado por Victor. El mismo abisal de la línea de
+     arriba en canales, para los alfas que NO son los dos de zona
+     (`--surface-area` .45 y `--surface-area-light` .30). No es un verde nuevo:
+     es ese hex descompuesto, y por eso vive pegado a él. */
+  --green-abyss-rgb: 9, 23, 14;
   --green-darkest: #0b1c11;
   --green-deep:    #153922;
   --green-base:    #1b482c;
