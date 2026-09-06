@@ -557,3 +557,7 @@ Los dos `_*A1.mjs` son andamios de esta sesión —la sonda de medida y la de ca
 **Sin commits. Sin `add`. Sin `push`. Sin `stash`.**
 
 STOP
+
+---
+
+*Publicado el 5-sep-2026. Cinco commits sobre `e75adf1` — `eae3b27` · `36c6edd` · `716d84d` · `644e5e2` · `1f2a610`— y `origin/main` en **`1f2a610b76ec7dcdb9f84214617e9c4b90163643`**, con los tres SHA de la ceremonia iguales. Este pie se añade **después** del commit que publicó el informe, así que vive en el árbol de trabajo hasta que Victor decida en qué tanda entra.*
