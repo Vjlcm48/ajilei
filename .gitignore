@@ -100,3 +100,10 @@ capturas-pue/
 # capturas-pue: son REGENERABLES y la carpeta NO se borra — el arnés escribe en
 # ella y sin el directorio revienta.
 capturas-lob/
+
+# SAL-A · temporales de la CLI de Supabase. `supabase link` escribe aquí el ref
+# del proyecto y datos de sesión; `supabase/config.toml` y `supabase/migrations/`
+# SÍ viajan —son la fuente de verdad del esquema— y esto NO, por la misma razón
+# que `.env.local`: es estado de la máquina de quien enlazó, no del proyecto.
+supabase/.temp/
+supabase/.branches/

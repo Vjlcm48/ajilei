@@ -1,0 +1,30 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# AJILEI · SAL-A — Configuración mínima de la CLI de Supabase
+# ═══════════════════════════════════════════════════════════════════════════
+# Rector: AJILEI_SALA_Fase1_v1.0.md §1.1.
+#
+# ── POR QUÉ APARECE UNA CLI AHORA Y NO ANTES ───────────────────────────────
+# La migración `0001_sup2a_identidad.sql` se aplicó pegándola a mano en el SQL
+# Editor del panel, y para un archivo eso funcionaba. SAL trae tres tablas, diez
+# funciones, políticas y un alta en la publicación de Realtime, y detrás vienen
+# ECO-1 y MES-PvP. Pegar a mano una secuencia de migraciones es perder la cuenta
+# de cuál se aplicó; además una Edge Function —que MOT-1 va a necesitar— NO se
+# puede pegar en ningún sitio: sólo se despliega con la CLI.
+#
+# ── ESTE ARCHIVO ES MÍNIMO A PROPÓSITO ─────────────────────────────────────
+# `supabase init` escribe un config de varios cientos de líneas con toda la
+# pila local —Postgres, Studio, Inbucket, Realtime, Storage, Analytics— que este
+# proyecto NO usa: aquí no se levanta Supabase en Docker, se trabaja contra el
+# proyecto en la nube. Un config de 300 líneas de valores por defecto es 300
+# líneas que nadie ha decidido y que el día que estorben nadie sabrá si importan.
+# Lo que la CLI necesita para `link`, `db push` y `migration list` es el id.
+#
+# `supabase link` completa el resto en `supabase/.temp/`, que git ignora.
+#
+# ── LO QUE NO ESTÁ AQUÍ ────────────────────────────────────────────────────
+# Ninguna credencial. Ni el `project-ref`, que va en la línea de comandos de
+# Victor; ni el token de acceso, que `supabase login` guarda en el perfil del
+# usuario y jamás en el árbol. La regla 3 de la tanda: las credenciales no
+# viajan.
+
+project_id = "ajilei"
