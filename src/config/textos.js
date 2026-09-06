@@ -51,25 +51,92 @@ const DICCIONARIOS = {
 // que una traducción olvidada sale ROJA en la corrida, no en producción.
 const AVISADAS = new Set()
 
+// ── SAL-Aa · Las variables, y por qué llegan ahora ──────────────────────────
+// Rector: AJILEI_SALA_Fase1_v1.0.md §3. Hasta LOB-1 el diccionario eran 18
+// rótulos fijos y `t(clave)` bastaba. Las salas no: «3 de 5 jugadores»,
+// «Quedan 2:47», «Apuesta: 500 HC» son frases con huecos, y la Fase 0 §3.5
+// midió que aquí no había ninguno.
+//
+// SE INTERPOLA EN VEZ DE TROCEAR, y ésa es toda la decisión. Partir la frase en
+// `t('sal.de')` + n + `t('sal.jugadores')` es barato hoy y deja el texto
+// INTRADUCIBLE mañana: el orden de las palabras cambia entre idiomas y un
+// traductor que recibe tres cachos sueltos no puede reordenarlos. IDI-1 trae
+// cuatro diccionarios más; la plomería tiene que aguantarlos.
+//
+// La sustitución es una expresión regular sobre `{nombre}` y NADA más. Sin
+// `eval`, sin `new Function`, sin plantillas anidadas: el valor de una clave
+// viene de un archivo del repo, pero las VARIABLES vienen del estado de la app
+// —un username que otro jugador eligió, por ejemplo— y no hay motivo para que
+// un texto pueda ejecutar nada.
+const PATRON_VAR = /\{([a-z0-9_]+)\}/g
+
 /**
- * Resuelve una clave de texto.
- * @param {string} clave        p. ej. 'lob.cta.ia'
+ * Resuelve una clave de texto, sustituyendo sus variables.
+ * @param {string} clave        p. ej. 'lob.cta.ia' o 'sal.espera.sentados'
+ * @param {object} [vars]       valores de los huecos `{nombre}` de la cadena
  * @param {string} [idioma]     id de idioma; cae al por defecto si no hay diccionario
- * @returns {string}            el texto, o `⟦clave⟧` si no existe
+ * @returns {string}            el texto resuelto, o `⟦clave⟧` si no existe
  */
-export function t(clave, idioma = IDIOMA_POR_DEFECTO) {
+export function t(clave, vars = {}, idioma = IDIOMA_POR_DEFECTO) {
   const dicc = DICCIONARIOS[idioma] ?? DICCIONARIOS[IDIOMA_POR_DEFECTO]
   const valor = dicc?.[clave]
-  if (typeof valor === 'string' && valor.length > 0) return valor
+
+  if (typeof valor === 'string' && valor.length > 0) return interpolar(valor, vars, clave)
 
   // UN aviso por clave y por vida del módulo. Sin el guardia, una clave rota
   // dentro de un render escupe una línea por fotograma y ahoga la consola —que
   // es justo donde `puerta.5` de diagPUE exige silencio.
-  if (!AVISADAS.has(clave)) {
-    AVISADAS.add(clave)
-    console.warn(`IDI-0: clave sin traducir en "${idioma}" — ${clave}`)
-  }
+  avisar(clave, `IDI-0: clave sin traducir en "${idioma}" — ${clave}`)
   return `⟦${clave}⟧`
+}
+
+/**
+ * Sustituye los huecos `{nombre}` de un texto ya resuelto.
+ *
+ * Se exporta —y no se queda dentro de `t`— porque es la mitad de esta plomería
+ * que se puede probar SOLA. El diccionario del lobby son 18 rótulos fijos sin un
+ * `{` en ninguno (lo defiende un test), así que probar la sustitución a través
+ * de `t` obligaría a sembrar claves de mentira en el diccionario real. Aquí la
+ * regla se ejercita con el texto que haga falta y `textos.es.js` no se entera.
+ *
+ * @param {string} texto    la cadena del diccionario, p. ej. '{n} de {total}'
+ * @param {object} [vars]   valores de los huecos
+ * @param {string} [clave]  sólo para el aviso: de qué clave venía el texto
+ * @returns {string}
+ */
+export function interpolar(texto, vars = {}, clave = '') {
+  // Atajo para las cadenas sin huecos, que son la inmensa mayoría: ni siquiera
+  // se construye el reemplazo. `includes('{')` es más barato que el `replace`.
+  if (typeof texto !== 'string' || !texto.includes('{')) return texto
+
+  // ── Una variable ausente CANTA, igual que una clave ausente ───────────────
+  // Devuelve `⟦nombre⟧` y no `undefined`, `''` ni el literal `{nombre}`. La
+  // razón es la misma que sostiene el fallback de clave desde LOB-1: los
+  // corchetes blancos salen en la primera captura del arnés y el punto 4 del
+  // modo `lob` ya los busca (`innerText` no contiene `⟦`). Un `undefined`
+  // impreso en una sala también se ve, pero no lo caza ninguna comprobación; una
+  // cadena vacía no se ve en absoluto y llega a producción.
+  //
+  // `null` cuenta como ausente y `0` NO: `0` es un valor legítimo —«0 jugadores
+  // sentados»— y confundirlos sería el clásico fallo de `||`. De ahí la
+  // comprobación explícita contra los dos y no una prueba de veracidad.
+  return texto.replace(PATRON_VAR, (_literal, nombre) => {
+    const valor = vars?.[nombre]
+    if (valor === undefined || valor === null) {
+      avisar(`${clave}#${nombre}`, `IDI-0: falta la variable "${nombre}" en "${clave || texto}"`)
+      return `⟦${nombre}⟧`
+    }
+    return String(valor)
+  })
+}
+
+// El guardia de avisos, compartido por los dos fallos. La marca lleva la clave y
+// —en el caso de una variable— el nombre, para que dos huecos rotos de la misma
+// cadena avisen los dos y no sólo el primero.
+function avisar(marca, mensaje) {
+  if (AVISADAS.has(marca)) return
+  AVISADAS.add(marca)
+  console.warn(mensaje)
 }
 
 /** ¿Este id tiene diccionario propio? Lo usa `useIdioma` para decidir el fallback. */

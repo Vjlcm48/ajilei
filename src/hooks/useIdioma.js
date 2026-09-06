@@ -57,7 +57,13 @@ export function useIdioma() {
 
   // `t` se memoiza por idioma para que no cambie de identidad en cada render:
   // los consumidores pueden meterla en dependencias sin provocar cascadas.
-  const t = useMemo(() => (clave) => traducir(clave, idioma), [idioma])
+  //
+  // SAL-Aa · El `t` que ven las pantallas acepta `(clave, vars)` y JAMÁS el
+  // idioma: ése lo pone el hook, que es quien lo conoce. Es lo que evita que un
+  // componente pinte en un idioma distinto del resto de la app por escribir un
+  // tercer argumento de más. `vars` viaja tal cual a `config/textos.js`, que es
+  // donde vive la sustitución.
+  const t = useMemo(() => (clave, vars) => traducir(clave, vars, idioma), [idioma])
 
   return { idioma, t }
 }
