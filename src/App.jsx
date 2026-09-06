@@ -16,6 +16,8 @@ import { readNivel, writeNivel } from './hooks/useNivel'
 import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
+// SAL-A · La invitación por enlace. Sólo se RECUERDA aquí; consumirla es SAL-B.
+import { recogerDeLaUrl } from './config/salaPendiente'
 
 // ── NIV-UI · Recorrido del lobby ─────────────────────────────────────────────
 // Rector: docs/AJILEI_Modos_y_Asistencia_v1.0.md §4.1.
@@ -66,6 +68,24 @@ function App() {
   // dificultad y jamás la salta (v1.0 §4.2): `screen` arranca en 'lobby' y el
   // único camino a la mesa pasa por elegir, aunque ya haya un nivel recordado.
   const [nivel, setNivel] = useState(() => readNivel())
+
+  // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
+  // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
+  // WhatsApp puede caer en alguien que todavía no tiene cuenta, y este proyecto
+  // no admite invitados (Fase 0 §1.6: `anonymous_users` es `false`). Sin esta
+  // línea, el código muere en la Portada y el jugador llega al lobby sin saber
+  // a qué venía.
+  //
+  // VA AQUÍ ARRIBA, ANTES DE LAS TRES GUARDAS DE SESIÓN, y no dentro de la rama
+  // de `COMPLETO`: el efecto se declara con los demás hooks —el orden de llamada
+  // tiene que ser el mismo en los cuatro estados— y se dispara aunque el render
+  // haya devuelto `null` por `CARGANDO` o la Portada por `SIN_SESION`. Que
+  // ocurra un fotograma después del primer pintado no importa: lo que se está
+  // haciendo es guardar, y nadie lee la memoria hasta el otro lado de la puerta.
+  //
+  // AQUÍ SÓLO SE RECUERDA. Unirse a la sala al llegar a `COMPLETO` es de SAL-B,
+  // que es cuando existen las pantallas que pueden enseñar el resultado.
+  useEffect(() => { recogerDeLaUrl() }, [])
 
   // ── PUE-1.2 · La mesa precarga sus efectos al ENCAMINARSE a la mesa ────────
   // Desde esta campaña los `Howl` nacen perezosos: en la puerta no baja un solo
@@ -123,7 +143,22 @@ function App() {
   // consumiera. Es un campo más en el mismo paquete: `GameTable`, que recibe
   // este mismo objeto, no se entera. Con el bypass es `null` y la línea del
   // correo se apaga reservando su caja (O1), en vez de desaparecer.
+  // SAL-A · Entra `id`, y es el campo sin el cual no hay PvP. La Fase 0 §3.3
+  // encontró el hueco: `useAuth` guarda el `uid` para sí (`useAuth.js:119`) y no
+  // lo devuelve, pero el perfil se consulta con `.select('id, username')`, así
+  // que `auth.perfil.id` ES el `auth.users.id`. Es el uuid que las salas usan
+  // como `anfitrion_id` y `jugador_id` — nunca el username, que es rótulo
+  // mutable (doctrina de SUP-2a: «el nombre es rótulo; el ID es contrato»).
+  //
+  // Con el bypass de desarrollo vale el uuid ficticio de `PERFIL_DEV`, que jamás
+  // viaja a la red. De ahí que el modo del arnés que mida contra Supabase NO
+  // pueda correr con bypass: ese uuid no existe en la base y cualquier clave
+  // foránea lo rechaza.
+  //
+  // Es un campo más en el mismo paquete: `GameTable`, que recibe este objeto, no
+  // se entera.
   const cuenta = {
+    id: auth.perfil?.id ?? null,
     username: auth.perfil?.username ?? '',
     correo: auth.correo ?? '',
     cambiarNombre: auth.cambiarNombre,
