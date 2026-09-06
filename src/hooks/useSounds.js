@@ -83,6 +83,28 @@ export const SONIDOS_MESA = [
 // El golpe de mesa sí lo es: cae en el mismo fotograma en que la pantalla cambia.
 export const SONIDOS_LOBBY = ['tableKnock']
 
+// ── SAL-A · Los tres de las salas ───────────────────────────────────────────
+// Rector: AJILEI_SALA_Fase1_v1.0.md §5.3. La lista nace aquí y SAL-B la pide al
+// montar la sala de espera; esta tanda no precarga nada, porque no hay todavía
+// ninguna pantalla que los dispare.
+//
+// LOS TRES, Y POR QUÉ CADA UNO:
+//   · `chipsCollect` — la llegada de un jugador a la sala. Es el único de los
+//     tres que hoy NO está en ninguna lista de precarga (la Fase 0 §3.4 lo
+//     midió): lo trajo la celebración y se pide en su propio momento. Aquí
+//     estrena segundo consumidor sin cambiar una cifra suya.
+//   · `cardShuffle` — el barajado con el que arranca la mesa. Ya viaja en
+//     `SONIDOS_MESA`, así que en el camino sala → mesa se pide dos veces y no
+//     pasa nada: `precargarSonidos` es idempotente.
+//   · `tableKnock` — el golpe del anfitrión al pulsar «Jugar ya». Mismo sonido
+//     que el CTA del lobby, mismo gesto: alguien abre una mesa.
+//
+// TRES Y NO NUEVE, por la misma razón que `SONIDOS_LOBBY` es uno solo: una sala
+// de espera es una pantalla donde se aguarda, y bajarle los 380 KiB de audio de
+// partida a alguien que quizá salga antes de que arranque es el gasto que
+// PUE-1.2 sacó del arranque. Los de la mesa se siguen pidiendo donde se pedían.
+export const SONIDOS_SALAS = ['chipsCollect', 'cardShuffle', 'tableKnock']
+
 /** Construye y arranca la descarga de los sonidos nombrados. Idempotente. */
 export function precargarSonidos(nombres) {
   if (!Array.isArray(nombres)) return
