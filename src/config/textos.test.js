@@ -105,22 +105,37 @@ describe('IDI-0 · diccionario es', () => {
     //     Son dos pantallas de dos sub-tandas: B2 reescribe la segunda entera y
     //     probablemente le añada el cronómetro, y entonces dejarán de coincidir.
     //
-    //   sal.casa.aria = sal.espera.lobby
-    //     El nombre accesible de la casa y el rótulo del botón que hace lo mismo
-    //     cuando la mesa ya arrancó.
+    //   sal.casa.aria = sal.partida.volver
+    //     El nombre accesible de la casa y el rótulo del botón del stub de
+    //     partida, que hace lo mismo cuando la mesa ya arrancó. (Hasta los
+    //     ajustes de B2 el par era `sal.casa.aria = sal.espera.lobby`, con
+    //     `lobby` de primera; retirada esa clave, el par lo cierra el stub.)
     const vistos = new Map()
     const repetidos = []
     for (const [clave, valor] of Object.entries(TEXTOS_ES)) {
       if (vistos.has(valor)) repetidos.push([vistos.get(valor), clave].sort().join(' = '))
       else vistos.set(valor, clave)
     }
+    //
+    //   sal.espera.fin.entrar.nota = sal.partida.pronto  (SAL-B2 F1b)
+    //     La nota bajo «Entrar a la mesa» y el rótulo de la pantalla a la que
+    //     lleva dicen lo mismo: «Partida PvP · Próximamente». Cuando MES-PvP
+    //     traiga la partida, la nota desaparece y la pantalla cambia de nombre.
+    //
+    //   sal.espera.cod.eti = sal.opciones.codigo.aria  (SAL-B2 F1b)
+    //     «Código de invitación»: el nombre accesible del campo donde se PEGA
+    //     (SAL-1) y la etiqueta sobre el código que se COMPARTE (SAL-3). Un
+    //     idioma futuro puede querer el sustantivo suelto en una y la frase en
+    //     la otra.
     expect(repetidos.sort()).toEqual([
       'lob.ajustes.aria = lob.cfg.titulo',
       'lob.cta.pvp = sal.opciones.titulo',
       'sal.armar.abierta = sal.espera.tipo.abierta',
       'sal.armar.privada = sal.espera.tipo.privada',
       'sal.armar.titulo = sal.opciones.armar',
-      'sal.casa.aria = sal.espera.lobby',
+      'sal.casa.aria = sal.partida.volver',
+      'sal.espera.cod.eti = sal.opciones.codigo.aria',
+      'sal.espera.fin.entrar.nota = sal.partida.pronto',
       'sal.espera.sentados = sal.opciones.mesa.estado',
     ])
   })

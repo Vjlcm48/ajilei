@@ -95,3 +95,19 @@ export function IconoCheck({ className }) {
     </svg>
   )
 }
+
+// ── SAL-B2 F1b · El sexto: compartir ────────────────────────────────────────
+// Los tres nodos unidos de «compartir», verbatim del `<symbol id="i-share">` de
+// la lámina SAL-3 v1.5. Acompaña al botón «Compartir» de la sala de espera, que
+// abre `navigator.share` con el enlace `?sala=AJ-XXXX` —o lo copia al
+// portapapeles donde no haya hoja de compartir—.
+export function IconoCompartir({ className }) {
+  return (
+    <svg {...COMUN} className={clase('compartir', className)}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4" />
+    </svg>
+  )
+}

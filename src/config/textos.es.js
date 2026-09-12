@@ -109,26 +109,77 @@ export const TEXTOS_ES = {
   'sal.armar.aviso.nuevos':  'Con {hc} HC, un invitado nuevo ({bono} HC de bienvenida) no podrá sentarse. Para invitar gente nueva, usa {alcance} HC.',
   'sal.armar.recuerdo':      'Hay una mesa de {n} a {hc} HC esperando gente ({x}/{n}).',
 
-  // ── SAL-3 · SalaEspera · SÓLO lo que el stub usa ────────────────────────
-  // El stub de §7 es provisional y B2 lo reemplaza entero. Aquí no se siembran
-  // las claves de la lámina SAL-3 que todavía no tienen consumidor: una clave
-  // sin pantalla es una promesa que nadie puede comprobar.
+  // ── SAL-3 · SalaEspera ───────────────────────────────────────────────────
+  // SAL-B2 F1b (rector §7): la pantalla real sustituye al stub de B1. Se
+  // CONSERVAN con su nombre del repo las claves que B1 declaró contrato
+  // (`anfitrion.tu`, `codigo.copiar`, `codigo.copiado`, `sentados`, `cancelar`,
+  // `cancelar.si`, `cancelar.no`, `salir`, `lobby`, `titulo`, `tipo.*`); se
+  // RETIRAN las cuatro que sólo el stub usaba (`actualizar`, `provisional`,
+  // `arranco`, `anfitrion.otro`); ENTRAN, con los nombres del `DICC` de la
+  // lámina v1.5, las que la pantalla real pinta. Los textos son los de la
+  // lámina, verbatim, salvo `cancelar.p`, corregido por el rector: los demás
+  // NO vuelven a la sala de opciones, leen el final en la misma pantalla.
+  //
+  // ── AJUSTES (lámina v1.6, tras la validación con dos teléfonos) ─────────
+  // · `vacia` pasa de «Esperando…» a «Libre»: a 360px de ancho el bloque de la
+  //   silla mide 1.6·silla y la palabra larga se truncaba a «Esperand…»
+  //   (informe de F1b §9-7). El texto corto cabe y dice lo mismo.
+  // · se RETIRAN `salio` y `lobby`, las dos sin un solo consumidor en `src/`
+  //   ni en `scripts/` (decisión de Victor sobre el informe de F1b §9-6): el
+  //   invitado que sale abandona la pantalla en el mismo gesto, y el rótulo
+  //   «Volver al inicio» del stub de partida es `sal.partida.volver`.
+  // · `fin.cerraste` del diccionario de la v1.6 NO entra: con la regla nueva
+  //   (`finDe` mira quién mira) no hay camino en el que el anfitrión que cerró
+  //   siga en la pantalla para leerla.
+  //
+  // `compartir.url` NO es texto: el enlace lo construye `enlaceDeSala` con el
+  // mismo parámetro que `recogerDeLaUrl()` lee, y así las dos puntas no pueden
+  // separarse por una cadena.
   'sal.espera.titulo':          'Mesa de {n} · {hc} HC por mano',
   'sal.espera.anfitrion.tu':    'Eres el anfitrión · {tipo}',
-  'sal.espera.anfitrion.otro':  'Estás en la mesa · {tipo}',
+  'sal.espera.sub.inv':         'Anfitrión: {anf} · {tipo}',
   'sal.espera.tipo.privada':    'Privada',
   'sal.espera.tipo.abierta':    'Abierta',
+  'sal.espera.cod.eti':         'Código de invitación',
   'sal.espera.codigo.copiar':   'Copiar el código',
   'sal.espera.codigo.copiado':  'Copiado',
+  'sal.espera.abierta.rot':     'Mesa abierta · visible para todos',
+  'sal.espera.compartir':       'Compartir',
+  'sal.espera.compartir.msg':   'Ven a jugar AJILEI conmigo: mesa de {n} a {hc} HC. Entra por aquí: {url}',
   'sal.espera.sentados':        '{x}/{n} sentados',
-  'sal.espera.actualizar':      'Actualizar',
-  'sal.espera.provisional':     'Sala de espera en construcción',
+  'sal.espera.anfitrion':       'Anfitrión',
+  'sal.espera.tu':              'Tú',
+  'sal.espera.vacia':           'Libre',
+  'sal.espera.jugar':           'Jugar ya',
+  'sal.espera.jugar.nota':      'Se juega con los que estén sentados',
+  'sal.espera.jugar.min':       'Hacen falta al menos 2',
+  'sal.espera.esperando':       'Esperando al anfitrión…',
   'sal.espera.salir':           'Salir de la mesa',
+  'sal.espera.salir.inv':       'Puedes salir cuando quieras; tu silla queda libre',
   'sal.espera.cancelar':        '¿Cancelar la mesa?',
+  'sal.espera.cancelar.p':      'Eres el anfitrión: si sales, la mesa se cierra para todos.',
   'sal.espera.cancelar.si':     'Sí, cancelar',
   'sal.espera.cancelar.no':     'Seguir esperando',
-  'sal.espera.arranco':         'La mesa arrancó · Partida PvP · Próximamente',
-  'sal.espera.lobby':           'Volver al inicio',
+  'sal.espera.llego':           '{quien} se sentó',
+  'sal.espera.consejo.1':       'Se juega con los que estén sentados cuando el reloj llegue a cero',
+  'sal.espera.consejo.2':       'En mesas de 4 y 5 jugadores entra el comodín',
+  'sal.espera.consejo.3':       'Para sentarte necesitas 5 veces la apuesta de la mesa',
+  'sal.espera.consejo.4':       'El anfitrión puede arrancar desde 2 jugadores con «Jugar ya»',
+  'sal.espera.consejo.5':       'Copia el código o comparte el enlace por WhatsApp: sienta a tu invitado aquí mismo',
+  'sal.espera.llena':           '¡Mesa completa! Arranca sola',
+  'sal.espera.llena.corta':     '¡Mesa completa!',
+  'sal.espera.llena.nota':      'Ya no hace falta «Jugar ya»',
+  'sal.espera.fin.cancelada':   'El anfitrión cerró la mesa',
+  'sal.espera.fin.vencida':     'La mesa se cerró: no llegó gente a tiempo',
+  'sal.espera.fin.activa':      '¡Arranca la partida!',
+  'sal.espera.fin.volver':      'Buscar otra mesa',
+  'sal.espera.fin.entrar':      'Entrar a la mesa',
+  'sal.espera.fin.entrar.nota': 'Partida PvP · Próximamente',
+
+  // ── Partida PvP · el stub que releva a la sala cuando la mesa arranca ────
+  // SAL-B2 F1b (rector §5). MES-PvP lo reemplaza con su propio nombre.
+  'sal.partida.pronto':  'Partida PvP · Próximamente',
+  'sal.partida.volver':  'Volver al inicio',
 
   // ── Navegación compartida por las tres pantallas ────────────────────────
   'sal.volver.aria':  'Volver',
