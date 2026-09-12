@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 // ── LOB-1 · `Lobby` releva a `WelcomeScreen` en la casilla de `COMPLETO` ─────
 // `components/WelcomeScreen.jsx` sigue en el árbol —borrar es otra tanda, igual
 // que con `TableSelect` y `Entrada`— pero deja de importarse desde aquí, así que
 // deja de renderizarse y pasa a ser código muerto declarado.
 import Lobby from './screens/Lobby'
+// SAL-B1 · Las tres pantallas del PvP. `SalaEspera` es todavia un STUB (rector
+// SAL-B1 §7) y B2 la reemplaza entera; las otras dos son definitivas.
+import SalaOpciones from './screens/SalaOpciones'
+import ArmarMesa from './screens/ArmarMesa'
+import SalaEspera from './screens/SalaEspera'
 import NivelSelect from './components/NivelSelect'
 import ModeSelect from './components/ModeSelect'
 import GameTable from './components/GameTable'
@@ -16,8 +21,21 @@ import { readNivel, writeNivel } from './hooks/useNivel'
 import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
-// SAL-A · La invitación por enlace. Sólo se RECUERDA aquí; consumirla es SAL-B.
-import { recogerDeLaUrl } from './config/salaPendiente'
+// SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
+// CUÁNDO: una vez por sesión, en el arranque, y ANTES de intentar nada (§4.1).
+import {
+  recogerDeLaUrl,
+  leer as leerSalaPendiente,
+  consumir as consumirSalaPendiente,
+  borrar as borrarSalaPendiente,
+} from './config/salaPendiente'
+import { salasApi, esMesa } from './lib/salasApi'
+// El unico punto por donde algo simulado puede entrar. En produccion devuelve
+// `null` en su primera linea y el minificador se lleva el archivo entero.
+import { simulacionSalas } from './dev/salasFixtures'
+// A2 §6.1 · la decision de «¿este uid ya arranco?» es pura y vive en salasCore
+// para poder probarse sin jsdom: aqui solo se le pasa el ref y el uid.
+import { arranqueDeSesion } from './screens/salasCore'
 
 // ── NIV-UI · Recorrido del lobby ─────────────────────────────────────────────
 // Rector: docs/AJILEI_Modos_y_Asistencia_v1.0.md §4.1.
@@ -55,13 +73,85 @@ import { recogerDeLaUrl } from './config/salaPendiente'
 // esto habría sido reorganizar el recorrido entero para colgar de él dos
 // pantallas. El patrón de la casa es un estado y una cascada de `if`; la puerta
 // habla ese idioma.
+// Las pantallas desde las que NO se va derecho a la mesa, y que por tanto no
+// pagan la precarga. El lobby estaba solo hasta SAL-B1; ahora le acompañan las
+// tres del PvP, que llevan a una partida que todavia no existe.
+const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sala-espera']
+
 function App() {
   // Los hooks van todos ARRIBA y ninguno detrás de un retorno: el orden de
   // llamada tiene que ser el mismo en los cuatro estados de sesión. Es la razón
   // por la que `useAuth` abre la función y los `useState` del lobby se declaran
   // aunque la puerta esté a punto de devolver otra pantalla.
   const auth = useAuth()
-  const [screen, setScreen] = useState('lobby') // 'lobby' | 'nivel-select' | 'mode-select' | 'table'
+
+  // ── SAL-B1 · La simulacion del arnes, resuelta UNA vez ────────────────────
+  // Rector SAL-B1 §8.2. `simulacionSalas()` mira `?sal=` detras de la puerta
+  // doble `DEV && VITE_AUTH_BYPASS`; en produccion devuelve `null` en su primera
+  // linea y el archivo entero desaparece del bundle (§9.3 lo comprueba con un
+  // `grep` sobre `dist/`).
+  //
+  // Se resuelve en un `useState` perezoso y no en un `useMemo` porque no es un
+  // calculo derivado: es una LECTURA de la URL en el instante del montaje, y
+  // volver a hacerla en cualquier otro momento seria leer una barra de
+  // direcciones que `salaPendiente` ya limpio.
+  const [simulacion] = useState(() => simulacionSalas())
+
+  // La API de salas entra en las tres pantallas por parametro. Es el UNICO
+  // punto de inyeccion: ninguna pantalla importa `salasApi` por su cuenta, y por
+  // eso no hay un segundo camino por el que algo simulado pueda colarse.
+  const api = simulacion?.api ?? salasApi
+
+  // ── §5.2 · La invitacion, leida en el PRIMER render ───────────────────────
+  // Se MIRA en el inicializador perezoso —`leer()`, que no gasta— y no se
+  // consume aqui: un inicializador de `useState` puede invocarse dos veces en
+  // desarrollo (StrictMode), y un consumo dentro dejaria la segunda lectura sin
+  // nada. El consumo vive en el efecto de arranque, mas abajo, tras la guardia.
+  //
+  // ── A1 · `recogerDeLaUrl()` SE LLAMA AQUI, NO EN UN EFECTO ────────────────
+  // SAL-A la llamaba en un `useEffect`, que corre DESPUES de este inicializador:
+  // un enlace `?sala=` abierto con sesion viva guardaba el codigo un fotograma
+  // tarde, esta lectura ya habia devuelto `null`, y la invitacion solo se veia
+  // en el SIGUIENTE arranque — una de las patas del defecto 3 (el codigo «que
+  // vuelve»). Recoger primero y leer despues, en el mismo gesto, cierra eso. Es
+  // idempotente: la segunda invocacion del inicializador ya no encuentra el
+  // parametro (la barra se limpio) y cae a `leer()`, que devuelve lo mismo. Con
+  // simulacion no se toca el almacenamiento: el codigo lo trae el fixture.
+  //
+  // Leerla ahora es tambien lo que permite que la pantalla inicial la tenga en
+  // cuenta sin un `setScreen` dentro de un efecto — que es un `setState`
+  // sincrono en efecto, encadena un render de mas y `react-hooks` lo prohibe.
+  const [invitacion, setInvitacion] = useState(() => (
+    simulacion ? (simulacion.codigo ?? null) : (recogerDeLaUrl() ?? leerSalaPendiente())
+  ))
+
+  // A1 §2.5 · el intento automatico NO se dispara por tener codigo: lo enciende
+  // el arranque de abajo cuando `mi_sala()` ya dijo que no hay mesa en espera.
+  // Con simulacion nace encendido si el fixture trae codigo, que es como el
+  // arnes reproduce la secuencia exacta del Motorola.
+  const [intentarInvitacion, setIntentarInvitacion] = useState(() => Boolean(simulacion?.codigo))
+
+  const [screen, setScreen] = useState(() => {
+    if (simulacion) {
+      // A2 §2.3 · la guarda del ultimo metro tambien en la entrada simulada: un
+      // fixture que pida el stub sin una mesa CON id se queda en la pantalla
+      // desde la que se entra al stub. Es la prueba negativa del arnes
+      // (`espera-fantasma`), y es el mismo predicado que `entrarSala`.
+      if (simulacion.pantalla === 'sala-espera' && !esMesa(simulacion.sala)) return 'sala-opciones'
+      return simulacion.pantalla
+    }
+    return invitacion !== null ? 'sala-opciones' : 'lobby'
+  })
+  // 'lobby' | 'nivel-select' | 'mode-select' | 'table'
+  // SAL-B1 anade: 'sala-opciones' | 'armar-mesa' | 'sala-espera'
+
+  // La sala en la que este jugador esta. La ponen los tres caminos que llevan a
+  // `SalaEspera` —entrar por codigo, unirse a una tarjeta, armar la tuya— y la
+  // reanudacion de §5.3. Vive en `App` y no en la pantalla porque sobrevive a
+  // que la pantalla se desmonte. Solo un fixture puede traerla al nacer; en
+  // produccion es `null` hasta que una RPC devuelva una mesa con id.
+  const [sala, setSala] = useState(() => (esMesa(simulacion?.sala) ? simulacion.sala : null))
+
   const [stake, setStake] = useState(null)
   const [playerCount, setPlayerCount] = useState(2)
   // La preferencia se lee UNA vez al arrancar. Preselecciona la pantalla de
@@ -72,20 +162,104 @@ function App() {
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
   // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
   // WhatsApp puede caer en alguien que todavía no tiene cuenta, y este proyecto
-  // no admite invitados (Fase 0 §1.6: `anonymous_users` es `false`). Sin esta
-  // línea, el código muere en la Portada y el jugador llega al lobby sin saber
+  // no admite invitados (Fase 0 §1.6: `anonymous_users` es `false`). Sin ese
+  // gesto, el código muere en la Portada y el jugador llega al lobby sin saber
   // a qué venía.
   //
-  // VA AQUÍ ARRIBA, ANTES DE LAS TRES GUARDAS DE SESIÓN, y no dentro de la rama
-  // de `COMPLETO`: el efecto se declara con los demás hooks —el orden de llamada
-  // tiene que ser el mismo en los cuatro estados— y se dispara aunque el render
-  // haya devuelto `null` por `CARGANDO` o la Portada por `SIN_SESION`. Que
-  // ocurra un fotograma después del primer pintado no importa: lo que se está
-  // haciendo es guardar, y nadie lee la memoria hasta el otro lado de la puerta.
+  // El Ajuste A1 movió la llamada al inicializador de `invitacion`, arriba: un
+  // efecto corría un fotograma DESPUÉS de esa lectura y la invitación recién
+  // llegada no se veía hasta el siguiente arranque. Sigue ocurriendo antes de
+  // las tres guardas de sesión —el inicializador corre en el primer render, sea
+  // cual sea el estado de `auth`— y sigue siendo sólo RECORDAR: el consumo está
+  // en el efecto de arranque de aquí abajo.
+
+  // ── A2 §2.3 · LA GUARDA DEL ULTIMO METRO ──────────────────────────────────
+  // TODO camino al stub pasa por aqui —el arranque, el codigo, la tarjeta, armar
+  // la tuya— y una mesa sin `id` NO cambia de pantalla. Aunque una RPC futura
+  // devuelva basura, o PostgREST su fila de nulos, el stub no se pinta con
+  // «Mesa de ⟦n⟧». `useCallback` con dependencias vacias porque los dos
+  // `set` son estables y el efecto de arranque la lista entre las suyas.
+  const entrarSala = useCallback((mesa) => {
+    if (!esMesa(mesa)) return
+    setSala(mesa)
+    setScreen('sala-espera')
+  }, [])
+
+  // ── SAL-B1 · El arranque de las salas, UNA sola vez ───────────────────────
+  // Rector SAL-B1 §5.2 y §5.3, con la PRECEDENCIA que el Ajuste A1 §2.5 hizo
+  // explicita despues de que dos telefonos la midieran al reves:
   //
-  // AQUÍ SÓLO SE RECUERDA. Unirse a la sala al llegar a `COMPLETO` es de SAL-B,
-  // que es cuando existen las pantallas que pueden enseñar el resultado.
-  useEffect(() => { recogerDeLaUrl() }, [])
+  //   (1) LA MESA EN ESPERA MANDA. Si `mi_sala()` devuelve una —y desde la
+  //       migracion `sal_b1_ajuste` solo devuelve 'esperando'— se abre el stub
+  //       de esa mesa y el codigo pendiente SE CONSUME SIN INTENTARSE: ya estas
+  //       sentado, y probar otro codigo solo produciria `ya_en_sala`.
+  //   (2) SI NO LA HAY y hay codigo pendiente, se intenta UNA vez en
+  //       `SalaOpciones`, con el codigo delante y el error —si lo hay— debajo.
+  //   (3) SI NO → lobby, que es donde ya estaba.
+  //
+  // EL CODIGO SE CONSUME ANTES DEL INTENTO, no despues (A1 §4.1). Antes se
+  // borraba condicionado al camino, y un fallo, una red caida o un cierre de
+  // app a mitad lo dejaban vivo: el Motorola lo reintentaba en cada entrada a
+  // «Jugar contra jugador» hasta que se borro a mano. `consumir()` lee y olvida
+  // en el mismo gesto; a partir de ahi el unico sitio donde el codigo existe es
+  // el estado `invitacion` de este componente, que muere al salir de
+  // `SalaOpciones` (`olvidarInvitacion`) y con el cualquier reintento.
+  //
+  // ── LA GUARDA DEL `ref`, Y POR QUE ESTE EFECTO NO LLEVA `vivo` ───────────
+  // El efecto depende de `cuenta.id`, que pasa de `null` a un uuid cuando el
+  // perfil llega; y en desarrollo React monta, desmonta y remonta cada
+  // componente. Sin la guardia, `mi_sala()` se pediria dos o tres veces por
+  // arranque. Y NO lleva la bandera `vivo` de los otros efectos, a proposito:
+  // con StrictMode el desmontaje simulado la pondria en falso y la respuesta de
+  // `mi_sala()` —la unica que se va a recibir, porque la guardia impide pedirla
+  // otra vez— se tiraria sin que nadie la viera. `App` no se desmonta nunca,
+  // asi que no hay nada de lo que protegerse.
+  //
+  // ── A2 §6.1 · LA GUARDA SE REARMA CON CADA SESION ─────────────────────────
+  // Era un booleano por instancia de `App`, y `App` no se desmonta al cerrar
+  // sesion: el segundo login en la misma carga de pagina encontraba la guardia
+  // puesta y nunca preguntaba `mi_sala()` — el S25 fue al lobby por eso, y una
+  // cuenta que entrara despues de otra no reanudaba su mesa. Ahora la guardia
+  // guarda EL UID QUE YA ARRANCO: se desarma cuando `uid` vuelve a `null`
+  // (cerrar sesion) y vuelve a arrancar con cualquier login, la misma cuenta u
+  // otra. Una sesion nueva es un arranque nuevo. StrictMode sigue cubierto:
+  // el remontaje trae el mismo uid, y el mismo uid no arranca dos veces.
+  const arranqueSalas = useRef(null)
+  const uid = auth.perfil?.id ?? null
+  useEffect(() => {
+    // `simulacion` ya decidio la pantalla: el arnes no quiere que nadie le
+    // mueva el escenario por debajo.
+    if (simulacion) return
+    const decision = arranqueDeSesion(arranqueSalas.current, uid)
+    arranqueSalas.current = decision.arrancado
+    if (!decision.arrancar) return
+
+    // Se consume AHORA, antes de saber nada: pase lo que pase con la red, el
+    // almacenamiento ya no lo tiene. Se consume aqui —al llegar el jugador al
+    // otro lado de la puerta— y no en el primer render: el trayecto puede
+    // cruzar de pestaña (el codigo de seis digitos llega por correo), y
+    // gastarla antes de la puerta dejaria sin invitacion a quien vuelva por
+    // otra via.
+    const pendiente = consumirSalaPendiente()
+
+    api.miSala().then(({ data }) => {
+      // La traza temporal de A2 (que devolvio `mi_sala()` y si habia invitacion)
+      // se retiro en la ficha de commits; sus lecturas estan en los informes.
+      if (esMesa(data)) {
+        // (1) · ya sentado. El codigo pendiente, si lo habia, se descarta.
+        setInvitacion(null)
+        entrarSala(data)
+        return
+      }
+      // (2) · un solo intento, en `SalaOpciones`, con el codigo que ya tiene.
+      if (pendiente !== null) setIntentarInvitacion(true)
+    })
+  }, [simulacion, uid, api, entrarSala])
+
+  // A1 §4.2/§4.3 · la invitacion vive UNA visita a `SalaOpciones`. Al salir de
+  // la pantalla por cualquiera de sus tres puertas se olvida, y la siguiente
+  // entrada —por navegacion normal— nace con el campo vacio y sin intento.
+  const olvidarInvitacion = () => { setInvitacion(null); setIntentarInvitacion(false) }
 
   // ── PUE-1.2 · La mesa precarga sus efectos al ENCAMINARSE a la mesa ────────
   // Desde esta campaña los `Howl` nacen perezosos: en la puerta no baja un solo
@@ -106,11 +280,28 @@ function App() {
   // como un `screen` NUEVO por delante de `'welcome'`, esta línea habría
   // disparado 380 KiB de audio y 0,57 MB de baraja al entrar al lobby, que es
   // exactamente lo que PUE-1.2 y CAR-1 sacaron del arranque.
+  //
+  // ── SAL-B1 · LAS TRES PANTALLAS DE SALAS NO PRECARGAN NADA ────────────────
+  // Rector SAL-B1 §5.4, primera frase: «Ni `SalaOpciones` ni `ArmarMesa`
+  // disparan precarga de mesa ni de baraja». La guarda decia `!== 'lobby'`, asi
+  // que sin tocarla las tres pantallas nuevas habrian disparado 380 KiB de audio
+  // y 0,57 MB de baraja al entrar a mirar quien esta armando mesa — que es
+  // exactamente lo que PUE-1.2 y CAR-1 sacaron del arranque.
+  //
+  // Se convierte en una LISTA de pantallas que no precargan, en vez de encadenar
+  // cuatro `!==`: asi la razon esta escrita una vez y la siguiente pantalla que
+  // no sea la mesa se anade a una lista en vez de a una condicion.
+  //
+  // §5.4 dice ademas «la guarda que hoy exista se deja como esta; B2 la mueve a
+  // la entrada de `SalaEspera`». Lo que NO se mueve es el sitio ni el momento:
+  // sigue colgada de `screen` y en este mismo efecto. Lo unico que cambia es a
+  // que pantallas alcanza, que es lo que la primera frase exige.
   useEffect(() => {
-    if (screen !== 'lobby') precargarSonidos(SONIDOS_MESA)
+    if (SIN_PRECARGA.includes(screen)) return
+    precargarSonidos(SONIDOS_MESA)
     // CAR-1 §3.2 · y la baraja con ellos, por la misma razón y en el mismo
     // momento: 0,57 MB de WebP contra los 24,28 MB de PNG que ya no viajan.
-    if (screen !== 'lobby') precargarBaraja()
+    precargarBaraja()
   }, [screen])
 
   // CARGANDO no pinta: pinta NADA. El fondo del documento ya es el verde abismo
@@ -175,6 +366,63 @@ function App() {
   // es el lobby de la lámina— y el arnés tiene que poder medirlo. Lo que en el
   // bypass no hay es correo, y para eso está la reserva de caja de O1.
 
+  // ── SAL-B1 · Las tres pantallas del PvP ───────────────────────────────────
+  // Van ANTES de las de vs-IA y en el orden en que se recorren, que es la misma
+  // convencion que ya seguian las otras: la cascada se lee como el viaje.
+  //
+  // Ninguna conoce `screen` ni el nombre de la siguiente: reciben callbacks. Es
+  // lo que mantiene a este archivo como el unico sitio del proyecto que sabe
+  // como se pasa de una pantalla a otra.
+  //
+  // LA CASA VA AL LOBBY DESDE LAS TRES (§5.1) y la flecha deshace UN paso, que
+  // en `SalaOpciones` coincide con el lobby y en `ArmarMesa` no.
+  if (screen === 'sala-opciones') {
+    return (
+      <SalaOpciones
+        api={api}
+        cuenta={cuenta}
+        codigoInicial={invitacion}
+        // El intento automatico ocurre solo cuando el codigo vino de un enlace
+        // Y el arranque ya comprobo que no hay mesa en espera (A1 §2.5). Un
+        // codigo tecleado a mano lo dispara el jugador con «Entrar».
+        intentar={intentarInvitacion}
+        onArmarMesa={() => { olvidarInvitacion(); setScreen('armar-mesa') }}
+        onEntrarSala={(nueva) => { olvidarInvitacion(); entrarSala(nueva) }}
+        onLobby={() => { olvidarInvitacion(); setScreen('lobby') }}
+      />
+    )
+  }
+
+  if (screen === 'armar-mesa') {
+    return (
+      <ArmarMesa
+        api={api}
+        cuenta={cuenta}
+        configInicial={simulacion?.config ?? null}
+        onEntrarSala={entrarSala}
+        onVolver={() => setScreen('sala-opciones')}
+        onLobby={() => setScreen('lobby')}
+      />
+    )
+  }
+
+  if (screen === 'sala-espera') {
+    return (
+      <SalaEspera
+        api={api}
+        cuenta={cuenta}
+        salaInicial={sala}
+        // Salir devuelve a `SalaOpciones` y no al lobby (§7): quien acaba de
+        // dejar una mesa casi siempre quiere otra, y el listado esta ahi.
+        onSalir={() => { setSala(null); setScreen('sala-opciones') }}
+        // A1 §2.4 · «Volver al inicio» desde una mesa que arranco o murio va al
+        // lobby y DESCARTA cualquier codigo pendiente: no hay nada que reanudar,
+        // y un codigo que sobreviviera aqui volveria a intentarse solo.
+        onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); setScreen('lobby') }}
+      />
+    )
+  }
+
   if (screen === 'table') {
     return (
       <GameTable
@@ -211,12 +459,15 @@ function App() {
     )
   }
 
-  // La caída de la cascada sigue siendo el destino de `COMPLETO`. Tres props y
-  // ninguna más: el lobby no conoce `screen`, ni Supabase, ni la mesa.
+  // La caída de la cascada sigue siendo el destino de `COMPLETO`. CUATRO props
+  // desde SAL-B1 —entra `onJugarPvP`— y ninguna más: el lobby sigue sin conocer
+  // `screen`, ni Supabase, ni la mesa. Lo unico que sabe es que su segundo CTA
+  // ahora lleva a alguna parte.
   return (
     <Lobby
       cuenta={cuenta}
       onJugarIA={() => setScreen('nivel-select')}
+      onJugarPvP={() => setScreen('sala-opciones')}
       onCerrarSesion={auth.cerrarSesion}
     />
   )

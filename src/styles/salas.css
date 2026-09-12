@@ -1,0 +1,789 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · SAL-B1 · Las salas jugador contra jugador
+   Rector: AJILEI_SAL-B1_Fase1_v1.0.md §2. Autoridad visual: las láminas
+   SAL-1 v1.2 y SAL-2 v1.2, selladas por Victor.
+
+   ADITIVA ESTRICTA (regla 2 de la sub-tanda). Ni un `!important`, ni un
+   selector existente reescrito. Todo cuelga de `.sal` o de `body.sal-activa`,
+   que sólo existen mientras una de estas tres pantallas vive.
+
+   NI UN HEX. Todo color sale de un token de `theme.css`, o se deriva de uno con
+   `rgba(var(--<token>-rgb), α)`. Los `rgba(0,0,0,α)` que quedan son SOMBRAS, no
+   color — misma excepción que declara `lobby.css`.
+
+   FÓRMULA SOBRE CONSTANTE. Ni un tamaño es un número suelto: todos cuelgan de
+   `--u`, la unidad óptica derivada del viewport. Es lo que permite que los dos
+   trajes compactos del pie sean cuatro líneas y no una hoja paralela.
+
+   B2 AÑADE A ESTA HOJA, NO LA REESCRIBE. Lo que SalaEspera necesite —el mazo,
+   la marca de agua, el cronómetro, los consejos— entra como bloque nuevo al
+   final. Las decisiones de esta tanda que B2 debe respetar están anotadas en el
+   informe.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 0 · La jaula de 1126px se EXCEPCIONA, no se demuele ═══════════════════
+   Molde EXACTO de `lobby.css:36` y `portada.css:14`: `index.css` es andamiaje
+   de Vite y esta campaña no lo abre. La pantalla se anuncia con una clase en el
+   <body> y la excepción se declara con alcance —`body.sal-activa #root` suma
+   una clase Y un elemento al mismo id, así que gana sin un solo `!important`—.
+   MUERE en cuanto la pantalla se desmonta. */
+body.sal-activa #root {
+  width: 100%;
+  max-width: none;
+  border-inline: 0;
+}
+
+/* ══ 0.1 · El reset de caja que la lámina daba por hecho ═══════════════════
+   Las dos láminas abren con `*{box-sizing:border-box}` y producción NO tiene
+   ese reset: `index.css` sólo lo pone en `#root`. Se repone con alcance de
+   salas, misma medicina y misma acotación que `lobby.css`. */
+.sal,
+.sal *,
+.sal *::before,
+.sal *::after { box-sizing: border-box; }
+
+/* ══ 1 · LA PANTALLA Y SUS TOKENS ══════════════════════════════════════════
+   Se declaran sobre `.sal` y NO sobre `:root`, por el mismo motivo que
+   `lobby.css` lo hace: `--u`, `--ico` o `--col` son demasiado genéricos para
+   vivir en el espacio global de una app que ya tiene `--card-w`, `--dsk-*` y
+   cinco familias de tapete. Acotados, no alcanzan a nada que no sea esto.
+
+   LOS VALORES SON LOS DE LAS LÁMINAS, verbatim. `--cta-h` y `--chip-h` llevan
+   el `max()` con el piso táctil que ellas mismas escriben, y que es la lección
+   que LOB-1 aprendió midiendo: en un teléfono `--u` toca su suelo de 3,2px y
+   once unidades no llegan a los 44 que pide el dedo. */
+.sal {
+  --u: clamp(3.2px, 1vmin, 6px);
+
+  /* EL CONTRATO DE ICONOS · un solo token. `--ico` dimensiona TODO icono de
+     acción: el ⚙, el avatar, la moneda, la flecha de volver y la casa. Ninguno
+     declara su tamaño por su cuenta y sus botones contenedores miden 1,45·--ico.
+     LOS GLIFOS DE LÍNEA NO ENTRAN AQUÍ —el `+` de la píldora se mide en `em`
+     con el texto que acompaña—; es la misma frontera que traza `lobby.css`. */
+  --ico: calc(var(--u) * 6);
+  --ico-caja: calc(var(--ico) * 1.45);
+
+  --pad: calc(var(--u) * 3.5);
+  --cta-h: max(44px, calc(var(--u) * 11));
+  --cta-w: min(100%, calc(var(--u) * 64));
+  --chip-h: max(40px, calc(var(--u) * 9.5));
+
+  /* El ancho de la columna de contenido. Las dos láminas lo comparten, y es lo
+     que hace que la cabecera, los bloques y el CTA se alineen entre pantallas
+     al pasar de una a otra. */
+  --col: min(100%, calc(var(--u) * 110));
+
+  /* La ventanilla de «Mesas formándose ahora»: EXACTAMENTE tres tarjetas.
+     Decisión sellada. La altura se deriva de la tarjeta y del hueco, así que
+     tocar cualquiera de los dos mantiene la promesa sin recalcular a mano.
+
+     ── LA TARJETA TIENE SUELO, Y NO LO TENÍA ────────────────────────────────
+     La fórmula de la lámina es `13.4u` a secas, y el arnés la midió: a 360×640,
+     640×360 y 844×390 las TRES tarjetas desbordaban su propia ventanilla —
+     `desplaza: true` con sólo tres—, y la ventanilla es justo la promesa que no
+     se puede romper.
+
+     La causa no es la tarjeta: es el DEDO. `.sal-unir` mide `0.8 · --cta-h`, y
+     `--cta-h` lleva el `max(44px, …)` que la lámina puso para el piso táctil. En
+     un teléfono `--u` toca su suelo de 3,2px, así que la fórmula da 42,9px de
+     tarjeta para un botón de 35,2 más 14,1 de relleno: 49,3 que no caben en
+     42,9. En escritorio no pasa porque `13.4u` sobra.
+
+     El suelo se DERIVA de lo que la tarjeta tiene que contener —el botón más su
+     relleno— en vez de escribirse como cifra: el día que cambie el piso táctil o
+     el relleno, esto se corrige solo. Y la fórmula de la lámina sigue mandando
+     en cuanto hay sitio, que es exactamente el trato que `--cta-h` ya tenía.
+     Al techo de `--u` (6px) gana `13.4u` = 80,4px; en el suelo gana el botón. */
+  --tarjeta-h: max(
+    calc(var(--cta-h) * 0.8 + var(--u) * 4.4),
+    calc(var(--u) * 13.4)
+  );
+  --lista-gap: calc(var(--u) * 2);
+
+  /* El filete de la casa: el crema del texto al 14 %. Es el
+     `rgba(245,237,216,.14)` de las láminas dicho con su token. */
+  --linea: rgba(var(--text-primary-rgb), 0.14);
+
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  /* ALTO DEFINIDO, no mínimo: `1fr` sólo reparte espacio libre si hay altura
+     contra la que repartir. Es la lección que LOB-1 pagó con una barra inferior
+     en `top: 1015` dentro de un viewport de 768.
+     `100vh` primero como red para navegadores sin `dvh`. */
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + var(--pad))
+    calc(env(safe-area-inset-right, 0px) + var(--pad))
+    calc(env(safe-area-inset-bottom, 0px) + var(--pad))
+    calc(env(safe-area-inset-left, 0px) + var(--pad));
+  max-width: calc(var(--u) * 213);   /* ≈1280px al techo de --u, como el lobby */
+  margin: 0 auto;
+  overflow: hidden;
+
+  color: var(--text-primary);
+  font-family: var(--sans, system-ui, 'Segoe UI', Roboto, sans-serif);
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  text-align: left;   /* `#root` centra por defecto (index.css:61) */
+
+  /* ── EL INTERLINEADO HEREDADO, Y POR QUÉ HAY QUE CORTARLO ────────────────
+     `index.css:18` declara `font: 18px/145%`. Un `line-height` en PORCENTAJE se
+     computa contra el tamaño de SU elemento y se hereda como LONGITUD FIJA, no
+     como razón: cada descendiente de la app recibe 23,2px de interlineado
+     —16px × 145% en móvil— mida su letra lo que mida.
+
+     Para la línea 2 de una tarjeta, que va a 2,9u ≈ 10,4px, eso son 23,2px de
+     alto para una letra de 10: más del doble. Las dos líneas sumaban 48,6px
+     dentro de una tarjeta de 51 con 15,8 de relleno, y las TRES tarjetas
+     desbordaban su ventanilla en los tres viewports de teléfono. Medido por
+     `sal.3` del arnés; las láminas no lo veían porque un documento suelto hereda
+     el `normal` del navegador.
+
+     Se corta con una razón SIN UNIDAD, que es lo que se hereda como proporción y
+     vuelve a calcularse en cada elemento. 1.2 es el `normal` que las láminas
+     tenían de hecho. Los bloques que quieren más aire —`.sal-vacio` 1.45,
+     `.sal-aviso` 1.4, `.sal-modo-d` 1.35— ya lo declaran por su cuenta y siguen
+     mandando. */
+  line-height: 1.2;
+}
+
+/* El fondo: la misma rampa verde que el lobby, para que el paso de una pantalla
+   a otra no tenga costura. `fixed` para que no se mueva con el scroll del traje
+   apaisado, y `z-index:0` bajo todo el contenido. */
+.sal-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, var(--green-base) 0%, transparent 70%),
+    radial-gradient(ellipse 120% 90% at 50% 100%, var(--green-deep) 0%, transparent 60%),
+    var(--green-abyss);
+}
+.sal > .lob-top,
+.sal > .sal-cab,
+.sal > .sal-cuerpo { position: relative; z-index: 1; }
+
+/* ══ 2 · BARRA SUPERIOR ════════════════════════════════════════════════════
+   El MARCADO es el del lobby y se monta desde `components/BarraSuperior.jsx`:
+   no hay una segunda copia de esos nodos en ninguna parte (rector §3.1).
+
+   LO QUE SÍ SE DUPLICA ES EL CSS, y se declara. `lobby.css` acota TODA la barra
+   bajo `.lobby .lob-*`, y esta tanda es de CSS aditivo estricto: reescribir
+   aquellos selectores para añadirles `.sal` sería tocar reglas existentes, que
+   es lo prohibido por la regla 2. Así que las mismas declaraciones se repiten
+   aquí bajo `.sal`.
+
+   Son ~45 líneas duplicadas, y el trato es deliberado: cero duplicación de
+   MARCADO —que es la que se pudre, porque diverge cuando alguien toca un solo
+   lado— a cambio de duplicación de estilo, que como mucho hace que una barra se
+   vea distinta de la otra y se ve a simple vista. Si una tanda futura mueve la
+   barra a su propia hoja, estos dos bloques se funden en uno y ése es el día de
+   pagar la deuda. */
+.sal .lob-top {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+}
+.sal .lob-perfil {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: var(--u) calc(var(--u) * 1.5) var(--u) var(--u);
+  border-radius: 999px;
+}
+.sal .lob-avatar {
+  width: var(--ico-caja);
+  height: var(--ico-caja);
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--green-bright) 0%, var(--green-deep) 100%);
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--linea);
+  flex: none;
+}
+.sal .lob-avatar .lob-ico { width: var(--ico); height: var(--ico); color: var(--text-primary); }
+.sal .lob-nombre { font-size: calc(var(--u) * 3.6); letter-spacing: 0.01em; }
+
+/* O1 · lo que puede faltar RESERVA SU CAJA. Un nombre ausente se apaga con
+   `visibility`, jamás sale del flujo: así la pantalla mide lo mismo con cuenta
+   y sin ella, y las capturas del arnés son comparables entre corridas. */
+.sal .lob-hueco { visibility: hidden; }
+
+.sal .lob-pildora {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.4);
+  border: 1px solid var(--linea);
+  background: var(--surface-panel);
+  border-radius: 999px;
+  padding: calc(var(--u) * 0.9) calc(var(--u) * 0.9) calc(var(--u) * 0.9) calc(var(--u) * 1.2);
+  font-size: calc(var(--u) * 3.4);
+  font-variant-numeric: tabular-nums;
+}
+.sal .lob-pildora .bd { font-size: inherit; gap: calc(var(--u) * 1.2); }
+.sal .lob-pildora .bd-num { font: inherit; color: var(--text-primary); }
+
+/* El `+` es GLIFO DE LÍNEA, no icono de acción: se mide en `em` con el número
+   que tiene al lado. Las dos líneas de `font: inherit; padding: 0` no son
+   adorno — son el hallazgo A1 de LOB-1: un <button> trae de fábrica
+   `font: 400 13.333px Arial` y `padding: 1px 6px`, así que sin apagarlas el
+   `1.5em` mide contra 13,33px y el 62 % contra una caja de 8×18. */
+.sal .lob-mas {
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--gold-brand);
+  color: var(--text-dark);
+  border: 0;
+  cursor: pointer;
+  margin-left: calc(var(--u) * 0.6);
+  flex: none;
+}
+.sal .lob-pildora .lob-mas {
+  font: inherit;
+  padding: 0;
+  line-height: 1;
+}
+.sal .lob-mas .lob-ico { width: 62%; height: 62%; }
+
+.sal .lob-ajustes {
+  margin-left: auto;
+  width: var(--ico-caja);
+  height: var(--ico-caja);
+  border-radius: 50%;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.sal .lob-ajustes .lob-ico { width: var(--ico); height: var(--ico); }
+.sal .lob-ajustes:hover,
+.sal .lob-ajustes:focus-visible { color: var(--text-primary); border-color: var(--linea); }
+
+/* ══ 3 · CABECERA DE PANTALLA · volver + título ════════════════════════════ */
+.sal-cab {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  width: var(--col);
+  margin: calc(var(--u) * 3) auto 0;
+}
+.sal-volver {
+  width: var(--ico-caja);
+  height: var(--ico-caja);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  flex: none;
+}
+.sal-volver .lob-ico { width: var(--ico); height: var(--ico); }
+.sal-volver:hover,
+.sal-volver:focus-visible { color: var(--text-primary); border-color: var(--linea); }
+.sal-cab h1 {
+  font-size: calc(var(--u) * 4.4);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin: 0;
+  /* ── EL COLOR NO ES REDUNDANTE ────────────────────────────────────────────
+     `index.css:69-74` —andamiaje de Vite que esta campaña no abre— pinta TODO
+     `h1` y `h2` con `color: var(--text-h)`, que en esquema claro es `#08060d`.
+     Como esta regla no declaraba color, el título caía a ese negro sobre el
+     verde abismo y era casi invisible: se vio en la captura de `opciones-3`,
+     NO en los seis puntos del arnés —ninguno miraba el color, y por eso ahora
+     `sal.1` lo mide—.
+     `inherit` y no el token directamente: así el título es del color de la
+     pantalla, sea el que sea, en vez de repetir una decisión que ya está tomada
+     doce líneas más arriba. Misma medicina que `index.css:76` obliga a aplicar
+     al tamaño y al margen, que sí estaban. */
+  color: inherit;
+}
+
+/* ══ 4 · CUERPO ════════════════════════════════════════════════════════════
+   `align-content: space-evenly` reparte el alto sobrante entre los bloques con
+   aire igual, que es como las dos láminas equilibran la columna. `min-height:0`
+   es lo que permite que la ventanilla de la lista pueda desbordar hacia dentro
+   en vez de estirar la fila: sin él, un `1fr` con contenido scrollable crece. */
+.sal-cuerpo {
+  width: var(--col);
+  margin: 0 auto;
+  min-height: 0;
+  display: grid;
+  align-content: space-evenly;
+  row-gap: calc(var(--u) * 3);
+  padding: calc(var(--u) * 2) 0 calc(var(--u) * 4);
+}
+/* SAL-2 tiene cuatro bloques donde SAL-1 tiene tres, así que su aire es más
+   apretado. La lámina lo escribe como `row-gap: 2.5u`. */
+.sal-cuerpo.es-armar { row-gap: calc(var(--u) * 2.5); }
+
+.sal-bloque h2 {
+  font-size: calc(var(--u) * 2.9);
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 calc(var(--u) * 1.8);
+}
+
+/* ══ 5 · SAL-1 · EL CÓDIGO ═════════════════════════════════════════════════ */
+.sal-codigo {
+  display: flex;
+  gap: calc(var(--u) * 2);
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.sal-campo {
+  flex: none;
+  width: calc(var(--u) * 40);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.5);
+  border: 1px solid var(--linea);
+  background: var(--surface-card);
+  border-radius: calc(var(--u) * 2.5);
+  padding: 0 calc(var(--u) * 3);
+  height: var(--cta-h);
+}
+/* El `AJ-` vive FUERA del campo y no se puede borrar: es constante del código,
+   no algo que el jugador teclee. Dibujarlo aparte es lo que permite que pegar
+   `7K2M` funcione sin que nadie explique nada. */
+.sal-campo .sal-pre {
+  color: var(--text-muted);
+  font-size: calc(var(--u) * 4);
+  letter-spacing: 0.08em;
+}
+.sal-campo input {
+  /* ── A1 §5 · EL ANCHO RESERVA CUATRO GLIFOS CON SU TRACKING, en `em` ──────
+     Era `6.2ch`. `ch` es el avance del «0», y cuatro MAYÚSCULAS con 0,28em de
+     tracking cada una miden más que eso en casi cualquier fuente: `LHQH` a
+     15,84px son ~64px contra los ~54px que daba `6.2ch`. Con el contenido más
+     ancho que la caja, el <input> se DESPLAZA hacia el cursor al recibir el
+     foco y la primera letra desaparece bajo el borde: es el `.HQH` que el
+     Motorola enseñó, y ocurría justo tras el error porque §3.2 devuelve el
+     foco al campo. El S25 no lo mostraba porque su fuente de sistema es más
+     estrecha, no porque el ancho estuviera bien.
+
+     Una mayúscula latina no pasa de 1em en ninguna fuente de sistema, así que
+     `1em + tracking` por hueco es el MÍNIMO que reserva los cuatro enteros en
+     cualquier fuente y en cualquier viewport —todo escala con la letra—. El `4`
+     es `LARGO_CODIGO` de `salasCore.js`, copiado: CSS no puede importarlo.
+
+     Y POR ENCIMA DEL MÍNIMO, EL RESTO DEL CAMPO. El ancho del campo es de la
+     lámina (40u) y lo que queda tras el relleno, el `AJ-` y el hueco —unas
+     24,5u— era espacio muerto a la derecha del <input>. Se le cede entero con
+     `flex: 1`: el arnés midió que con el mínimo a secas (22,5u) `MWMW` a
+     360×640 caía a 1px de la caja y el cuantizado del ancho decidía si
+     desplazaba o no. La holgura es DERIVADA del campo, no una cifra: si la
+     lámina ensancha el campo, el <input> crece con él; si lo estrecha por
+     debajo del mínimo, el mínimo manda y el arnés lo ve (`cabe`).
+     El arnés lo mide lleno, con foco y con las cuatro letras más anchas. */
+  --tracking: 0.28em;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: calc(4 * (1em + var(--tracking)));
+  background: none;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: calc(var(--u) * 4.4);
+  letter-spacing: var(--tracking);
+  text-transform: uppercase;
+}
+.sal-campo input::placeholder { color: var(--text-faint); letter-spacing: var(--tracking); }
+.sal-entrar {
+  height: var(--cta-h);
+  padding: 0 calc(var(--u) * 4);
+  border-radius: calc(var(--cta-h) / 2);
+  border: 1px solid var(--gold-brand);
+  background: none;
+  color: var(--gold-brand);
+  font: inherit;
+  font-size: calc(var(--u) * 3.6);
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+.sal-entrar[disabled] { opacity: 0.38; cursor: default; }
+
+/* O1 · el aviso RESERVA SU CAJA y sólo se apaga con `visibility`. Sin esto,
+   equivocarse de código empujaría la lista tres bloques hacia abajo justo en el
+   momento en que el jugador está mirando el campo. */
+.sal-aviso-error {
+  font-size: calc(var(--u) * 2.9);
+  font-weight: 400;
+  color: var(--loss-red);
+  margin: calc(var(--u) * 1.2) 0 0;
+  min-height: 1.4em;
+  visibility: hidden;
+}
+.sal-aviso-error.is-on { visibility: visible; }
+
+/* ══ 6 · SAL-1 · MESAS FORMÁNDOSE AHORA ════════════════════════════════════
+   La ventanilla mide EXACTAMENTE tres tarjetas, siempre: `3·tarjeta + 2·gap`.
+   Si hay más, la caja NO crece — desplaza por dentro. Es decisión sellada y el
+   arnés la mide en los seis viewports. */
+.sal-lista {
+  display: grid;
+  gap: var(--lista-gap);
+  overflow: auto;
+  align-content: start;
+  height: calc(var(--tarjeta-h) * 3 + var(--lista-gap) * 2);
+  scrollbar-width: thin;
+}
+.sal-lista .sal-mesa { height: var(--tarjeta-h); }
+
+/* ── EL ESTADO VACIO OCUPA LA VENTANILLA ENTERA ────────────────────────────
+   Sin `align-content: stretch` la caja punteada mide lo que mide su texto —unos
+   80px de los 159 de la ventanilla— y el bloque de abajo sube: la pantalla
+   tendria una forma cuando hay mesas y otra cuando no.
+   Y no basta con `height: 100%` en el hijo, que es lo primero que se prueba: con
+   `align-content: start` la fila de la rejilla se dimensiona AL CONTENIDO, asi
+   que ese 100% se mide contra una altura que depende de el mismo, la referencia
+   es circular y el navegador cae a `auto` sin decir nada. Medido por el punto
+   `sal.6` del arnes en los seis viewports.
+   La clase la pone el JSX, que es quien sabe si la lista esta vacia; se prefiere
+   a un `:has()` porque el estado es de datos, no de forma. */
+.sal-lista.es-vacia { align-content: stretch; }
+.sal-lista .sal-vacio { height: 100%; }
+
+.sal-mesa {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+  border: 1px solid var(--linea);
+  background: var(--surface-card);
+  border-radius: calc(var(--u) * 2.5);
+  padding: calc(var(--u) * 2.2) calc(var(--u) * 3);
+}
+/* Las sillas: un punto por asiento, relleno el ocupado. Dicen de un vistazo lo
+   que el `x/N` dice con cifras, y sobreviven a una tarjeta estrecha. */
+.sal-sillas { display: flex; gap: calc(var(--u) * 0.8); }
+.sal-silla {
+  width: calc(var(--u) * 2.6);
+  height: calc(var(--u) * 2.6);
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+}
+.sal-silla.is-ocupada { background: var(--text-primary); border-color: var(--text-primary); }
+.sal-mesa-info { display: grid; gap: calc(var(--u) * 0.6); min-width: 0; }
+.sal-mesa-l1 {
+  font-size: calc(var(--u) * 3.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sal-mesa-l1 b { font-weight: 500; color: var(--gold-brand); }
+.sal-mesa-l2 {
+  font-size: calc(var(--u) * 2.9);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sal-unir {
+  height: calc(var(--cta-h) * 0.8);
+  padding: 0 calc(var(--u) * 3.5);
+  border-radius: 999px;
+  border: 1px solid var(--gold-brand);
+  background: none;
+  color: var(--gold-brand);
+  font: inherit;
+  font-size: calc(var(--u) * 3.2);
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+/* Fuera de alcance: la tarjeta se atenúa y el botón se apaga, PERO SIGUE AHÍ.
+   Decisión de Victor (7-sep-2026) sobre la contradicción entre la lámina —que
+   deja «Unirme» apagado y pone «Te faltan X HC» en la línea 2— y la ficha §3.3
+   —que sustituía el CTA por el texto—. Manda la lámina, y la razón mecánica es
+   que conservar las tres columnas hace que una mesa fuera de alcance mida
+   EXACTAMENTE lo mismo que una normal: la ventanilla de tres sigue siendo de
+   tres, mezcle lo que mezcle. */
+.sal-mesa.is-fuera { opacity: 0.55; }
+.sal-mesa.is-fuera .sal-unir {
+  border-color: var(--linea);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.sal-vacio {
+  border: 1px dashed var(--linea);
+  border-radius: calc(var(--u) * 2.5);
+  padding: calc(var(--u) * 4) calc(var(--u) * 3);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: calc(var(--u) * 3.3);
+  line-height: 1.45;
+  display: grid;
+  place-content: center;
+}
+.sal-vacio small {
+  display: block;
+  color: var(--text-faint);
+  font-size: 0.85em;
+  margin-top: calc(var(--u) * 1);
+}
+
+/* ══ 7 · SAL-2 · CHIPS DE JUGADORES Y APUESTA ══════════════════════════════ */
+.sal-chips { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 2); }
+.sal-chip {
+  height: var(--chip-h);
+  padding: 0 calc(var(--u) * 4);
+  border-radius: 999px;
+  border: 1px solid var(--linea);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: calc(var(--u) * 3.6);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.sal-chip[aria-pressed="true"] { border-color: var(--gold-brand); color: var(--gold-brand); }
+.sal-chip[disabled] { opacity: 0.4; cursor: default; }
+/* Los de jugadores son un solo dígito y sin un ancho mínimo saldrían
+   ridículamente estrechos al lado de los de apuesta. */
+.sal-chips.es-jugadores .sal-chip { min-width: calc(var(--chip-h) * 1.6); }
+
+/* O1 · los dos avisos de SAL-2 reservan caja: dos líneas el del anfitrión,
+   porque su texto es largo y aparecer no puede empujar el CTA. */
+.sal-aviso {
+  font-size: calc(var(--u) * 2.9);
+  font-weight: 400;
+  line-height: 1.4;
+  margin: calc(var(--u) * 1.4) 0 0;
+  min-height: 2.8em;
+  visibility: hidden;
+}
+.sal-aviso.is-on { visibility: visible; }
+.sal-aviso.es-anfitrion { color: var(--bet-orange); }
+.sal-aviso.es-recuerdo { color: var(--text-secondary); }
+.sal-aviso b { font-weight: 500; color: var(--gold-brand); }
+
+/* ══ 8 · SAL-2 · ¿CÓMO LA LLENAMOS? ════════════════════════════════════════ */
+.sal-modos { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 2); }
+.sal-modo {
+  display: grid;
+  gap: calc(var(--u) * 0.8);
+  text-align: left;
+  border: 1px solid var(--linea);
+  background: var(--surface-card);
+  border-radius: calc(var(--u) * 2.5);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 3);
+  min-height: calc(var(--u) * 15);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sal-modo[aria-pressed="true"] { border-color: var(--gold-brand); }
+.sal-modo .sal-modo-t {
+  font-size: calc(var(--u) * 3.6);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.4);
+}
+.sal-modo[aria-pressed="true"] .sal-modo-t { color: var(--gold-brand); }
+/* El candado y el globo son GLIFOS DE LÍNEA dentro de una frase, no iconos de
+   acción: se miden en `em` con el texto que acompañan y por eso no llevan
+   `--ico`. Misma frontera que el `+` de la píldora. */
+.sal-modo .sal-modo-t .lob-ico { width: 1em; height: 1em; }
+.sal-modo .sal-modo-d {
+  font-size: calc(var(--u) * 2.9);
+  color: var(--text-muted);
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+/* ══ 9 · EL CTA ════════════════════════════════════════════════════════════ */
+.sal-accion {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 1.6);
+}
+.sal-cta {
+  height: var(--cta-h);
+  width: var(--cta-w);
+  border-radius: calc(var(--cta-h) / 2);
+  border: 0;
+  background: linear-gradient(180deg, var(--gold-hover) 0%, var(--gold-brand) 55%, var(--gold-brand-deep) 100%);
+  color: var(--text-dark);
+  font: inherit;
+  font-weight: 600;
+  font-size: calc(var(--u) * 4.2);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow:
+    0 calc(var(--u) * 1.5) calc(var(--u) * 4) rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(var(--text-primary-rgb), 0.35);
+  white-space: nowrap;
+  padding: 0 calc(var(--u) * 3);
+}
+/* SAL-1 lo pinta un punto mayor que SAL-2, y la razón está en la lámina: allí
+   es el único CTA de la pantalla y aquí compite con cuatro bloques. */
+.sal-cta.es-opciones { font-size: calc(var(--u) * 4.4); }
+.sal-cta:active { transform: translateY(1px) scale(0.995); }
+.sal-cta:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+.sal-cta[disabled] { opacity: 0.5; cursor: default; transform: none; }
+/* O1 · la nota bajo el CTA reserva su caja: en SAL-2 aparece y desaparece según
+   el modo, y sin reserva movería el CTA bajo el dedo que va a pulsarlo. */
+.sal-accion small {
+  color: var(--text-muted);
+  font-size: calc(var(--u) * 2.9);
+  min-height: 1.4em;
+  text-align: center;
+}
+
+/* ══ 10 · LA CASA ══════════════════════════════════════════════════════════
+   Vía rápida al lobby en todas las pantallas previas a la mesa. Abajo a la
+   izquierda, fuera del flujo, donde no compite con nada. */
+.sal-casa {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + var(--pad));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--pad));
+  width: var(--ico-caja);
+  height: var(--ico-caja);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  z-index: 2;
+}
+.sal-casa .lob-ico { width: var(--ico); height: var(--ico); }
+.sal-casa:hover,
+.sal-casa:focus-visible { color: var(--text-primary); border-color: var(--linea); }
+
+/* ══ 11 · EL TOAST ═════════════════════════════════════════════════════════
+   Un solo aviso flotante por pantalla. `role="status"` + `aria-live` lo anuncia
+   sin robar el foco; la caja se reserva siempre y sólo se apaga con
+   `visibility`, para que aparecer no empuje un píxel (O1). */
+.sal-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--u) * 22);
+  transform: translate(-50%, 8px);
+  background: var(--surface-modal);
+  border: 1px solid var(--linea);
+  padding: calc(var(--u) * 1.6) calc(var(--u) * 3.4);
+  border-radius: 999px;
+  font-size: calc(var(--u) * 3.2);
+  max-width: min(92vw, var(--col));
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s, transform 0.18s, visibility 0s 0.18s;
+  z-index: 5;
+  pointer-events: none;
+}
+.sal-toast.is-on {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition-delay: 0s;
+}
+
+/* ══ 12 · SAL-3 · EL STUB DE LA SALA DE ESPERA ═════════════════════════════
+   PROVISIONAL. B2 reemplaza la pantalla entera y puede reemplazar este bloque
+   con ella; lo que NO debe tocar es nada de los §1–§11, que son de las dos
+   pantallas selladas. */
+.sal-espera { display: grid; gap: calc(var(--u) * 2.5); justify-items: center; text-align: center; }
+.sal-espera-sub { font-size: calc(var(--u) * 3.2); color: var(--text-secondary); font-weight: 400; }
+/* El código en oro, con su botón de copiar al lado. Es la única línea de la
+   lámina SAL-3 que esta sub-tanda adelanta, y B2 la hereda tal cual. */
+.sal-codigo-grande {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  font-size: calc(var(--u) * 7);
+  letter-spacing: 0.14em;
+  color: var(--gold-brand);
+  font-variant-numeric: tabular-nums;
+}
+.sal-copiar {
+  width: var(--ico-caja);
+  height: var(--ico-caja);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  flex: none;
+}
+.sal-copiar .lob-ico { width: var(--ico); height: var(--ico); }
+.sal-copiar:hover,
+.sal-copiar:focus-visible { color: var(--text-primary); border-color: var(--linea); }
+.sal-copiar.is-hecho { color: var(--win-green); }
+.sal-sentados { font-size: calc(var(--u) * 4); font-variant-numeric: tabular-nums; }
+.sal-provisional {
+  font-size: calc(var(--u) * 2.9);
+  font-weight: 400;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+/* Los secundarios de la sala de espera: contorno, nunca oro sólido. El oro
+   único de la pantalla es el código. */
+.sal-secundario {
+  height: var(--cta-h);
+  padding: 0 calc(var(--u) * 4);
+  border-radius: calc(var(--cta-h) / 2);
+  border: 1px solid var(--linea);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: calc(var(--u) * 3.4);
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sal-secundario:hover,
+.sal-secundario:focus-visible { color: var(--text-primary); border-color: var(--gold-brand); }
+.sal-espera-botones { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 2); justify-content: center; }
+
+/* ══ 13 · LOS DOS TRAJES ═══════════════════════════════════════════════════
+   Verbatim de las láminas. Lo que no cabe NO se scrollea, se aprieta — salvo en
+   el apaisado bajo, donde la columna es tan alta que apretar no basta y la
+   propia pantalla desplaza. Es la misma decisión que toman `.welcome-screen`,
+   `ModeSelect` y el lobby. */
+@media (max-height: 660px) {
+  .sal-cab { margin-top: calc(var(--u) * 1.5); }
+  .sal-cuerpo { row-gap: calc(var(--u) * 2.2); padding-top: calc(var(--u) * 1.5); }
+  .sal-cuerpo.es-armar { row-gap: calc(var(--u) * 1.6); padding-top: calc(var(--u) * 1); }
+  .sal-bloque h2 { margin-bottom: calc(var(--u) * 1); }
+  .sal-aviso { min-height: 1.4em; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  /* Misma columna; la pantalla desplaza. La tercera fila deja de ser `1fr`
+     porque en este traje el cuerpo mide lo que mide y es el contenedor quien
+     scrollea. */
+  .sal { grid-template-rows: auto auto auto; overflow: auto; }
+  .sal-cuerpo { align-content: start; row-gap: calc(var(--u) * 3); }
+  /* La ventanilla sigue siendo de tres tarjetas: la promesa es de la lista, no
+     del viewport, y aquí es cuando más falta hace que la caja no crezca. */
+  .sal-casa { position: fixed; }
+}
