@@ -16,19 +16,18 @@ import '../styles/welcome.css'
 import '../styles/lobby.css'
 
 import ArcoEstrellas from '../components/ArcoEstrellas'
-import BalanceDisplay from '../components/BalanceDisplay'
 import { SoundButton } from '../components/SoundButton'
+// SAL-B1 · La barra superior sale de aquí a un componente compartido: las
+// pantallas de salas montan la MISMA, no una copia (rector SAL-B1 §3.1). El
+// lobby pinta exactamente el mismo DOM que antes —mismas clases, mismos
+// `data-accion`, misma hoja de estilo—; lo único que cambia es dónde está
+// escrito el marcado. `BalanceDisplay`, `montoTexto`, `IconoMas` e
+// `IconoAjustes` se fueron con él y por eso ya no se importan aquí.
+import BarraSuperior from '../components/BarraSuperior'
 import {
-  IconoUsuario, IconoMas, IconoCandado, IconoAjustes,
-  IconoTrofeo, IconoTienda, IconoLibro,
+  IconoUsuario, IconoTrofeo, IconoTienda, IconoLibro,
 } from '../components/IconosLobby'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
-// `montoTexto` es el formateador de montos de la casa —"10.000"— y nació en
-// `config/tapetes.js` junto a los únicos montos que hasta hoy necesitaban miles.
-// El saldo del lobby es el segundo, y la lámina lo pinta así ("1.500"). Función
-// pura y sin `Intl` a propósito: el arnés y Vitest la corren en Node, donde el
-// juego de locales instalado no es una constante del entorno.
-import { montoTexto } from '../config/tapetes'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { useIdioma } from '../hooks/useIdioma'
 import { enmascararCorreo } from '../hooks/lobbyCore'
@@ -72,7 +71,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
 
-export default function Lobby({ cuenta, onJugarIA, onCerrarSesion }) {
+export default function Lobby({ cuenta, onJugarIA, onJugarPvP, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -162,60 +161,22 @@ export default function Lobby({ cuenta, onJugarIA, onCerrarSesion }) {
       <div className="lob-fondo" aria-hidden="true" />
 
       {/* ── Barra superior ─────────────────────────────────────────────── */}
-      <header className="lob-top">
-        <SoundButton
-          className={`lob-perfil${usuario ? '' : ' lob-hueco'}`}
-          data-accion="perfil"
-          aria-label={t('lob.perfil.aria')}
-          onClick={pronto}
-        >
-          <span className="lob-avatar" aria-hidden="true"><IconoUsuario /></span>
-          <span className="lob-nombre">{usuario || ' '}</span>
-        </SoundButton>
-
-        {/* La píldora NO es un botón: es un dato con un atajo dentro. El `+` sí
-            lo es, y por eso es el único elemento pulsable de la caja. */}
-        <div className="lob-pildora" aria-label={t('lob.saldo.aria')}>
-          {/* PROVISIONAL: sin billetera; ECO-x lo conecta a Supabase.
-              `saldoInicial` es una CONSTANTE de `ajileiConfig.js` (5000), la
-              misma que `ModeSelect.jsx:40` ya pinta. No hay saldo vivo en el
-              producto: no existe ledger, y una cifra que no se mueve nunca es lo
-              único honesto que se puede enseñar hasta que exista.
-
-              ── La moneda de la casa, y UNA sola ──────────────────────────────
-              `BalanceDisplay` YA monta su `ChipToken`, que es `heptacoin.svg`
-              —el maestro sellado— en un <img>. Es exactamente la moneda que la
-              ficha §3.3.1 pide, así que no se añade una segunda al lado: se
-              envuelve la que hay. `.lob-moneda` es ese envoltorio con
-              `position: relative`, y es quien recibe el brillo de la fase 2
-              (§3.5): el halo va sobre el `<img>` y el destello corto sobre un
-              pseudo-elemento colocado encima de su caja, nunca sobre la cifra.
-              El lado lo fija `--ico` desde `lobby.css`, no el atributo del
-              componente — contrato de iconos, §1.9. */}
-          <span className="lob-moneda">
-            <BalanceDisplay chips={montoTexto(AJILEI_CONFIG.economy.saldoInicial)} size="icon" />
-          </span>
-          <SoundButton className="lob-mas" data-accion="tienda" aria-label={t('lob.nav.tienda')} onClick={pronto}>
-            <IconoMas />
-          </SoundButton>
-        </div>
-
-        {/* <button> pelado y no `SoundButton` por una razón mecánica: necesita
-            `ref` para devolverle el foco al cerrar la hoja, y `SoundButton` no
-            expone el nodo. El clic de la casa se dispara a mano. */}
-        <button
-          ref={ajustesRef}
-          type="button"
-          className="lob-ajustes"
-          data-accion="ajustes"
-          aria-label={t('lob.ajustes.aria')}
-          aria-haspopup="dialog"
-          aria-expanded={hojaAbierta}
-          onClick={() => { play('buttonClick'); setHojaAbierta(true) }}
-        >
-          <IconoAjustes />
-        </button>
-      </header>
+      {/* SAL-B1 · El marcado se fue a `components/BarraSuperior.jsx` para que
+          las tres pantallas de salas monten LA MISMA barra y no una copia
+          (rector SAL-B1 §3.1). Lo que se pinta es idéntico a lo de antes: las
+          mismas clases `lob-*`, los mismos tres `data-accion` y la misma
+          píldora con su `BalanceDisplay`. `saldoInicial` sigue siendo la
+          constante de `ajileiConfig.js` que este lobby ya pintaba — el lobby NO
+          pasa por `lib/saldo.js`, que es el lector reservado a SAL. */}
+      <BarraSuperior
+        usuario={usuario}
+        saldo={AJILEI_CONFIG.economy.saldoInicial}
+        onPerfil={pronto}
+        onTienda={pronto}
+        onAjustes={() => setHojaAbierta(true)}
+        ajustesRef={ajustesRef}
+        ajustesExpandido={hojaAbierta}
+      />
 
       {/* ── Centro ─────────────────────────────────────────────────────── */}
       <section className="lob-centro">
@@ -252,10 +213,15 @@ export default function Lobby({ cuenta, onJugarIA, onCerrarSesion }) {
             {t('lob.cta.ia')}
           </button>
 
-          <SoundButton className="lob-cta-pvp" data-accion="jugar-pvp" onClick={pronto}>
-            <IconoCandado />
+          {/* ── SAL-B1 · El PvP deja de estar cerrado ──────────────────────
+              Pierde el candado y la pastilla «Próximamente» porque ya lleva a
+              alguna parte: `SalaOpciones`. Las dos cosas eran la promesa mínima
+              de un botón que no hacía nada; con el botón vivo, dejarlas sería
+              mentir en la otra dirección.
+              `lob.cta.pronto` NO se borra del diccionario: la pastilla sigue
+              viva en las seis filas de la hoja ⚙ y en el toast. */}
+          <SoundButton className="lob-cta-pvp" data-accion="jugar-pvp" onClick={() => onJugarPvP?.()}>
             <span>{t('lob.cta.pvp')}</span>
-            <span className="lob-pastilla">{t('lob.cta.pronto')}</span>
           </SoundButton>
         </div>
       </section>
