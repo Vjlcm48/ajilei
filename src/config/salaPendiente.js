@@ -97,6 +97,35 @@ export function borrar() {
   }
 }
 
+// ── SAL-B1 · Ajuste A1 · Consumir: leer UNA vez y olvidar ───────────────────
+// Rector: AJILEI_SAL-B1_AjusteA1_v1.0.md §4.1 y §4.4.
+//
+// ── EL DEFECTO QUE LO TRAJO ────────────────────────────────────────────────
+// Dos teléfonos midieron el 2026-09-11 que un código recordado que FALLA
+// —«esa mesa ya no está»— volvía a intentarse en cada entrada a «Jugar contra
+// jugador», y que borrarlo del campo no servía: el almacenamiento lo devolvía
+// entero. La causa: el borrado dependía del resultado, así que un fallo, una
+// red caída o un cierre de app a mitad lo dejaban vivo.
+//
+// `consumir()` cierra ese agujero por construcción: quien lo llama recibe el
+// código Y se queda sin él en el mismo gesto, ANTES de intentar nada. La
+// segunda llamada devuelve `null`, y eso es exactamente lo que el test sella.
+// `leer()` sigue existiendo para quien sólo quiera MIRAR —decidir la pantalla
+// inicial sin gastar la invitación—; consumir es para quien va a actuar.
+//
+// El borrado ocurre aunque el valor leído fuera basura: una clave con basura
+// tampoco tiene por qué sobrevivir a la lectura que la descubrió.
+
+/**
+ * El código recordado —o `null`— y, en el mismo gesto, el olvido.
+ * @returns {string|null}
+ */
+export function consumir() {
+  const codigo = leer()
+  borrar()
+  return codigo
+}
+
 // ── El parámetro de la URL ──────────────────────────────────────────────────
 // `?sala=AJ7K2M`, y no `/sala/AJ-7K2M`. La Fase 0 §6.2 dejó dicho por qué: el
 // proyecto NO tiene router —es un `useState` y una cascada de `if`— así que una

@@ -139,3 +139,39 @@ export const JUGADORES_PVP = Array.from(
   { length: AJILEI_CONFIG.game.playersMax - AJILEI_CONFIG.game.playersMin + 1 },
   (_, i) => AJILEI_CONFIG.game.playersMin + i
 )
+
+// ── SAL-B1 · La memoria de la última mesa armada ────────────────────────────
+// Rector: AJILEI_SAL-B1_Fase1_v1.0.md §4.4, que pide expresamente que el nombre
+// de la clave viva AQUÍ. Es lo ÚNICO que esta sub-tanda añade a este archivo:
+// ninguna de las líneas de arriba cambia.
+//
+// La lógica de leer y escribir está en `salaRecordada.js` y las guardas en
+// `screens/salasCore.js`; aquí sólo el nombre, por la misma razón que
+// `APUESTAS_PVP` está aquí y no en la pantalla que la pinta. Convención de la
+// casa `ajilei.<cosa>`, la de `ajilei.nivel`, `ajilei.tapete`, `ajilei.idioma`,
+// `ajilei.sound` y `ajilei.salaPendiente`.
+//
+// NUNCA VIAJA AL SERVIDOR. Es una comodidad del dedo —volver a la pantalla y
+// encontrar puesto lo de ayer—, no un dato de la partida: la base no sabe ni
+// tiene por qué saber qué mesa suele armar cada quien.
+export const CLAVE_CONFIG_SALA = 'ajilei.salaConfig'
+
+// ── SAL-B1 · Ajuste A1 · Una mesa `activa` sin partida es una mesa muerta ───
+// Rector: AJILEI_SAL-B1_AjusteA1_v1.0.md §2.2. PROVISIONAL HASTA MES-PvP.
+//
+// En B1 no existe la partida: una mesa que el barrido arranca (`activa`) no
+// lleva a ninguna parte, y sin esta regla RETENÍA al jugador para siempre —
+// `mi_sala()` la devolvía en cada arranque y ninguna función la terminaba. Lo
+// midieron dos teléfonos el 2026-09-11: hubo que cancelarla a mano en SQL.
+//
+// Los minutos que una `activa` sin `estado_partida` puede vivir desde que
+// arrancó antes de que `barrer_salas()` la cancele. La cifra viaja COPIADA al
+// SQL de la migración `<timestamp>_sal_b1_ajuste.sql` con un comentario que
+// apunta aquí, igual que `DURACION_SALA_SEG`: no hay forma de leer un
+// `interval` de una función desde Vitest, así que si una cambia, la otra se
+// cambia a mano. El cliente NO la usa para decidir nada —el barrido es del
+// servidor—; vive aquí para que la cifra tenga un dueño con nombre.
+//
+// MES-PvP, cuando exista la partida, reescribe el ciclo de vida de `activa` y
+// esta constante se retira con la rama del barrido que la cita.
+export const ACTIVA_SIN_PARTIDA_MIN = 10

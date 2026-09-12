@@ -5,6 +5,7 @@ import {
   guardar,
   leer,
   borrar,
+  consumir,
   recogerDeLaUrl,
 } from './salaPendiente.js'
 
@@ -152,5 +153,46 @@ describe('SAL-A · recoger de la URL', () => {
 
   it('el nombre del parámetro es el sellado', () => {
     expect(PARAM_SALA).toBe('sala')
+  })
+})
+
+// ── SAL-B1 · Ajuste A1 · consumir ───────────────────────────────────────────
+// Rector: AJILEI_SAL-B1_AjusteA1_v1.0.md §4.4: «consumir devuelve el código una
+// vez y `null` la segunda». Es la prueba que sella el arreglo del defecto 3: un
+// código pendiente que FALLA no puede volver a intentarse, porque quien lo
+// intentó ya no lo tiene.
+describe('SAL-B1 · consumir', () => {
+  it('devuelve el código UNA vez y null la segunda', () => {
+    guardar('AJ-7K2M')
+    expect(consumir()).toBe('AJ-7K2M')
+    expect(consumir()).toBe(null)
+    expect(CLAVE_SALA_PENDIENTE in almacen).toBe(false)
+  })
+
+  it('olvida ANTES de que nadie pueda intentar: leer() ya no lo ve', () => {
+    // Es la diferencia con `leer()`: mirar no gasta; consumir sí. Un arranque
+    // que consume y luego falla en la red no deja la invitación viva.
+    guardar('AJ-7K2M')
+    consumir()
+    expect(leer()).toBe(null)
+  })
+
+  it('en frío devuelve null y no siembra nada', () => {
+    expect(consumir()).toBe(null)
+    expect(Object.keys(almacen)).toEqual([])
+  })
+
+  it('la basura también se consume: no sobrevive a la lectura que la descubrió', () => {
+    almacen[CLAVE_SALA_PENDIENTE] = 'basura'
+    expect(consumir()).toBe(null)
+    expect(CLAVE_SALA_PENDIENTE in almacen).toBe(false)
+  })
+
+  it('con el almacenamiento denegado no rompe', () => {
+    globalThis.window = {
+      get localStorage() { throw new Error('SecurityError') },
+    }
+    expect(() => consumir()).not.toThrow()
+    expect(consumir()).toBe(null)
   })
 })

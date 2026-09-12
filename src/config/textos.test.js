@@ -22,15 +22,27 @@ import { TEXTOS_ES } from './textos.es.js'
 // segundo idioma. Cada aserción existe contra un modo concreto de romperlo.
 
 describe('IDI-0 · diccionario es', () => {
-  it('toda clave devuelve una cadena no vacía', () => {
+  it('toda clave devuelve una cadena no vacía y sin huecos sin llenar', () => {
+    // SAL-B1 · Este test cambia de forma porque el diccionario cambió de forma.
+    // Hasta esta sub-tanda ninguna clave llevaba variables, así que bastaba con
+    // `t(clave, {})`; ahora doce las llevan, y pedirlas sin vars produce `⟦hc⟧`
+    // legítimamente —es el aviso de falta que IDI-0 diseñó, no un defecto—.
+    //
+    // Lo que se comprueba ahora es MÁS fuerte que antes: se leen los nombres de
+    // los huecos del propio valor, se rellenan todos, y se exige que no quede ni
+    // un `⟦` en el resultado. Así una clave con un hueco mal escrito —`{ hc }`,
+    // `{HC}`— que el patrón no reconozca sale aquí, y no en pantalla.
     const claves = clavesDe('es')
     expect(claves.length).toBeGreaterThan(0)
     for (const clave of claves) {
-      const valor = t(clave, {}, 'es')
+      const crudo = TEXTOS_ES[clave]
+      const vars = {}
+      for (const [, nombre] of crudo.matchAll(/\{([a-z0-9_]+)\}/g)) vars[nombre] = 'X'
+      const valor = t(clave, vars, 'es')
       expect(typeof valor).toBe('string')
       expect(valor.length).toBeGreaterThan(0)
-      // …y no es el marcador de fallo disfrazado de texto.
-      expect(valor.startsWith('⟦')).toBe(false)
+      // …y no queda ningún marcador de fallo disfrazado de texto.
+      expect(valor).not.toContain('⟦')
     }
   })
 
@@ -38,33 +50,79 @@ describe('IDI-0 · diccionario es', () => {
     // Las claves son el CONTRATO y viajan a `data-i18n`, a los tests y a los
     // diccionarios hermanos. Una mayúscula o un espacio cuelan una clave que se
     // escribe de dos maneras y sólo funciona en una.
+    //
+    // SAL-B1 · El guion bajo entra en el último segmento, y SÓLO por una razón:
+    // las nueve claves `sal.error.*` son el nombre EXACTO que la migración lanza
+    // en su `raise exception` (`sala_llena`, `no_eres_anfitrion`). `claveDeError`
+    // las compone concatenando el prefijo, así que renombrarlas a `sala-llena`
+    // obligaría a una tabla de traducción entre dos nombres de la misma cosa —y
+    // ésa es exactamente la clase de tabla que se desincroniza en silencio.
     for (const clave of clavesDe('es')) {
       expect(clave).toBe(clave.toLowerCase())
       expect(clave).not.toMatch(/\s/)
-      expect(clave).toMatch(/^[a-z0-9]+(\.[a-z0-9]+)+$/)
+      expect(clave).toMatch(/^[a-z0-9]+(\.[a-z0-9_]+)+$/)
     }
   })
 
-  it('todas las claves del lobby viven bajo el prefijo lob.', () => {
-    // El alcance de esta fase es el lobby y sólo el lobby (§2.1). El prefijo es
-    // lo que permitirá que otra campaña añada `mesa.*` sin pisar nada.
+  it('toda clave vive bajo uno de los prefijos declarados', () => {
+    // IDI-0 dejó escrito que el prefijo «permitirá que otra campaña añada
+    // `mesa.*` sin pisar nada». SAL-B1 es esa otra campaña, y añade `sal.*`.
+    //
+    // La lista es una PUERTA, no un inventario: se amplía a propósito cuando una
+    // tanda trae una superficie nueva, y así una clave suelta sin prefijo —o con
+    // uno inventado a medias— sigue cayendo aquí.
+    const PREFIJOS = ['lob.', 'sal.']
     for (const clave of clavesDe('es')) {
-      expect(clave.startsWith('lob.')).toBe(true)
+      expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
   })
 
   it('no hay dos claves con el mismo texto por descuido de copia-pega', () => {
-    // Excepción declarada y ÚNICA: `lob.cfg.titulo` y `lob.ajustes.aria` dicen
-    // los dos "Configuración" a propósito —el rótulo de la hoja y el nombre
-    // accesible del engranaje que la abre son la misma palabra—. Cualquier otro
-    // par repetido es una clave que se duplicó al escribir el diccionario.
+    // Cada par de esta lista está DECLARADO, y cada uno tiene su motivo. Lo que
+    // el test defiende es que no aparezca un octavo sin que nadie lo piense.
+    //
+    //   lob.ajustes.aria = lob.cfg.titulo
+    //     El rótulo de la hoja y el nombre accesible del engranaje que la abre
+    //     son la misma palabra: "Configuración".
+    //
+    //   lob.cta.pvp = sal.opciones.titulo
+    //     La pantalla se llama como el botón que la abre. Es lo que le dice al
+    //     jugador que llegó donde tocaba.
+    //
+    //   sal.armar.titulo = sal.opciones.armar
+    //     Lo mismo un piso más abajo: el CTA "Armar una mesa" abre la pantalla
+    //     "Armar una mesa".
+    //
+    //   sal.armar.privada = sal.espera.tipo.privada
+    //   sal.armar.abierta = sal.espera.tipo.abierta
+    //     El rótulo con el que se ELIGE el modo y el nombre con el que se
+    //     RECUERDA en la sala de espera. Separarlas permite que un idioma futuro
+    //     los decline distinto —etiqueta suelta contra palabra dentro de una
+    //     frase— sin tocar el código.
+    //
+    //   sal.espera.sentados = sal.opciones.mesa.estado
+    //     "{x}/{n} sentados" en la tarjeta del listado y en la sala de espera.
+    //     Son dos pantallas de dos sub-tandas: B2 reescribe la segunda entera y
+    //     probablemente le añada el cronómetro, y entonces dejarán de coincidir.
+    //
+    //   sal.casa.aria = sal.espera.lobby
+    //     El nombre accesible de la casa y el rótulo del botón que hace lo mismo
+    //     cuando la mesa ya arrancó.
     const vistos = new Map()
     const repetidos = []
     for (const [clave, valor] of Object.entries(TEXTOS_ES)) {
       if (vistos.has(valor)) repetidos.push([vistos.get(valor), clave].sort().join(' = '))
       else vistos.set(valor, clave)
     }
-    expect(repetidos).toEqual(['lob.ajustes.aria = lob.cfg.titulo'])
+    expect(repetidos.sort()).toEqual([
+      'lob.ajustes.aria = lob.cfg.titulo',
+      'lob.cta.pvp = sal.opciones.titulo',
+      'sal.armar.abierta = sal.espera.tipo.abierta',
+      'sal.armar.privada = sal.espera.tipo.privada',
+      'sal.armar.titulo = sal.opciones.armar',
+      'sal.casa.aria = sal.espera.lobby',
+      'sal.espera.sentados = sal.opciones.mesa.estado',
+    ])
   })
 })
 
@@ -161,10 +219,18 @@ describe('SAL-Aa · t() con variables', () => {
     expect(t('lob.cta.ia', { sobra: 1, tampoco: 'nada' })).toBe(t('lob.cta.ia'))
   })
 
-  it('las 18 claves del lobby siguen resolviendo sin pasar vars', () => {
+  it('toda clave SIN huecos sigue resolviendo sin pasar vars', () => {
     // La promesa de retrocompatibilidad, medida y no prometida: `Lobby.jsx`
     // llama `t(clave)` en sus 18 sitios y ninguno pasa un segundo argumento.
-    for (const clave of clavesDe('es')) {
+    //
+    // SAL-B1 · El filtro es lo único que cambia. Una clave CON huecos pedida sin
+    // vars devuelve `⟦hc⟧` a propósito —es el aviso de falta—, así que exigirle
+    // su texto crudo sería exigir que el mecanismo de IDI-0 no funcione. Las que
+    // no llevan huecos, que son la mayoría y todas las del lobby, siguen atadas
+    // exactamente como estaban.
+    const sinHuecos = clavesDe('es').filter((k) => !TEXTOS_ES[k].includes('{'))
+    expect(sinHuecos.length).toBeGreaterThan(18)
+    for (const clave of sinHuecos) {
       expect(t(clave)).toBe(TEXTOS_ES[clave])
     }
   })
