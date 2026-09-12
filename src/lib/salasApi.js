@@ -60,6 +60,27 @@ export const CLAVES_ERROR = [
 // mensaje de reglas.
 export const ERROR_INESPERADO = 'error_inesperado'
 
+// ── SAL-B1 · Ajuste A2 · ¿Esto es una mesa? ────────────────────────────────
+// Rector: AJILEI_SAL-B1_AjusteA2_v1.0.md §2.1. EL ÚNICO predicado de «hay mesa»
+// del cliente: `App` lo usa como guarda del último metro y esta capa para
+// normalizar lo que devuelve la base. Nada vuelve a comparar contra `null` a
+// mano.
+//
+// ── LA FILA DE NULOS ──────────────────────────────────────────────────────
+// Una función que `returns public.salas` y hace `return null` NO llega al
+// cliente como JSON `null`. PostgREST la llama con `select * from f()`, y
+// Postgres, al expandir en `FROM` un compuesto nulo, produce UNA fila con todas
+// las columnas en null (`ExecMakeTableFunctionResult`: «NULL result, store a
+// null row»). El cliente recibía `{ id: null, jugadores: null, estado: null, … }`,
+// lo tomaba por mesa, y pintaba un stub con «Mesa de ⟦n⟧ · 0 HC · La mesa
+// arrancó». Dos teléfonos lo vieron el 2026-09-11 tras un código falso.
+//
+// Se detecta por `id`: es la clave primaria, `not null` en la tabla, así que
+// una fila sin él no puede ser una mesa venga de donde venga.
+export function esMesa(mesa) {
+  return mesa != null && typeof mesa === 'object' && mesa.id != null
+}
+
 /**
  * Traduce la respuesta de una RPC a `{ data, error }`.
  *
@@ -90,6 +111,21 @@ function traducir({ data, error }) {
 export function crearSalasApi(cliente = supabase) {
   const llamar = (nombre, args) => cliente.rpc(nombre, args).then(traducir)
 
+  // ── A2 §2.1 · Toda RPC que devuelve `public.salas` pasa por aquí ──────────
+  // Sin error y sin `id` → «no hay mesa» → `{ data: null, error: null }`, sea
+  // la respuesta `null`, `undefined` o la fila de nulos de PostgREST. Los cinco
+  // envoltorios de abajo que devuelven una mesa lo usan; ninguno llama a
+  // `llamar` a secas.
+  //
+  // La traza temporal de A2 que escribía aquí la forma cruda de la fila se
+  // retiró en la ficha de commits: su lectura verbatim está en los informes de
+  // A2 y A3 (`{"id":null,"codigo":null,…}`, leída en el PC el 2026-09-11).
+  const mesaOpcional = (nombre, args) =>
+    llamar(nombre, args).then((r) => {
+      if (r.error !== null || esMesa(r.data)) return r
+      return { data: null, error: null }
+    })
+
   return {
     /** La hora del servidor. La usa `useReloj` una sola vez, al montar. */
     ahora: () => llamar('ahora'),
@@ -101,33 +137,84 @@ export function crearSalasApi(cliente = supabase) {
      * y no aquí porque entre la consulta y la creación cabe otro jugador.
      */
     crearSala: (tipo, jugadores, apuesta) =>
-      llamar('crear_sala', { p_tipo: tipo, p_jugadores: jugadores, p_apuesta: apuesta }),
+      mesaOpcional('crear_sala', { p_tipo: tipo, p_jugadores: jugadores, p_apuesta: apuesta }),
 
     /**
      * Se sienta en una sala, por código o por id.
      * Idempotente: si ya se está dentro, devuelve la sala sin error.
+     *
+     * ── SAL-B1 · Ajuste A1 · el «no encontrado» por código VUELVE COMO DATO ──
+     * Rector: AJILEI_SAL-B1_AjusteA1_v1.0.md §3. Desde la migración
+     * `sal_b1_ajuste`, `unirse_sala(p_codigo)` con un código bien formado que no
+     * encuentra mesa viva devuelve NULL en vez de lanzar. La razón es de
+     * Postgres y no de gusto: el intento se anota en `intentos_codigo` DENTRO de
+     * la misma transacción, y un `raise` al final la deshace entera —anotación
+     * incluida—, así que el límite de cinco por minuto nunca llegaba a contar.
+     * Once códigos falsos seguidos lo demostraron el 2026-09-11.
+     *
+     * Aquí ese `null` se traduce a la MISMA clave que el jugador leía antes,
+     * `codigo_invalido` («Código no encontrado o mesa ya iniciada»), para que
+     * ninguna pantalla se entere del cambio de mecanismo. SÓLO en el camino por
+     * código: por id (`p_sala`) la base sigue lanzando `sala_no_disponible`,
+     * porque ahí no hay intento que persistir.
+     *
+     * A2 · ese «null» llega en realidad como la FILA DE NULOS (ver `esMesa`);
+     * `mesaOpcional` la normaliza antes de que esta línea la mire.
      */
     unirseSala: ({ codigo = null, salaId = null } = {}) =>
-      llamar('unirse_sala', { p_codigo: codigo, p_sala: salaId }),
+      mesaOpcional('unirse_sala', { p_codigo: codigo, p_sala: salaId })
+        .then((r) => (codigo !== null && r.error === null && r.data === null
+          ? { data: null, error: 'codigo_invalido' }
+          : r)),
 
     /** Deja la sala. Si el que sale es el anfitrión, la sala se cancela. */
     salirSala: (salaId) => llamar('salir_sala', { p_sala: salaId }),
 
     /** El anfitrión arranca antes de tiempo. Exige ≥2 sentados. */
-    jugarYa: (salaId) => llamar('jugar_ya', { p_sala: salaId }),
+    jugarYa: (salaId) => mesaOpcional('jugar_ya', { p_sala: salaId }),
 
     /**
      * Cierra una sala vencida. La llama el cliente cuando su cronómetro toca
      * cero: es idempotente y varios jugadores pueden llamarla a la vez sin que
      * el resultado cambie, que es lo que permite no depender de `pg_cron`.
      */
-    resolverSala: (salaId) => llamar('resolver_sala', { p_sala: salaId }),
+    resolverSala: (salaId) => mesaOpcional('resolver_sala', { p_sala: salaId }),
 
     /** Las mesas abiertas en espera, con su recuento de sentados. Pinta SAL-1. */
     salasAbiertas: () => llamar('salas_abiertas'),
 
     /** La sala en la que este jugador está, o `null`. Para reanudar tras recargar. */
-    miSala: () => llamar('mi_sala'),
+    miSala: () => mesaOpcional('mi_sala'),
+
+    // ── SAL-B1 · Cuántos hay sentados en ESTA sala ──────────────────────────
+    // Añadida por SAL-B1 (rector §2: «si `salasApi.js` no expone algo que una
+    // pantalla necesita, se añade una función NUEVA, sin alterar las
+    // existentes»). Ninguna de las de arriba cambia.
+    //
+    // ── POR QUÉ HACÍA FALTA ────────────────────────────────────────────────
+    // `mi_sala()` devuelve la fila de `salas`, que trae `jugadores` —el tamaño
+    // de la mesa— pero NO el recuento de sentados; y `salas_abiertas()`, que sí
+    // lo trae, sólo ve las abiertas. Una sala privada quedaba sin manera de
+    // saber su «x/N», que es justo lo que la sala de espera enseña.
+    //
+    // ── Y POR QUÉ NO HIZO FALTA UNA FUNCIÓN NUEVA EN LA BASE ───────────────
+    // Porque la política de lectura de `sala_jugadores` YA lo permite: un
+    // miembro ve los asientos de su sala (`es_miembro`), y cualquiera ve los de
+    // una abierta que espera (`es_sala_publica`). Un `select` con `count` cae
+    // dentro de lo que la RLS de SAL-A ya concedió, así que esta tanda no
+    // escribe SQL — que es la regla 3.
+    //
+    // `head: true` pide el recuento SIN traerse las filas: lo único que se
+    // necesita es un número, y bajar cinco filas para contarlas sería pagar por
+    // datos que nadie va a mirar.
+    contarSentados: (salaId) =>
+      cliente
+        .from('sala_jugadores')
+        .select('jugador_id', { count: 'exact', head: true })
+        .eq('sala_id', salaId)
+        .then(({ count, error }) => (error
+          ? traducir({ data: null, error })
+          : { data: count ?? 0, error: null })),
 
     /**
      * Escucha una sala concreta: la fila de `salas` y los asientos de
@@ -181,3 +268,40 @@ export function crearSalasApi(cliente = supabase) {
 
 /** La instancia de la casa, contra el cliente singleton. */
 export const salasApi = crearSalasApi()
+
+// ── SAL-B1 · De la clave de error a la clave de texto ───────────────────────
+// Rector: AJILEI_SAL-B1_Fase1_v1.0.md §6.3 y §2 («si `salasApi.js` no expone
+// algo que una pantalla necesita, se añade una función NUEVA»). Es lo único que
+// esta sub-tanda añade a este archivo: ninguna línea de arriba cambia.
+//
+// ── POR QUÉ AQUÍ Y NO EN CADA PANTALLA ──────────────────────────────────────
+// Las tres pantallas de SAL pintan errores y las tres tendrían que saber
+// convertir `sala_llena` en `sal.error.sala_llena`. Repetir esa concatenación
+// tres veces es repetir tres veces la ocasión de escribirla mal, y un prefijo
+// mal escrito no falla: pinta `⟦sal.errr.sala_llena⟧` en la cara del jugador.
+//
+// Vive junto a `CLAVES_ERROR` porque es la MISMA lista mirada desde el otro
+// lado: si un día la base gana un `raise` nuevo, la lista de arriba y el
+// diccionario tienen que crecer con él, y tenerlos a dos líneas de distancia es
+// lo que hace probable que se recuerde.
+//
+// EL DESCONOCIDO NO SE LLAMA COMO EL ERROR. `ERROR_INESPERADO` es
+// `'error_inesperado'` —el nombre del estado— y su texto vive en
+// `sal.error.desconocido`, que es como lo bautizó §6.3. La traducción entre los
+// dos nombres ocurre aquí y en ningún otro sitio.
+export const CLAVE_TEXTO_DESCONOCIDO = 'sal.error.desconocido'
+
+/**
+ * La clave de texto que corresponde a un error de `salasApi`.
+ *
+ * Cualquier cosa que no sea una de las nueve —`null`, `undefined`,
+ * `ERROR_INESPERADO`, o una clave futura que el diccionario aún no conozca—
+ * cae al genérico. Devolver el prefijo + lo que sea sería fabricar claves
+ * inexistentes y convertir un error del servidor en un `⟦…⟧` en pantalla.
+ *
+ * @param {string|null} error  lo que devolvió una llamada de `salasApi`
+ * @returns {string} una clave que el diccionario tiene, siempre
+ */
+export function claveDeError(error) {
+  return CLAVES_ERROR.includes(error) ? `sal.error.${error}` : CLAVE_TEXTO_DESCONOCIDO
+}

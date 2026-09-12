@@ -134,6 +134,40 @@ describe('SAL-A · traducción de errores', () => {
     await expect(crearSalasApi(c).miSala()).resolves.toEqual({ data: null, error: null })
   })
 
+  // ── SAL-B1 · Ajuste A1 · el nuevo camino del código no encontrado ────────
+  // Rector: AJILEI_SAL-B1_AjusteA1_v1.0.md §3. La base ya no LANZA cuando un
+  // código bien formado no encuentra mesa viva: devuelve NULL, porque un `raise`
+  // deshacía la anotación del intento y el límite de cinco por minuto nunca
+  // contaba. Esta capa convierte ese NULL en la misma clave de siempre.
+  it('unirseSala por CÓDIGO traduce el null de la base a codigo_invalido', async () => {
+    const c = clienteFalso({ unirse_sala: { data: null, error: null } })
+    await expect(crearSalasApi(c).unirseSala({ codigo: 'AJ-7K2M' }))
+      .resolves.toEqual({ data: null, error: 'codigo_invalido' })
+  })
+
+  it('unirseSala por ID deja pasar el null tal cual: ahí no hay intento que persistir', async () => {
+    // Por id la base sigue lanzando `sala_no_disponible`; un null por ese camino
+    // no significa «código malo» y no se disfraza de tal.
+    const c = clienteFalso({ unirse_sala: { data: null, error: null } })
+    await expect(crearSalasApi(c).unirseSala({ salaId: 'u1' }))
+      .resolves.toEqual({ data: null, error: null })
+  })
+
+  it('unirseSala por código con sala devuelta no toca nada', async () => {
+    const sala = { id: 'u1', codigo: 'AJ-7K2M', estado: 'esperando' }
+    const c = clienteFalso({ unirse_sala: { data: sala, error: null } })
+    await expect(crearSalasApi(c).unirseSala({ codigo: 'AJ-7K2M' }))
+      .resolves.toEqual({ data: sala, error: null })
+  })
+
+  it('unirseSala por código con un raise de la base conserva ESA clave', async () => {
+    // `demasiados_intentos` sigue siendo un `raise` (§3): el sexto en un minuto
+    // tiene que llegar con su propia clave, no disfrazado de código malo.
+    const c = clienteFalso({ unirse_sala: { data: null, error: { code: 'P0001', message: 'demasiados_intentos' } } })
+    await expect(crearSalasApi(c).unirseSala({ codigo: 'AJ-7K2M' }))
+      .resolves.toEqual({ data: null, error: 'demasiados_intentos' })
+  })
+
   it('las claves de error son las que lanza la migración', () => {
     // Recordatorio deliberado: si la base gana un `raise` nuevo, esta lista y
     // las claves `sal.error.*` del diccionario tienen que crecer con él.
@@ -210,5 +244,134 @@ describe('SAL-A · el cliente por defecto', () => {
     // `createClient` aquí, este import fallaría o abriría un segundo cliente.
     expect(typeof crearSalasApi).toBe('function')
     expect(() => crearSalasApi()).not.toThrow()
+  })
+})
+
+// ── SAL-B1 · El mapa de errores: nueve claves y un genérico ─────────────────
+// Rector: AJILEI_SAL-B1_Fase1_v1.0.md §6.3 y §9.2 («mapa de errores completo, 9
+// + desconocido»).
+//
+// Vive AQUÍ y no en un archivo aparte porque la lista de la que depende
+// —`CLAVES_ERROR`— está veinte líneas más arriba: el día que la base gane un
+// `raise` nuevo, quien toque la lista se tropieza con estas pruebas.
+describe('SAL-B1 · claveDeError', () => {
+  it('las nueve claves de la base tienen su texto en el diccionario', async () => {
+    const { claveDeError } = await import('./salasApi.js')
+    const { TEXTOS_ES } = await import('../config/textos.es.js')
+
+    // El bucle recorre `CLAVES_ERROR`, no una lista escrita a mano: si mañana
+    // hay una décima clave y nadie escribe su texto, esto cae. Es el único
+    // mecanismo que impide que un error del servidor salga a pantalla como
+    // `⟦sal.error.lo_que_sea⟧`.
+    for (const clave of CLAVES_ERROR) {
+      const claveTexto = claveDeError(clave)
+      expect(claveTexto).toBe(`sal.error.${clave}`)
+      expect(typeof TEXTOS_ES[claveTexto]).toBe('string')
+      expect(TEXTOS_ES[claveTexto].length).toBeGreaterThan(0)
+    }
+    expect(CLAVES_ERROR).toHaveLength(9)
+  })
+
+  it('ninguno de los nueve textos enseña el nombre técnico', async () => {
+    const { TEXTOS_ES } = await import('../config/textos.es.js')
+    // `sala_llena` es un identificador para el programa. Lo que el jugador tiene
+    // que leer es «Esa mesa ya está llena»; una clave filtrada a la pantalla es
+    // el defecto que §6.3 nombra con ese ejemplo exacto.
+    for (const clave of CLAVES_ERROR) {
+      expect(TEXTOS_ES[`sal.error.${clave}`]).not.toContain(clave)
+      expect(TEXTOS_ES[`sal.error.${clave}`]).not.toContain('_')
+    }
+  })
+
+  it('el décimo texto es el genérico, y NO se llama como el estado', async () => {
+    const { claveDeError, CLAVE_TEXTO_DESCONOCIDO } = await import('./salasApi.js')
+    const { TEXTOS_ES } = await import('../config/textos.es.js')
+
+    // `ERROR_INESPERADO` es `'error_inesperado'` —el nombre del estado— y su
+    // texto vive en `sal.error.desconocido`, que es como lo bautizó §6.3. La
+    // traducción entre los dos nombres ocurre en `claveDeError` y en ningún otro
+    // sitio; esto lo sella.
+    expect(CLAVE_TEXTO_DESCONOCIDO).toBe('sal.error.desconocido')
+    expect(claveDeError(ERROR_INESPERADO)).toBe(CLAVE_TEXTO_DESCONOCIDO)
+    expect(typeof TEXTOS_ES[CLAVE_TEXTO_DESCONOCIDO]).toBe('string')
+  })
+
+  it('cualquier cosa que no sea una de las nueve cae al genérico', async () => {
+    const { claveDeError } = await import('./salasApi.js')
+    // Fabricar `sal.error.<lo que llegue>` sería inventar claves inexistentes y
+    // convertir un error del servidor en un `⟦…⟧` en la cara del jugador.
+    for (const raro of [null, undefined, '', 'sala_incendiada', 42, {}]) {
+      expect(claveDeError(raro)).toBe('sal.error.desconocido')
+    }
+  })
+})
+
+// ── SAL-B1 · Ajuste A2 · La fila de nulos de PostgREST ──────────────────────
+// Rector: AJILEI_SAL-B1_AjusteA2_v1.0.md §3. EL MOCK IMITA A POSTGREST, NO A
+// SQL: una función que `returns public.salas` y devuelve `null` llega al
+// cliente como un objeto con todas las columnas en null, porque PostgREST la
+// llama con `select * from f()` y Postgres expande el compuesto nulo en una
+// fila de nulos. Es lo que dos teléfonos tomaron por mesa el 2026-09-11.
+describe('SAL-B1 A2 · la fila de nulos', () => {
+  const filaDeNulos = () => ({
+    id: null, codigo: null, tipo: null, jugadores: null, apuesta: null,
+    anfitrion_id: null, estado: null, creada_en: null, expira_en: null,
+    iniciada_en: null, estado_partida: null,
+  })
+  const mesa = () => ({ id: 'u1', codigo: 'AJ-7K2M', tipo: 'privada', jugadores: 4, apuesta: 200, estado: 'esperando' })
+  // La traza `console.log` de A2 se retiró en la ficha de commits (§0.6), y con
+  // ella las aserciones que la medían. Lo que queda aquí es la conducta.
+
+  it('esMesa: sólo un objeto con id es una mesa', async () => {
+    const { esMesa } = await import('./salasApi.js')
+    expect(esMesa(mesa())).toBe(true)
+    for (const no of [null, undefined, filaDeNulos(), {}, { id: undefined }, 'u1', 42, []]) {
+      expect(esMesa(no)).toBe(false)
+    }
+  })
+
+  it('unirseSala por CÓDIGO con la fila de nulos → codigo_invalido', async () => {
+    const c = clienteFalso({ unirse_sala: { data: filaDeNulos(), error: null } })
+    await expect(crearSalasApi(c).unirseSala({ codigo: 'AJ-ZZZZ' }))
+      .resolves.toEqual({ data: null, error: 'codigo_invalido' })
+  })
+
+  it('miSala con la fila de nulos → null', async () => {
+    const c = clienteFalso({ mi_sala: { data: filaDeNulos(), error: null } })
+    await expect(crearSalasApi(c).miSala()).resolves.toEqual({ data: null, error: null })
+  })
+
+  it('un null de verdad también es «sin mesa»', async () => {
+    const c = clienteFalso({ mi_sala: { data: null, error: null } })
+    await expect(crearSalasApi(c).miSala()).resolves.toEqual({ data: null, error: null })
+  })
+
+  it('una fila CON id pasa intacta por las cinco', async () => {
+    const respuestas = {}
+    for (const fn of ['crear_sala', 'unirse_sala', 'jugar_ya', 'resolver_sala', 'mi_sala']) {
+      respuestas[fn] = { data: mesa(), error: null }
+    }
+    const api = crearSalasApi(clienteFalso(respuestas))
+    for (const llamada of [
+      api.crearSala('privada', 4, 200),
+      api.unirseSala({ codigo: 'AJ-7K2M' }),
+      api.unirseSala({ salaId: 'u1' }),
+      api.jugarYa('u1'),
+      api.resolverSala('u1'),
+      api.miSala(),
+    ]) {
+      await expect(llamada).resolves.toEqual({ data: mesa(), error: null })
+    }
+  })
+
+  it('unirseSala por ID con la fila de nulos → null sin error (lo que ya hacía con null)', async () => {
+    const c = clienteFalso({ unirse_sala: { data: filaDeNulos(), error: null } })
+    await expect(crearSalasApi(c).unirseSala({ salaId: 'u1' }))
+      .resolves.toEqual({ data: null, error: null })
+  })
+
+  it('un raise de la base sigue ganando a la normalización', async () => {
+    const c = clienteFalso({ mi_sala: { data: null, error: { code: 'P0001', message: 'no_autenticado' } } })
+    await expect(crearSalasApi(c).miSala()).resolves.toEqual({ data: null, error: 'no_autenticado' })
   })
 })
