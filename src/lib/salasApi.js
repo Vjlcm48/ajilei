@@ -127,7 +127,11 @@ export function crearSalasApi(cliente = supabase) {
     })
 
   return {
-    /** La hora del servidor. La usa `useReloj` una sola vez, al montar. */
+    /**
+     * La hora del servidor. La usa `useCronometroSala` una sola vez, al montar.
+     * (SAL-B2: el comentario decía `useReloj`, y era falso — aquel hook llama al
+     * singleton por su cuenta; el informe de B2 Fase 0 §3.7 lo midió.)
+     */
     ahora: () => llamar('ahora'),
 
     /**
@@ -215,6 +219,77 @@ export function crearSalasApi(cliente = supabase) {
         .then(({ count, error }) => (error
           ? traducir({ data: null, error })
           : { data: count ?? 0, error: null })),
+
+    // ── SAL-B2 · Quién está sentado en ESTA sala, con su nombre ─────────────
+    // Rector: AJILEI_SAL-B2_Fase1a_v1.0.md §4, sobre el informe de Fase 0 §2.3.
+    // Función NUEVA; ninguna de las de arriba cambia.
+    //
+    // ── POR QUÉ NO HACE FALTA SQL ──────────────────────────────────────────
+    // Tres hechos que ya estaban en la base: la política de lectura de
+    // `sala_jugadores` deja a un miembro ver los asientos de su mesa (SAL-A
+    // §6); la de `profiles` es `using (true)` para todo autenticado (SUP-2a §5:
+    // «los rivales tienen que verte el nombre en la mesa»); y `jugador_id` es
+    // clave foránea a `profiles(id)`, que es lo que PostgREST necesita para
+    // incrustar `profiles(username)` en la misma consulta. Es el mismo camino
+    // que `contarSentados` ya recorre sin migración.
+    //
+    // El informe de B1 (§«requiere autorización» 1) afirmaba que `profiles` no
+    // era legible para un tercero por RLS. No era cierto, y por eso el stub
+    // pintaba «Estás en la mesa» en vez del nombre del anfitrión.
+    //
+    // ── LA FORMA QUE SE DEVUELVE ───────────────────────────────────────────
+    // `[{ asiento, jugadorId, username }]` ordenado por asiento. Los nombres
+    // van en camelCase porque es lo que el cliente consume; los de la base se
+    // quedan en la base. `username` es `null` si la incrustación no llegó —un
+    // perfil borrado a mitad, una fila rara— para que la pantalla pinte una
+    // inicial de respaldo en vez de caerse. PostgREST entrega la incrustación
+    // de un «muchos a uno» como OBJETO; se tolera también un array de uno por
+    // si un cambio de configuración lo devolviera así.
+    asientosDe: (salaId) =>
+      cliente
+        .from('sala_jugadores')
+        .select('asiento, jugador_id, profiles(username)')
+        .eq('sala_id', salaId)
+        .order('asiento')
+        .then(({ data, error }) => {
+          if (error) return traducir({ data: null, error })
+          const filas = Array.isArray(data) ? data : []
+          return {
+            data: filas.map((fila) => {
+              const perfil = Array.isArray(fila.profiles) ? fila.profiles[0] : fila.profiles
+              return {
+                asiento: Number(fila.asiento),
+                jugadorId: fila.jugador_id ?? null,
+                username: perfil?.username ?? null,
+              }
+            }),
+            error: null,
+          }
+        }),
+
+    // ── SAL-B2 F1b · La fila de MI sala, en el estado que esté ──────────────
+    // Rector: AJILEI_SAL-B2_Fase1b_v1.0.md §3.2. Función NUEVA, aditiva.
+    //
+    // `mi_sala()` sólo devuelve 'esperando' (A1 §5): para un miembro sentado es
+    // la única pregunta que NO puede responder: «¿mi mesa quedó cancelada o
+    // arrancó?». La política `salas_select_visibles` (SAL-A §6) sí lo permite:
+    // un miembro ve su sala «en el estado que sea», que es exactamente lo que
+    // la sala de espera necesita para pintar uno de sus tres finales. Se lee la
+    // fila directa, sin RPC, y se normaliza con `esMesa` como las cinco RPC:
+    // una fila sin `id` —o ninguna— es «no hay mesa», nunca una mesa.
+    //
+    // `maybeSingle()` y no `single()`: una sala que ya no es visible (un
+    // no-miembro, una abierta que arrancó) devuelve cero filas, y eso es un
+    // `null` legítimo, no un error que traducir.
+    leerSala: (salaId) =>
+      cliente
+        .from('salas')
+        .select('*')
+        .eq('id', salaId)
+        .maybeSingle()
+        .then(({ data, error }) => (error
+          ? traducir({ data: null, error })
+          : { data: esMesa(data) ? data : null, error: null })),
 
     /**
      * Escucha una sala concreta: la fila de `salas` y los asientos de

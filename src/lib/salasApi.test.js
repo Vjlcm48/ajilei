@@ -375,3 +375,146 @@ describe('SAL-B1 A2 · la fila de nulos', () => {
     await expect(crearSalasApi(c).miSala()).resolves.toEqual({ data: null, error: 'no_autenticado' })
   })
 })
+
+// ── SAL-B2 · asientosDe: los sentados con su nombre, sin SQL ────────────────
+// Rector: AJILEI_SAL-B2_Fase1a_v1.0.md §4. Lo que se sella es la FRONTERA: qué
+// consulta se manda (tabla, columnas con la incrustación, filtro, orden) y en
+// qué se convierte lo que vuelve. La RLS que lo permite vive en la base y la
+// documenta el informe de Fase 0 §2.3.
+describe('SAL-B2 · asientosDe', () => {
+  // Un cliente con `from(...).select(...).eq(...).order(...)` que registra la
+  // cadena entera y responde con lo que el caso quiera. Distinto de
+  // `clienteFalso` porque aquél no tiene tabla: `asientosDe` no pasa por `rpc`.
+  function clienteConTabla(respuesta = { data: [], error: null }) {
+    const registro = {}
+    const cadena = {
+      select(columnas, opciones) { registro.select = { columnas, opciones }; return cadena },
+      eq(columna, valor) { registro.eq = { columna, valor }; return cadena },
+      order(columna) { registro.order = columna; return cadena },
+      then(fn) { return Promise.resolve(respuesta).then(fn) },
+    }
+    return {
+      registro,
+      from(tabla) { registro.from = tabla; return cadena },
+      rpc() { return Promise.resolve({ data: null, error: null }) },
+      channel() { return { on() { return this }, subscribe() { return this } } },
+      removeChannel() {},
+    }
+  }
+
+  it('manda la consulta con la incrustación de profiles, filtrada y ordenada por asiento', async () => {
+    const c = clienteConTabla()
+    await crearSalasApi(c).asientosDe('u1')
+    expect(c.registro.from).toBe('sala_jugadores')
+    expect(c.registro.select.columnas).toBe('asiento, jugador_id, profiles(username)')
+    expect(c.registro.eq).toEqual({ columna: 'sala_id', valor: 'u1' })
+    expect(c.registro.order).toBe('asiento')
+  })
+
+  it('devuelve la forma del cliente: asiento, jugadorId, username', async () => {
+    const c = clienteConTabla({
+      data: [
+        { asiento: 0, jugador_id: 'a', profiles: { username: 'carlos_vzla' } },
+        { asiento: 1, jugador_id: 'b', profiles: { username: 'maria_ccs' } },
+      ],
+      error: null,
+    })
+    await expect(crearSalasApi(c).asientosDe('u1')).resolves.toEqual({
+      data: [
+        { asiento: 0, jugadorId: 'a', username: 'carlos_vzla' },
+        { asiento: 1, jugadorId: 'b', username: 'maria_ccs' },
+      ],
+      error: null,
+    })
+  })
+
+  it('el orden lo pide la consulta; la capa no reordena ni pierde filas', async () => {
+    // Si PostgREST devolviera desordenado (no lo hace con `order`), la capa lo
+    // pasa tal cual: reordenar aquí escondería un `order` que dejó de mandarse.
+    const c = clienteConTabla({
+      data: [
+        { asiento: 2, jugador_id: 'c', profiles: { username: 'ana_bcn' } },
+        { asiento: 0, jugador_id: 'a', profiles: { username: 'carlos_vzla' } },
+      ],
+      error: null,
+    })
+    const { data } = await crearSalasApi(c).asientosDe('u1')
+    expect(data.map((f) => f.asiento)).toEqual([2, 0])
+  })
+
+  it('una incrustación ausente da username null, no un error', async () => {
+    const c = clienteConTabla({
+      data: [
+        { asiento: 0, jugador_id: 'a', profiles: null },
+        { asiento: 1, jugador_id: 'b' },
+        // Y si un día llegara como array de uno, también se lee.
+        { asiento: 2, jugador_id: 'c', profiles: [{ username: 'luis_mia' }] },
+      ],
+      error: null,
+    })
+    const { data, error } = await crearSalasApi(c).asientosDe('u1')
+    expect(error).toBeNull()
+    expect(data.map((f) => f.username)).toEqual([null, null, 'luis_mia'])
+  })
+
+  it('sin filas devuelve un array vacío, nunca null', async () => {
+    const c = clienteConTabla({ data: null, error: null })
+    await expect(crearSalasApi(c).asientosDe('u1')).resolves.toEqual({ data: [], error: null })
+  })
+
+  it('un error del SDK pasa por la misma traducción que el resto', async () => {
+    const c = clienteConTabla({ data: null, error: { code: '42501', message: 'permission denied' } })
+    await expect(crearSalasApi(c).asientosDe('u1')).resolves.toEqual({ data: null, error: ERROR_INESPERADO })
+    expect(avisos).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── SAL-B2 F1b · leerSala: la fila de mi sala, en el estado que esté ────────
+// Rector: AJILEI_SAL-B2_Fase1b_v1.0.md §3.2. Misma frontera que `asientosDe`:
+// qué consulta se manda y en qué se convierte lo que vuelve.
+describe('SAL-B2 · leerSala', () => {
+  function clienteConSalas(respuesta = { data: null, error: null }) {
+    const registro = {}
+    const cadena = {
+      select(columnas) { registro.select = columnas; return cadena },
+      eq(columna, valor) { registro.eq = { columna, valor }; return cadena },
+      maybeSingle() { registro.maybeSingle = true; return cadena },
+      then(fn) { return Promise.resolve(respuesta).then(fn) },
+    }
+    return {
+      registro,
+      from(tabla) { registro.from = tabla; return cadena },
+      rpc() { return Promise.resolve({ data: null, error: null }) },
+      channel() { return { on() { return this }, subscribe() { return this } } },
+      removeChannel() {},
+    }
+  }
+
+  it('lee la fila entera de salas por id, una como mucho', async () => {
+    const c = clienteConSalas()
+    await crearSalasApi(c).leerSala('u1')
+    expect(c.registro.from).toBe('salas')
+    expect(c.registro.select).toBe('*')
+    expect(c.registro.eq).toEqual({ columna: 'id', valor: 'u1' })
+    expect(c.registro.maybeSingle).toBe(true)
+  })
+
+  it('devuelve la fila tal cual, en cualquier estado', async () => {
+    const fila = { id: 'u1', estado: 'cancelada', jugadores: 4, expira_en: '2026-09-11T12:00:00+00:00' }
+    const c = clienteConSalas({ data: fila, error: null })
+    await expect(crearSalasApi(c).leerSala('u1')).resolves.toEqual({ data: fila, error: null })
+  })
+
+  it('sin fila —o con una sin id— es null, no una mesa', async () => {
+    await expect(crearSalasApi(clienteConSalas({ data: null, error: null })).leerSala('u1'))
+      .resolves.toEqual({ data: null, error: null })
+    await expect(crearSalasApi(clienteConSalas({ data: { id: null, estado: null }, error: null })).leerSala('u1'))
+      .resolves.toEqual({ data: null, error: null })
+  })
+
+  it('un error del SDK se traduce como el resto', async () => {
+    const c = clienteConSalas({ data: null, error: { code: '42501', message: 'permission denied' } })
+    await expect(crearSalasApi(c).leerSala('u1')).resolves.toEqual({ data: null, error: ERROR_INESPERADO })
+    expect(avisos).toHaveBeenCalledTimes(1)
+  })
+})
