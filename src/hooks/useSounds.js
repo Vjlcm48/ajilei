@@ -89,15 +89,21 @@ export const SONIDOS_LOBBY = ['tableKnock']
 // ninguna pantalla que los dispare.
 //
 // LOS TRES, Y POR QUÉ CADA UNO:
-//   · `chipsCollect` — la llegada de un jugador a la sala. Es el único de los
-//     tres que hoy NO está en ninguna lista de precarga (la Fase 0 §3.4 lo
-//     midió): lo trajo la celebración y se pide en su propio momento. Aquí
-//     estrena segundo consumidor sin cambiar una cifra suya.
-//   · `cardShuffle` — el barajado con el que arranca la mesa. Ya viaja en
-//     `SONIDOS_MESA`, así que en el camino sala → mesa se pide dos veces y no
-//     pasa nada: `precargarSonidos` es idempotente.
-//   · `tableKnock` — el golpe del anfitrión al pulsar «Jugar ya». Mismo sonido
-//     que el CTA del lobby, mismo gesto: alguien abre una mesa.
+//   · `chipsCollect` — el anfitrión pulsa «Jugar ya»: las fichas suenan cuando
+//     la apuesta entra en juego. Es el único de los tres que hoy NO está en
+//     ninguna lista de precarga (la Fase 0 §3.4 lo midió): lo trajo la
+//     celebración y se pide en su propio momento. Aquí estrena segundo
+//     consumidor sin cambiar una cifra suya.
+//   · `cardShuffle` — el barajado de fondo del mazo en el fieltro, a 0,15. Ya
+//     viaja en `SONIDOS_MESA`, así que en el camino sala → mesa se pide dos
+//     veces y no pasa nada: `precargarSonidos` es idempotente.
+//   · `tableKnock` — alguien se sienta: el golpe en la mesa es «ya llegué»,
+//     corto y seco. Mismo sonido que el CTA del lobby.
+//
+// SAL-B2 (ajustes, 12-sep-2026): `chipsCollect` y `tableKnock` INTERCAMBIARON
+// su momento por decisión de Victor. La receta de los tres no cambia —mismos
+// archivos, mismos volúmenes, misma lista—; lo que cambió es quién llama a
+// cuál, en `SalaEspera.jsx`. Este comentario se actualiza para que no mienta.
 //
 // TRES Y NO NUEVE, por la misma razón que `SONIDOS_LOBBY` es uno solo: una sala
 // de espera es una pantalla donde se aguarda, y bajarle los 380 KiB de audio de

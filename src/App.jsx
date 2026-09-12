@@ -9,6 +9,8 @@ import Lobby from './screens/Lobby'
 import SalaOpciones from './screens/SalaOpciones'
 import ArmarMesa from './screens/ArmarMesa'
 import SalaEspera from './screens/SalaEspera'
+// SAL-B2 F1b · el destino de una mesa que arranco: un stub hasta MES-PvP.
+import PartidaPvP from './screens/PartidaPvP'
 import NivelSelect from './components/NivelSelect'
 import ModeSelect from './components/ModeSelect'
 import GameTable from './components/GameTable'
@@ -76,7 +78,8 @@ import { arranqueDeSesion } from './screens/salasCore'
 // Las pantallas desde las que NO se va derecho a la mesa, y que por tanto no
 // pagan la precarga. El lobby estaba solo hasta SAL-B1; ahora le acompañan las
 // tres del PvP, que llevan a una partida que todavia no existe.
-const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sala-espera']
+// SAL-B2 F1b · y el stub de partida PvP, que todavia no reparte nada.
+const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sala-espera', 'partida-pvp']
 
 function App() {
   // Los hooks van todos ARRIBA y ninguno detrás de un retorno: el orden de
@@ -144,6 +147,7 @@ function App() {
   })
   // 'lobby' | 'nivel-select' | 'mode-select' | 'table'
   // SAL-B1 anade: 'sala-opciones' | 'armar-mesa' | 'sala-espera'
+  // SAL-B2 anade: 'partida-pvp'
 
   // La sala en la que este jugador esta. La ponen los tres caminos que llevan a
   // `SalaEspera` —entrar por codigo, unirse a una tarjeta, armar la tuya— y la
@@ -418,6 +422,24 @@ function App() {
         // A1 §2.4 · «Volver al inicio» desde una mesa que arranco o murio va al
         // lobby y DESCARTA cualquier codigo pendiente: no hay nada que reanudar,
         // y un codigo que sobreviviera aqui volveria a intentarse solo.
+        onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); setScreen('lobby') }}
+        // SAL-B2 F1b · «Entrar a la mesa» cuando la mesa arranco: la mesa se
+        // CONSERVA en el estado (el stub la nombra) y solo cambia la pantalla.
+        onPartida={(mesa) => { if (esMesa(mesa)) setSala(mesa); setScreen('partida-pvp') }}
+      />
+    )
+  }
+
+  // ── SAL-B2 F1b · El stub de la partida PvP ────────────────────────────────
+  // Decision de Victor (11-sep-2026): pantalla propia y no un estado mas de la
+  // sala, para que MES-PvP la releve con su nombre sin desmontar la sala de
+  // espera. La casa hace lo mismo que la casita de la sala (:421): olvida la
+  // invitacion, suelta la mesa y va al lobby.
+  if (screen === 'partida-pvp') {
+    return (
+      <PartidaPvP
+        cuenta={cuenta}
+        sala={sala}
         onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); setScreen('lobby') }}
       />
     )

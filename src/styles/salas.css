@@ -706,23 +706,106 @@ body.sal-activa #root {
   transition-delay: 0s;
 }
 
-/* ══ 12 · SAL-3 · EL STUB DE LA SALA DE ESPERA ═════════════════════════════
-   PROVISIONAL. B2 reemplaza la pantalla entera y puede reemplazar este bloque
-   con ella; lo que NO debe tocar es nada de los §1–§11, que son de las dos
-   pantallas selladas. */
-.sal-espera { display: grid; gap: calc(var(--u) * 2.5); justify-items: center; text-align: center; }
-.sal-espera-sub { font-size: calc(var(--u) * 3.2); color: var(--text-secondary); font-weight: 400; }
-/* El código en oro, con su botón de copiar al lado. Es la única línea de la
-   lámina SAL-3 que esta sub-tanda adelanta, y B2 la hereda tal cual. */
-.sal-codigo-grande {
+/* ══ 12 · SAL-3 · LA SALA DE ESPERA ════════════════════════════════════════
+   SAL-B2 F1b (rector §6). Reemplaza entero el bloque del stub de B1; §1–§11 y
+   §13 quedan intactos. Autoridad visual: la lámina SAL-3 v1.5, verbatim, con
+   dos traducciones y una regla:
+     · los hex de la lámina → tokens de `theme.css`; los `rgba(232,184,75,α)`
+       → `rgba(var(--gold-brand-rgb), α)`, los `rgba(245,223,174,α)` →
+       `rgba(var(--gold-brand-hi-rgb), α)`, los `rgba(245,237,216,α)` →
+       `rgba(var(--text-primary-rgb), α)`, los `rgba(9,23,14,α)` →
+       `rgba(var(--green-abyss-rgb), α)`; los `rgba(0,0,0,α)` son sombras;
+     · los nombres de la lámina (`.codigo`, `.mesa`, `.silla`) NO entran:
+       `.sal-codigo` ya es el campo de SAL-1 (§5). Todo lo nuevo va bajo
+       `.sal-esp-*` y los estados como `is-*`;
+     · fórmula sobre constante: todo cuelga de `--u`.
+
+   `.sal-esp` es el CUERPO de la pantalla (`.sal-cuerpo.sal-esp`), hija de
+   `.sal`: los tokens de la lámina que sólo esta pantalla usa viven ahí y no
+   en `.sal`, que es de las tres. El diálogo y el velo son `fixed` y les da
+   igual dónde cuelguen. */
+.sal-esp {
+  --mesa-w: min(100%, calc(var(--u) * 84));
+  --mesa-h: calc(var(--u) * 34);
+  --silla: calc(var(--u) * 9.5);
+  --ciclo: 8s;    /* el ciclo de brillo de LOB-1: fase 1 isotipo, fase 2 moneda */
+}
+/* La lámina reparte cuatro filas con aire igual y centra cada bloque. */
+.sal-cuerpo.sal-esp {
+  /* Cinco filas desde los ajustes: código, mesa, consejo, acción y el botón de
+     salir que la lámina v1.6 pone debajo. */
+  grid-template-rows: auto auto auto auto auto;
+  align-content: space-evenly;
+  justify-items: center;
+  row-gap: calc(var(--u) * 2.5);
+  padding: calc(var(--u) * 1.5) 0 calc(var(--u) * 4);
+}
+
+/* ── Cabecera: título y subtítulo en dos líneas ─────────────────────────── */
+.sal-cab .sal-esp-tit { display: grid; gap: calc(var(--u) * 0.5); min-width: 0; }
+.sal-esp-sub {
+  font-size: calc(var(--u) * 2.9);
+  color: var(--text-muted);
+  font-weight: 400;
+  min-height: 1.2em;   /* O1: el nombre del anfitrión llega después */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── El código (privada) / el rótulo (abierta): la MISMA caja ───────────── */
+.sal-esp-codigo {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+  border: 1px solid var(--linea);
+  background: var(--surface-card);
+  border-radius: calc(var(--u) * 2.5);
+  padding: calc(var(--u) * 2.2) calc(var(--u) * 3);
+  /* SIN `min-height`, y es una medida: la lámina escribe `min-height: 15u`,
+     pero un grid con el alto justo (el apaisado bajo, los 768 de escritorio)
+     dimensiona sus filas por el MÍNIMO de cada ítem, y un mínimo explícito deja
+     que la caja se encoja por debajo de su contenido (el arnés lo midió: 54px
+     para 64 de contenido). Sin él, el mínimo es el contenido —etiqueta más la
+     fila del código a `--ico-caja`, 17.4u—, que ya supera los 15u de la lámina
+     en los dos modos. */
+}
+.sal-esp-codigo-col { min-width: 0; }
+/* O1: la etiqueta reserva su línea también en abierta, donde va vacía, para
+   que la caja mida igual en los dos modos. */
+.sal-esp-eti {
+  font-size: calc(var(--u) * 2.9);
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: calc(var(--u) * 0.8);
+  min-height: 1.2em;
+}
+.sal-esp-cod {
   display: flex;
   align-items: center;
-  gap: calc(var(--u) * 2);
-  font-size: calc(var(--u) * 7);
-  letter-spacing: 0.14em;
-  color: var(--gold-brand);
+  gap: 0.35em;
+  /* O1: la fila del código mide lo que mide su botón de copiar (`--ico-caja`,
+     más alto que la cifra), también en abierta, donde no hay botón. */
+  min-height: var(--ico-caja);
+  line-height: 1;
+  font-size: calc(var(--u) * 6.4);
+  letter-spacing: 0.18em;
   font-variant-numeric: tabular-nums;
+  color: var(--gold-brand);
+  user-select: all;
 }
+.sal-esp-codigo.is-abierta .sal-esp-cod {
+  color: var(--text-primary);
+  font-size: calc(var(--u) * 4);
+  letter-spacing: 0;
+  gap: 0.5em;
+  user-select: none;
+}
+.sal-esp-codigo.is-abierta .sal-esp-cod .lob-ico { width: 1em; height: 1em; flex: none; }
+/* El botón de copiar, heredado de B1: contorno, acuse verde dos segundos. */
 .sal-copiar {
   width: var(--ico-caja);
   height: var(--ico-caja);
@@ -739,15 +822,296 @@ body.sal-activa #root {
 .sal-copiar:hover,
 .sal-copiar:focus-visible { color: var(--text-primary); border-color: var(--linea); }
 .sal-copiar.is-hecho { color: var(--win-green); }
-.sal-sentados { font-size: calc(var(--u) * 4); font-variant-numeric: tabular-nums; }
-.sal-provisional {
-  font-size: calc(var(--u) * 2.9);
-  font-weight: 400;
-  color: var(--text-faint);
-  letter-spacing: 0.04em;
+.sal-copiar.is-hecho .lob-ico { animation: sal-esp-llega 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+.sal-esp-compartir {
+  height: calc(var(--cta-h) * 0.8);
+  padding: 0 calc(var(--u) * 3.5);
+  border-radius: 999px;
+  border: 1px solid var(--gold-brand);
+  background: none;
+  color: var(--gold-brand);
+  font: inherit;
+  font-size: calc(var(--u) * 3.2);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  white-space: nowrap;
+  cursor: pointer;
 }
-/* Los secundarios de la sala de espera: contorno, nunca oro sólido. El oro
-   único de la pantalla es el código. */
+.sal-esp-compartir .lob-ico { width: 1em; height: 1em; flex: none; }
+.sal-esp-compartir:hover,
+.sal-esp-compartir:focus-visible { color: var(--gold-hover); border-color: var(--gold-hover); }
+/* Abierta no tiene código que compartir: el botón se APAGA, no se va (O1). */
+.sal-esp-codigo.is-abierta .sal-esp-compartir { visibility: hidden; }
+
+/* ── La mesa: óvalo con cronómetro, sillas en anillo ────────────────────── */
+.sal-esp-mesa {
+  position: relative;
+  width: var(--mesa-w);
+  height: calc(var(--mesa-h) + var(--silla) * 3.3);
+}
+.sal-esp-ovalo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - var(--silla) * 2);
+  height: var(--mesa-h);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, var(--green-bright) 0%, var(--surface-game) 70%);
+  border: 2px solid rgba(var(--gold-brand-rgb), 0.35);
+  box-shadow:
+    inset 0 0 calc(var(--u) * 6) rgba(0, 0, 0, 0.45),
+    0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: calc(var(--u) * 0.6);
+}
+.sal-esp-reloj {
+  position: relative;
+  font-size: calc(var(--u) * 8);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.sal-esp-reloj.is-urge { color: var(--bet-orange); }
+/* Mesa llena: la cuenta corta va en oro; es buena noticia, no urgencia. */
+.sal-esp-reloj.is-llena { color: var(--gold-brand); }
+.sal-esp-estado {
+  position: relative;
+  font-size: calc(var(--u) * 2.9);
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.sal-esp-fin {
+  display: none;
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  max-width: calc(var(--u) * 46);
+  padding: 0 calc(var(--u) * 2);
+}
+
+/* Las sillas: el bloque se ancla por el centro del avatar, no por su caja. */
+.sal-esp-silla {
+  position: absolute;
+  width: calc(var(--silla) * 1.6);
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 0.6);
+  transform: translateX(-50%);
+  text-align: center;
+}
+/* Mitad superior: los textos crecen hacia arriba y el avatar queda abajo. */
+.sal-esp-silla.is-arriba .sal-esp-av { order: 3; }
+.sal-esp-silla.is-arriba .sal-esp-n { order: 2; }
+.sal-esp-silla.is-arriba .sal-esp-tag { order: 1; }
+.sal-esp-av {
+  position: relative;
+  width: calc(var(--silla) * 0.72);
+  height: calc(var(--silla) * 0.72);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, var(--green-bright) 0%, var(--green-deep) 100%);
+  border: 1.5px solid var(--text-secondary);
+}
+/* v1.5 §A · el hueco del avatar: la inicial del username como respaldo. AVA-1
+   monta la imagen comprada en ESTE mismo círculo (misma caja, mismo borde). */
+.sal-esp-ini {
+  font-size: calc(var(--silla) * 0.32);
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.sal-esp-av img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }   /* [AVA-1] */
+.sal-esp-n {
+  font-size: calc(var(--u) * 2.7);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sal-esp-tag {
+  font-size: calc(var(--u) * 2.2);
+  color: var(--gold-brand);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  min-height: 1.2em;   /* O1: la silla sin marca mide lo mismo */
+}
+.sal-esp-silla.is-vacia .sal-esp-av {
+  background: none;
+  border: 1.5px dashed var(--text-muted);
+  animation: sal-esp-late 2.4s ease-in-out infinite;
+}
+.sal-esp-silla.is-vacia .sal-esp-n { color: var(--text-muted); font-weight: 400; }
+.sal-esp-silla.is-tu .sal-esp-av { border-color: var(--gold-brand); }
+/* La llegada: el asiento salta y un anillo dorado se expande. */
+.sal-esp-silla.is-llega .sal-esp-av { animation: sal-esp-llega 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+.sal-esp-silla.is-llega .sal-esp-av::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-brand);
+  animation: sal-esp-anillo 0.8s ease-out forwards;
+}
+/* v1.5 §B · mesa llena: todas las sillas en oro. */
+.sal-esp.is-llena .sal-esp-silla .sal-esp-av { border-color: var(--gold-brand); }
+
+/* La marca de agua: el isotipo REAL como máscara sobre un fondo de oro (receta
+   de `embellecimiento.css` para el brillo de la portada), al 11 %, respira en 6 s
+   y destella en la fase 1 del ciclo de 8 s con la luz clara sobre un pseudo. */
+.sal-esp-marca {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--mesa-h) * 0.62);
+  height: calc(var(--mesa-h) * 0.62);
+  transform: translate(-50%, -50%);
+  opacity: 0.11;
+  pointer-events: none;
+  background: var(--gold-brand);
+  -webkit-mask-image: url('../assets/ajilei-isotipo.svg?no-inline');
+  mask-image: url('../assets/ajilei-isotipo.svg?no-inline');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  animation: sal-esp-respira 6s ease-in-out infinite;
+}
+.sal-esp-marca::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--gold-brand-hi);
+  opacity: 0;
+  animation: sal-esp-destello var(--ciclo) ease-in-out infinite;
+}
+
+/* El mazo en el fieltro: tres dorsos REALES apilados (decisión de Victor), que
+   se abanican al barajar. */
+.sal-esp-mazo {
+  position: absolute;
+  left: 18%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(var(--mesa-h) * 0.2);
+  aspect-ratio: 2 / 3;
+  pointer-events: none;
+}
+.sal-esp-mazo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 8%;
+  object-fit: cover;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  transform-origin: 50% 120%;
+}
+.sal-esp-mazo img:nth-child(1) { transform: translate(0, 0); }
+.sal-esp-mazo img:nth-child(2) { transform: translate(1px, -1.5px); }
+.sal-esp-mazo img:nth-child(3) { transform: translate(2px, -3px); }
+/* Cierre · el abanico manda y el sonido se acompasa a él. La duración vive en
+   UNA constante de `SalaEspera.jsx` (1 200 ms, con su motivo escrito allí), que
+   la pantalla escribe en `--sal-esp-baraja` al encender la clase: la misma
+   cifra gobierna el dibujo y el apagado del audio. El valor de respaldo es esa
+   misma cifra, por si algún día la clase llega sin su variable. */
+.sal-esp-mazo.is-baraja img:nth-child(1) { animation: sal-esp-abanico1 var(--sal-esp-baraja, 1.2s) ease-in-out; }
+.sal-esp-mazo.is-baraja img:nth-child(2) { animation: sal-esp-abanico2 var(--sal-esp-baraja, 1.2s) ease-in-out; }
+.sal-esp-mazo.is-baraja img:nth-child(3) { animation: sal-esp-abanico3 var(--sal-esp-baraja, 1.2s) ease-in-out; }
+
+/* ── Un consejo mientras esperas: una sola línea, con caja reservada ────── */
+.sal-esp-consejo {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  font-size: calc(var(--u) * 3);
+  font-weight: 400;
+  color: var(--text-secondary);
+  min-height: 1.5em;
+  transition: opacity 0.4s ease;
+}
+.sal-esp-consejo.is-fuera { opacity: 0; }
+
+/* ── La acción: CTA (`.sal-cta` de §9) o caja punteada, misma caja (O1) ──── */
+.sal-esp-accion { width: 100%; }
+.sal-esp-espera {
+  height: var(--cta-h);
+  width: var(--cta-w);
+  border-radius: calc(var(--cta-h) / 2);
+  border: 1px dashed var(--linea);
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  font-size: calc(var(--u) * 3.4);
+  text-align: center;
+  padding: 0 calc(var(--u) * 3);
+}
+
+/* ── Ajustes (lámina v1.6) · «Salir de la mesa»: contorno, nunca oro ─────
+   El oro de esta pantalla es el código y el CTA. Es la QUINTA fila de la
+   columna —fuera de la caja que la acción repinta, justo debajo— y reserva su
+   sitio SIEMPRE (O1): en los tres finales se apaga con `visibility`, porque el
+   CTA del final ya es la salida y la columna no debe moverse al terminar la
+   mesa. Alto de la casa para lo tocable: 40px o 9u, lo que sea mayor. */
+.sal-esp-salir {
+  height: max(40px, calc(var(--u) * 9));
+  padding: 0 calc(var(--u) * 4);
+  border-radius: 999px;
+  border: 1px solid var(--linea);
+  background: none;
+  color: var(--text-secondary);
+  font-size: calc(var(--u) * 3.2);
+  line-height: 1;
+  white-space: nowrap;
+  margin-top: calc(var(--u) * 0.4);
+}
+.sal-esp-salir:hover,
+.sal-esp-salir:focus-visible { color: var(--text-primary); border-color: var(--gold-brand); }
+.sal-esp-salir[disabled] { opacity: 0.5; cursor: default; }
+
+/* ── La confirmación del anfitrión: velo + diálogo ──────────────────────── */
+.sal-esp-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  background: rgba(var(--green-abyss-rgb), 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0s 0.2s;
+}
+.sal-esp-velo.is-on { opacity: 1; visibility: visible; transition-delay: 0s; }
+.sal-esp-dialogo {
+  position: fixed;
+  z-index: 7;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.96);
+  opacity: 0;
+  visibility: hidden;
+  width: min(calc(100% - 2 * var(--pad)), calc(var(--u) * 80));
+  background: var(--surface-modal);
+  border: 1px solid var(--linea);
+  border-radius: calc(var(--u) * 3);
+  padding: calc(var(--u) * 4);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s, visibility 0s 0.2s;
+}
+.sal-esp-dialogo.is-on { transform: translate(-50%, -50%) scale(1); opacity: 1; visibility: visible; transition-delay: 0s; }
+/* `color: inherit` por la misma razón que el h1 de §3: `index.css` pinta todo
+   h2 con `--text-h`, casi negro. */
+.sal-esp-dialogo h2 { font-size: calc(var(--u) * 3.8); font-weight: 500; margin: 0 0 calc(var(--u) * 1.5); color: inherit; }
+.sal-esp-dialogo p { font-size: calc(var(--u) * 3.1); color: var(--text-secondary); font-weight: 400; line-height: 1.4; margin: 0 0 calc(var(--u) * 3.5); }
+.sal-esp-botones { display: flex; gap: calc(var(--u) * 2); justify-content: flex-end; flex-wrap: wrap; }
+/* Los secundarios, heredados de B1: contorno, nunca oro sólido. En el diálogo
+   miden lo que la lámina dice, con el piso táctil de 40px. */
 .sal-secundario {
   height: var(--cta-h);
   padding: 0 calc(var(--u) * 4);
@@ -763,7 +1127,91 @@ body.sal-activa #root {
 }
 .sal-secundario:hover,
 .sal-secundario:focus-visible { color: var(--text-primary); border-color: var(--gold-brand); }
-.sal-espera-botones { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 2); justify-content: center; }
+.sal-esp-dialogo .sal-secundario { height: max(40px, calc(var(--u) * 9)); padding: 0 calc(var(--u) * 3.5); font-size: calc(var(--u) * 3.3); }
+.sal-secundario.is-seguir { border-color: var(--gold-brand); color: var(--gold-brand); }
+.sal-secundario.is-cancelar { border-color: var(--loss-red); color: var(--loss-red); }
+.sal-secundario[disabled] { opacity: 0.5; cursor: default; }
+
+/* ── v1.5 §C · El final de mesa: tres estados sobre la misma pantalla ───── */
+.sal-esp.is-fin .sal-esp-codigo,
+.sal-esp.is-fin .sal-esp-consejo { opacity: 0.35; pointer-events: none; }
+.sal-esp.is-fin .sal-esp-mazo { visibility: hidden; }
+.sal-esp.is-fin .sal-esp-salir { visibility: hidden; }
+.sal-esp.is-fin .sal-esp-silla.is-vacia .sal-esp-av { animation: none; opacity: 0.35; }
+.sal-esp.is-fin-cancelada .sal-esp-silla .sal-esp-av,
+.sal-esp.is-fin-vencida .sal-esp-silla .sal-esp-av { opacity: 0.45; border-color: var(--text-muted); }
+.sal-esp.is-fin-activa .sal-esp-silla:not(.is-vacia) .sal-esp-av {
+  border-color: var(--gold-brand);
+  box-shadow: 0 0 0 3px rgba(var(--gold-brand-rgb), 0.22);
+}
+.sal-esp.is-fin .sal-esp-reloj,
+.sal-esp.is-fin .sal-esp-estado { display: none; }
+.sal-esp.is-fin .sal-esp-fin { display: block; position: relative; animation: sal-esp-sube 0.5s ease; }
+.sal-esp.is-fin-activa .sal-esp-fin { color: var(--gold-brand); font-size: calc(var(--u) * 4.4); font-weight: 600; }
+
+/* ── El stub de partida PvP (rector §5): un rótulo y el CTA ─────────────── */
+.sal-cuerpo.sal-partida { justify-items: center; align-content: center; row-gap: calc(var(--u) * 4); }
+.sal-partida-pronto {
+  margin: 0;
+  font-size: calc(var(--u) * 4.4);
+  font-weight: 500;
+  color: var(--gold-brand);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* ── Keyframes de la sala, con prefijo propio ───────────────────────────── */
+@keyframes sal-esp-late { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@keyframes sal-esp-llega { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes sal-esp-anillo { 0% { transform: scale(0.8); opacity: 0.9; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes sal-esp-sube { 0% { transform: translateY(6px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+@keyframes sal-esp-respira { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.025); } }
+@keyframes sal-esp-destello { 0% { opacity: 0; } 10% { opacity: 0.8; } 26% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes sal-esp-abanico1 { 40% { transform: rotate(-14deg) translate(-3px, 0); } 100% { transform: translate(0, 0); } }
+@keyframes sal-esp-abanico2 { 40% { transform: rotate(0deg) translate(1px, -5px); } 100% { transform: translate(1px, -1.5px); } }
+@keyframes sal-esp-abanico3 { 40% { transform: rotate(14deg) translate(5px, -3px); } 100% { transform: translate(2px, -3px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sal-esp-marca,
+  .sal-esp-marca::after,
+  .sal-esp-mazo img,
+  .sal-esp-silla.is-llega .sal-esp-av,
+  .sal-esp-silla.is-llega .sal-esp-av::after,
+  .sal-esp-silla.is-vacia .sal-esp-av,
+  .sal-copiar.is-hecho .lob-ico { animation: none; }
+}
+
+/* ── Los trajes de la sala, dentro de §12 para no tocar §13 ─────────────── */
+/* Los dos de la lámina, verbatim. */
+@media (max-height: 660px) {
+  .sal-esp { --mesa-h: calc(var(--u) * 32); --silla: calc(var(--u) * 9); }
+  .sal-cuerpo.sal-esp { row-gap: calc(var(--u) * 1.5); padding-top: calc(var(--u) * 0.5); }
+}
+/* Y uno que la lámina no cubría: entre 661 y 800 de alto —los 768 de
+   escritorio— con `--u` en su techo de 6px, las filas suman más que el
+   viewport y el grid encogería la caja del código por debajo de su contenido.
+   Por encima de 800 la lámina cabe tal cual.
+
+   AJUSTES · la quinta fila (el botón de salir de la lámina v1.6) trae 54px de
+   botón + 2,4 de su margen + 7,2 de un hueco más: medido, 634 de contenido
+   contra 588 disponibles, y con la columna desbordada `space-evenly` se
+   comporta como `start`, así que el anillo de sillas pisaba además el consejo.
+   La mesa es la palanca —es la única fila que puede ceder sin perder
+   información— pero el reparto entre óvalo y silla cambia: la SILLA sube
+   (7,6u → 8,5u) y el ÓVALO baja (27u → 16u). El motivo, medido: los rótulos de
+   la silla van en 2,7u y 2,2u, cifras que NO cuelgan de `--silla`, así que
+   apretar la silla deja el bloque de texto sin sitio y las sillas se salen; el
+   óvalo, en cambio, sólo tiene dentro el reloj y una línea. Resultado: la mesa
+   pasa de 312,5px a 264,3, la columna cabe justa en los 588,3 disponibles y
+   las sillas quedan 2,6px por dentro de la caja del código y del consejo. El
+   relleno baja a .4/.8u para comprar ese margen. */
+@media (min-height: 661px) and (max-height: 800px) {
+  .sal-esp { --mesa-h: calc(var(--u) * 16); --silla: calc(var(--u) * 8.5); }
+  .sal-cuerpo.sal-esp { row-gap: calc(var(--u) * 1.2); padding: calc(var(--u) * 0.4) 0 calc(var(--u) * 0.8); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .sal-cuerpo.sal-esp { align-content: start; }
+}
 
 /* ══ 13 · LOS DOS TRAJES ═══════════════════════════════════════════════════
    Verbatim de las láminas. Lo que no cabe NO se scrollea, se aprieta — salvo en
@@ -786,4 +1234,75 @@ body.sal-activa #root {
   /* La ventanilla sigue siendo de tres tarjetas: la promesa es de la lista, no
      del viewport, y aquí es cuando más falta hace que la caja no crezca. */
   .sal-casa { position: fixed; }
+}
+
+/* ══ 14 · LA MONEDA BAJO `.sal` ═════════════════════════════════════════════
+   SAL-B2 F1b (rector §6.3): la deuda de B1 que B2 paga. §2 duplicó bajo `.sal`
+   la barra entera MENOS la moneda: sin este bloque, en las pantallas de salas
+   `ChipToken` medía lo que fija su atributo para `size="icon"` (16px) y no
+   brillaba. Es el bloque de `lobby.css` para `.lobby .lob-moneda` (posición,
+   tamaño a `--ico`, halo y destello), reescrito bajo `.sal`, con la misma
+   deuda declarada que §2: si una tanda mueve la barra a su propia hoja, los
+   dos bloques se funden en uno.
+
+   LOS KEYFRAMES SE DUPLICAN CON NOMBRE PROPIO, y el motivo está medido:
+   `lobby.css` sólo lo importa `Lobby.jsx`. En producción todo el CSS acaba en
+   un único archivo y `lob-halo-moneda` estaría siempre en la página; pero en
+   desarrollo Vite inyecta cada hoja cuando se importa su módulo, y bajo el
+   arnés (`?sal=espera-*`) la app arranca en la sala SIN pasar por el lobby: los
+   keyframes del lobby no existen todavía y la moneda no brillaría. Un nombre
+   que resuelve en producción y no en el metro es justo la clase de verde
+   falso que no se puede aceptar. */
+.sal .lob-moneda {
+  --ciclo: 8s;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.sal .lob-moneda .chip-token {
+  display: block;
+  width: var(--ico);
+  height: var(--ico);
+  /* El halo conserva la sombra propia de `ChipToken` en las tres paradas: una
+     animación de `filter` REEMPLAZA la propiedad entera. */
+  animation: sal-halo-moneda var(--ciclo) ease-in-out infinite;
+}
+.sal .lob-moneda::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--ico);
+  height: var(--ico);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%,
+    rgba(var(--gold-brand-hi-rgb), 0.95) 0%,
+    transparent 60%);
+  opacity: 0;
+  animation: sal-destello-moneda var(--ciclo) ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes sal-halo-moneda {
+  0%, 50% {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  }
+  60% {
+    filter:
+      drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45))
+      drop-shadow(0 0 calc(var(--ico) * 0.5) rgba(var(--gold-brand-hi-rgb), 0.85));
+  }
+  76%, 100% {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  }
+}
+@keyframes sal-destello-moneda {
+  0%, 52%   { opacity: 0; }
+  58%       { opacity: 1; }
+  70%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sal .lob-moneda .chip-token,
+  .sal .lob-moneda::after { animation: none; }
 }
