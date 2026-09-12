@@ -69,10 +69,17 @@ const ESTADOS = [
   { id: 'armar',                  pantalla: 'armar',    nota: 'estado base' },
   { id: 'armar-aviso',            pantalla: 'armar',    nota: 'apuesta 500 · aviso al anfitrión' },
   { id: 'armar-unirme',           pantalla: 'armar',    nota: 'combinación existente · CTA cambiado' },
-  { id: 'espera-stub',            pantalla: 'espera',   nota: 'stub provisional' },
+  // ── SAL-B2 F1b · la sala de espera real, un estado por vista de la lámina ──
+  { id: 'espera-anfitrion',       pantalla: 'espera',   nota: 'anfitrión · 2/4 · «Jugar ya» · llegada, salida y cancelación por Realtime' },
+  { id: 'espera-invitado',        pantalla: 'espera',   nota: 'invitado · «Esperando al anfitrión…» · Tú en la silla 1' },
+  { id: 'espera-abierta',         pantalla: 'espera',   nota: 'abierta · globo en vez de código · Compartir apagado, misma caja' },
+  { id: 'espera-llena',           pantalla: 'espera',   nota: '5/5 · reloj en oro ≤ 0:10 · sin «Jugar ya»' },
+  { id: 'espera-fin-cancelada',   pantalla: 'espera',   nota: 'invitado · «El anfitrión cerró la mesa» · «Buscar otra mesa»' },
+  { id: 'espera-fin-vencida',     pantalla: 'espera',   nota: 'anfitrión solo · reloj a 0 → resolver → «no llegó gente a tiempo»' },
+  { id: 'espera-fin-activa',      pantalla: 'espera',   nota: 'dos sentados · reloj a 0 → resolver → «¡Arranca la partida!» · «Entrar a la mesa»' },
   // A2 · pantalla 'opciones' porque es donde la app DEBE quedarse: la mesa que
-  // el fixture trae es la fila de nulos y el stub no puede pintarse con ella.
-  { id: 'espera-fantasma',        pantalla: 'opciones', nota: 'mi_sala devuelve la fila de nulos · el stub NO se pinta' },
+  // el fixture trae es la fila de nulos y la sala no puede pintarse con ella.
+  { id: 'espera-fantasma',        pantalla: 'opciones', nota: 'mi_sala devuelve la fila de nulos · la sala NO se pinta' },
 ]
 
 // Los seis viewports de la casa, los MISMOS de `diagDSK lob`. No se inventa
@@ -259,6 +266,11 @@ async function medirCelda(browser, estado, vp) {
     })) {
       const el = document.querySelector(sel)
       if (!el) continue
+      // F1b · un control que no se ve no se toca: los botones del diálogo de
+      // cancelar viven ocultos (`visibility: hidden`, con `scale(.96)` de
+      // entrada) hasta que el anfitrión pulsa «Salir», y el piso táctil se
+      // exige a lo que el dedo puede alcanzar.
+      if (getComputedStyle(el).visibility === 'hidden') continue
       const b = el.getBoundingClientRect()
       cajas[nombre] = { w: b.width, h: b.height }
     }
@@ -292,6 +304,8 @@ async function medirCelda(browser, estado, vp) {
       volver: '.sal-volver svg',
       casa: '.sal-casa svg',
       copiar: '.sal-copiar svg',
+      // F1b · la moneda de la barra, ahora que §14 la dimensiona bajo `.sal`.
+      moneda: '.lob-moneda .chip-token',
     })) {
       const el = document.querySelector(sel)
       if (!el) continue
@@ -559,24 +573,14 @@ async function medirEstado(page, estado) {
       }
     }
 
-    case 'espera-stub': {
-      const r = await page.evaluate(() => ({
-        codigo: document.querySelector('[data-accion="codigo-sala"]')?.textContent?.trim() ?? '',
-        sentados: document.querySelector('[data-accion="sentados"]')?.textContent?.trim() ?? '',
-        provisional: document.querySelector('[data-accion="provisional"]')?.textContent?.trim() ?? '',
-        actualizar: !!document.querySelector('[data-accion="actualizar"]'),
-        salir: !!document.querySelector('[data-accion="salir"]'),
-        // §7 · el stub NO tiene «Jugar ya». Si apareciera, alguien habría
-        // adelantado B2 sin decirlo.
-        sinJugarYa: !document.querySelector('[data-accion="jugar-ya"]'),
-      }))
-      return {
-        ...r,
-        ok: r.codigo.includes('AJ-7K2M') && r.sentados.includes('2/4')
-          && r.provisional.length > 0 && r.actualizar && r.salir && r.sinJugarYa
-          && !r.sentados.includes('⟦'),
-      }
-    }
+    case 'espera-anfitrion':
+    case 'espera-invitado':
+    case 'espera-abierta':
+    case 'espera-llena':
+    case 'espera-fin-cancelada':
+    case 'espera-fin-vencida':
+    case 'espera-fin-activa':
+      return medirEspera(page, estado.id)
 
     case 'espera-fantasma': {
       // ── A2 §3 · LA PRUEBA NEGATIVA ────────────────────────────────────────
@@ -602,6 +606,253 @@ async function medirEstado(page, estado) {
   }
 }
 
+// ── SAL-B2 F1b · La sala de espera: lo que la lámina enseña en cada estado ──
+// Rector §8.3. Un verde mide lo que dice: cada punto lleva el nombre de lo que
+// mide, y el veredicto del estado es la conjunción. Los textos esperados son
+// los del `DICC` de la lámina v1.5, tal como `textos.es.js` los trae.
+const ESPERA = {
+  'espera-anfitrion':     { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Jugar ya', ctaVivo: true, privada: true },
+  'espera-invitado':      { sillas: 4, ocupadas: 2, iniciales: ['C', 'D'], tagAnf: 0, tagTu: 1, accion: 'espera', espera: 'Esperando al anfitrión…', privada: true },
+  'espera-abierta':       { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Jugar ya', ctaVivo: true, privada: false },
+  'espera-llena':         { sillas: 5, ocupadas: 5, iniciales: ['D', 'M', 'J', 'A', 'L'], tagAnf: 0, tagTu: null, accion: 'espera', espera: '¡Mesa completa! Arranca sola', privada: true, llena: true },
+  'espera-fin-cancelada': { sillas: 4, ocupadas: 2, iniciales: ['C', 'D'], tagAnf: 0, tagTu: 1, accion: 'cta', cta: 'Buscar otra mesa', ctaVivo: true, privada: true, fin: 'cancelada', finTexto: 'El anfitrión cerró la mesa' },
+  'espera-fin-vencida':   { sillas: 4, ocupadas: 1, iniciales: ['D'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Buscar otra mesa', ctaVivo: true, privada: true, fin: 'vencida', finTexto: 'La mesa se cerró: no llegó gente a tiempo' },
+  'espera-fin-activa':    { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Entrar a la mesa', ctaVivo: true, privada: true, fin: 'activa', finTexto: '¡Arranca la partida!' },
+}
+
+// La foto de la pantalla que los siete puntos comparten. Se lee en una sola
+// evaluación para que los números sean del mismo fotograma.
+const LEER_ESPERA = () => {
+  const q = (s) => document.querySelector(s)
+  const sillas = [...document.querySelectorAll('[data-accion="silla"]')]
+  const cuerpo = q('[data-accion="espera-cuerpo"]')
+  const columna = cuerpo?.getBoundingClientRect()
+  const cajaCodigo = q('[data-accion="codigo-caja"]')?.getBoundingClientRect()
+  const cajaConsejo = q('[data-accion="consejo"]')?.getBoundingClientRect()
+  const reloj = q('[data-accion="reloj"]')
+  const estado = q('[data-accion="estado"]')
+  const mazo = q('[data-accion="mazo"]')
+  const accion = q('[data-accion="accion"]')
+  const salir = q('[data-accion="salir"]')
+  const cta = q('[data-accion="cta"]')
+  const espera = q('[data-accion="espera"]')
+  const codigo = q('[data-accion="codigo-caja"]')
+  const compartir = q('[data-accion="compartir"]')
+  const u = window.__tokenPx('--u').h
+  const ctaH = window.__tokenPx('--cta-h').h
+  return {
+    sillas: {
+      total: sillas.length,
+      ocupadas: sillas.filter((s) => !s.classList.contains('is-vacia')).length,
+      iniciales: sillas.filter((s) => !s.classList.contains('is-vacia')).map((s) => s.querySelector('.sal-esp-ini')?.textContent ?? ''),
+      tags: sillas.map((s) => s.querySelector('.sal-esp-tag')?.textContent?.trim() ?? ''),
+      llegan: sillas.filter((s) => s.classList.contains('is-llega')).map((s) => Number(s.dataset.asiento)),
+      // Ajustes · la silla vacía dice «Libre» (lámina v1.6) y NO se trunca: a
+      // 360px «Esperando…» se leía «Esperand…» y ese fue el motivo del cambio,
+      // así que lo que se mide es que la palabra QUEPA, no sólo que esté.
+      vacias: sillas.filter((s) => s.classList.contains('is-vacia'))
+        .map((s) => s.querySelector('.sal-esp-n')?.textContent?.trim() ?? ''),
+      vaciasCaben: sillas.filter((s) => s.classList.contains('is-vacia')).every((s) => {
+        const n = s.querySelector('.sal-esp-n')
+        return !!n && n.scrollWidth <= n.clientWidth + 1
+      }),
+      // El anillo de la lámina saca las sillas unos píxeles de la caja de la
+      // mesa a propósito (el bloque de la silla es más ancho que su aire). Lo
+      // que se promete es que ninguna se salga de la columna ni pise la caja
+      // del código por arriba o el consejo por abajo.
+      dentro: !!columna && !!cajaCodigo && !!cajaConsejo && sillas.every((s) => {
+        const b = s.getBoundingClientRect()
+        return b.left >= columna.left - 1 && b.right <= columna.right + 1
+          && b.top >= cajaCodigo.bottom - 1 && b.bottom <= cajaConsejo.top + 1
+      }),
+    },
+    reloj: {
+      texto: reloj?.textContent?.trim() ?? '',
+      urge: reloj?.classList.contains('is-urge') ?? false,
+      llena: reloj?.classList.contains('is-llena') ?? false,
+      oculto: !!reloj && getComputedStyle(reloj).display === 'none',
+      estadoOculto: !!estado && getComputedStyle(estado).display === 'none',
+      estadoTexto: estado?.textContent?.trim() ?? '',
+    },
+    accion: {
+      alto: accion?.getBoundingClientRect().height ?? 0,
+      // La caja de acción mide lo mismo en sus cuatro variantes (O1): CTA o
+      // caja punteada de `--cta-h`, hueco de 1.6u, nota de 1.4em a 2.9u.
+      esperado: ctaH + 1.6 * u + 1.4 * 2.9 * u,
+      cta: cta?.textContent?.trim() ?? null,
+      ctaVivo: !!cta && !cta.disabled,
+      espera: espera?.textContent?.trim() ?? null,
+      // Ajustes · el BLOQUE de acción, que desde la lámina v1.6 termina en el
+      // botón de salir: de la cima de la caja al pie del botón. El aire entre
+      // filas lo reparte `align-content: space-evenly`, así que no se supone:
+      // se lee del hueco consejo → acción, que es el mismo, y se le suma el
+      // `margin-top: .4u` propio del botón y su alto. Así el punto sigue
+      // midiendo lo que dice —la columna no se mueve— con el botón dentro.
+      bloque: accion && salir
+        ? salir.getBoundingClientRect().bottom - accion.getBoundingClientRect().top
+        : 0,
+      esperadoBloque: accion && salir && cajaConsejo
+        ? ctaH + 1.6 * u + 1.4 * 2.9 * u
+          + (accion.getBoundingClientRect().top - cajaConsejo.bottom)
+          + 0.4 * u + salir.getBoundingClientRect().height
+        : 0,
+    },
+    salir: {
+      hay: !!salir,
+      alto: salir?.getBoundingClientRect().height ?? 0,
+      minimo: Math.max(40, 9 * u),
+      texto: salir?.textContent?.trim() ?? '',
+      cabe: !!salir && salir.scrollWidth <= salir.clientWidth + 1,
+      visible: !!salir && getComputedStyle(salir).visibility === 'visible',
+    },
+    codigo: {
+      alto: codigo?.getBoundingClientRect().height ?? 0,
+      // La caja: etiqueta (2.9u a 1.2) + 0.8u + la fila del código, que mide
+      // lo que su botón de copiar (`--ico-caja`) + relleno 4.4u + el borde de
+      // 1px arriba y abajo; supera el mínimo de 15u. Y la MISMA en abierta,
+      // porque la etiqueta y la fila reservan su alto sin botón (O1).
+      esperado: Math.max(15 * u + 2, 2.9 * 1.2 * u + 0.8 * u + window.__tokenPx('--ico-caja').h + 4.4 * u + 2),
+      texto: q('[data-accion="codigo-sala"]')?.textContent?.trim() ?? '',
+      copiar: !!q('[data-accion="copiar"]'),
+      globo: !!codigo?.querySelector('.lob-ico-globo'),
+      compartirVisible: !!compartir && getComputedStyle(compartir).visibility === 'visible',
+    },
+    fin: {
+      clases: cuerpo ? [...cuerpo.classList].filter((c) => c.startsWith('is-fin')) : [],
+      texto: q('[data-accion="fin"]')?.textContent?.trim() ?? '',
+      mazoOculto: !!mazo && getComputedStyle(mazo).visibility === 'hidden',
+    },
+    toast: q('.sal-toast')?.classList.contains('is-on') ? q('.sal-toast').textContent.trim() : '',
+    sub: q('[data-accion="sub"]')?.textContent?.trim() ?? '',
+    rotos: (q('main.sal')?.innerText.match(/⟦[^⟧]*⟧/g) ?? []).length,
+  }
+}
+
+async function medirEspera(page, id) {
+  const esp = ESPERA[id]
+  // Las sillas llegan con la primera medida del `ResizeObserver` y los finales
+  // que el reloj decide pasan por `resolver_sala`: se espera a lo que cada
+  // estado promete antes de fotografiar.
+  await page.waitForSelector('[data-accion="silla"]', { timeout: 5000 })
+  if (esp.fin) await page.waitForSelector(`[data-accion="espera-cuerpo"].is-fin-${esp.fin}`, { timeout: 5000 })
+  await page.waitForTimeout(150)
+
+  const f = await page.evaluate(LEER_ESPERA)
+  const puntos = {}
+
+  const tagEsperado = (i) => (i === esp.tagAnf ? 'Anfitrión' : i === esp.tagTu ? 'Tú' : '')
+  puntos['esp.sillas'] = {
+    ...f.sillas,
+    ok: f.sillas.total === esp.sillas && f.sillas.ocupadas === esp.ocupadas
+      && f.sillas.iniciales.join('') === esp.iniciales.join('')
+      && f.sillas.tags.every((tag, i) => tag === tagEsperado(i))
+      && f.sillas.vacias.every((tx) => tx === 'Libre')
+      && f.sillas.vaciasCaben
+      && f.sillas.dentro,
+  }
+
+  const relojOk = esp.fin
+    ? f.reloj.oculto && f.reloj.estadoOculto
+    : /^\d+:\d\d$/.test(f.reloj.texto) && !f.reloj.urge
+      && (esp.llena
+        ? f.reloj.llena && f.reloj.texto <= '0:10' && f.reloj.estadoTexto === '¡Mesa completa!'
+        : !f.reloj.llena && f.reloj.estadoTexto === `${esp.ocupadas}/${esp.sillas} sentados`)
+  puntos['esp.reloj'] = { ...f.reloj, ok: relojOk }
+
+  puntos['esp.accion'] = {
+    ...f.accion,
+    ok: Math.abs(f.accion.alto - f.accion.esperado) <= 1.5
+      && Math.abs(f.accion.bloque - f.accion.esperadoBloque) <= 1.5
+      && (esp.accion === 'cta'
+        ? f.accion.cta === esp.cta && f.accion.ctaVivo === esp.ctaVivo && f.accion.espera === null
+        : f.accion.espera === esp.espera && f.accion.cta === null),
+  }
+
+  // ── esp.salir · el botón de la lámina v1.6, y su caja en los finales ─────
+  // Existe en las dos vistas y también con la mesa llena, es tocable (40px de
+  // la casa), su texto no desborda, y en los tres finales está apagado con
+  // `visibility` —conservando su caja, que es lo que impide que la columna se
+  // mueva al terminar la mesa—.
+  puntos['esp.salir'] = {
+    ...f.salir,
+    ok: f.salir.hay && f.salir.alto >= f.salir.minimo - 0.5
+      && f.salir.texto === 'Salir de la mesa' && f.salir.cabe
+      && f.salir.visible === !esp.fin,
+  }
+
+  puntos['esp.codigo'] = {
+    ...f.codigo,
+    ok: Math.abs(f.codigo.alto - f.codigo.esperado) <= 1.5
+      && (esp.privada
+        ? f.codigo.texto.includes('AJ-7K2M') && f.codigo.copiar && f.codigo.compartirVisible && !f.codigo.globo
+        : f.codigo.globo && !f.codigo.copiar && !f.codigo.compartirVisible && f.codigo.texto.includes('Mesa abierta')),
+  }
+
+  puntos['esp.fin'] = {
+    ...f.fin,
+    ok: esp.fin
+      ? f.fin.clases.includes('is-fin') && f.fin.clases.includes(`is-fin-${esp.fin}`)
+        && f.fin.texto === esp.finTexto && f.fin.mazoOculto
+      : f.fin.clases.length === 0 && f.fin.texto === '' && !f.fin.mazoOculto,
+  }
+
+  // El subtítulo del invitado nombra al anfitrión por su username, que llegó
+  // por la incrustación de `profiles`: es la prueba de que `asientosDe` pinta.
+  puntos['esp.sub'] = {
+    sub: f.sub,
+    ok: esp.tagTu === 1 ? f.sub === 'Anfitrión: carlos_vzla · Privada' : f.sub.startsWith('Eres el anfitrión'),
+  }
+
+  // ── esp.realtime · sólo en `espera-anfitrion` ────────────────────────────
+  // Sin backend, la única forma de medir que la pantalla RELEE al recibir: el
+  // canal falso guarda los handlers y `window.__salEmitir` los dispara tras
+  // mutar los datos. Tres actos: alguien se levanta (el CTA se apaga con uno
+  // solo), alguien llega (silla nueva con `is-llega`, toast) y el anfitrión…
+  // no: la fila pasa a 'cancelada' y la pantalla lee el final.
+  if (id === 'espera-anfitrion') {
+    const DEV = '00000000-0000-4000-8000-000000000000'
+    const s = (asiento, jugadorId, username) => ({ asiento, jugadorId, username })
+    const emitir = (args) => page.evaluate((a) => window.__salEmitir(a), args)
+
+    await emitir({ tabla: 'sala_jugadores', evento: 'DELETE', asientos: [s(0, DEV, 'DevLocal')] })
+    await page.waitForTimeout(250)
+    const trasSalida = await page.evaluate(LEER_ESPERA)
+
+    // Llega UNA persona nueva (ana_bcn) y ocupa la silla libre más baja, la 1
+    // (SAL-A §10): silla con `is-llega`, toast con su nombre, recuento 2/4.
+    await emitir({
+      tabla: 'sala_jugadores', evento: 'INSERT',
+      asientos: [s(0, DEV, 'DevLocal'), s(1, '00000000-0000-4000-8000-000000000013', 'ana_bcn')],
+    })
+    await page.waitForTimeout(250)
+    const trasLlegada = await page.evaluate(LEER_ESPERA)
+
+    // Y el tercer acto es el defecto E5 tal cual se vivió: la fila pasa a
+    // 'cancelada' —el barrido la cerró— mientras QUIEN MIRA es el anfitrión.
+    // Con la regla de los ajustes lee «no llegó gente a tiempo»; la fila dice
+    // lo mismo que en `espera-fin-cancelada`, donde el invitado lee lo otro.
+    await emitir({ tabla: 'salas', evento: 'UPDATE', sala: { estado: 'cancelada' } })
+    await page.waitForTimeout(250)
+    const trasCancelar = await page.evaluate(LEER_ESPERA)
+
+    puntos['esp.realtime'] = {
+      trasSalida: { ocupadas: trasSalida.sillas.ocupadas, ctaVivo: trasSalida.accion.ctaVivo, estado: trasSalida.reloj.estadoTexto },
+      trasLlegada: { ocupadas: trasLlegada.sillas.ocupadas, llegan: trasLlegada.sillas.llegan, toast: trasLlegada.toast, estado: trasLlegada.reloj.estadoTexto },
+      trasCancelar: { clases: trasCancelar.fin.clases, texto: trasCancelar.fin.texto, cta: trasCancelar.accion.cta },
+      ok: trasSalida.sillas.ocupadas === 1 && !trasSalida.accion.ctaVivo && trasSalida.reloj.estadoTexto === '1/4 sentados'
+        && trasLlegada.sillas.ocupadas === 2 && trasLlegada.sillas.llegan.join() === '1'
+        && trasLlegada.toast === 'ana_bcn se sentó' && trasLlegada.reloj.estadoTexto === '2/4 sentados'
+        && trasCancelar.fin.clases.includes('is-fin-vencida')
+        && trasCancelar.fin.texto === 'La mesa se cerró: no llegó gente a tiempo'
+        && trasCancelar.accion.cta === 'Buscar otra mesa' && !trasCancelar.salir.visible,
+    }
+  }
+
+  puntos.rotos = f.rotos
+  puntos.ok = f.rotos === 0 && Object.values(puntos).every((p) => typeof p !== 'object' || p === null || p.ok !== false)
+  return puntos
+}
+
 // ── sal.0 · las dos listas de estados no se han separado ────────────────────
 // El arnés declara los once nombres por su cuenta (no puede importar un módulo
 // que usa `import.meta.env` desde Node). Este punto lee el archivo de fixtures
@@ -625,7 +876,7 @@ const report = {
   mode: MODE,
   ts: new Date().toISOString(),
   base: BASE,
-  arnes: { tanda: 'SAL-B1', playwrightCore: PW_VERSION, chromium: chromiumVivo },
+  arnes: { tanda: 'SAL-B2', playwrightCore: PW_VERSION, chromium: chromiumVivo },
 }
 
 try {
@@ -636,7 +887,7 @@ try {
 
   const objetivo = SOLO ? ESTADOS.filter((e) => e.id === SOLO) : ESTADOS
   if (objetivo.length === 0) {
-    throw new Error(`estado desconocido: ${SOLO}. Los once son: ${ESTADOS.map((e) => e.id).join(', ')}`)
+    throw new Error(`estado desconocido: ${SOLO}. Los ${ESTADOS.length} son: ${ESTADOS.map((e) => e.id).join(', ')}`)
   }
 
   const celdas = []

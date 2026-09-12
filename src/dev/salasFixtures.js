@@ -1,5 +1,6 @@
-// ── SAL-B1 · Los nueve estados que el arnés puede pedir ─────────────────────
-// Rector: AJILEI_SAL-B1_Fase1_v1.0.md §8.2 y §8.3.
+// ── SAL-B1 · Los estados que el arnés puede pedir ───────────────────────────
+// Rector: AJILEI_SAL-B1_Fase1_v1.0.md §8.2 y §8.3; SAL-B2 F1b §8 añade los
+// siete estados `espera-*` de la sala de espera real y retira el del stub.
 //
 // ── QUÉ RESUELVE ───────────────────────────────────────────────────────────
 // Medir «Mesas formándose ahora» con cinco mesas, una de ellas fuera de alcance,
@@ -15,11 +16,11 @@
 //
 // `import.meta.env.DEV` es `false` bajo `vite build`, así que la primera línea
 // de `simulacionSalas` se compila a `if (true) return null` y el minificador se
-// lleva por delante TODO lo que viene detrás —los nueve estados, los datos y el
-// nombre del parámetro—. Por eso `?sal=` no significa nada en producción: no es
-// que esté apagado, es que no existe. §9.3 lo comprueba con un `grep` sobre
-// `dist/`, y ése es el único veredicto que cuenta: este comentario es una
-// intención, el grep es una medida.
+// lleva por delante TODO lo que viene detrás —los estados, los datos, el nombre
+// del parámetro y el emisor de eventos—. Por eso `?sal=` no significa nada en
+// producción: no es que esté apagado, es que no existe. §9.3 lo comprueba con
+// un `grep` sobre `dist/`, y ése es el único veredicto que cuenta: este
+// comentario es una intención, el grep es una medida.
 //
 // La segunda mitad de la puerta no es redundante. Un despiste que hiciera un
 // build en modo desarrollo seguiría necesitando `VITE_AUTH_BYPASS` en el
@@ -27,36 +28,45 @@
 //
 // ── LO QUE ESTOS DATOS NO SON ──────────────────────────────────────────────
 // No son una simulación del servidor. No comprueban la regla 5×, ni el límite
-// de intentos, ni el índice parcial: eso vive en SQL y se prueba con dos
-// teléfonos (§9.5). Lo que sostienen es la GEOMETRÍA —que la ventanilla mida
-// tres tarjetas, que el CTA mida lo que la lámina dice, que nada desborde en
-// seis viewports—, y para eso lo que hace falta es que los datos sean FIJOS.
+// de intentos, ni el índice parcial, ni la cuenta corta de la mesa llena: eso
+// vive en SQL y se prueba en SQL y con dos teléfonos. Lo que sostienen es la
+// GEOMETRÍA y la CONDUCTA DE PANTALLA —que la ventanilla mida tres tarjetas,
+// que las sillas estén en su anillo, que una llegada por Realtime pinte una
+// silla nueva—, y para eso lo que hace falta es que los datos sean FIJOS.
 
-// A2 · los fixtures ya no fabrican una API a mano: fabrican un CLIENTE falso con
+// A2 · los fixtures no fabrican una API a mano: fabrican un CLIENTE falso con
 // la forma de PostgREST y lo pasan por `crearSalasApi`, que es la capa real. Lo
 // que el arnés mide así es la pantalla Y la traducción, no un doble de las dos.
 import { crearSalasApi } from '../lib/salasApi'
+import { LLENA_SEG } from '../config/salas'
 
 export const PARAM_SAL = 'sal'
 
-// Los nueve nombres de §8.3, en un solo sitio: el arnés los recorre desde aquí
-// y así no puede pedir uno que no exista ni olvidarse de uno que sí.
+// Los nombres, en un solo sitio: el arnés los recorre desde aquí y así no puede
+// pedir uno que no exista ni olvidarse de uno que sí.
 export const ESTADOS_SAL = [
   'opciones-vacio',
   'opciones-3',
   'opciones-mas',
   'opciones-fuera-alcance',
   'opciones-error',
-  // A1 §5 · el décimo: campo LLENO por el camino real del enlace (código
-  // precargado, intento automático, fallo, foco) — la secuencia con la que el
-  // Motorola escondió la primera letra.
+  // A1 §5 · campo LLENO por el camino real del enlace (código precargado,
+  // intento automático, fallo, foco) — la secuencia con la que el Motorola
+  // escondió la primera letra.
   'opciones-codigo-lleno',
   'armar',
   'armar-aviso',
   'armar-unirme',
-  'espera-stub',
+  // ── SAL-B2 F1b · la sala de espera real, un estado por vista de la lámina ──
+  'espera-anfitrion',
+  'espera-invitado',
+  'espera-abierta',
+  'espera-llena',
+  'espera-fin-cancelada',
+  'espera-fin-vencida',
+  'espera-fin-activa',
   // A2 §3 · la prueba NEGATIVA: `mi_sala()` devuelve la fila de nulos de
-  // PostgREST y el stub NO debe pintarse.
+  // PostgREST y la sala NO debe pintarse.
   'espera-fantasma',
 ]
 
@@ -84,24 +94,24 @@ export function simulacionSalas() {
   }
   if (estado === null || !ESTADOS_SAL.includes(estado)) return null
 
+  // F1b · los datos VIVOS del estado: la mesa y sus asientos. Son un solo
+  // objeto compartido por la mesa con la que `App` nace y por el cliente falso
+  // que la relee, para que lo que el emisor de eventos cambie sea lo que la
+  // siguiente lectura devuelva.
+  const datos = datosDe(estado)
+
   return {
     estado,
     pantalla: pantallaDe(estado),
-    api: apiDe(estado),
+    api: crearSalasApi(clienteDe(estado, datos)),
     config: configDe(estado),
     // A1 · el código con el que `SalaOpciones` nace, o `null`. Cuando lo hay,
     // `App` enciende el intento automático como si viniera de un enlace.
     codigo: codigoDe(estado),
     // A2 · la mesa con la que la app nace, como si se hubiera entrado por una
     // RPC. En `espera-fantasma` es la fila de nulos: `App` tiene que rechazarla.
-    sala: salaDe(estado),
+    sala: datos.sala,
   }
-}
-
-function salaDe(estado) {
-  if (estado === 'espera-stub') return salaFalsa()
-  if (estado === 'espera-fantasma') return filaDeNulos()
-  return null
 }
 
 // ── Qué código trae cada estado ─────────────────────────────────────────────
@@ -132,10 +142,13 @@ function pantallaDe(estado) {
 
 const uuid = (n) => `00000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`
 
+// El uuid del perfil del bypass (`PERFIL_DEV` en `useAuth.js:54`, no exportado
+// a propósito). Con él como `anfitrion_id` la sala se ve como ANFITRIÓN; con
+// otro, como INVITADO. Se escribe aquí igual que allí, y el arnés lo mide.
+const UID_DEV = '00000000-0000-4000-8000-000000000000'
+
 // `expira_en` se fabrica siempre en el futuro para que la fila sea coherente con
-// una sala viva. En B1 no se pinta —la tarjeta no lleva cronómetro— pero el dato
-// viaja igual, porque el contrato de `salas_abiertas()` lo incluye y un fixture
-// que omitiera columnas dejaría de ser un ensayo de lo real.
+// una sala viva —o en el pasado, para los finales que el reloj decide—.
 const enUnRato = (seg) => new Date(Date.now() + seg * 1000).toISOString()
 
 function mesa(n, jugadores, apuesta, sentados, seg = 150) {
@@ -202,17 +215,19 @@ function configDe(estado) {
   return null
 }
 
-function salaFalsa({ tipo = 'privada', jugadores = 4, apuesta = 200 } = {}) {
+function salaFalsa({
+  tipo = 'privada', jugadores = 4, apuesta = 200, anfitrionId = UID_DEV, estado = 'esperando', expiraEn = enUnRato(150),
+} = {}) {
   return {
     id: uuid(9),
     codigo: tipo === 'privada' ? 'AJ-7K2M' : null,
     tipo,
     jugadores,
     apuesta,
-    anfitrion_id: '00000000-0000-4000-8000-000000000000',
-    estado: 'esperando',
+    anfitrion_id: anfitrionId,
+    estado,
     creada_en: new Date().toISOString(),
-    expira_en: enUnRato(150),
+    expira_en: expiraEn,
     iniciada_en: null,
     estado_partida: null,
   }
@@ -232,22 +247,79 @@ function filaDeNulos() {
   }
 }
 
+// ── F1b · Los asientos, en la forma del CLIENTE ─────────────────────────────
+// `{ asiento, jugadorId, username }`, lo que `asientosDe` devuelve; el cliente
+// falso los traduce a la forma de PostgREST al servirlos. Los nombres son los de
+// la lámina; `DevLocal` es el username de `PERFIL_DEV`.
+const OTRO = uuid(7)
+const silla = (asiento, jugadorId, username) => ({ asiento, jugadorId, username })
+const ANFITRION_DEV = silla(0, UID_DEV, 'DevLocal')
+const ANFITRION_OTRO = silla(0, OTRO, 'carlos_vzla')
+const INVITADOS = [silla(1, uuid(11), 'maria_ccs'), silla(2, uuid(12), 'jose_mad'), silla(3, uuid(13), 'ana_bcn'), silla(4, uuid(14), 'luis_mia')]
+
+// ── F1b · La mesa y los asientos de cada estado ─────────────────────────────
+//   anfitrión     · privada de 4, yo en la 0 con una invitada
+//   invitado      · privada de 4, otro anfitrión en la 0 y yo en la 1
+//   abierta       · como anfitrión, sin código
+//   llena         · 5 de 5 y la cuenta corta (`LLENA_SEG`)
+//   fin-cancelada · invitado; la fila ya dice 'cancelada' (el anfitrión cerró)
+//   fin-vencida   · ANFITRIÓN solo, reloj en el pasado y la fila YA en
+//                   'cancelada': es exactamente lo que E5 vivió en el teléfono
+//                   (el barrido la cerró y Realtime trajo la fila antes de que
+//                   este cliente resolviera). Con la regla de los ajustes el
+//                   anfitrión lee «no llegó gente a tiempo», no «el anfitrión
+//                   cerró la mesa»: la fila es la misma, quien mira no.
+//   fin-activa    · dos sentados, reloj en el pasado; `resolver_sala` → activa
+function datosDe(estado) {
+  switch (estado) {
+    case 'espera-anfitrion':
+      return { sala: salaFalsa(), asientos: [ANFITRION_DEV, INVITADOS[0]] }
+    case 'espera-invitado':
+      return { sala: salaFalsa({ anfitrionId: OTRO }), asientos: [ANFITRION_OTRO, silla(1, UID_DEV, 'DevLocal')] }
+    case 'espera-abierta':
+      return { sala: salaFalsa({ tipo: 'abierta' }), asientos: [ANFITRION_DEV, INVITADOS[0]] }
+    case 'espera-llena':
+      return { sala: salaFalsa({ jugadores: 5, expiraEn: enUnRato(LLENA_SEG) }), asientos: [ANFITRION_DEV, ...INVITADOS] }
+    case 'espera-fin-cancelada':
+      return { sala: salaFalsa({ anfitrionId: OTRO, estado: 'cancelada' }), asientos: [ANFITRION_OTRO, silla(1, UID_DEV, 'DevLocal')] }
+    case 'espera-fin-vencida':
+      return { sala: salaFalsa({ expiraEn: enUnRato(-5), estado: 'cancelada' }), asientos: [ANFITRION_DEV] }
+    case 'espera-fin-activa':
+      return { sala: salaFalsa({ expiraEn: enUnRato(-5) }), asientos: [ANFITRION_DEV, INVITADOS[0]] }
+    case 'espera-fantasma':
+      return { sala: filaDeNulos(), asientos: [] }
+    default:
+      return { sala: null, asientos: [] }
+  }
+}
+
 // ── El CLIENTE simulado ─────────────────────────────────────────────────────
 // Imita al SDK de Supabase en lo que `crearSalasApi` toca: `rpc(nombre, args)`,
-// `from(...).select(...).eq(...)` para el recuento de sentados, y un canal que
-// no hace nada. Devuelve lo que PostgREST devolvería, con `error: null`; la
-// traducción a claves y la normalización de «no hay mesa» las hace la capa
-// real, que es justo lo que A2 quiere medir.
+// `from(...).select(...).eq(...)[.order() | .maybeSingle()]` para los asientos,
+// el recuento y la fila de la sala, y un canal que GUARDA sus handlers.
+// Devuelve lo que PostgREST devolvería, con `error: null`; la traducción a
+// claves y la normalización de «no hay mesa» las hace la capa real, que es
+// justo lo que A2 quiere medir.
 //
 // Los estados que rechazan el código (`opciones-error`, `opciones-codigo-lleno`)
 // responden con la FILA DE NULOS, que es lo que `unirse_sala` devuelve desde A1
 // para un código que no encuentra mesa viva; `salasApi` la convierte en
-// `codigo_invalido`. Y `mi_sala` sin mesa responde también con ella —salvo en
-// `espera-stub`—, porque eso es lo que la base hace de verdad.
-function clienteDe(estado) {
+// `codigo_invalido`. Y `mi_sala` sin mesa responde también con ella, porque eso
+// es lo que la base hace de verdad.
+//
+// ── F1b · `window.__salEmitir`: Realtime sin backend ───────────────────────
+// El canal falso guarda los handlers que `suscribirSala` registra, y el arnés
+// dispara uno con `window.__salEmitir({ tabla, evento, sala, asientos })`:
+// primero muta los datos vivos (una silla más, la fila en 'cancelada'), luego
+// llama a los handlers de esa tabla con `{ eventType }`. La pantalla, por
+// contrato, no mira el payload: relee. Es la única forma de medir sin backend
+// que la pantalla relee al recibir. Vive DENTRO de esta función, tras la puerta
+// doble: en producción no existe, y el `grep` de `dist/` lo comprueba.
+function clienteDe(estado, datos) {
   const abiertas = abiertasDe(estado)
   const fila = (data) => Promise.resolve({ data, error: null })
   const sinMesa = estado === 'opciones-error' || estado === 'opciones-codigo-lleno'
+  const hayMesa = () => datos.sala !== null && datos.sala.id !== null
 
   const rpc = (nombre, args = {}) => {
     switch (nombre) {
@@ -261,25 +333,65 @@ function clienteDe(estado) {
         return fila(salaFalsa({ tipo: args.p_tipo, jugadores: args.p_jugadores, apuesta: args.p_apuesta }))
       case 'salir_sala':    return fila(null)
       case 'jugar_ya':
-      case 'resolver_sala': return fila(salaFalsa())
-      case 'mi_sala':       return fila(estado === 'espera-stub' ? salaFalsa() : filaDeNulos())
+        return fila(hayMesa() ? { ...datos.sala, estado: 'activa', iniciada_en: new Date().toISOString() } : salaFalsa())
+      // Los dos finales que el reloj decide: la fila resuelta dice lo que el
+      // barrido diría con esos sentados (< 2 cancela, ≥ 2 arranca).
+      case 'resolver_sala':
+        if (!hayMesa()) return fila(salaFalsa())
+        if (estado === 'espera-fin-vencida') return fila({ ...datos.sala, estado: 'cancelada' })
+        if (estado === 'espera-fin-activa') return fila({ ...datos.sala, estado: 'activa', iniciada_en: new Date().toISOString() })
+        return fila(datos.sala)
+      case 'mi_sala':       return fila(hayMesa() ? datos.sala : filaDeNulos())
       default:              return fila(null)
     }
   }
 
-  // Dos de cuatro: la sala de espera enseña «2/4 sentados» y el botón
-  // «Actualizar» devuelve el mismo número, que es lo que hace la captura
-  // repetible.
-  const from = () => ({ select: () => ({ eq: () => Promise.resolve({ count: 2, error: null }) }) })
-
-  const channel = () => {
-    const canal = { on: () => canal, subscribe: () => canal }
-    return canal
+  // `from`: la fila de `salas` para `leerSala`, los asientos (forma PostgREST,
+  // con `profiles` incrustado) para `asientosDe`, y el `count` para
+  // `contarSentados` cuando el `select` pide `head: true`.
+  const from = (tabla) => {
+    let soloCuenta = false
+    const responder = () => {
+      if (tabla === 'salas') return { data: hayMesa() ? datos.sala : null, error: null }
+      if (soloCuenta) return { count: datos.asientos.length, error: null }
+      return {
+        data: datos.asientos.map((a) => ({ asiento: a.asiento, jugador_id: a.jugadorId, profiles: { username: a.username } })),
+        error: null,
+      }
+    }
+    const cadena = {
+      select(columnas, opciones) { soloCuenta = Boolean(opciones?.head); return cadena },
+      eq() { return cadena },
+      order() { return cadena },
+      maybeSingle() { return cadena },
+      then(fn) { return Promise.resolve(responder()).then(fn) },
+    }
+    return cadena
   }
 
-  return { rpc, from, channel, removeChannel: () => {} }
-}
+  const escuchas = []
+  const emitir = ({ tabla, evento = 'UPDATE', sala = null, asientos = null } = {}) => {
+    if (sala && datos.sala) Object.assign(datos.sala, sala)
+    if (Array.isArray(asientos)) datos.asientos = asientos
+    let avisados = 0
+    for (const e of escuchas) {
+      if (e.tabla === tabla) { e.fn({ eventType: evento }); avisados += 1 }
+    }
+    return avisados
+  }
+  // El emisor se cuelga de `window` AL SUSCRIBIR, no al construir el cliente:
+  // en desarrollo React invoca dos veces el inicializador de `useState` que
+  // llama a `simulacionSalas()` (StrictMode) y se queda con uno de los dos
+  // clientes. Colgarlo aquí garantiza que el emisor sea el del cliente que la
+  // pantalla usa de verdad, con SUS handlers y SUS datos.
+  const channel = () => {
+    const canal = {
+      on(tipo, filtro, fn) { escuchas.push({ tabla: filtro?.table, fn }); return canal },
+      subscribe() { window.__salEmitir = emitir; return canal },
+    }
+    return canal
+  }
+  const removeChannel = () => { escuchas.length = 0 }
 
-function apiDe(estado) {
-  return crearSalasApi(clienteDe(estado))
+  return { rpc, from, channel, removeChannel }
 }
