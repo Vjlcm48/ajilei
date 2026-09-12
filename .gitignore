@@ -107,3 +107,8 @@ capturas-lob/
 # que `.env.local`: es estado de la máquina de quien enlazó, no del proyecto.
 supabase/.temp/
 supabase/.branches/
+
+# SAL-B1 · capturas del arnés de salas (scripts/diagSAL.mjs). Mismo criterio que
+# capturas-lob y capturas-pue: son REGENERABLES —una corrida del modo `sal` las
+# rehace todas— y pesan 54 PNG por tanda (9 estados × 6 viewports).
+capturas-sal/
