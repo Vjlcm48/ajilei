@@ -128,6 +128,16 @@ export function normalizarCodigo(texto) {
 // comentario es el enlace: si uno cambia, el otro se cambia a mano.
 export const DURACION_SALA_SEG = 180
 
+// ── SAL-B2 · Los diez segundos de la mesa llena ─────────────────────────────
+// Rector: AJILEI_SAL-B2_Fase1a_v1.0.md §5. Cuando se ocupa la última silla,
+// `unirse_sala` (migración `<timestamp>_sal_b2.sql`) acorta `expira_en` a
+// `now() + interval '10 seconds'`: los que ya están no esperan a un reloj que
+// ya no espera a nadie. Esta constante es el ESPEJO de ese `interval`, con el
+// mismo trato que `DURACION_SALA_SEG`: la cifra que decide vive en SQL, ésta
+// sólo sirve para enseñar y para que las fixtures del arnés fabriquen una mesa
+// llena coherente. Si cambia uno, el otro se cambia a mano.
+export const LLENA_SEG = 10
+
 // ── Los tamaños de mesa ─────────────────────────────────────────────────────
 // [2, 3, 4, 5]. NO se escribe a mano: se DERIVA de `AJILEI_CONFIG.game`, que es
 // quien decide de cuántos puede ser una mesa de Ajilei y ya gobernaba el motor y
