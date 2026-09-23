@@ -1,6 +1,9 @@
 # AJILEI — Modos y Asistencia v1.0
 
 **Estado:** **Especificación de implementación.** Ya no es borrador de conceptualización.
+**Errata e1 (2026-09-17) — §3.3 corregida.** El modelo de «costo único por partida» que este
+documento describía **no es el del código ni el del juego**: el monto es el ante de cada mano. La
+autoridad de todo lo que toque dinero pasa a `AJILEI_APU-1_Reglas_v1.0.md`. Detalle en §12.
 **Fecha:** 2026-08-14
 **Base de código:** HEAD `df5270f` (ESC-1). Documento **doc-only**: no toca `src/`, no abre
 protegidos. Lo implementan las tandas **NIV-B0 → NIV-UI → NIV-1 → NIV-2** (§10).
@@ -215,7 +218,13 @@ encarece.
 
 ### 3.3 Las tres tablas
 
-**Costo único por partida.** El ganador se lleva el **pote = monto × jugadores**.
+**ERRATA e1 (2026-09-17).** Donde decía «Costo único por partida. El ganador se lleva el pote =
+monto × jugadores» hay que leer: **el monto es el ANTE DE CADA MANO**. Cada mano arranca cobrando
+un ante igual al monto a cada jugador vivo (`gameEngine.js:413-418`), y el pozo de esa mano se
+reparte al final de esa mano. Una partida son muchas manos y, por tanto, muchos antes y muchos
+pozos. **Reglas del dinero: `AJILEI_APU-1_Reglas_v1.0.md` §2.4**, que manda sobre esta sección en
+todo lo que toque dinero. Las tres tablas de abajo —qué montos ofrece cada nivel— **siguen
+vigentes tal cual**: lo que estaba mal era qué significa el monto, no cuáles son.
 
 | Nivel | Entradas |
 |---|---|
@@ -223,18 +232,13 @@ encarece.
 | **Avanzado** | **100 · 200 · 300 · 500** *(las de hoy)* |
 | **Pro** | **200 · 400 · 600 · 1000** |
 
-Rango del pote resultante, por nivel:
-
-| Nivel | Pote mínimo (2 jugadores, mesa baja) | Pote máximo (5 jugadores, mesa alta) |
-|---|---|---|
-| Básico | **100** | **1250** |
-| Avanzado | 200 | 2500 |
-| Pro | 400 | **5000** |
-
-**Consecuencia aritmética anotada, sin decisión asociada:** con `saldoInicial` de 5000
-(`ajileiConfig.js`), la entrada más alta de Pro consume **el 20 % del saldo de arranque** por
-partida, y el pote máximo de la escalera iguala exactamente ese saldo. Se registra para la
-calibración final; **no se toca la economía de arranque en esta fase**.
+**Retirado por la errata e1:** aquí vivían una tabla de «pote mínimo / pote máximo» por nivel
+(100–1250 · 200–2500 · 400–5000) y una nota sobre el 20 % del `saldoInicial`. Las dos describían
+**la primera mano con todos pasando**, no una partida, así que no acotaban nada: con ante por mano
+el pozo crece con cada subida y una partida cobra tantos antes como manos dure. Además
+`saldoInicial` se retira en APU-1 (`AJILEI_APU-1_Reglas_v1.0.md` §10), con lo que la nota se
+quedaba sin referente. Se retiran en vez de anotarse porque una cifra que no acota nada, anotada,
+se sigue citando.
 
 **Solapamiento deliberado:** 100 pertenece a Básico *y* a Avanzado; 200 a Avanzado *y* a Pro. No
 es un descuido de tabla — es la costura que permite subir de nivel **sin subir de apuesta**, de
@@ -616,6 +620,22 @@ Conforme al mandato de **reportar y no resolver**:
 
 ## 12. Historial de versiones
 
+- **v1.0 · errata e1** — 2026-09-17 (**APU-1 Fase 1a**). **Corrección de un error de hecho en
+  §3.3**, levantado como **I-1a/I-1b** por `docs/reportes/AJILEI_APU-1_Fase0_Informe_v1.0.md`. El
+  documento describía la apuesta como **«costo único por partida»** con un pozo único; el código
+  la cobra como **ante de cada mano** desde antes de que este documento existiera. Se corrige el
+  enunciado, **se conservan las tres tablas de montos** (que eran correctas) y **se retiran** la
+  tabla de rango del pote y la nota del 20 % del `saldoInicial`, porque describían la primera mano
+  y no una partida. La autoridad sobre el dinero pasa a **`AJILEI_APU-1_Reglas_v1.0.md`**, que se
+  declara a sí mismo sustituto de esta §3.3.
+  **§7 (lista de protegidos) queda subsumido por `AJILEI_Protegidos_v1.0.md` v1.4**, que recoge los
+  seis archivos y la excepción pre-autorizada de siembra —ampliada por decisión de Victor del
+  2026-09-17 (L-3) a `aiPlayer.js` además de `deck.js`—. Nada más de este documento se toca.
+  **Por qué «errata e1» y no «v1.1»:** el nombre v1.1 ya lo ocupa
+  `AJILEI_Modos_y_Asistencia_v1.1.md`, un documento distinto y posterior (NIV-CAL, 2026-08-15) que
+  es la cabeza viva de esta cadena. Esta cadena versiona **por archivo**, no por cabecera, así que
+  subir la cabecera del v1.0 a v1.1 habría creado dos documentos con el mismo nombre de versión y
+  distinto contenido. Queda consignado en el informe de la tanda §D.
 - **v1.0** — 2026-08-14. **Primera versión en el repositorio.** **Ratifica las ocho decisiones
   D-1…D-8 con su enunciado literal** —las tres primeras transcritas desde el registro de la sesión
   de la v0.1— y las desarrolla. Sella la escalera

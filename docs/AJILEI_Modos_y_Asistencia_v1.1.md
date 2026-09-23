@@ -458,13 +458,15 @@ Se enumera para que no haya duda de alcance:
 
 - **§2 · D-1…D-8** — las ocho decisiones, incluida **D-4 (prohibido el multiplicador ciego de
   agresión)** y **D-5 (integridad de información)** con la trampa `Proxy` como puerta obligatoria.
-- **§3 · Nombres y tablas** — Básico/Avanzado/Pro y las tres tablas de entrada.
+- **§3 · Nombres y tablas** — Básico/Avanzado/Pro. *(APU-1 1a corrigió la errata e1 de
+  §3.3: las tablas de entrada de la v1.0 ya no dicen lo que decían, y la referencia buena es
+  el normativo `AJILEI_APU-1_Reglas_v1.0.md` §2.2 y §3.1.)*
 - **§4 · Pantallas** y el recorrido.
 - **§5 · Asignación de capacidades** — con la única precisión de §1.3 de este documento sobre qué
   supone Avanzado de sus rivales.
 - **§6 · Puntos de ranking**, sellados y durmientes.
-- **§7 · Lista de protegidos** — cinco archivos, con la excepción pre-autorizada de siembra en
-  `deck.js`.
+- **§7 · Lista de protegidos** — desde `AJILEI_Protegidos` v1.4 son **seis** archivos, y la
+  excepción pre-autorizada de siembra cubre `deck.js` **y `aiPlayer.js`**.
 - **§8 · Deuda de motor** — pila de descartes y gancho de showdown. **Sigue sin abrirse**, y ahora
   tiene dos límites de §5 esperándola por nombre.
 - **§9 · Red de pruebas** y la regla de que **cada tanda de nivel trae la suya**.
