@@ -19,7 +19,7 @@
 //
 // Parámetros:
 //   --mesa <2|3|4|5>            una sola mesa (omitido = las cuatro)
-//   --j0 <espejo|pasivo|aleatorio>  un solo conductor (omitido = los tres)
+//   --j0 <espejo|pasivo|aleatorio|manoso>  un solo conductor (omitido = los cuatro)
 //   --manos <n>                 manos CONTADAS por celda (default 100.000). El
 //                               mínimo de humo son 5.000: sirve para ver que el
 //                               banco corre, no para fijar una banda — a ese
@@ -35,13 +35,32 @@
 //                               (default: el de la mesa). Distinto = DUELO.
 //   --duelo <nivel>             añade una celda espejo EXTRA por mesa con el
 //                               asiento 0 a ese nivel, sin quitar la simétrica
+//   --seed N                    siembra el azar del mazo Y el de la IA con un
+//                               PRNG determinista (APU-1 1c §2.3). Dos corridas
+//                               con la misma semilla dan el mismo volcado.
+//                               Sin la bandera, `Math.random` como siempre.
 //   --bandas                    compara cada celda producida contra la vara
-//                               sellada (capturas-dsk/evidencia/nivCAL_bandas.json)
+//                               sellada (scripts/apu1_bandas.json; la de NIV-CAL,
+//                               superada, se conserva en capturas-dsk/evidencia/)
 //                               y sale con codigo 1 si alguna se sale de banda.
+//                               Si no comparo NINGUNA celda dice SIN COMPARAR y
+//                               sale con codigo 2: una vara que no mide nada no
+//                               es verde, es nada (APU-1 1c, D-16 de 1b).
 //                               Es la alarma anti-degradacion de toda tanda que
 //                               toque aiPlayer.js (NIV-CAL §3).
 //   --sellar-bandas <a,b,...>   lee volcados completos y ESCRIBE esa vara. Se
 //                               vuelve a sellar solo con autorizacion explicita.
+//   --anadir                    con --sellar-bandas: RE-SELLA SOLO las claves que
+//                               vengan en los volcados y CONSERVA el resto de la
+//                               vara. Sin ella, sellar reescribe el archivo entero
+//                               y las celdas que no vinieran se pierden — que es
+//                               justo lo que una tanda de re-sello parcial no
+//                               quiere (APU-1 C-0.4).
+//   --nota <texto>              con --sellar-bandas: se graba en cada celda
+//                               sellada en esta pasada. Una celda que cambia de
+//                               cifra tiene que decir POR QUE cambio.
+//   --vara-bandas <ruta>        lee (o escribe) la vara en otra ruta. Sin ella,
+//                               scripts/apu1_bandas.json.
 //   --ref <archivo>             vara de la que sale la cifra de referencia de la
 //                               puerta N1(b) (default niv1_avanzado.json)
 //   --repuertas <ruta>          recalcula los veredictos de un JSON ya escrito
@@ -52,6 +71,27 @@
 //   --evid <archivo>            nombre del resumen rastreado (default nivB0_base.json)
 //   --tanda <nombre>            etiqueta de la corrida (default NIV-B0)
 //   --volcado <archivo>         nombre del volcado completo
+//   --sinReloj                  omite del volcado los campos de reloj (`generado`,
+//                               `ms`, `manosPorMinuto`). Con la misma semilla, dos
+//                               corridas dan archivos IDÉNTICOS y el `diff` sale
+//                               vacío: es lo que convierte la siembra en una vara
+//                               comprobable (APU-1 1d §2.2).
+//   --param ruta=valor          (repetible) sobreescribe AJILEI_CONFIG en memoria
+//                               antes de correr, con ruta por puntos:
+//                                 --param ia.subidaFuerte.porMesa.5=38
+//                                 --param ia.fraccionPozo.basico=0.25
+//                                 --param ia.farol.bloquePorReto.basico=null
+//                               `null`, `true` y `false` se leen como tales; lo
+//                               que parsee a número entra como número. El volcado
+//                               registra los overrides aplicados.
+//   --manosoDelta <n>           baja n puntos el liston de subida del conductor
+//                               `manoso` (y SOLO eso: ni el archivo, ni PAGA,
+//                               ni los listones del farol). Tabla de
+//                               sensibilidad de 1d-ii. Por defecto 0.
+//   --barrido <spec.json>       corre una LISTA de celdas {nombre, params, mesa,
+//                               j0, nivel, manos} y escribe un solo JSON con las
+//                               varas de cada una. Es lo que hace reproducibles
+//                               los barridos de 1d sin scripts sueltos.
 //
 // Salidas (§6): volcado completo a capturas-dsk/ (ignorada, regenerable) y
 // —sólo con --base— el resumen a capturas-dsk/evidencia/<--evid>, que SÍ se
@@ -65,6 +105,7 @@ import { register } from 'node:module'
 // que `register` corra.
 register('./_resolveExt.mjs', import.meta.url)
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -72,8 +113,27 @@ const {
   PHASES, createInitialState, startHand, advanceFromDeal,
   applyPlayerBetAction, applyAIBetAction, applyDiscard,
 } = await import('../src/engine/gameEngine.js')
-const { decideBetAction, decideDiscard, getPersonalityName, initPersonalities, _resetForTesting, _DIAG_PRO } =
-  await import('../src/engine/aiPlayer.js')
+const {
+  decideBetAction, decideDiscard, getPersonalityName, initPersonalities,
+  _resetForTesting, _DIAG_PRO, _CONT_APU1, setRng: sembrarIA,
+} = await import('../src/engine/aiPlayer.js')
+// APU-1 1c §2.3 · las dos fuentes de azar del banco, para `--seed`.
+const { setRng: sembrarMazo } = await import('../src/engine/deck.js')
+// APU-1 §3.2 · el motor valida y ya no reescribe acciones. El conductor del
+// asiento 0 pregunta qué es legal antes de mandar.
+const { accionesDe, esLegal } = await import('../src/engine/pozos.js')
+// APU-1 1d · el conductor `mañoso` y el contador de faroles necesitan el puntaje
+// del asiento desde FUERA de la IA: misma función que usa el motor al evaluar.
+const { getBestSuitScore } = await import('../src/engine/handEvaluator.js')
+// APU-1 1d §2.2 · `--param` sobreescribe la configuración EN MEMORIA. Los ocho
+// lectores de `aiPlayer.js` leen `AJILEI_CONFIG` en vivo en cada llamada (regla
+// 1.3 de la ficha, verificada en el paso 0), así que basta mutar el objeto.
+const { AJILEI_CONFIG } = await import('../src/config/ajileiConfig.js')
+// APU-1 1c-2-iii · `--entrada` reparte con `entrada.js`, no con una copia de la
+// fórmula. Cuando el rector cambió §2.3 de `entrada + margen` a
+// `round(entrada × factor)`, el banco lo heredó sin tocarse: eso es justo lo
+// que la copia local impedía.
+const { pilaIA: pilaDeIA } = await import('../src/engine/entrada.js')
 
 const RAIZ     = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIR_OUT  = join(RAIZ, 'capturas-dsk')
@@ -86,13 +146,116 @@ const arg  = (nombre, porDefecto = null) => {
   return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : porDefecto
 }
 const flag = (nombre) => argv.includes(`--${nombre}`)
+// Repetible: `arg` sólo ve la primera aparición y `--param` se usa varias veces.
+const args = (nombre) => {
+  const out = []
+  for (let i = 0; i < argv.length - 1; i++) if (argv[i] === `--${nombre}`) out.push(argv[i + 1])
+  return out
+}
 
-const MESAS       = arg('mesa') ? [Number(arg('mesa'))] : [2, 3, 4, 5]
-const CONDUCTORES = arg('j0')   ? [arg('j0')]           : ['espejo', 'pasivo', 'aleatorio']
-const MANOS       = Number(arg('manos', 100000))
-const UNIT        = Number(arg('unit', 50))
-const SORTEO      = arg('sorteo', 'partida')
-const NIVEL       = arg('nivel', 'basico')
+// El conductor de la ficha se escribe `mañoso`; la ñ en una línea de órdenes de
+// Windows es una lotería de páginas de código, así que la clave canónica —la que
+// viaja a los JSON— es ASCII (`manoso`) y la acentuada es un alias de entrada.
+const normalizaJ0 = (x) => (x === 'mañoso' ? 'manoso' : x)
+
+let MESAS       = arg('mesa') ? [Number(arg('mesa'))] : [2, 3, 4, 5]
+let CONDUCTORES = arg('j0')   ? [normalizaJ0(arg('j0'))] : ['espejo', 'pasivo', 'aleatorio', 'manoso']
+// MANOS y NIVEL dejan de ser constantes porque `--barrido` los fija POR CELDA.
+// Fuera de ese modo se escriben una vez aquí y no se vuelven a tocar.
+let MANOS       = Number(arg('manos', 100000))
+let UNIT        = Number(arg('unit', 50))
+const SORTEO    = arg('sorteo', 'partida')
+let NIVEL       = arg('nivel', 'basico')
+// APU-1 1d §2.2 · sin campos de reloj el volcado es función pura de la semilla.
+const SIN_RELOJ = flag('sinReloj') || flag('sinreloj')
+const ahora     = () => (SIN_RELOJ ? null : new Date().toISOString())
+
+// ── PILA INICIAL · 5.000 en TODOS los asientos (ficha 1d §2.2) ──────────────
+// El banco mide el motor y la IA, no la economía: la entrada de mesa y la
+// recarga son de pantalla (1e). Se construye la lista explícita en vez de
+// apoyarse en `economy.pilaPruebas` para que ningún `--param` de un barrido
+// pueda mover la pila sin que nadie se entere.
+const PILA_INICIAL = 5000
+
+// ── APU-1 1c-2 §2.3 · `--entrada k` · PILAS REALES DE LA PANTALLA ─────────────
+//
+// Hasta 1d el banco sentaba a todos con 5.000 fichas fijas, o sea 100 antes a la
+// apuesta de 50. La pantalla no reparte así: el humano elige su entrada (10×,
+// 20× o 50× la apuesta de mesa, §2.2 del normativo v1.1; eran 5× y 15× cuando
+// se midieron las celdas selladas con `--entrada`) y cada IA se sienta con
+// lo que `entrada.pilaIA` reparta (desde 1c-2-iii, `round(entrada ×
+// ia.factorPila)` topado por el techo). Y la profundidad manda: D.9 del
+// informe 1d midió que partir la profundidad por la mitad parte la mediana de la
+// partida casi por la mitad —202 / 115 / 58 / 50 / 26 / 11—, así que V1 y V2
+// medidas a 100 antes no dicen nada sobre la mesa que Victor juega.
+//
+// SIN `--entrada` NO CAMBIA NADA: `null` deja los 5.000 de siempre, y con ellos
+// todas las bandas ya selladas se siguen reproduciendo.
+//
+// SE RECHAZA BAJO `espejo`, y no por prudencia: la puerta (b) del banco
+// comprueba que bajo el espejo cada asiento se lleva 1/N de las manos, y esa
+// permutación sólo es honesta si las pilas son iguales. Con entrada, el asiento
+// 0 arranca con menos que el resto y el espejo dejaría de medir la simetría del
+// cerebro para medir la del bolsillo.
+// `let` y no `const` porque `--barrido` la relee de cada celda, igual que
+// `unit`: la tabla de §3.1 compara 5×, 15× y 50× en una sola corrida.
+let ENTRADA = arg('entrada') !== null ? Number(arg('entrada')) : null
+const validarEntrada = (e, modo) => {
+  if (e === null) return
+  if (!(e > 0)) {
+    console.error('--entrada: se espera un m\u00faltiplo positivo de la apuesta de mesa')
+    process.exit(1)
+  }
+  if (modo === 'espejo') {
+    console.error('--entrada no vale bajo `espejo`: la puerta (b) mide que cada ' +
+      'asiento se lleva 1/N de las manos, y esa permutaci\u00f3n s\u00f3lo es honesta con ' +
+      'las pilas iguales. Con entrada, el espejo medir\u00eda el bolsillo y no el cerebro.')
+    process.exit(1)
+  }
+}
+// La corrida normal se valida ya; el barrido, celda a celda.
+for (const modo of CONDUCTORES) validarEntrada(ENTRADA, modo)
+
+// ── `--param ruta=valor` · sobreescritura de AJILEI_CONFIG en memoria ───────
+// Los ocho lectores de `aiPlayer.js` (§C-2 de 1c) resuelven `AJILEI_CONFIG` en
+// CADA llamada, así que mutar el objeto basta y no hace falta reimportar nada.
+// La copia prístina se guarda antes de tocar nada: `--barrido` la restaura
+// entre celdas para que un barrido de un factor no arrastre el anterior.
+const CONFIG_PRISTINA = structuredClone(AJILEI_CONFIG)
+function restaurarConfig() {
+  for (const k of Object.keys(AJILEI_CONFIG)) delete AJILEI_CONFIG[k]
+  Object.assign(AJILEI_CONFIG, structuredClone(CONFIG_PRISTINA))
+}
+function leerValor(txt) {
+  if (txt === 'null')  return null
+  if (txt === 'true')  return true
+  if (txt === 'false') return false
+  const n = Number(txt)
+  return txt.trim() !== '' && Number.isFinite(n) ? n : txt
+}
+function fijarParam(ruta, valor) {
+  const partes = String(ruta).split('.')
+  let nodo = AJILEI_CONFIG
+  for (let i = 0; i < partes.length - 1; i++) {
+    if (nodo[partes[i]] === null || typeof nodo[partes[i]] !== 'object') nodo[partes[i]] = {}
+    nodo = nodo[partes[i]]
+  }
+  nodo[partes[partes.length - 1]] = valor
+}
+function aplicarParams(lista) {
+  const aplicados = {}
+  for (const uno of lista) {
+    const i = String(uno).indexOf('=')
+    if (i < 0) { console.error(`--param pide ruta=valor, llegó «${uno}»`); process.exit(1) }
+    const ruta = uno.slice(0, i).trim()
+    const valor = leerValor(uno.slice(i + 1))
+    fijarParam(ruta, valor)
+    aplicados[ruta] = valor
+  }
+  return aplicados
+}
+const PARAMS = args('param')
+const PARAMS_APLICADOS = aplicarParams(PARAMS)
 // NIV-1 §7 · nivel del CEREBRO que conduce el asiento 0 bajo `espejo`. Por
 // defecto es el mismo de la mesa (espejo simétrico, que es lo que valida el
 // banco). Distinto = DUELO: misma cabeza, mismo temperamento prestado por el
@@ -109,6 +272,45 @@ const DUELO       = (arg('duelo') ?? '').split(',').map(s => s.trim()).filter(Bo
 // Nivel VIGENTE del cerebro del asiento 0. Lo fija `correrCelda` al empezar cada
 // celda: es la única pieza mutable del banco y no cruza celdas.
 let J0_ACTUAL = J0_NIVEL
+// ── Siembra determinista (APU-1 1c §2.3) ─────────────────────────────────────
+// Un solo generador alimenta al mazo Y a la IA: el azar de una corrida es UNA
+// secuencia, y partirla en dos haría que un cambio en el consumo de la IA no
+// moviera el barajado, que es precisamente la ilusión de independencia que una
+// semilla no debe dar. mulberry32 — 32 bits de estado, distribución plana,
+// seis líneas y sin dependencias.
+const SEED = arg('seed') !== null ? Number(arg('seed')) : null
+function mulberry32(a) {
+  return function () {
+    a = (a + 0x6D2B79F5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+// `sembrar()` es re-invocable a propósito: `--barrido` la llama antes de CADA
+// celda para que todas arranquen con la MISMA secuencia de azar. Son números
+// aleatorios comunes, que es la técnica estándar para comparar variantes: la
+// diferencia entre dos celdas de un barrido queda libre del ruido del reparto y
+// mide sólo el parámetro que cambió.
+//
+// APU-1 C-0.4 (D-31) · Y EL CONDUCTOR TAMBIÉN. Hasta 1e-iv el asiento 0 bajo
+// `aleatorio` tiraba con `Math.random` aunque la corrida llevara semilla, así
+// que sus VEINTE celdas no se reproducían ni sembradas (E-27). `azar()` es la única
+// puerta de azar del conductor: con `--seed` sale de la MISMA corriente que el
+// mazo y la IA —que es lo que hace que un cambio en el consumo de uno mueva a
+// los otros, la propiedad que una semilla debe dar—, y sin semilla sigue siendo
+// `Math.random`, como siempre.
+let azar = Math.random
+function sembrar() {
+  if (SEED === null) return
+  const r = mulberry32(SEED | 0)
+  sembrarMazo(r)
+  sembrarIA(r)
+  azar = r
+}
+if (SEED !== null && !Number.isFinite(SEED)) { console.error('--seed pide un número'); process.exit(1) }
+sembrar()
+
 const ESCRIBE_BASE = flag('base')
 const ARCHIVO_EVID = arg('evid', 'nivB0_base.json')
 const TANDA        = arg('tanda', 'NIV-B0')
@@ -182,6 +384,40 @@ const CAP_PARTIDA = 100000
 // idénticos. `_ensurePersonalities` (`:58-64`) RE-SORTEA los perfiles si
 // cualquiera de los dos cambia; alterarlos corrompería los asientos IA reales a
 // mitad de partida.
+// ── D-8 (informe 1c) · EL ESPEJO VOLVIÓ A SER SIMÉTRICO ────────────────────
+// Lo que se midió en 1c: la faroleadora de §6.4 se elige entre los asientos con
+// `isHuman !== true`, y bajo espejo el asiento conducido lleva el `isHuman` del
+// humano real, así que NUNCA salía elegido. El espejo simétrico —dos copias del
+// mismo cerebro— daba 48,16% en Avanzado (5,03σ) y 46,56% en Pro (10,02σ): el
+// instrumento medía una asimetría que él mismo fabricaba.
+//
+// El rector decidió arreglar el BANCO, no la IA (ficha 1d §0): bajo `espejo` el
+// asiento 0 se crea con `isHuman: false` y con eso se presenta como IA para
+// TODAS las reglas —la elección del farol y también la lectura de descartes de
+// ②, que consulta el mismo campo en `aiPlayer.js:817`—. No se toca
+// `estadoEspejo`: la permutación siempre fue correcta; lo que estaba torcido era
+// el jugador que permutaba.
+//
+// Bajo `pasivo`, `aleatorio` y `manoso` el asiento 0 SÍ es el humano y conserva
+// su `isHuman: true`: ahí la exclusión del farol es la conducta correcta.
+function nuevaPartida(N, modo) {
+  const humano = modo !== 'espejo'
+  // 1c-2 §2.3 · con `--entrada k`, las pilas de la pantalla: el asiento 0 entra
+  // con `k × apuesta` y cada IA con lo que le dé `entrada.pilaIA`, que es la
+  // MISMA función que usará la Fase 1e. No se copia la fórmula aquí: el día
+  // que §2.3 cambie —y cambió en 1c-2-iii, de margen fijo a factor— el banco
+  // tiene que heredarlo sin que nadie se acuerde de venir a tocarlo.
+  // Sin `--entrada`, los 5.000 de siempre.
+  const pilaJ0 = ENTRADA === null ? PILA_INICIAL : ENTRADA * UNIT
+  const pilaIA = ENTRADA === null ? PILA_INICIAL : pilaDeIA(pilaJ0, UNIT, AJILEI_CONFIG)
+  const lista = Array.from({ length: N }, (_, i) => ({
+    isHuman: i === 0 ? humano : false,
+    chips:   i === 0 ? pilaJ0 : pilaIA,
+    name:    i === 0 ? 'Tú' : (N === 2 ? 'IA' : `IA ${i}`),
+  }))
+  return { ...createInitialState(UNIT, lista), nivelIA: NIVEL }
+}
+
 function estadoEspejo(s) {
   const perm = (i) => (i === 0 ? 1 : i === 1 ? 0 : i)
   return {
@@ -195,7 +431,12 @@ function estadoEspejo(s) {
 function j0Espejo(s) {
   // El nivel del asiento 0 viaja en SU estado espejo, no en el de la mesa: así
   // el duelo enfrenta dos niveles sin que ninguno contamine al otro.
-  return decideBetAction({ ...estadoEspejo(s), nivelIA: J0_ACTUAL }, 1).action
+  //
+  // APU-1 1c · devuelve `{action, k}`: desde §6.2 la IA elige MONTO, y un
+  // espejo que se quedara con el `.action` mandaría siempre ×1 y mediría un
+  // duelo contra una versión mutilada de sí misma.
+  const { action, k } = decideBetAction({ ...estadoEspejo(s), nivelIA: J0_ACTUAL }, 1)
+  return { action, k }
 }
 
 // PASIVO · iguala o pasa, jamás sube, jamás se retira por decisión propia.
@@ -219,10 +460,94 @@ function j0Aleatorio(s) {
     // `subir` pone el total (currentBet + unit) − contrib (`gameEngine.js:262`)
     if (p.chips >= (s.currentBet + s.unit) - p.contrib) legales.push('subir')
   }
-  return legales[Math.floor(Math.random() * legales.length)]
+  // APU-1 C-0.4 · E-27 CERRADO. Esto era un `Math.random` que `--seed` no
+  // alcanzaba, y con él una celda de `aleatorio` no se reproducía ni sembrada.
+  // Ahora tira de `azar()`, que bajo semilla es la corriente común. El precio
+  // era re-sellar las veinte celdas de este conductor —no las «36» de la nota
+  // vieja: 36 son los volcados de la tanda de convergencia y sólo un tercio de
+  // ellos es `aleatorio`—, y eso es justo lo que la
+  // ficha de commits manda hacer en la misma pasada (D-31).
+  return legales[Math.floor(azar() * legales.length)]
 }
 
-const APUESTA = { espejo: j0Espejo, pasivo: j0Pasivo, aleatorio: j0Aleatorio }
+// ── MAÑOSO · la transcripción de la maña de Victor (ficha 1d §2.2) ─────────
+//
+// ESTOS NÚMEROS NO SON CIFRAS DEL JUEGO Y NO SE CALIBRAN. Son la maña que Victor
+// describió con sus palabras —«retirándome puntualmente, haciendo el 10×»— y por
+// eso viven aquí, fijos y a la vista, y no en `ajileiConfig.js`. Si se
+// calibraran, las varas V1-V3 dejarían de medir a la IA y pasarían a medir al
+// propio banco: un conductor que se adapta a lo que mide no es una vara.
+//
+// La regla, tal cual:
+//   BET_1 · nunca abre; con apuesta viva iguala si el costo ≤ ¼ del pozo y si no
+//           se retira. Es el «retirarse puntualmente» de la mesa de dos.
+//   BET_2/BET_3 · puntaje ≥ FUERTE[mesa] → sube con el MAYOR k legal (el 10× que
+//           quiebra a la IA en seis manos); ≥ 30 → paga sólo si es barato; por
+//           debajo, pasa si puede y si no se retira.
+//   Ante ['allIn','retirarse'] · empuja la pila sólo con puntaje ≥ FUERTE−2.
+//   No farolea NUNCA y descarta con la política de la IA.
+const FUERTE_MANOSO = { 2: 40, 3: 38, 4: 36, 5: 34 }
+const PAGA_MANOSO   = 30          // por debajo de esto no se paga ni barato
+const CUARTO        = 0.25
+
+// SENSIBILIDAD DE LA VARA, NO DEL JUEGO (orden del rector para 1d-ii, punto 3).
+// `--manosoDelta n` baja n puntos el liston con el que el CONDUCTOR decide
+// subir, y nada mas: la respuesta que buscamos es si la distancia de V1 la puso
+// el conductor o Basico. Tres cosas que NO se mueven, a proposito:
+//   · los umbrales del archivo siguen siendo {2:40, 3:38, 4:36, 5:34}; el delta
+//     es de linea de ordenes, vale 0 por defecto y no se calibra;
+//   · `PAGA_MANOSO` no se toca (lo pidio el rector por escrito);
+//   · los dos listones del FAROL OBSERVABLE siguen leyendo `FUERTE_MANOSO` sin
+//     delta, para que V4 siga siendo comparable entre celdas.
+let MANOSO_DELTA = Number(arg('manosoDelta', 0))
+const fuerteConductor = (N) => (FUERTE_MANOSO[N] ?? 36) - MANOSO_DELTA
+
+const puntajeDe = (s, asiento) => getBestSuitScore(
+  s.players[asiento].cards, s.handRules.ruleN, s.handRules.comodinValue !== null,
+).points
+
+// El mayor multiplicador que la pila cubre para esa acción, entre los de la
+// configuración. Mismo criterio que `mayorK` de `aiPlayer.js`, medido con
+// `esLegal` para no duplicar aritmética de costos.
+function mayorKLegal(s, asiento, accion) {
+  const mults = AJILEI_CONFIG.betting?.multiplicadores ?? [1]
+  for (let i = mults.length - 1; i >= 0; i--) if (esLegal(s, asiento, accion, mults[i]).ok) return mults[i]
+  return null
+}
+
+function j0Manoso(s) {
+  const p       = s.players[0]
+  const legales = accionesDe(s, 0)
+  const puede   = a => legales.includes(a)
+  const falta   = s.currentBet - p.contrib
+  const barato  = falta <= CUARTO * s.pot
+  const fuerte  = fuerteConductor(s.numPlayers)
+
+  // Sólo cabe empujar la pila o irse: `allIn` es legal exactamente cuando la
+  // apuesta viva no la cubre (§4.1), así que su presencia define el caso.
+  if (puede('allIn')) return puntajeDe(s, 0) >= fuerte - 2 ? 'allIn' : 'retirarse'
+
+  if (s.phase === PHASES.BET_1) {
+    if (falta <= 0) return puede('pasar') ? 'pasar' : 'retirarse'   // nunca abre
+    return barato && puede('igualar') ? 'igualar' : 'retirarse'
+  }
+
+  const score = puntajeDe(s, 0)
+  if (score >= fuerte) {
+    for (const accion of ['subir', 'apostar']) {
+      if (!puede(accion)) continue
+      const k = mayorKLegal(s, 0, accion)
+      if (k !== null) return { action: accion, k }
+    }
+  }
+  if (score >= PAGA_MANOSO) {
+    if (falta <= 0) return puede('pasar') ? 'pasar' : 'retirarse'
+    return barato && puede('igualar') ? 'igualar' : 'retirarse'
+  }
+  return puede('pasar') ? 'pasar' : 'retirarse'
+}
+
+const APUESTA = { espejo: j0Espejo, pasivo: j0Pasivo, aleatorio: j0Aleatorio, manoso: j0Manoso }
 
 // Descarte del asiento 0. `decideDiscard` SÍ es invocable con seat 0 sin
 // adaptador: no consulta perfiles, sólo cartas propias y `handRules`
@@ -233,11 +558,14 @@ function descarte(modo, s) {
   // duelo, la estrategia de comodín es parte de lo que se está midiendo.
   if (modo === 'espejo') return decideDiscard({ ...s, nivelIA: J0_ACTUAL }, 0)
   if (modo !== 'aleatorio') return decideDiscard(s, 0)
+  // Mismo azar que la apuesta del conductor: el descarte aleatorio también
+  // quedaba fuera de la semilla, y una celda sólo es reproducible si lo son
+  // TODAS sus tiradas.
   const tope  = s.handRules.maxDiscard
   const libres = s.players[0].cards.map((_, i) => i)
-  const n = Math.floor(Math.random() * (Math.min(tope, libres.length) + 1))
+  const n = Math.floor(azar() * (Math.min(tope, libres.length) + 1))
   for (let i = libres.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(azar() * (i + 1))
     ;[libres[i], libres[j]] = [libres[j], libres[i]]
   }
   return libres.slice(0, n)
@@ -250,40 +578,126 @@ function descarte(modo, s) {
 // niveles. Es el insumo que NIV-2 §7 pide para explicar POR QUÉ un nivel gana
 // más manos: en este juego casi todo se decide en el showdown, luego quien menos
 // se retira (con razón) es quien más manos gana.
-function jugarRonda(s, fase, modo, cond) {
+//
+// `obs` (opcional) es el observador de APU-1 1d §2.2: mide faroles, all-ins y
+// multiplicadores SIN mirar dentro de `aiPlayer`. Todo lo que anota sale de
+// comparar el estado antes y después de cada acción, así que vale igual para los
+// cuatro conductores y para los tres retos, y ninguna métrica depende de que la
+// IA se acuerde de instrumentarse a sí misma.
+function jugarRonda(s, fase, modo, cond, obs) {
   let n = 0
   while (s.phase === fase) {
     if (++n > 5000) throw new Error(`ronda ${fase} sin converger`)
     const asiento = s.activePlayerIndex
-    // Un asiento RETIRADO puede recibir turno al abrir BET_2/BET_3 (el motor
-    // reinicia activePlayerIndex = manoIndex). Se salta en silencio, igual que
-    // hace la UI en GameTable.jsx:691.
-    if (s.players[asiento].folded) {
-      s = asiento === 0 ? applyPlayerBetAction(s, 'pasar') : applyAIBetAction(s)
-      continue
-    }
     const apuestaAntes = s.currentBet
-    s = asiento === 0
-      ? applyPlayerBetAction(s, APUESTA[modo](s), s.unit)
-      : applyAIBetAction(s)
+    // Un asiento lleva CEREBRO DE IA si no es el 0, o si es el 0 bajo espejo.
+    const conCerebro = obs ? (asiento !== 0 || modo === 'espejo') : false
+    const allInAntes = conCerebro ? s.players[asiento].allIn === true : false
+    // El puntaje se lee ANTES de actuar y sólo en las rondas de apuesta alta:
+    // en BET_1 la mano tiene dos cartas y «farol» no querría decir nada.
+    const puntajeAntes = conCerebro && (fase === PHASES.BET_2 || fase === PHASES.BET_3)
+      ? puntajeDe(s, asiento) : null
+    if (asiento !== 0) {
+      s = applyAIBetAction(s)
+    } else {
+      // APU-1 §3.2 y §4.1: una acción ilegal ya no se reescribe en `retirarse`
+      // —el motor devuelve el mismo estado—, así que el conductor tiene que
+      // mandar algo legal o la ronda no converge. Cuando lo que pide el modo no
+      // cabe, se cae al all-in defensivo antes que al retiro, que es la regla
+      // nueva. Desde `primerTurno` el motor ya no da el turno a un asiento que
+      // no puede actuar, así que la lista vacía sería un fallo del motor.
+      const legales = accionesDe(s, 0)
+      if (!legales.length) throw new Error(`asiento 0 con el turno y sin acciones legales en ${fase}`)
+      // Los tres conductores hablan el mismo idioma: `{action, k}`. `pasivo` y
+      // `aleatorio` devuelven una cadena y van siempre a ×1; `espejo` trae el
+      // multiplicador que la IA eligió.
+      const propuesta = APUESTA[modo](s)
+      let accion = typeof propuesta === 'string' ? propuesta : propuesta.action
+      let k      = typeof propuesta === 'string' ? 1 : (propuesta.k ?? 1)
+      if (!legales.includes(accion)) {
+        accion = ['allIn', 'igualar', 'pasar', 'retirarse'].find(a => legales.includes(a)) ?? legales[0]
+        k = 1
+      }
+      // `accionesDe` sólo certifica el ×1: un multiplicador que la pila no cubra
+      // sería una acción ilegal, el motor devolvería el mismo estado y la ronda
+      // no convergería. Se comprueba el monto exacto antes de mandarlo.
+      if (k !== 1 && !esLegal(s, 0, accion, k).ok) k = 1
+      s = applyPlayerBetAction(s, accion, k)
+    }
     if (cond) {
       cond.acciones[asiento]++
       if (s.players[asiento].folded) cond.retiros[asiento]++
       else if (s.currentBet > apuestaAntes) cond.subidas[asiento]++
     }
+    if (conCerebro) {
+      // El multiplicador se deduce del salto de la apuesta: `apostar` la lleva
+      // de 0 a k·unit y `subir` le suma k·unit, así que en ambos casos
+      // k = Δ/unit. El all-in defensivo no mueve `currentBet` y no cuenta aquí.
+      if (s.currentBet > apuestaAntes) {
+        const k = Math.round((s.currentBet - apuestaAntes) / s.unit)
+        if (obs.subidasIA[`x${k}`] === undefined) obs.subidasIA.otros++
+        else obs.subidasIA[`x${k}`]++
+        // FAROL OBSERVABLE (V4). Se anota TODA subida de BET_2/BET_3 con el
+        // puntaje que la respaldaba —una por asiento y por mano, porque el
+        // farol es un suceso de la mano y no de cada subida— y la clasificación
+        // se hace al cerrar. Las dos varas, declaradas:
+        //   · farol ANCHO  · puntaje < FUERTE_MANOSO[mesa] — «subió sin la mano
+        //     que justifica subir», que incluye la agresión con mano mediana.
+        //   · farol DURO   · puntaje < 30 — la mano con la que ni la maña de
+        //     Victor pagaría. Es lo que él describe cuando dice «de cada 10
+        //     faroles que salgan mal la mitad», y sobre ésta se gatea V4.
+        // Los dos listones son de la maña de Victor y NO del `ajileiConfig` que
+        // 1d barre: un listón que se moviera con el parámetro barrido haría V4
+        // incomparable entre celdas del mismo barrido.
+        if (puntajeAntes !== null && !obs.subidaMano.has(asiento)) {
+          obs.subidaMano.set(asiento, puntajeAntes)
+        }
+      }
+      if (!allInAntes && s.players[asiento].allIn === true) obs.allInMano.add(asiento)
+    }
   }
   return s
 }
 
-function jugarMano(s, modo, cond) {
+function jugarMano(s, modo, cond, obs) {
   s = advanceFromDeal(s)                            // DEAL_2 → BET_1
-  s = jugarRonda(s, PHASES.BET_1, modo, cond)
+  s = jugarRonda(s, PHASES.BET_1, modo, cond, obs)
   if (s.phase === PHASES.PAYOUT) return s
   s = advanceFromDeal(s)                            // DEAL_3 → BET_2
-  s = jugarRonda(s, PHASES.BET_2, modo, cond)
+  s = jugarRonda(s, PHASES.BET_2, modo, cond, obs)
   if (s.phase === PHASES.PAYOUT) return s
   s = applyDiscard(s, s.players[0].folded ? [] : descarte(modo, s))
-  return jugarRonda(s, PHASES.BET_3, modo, cond)    // → SHOWDOWN → PAYOUT
+  return jugarRonda(s, PHASES.BET_3, modo, cond, obs)    // → SHOWDOWN → PAYOUT
+}
+
+// Cierre de la contabilidad de la mano: lo que sólo se puede saber al final.
+function cerrarMano(s, obs) {
+  if (!obs) return
+  const enPie = s.players.filter(p => !p.folded).length
+  for (const [asiento, puntaje] of obs.subidaMano) {
+    const fuerte = FUERTE_MANOSO[s.numPlayers] ?? 36
+    const cubos = puntaje >= fuerte ? [obs.conMano]
+      : puntaje < PAGA_MANOSO ? [obs.ancho, obs.duro]
+      : [obs.ancho]
+    // PAGADO = alguien se quedó a verlo. Con `enPie === 1` el farol cobró sin
+    // que nadie pagara (que es su éxito barato) y con la faroleadora retirada el
+    // farol se abandonó: ninguno de los dos casos entra en el denominador de V4.
+    const pagado = enPie >= 2 && !s.players[asiento].folded
+    for (const cubo of [...cubos, obs.cuboBin(puntaje)]) {
+      cubo.total++
+      cubo.sumaPuntaje += puntaje
+      if (pagado) {
+        cubo.pagados++
+        if (s.winner !== asiento) cubo.pagadosYPerdidos++
+      }
+    }
+  }
+  for (const asiento of obs.allInMano) {
+    obs.allIn[asiento].forzados++
+    if (s.winner === asiento) obs.allIn[asiento].ganados++
+  }
+  obs.subidaMano.clear()
+  obs.allInMano.clear()
 }
 
 // ── Una celda de la matriz ───────────────────────────────────────────────────
@@ -315,6 +729,10 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
   const acc = {
     manos: 0,          // simuladas (todas)
     manosLlenas: 0,    // contadas (mesa completa) ← denominador primario
+    // 1c-2 §2.3 · manos que empezaron SIN un humano vivo en la mesa. Es R-D
+    // vista desde el banco: bajo `espejo` son todas, porque ahí el asiento 0 es
+    // otra IA y no lleva `isHuman`.
+    manosSinHumano: 0,
     partidas: 0, partidasCompletas: 0, sorteos: 0,
     ganadasPorAsiento: new Array(N).fill(0),   // sólo manos de mesa llena
     // ── FICHAS NETAS · la métrica de fuerza (NIV-2) ─────────────────────────
@@ -347,6 +765,36 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
     // showdown; `farolCobra` las que además las ganó un asiento que había
     // faroleado en esa mano — el dato que la calibración necesitará.
     pro: { porAbandono: 0, farolCobra: 0, farolAlShowdown: 0 },
+    // APU-1 1d §2.2 · quiebras y fin de partida por quiebra del asiento 0.
+    quiebras: 0,
+    partidasPorQuiebraJ0: 0,
+  }
+
+  // Observador de APU-1 1d: todo lo que mide sale de comparar estados, nunca de
+  // mirar dentro de `aiPlayer`.
+  const vacio = () => ({ total: 0, pagados: 0, pagadosYPerdidos: 0, sumaPuntaje: 0 })
+  // HISTOGRAMA POR PUNTAJE (APU-1 1d-ii). V4 dice que los faroles pagados
+  // pierden demasiado, pero no dice DONDE esta el corte. Esto lo dice: para
+  // cada bin de 2 puntos del puntaje que respaldaba la subida, cuantas se
+  // pagaron y cuantas de esas se perdieron. El piso de puntaje para el farol
+  // que §E propone sale de leer esta columna, no de una corazonada.
+  const BIN = 2
+  const binDe = (x) => Math.floor(x / BIN) * BIN
+  const porPuntaje = new Map()
+  const cuboBin = (x) => {
+    const k = binDe(x)
+    if (!porPuntaje.has(k)) porPuntaje.set(k, vacio())
+    return porPuntaje.get(k)
+  }
+  const obs = {
+    porPuntaje, cuboBin,
+    subidaMano: new Map(),           // asiento → puntaje de su primera subida de la mano
+    allInMano: new Set(),
+    ancho: vacio(),                  // puntaje < FUERTE_MANOSO[mesa]
+    duro:  vacio(),                  // puntaje < 30 (la vara de V4)
+    conMano: vacio(),                // puntaje >= FUERTE_MANOSO[mesa], de contraste
+    allIn: Array.from({ length: N }, () => ({ forzados: 0, ganados: 0 })),
+    subidasIA: { x1: 0, x2: 0, x5: 0, x10: 0, otros: 0 },
   }
 
   const t0 = Date.now()
@@ -355,7 +803,7 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
     // donde lo hará la UI (GameTable.jsx:268), y es de MESA COMPLETA (D-7). Hoy
     // es inerte —aiPlayer no lo lee—, y ese es el punto: el día que NIV-1
     // aterrice, el banco mide niveles sin cambiar una línea de este script.
-    let s = { ...createInitialState(UNIT, N), nivelIA: NIVEL }
+    let s = nuevaPartida(N, modo)
     const fichasIniciales = s.players.reduce((a, p) => a + p.chips, 0)
     acc.partidas++
     let manosPartida = 0
@@ -385,6 +833,21 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
         if (s.winner !== null && s.winner >= 0) acc.partidasGanadasPorAsiento[s.winner]++
         break
       }
+      acc.quiebras += s.eliminatedNames.length
+      // APU-1 1d §2.2 · «PARTIDA» = desde `createInitialState` hasta que el
+      // asiento 0 quiebra O quedan ≤1 vivos. Antes el banco sólo cortaba por lo
+      // segundo y seguía simulando mesas encogidas sin el asiento 0 durante
+      // cientos de manos que no contaba para nada. La estadística de manos
+      // CONTADAS no se mueve un ápice —sólo son manos de mesa llena, y ésas
+      // ocurren todas antes de la primera eliminación—; lo que cambia es que
+      // `duracionPartida` pasa a medir lo que V1 y V2 preguntan: cuántas manos
+      // aguanta el conductor.
+      if (s.players[0].eliminated) {
+        acc.partidasCompletas++
+        acc.partidasPorQuiebraJ0++
+        completa = true
+        break
+      }
       const manoDe = s.manoIndex, pieDe = s.pieIndex
       const vivos  = s.players.map(p => !p.eliminated)
       const nVivos = vivos.reduce((a, v) => a + (v ? 1 : 0), 0)
@@ -394,7 +857,14 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
       // después, así que ningún farol de la mano anterior se cuela.
       for (const k of Object.keys(_DIAG_PRO.farolPorAsiento)) delete _DIAG_PRO.farolPorAsiento[k]
 
-      s = jugarMano(s, modo, acc.conducta)
+      // 1c-2 · se mira ANTES de jugarla, con la misma definición que usa R-D
+      // dentro de `aiPlayer.js`: humano, no retirado y no eliminado.
+      if (!s.players.some(p => p.isHuman === true && !p.folded && !p.eliminated)) {
+        acc.manosSinHumano++
+      }
+
+      s = jugarMano(s, modo, acc.conducta, obs)
+      cerrarMano(s, obs)
       acc.manos++; manosPartida++
 
       const enPie = s.players.filter(p => !p.folded).length
@@ -534,7 +1004,11 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
   return {
     mesa: N, conductor: modo,
     manosContadas: acc.manosLlenas, manosSimuladas: acc.manos,
-    unit: UNIT, nivel: NIVEL, nivelAsiento0: j0nivel,
+    // 1c-2-iii · la ENTRADA viaja con la celda cruda, no sólo con su bloque
+    // `varas`: es lo que distingue cuatro celdas que antes tenían la misma
+    // clave de bandas (5×, 15×, 50× y sin entrada).
+    unit: UNIT, entrada: ENTRADA, manosPedidas: MANOS,
+    nivel: NIVEL, nivelAsiento0: j0nivel,
     sorteo: SORTEO, sorteosDePerfiles: acc.sorteos,
     duelo: modo === 'espejo' ? duelo : null,
     dueloFichas: modo === 'espejo' ? dueloFichas : null,
@@ -565,7 +1039,46 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
       seAsiento0: se(tasa(acc.partidasGanadasPorAsiento[0], acc.partidasCompletas), acc.partidasCompletas),
       medianaManosPorPartida: mediana(acc.manosPorPartida),
     },
-    capacidad: { ms, manosPorMinuto: Math.round((acc.manos / ms) * 60000) },
+    // ── Métricas de APU-1 1d §2.2 · el insumo de las varas V1-V7 ───────────
+    partidasCompletas: acc.partidasCompletas,
+    partidasPorQuiebraJ0: acc.partidasPorQuiebraJ0,
+    duracionPartida: {
+      mediana: mediana(acc.manosPorPartida),
+      p10: percentil(acc.manosPorPartida, 10),
+      p90: percentil(acc.manosPorPartida, 90),
+      n: acc.manosPorPartida.length,
+    },
+    victoriasJ0: {
+      ganadas: acc.partidasGanadasPorAsiento[0],
+      completas: acc.partidasCompletas,
+      tasa: tasa(acc.partidasGanadasPorAsiento[0], acc.partidasCompletas),
+      se: se(tasa(acc.partidasGanadasPorAsiento[0], acc.partidasCompletas), acc.partidasCompletas),
+    },
+    farolesIA: (() => {
+      const bloque = (c) => ({
+        total: c.total, pagados: c.pagados, pagadosYPerdidos: c.pagadosYPerdidos,
+        tasaPerdidaDeLosPagados: tasa(c.pagadosYPerdidos, c.pagados),
+        sePerdida: se(tasa(c.pagadosYPerdidos, c.pagados), c.pagados),
+        puntajeMedio: c.total > 0 ? c.sumaPuntaje / c.total : null,
+        porMano: acc.manos > 0 ? c.total / acc.manos : 0,
+      })
+      return {
+        // La vara de V4 es la DURA; la ancha va al lado porque la diferencia
+        // entre las dos es, ella misma, un dato sobre cómo apuesta la IA.
+        ...bloque(obs.duro),
+        duro: bloque(obs.duro),
+        ancho: bloque(obs.ancho),
+        conMano: bloque(obs.conMano),
+        // Bins de 2 puntos, ordenados. `desde` es el borde inferior cerrado.
+        porPuntaje: [...obs.porPuntaje.entries()].sort((a, b) => a[0] - b[0])
+          .map(([desde, c]) => ({ desde, hasta: desde + 1, ...bloque(c) })),
+        definicion: `subida de BET_2/BET_3 con puntaje < ${PAGA_MANOSO} (farol DURO, la vara de V4). "ancho" = puntaje < ${FUERTE_MANOSO[N] ?? 36}; "conMano" = el resto. Listones fijos de la maña de Victor, nunca los que 1d barre. Uno por asiento y mano.`,
+      }
+    })(),
+    allInPorAsiento: obs.allIn.map((x, i) => ({ asiento: i, ...x, porMano: acc.manos > 0 ? x.forzados / acc.manos : 0 })),
+    subidasIA: obs.subidasIA,
+    quiebrasPorMano: acc.manos > 0 ? acc.quiebras / acc.manos : 0,
+    capacidad: SIN_RELOJ ? null : { ms, manosPorMinuto: Math.round((acc.manos / ms) * 60000) },
     fallas: acc.fallas,
     // ── Diagnóstico de conducta (NIV-2 §7) — se reporta, no es puerta ────────
     conducta: acc.conducta.acciones.map((n, i) => ({
@@ -593,7 +1106,133 @@ function correrCelda(N, modo, j0nivel = J0_NIVEL) {
       manosPorAbandono: acc.pro.porAbandono,
       tasaAbandono: acc.manos > 0 ? acc.pro.porAbandono / acc.manos : 0,
     },
+    // ── APU-1 1c-2 §2.3 · las dos reglas nuevas, contadas ──────────────────
+    //
+    // `trasladados` es la tasa de traslado de R-A: cuántos planes de farol no se
+    // ejecutaron porque la mano no llegaba al piso. Si pasa del 50 % de los
+    // bloques, el piso es demasiado alto PARA ESE BLOQUE y lo que hay que mover
+    // es el bloque, no el piso (ficha §3.2).
+    //
+    // `sinHumano` es R-D vista desde fuera. Bajo `espejo` no hay humano en la
+    // mesa, así que en Básico sale el 100 % y eso NO es un fallo: es exactamente
+    // la mitad del juego que R-D apaga, y la razón por la que V7 debería
+    // sostenerse ahora con Básico encendido.
+    reglas1c2: {
+      farolBloqueEjecutado: _CONT_APU1.farolBloqueEjecutado,
+      trasladados: _CONT_APU1.farolTrasladadoPiso + _CONT_APU1.farolTrasladadoSinHumano,
+      trasladadoPiso: _CONT_APU1.farolTrasladadoPiso,
+      trasladadoSinHumano: _CONT_APU1.farolTrasladadoSinHumano,
+      bloqueAgotado: _CONT_APU1.farolBloqueAgotado,
+      tasaTraslado: (() => {
+        const intentos = _CONT_APU1.farolBloqueEjecutado
+          + _CONT_APU1.farolTrasladadoPiso + _CONT_APU1.farolTrasladadoSinHumano
+        return intentos > 0
+          ? (_CONT_APU1.farolTrasladadoPiso + _CONT_APU1.farolTrasladadoSinHumano) / intentos
+          : null
+      })(),
+      farolSeisBloqueado: _CONT_APU1.farolSeisBloqueado,
+      decisionesSinHumano: _CONT_APU1.decisionesSinHumano,
+      manosSinHumano: acc.manosSinHumano,
+      tasaManosSinHumano: acc.manos > 0 ? acc.manosSinHumano / acc.manos : 0,
+    },
   }
+}
+
+// ── Las siete varas de APU-1 1d §0 ──────────────────────────────────────────
+//
+// Son la traducción a número de lo que Victor dijo jugando. Se extraen de cada
+// celda en la misma forma, de modo que `--varas` pueda juntar corridas de los
+// tres retos y leer la tabla §C sin re-simular nada.
+function varasDeCelda(c) {
+  const f0 = c.fichas?.find(x => x.asiento === 0) ?? null
+  const u  = c.unit || 1
+  return {
+    clave: `mesa${c.mesa}|${c.nivel}|${c.conductor}|j0=${c.nivelAsiento0}`,
+    mesa: c.mesa, nivel: c.nivel, conductor: c.conductor, nivelAsiento0: c.nivelAsiento0,
+    manosContadas: c.manosContadas, manosSimuladas: c.manosSimuladas,
+    // V1 · V3 — cuántas partidas gana el conductor
+    victoriasJ0: c.victoriasJ0?.tasa ?? null,
+    seVictoriasJ0: c.victoriasJ0?.se ?? null,
+    partidas: c.partidasCompletas ?? null,
+    porQuiebraJ0: c.partidasPorQuiebraJ0 ?? null,
+    // V2 · V7 — cuánto dura una partida
+    duracion: c.duracionPartida ?? null,
+    // V4 · V4b — los faroles
+    farol: c.farolesIA ?? null,
+    // V5 — los all-in forzados
+    allIn: (c.allInPorAsiento ?? []).map(x => ({ asiento: x.asiento, forzados: x.forzados, ganados: x.ganados, porMano: x.porMano })),
+    subidasIA: c.subidasIA ?? null,
+    quiebrasPorMano: c.quiebrasPorMano ?? null,
+    fichasPorManoJ0: f0 ? f0.porMano / u : null,
+    tasaManosJ0: c.tasaAsiento0 ?? null,
+    // 1c-2 §2.3 · R-A y R-D contadas, para que el barrido las lleve por celda.
+    reglas1c2: c.reglas1c2 ?? null,
+    entrada: ENTRADA,
+  }
+}
+
+// ── V6 · la vara que NO se simula ───────────────────────────────────────────
+// D-5 de 1c: el umbral de subida fuerte de §6.3 quedó POR DEBAJO del `raiseMin`
+// del temperamento más agresivo, así que la regla nueva no podía decidir nada —
+// la IA ya subía por la lógica de NIV-2 antes de llegar a ella. Es aritmética
+// sobre la configuración, no una medición: se evalúa igual con cero manos.
+//
+// COPIA LOCAL DECLARADA: `PROFILES` no se exporta de `aiPlayer.js`, que además
+// es archivo protegido y no se abre en 1d. Se replica aquí sólo el temperamento
+// más agresivo, que es el que fija el listón, con la misma doctrina que
+// `maxDiscardDeMesa`. Si alguien tocara `PROFILES`, esta vara mentiría: por eso
+// va con el número a la vista y no escondido en un cálculo.
+const RAISEMIN_AGRESIVA = 28          // aiPlayer.js PROFILES.AGRESIVA.raiseMin
+function varaV6() {
+  const cfg  = AJILEI_CONFIG.ia ?? {}
+  const desp = (cfg.desplazamiento ?? {}).AGRESIVA ?? 0
+  const filas = []
+  // R-B (1c-2) · `porMesa` admite la forma anidada por reto; el banco tiene que
+  // leerla igual que `aiPlayer.js:88-92`, o esta vara informaría `null` en todo.
+  const mapa = cfg.subidaFuerte?.porMesa ?? {}
+  const umbralDe = (reto, N) => {
+    const propio = mapa[reto]
+    const fuente = (propio !== null && typeof propio === 'object') ? propio : mapa
+    const base   = fuente[N]
+    return typeof base === 'number' ? base + desp : null
+  }
+  for (const N of [2, 3, 4, 5]) {
+    const piso = RAISEMIN_AGRESIVA + (N - 1) * 2       // raiseMin + opponentAdj
+    for (const reto of ['basico', 'avanzado', 'pro']) {
+      const encendida = (cfg.subidaFuerte?.porReto ?? {})[reto] === true
+      const umbral    = umbralDe(reto, N)
+      // R-E (1c-2) · V6 NO GATEA SOBRE BÁSICO, y la razón es de diseño, no de
+      // conveniencia: con umbral propio bajo (R-B), la banda del ×1 de Básico
+      // sale negativa A PROPÓSITO —un Básico que sólo sabe empujar ×10 es
+      // exactamente lo que lo hace el más fácil de leer—. La vara sigue
+      // REPORTÁNDOLO; lo único que cambia es que no lo cuenta como fallo.
+      const gatea = reto !== 'basico'
+      filas.push({
+        mesa: N, reto, encendida, umbralFuerte: umbral, pisoRaiseMin: piso,
+        banda: umbral === null ? null : umbral - piso,
+        gatea,
+        // «La subida ×1 tiene que existir»: hace falta una franja de puntaje en
+        // la que la IA suba ×1 (raiseMin ≤ score < umbral). Con banda ≤ 0 esa
+        // franja está vacía y el ×1 desaparece del juego.
+        pasa: !gatea || !encendida || (umbral !== null && umbral - piso > 0),
+      })
+    }
+  }
+  return { raiseMinAgresiva: RAISEMIN_AGRESIVA, desplazamientoAgresiva: desp,
+           reglaRE: 'V6 gatea sólo sobre Avanzado y Pro (1c-2 §2.3)',
+           pasa: filas.every(f => f.pasa), detalle: filas }
+}
+
+// Percentil por interpolación lineal sobre la muestra ordenada (definición 7 de
+// Hyndman-Fan, la de R y numpy por defecto). Con una sola partida devuelve su
+// valor; con ninguna, 0.
+function percentil(xs, q) {
+  if (!xs.length) return 0
+  const a = [...xs].sort((x, y) => x - y)
+  if (a.length === 1) return a[0]
+  const pos = ((q / 100) * (a.length - 1))
+  const lo = Math.floor(pos), hi = Math.ceil(pos)
+  return Math.round(a[lo] + (a[hi] - a[lo]) * (pos - lo))
 }
 
 function mediana(xs) {
@@ -1082,7 +1721,62 @@ function maxDiscardDeMesa(n) { return n <= 4 ? 5 : 3 }
 // SIGNO APARTE. En los duelos se exige ADEMÁS que el signo se conserve: una
 // escalera podría invertirse y seguir «dentro de tolerancia» si la magnitud es
 // pequeña, y esa es justo la degradación que estas bandas existen para cazar.
-const RUTA_BANDAS = join(DIR_EVID, 'nivCAL_bandas.json')
+//
+// DÓNDE VIVE LA VARA (1c-2-iii, decisión 5 del rector). Hasta aquí era
+// `capturas-dsk/evidencia/nivCAL_bandas.json`, sellada en NIV-CAL contra una IA
+// que aún no tenía ni entrada de mesa ni las reglas de APU-1. Esa vara queda
+// SUPERADA —se conserva donde está, y con su nota, porque es el único registro
+// de cómo se comportaba la escalera antes de APU-1— y la vara viva pasa a
+// `scripts/apu1_bandas.json`, que SÍ se rastrea: una vara que vive en una
+// carpeta ignorada no sobrevive a un `clone`.
+// APU-1 1e-iv · E-25 · LA PROCEDENCIA DE UNA VARA. Hasta 1e-iv la vara no
+// registraba contra qué motor se selló cada celda: `commitOrigen` era `null` y
+// no había un solo blob en el archivo. Una celda sin procedencia no se puede
+// declarar ni verde ni caducada, porque no hay con qué compararla. Desde aquí
+// toda vara nueva lleva la huella de los tres archivos que el banco mide —el
+// motor, el cerebro y la baraja— con el MISMO hash que `git hash-object`, para
+// que la huella se pueda leer y comprobar sin el banco delante.
+function blobDe(ruta) {
+  try {
+    const buf = readFileSync(join(RAIZ, ruta))
+    return createHash('sha1').update(`blob ${buf.length} `).update(buf).digest('hex')
+  } catch { return null }
+}
+const MOTOR_ACTUAL = {
+  'src/engine/gameEngine.js': blobDe('src/engine/gameEngine.js'),
+  'src/engine/aiPlayer.js':   blobDe('src/engine/aiPlayer.js'),
+  'src/engine/deck.js':       blobDe('src/engine/deck.js'),
+}
+// Dos huellas son distintas sólo si las dos existen y difieren: una vara vieja
+// que no trae huella no es «otro motor», es «sin procedencia», y son cosas
+// distintas que el lector nombra distinto.
+// RESCATE DE LA ENTRADA PARA LAS VARAS VIEJAS. Las 84 celdas de `APU1-1c2` no
+// registran `unit`, pero SÍ registran de qué volcado salieron, y el volcado lo
+// dice en `configuracion.unit`. Cuando ese archivo sigue en el disco, la
+// procedencia se recupera sin tocar un solo número sellado. Cuando no —un
+// `clone` limpio: `capturas-dsk/` no se rastrea—, la celda se queda sin
+// procedencia y el lector lo dice, que es la verdad.
+const _unitCache = new Map()
+function unitSellada(sellada) {
+  if (sellada.unit !== null && sellada.unit !== undefined) return sellada.unit
+  if (!sellada.origen) return null
+  if (!_unitCache.has(sellada.origen)) {
+    let u = null
+    try { u = JSON.parse(readFileSync(join(RAIZ, sellada.origen), 'utf8')).configuracion?.unit ?? null } catch { u = null }
+    _unitCache.set(sellada.origen, u)
+  }
+  return _unitCache.get(sellada.origen)
+}
+
+function motorDifiere(sellado) {
+  if (!sellado) return false
+  return Object.keys(MOTOR_ACTUAL).some(k => sellado[k] && sellado[k] !== MOTOR_ACTUAL[k])
+}
+
+const RUTA_BANDAS_LEGADO = join(DIR_EVID, 'nivCAL_bandas.json')
+const RUTA_BANDAS = arg('vara-bandas')
+  ? join(RAIZ, arg('vara-bandas'))
+  : join(RAIZ, 'scripts', 'apu1_bandas.json')
 
 // Extrae de una celda las cuatro magnitudes que se sellan. Trabaja sobre la
 // forma de `celdas` del VOLCADO completo, que es la misma que produce una celda
@@ -1091,8 +1785,27 @@ function medidasDeCelda(c) {
   const f0 = c.fichas?.find(x => x.asiento === 0) ?? null
   const u  = c.unit || 1
   return {
-    clave: `mesa${c.mesa}|${c.nivel}|${c.conductor}|j0=${c.nivelAsiento0}`,
+    // La ENTRADA entra en la clave desde 1c-2-iii: `mesa2|basico|manoso|j0=basico`
+    // existe ahora a 5×, a 15×, a 50× y sin entrada, y son cuatro celdas
+    // distintas. Se añade SÓLO cuando hay entrada, para que las claves de todo
+    // lo que se selló sin ella sigan siendo las mismas byte a byte.
+    clave: `mesa${c.mesa}|${c.nivel}|${c.conductor}|j0=${c.nivelAsiento0}` +
+      (c.entrada === null || c.entrada === undefined ? '' : `|e=${c.entrada}`) +
+      // El VOLUMEN tambien forma parte de la identidad de una banda: la celda de
+      // 5.000 manos de la tanda de convergencia y la de 100.000 de la corrida
+      // real miden lo mismo con errores muy distintos, y el rector pidio sellar
+      // las dos. Sin esto chocarian de clave y una tapa a la otra.
+      (c.manosPedidas ? `|n=${c.manosPedidas}` : ''),
     mesa: c.mesa, nivel: c.nivel, conductor: c.conductor, nivelAsiento0: c.nivelAsiento0,
+    entrada: c.entrada ?? null,
+    // APU-1 1e-iv · E-24. La APUESTA DE MESA se sella con la celda. NO entra en
+    // la clave —añadirla dejaría huérfanas las 84 claves ya selladas— pero sí
+    // se registra, y el lector se niega a comparar dos celdas que no la
+    // compartan. Sin esto, una corrida a `--unit 50` (el valor por defecto) se
+    // medía contra una vara sellada a `--unit 100` y salía roja por veinte
+    // sigmas sin que nada del producto hubiera cambiado: la misma pila de 5.000
+    // fichas son 100 apuestas de profundidad o 50, y ese es otro juego.
+    unit: c.unit ?? null,
     manosContadas: c.manosContadas,
     fichasPorMano:  f0 ? f0.porMano / u : null,
     seFichas:       f0 && f0.se !== null && f0.se !== undefined ? f0.se / u : null,
@@ -1112,6 +1825,10 @@ const MAGNITUDES = [
   { nombre: 'dueloManos',    se: 'seDueloManos',  signo: true,  etiqueta: 'duelo 0-1 en manos' },
 ]
 
+// La nota de una celda re-sellada: por que su cifra cambio. Se lee aqui porque
+// el bloque de sellado sale del proceso y nunca vuelve.
+const NOTA_SELLO = arg('nota')
+
 // ── Modo --sellar-bandas · escribe la vara permanente ───────────────────────
 // Uso: node scripts/bancoNiveles.mjs --sellar-bandas capturas-dsk/a.json,capturas-dsk/b.json
 const RUTA_SELLAR = arg('sellar-bandas')
@@ -1121,18 +1838,45 @@ if (RUTA_SELLAR) {
   for (const f of fuentes) {
     const j = JSON.parse(readFileSync(join(RAIZ, f), 'utf8'))
     if (!Array.isArray(j.celdas)) { console.error(`${f}: no trae 'celdas'`); process.exit(1) }
-    for (const c of j.celdas) celdas.push({ ...medidasDeCelda(c), origen: f, tanda: j.tanda })
+    // E-25 POR CELDA. La huella del motor se graba en la celda y no solo en la
+    // cabecera: desde C-0.4 la vara es MIXTA —84 celdas de 1c-2 cuyo arbol ya no
+    // existe (`blobs: null`) y las re-selladas hoy— y una sola huella en la
+    // cabecera no podria decir la verdad sobre las dos mitades a la vez.
+    for (const c of j.celdas) celdas.push({
+      ...medidasDeCelda(c), siembra: j.siembra ?? null, origen: f, tanda: j.tanda,
+      blobs: { ...MOTOR_ACTUAL }, ...(NOTA_SELLO ? { nota: NOTA_SELLO } : {}),
+    })
   }
   const vistas = new Set()
   for (const c of celdas) {
     if (vistas.has(c.clave)) { console.error(`clave duplicada entre volcados: ${c.clave}`); process.exit(1) }
     vistas.add(c.clave)
   }
-  mkdirSync(DIR_EVID, { recursive: true })
+  // ── --anadir · RE-SELLO PARCIAL (APU-1 C-0.4) ────────────────────────────
+  // Sellar sin esto reescribe la vara entera con lo que traigan los volcados: en
+  // una tanda que re-sella 20 celdas de 84, las otras 64 desaparecerian sin que
+  // nadie lo pidiera. Con `--anadir` se sustituyen las claves que vienen, se
+  // conservan las que no, y se dice cuantas de cada.
+  let previas = [], cabeceraPrevia = null, sustituidas = 0
+  if (flag('anadir')) {
+    try {
+      const vieja = JSON.parse(readFileSync(RUTA_BANDAS, 'utf8'))
+      cabeceraPrevia = vieja
+      previas = (vieja.celdas ?? []).filter(c => {
+        const choca = vistas.has(c.clave)
+        if (choca) sustituidas++
+        return !choca
+      })
+    } catch { console.error(`--anadir: no se pudo leer la vara ${RUTA_BANDAS}`); process.exit(1) }
+  }
+  const celdasFinales = [...previas, ...celdas]
+  mkdirSync(dirname(RUTA_BANDAS), { recursive: true })
   writeFileSync(RUTA_BANDAS, JSON.stringify({
     tanda: TANDA,
     generado: new Date().toISOString(),
     commitOrigen: process.env.NIVCAL_COMMIT ?? null,
+    // E-25 · contra qué motor se sella esto. `git hash-object` sobre los tres.
+    motor: MOTOR_ACTUAL,
     queEs: 'bandas de regresion permanentes de la escalera de niveles (NIV-CAL §3, decision B). Toda tanda que toque aiPlayer.js debe correr --bandas y reportar el resultado.',
     metodo: {
       prueba: 'dos muestras: |nuevo - sellado| <= umbral * sqrt(se_nuevo^2 + se_sellado^2)',
@@ -1142,10 +1886,14 @@ if (RUTA_SELLAR) {
       signo: 'en los duelos se exige ademas que el signo se conserve, PERO solo si el valor sellado esta a mas de 3 sigmas de cero por si mismo. Un signo que nunca se establecio (el duelo del espejo simetrico, cuyo valor verdadero es cero) no se puede conservar: exigirselo convierte ruido en rojo.',
       metricaPrimaria: 'fichas netas por mano; la tasa de manos se sella tambien, como secundaria',
     },
-    fuentes,
-    celdas,
+    fuentes: cabeceraPrevia ? [...new Set([...(cabeceraPrevia.fuentes ?? []), ...fuentes])] : fuentes,
+    // La procedencia de C-0.3 sobrevive al re-sello parcial: describe las celdas
+    // viejas, que siguen ahi.
+    ...(cabeceraPrevia?.procedencia ? { procedencia: cabeceraPrevia.procedencia } : {}),
+    celdas: celdasFinales,
   }, null, 2) + '\n')
-  console.log(`Bandas selladas → capturas-dsk/evidencia/${RUTA_BANDAS.split(/[\\/]/).pop()}  (${celdas.length} celdas de ${fuentes.length} volcado(s))`)
+  console.log(`Bandas selladas → ${RUTA_BANDAS.slice(RAIZ.length + 1).split('\\').join('/')}  (${celdas.length} celda(s) de ${fuentes.length} volcado(s)` +
+    (flag('anadir') ? `; ${sustituidas} sustituida(s), ${previas.length} conservada(s), ${celdasFinales.length} en total)` : ')'))
   for (const c of celdas) {
     console.log(`  ${c.clave.padEnd(38)} fichas ${c.fichasPorMano === null ? '  n/d' : (c.fichasPorMano >= 0 ? '+' : '') + c.fichasPorMano.toFixed(3)}u` +
       `  manos ${(100 * c.tasaManos).toFixed(2)}%` +
@@ -1158,14 +1906,33 @@ if (RUTA_SELLAR) {
 function compararConBandas(celdas) {
   let vara
   try { vara = JSON.parse(readFileSync(RUTA_BANDAS, 'utf8')) } catch {
-    return { disponible: false, porQue: `no existe ${RUTA_BANDAS}: sella primero con --sellar-bandas` }
+    return { disponible: false, porQue: `no existe ${RUTA_BANDAS}: sella primero con --sellar-bandas (la vara de NIV-CAL, superada, sigue en ${RUTA_BANDAS_LEGADO})` }
   }
   const porClave = new Map(vara.celdas.map(c => [c.clave, c]))
+  const otroMotor = motorDifiere(vara.motor)
   const filas = []
   for (const c of celdas) {
     const nueva = medidasDeCelda(c)
     const sellada = porClave.get(nueva.clave)
     if (!sellada) { filas.push({ clave: nueva.clave, sinBanda: true }); continue }
+    // E-24 · MISMA APUESTA DE MESA O NO SE COMPARA. Una celda sellada a otra
+    // entrada no es roja ni verde: es INCOMPARABLE, y decir cualquier otra cosa
+    // es inventarse un veredicto.
+    const unitSel = unitSellada(sellada)
+    if (unitSel !== null && unitSel !== undefined && unitSel !== nueva.unit) {
+      filas.push({ clave: nueva.clave, otraEntrada: { sellada: unitSel, nueva: nueva.unit, rescatada: sellada.unit === undefined || sellada.unit === null } })
+      continue
+    }
+    // E-25 · MISMO MOTOR O NO SE COMPARA. Una celda sellada contra otros blobs
+    // mide un producto que ya no existe: está CADUCADA, no roja.
+    //
+    // C-0.4 · la huella de la CELDA manda sobre la de la cabecera. La vara es
+    // mixta desde el re-sello parcial: las celdas de 1c-2 no tienen huella (su
+    // árbol no existe) y las re-selladas hoy la traen suya. Con una sola huella
+    // en la cabecera, o se caducaban todas o no se caducaba ninguna.
+    if (motorDifiere(sellada.blobs ?? null) || (!sellada.blobs && otroMotor)) {
+      filas.push({ clave: nueva.clave, otroMotor: true }); continue
+    }
     const comparaciones = []
     for (const m of MAGNITUDES) {
       const a = nueva[m.nombre], b = sellada[m.nombre]
@@ -1203,14 +1970,55 @@ function compararConBandas(celdas) {
       c.umbralSigmas = umbral
       c.pasa = Math.abs(c.sigmas) <= umbral && c.signoConservado
     }
-    f.pasa = f.sinBanda ? null : f.comparaciones.every(c => c.pasa)
+    f.pasa = f.comparaciones ? f.comparaciones.every(c => c.pasa) : null
   }
+  // D-16 de 1b · CUÁNTAS celdas se llegaron a comparar. Sin esta cuenta, una
+  // corrida cuyas celdas no están en la vara —el caso de la corrida por
+  // defecto, que es `basico`, contra una vara sellada toda en avanzado/pro—
+  // salía VERDE sobre CERO comparaciones. Una vara que no mide nada no es una
+  // puerta; el que la lee tiene que enterarse.
+  //
+  // 1e-iv · E-26. La cuenta se abre en CUATRO cubos porque hay cuatro cosas
+  // distintas que le pueden pasar a una celda, y tres de ellas no son un
+  // veredicto. Un lector que las suma todas bajo «VERDE» es exactamente cómo
+  // STOP-2 leyó ocho celdas sin vara como ocho celdas aprobadas.
+  const comparables   = filas.filter(f => f.comparaciones)
+  const comparadas    = comparables.length
+  const sinBanda      = filas.filter(f => f.sinBanda)
+  const otraEntrada   = filas.filter(f => f.otraEntrada)
+  const caducadas     = filas.filter(f => f.otroMotor)
+  const rojas         = comparables.filter(f => f.pasa === false)
+  // Una celda comparada cuya vara no dice con qué entrada se selló se compara
+  // igual —es lo único que se puede hacer con las 84 de `APU1-1c2`— pero se
+  // cuenta aparte: el que lea el veredicto tiene derecho a saber que la vara no
+  // pudo demostrar que mide el mismo juego.
+  const sinProcedencia = comparables.filter(f => {
+    const sel = porClave.get(f.clave)
+    return sel && (unitSellada(sel) === null || unitSellada(sel) === undefined)
+  })
+  const incomparables = otraEntrada.length + caducadas.length + sinBanda.length
+  const veredicto =
+    (incomparables > 0 ? 'INCOMPARABLE · ' : '') +
+    `VERDE ${comparadas - rojas.length}/${comparadas} comparables` +
+    ` · ROJA ${rojas.length}` +
+    ` · OTRA ENTRADA ${otraEntrada.length}` +
+    ` · OTRO MOTOR ${caducadas.length}` +
+    ` · SIN VARA ${sinBanda.length}` +
+    (sinProcedencia.length ? ` · sin procedencia ${sinProcedencia.length}` : '')
   return {
     disponible: true,
     varaDe: vara.tanda, varaGenerada: vara.generado, commitOrigen: vara.commitOrigen ?? null,
+    motorSellado: vara.motor ?? null, motorActual: MOTOR_ACTUAL, motorDifiere: otroMotor,
     familia: m, umbralSigmas: umbral,
-    celdasSinBanda: filas.filter(f => f.sinBanda).map(f => f.clave),
-    pasa: filas.every(f => f.pasa !== false),
+    celdasComparadas: comparadas,
+    celdasSinBanda: sinBanda.map(f => f.clave),
+    celdasOtraEntrada: otraEntrada.map(f => f.clave),
+    celdasOtroMotor: caducadas.map(f => f.clave),
+    celdasSinProcedencia: sinProcedencia.map(f => f.clave),
+    celdasRojas: rojas.map(f => f.clave),
+    veredicto,
+    pasa: comparadas > 0 && rojas.length === 0,
+    sinComparar: comparadas === 0,
     detalle: filas,
   }
 }
@@ -1252,12 +2060,334 @@ if (RUTA_REPUERTAS) {
   process.exit(0)
 }
 
+// ══ LAS SIETE VARAS · veredicto con rango (APU-1 1d §0) ═════════════════════
+//
+// V1, V2, V3, V4, V6 y V7 tienen RANGO y se pintan. V4b y V5 sólo se reportan:
+// son las dos que Victor quiere juzgar con los ojos, en pantalla, en 1e.
+//
+// Una corrida del banco lleva UN reto, así que V3 y V7 —que comparan los tres—
+// necesitan juntar tres volcados. Eso es lo que hace `--varas a,b,c`: lee los
+// bloques `varas` ya escritos y evalúa sin re-simular una sola mano.
+//
+// V1 Y V2 SE MIDEN A UNA PROFUNDIDAD CONCRETA (1c-2-iii, decision 4 del rector).
+// Hasta 1c-2 las dos se evaluaban con 5.000 fichas en todos los asientos, o sea
+// a 100 veces la apuesta, una mesa que nadie juega. D-27 del informe 1c-2 midio
+// lo que eso escondia: cada vara pedia DOS cosas que viven a profundidades
+// distintas, y no habia entrada entre 5x y 50x en la que las dos coincidieran.
+// El rector las reescribe por entrada: V1 se juzga al TECHO (50x) y V2 al MEDIO
+// (15x), que son dos de los botones que la pantalla ofrece de verdad. Las demas
+// entradas se reportan y no gatean.
+const ENTRADA_V1 = 50
+const ENTRADA_V2 = 15
+const RANGOS = {
+  // V1 CORREGIDA dos veces: por el rector al abrir 1d-ii («los 5-6 manos de
+  // Victor son records, no la partida tipica») y por el rector al cerrar 1c-2,
+  // que la sube a 60-80% y deja la duracion en REPORTE. A 50x el humano que
+  // juega con maña gana mucho contra una sola IA Basica, y eso es lo que Basico
+  // tiene que ser; la duracion a esa profundidad es larga por construccion.
+  V1: { entrada: ENTRADA_V1, victorias: [0.60, 0.80] },
+  // V2 a 15x: mediana 10-35 manos y p10 >= 3.
+  V2: { entrada: ENTRADA_V2, mediana: [10, 35], p10Min: 3 },
+  // V3 compara las tres tasas de victoria del mañoso, y desde que las pilas son
+  // reales eso también depende de la profundidad. Se mide donde V2, que es el
+  // botón de en medio de la pantalla y la profundidad a la que 1c-2-ii barrió el
+  // umbral de Básico. Si no hay celdas a esa entrada se usa la que haya, para
+  // que los volcados anteriores a 1c-2 se sigan leyendo.
+  V3: { caidaMinPp: 10, entrada: ENTRADA_V2 },
+  // V4 REESCRITA por el rector al cerrar 1c-2: 40-60%, que son las palabras de
+  // Victor («la mitad o tal vez un 40%»). Con 0,55 de tope, `fraccionPozo` tenia
+  // que irse a 0,40 para meter las doce celdas; con 0,60 basta 0,33, que es el
+  // MENOR de los tres candidatos y no paga el tercio de quiebras de mas (D-26).
+  V4: { perdida: [0.40, 0.60] },
+  V7: { medianaMin: 12 },
+}
+const enRango = (x, [lo, hi]) => x !== null && x !== undefined && x >= lo && x <= hi
+
+function evaluarVaras(varas) {
+  // `entrada` distingue celdas que antes eran la misma: mesa 2, mañoso, básico
+  // existe ahora a 5×, a 15×, a 50× y sin entrada (los 5.000 de siempre).
+  // `undefined` = «la que haya», para todo lo que no se mide por profundidad.
+  const de = (mesa, conductor, reto, entrada) => varas.find(
+    v => v.mesa === mesa && v.conductor === conductor && v.nivel === reto && v.nivelAsiento0 === reto
+      && (entrada === undefined || (v.entrada ?? null) === entrada)) ?? null
+  const retos = [...new Set(varas.map(v => v.nivel))]
+  const entradasDe = (mesa, conductor, reto) => varas
+    .filter(v => v.mesa === mesa && v.conductor === conductor && v.nivel === reto && v.nivelAsiento0 === reto)
+    .map(v => ({
+      entrada: v.entrada ?? null, victorias: v.victoriasJ0, se: v.seVictoriasJ0,
+      mediana: v.duracion?.mediana ?? null, p10: v.duracion?.p10 ?? null,
+      p90: v.duracion?.p90 ?? null, partidas: v.partidas,
+    }))
+    .sort((a, b) => (a.entrada ?? 1e9) - (b.entrada ?? 1e9))
+
+  // V1 · mañoso contra 1 IA Básico, mesa 2, ENTRANDO AL TECHO (50×): gana
+  // 60-80% de las partidas. La duración (mediana, p10, p90) se REPORTA y no
+  // gatea: a 50× una partida de dos pilas iguales es larga por construcción, y
+  // el recuerdo de Victor —«cinco o seis manos»— es el de la mesa corta, que
+  // es otra profundidad. Sin celda a 50×, V1 no se puede evaluar.
+  const v1c = de(2, 'manoso', 'basico', RANGOS.V1.entrada)
+  const v1 = v1c ? {
+    enunciado: `mañoso vs 1 IA Básico, mesa 2, entrada ${RANGOS.V1.entrada}×: gana 60-80% de las partidas (duración sólo reporte)`,
+    entrada: RANGOS.V1.entrada,
+    victorias: v1c.victoriasJ0, se: v1c.seVictoriasJ0, partidas: v1c.partidas,
+    mediana: v1c.duracion?.mediana ?? null, p10: v1c.duracion?.p10 ?? null,
+    p90: v1c.duracion?.p90 ?? null,
+    porEntrada: entradasDe(2, 'manoso', 'basico'),
+    pasa: enRango(v1c.victoriasJ0, RANGOS.V1.victorias),
+  } : null
+
+  // V2 · mañoso contra 4 IAS, mesa 5, ENTRANDO AL MEDIO (15×): mediana 10-35
+  // manos y p10 >= 3. Las otras dos entradas se reportan.
+  const v2detalle = retos.map(reto => {
+    const c = de(5, 'manoso', reto, RANGOS.V2.entrada)
+    if (!c) return null
+    const med = c.duracion?.mediana ?? null, p10 = c.duracion?.p10 ?? null
+    return { reto, entrada: RANGOS.V2.entrada, mediana: med, p10, p90: c.duracion?.p90 ?? null,
+             partidas: c.partidas, porQuiebraJ0: c.porQuiebraJ0,
+             porEntrada: entradasDe(5, 'manoso', reto),
+             pasa: enRango(med, RANGOS.V2.mediana) && p10 !== null && p10 >= RANGOS.V2.p10Min }
+  }).filter(Boolean)
+  const v2 = v2detalle.length ? {
+    enunciado: `mañoso vs 4 IAS, mesa 5, entrada ${RANGOS.V2.entrada}×: mediana 10-35 manos por partida y p10 >= 3`,
+    pasa: v2detalle.every(d => d.pasa), detalle: v2detalle } : null
+
+  // V3 · la tasa de victoria del mañoso cae Básico -> Avanzado -> Pro, y Pro
+  //      queda al menos 10pp por debajo de Básico.
+  const v3detalle = []
+  for (const N of [...new Set(varas.map(v => v.mesa))].sort((a, b) => a - b)) {
+    const conEntrada = de(N, 'manoso', 'basico', RANGOS.V3.entrada)
+      && de(N, 'manoso', 'avanzado', RANGOS.V3.entrada)
+      && de(N, 'manoso', 'pro', RANGOS.V3.entrada)
+    const eV3 = conEntrada ? RANGOS.V3.entrada : undefined
+    const b = de(N, 'manoso', 'basico', eV3), a = de(N, 'manoso', 'avanzado', eV3),
+          pr = de(N, 'manoso', 'pro', eV3)
+    if (!b || !a || !pr) continue
+    const caidaPp = (b.victoriasJ0 - pr.victoriasJ0) * 100
+
+    // R-C (1c-2 §2.3) · EL ORDEN ESTRICTO SÓLO SE EXIGE DONDE HAY SEÑAL.
+    //
+    // D-16 del informe 1d: con 100.000 manos, Avanzado y Pro están separados por
+    // 0,71 pp (1,08σ) en mesa 4 y 0,80 pp (1,80σ) en mesa 5. El «estrictamente
+    // decreciente» decidía ahí por ruido: la misma configuración daba el orden
+    // correcto en una corrida e invertido en la siguiente. No se afloja la vara,
+    // se le pone instrumento: donde el par no se separa 2σ, su orden NO es una
+    // medición y no gatea; lo que sí gatea siempre es la caída Básico→Pro, que
+    // va de 34 a 53 pp y no se confunde con nada.
+    const sigmasDe = (x, y) => {
+      const sx = x.seVictoriasJ0, sy = y.seVictoriasJ0
+      if (typeof sx !== 'number' || typeof sy !== 'number') return null
+      const sd = Math.sqrt(sx * sx + sy * sy)
+      return sd > 0 ? Math.abs(x.victoriasJ0 - y.victoriasJ0) / sd : null
+    }
+    const parBA = sigmasDe(b, a), parAP = sigmasDe(a, pr)
+    const separado = (sig) => sig !== null && sig >= 2
+    const ordenBA = !separado(parBA) || b.victoriasJ0 > a.victoriasJ0
+    const ordenAP = !separado(parAP) || a.victoriasJ0 > pr.victoriasJ0
+
+    v3detalle.push({
+      mesa: N, entrada: eV3 ?? null,
+      basico: b.victoriasJ0, avanzado: a.victoriasJ0, pro: pr.victoriasJ0,
+      decreciente: b.victoriasJ0 > a.victoriasJ0 && a.victoriasJ0 > pr.victoriasJ0,
+      sigmasBasicoAvanzado: parBA, sigmasAvanzadoPro: parAP,
+      gateaOrdenBA: separado(parBA), gateaOrdenAP: separado(parAP),
+      caidaPp,
+      pasa: ordenBA && ordenAP && caidaPp >= RANGOS.V3.caidaMinPp,
+    })
+  }
+  const v3 = v3detalle.length ? {
+    enunciado: 'victorias del mañoso decrecientes Básico > Avanzado > Pro donde el par se separa 2σ (R-C), y Pro >= 10pp por debajo de Básico siempre',
+    pasa: v3detalle.every(d => d.pasa), detalle: v3detalle } : null
+
+  // V4 · de los faroles de la IA que reciben pago, pierden 40-55%.
+  // V4b · puntaje medio de la IA en sus faroles, por mesa (sólo se reporta).
+  const v4detalle = varas.filter(v => (v.farol?.total ?? 0) > 0).map(v => ({
+    clave: v.clave, mesa: v.mesa, reto: v.nivel, conductor: v.conductor,
+    total: v.farol.total, pagados: v.farol.pagados, perdidos: v.farol.pagadosYPerdidos,
+    tasaPerdida: v.farol.tasaPerdidaDeLosPagados, se: v.farol.sePerdida,
+    puntajeMedio: v.farol.puntajeMedio, porMano: v.farol.porMano,
+    // Contraste (no gatea): la lectura ancha y la de las subidas CON mano. Si la
+    // dura y la ancha se parecen, la IA no distingue farol de valor.
+    ancho: v.farol.ancho ?? null, conMano: v.farol.conMano ?? null,
+    pasa: v.farol.pagados >= 100 ? enRango(v.farol.tasaPerdidaDeLosPagados, RANGOS.V4.perdida) : null,
+  }))
+  const conDatos = v4detalle.filter(d => d.pasa !== null)
+  const v4 = v4detalle.length ? {
+    enunciado: 'de los faroles de la IA que reciben pago, pierden 40-55% (celdas con >=100 faroles pagados)',
+    pasa: conDatos.length ? conDatos.every(d => d.pasa) : null,
+    celdasConDatos: conDatos.length, detalle: v4detalle } : null
+
+  // V5 · all-in forzados por asiento y mesa (se reporta, no se gatea).
+  const v5 = varas.map(v => ({
+    clave: v.clave, mesa: v.mesa, reto: v.nivel, conductor: v.conductor,
+    porAsiento: v.allIn, quiebrasPorMano: v.quiebrasPorMano, subidasIA: v.subidasIA,
+  }))
+
+  // V7 · IA contra IA (espejo simétrico), mesa 5: mediana >= 12 manos.
+  const v7detalle = retos.map(reto => {
+    const c = de(5, 'espejo', reto)
+    if (!c) return null
+    return { reto, mediana: c.duracion?.mediana ?? null, p10: c.duracion?.p10 ?? null,
+             p90: c.duracion?.p90 ?? null, partidas: c.partidas,
+             pasa: (c.duracion?.mediana ?? -1) >= RANGOS.V7.medianaMin }
+  }).filter(Boolean)
+  const v7 = v7detalle.length ? {
+    enunciado: 'espejo (IA vs IA), mesa 5: mediana >= 12 manos por partida en los tres retos',
+    pasa: v7detalle.every(d => d.pasa), detalle: v7detalle } : null
+
+  return { rangos: RANGOS, V1: v1, V2: v2, V3: v3, V4: v4, V5_soloReporte: v5, V6: varaV6(), V7: v7 }
+}
+
+function pintarVaras(V) {
+  const pinta = (x) => (x === null || x === undefined ? 'n/d' : x ? 'EN RANGO' : 'FUERA')
+  const pc = (x) => (x === null || x === undefined ? 'n/d' : (100 * x).toFixed(2) + '%')
+  console.log('\nLAS SIETE VARAS (APU-1 1d §0):')
+  const pe = (x) => (x === null ? 'sin entrada' : `${String(x).padStart(2)}×`)
+  if (V.V1) {
+    console.log(`  V1 ${pinta(V.V1.pasa)} · mesa 2 mañoso vs Básico a ${V.V1.entrada}×: victorias ${pc(V.V1.victorias)} (rango 60-80%) · ${V.V1.partidas} partidas`)
+    console.log(`       duración (sólo reporte): mediana ${V.V1.mediana} · p10 ${V.V1.p10} · p90 ${V.V1.p90}`)
+    for (const e of V.V1.porEntrada.filter(x => x.entrada !== V.V1.entrada)) {
+      console.log(`       reporte ${pe(e.entrada)}: victorias ${pc(e.victorias)} · mediana ${e.mediana} · p10 ${e.p10} · p90 ${e.p90}`)
+    }
+  } else console.log(`  V1 n/d · falta la celda mesa2|basico|manoso a ${RANGOS.V1.entrada}× (correr con --entrada ${RANGOS.V1.entrada})`)
+  if (V.V2) {
+    console.log(`  V2 ${pinta(V.V2.pasa)} · mesa 5 mañoso vs 4 IAS a ${RANGOS.V2.entrada}× (mediana 10-35, p10 >= 3):`)
+    for (const d of V.V2.detalle) {
+      console.log(`       ${d.reto.padEnd(9)} mediana ${String(d.mediana).padStart(3)} · p10 ${String(d.p10).padStart(3)} · p90 ${String(d.p90).padStart(4)} · ${d.partidas} partidas (${d.porQuiebraJ0} por quiebra del j0) -> ${pinta(d.pasa)}`)
+      for (const e of d.porEntrada.filter(x => x.entrada !== d.entrada)) {
+        console.log(`         reporte ${pe(e.entrada)}: mediana ${String(e.mediana).padStart(3)} · p10 ${String(e.p10).padStart(3)} · p90 ${String(e.p90).padStart(4)}`)
+      }
+    }
+  } else console.log(`  V2 n/d · falta la celda mesa5|*|manoso a ${RANGOS.V2.entrada}× (correr con --entrada ${RANGOS.V2.entrada})`)
+  if (V.V3) {
+    console.log('  V3 ' + pinta(V.V3.pasa) + ' · victorias del mañoso decrecientes, Pro >= 10pp bajo Básico:')
+    for (const d of V.V3.detalle) console.log(`       mesa ${d.mesa}: básico ${pc(d.basico)} -> avanzado ${pc(d.avanzado)} -> pro ${pc(d.pro)}  caída ${d.caidaPp.toFixed(2)}pp -> ${pinta(d.pasa)}`)
+  } else console.log('  V3 n/d · hacen falta los tres retos en la misma mesa (junta volcados con --varas)')
+  if (V.V4) {
+    console.log('  V4 ' + pinta(V.V4.pasa) + ' · faroles pagados que pierden (rango 40-60%) · V4b puntaje medio, sólo reporte:')
+    for (const d of V.V4.detalle) console.log(`       ${d.clave.padEnd(34)} faroles ${String(d.total).padStart(6)} · pagados ${String(d.pagados).padStart(6)} · pierden ${pc(d.tasaPerdida)} · puntaje medio ${d.puntajeMedio === null ? 'n/d' : d.puntajeMedio.toFixed(2)} -> ${pinta(d.pasa)}`)
+  } else console.log('  V4 n/d · ningún farol observado en esta corrida')
+  console.log(`  V6 ${pinta(V.V6.pasa)} · umbral de subida fuerte vs raiseMin(AGRESIVA ${V.V6.raiseMinAgresiva}) + opponentAdj, desplazamiento ${V.V6.desplazamientoAgresiva}:`)
+  for (const f of V.V6.detalle.filter(x => x.reto === 'avanzado')) {
+    console.log(`       mesa ${f.mesa}: umbral ${f.umbralFuerte} vs piso ${f.pisoRaiseMin} -> banda para el x1 = ${f.banda} -> ${pinta(f.pasa)}`)
+  }
+  const apagadas = [...new Set(V.V6.detalle.filter(x => !x.encendida).map(x => x.reto))]
+  if (apagadas.length) console.log(`       (retos con la regla apagada, la vara no aplica: ${apagadas.join(', ')})`)
+  if (V.V7) {
+    console.log('  V7 ' + pinta(V.V7.pasa) + ' · espejo mesa 5, mediana >= 12 manos:')
+    for (const d of V.V7.detalle) console.log(`       ${d.reto.padEnd(9)} mediana ${String(d.mediana).padStart(3)} · p10 ${String(d.p10).padStart(3)} · p90 ${String(d.p90).padStart(4)} · ${d.partidas} partidas -> ${pinta(d.pasa)}`)
+  } else console.log('  V7 n/d · falta la celda mesa5|*|espejo')
+  console.log('  V5 (sólo reporte): all-in forzados y multiplicadores por celda, en el JSON.')
+}
+
+// ── Modo --varas a.json,b.json,c.json · junta corridas y lee la tabla §C ─────
+const RUTA_VARAS = arg('varas')
+if (RUTA_VARAS) {
+  const fuentes = RUTA_VARAS.split(',').map(x => x.trim()).filter(Boolean)
+  const todas = []
+  for (const f of fuentes) {
+    const j = JSON.parse(readFileSync(join(RAIZ, f), 'utf8'))
+    // Dos formas válidas: el volcado de una corrida normal, que trae `varas` en
+    // la raíz, y el de un `--barrido`, que las trae una por celda. Desde 1c-2-iii
+    // se admiten las dos: las celdas de V1 y V2 por entrada sólo existen en un
+    // barrido, y sin esto habría que copiarlas a mano para evaluar las varas.
+    const deBarrido = Array.isArray(j.celdas)
+      ? j.celdas.filter(c => c && c.varas).map(c => ({ ...c.varas, nombre: c.nombre }))
+      : []
+    const lista = Array.isArray(j.varas) ? j.varas : deBarrido
+    if (!lista.length) { console.error(`${f}: no trae 'varas' ni celdas con varas`); process.exit(1) }
+    for (const v of lista) todas.push({ ...v, origen: f })
+  }
+  const V = evaluarVaras(todas)
+  pintarVaras(V)
+  mkdirSync(DIR_OUT, { recursive: true })
+  const archivo = arg('volcado', `${TANDA.replace(/[^A-Za-z0-9]/g, '')}_varas.json`)
+  writeFileSync(join(DIR_OUT, archivo), JSON.stringify({
+    tanda: TANDA, generado: ahora(), fuentes, celdas: todas.length, varas: V,
+  }, null, 2) + '\n')
+  console.log(`\nVaras -> capturas-dsk/${archivo}  (${todas.length} celdas de ${fuentes.length} volcado(s))`)
+  process.exit(0)
+}
+
+// ══ MODO --barrido · una lista de celdas parametrizadas, un solo JSON ════════
+//
+// Es lo que hace reproducibles los barridos de 1d §3.2 sin un script suelto por
+// parámetro. El spec es un JSON con `celdas`, cada una:
+//
+//   { "nombre": "porMesa5=38", "params": { "ia.subidaFuerte.porMesa.5": 38 },
+//     "mesa": 5, "j0": "manoso", "nivel": "avanzado", "manos": 100000 }
+//
+// `params` acepta tanto el objeto como una lista de cadenas `ruta=valor`.
+// Entre celdas se RESTAURA la configuración prístina y se vuelven a aplicar los
+// `--param` globales, así que un barrido de un factor no arrastra el anterior;
+// y se re-siembra, así que todas las celdas ven el mismo reparto.
+const RUTA_BARRIDO = arg('barrido')
+if (RUTA_BARRIDO) {
+  const spec = JSON.parse(readFileSync(join(RAIZ, RUTA_BARRIDO), 'utf8'))
+  const lista = Array.isArray(spec) ? spec : spec.celdas
+  if (!Array.isArray(lista) || !lista.length) {
+    console.error(`${RUTA_BARRIDO}: no trae 'celdas' (o viene vacío)`); process.exit(1)
+  }
+  mkdirSync(DIR_OUT, { recursive: true })
+  const salida = []
+  console.log(`Barrido ${TANDA} · ${lista.length} celda(s) de ${RUTA_BARRIDO}` +
+    (SEED === null ? ' (SIN SEMILLA: las celdas no son comparables entre sí)' : ` · semilla ${SEED} en todas`))
+  for (const [i, celda] of lista.entries()) {
+    const N     = Number(celda.mesa ?? MESAS[0])
+    const modo  = normalizaJ0(celda.j0 ?? 'manoso')
+    NIVEL       = celda.nivel ?? NIVEL
+    MANOS       = Number(celda.manos ?? MANOS)
+    // Se relee de la celda SIEMPRE, con el valor de la linea de ordenes como
+    // respaldo, para que una celda con delta no contagie a la siguiente.
+    MANOSO_DELTA = Number(celda.manosoDelta ?? arg('manosoDelta', 0))
+    UNIT         = Number(celda.unit ?? arg('unit', 50))
+    ENTRADA      = celda.entrada != null
+      ? Number(celda.entrada)
+      : (arg('entrada') !== null ? Number(arg('entrada')) : null)
+    validarEntrada(ENTRADA, modo)
+    restaurarConfig()
+    aplicarParams(PARAMS)
+    const suyos = Array.isArray(celda.params)
+      ? aplicarParams(celda.params)
+      : aplicarParams(Object.entries(celda.params ?? {}).map(([k, v]) => `${k}=${v === null ? 'null' : v}`))
+    sembrar()
+    const r = correrCelda(N, modo, celda.j0Nivel ?? NIVEL)
+    const fila = {
+      nombre: celda.nombre ?? `celda${i}`,
+      mesa: N, conductor: modo, nivel: NIVEL, manos: MANOS,
+      params: suyos,
+      unit: UNIT, entrada: ENTRADA,
+      // La profundidad REAL del asiento 0: es el mando que D.11 del informe 1d
+      // señaló como gobernador de la mediana de V1 y V2.
+      profundidad: (ENTRADA === null ? PILA_INICIAL / UNIT : ENTRADA),
+      manosoDelta: MANOSO_DELTA,
+      fuerteManoso: MANOSO_DELTA ? fuerteConductor(N) : null,
+      varas: varasDeCelda(r),
+    }
+    salida.push(fila)
+    const v = fila.varas
+    console.log(`  ${String(fila.nombre).padEnd(26)} mesa ${N} ${modo.padEnd(9)} ${NIVEL.padEnd(9)}` +
+      ` victoriasJ0 ${(100 * v.victoriasJ0).toFixed(2)}%  dur ${v.duracion.mediana}/${v.duracion.p10}` +
+      `  farolPagPerd ${v.farol.pagados ? (100 * v.farol.tasaPerdidaDeLosPagados).toFixed(1) + '%' : ' n/d'}` +
+      `  fichas/mano ${v.fichasPorManoJ0 === null ? 'n/d' : v.fichasPorManoJ0.toFixed(3)}u`)
+  }
+  const archivo = arg('volcado', `${TANDA.replace(/[^A-Za-z0-9]/g, '')}_barrido.json`)
+  writeFileSync(join(DIR_OUT, archivo), JSON.stringify({
+    tanda: TANDA, generado: ahora(), spec: RUTA_BARRIDO, siembra: SEED,
+    unit: UNIT, pilaInicial: PILA_INICIAL, paramsGlobales: PARAMS_APLICADOS,
+    celdas: salida,
+  }, null, 2) + '\n')
+  console.log(`\nBarrido → capturas-dsk/${archivo}`)
+  process.exit(0)
+}
+
 // ── Corrida ──────────────────────────────────────────────────────────────────
 mkdirSync(DIR_EVID, { recursive: true })   // idempotente: correr dos veces no rompe (ESC-1)
 
 console.log(`Banco ${TANDA} · mesas=[${MESAS}] conductores=[${CONDUCTORES}] manos/celda=${MANOS} unit=${UNIT} nivel=${NIVEL}` +
   (J0_NIVEL !== NIVEL ? ` j0-nivel=${J0_NIVEL}` : '') + (DUELO.length ? ` +duelo=${DUELO.join(',')}` : ''))
-console.log('(sin siembra: Math.random sin semilla en baraja y en IA — límite conocido, se compensa con volumen)\n')
+console.log(SEED === null
+  ? '(sin siembra: Math.random sin semilla en baraja y en IA — límite conocido, se compensa con volumen)\n'
+  : `(siembra ${SEED}: un mulberry32 alimenta baraja e IA — dos corridas iguales dan el mismo volcado)\n`)
 
 const celdas = []
 const planCeldas = []
@@ -1274,7 +2404,7 @@ for (const N of MESAS) {
     console.log(
       `mesa ${N} · ${etiqueta.padEnd(16)} → asiento0 ${pct(r.tasaAsiento0)}% ±${((r.seClusterAsiento0 ?? r.seAsiento0) * 100).toFixed(2)}` +
       `  (esperado ${pct(r.esperado)}%)  partidas=${r.partidas.completas}` +
-      `  ${r.capacidad.manosPorMinuto.toLocaleString('es')} manos/min` +
+      (r.capacidad ? `  ${r.capacidad.manosPorMinuto.toLocaleString('es')} manos/min` : '') +
       (Object.values(r.fallas).some(v => v > 0) ? `  ⚠ fallas=${JSON.stringify(r.fallas)}` : '')
     )
   }
@@ -1610,10 +2740,11 @@ const puertasNiv2 = puertasNivelDos()
 
 const informe = {
   tanda: TANDA,
-  generado: new Date().toISOString(),
+  generado: ahora(),
+  paramsAplicados: Object.keys(PARAMS_APLICADOS).length ? PARAMS_APLICADOS : null,
   rector: 'docs/AJILEI_Modos_y_Asistencia_v1.0.md §10',
   configuracion: { manosPorCelda: MANOS, unit: UNIT, nivel: NIVEL, sorteo: SORTEO, mesas: MESAS, conductores: CONDUCTORES, capPartida: CAP_PARTIDA },
-  siembra: null,
+  siembra: SEED,
   metodoSE: {
     publicado: 'seCluster',
     porQue: 'las manos NO son independientes: van en racimos por partida (dentro de una, el reparto de perfiles es fijo y las pilas de fichas se arrastran de mano en mano). La unidad independiente real es la PARTIDA.',
@@ -1621,7 +2752,9 @@ const informe = {
     efectoDiseno: 'seCluster² / seBinomial², publicado por celda. Publicar la barra binomial fijaría las bandas de NIV-1/NIV-2 más estrechas de lo real.',
     validacion: 'cinco réplicas de mesa 4 × 20.000 manos: SD observada del asiento 0 = 0,240pp frente a una barra declarada de 0,42pp media. La barra por racimos es CONSERVADORA, que es el lado seguro.',
   },
-  limiteConocido: 'sin siembra: Math.random sin semilla en deck.js:45 y en aiPlayer (:29,:69,:135,:143). No reproducible mano a mano; se compensa con volumen. El conteo exacto de manos queda registrado en manosContadas/manosSimuladas.',
+  limiteConocido: SEED === null
+    ? 'sin siembra: Math.random sin semilla en deck.js y en aiPlayer. No reproducible mano a mano; se compensa con volumen. El conteo exacto de manos queda registrado en manosContadas/manosSimuladas. Con --seed N sí es reproducible (APU-1 1c §2.3).'
+    : `sembrado con --seed ${SEED}: un solo mulberry32 alimenta deck.setRng y aiPlayer.setRng, así que la corrida es repetible byte a byte salvo los campos de reloj (generado, ms). UN LÍMITE (E-27 cerrado en C-0.4/D-31: el conductor 'aleatorio' ya tira de la misma corriente y sus celdas SÍ se repiten): la corriente de azar es ÚNICA para toda la matriz, así que una celda sólo se reproduce repitiendo la MISMA lista de mesas y conductores.`,
   adaptadorEspejo: {
     porQue: 'decideBetAction(state,0) no es invocable: los perfiles se reparten sólo a los asientos 1..N-1 (aiPlayer.js:41-43), así que PROFILES[undefined].openMin lanza TypeError.',
     como: 'estado espejo que permuta los asientos 0↔1 y remapea Mano/Pie por la misma permutación; conserva numPlayers y handCount para no disparar el re-sorteo de _ensurePersonalities.',
@@ -1632,6 +2765,11 @@ const informe = {
   puertas,
   puertasNiv1,
   puertasNiv2,
+  // APU-1 1d §0 · las siete varas, extraídas celda a celda. `--varas` junta
+  // varios volcados y evalúa V3 y V7, que necesitan los tres retos.
+  varas: celdas.map(varasDeCelda),
+  varaV6: varaV6(),
+  pilaInicial: PILA_INICIAL,
   celdas,
 }
 
@@ -1710,22 +2848,52 @@ if (puertasNiv2) {
   }
 }
 
+// Las siete varas de esta corrida. Lo que no se pueda evaluar con un solo reto
+// (V3 y V7 completas) sale n/d y se cierra juntando volcados con `--varas`.
+pintarVaras(evaluarVaras(informe.varas))
+
 // ── Alarma anti-degradación (NIV-CAL §3) ────────────────────────────────────
+// Las tres formas de NO tener veredicto, cada una con su nombre. Ninguna se
+// imprime como VERDE ni como ROJA (1e-iv §5).
+function etiquetaFila(f) {
+  if (f.sinBanda) return 'SIN VARA (celda nueva)'
+  if (f.otraEntrada) return `VARA DE OTRA ENTRADA (sellada a --unit ${f.otraEntrada.sellada}${f.otraEntrada.rescatada ? ' según su volcado' : ''}, corrida a ${f.otraEntrada.nueva})`
+  if (f.otroMotor) return 'VARA DE OTRO MOTOR (caducada)'
+  return ''
+}
+
 let bandas = null
 if (flag('bandas')) {
   bandas = compararConBandas(celdas)
   informe.bandas = bandas
   if (!bandas.disponible) {
     console.log(`\nBandas: ${bandas.porQue}`)
+  } else if (bandas.sinComparar) {
+    // Ni VERDE ni ROJA: la vara no tocó nada. Código 2 para distinguirlo de una
+    // banda de verdad rota (código 1) en cualquier guion que encadene corridas.
+    console.log(`\nBANDAS DE REGRESION vs vara ${bandas.varaDe} (${bandas.varaGenerada}): SIN COMPARAR (0 celdas con banda)`)
+    console.log(`   de las ${celdas.length} celda(s) de esta corrida, ninguna se pudo comparar.` +
+      (bandas.celdasOtraEntrada.length
+        ? ` ${bandas.celdasOtraEntrada.length} tienen vara pero sellada a OTRA APUESTA DE MESA: repite con --unit el de la vara.`
+        : ` La vara se selló con otros niveles: pásale --nivel/--duelo de los que sí tiene.`))
+    for (const f of bandas.detalle) console.log(`   ${f.clave.padEnd(38)} ${etiquetaFila(f)}`)
+    console.log(`   ${bandas.veredicto}`)
+    process.exitCode = 2
   } else {
     console.log(`\nBANDAS DE REGRESION vs vara ${bandas.varaDe} (${bandas.varaGenerada}): ${bandas.pasa ? 'VERDE' : 'ROJA'}` +
-      `  [umbral ${bandas.umbralSigmas.toFixed(2)}s, familia ${bandas.familia}]`)
+      `  [umbral ${bandas.umbralSigmas.toFixed(2)}s, familia ${bandas.familia}, ${bandas.celdasComparadas} celda(s) comparada(s)]`)
     for (const f of bandas.detalle) {
-      if (f.sinBanda) { console.log(`   ${f.clave.padEnd(38)} SIN BANDA SELLADA (celda nueva)`); continue }
+      if (!f.comparaciones) { console.log(`   ${f.clave.padEnd(38)} ${etiquetaFila(f)}`); continue }
       const peor = f.comparaciones.reduce((a, c) => (Math.abs(c.sigmas) > Math.abs(a.sigmas) ? c : a), f.comparaciones[0])
       console.log(`   ${f.clave.padEnd(38)} ${f.pasa ? 'VERDE' : 'ROJA '}  peor: ${peor.magnitud} ${peor.sigmas.toFixed(2)}s` +
         (f.pasa ? '' : `\n      ${f.comparaciones.filter(c => !c.pasa).map(c => `${c.etiqueta}: sellado ${c.sellado.toFixed(4)} -> nuevo ${c.nuevo.toFixed(4)} (${c.sigmas.toFixed(2)}s${c.signoConservado ? '' : ', SIGNO INVERTIDO'})`).join('\n      ')}`))
     }
+    // La ÚLTIMA línea es el veredicto, y se lee entera o no se lee: cuántas
+    // celdas pasaron DE LAS COMPARABLES, cuántas no se pudieron comparar y por
+    // qué. Empieza por INCOMPARABLE en cuanto hay una sola celda que la vara no
+    // cubre, para que ninguna tabla de esta alarma se pueda volver a resumir
+    // como «verde» de un vistazo (E-20).
+    console.log(`   ${bandas.veredicto}`)
     if (!bandas.pasa) process.exitCode = 1
   }
 }
@@ -1740,7 +2908,7 @@ if (ESCRIBE_BASE) {
     commit: process.env.NIVB0_COMMIT ?? null,
     rector: informe.rector,
     configuracion: informe.configuracion,
-    siembra: null,
+    siembra: SEED,
     metodoSE: informe.metodoSE,
     limiteConocido: informe.limiteConocido,
     adaptadorEspejo: informe.adaptadorEspejo,
@@ -1785,7 +2953,7 @@ if (ESCRIBE_BASE) {
         seAsiento0: c.partidas.seAsiento0,
         medianaManosPorPartida: c.partidas.medianaManosPorPartida,
       },
-      manosPorMinuto: c.capacidad.manosPorMinuto,
+      manosPorMinuto: c.capacidad?.manosPorMinuto ?? null,
     })),
   }
   writeFileSync(join(DIR_EVID, ARCHIVO_EVID), JSON.stringify(resumen, null, 2))

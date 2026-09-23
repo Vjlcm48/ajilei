@@ -3,6 +3,7 @@
   "generado": "2026-08-15T15:08:49.186Z",
   "commitOrigen": null,
   "queEs": "bandas de regresion permanentes de la escalera de niveles (NIV-CAL §3, decision B). Toda tanda que toque aiPlayer.js debe correr --bandas y reportar el resultado.",
+  "superada": "SUPERADA por scripts/apu1_bandas.json (APU-1 1c-2-iii, decision 5 del rector). Se conserva porque es el unico registro de como se comportaba la escalera ANTES de APU-1: sin entrada de mesa, sin pozos.esLegal, sin las reglas de la fase 1c. Sus celdas ya no se pueden reproducir con el motor vivo, asi que no se compara contra ella; el banco lee la vara nueva por defecto y a esta solo se llega con --vara-bandas.",
   "metodo": {
     "prueba": "dos muestras: |nuevo - sellado| <= umbral * sqrt(se_nuevo^2 + se_sellado^2)",
     "se": "por CONGLOMERADOS (un racimo por partida), que es el que manda en todo este banco",
