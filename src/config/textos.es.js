@@ -219,6 +219,131 @@ export const TEXTOS_ES = {
   // porque la respuesta del jugador es distinta: «vuelve a intentarlo», no
   // «elige otra mesa».
   'sal.error.desconocido':         'Algo falló. Vuelve a intentarlo.',
+
+  // ══ APU-1 1e · «RETAR A LAS IAS» ═════════════════════════════════
+  // Rector: AJILEI_APU-1_Fase1e_v1.0.md §2.4. El prefijo `ia.` es el tercero del
+  // diccionario, junto a `lob.` y `sal.`, y cubre la pantalla de entrada a la
+  // mesa contra máquinas. Las pantallas que releva —`NivelSelect` y
+  // `ModeSelect`— tenían su copy incrustado en el JSX; al retirarlas, lo que
+  // sobrevive entra aquí como clave.
+  //
+  // Los RÓTULOS DE LOS TRES RETOS NO ESTÁN AQUÍ, y no es un olvido: viven en
+  // `config/niveles.js` con sus `id` de contrato desde NIV-UI, que es la fuente
+  // única que ese documento selló. Duplicarlos sería abrir la puerta a que el
+  // chip diga una cosa y el ranking otra.
+  'ia.retar.titulo':          'Retar a las IAS',
+  'ia.retar.reto':            'Reto',
+  'ia.retar.jugadores':       'Jugadores',
+  'ia.retar.apuesta':         'Apuesta HC por mano',
+  'ia.retar.entrada':         '¿Con cuánto entras?',
+
+  // Los tres montos con nombre. La cifra la calcula `entrada.js` (10× · 20× ·
+  // 50× la apuesta de mesa desde 1f-A4; eran 5× · 15× · 50×) y el texto sólo la
+  // coloca: escribirla aquí sería dejar cuatro frases que mentirían el día que
+  // el normativo mueva un múltiplo — y 1f-A4 es ese día.
+  'ia.retar.entrada.piso':    'Mínimo {hc}',
+  'ia.retar.entrada.medio':   'Medio {hc}',
+  'ia.retar.entrada.techo':   'Techo {hc}',
+  'ia.retar.entrada.otra':    'Otra…',
+  'ia.retar.entrada.menos':   'Bajar la entrada una apuesta',
+  'ia.retar.entrada.mas':     'Subir la entrada una apuesta',
+
+  // La nota de comodín que daba `ModeSelect` en cada tarjeta de mesa. Aquí es
+  // una sola línea bajo la fila, porque el chip elegido ya dice cuál es.
+  'ia.retar.comodin.si':      'Con esta mesa juega el comodín (7 de Oros).',
+  'ia.retar.comodin.no':      'Sin comodín: el 7 de Oros es una carta más.',
+
+  // El gris se explica solo. `{min}` es el PISO de entrada de esa mesa —5 veces
+  // su apuesta—, no su apuesta: es la cifra que de verdad hace falta tener.
+  'ia.retar.aviso.saldo':     'Te faltan fichas: sentarte a esa mesa pide {min} HC.',
+  // Lo que la cuarta fila promete antes de pulsar. Sale de `entrada.pilaIA`.
+  'ia.retar.aviso.pila':      'Cada IA se sienta con {hc} HC.',
+
+  // El CTA dice las tres decisiones en voz alta, que es lo que lo convierte en
+  // una confirmación y no en un botón. Dos frases y no un plural calculado: el
+  // español no pluraliza las siglas con una `s`.
+  'ia.retar.cta':             'Retar a {n} IAS · mesa {hc} · entras con {entrada}',
+  'ia.retar.cta.una':         'Retar a 1 IA · mesa {hc} · entras con {entrada}',
+  'ia.retar.cta.vacio':       'Elige tu mesa',
+  'ia.retar.cta.falta':       'Elige reto, jugadores, apuesta y entrada.',
+
+  // Los tres motivos de `entrada.entradaValida` más el cuarto que añade la
+  // pantalla (§2.2). El motor no puede juzgar el bolsillo —no lo conoce— y por
+  // eso `sin_saldo` nace en `retarCore` y no en `entrada.js`.
+  'ia.entrada.monto_invalido': 'La entrada va de apuesta en apuesta.',
+  'ia.entrada.bajo_piso':      'El mínimo para sentarte es {hc} HC.',
+  'ia.entrada.sobre_techo':    'El máximo para sentarte es {techo} HC.',
+  'ia.entrada.sin_saldo':      'No te alcanza: tienes {saldo} HC.',
+
+  // ── 1e-ii · LA MESA ───────────────────────────────────────
+  // Los rótulos de la mesa siguen siendo literales dentro de `GameTable.jsx`
+  // —«Pasar», «Igualar (N)», «Subir a N»— y esta tanda NO los muda: mover texto
+  // vivo a diccionario es una tanda propia (IDI-1) y mezclarla con la del
+  // all-in haría ilegible el diff de las dos. Lo que sí entra aquí es TODO lo
+  // que 1e-ii estrena, que es la regla de la ficha §1.
+  //
+  // El monto del botón es la pila ENTERA, que es lo que el all-in cuesta.
+  // Decirlo importa: es la única acción de la mesa que no se puede deshacer ni
+  // dosificar, y el jugador tiene derecho a ver la cifra antes de pulsarla.
+  'ia.mesa.allin':             'All-in ({hc})',
+  // La marca del asiento. Seis caracteres y en versales porque va en una ranura
+  // de 151 px de ancho y 18 de alto: medida antes de escribirla, ocupa 69,56.
+  'ia.mesa.marca.allin':       'ALL-IN',
+  // Y la del humano, que no tiene ranura sino fila de botones — y en all-in la
+  // fila está vacía. Sin esta frase veía «La IA está pensando…» y ninguna
+  // explicación de por qué a él no le toca. La segunda mitad no es adorno: es
+  // la diferencia entre estar en all-in y estar retirado.
+  'ia.mesa.humano.allin':      'Estás all-in — tus cartas siguen jugando.',
+
+  // ── 1e-ii · LA RECARGA (§5) ──────────────────────────────────
+  // Tres formas de la misma pregunta, y el subtítulo es lo único que las
+  // distingue de verdad: la voluntaria informa, la automática avisa y la
+  // forzosa constata. Ninguna de las tres empuja a gastar —no hay «¡sigue
+  // jugando!» en ninguna—, que es posicionamiento de la casa y no cortesía.
+  //
+  // 1f-A3 · LOS DOS SUBTÍTULOS BLANDOS DICEN LA PROMESA DE §5.3. Hasta 1f la
+  // decía sólo `ia.recarga.nivelado`, en una línea aparte que el teléfono
+  // retira por falta de sitio (1f-A2): la promesa se quedaba sin decir justo
+  // donde va a jugar casi todo el mundo. Se muda al subtítulo, que siempre se
+  // pinta. Lo que sale para hacerle sitio es la pregunta «¿Recargas antes de
+  // la próxima mano?»: la hacen los dos botones que hay debajo, y un renglón
+  // no puede gastarse en repetir lo que el jugador ya está mirando. La forzosa
+  // no la lleva porque ahí no hay nivelación que prometer: o se recarga o se
+  // sale de la mesa.
+  //
+  // 1f-A4 · LAS DOS ACABAN EN «Las IAS se nivelan contigo.», que es la frase
+  // entera. A3 la había recortado a «se nivelan» para ganar margen, y el rector
+  // devolvió «contigo» al cerrar la Parte B: sin él, «las IAS se nivelan» puede
+  // leerse como que se nivelan ENTRE ELLAS, que es justo lo contrario de lo que
+  // §5.3 promete. El sitio da para las dos —A3 midió la automática con «contigo»
+  // en 72,58 px de margen sobre un hueco de 332—, así que lo que se acorta es la
+  // PRIMERA mitad: «Quedan {hc} HC.» y «Hasta {hc} HC más.». El renglón se mide
+  // con cinco cifras, que es el peor caso que el producto puede emitir
+  // (`topeRecarga` está acotado por `techoDe(unit)`, 50 × 1.000 = 50.000).
+  //
+  // Lo que salió para hacer sitio, en A3, fue la pregunta «¿Recargas antes de la
+  // próxima mano?»: la hacen los dos botones que están justo debajo.
+  'ia.recarga.titulo':         'Recargar fichas',
+  'ia.recarga.sub.voluntaria': 'Hasta {hc} HC más. Las IAS se nivelan contigo.',
+  'ia.recarga.sub.automatica': 'Quedan {hc} HC. Las IAS se nivelan contigo.',
+  'ia.recarga.sub.forzosa':    'Con estas fichas la mesa no puede continuar.',
+  'ia.recarga.opcion.piso':    'Mínimo {hc}',
+  'ia.recarga.opcion.medio':   'Medio {hc}',
+  'ia.recarga.opcion.techo':   'Al techo {hc}',
+  'ia.recarga.si':             'Recargar {hc}',
+  'ia.recarga.no':             'No recargar',
+  // En la forzosa, decir que no NO es «seguir sin recargar»: es levantarse. Se
+  // nombra por lo que hace, y se nombra con lo que el jugador se lleva —que por
+  // §2.5 son sus fichas enteras—, para que nadie crea que pierde algo por irse.
+  'ia.recarga.no.forzosa':     'Salir con mis fichas',
+  'ia.recarga.plazo':          'Se cierra en {s} s',
+  'ia.recarga.pedir':          'Recargar',
+  // 1f-A4 · `ia.recarga.nivelado` SE RETIRA. Era la promesa de §5.3 en un
+  // renglón aparte, y desde A3 la dicen los dos subtítulos blandos. En el
+  // teléfono no se pintaba (no cabía) y en escritorio se pintaba justo debajo
+  // del subtítulo que ya lo decía: la misma frase dos veces seguidas (E-31).
+  // Una sola voz en todas las pantallas. Con la clave se van el `<p>` de
+  // `GameTable.jsx` y las reglas `.apu-nota` de `apu.css`.
 }
 
 export default TEXTOS_ES

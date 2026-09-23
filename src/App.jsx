@@ -11,12 +11,16 @@ import ArmarMesa from './screens/ArmarMesa'
 import SalaEspera from './screens/SalaEspera'
 // SAL-B2 F1b · el destino de una mesa que arranco: un stub hasta MES-PvP.
 import PartidaPvP from './screens/PartidaPvP'
-import NivelSelect from './components/NivelSelect'
-import ModeSelect from './components/ModeSelect'
+// APU-1 1e · «Retar a las IAS» releva a `NivelSelect` + `ModeSelect`, que se
+// RETIRAN del árbol en esta tanda (rector 1e §2.3) junto con `TableSelect`.
+import RetarIAS from './screens/RetarIAS'
 import GameTable from './components/GameTable'
 import Portada from './screens/Portada'
 import Bautizo from './screens/Bautizo'
-import { readNivel, writeNivel } from './hooks/useNivel'
+import { saldoDelJugador } from './lib/saldo'
+// El molde de APU-1, hermano de `siembraCEL`: en producción devuelve `null` en
+// su primera línea y el minificador se lleva el archivo entero.
+import { siembraAPU } from './dev/siembraAPU'
 // `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
 // `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
 // sigue viva y exportada en el hook, que es donde trabaja.
@@ -145,7 +149,7 @@ function App() {
     }
     return invitacion !== null ? 'sala-opciones' : 'lobby'
   })
-  // 'lobby' | 'nivel-select' | 'mode-select' | 'table'
+  // 'lobby' | 'retar-ias' | 'table'
   // SAL-B1 anade: 'sala-opciones' | 'armar-mesa' | 'sala-espera'
   // SAL-B2 anade: 'partida-pvp'
 
@@ -156,12 +160,32 @@ function App() {
   // produccion es `null` hasta que una RPC devuelva una mesa con id.
   const [sala, setSala] = useState(() => (esMesa(simulacion?.sala) ? simulacion.sala : null))
 
-  const [stake, setStake] = useState(null)
-  const [playerCount, setPlayerCount] = useState(2)
-  // La preferencia se lee UNA vez al arrancar. Preselecciona la pantalla de
-  // dificultad y jamás la salta (v1.0 §4.2): `screen` arranca en 'lobby' y el
-  // único camino a la mesa pasa por elegir, aunque ya haya un nivel recordado.
-  const [nivel, setNivel] = useState(() => readNivel())
+  // ── APU-1 1e · LAS CUATRO DECISIONES VIAJAN JUNTAS ───────────────────────
+  // Rector 1e §2.3. Eran tres estados sueltos —`stake`, `playerCount`, `nivel`—
+  // repartidos por dos pantallas; ahora son UNA decisión que se toma de una vez
+  // en «Retar a las IAS» y que la mesa consume entera. `null` mientras no haya
+  // mesa, que es lo que permite que `GameTable` no se monte a medias.
+  //
+  // La MEMORIA de las tres primeras vive en la pantalla (`ajilei.retoConfig`),
+  // no aquí: `App` no recuerda nada, sólo enruta. La cuarta —la entrada— no se
+  // recuerda en ninguna parte, a propósito.
+  const [mesa, setMesa] = useState(null)
+
+  // ── El saldo de la SESIÓN (ECO-1 sigue pendiente) ────────────────────────
+  // Rector 1e §0 y §2.3. No hay billetera: `saldoDelJugador()` devuelve una
+  // constante y nada se persiste. Lo que esta cifra sí hace es MOVERSE dentro de
+  // la sesión —baja al sentarse, sube con lo que se levante de la mesa— y eso es
+  // lo que permite validar de verdad las dos reglas que dependen de ella: la
+  // mesa en gris por saldo (§2.2) y la recarga (§3.5).
+  //
+  // Vive en `App` y no en la pantalla porque tiene que SOBREVIVIR a que la
+  // pantalla se desmonte: el viaje es lobby → retar → mesa → resultado → lobby,
+  // y el saldo es lo único que cruza las cuatro. Al recargar la página vuelve a
+  // la constante, que es exactamente lo honesto hasta que exista el ledger.
+  //
+  // `?apu=saldo:<n>` (solo en desarrollo) lo arranca en otra cifra: es lo que
+  // permite fotografiar una mesa EN GRIS por saldo sin perder antes una partida.
+  const [saldoSesion, setSaldoSesion] = useState(() => siembraAPU()?.saldo ?? saldoDelJugador())
 
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
   // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
@@ -445,38 +469,53 @@ function App() {
     )
   }
 
-  if (screen === 'table') {
+  // ── APU-1 1e · LA MESA ───────────────────────────────────────────────────
+  // Rector 1e §2.3. `GameTable` recibe la mesa ENTERA y la crea con la LISTA de
+  // jugadores que arma `entrada.jugadoresVsIA` —nunca con el número—: es lo que
+  // hace que el asiento 0 se siente con lo que el jugador eligió y las IAS con
+  // la pila proporcional de §2.3 (factor 1,5, sellado en 1c-2).
+  //
+  // `onLeave` recibe las FICHAS con las que el humano se levanta y las devuelve
+  // al saldo de la sesión. Es la otra mitad de la resta de abajo, y sin ella el
+  // saldo bajaría en cada mesa y no subiría nunca.
+  if (screen === 'table' && mesa !== null) {
     return (
+      /* APU-1 §5 · `saldo` y `onRecargar`: la recarga gasta BOLSILLO, y el
+         bolsillo vive aquí. La mesa no lo guarda ni lo recuerda —lo LEE para
+         saber qué puede ofrecer, y avisa cuando el jugador gasta—. Es la misma
+         dirección que la entrada, que también sale del bolsillo al sentarse. */
       <GameTable
-        stake={stake}
-        numPlayers={playerCount}
-        nivel={nivel}
+        stake={mesa.apuesta}
+        numPlayers={mesa.jugadores}
+        nivel={mesa.reto}
+        entrada={mesa.entrada}
         cuenta={cuenta}
-        onLeave={() => setScreen('mode-select')}
+        saldo={saldoSesion}
+        onRecargar={(monto) => setSaldoSesion((previo) => Math.max(0, previo - monto))}
+        onLeave={(fichas) => {
+          setSaldoSesion((previo) => previo + (Number.isFinite(fichas) ? fichas : mesa.entrada))
+          setMesa(null)
+          setScreen('retar-ias')
+        }}
       />
     )
   }
 
-  if (screen === 'mode-select') {
+  if (screen === 'retar-ias') {
     return (
-      <ModeSelect
-        nivel={nivel}
-        onSelectMode={(players, monto) => {
-          setPlayerCount(players)
-          setStake(monto)
+      <RetarIAS
+        cuenta={cuenta}
+        saldoSesion={saldoSesion}
+        onRetar={(elegida) => {
+          // La entrada sale del bolsillo AQUÍ, al sentarse, y no cuando la mesa
+          // termina: es lo que el jugador arriesga, y la barra superior de la
+          // mesa tiene que enseñarlo desde la primera mano.
+          setSaldoSesion((previo) => previo - elegida.entrada)
+          setMesa(elegida)
           setScreen('table')
         }}
-        onBack={() => setScreen('nivel-select')}
-      />
-    )
-  }
-
-  if (screen === 'nivel-select') {
-    return (
-      <NivelSelect
-        preseleccionado={nivel}
-        onSelect={(id) => { setNivel(id); writeNivel(id); setScreen('mode-select') }}
-        onBack={() => setScreen('lobby')}
+        onVolver={() => setScreen('lobby')}
+        onLobby={() => setScreen('lobby')}
       />
     )
   }
@@ -488,7 +527,8 @@ function App() {
   return (
     <Lobby
       cuenta={cuenta}
-      onJugarIA={() => setScreen('nivel-select')}
+      saldo={saldoSesion}
+      onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
       onCerrarSesion={auth.cerrarSesion}
     />

@@ -1306,3 +1306,132 @@ body.sal-activa #root {
   .sal .lob-moneda .chip-token,
   .sal .lob-moneda::after { animation: none; }
 }
+
+/* ══ 15 · APU-1 1e · «RETAR A LAS IAS» ═════════════════════════════════════
+   La pantalla comparte carcasa y chips con SAL-2 (K-3a), así que aquí sólo vive
+   lo que SAL-2 no tiene: una fila más y el contador de «Otra…».
+
+   CUATRO FILAS CON AVISO, DONDE SAL-2 TIENE TRES BLOQUES Y UN AVISO. Cada
+   `.sal-aviso` reserva 2,8em aunque esté vacío (O1, §7), y cuatro de ésos son
+   ~11em de caja reservada: con el `row-gap` de `es-armar` la columna no cabe en
+   un 360×640. Se aprieta el aire y se recorta la reserva a UNA línea, que es
+   todo lo que estos avisos necesitan — el del anfitrión de SAL-2 es la
+   excepción larga, no la regla. */
+.sal-cuerpo.es-retar { row-gap: calc(var(--u) * 1.6); }
+.sal-cuerpo.es-retar .sal-bloque h2 { margin-bottom: calc(var(--u) * 1.2); }
+.sal-cuerpo.es-retar .sal-aviso {
+  min-height: 1.4em;
+  margin-top: calc(var(--u) * 1);
+}
+/* Una fila que la cascada todavía no habilita se apaga ENTERA, no chip a chip:
+   el gris de un chip dice «esta opción no», y el de la fila dice «todavía no
+   toca». Son dos cosas distintas y el jugador tiene que poder distinguirlas, así
+   que la fila apagada baja también su título. */
+.sal-cuerpo.es-retar .sal-bloque:not(:has(.sal-chip:not([disabled]))) h2 { opacity: 0.45; }
+
+/* ── El contador de «Otra…» ────────────────────────────────────────────────
+   Vive DENTRO de `.sal-chips`, como un hijo más del flex, para que abrirlo no
+   añada una caja al bloque ni empuje la fila de abajo (O1). Su alto es el del
+   chip, así que la fila mide lo mismo con el contador y sin él. */
+.sal-contador {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  height: var(--chip-h);
+  padding: 0 calc(var(--u) * 1.6);
+  border-radius: 999px;
+  border: 1px solid var(--gold-brand);
+  background: var(--surface-card);
+}
+.sal-contador b {
+  min-width: calc(var(--u) * 9);
+  text-align: center;
+  font-weight: 500;
+  font-size: calc(var(--u) * 3.6);
+  line-height: 1;
+  color: var(--gold-brand);
+  font-variant-numeric: tabular-nums;
+}
+/* El piso táctil de la casa son 40px y estos dos botones son los más pequeños
+   de la pantalla, así que se declara explícito en vez de heredarlo del alto del
+   chip — que en un viewport estrecho podría quedarse corto. */
+.sal-paso {
+  width: max(calc(var(--u) * 7), 40px);
+  height: max(calc(var(--u) * 7), 40px);
+  border-radius: 50%;
+  border: 1px solid var(--linea);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: calc(var(--u) * 4);
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sal-paso:hover,
+.sal-paso:focus-visible { border-color: var(--gold-brand); color: var(--gold-brand); }
+.sal-paso[disabled] { opacity: 0.35; cursor: default; }
+
+/* ── EL CTA QUE DICE TRES CIFRAS ──────────────────────────────────
+   «Retar a 4 IAS · mesa 200 · entras con 3.000» son 43 caracteres, contra los 18
+   del «Crear mesa privada» para el que se dimensionó `.sal-cta`. Con el ancho
+   fijo de `--cta-w` y `white-space: nowrap`, en un 360 de ancho la frase se
+   cortaba en «entra…» — y el CTA es justo la pieza que no puede mentir sobre
+   lo que va a pasar al pulsarlo.
+   La caja pasa a medir lo que mide su texto, con el ancho de la lámina como
+   MÍNIMO, y se le deja envolver en dos líneas. Envolver y no encoger la letra:
+   IDI-1 trae cuatro idiomas más y en alguno esta frase será más larga todavía,
+   así que la solución tiene que aguantar un texto que hoy no existe. */
+.sal-cta.es-retar {
+  width: auto;
+  min-width: var(--cta-w);
+  max-width: 100%;
+  height: auto;
+  min-height: var(--cta-h);
+  padding: calc(var(--u) * 1.6) calc(var(--u) * 4);
+  white-space: normal;
+  line-height: 1.25;
+  font-size: calc(var(--u) * 3.8);
+  text-wrap: balance;
+}
+
+/* O1 · el contador se RESERVA. Montarlo sólo al abrir «Otra…» añadía una línea
+   de flex a la fila, y esa línea empujaba el CTA fuera de la ventana en un
+   1024×768 (§E-8 del informe: medido, no supuesto). Está siempre y lo que
+   cambia es su visibilidad — la misma regla que ya gobierna los avisos.
+   `visibility: hidden` lo saca además del orden de tabulación, así que oculto
+   tampoco se alcanza con el teclado. */
+.sal-contador.is-off { visibility: hidden; }
+
+/* ── EL TRAJE CORTO DE `.es-retar` ─────────────────────────────────────────
+   Cuatro filas con su aviso, más el contador reservado, más el CTA. En un
+   1024×768 —y en cualquier escritorio de 768 de alto— esa columna se pasaba 33
+   px de la ventana, y el CTA quedaba fuera. Medido, no supuesto.
+
+   Se aprieta, que es la doctrina de §13 («lo que no cabe NO se scrollea, se
+   aprieta»), y NO se scrollea: un CTA al que hay que bajar con la rueda es un
+   CTA que la mitad de la gente no ve. La frontera son los 800 px de alto, la
+   misma que ya usa la sala de espera para su propio traje corto.
+
+   Se consideró arreglarlo a lo ancho —en un 1024 sobran 364 px a los lados de la
+   columna, que son 660— repartiendo las cuatro filas en dos columnas cuando hay
+   sitio. Victor lo miró y lo descartó: la lámina de esta pantalla es la MISMA que
+   la de «Armar una mesa», y una columna que se parte en dos según el viewport son
+   dos pantallas que el jugador tiene que reconocer como una. Aquí se aprieta y
+   no se ensancha; `.sal-cuerpo.es-retar` hereda su `width: var(--col)` de
+   `.sal-cuerpo` sin tocarlo, y así se queda. */
+@media (max-height: 800px) {
+  .sal-cuerpo.es-retar {
+    row-gap: calc(var(--u) * 1.1);
+    padding-top: calc(var(--u) * 0.8);
+    padding-bottom: calc(var(--u) * 1.6);
+  }
+  .sal-cuerpo.es-retar .sal-bloque h2 { margin-bottom: calc(var(--u) * 0.5); }
+  .sal-cuerpo.es-retar .sal-aviso { margin-top: calc(var(--u) * 0.5); }
+  .sal-cuerpo.es-retar .sal-accion { gap: calc(var(--u) * 0.8); }
+  /* El CTA envuelve en dos líneas cuando hace falta, así que su relleno es lo
+     último que se aprieta: quitarlo de más lo dejaría pegado al texto. */
+  .sal-cta.es-retar { padding-block: calc(var(--u) * 1.1); }
+}

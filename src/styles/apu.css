@@ -1,0 +1,356 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   apu.css · LO QUE APU-1 AÑADE A LA MESA
+   Rector: AJILEI_APU-1_Fase1e_v1.0.md §3 · Normativo: AJILEI_APU-1_Reglas_v1.1
+
+   ── POR QUÉ ESTA HOJA EXISTE ────────────────────────────────────────────────
+   `gameTable.css` y `opponentPanel.css` son PROTEGIDAS (docs/AJILEI_Protegidos
+   _v1.0.md) y la ficha de 1e es explícita: no se abren. Pero 1e-ii estrena tres
+   piezas visibles —el botón All-in, la marca de ALL-IN en el asiento y el panel
+   de recarga— y alguna necesita una regla.
+
+   La salida no es tocar la hoja sellada ni renunciar a las piezas: es una hoja
+   NUEVA, que `GameTable.jsx` importa después de la suya. Es el mismo patrón que
+   ya usan `celebracion.css`, `cuenta.css` y `tapetes.css` —cada campaña trae la
+   suya y ninguna reescribe la de la mesa—, y tiene una propiedad que importa
+   más que la limpieza: al importarse DESPUÉS, sus reglas ganan a igualdad de
+   especificidad sin necesidad de `!important` ni de selectores inflados.
+
+   ── LO QUE NO HAY AQUÍ, Y ES DELIBERADO ─────────────────────────────────────
+   No hay una sola regla para la marca «ALL-IN». Vive en `.opp-status`, que es
+   el hueco que C4.3.1 ya reservaba y que §H5 de `opponentPanel.css` saca de
+   flujo con `position: absolute`: diga lo que diga, no mueve un píxel. Lo único
+   que se le añade es un color, abajo, y ni eso era imprescindible.
+
+   E-28 (1f) · LA GARANTÍA ES LA RELACIÓN, NO EL NÚMERO. Aquí ponía «ocupa 69,56
+   px y el hueco más estrecho son 151», y las dos cifras engañaban: la primera
+   era de escritorio y no vale en un teléfono, y para cuando 1f volvió a medir ya
+   no valía ni en escritorio —el rótulo daba 73,17 px sin que nadie tocara una
+   regla, por una actualización del navegador (E-30)—. Lo que se garantiza, y lo
+   que `diagDSK apu` mide en cada corrida, es que el rótulo CABE EN UNA LÍNEA en
+   todas las mesas y viewports de la casa: portrait 43,69 en huecos de ≥99;
+   apaisado 50,23 en ≥97; escritorio 73,17 en ≥151 (Edge 153).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · EL BOTÓN ALL-IN ────────────────────────────────────────────────────
+   Hereda `btn btn-call`: el verde del pago, y con él todas las reglas por celda
+   que `gameTable.css` ya le da —el `order: -1` de las mesas anchas que lo pone
+   el primero de la fila, el `min-height: 40px` táctil, el padding compacto del
+   apaisado bajo—. Lo que añade `btn-allin` es lo que lo distingue de igualar:
+   que es la pila ENTERA, y eso se dice con un anillo, no con otro color. Cambiar
+   el color habría roto la lectura que el jugador ya tiene aprendida (verde =
+   pagar, naranja = subir, rojo = soltar). */
+.btn-allin {
+  /* E-33 · EL ANILLO NO PUEDE OCUPAR SITIO. Esto era un `border: 2px`, y un
+     borde suma 4 px al alto de la caja. `.action-area.action-col` reparte sus
+     dos hijos —la fila de multiplicadores y la de acciones— centrados en una
+     caja de alto fijo, así que esos 4 px se repartían en dos: con All-in en
+     pantalla la fila entera subía 2 px y se llevaba el cronómetro con ella,
+     de 178,89 a 176,89 (211,45 → 209,45 en 1920). La línea base A1_PRE mide
+     justamente eso, y tenía razón en quejarse.
+     La sombra interior pinta el MISMO anillo de 2 px en el mismo borde y NO
+     ocupa maqueta: ni alto ni ancho. Es la disciplina que el §2 de este mismo
+     archivo ya se aplicaba a la marca del asiento —«ni una caja, ni un borde,
+     ni un tamaño»— y que a este botón se le había olvidado. */
+  box-shadow: inset 0 0 0 2px var(--gold-brand);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* ── 2 · LA MARCA DEL ASIENTO ───────────────────────────────────────────────
+   Un asiento en all-in no está retirado ni eliminado: sigue disputando sus
+   capas, y por eso su marca NO es el rojo de «Sin saldo» ni el gris de «Se
+   retiró». Es el oro de la casa, que aquí significa lo que significa siempre:
+   esto sigue vivo. Sólo color y peso; ni una caja, ni un borde, ni un tamaño —
+   cualquiera de esas tres movería el renglón que O1 mide. */
+.opp-status.opp-status-allin {
+  color: var(--gold-brand);
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* ── 3 · EL PANEL DE RECARGA ────────────────────────────────────────────────
+   Hereda la caja del modal de bancarrota (`bankrupt-overlay` / `bankrupt-modal`
+   / `-title` / `-sub` / `-actions`), que es la superficie que §5.4 señala como
+   la que se reemplaza. Así la lámina es la que Victor ya aprobó para un modal
+   bloqueante de esta mesa, y lo único propio son los tres montos y el plazo. */
+.bankrupt-modal.apu-recarga {
+  gap: 10px;
+}
+
+/* Los tres montos. `btn-mult` les da la forma de pastilla y el estado activo
+   que los multiplicadores ya usan en esta mesa: es el mismo gesto —elegir una
+   cifra de una fila corta— y no tenía por qué aprenderse dos veces. */
+.apu-montos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+
+.apu-monto {
+  min-height: 40px;            /* piso táctil de la casa */
+  padding: 8px 14px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+/* 1f-A4 · Aquí vivía `.apu-nota`, la promesa de §5.3 en su propio renglón.
+   Desde A3 la dicen los dos subtítulos blandos, y el párrafo sólo servía para
+   repetirla en escritorio (E-31). Retirado el `<p>`, se van con él estas
+   reglas y las dos menciones que lo escondían en las ventanas cortas. */
+
+/* O1 · el renglón del plazo se RESERVA aunque la voluntaria no lo use. Sin la
+   reserva, los dos botones de arriba bailarían entre una forma de la pregunta y
+   otra, y son los botones que el dedo va buscando. */
+.apu-plazo {
+  margin: 0;
+  min-height: 1.3em;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--gold-brand);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ── 3b · LA PREGUNTA QUE NO TAPA LA MANO ───────────────────────────────────
+   La primera corrida de `diagDSK msg` con la mesa nueva dio rojo en mesa 5, y no
+   por el texto: el arnés no podía tocar los nombres de las IAS para destapar sus
+   manos. La causa resultó ser esto mismo — con las pilas cortas de APU-1 la pila
+   del humano baja del listón de §5.1 a menudo, la pregunta automática sale al
+   cerrar la mano, y hereda de `bankrupt-overlay` un velo a pantalla completa que
+   CUBRE el showdown.
+
+   Y el showdown es justo lo que el jugador está mirando en ese instante: las
+   cartas reveladas, quién ganó y con qué. Taparlo con una oferta de recargar es
+   pedirle que decida sin ver el resultado que motiva la decisión.
+
+   Así que la pregunta se divide en dos láminas, y la frontera es la que el
+   normativo ya traza:
+     · FORZOSA (§5.4) — la mesa NO puede continuar. Bloquea, como el modal de
+       bancarrota al que releva: no hay nada detrás que valga la pena mirar.
+     · automática y voluntaria — se apoya abajo, sin velo y sin capturar el
+       ratón fuera de su caja. La mesa sigue viva y consultable detrás; lo único
+       que la pregunta bloquea es «Siguiente mano», que es lo que §5.1 pide y
+       ni un píxel más.
+
+   `pointer-events` es lo que lo hace de verdad: en `none` el contenedor deja
+   pasar los toques a la mesa, y la tarjeta los recupera con `auto`. Sin esas dos
+   líneas la caja seguiría siendo transparente pero invisible al tacto — que es
+   la peor de las dos, porque parece que se puede tocar. */
+.bankrupt-overlay.apu-suave {
+  background: none;
+  backdrop-filter: none;
+  align-items: flex-end;
+  padding-bottom: 12px;
+  pointer-events: none;
+}
+
+.bankrupt-overlay.apu-suave .bankrupt-modal {
+  pointer-events: auto;
+  padding: 18px 22px 16px;
+  /* El velo ya no separa la tarjeta del fieltro, así que la separación la tiene
+     que poner ella: sombra más marcada y borde entero. */
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(var(--gold-brand-rgb), 0.18);
+}
+
+.bankrupt-overlay.apu-suave .bankrupt-title { font-size: 18px; margin-bottom: 6px; }
+.bankrupt-overlay.apu-suave .bankrupt-sub   { font-size: 13px; margin-bottom: 12px; }
+.bankrupt-overlay.apu-suave .bankrupt-actions { flex-direction: row; justify-content: center; }
+
+/* En una ventana baja la tarjeta apoyada se come el tapete. Se aprieta, que es
+   la doctrina de la casa.
+
+   1f-A2 · Y TAMBIÉN EN UNA VENTANA ESTRECHA. El umbral era sólo de alto, y el
+   teléfono en vertical mide 640 — veinte píxeles por encima—, así que la
+   tarjeta se pintaba con su traje entero en la única ventana donde no cabe.
+   Medido en 360×640 antes de tocar nada: 360×274,02 px encima de las cinco
+   cartas del jugador, 24.591,9 px² de 24.591,88, el 100 %.
+
+   1f-A4 · La segunda regla de este bloque escondía la nota de §5.3; la nota ya
+   no existe, así que queda sólo el apretón del padding. */
+@media (max-height: 620px), (max-width: 480px) {
+  .bankrupt-overlay.apu-suave .bankrupt-modal { padding: 12px 16px 10px; }
+}
+
+/* El botón de la recarga voluntaria, al lado de «Siguiente mano». Discreto a
+   propósito: es una salida que está ahí cuando se la busca, no una invitación a
+   gastar. El primario de esa fila es seguir jugando. */
+.btn-recarga {
+  background: transparent;
+  color: var(--gold-brand);
+  border: 1px solid var(--gold-brand);
+}
+
+.btn-recarga:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gold-brand) 14%, transparent);
+}
+
+/* ── 4 · EL TRAJE CORTO ─────────────────────────────────────────────────────
+   Mismo criterio que §13 de `salas.css`: lo que no cabe se aprieta, no se
+   scrollea. El apaisado bajo del móvil es la celda donde este modal va más
+   justo —el teclado virtual no entra aquí, pero 360 px de alto sí. */
+@media (orientation: landscape) and (max-height: 520px), (max-width: 480px) {
+  .bankrupt-modal.apu-recarga { gap: 6px; }
+  .apu-montos { gap: 6px; }
+  .apu-monto { min-height: 36px; padding: 6px 10px; font-size: 14px; }
+  .apu-plazo { font-size: 12px; }
+}
+
+/* ── 5 · 1f-A2 · EL TELÉFONO EN VERTICAL ────────────────────────────────────
+   Medido: en 360×640 la banda entre el borde inferior del óvalo (372) y el
+   superior de la zona del jugador (374) son DOS PÍXELES. La banda que la ficha
+   nombra no existe, así que la tarjeta no se puede anclar «entre» nada: lo que
+   hay es el hueco que queda DEBAJO de las cartas del jugador, que acaban en
+   470,83 — 157,17 px contando los 12 de aire que el apoyo ya reserva.
+
+   Se aprieta hasta ahí, que es la doctrina de la casa, y sin bajar de los 36 px
+   de alto que el apaisado ya fija para los botones: por debajo de eso la
+   pregunta deja de ser tocable, y una pregunta que no se puede contestar es
+   peor que una que tapa. */
+@media (max-width: 480px) and (orientation: portrait) {
+  /* La tarjeta ocupa el ancho entero y en BORDER-BOX. Heredaba `width: 90%` en
+     caja de contenido, así que el texto se medía contra ~300 px mientras la caja
+     ya ocupaba los 360: treinta píxeles de ancho tirados, que es justo lo que
+     hacía al subtítulo partirse en dos renglones. */
+  .bankrupt-overlay.apu-suave .bankrupt-modal {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 12px;
+  }
+  /* El alto del título no bajaba al bajarle la letra: su `line-height` viene
+     heredado EN PÍXELES, así que hay que decírselo en la misma regla. */
+  .bankrupt-overlay.apu-suave .bankrupt-title {
+    font-size: 14px; line-height: 1.2; margin-bottom: 2px;
+  }
+  .bankrupt-overlay.apu-suave .bankrupt-sub {
+    font-size: 12px; line-height: 1.35; margin-bottom: 6px;
+  }
+  .bankrupt-overlay.apu-suave .apu-montos { margin-top: 0; gap: 5px; }
+  .bankrupt-overlay.apu-suave .apu-monto { padding: 6px 8px; font-size: 13px; }
+  .bankrupt-overlay.apu-suave .apu-plazo {
+    font-size: 12px; line-height: 1.15; min-height: 1.15em;
+  }
+}
+
+/* ── 6 · 1f-A4 · EL TELÉFONO APAISADO: QUE LOS BOTONES SE PUEDAN TOCAR ──────
+   Observación 2 de Victor al jugar la Parte B: en apaisado los botones de la
+   tarjeta se le hacían pequeños. Medido en 640×360 antes de tocar nada: los
+   cinco a 36 px de alto —el piso táctil, no se puede bajar de ahí—, 6 px entre
+   los montos y CERO entre la fila de montos y la de acciones. Cero es el
+   número que explica la queja: dos filas de botones pegadas se leen como un
+   bloque y el dedo no distingue dónde acaba una.
+
+   El `gap: 6px` de §4 sobre `.bankrupt-modal.apu-recarga` no hacía nada, y
+   conviene dejarlo escrito: esa caja NO es flex —`gameTable.css:737` no le da
+   `display`—, así que su `gap` no tiene sobre qué actuar. La separación entre
+   filas hay que pedirla con un margen, que es lo que entienden los bloques.
+
+   El alto que cuesta el respiro se paga arriba, en el título y el subtítulo, no
+   en los botones: la tarjeta no puede crecer, porque en 360 px de alto lo que
+   crece tapa más mano. Este bloque es SÓLO apaisado —el de §4 lleva una coma y
+   alcanza también al teléfono vertical, que tiene su propia vara en §5— y sólo
+   alcanza a la pregunta blanda: la forzosa (§5.4) bloquea a propósito, va
+   centrada y tiene sitio de sobra. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .bankrupt-overlay.apu-suave .bankrupt-title {
+    font-size: 16px; line-height: 1.2; margin-bottom: 4px;
+  }
+  .bankrupt-overlay.apu-suave .bankrupt-sub {
+    font-size: 12px; line-height: 1.3; margin-bottom: 6px;
+  }
+  .bankrupt-overlay.apu-suave .apu-montos { gap: 8px; margin-top: 0; }
+  /* 10 y no 8, que es lo que la vara pide: un margen de 8 px exactos se LEE
+     entre 7,88 y 8,00 según lo que midan los renglones de encima, porque las
+     cajas caen en posiciones fraccionarias y `getBoundingClientRect` cuantiza.
+     Pedir en CSS justo el mínimo de la vara es fabricarse un rojo intermitente
+     (E-32). Con 10 se mide entre 9,88 y 10,00 y el mínimo se cumple siempre. */
+  .bankrupt-overlay.apu-suave .bankrupt-actions { margin-top: 10px; }
+}
+
+/* ── 7 · 1f-A5 · AIRE EN LA TARJETA BLANDA, TELÉFONO VERTICAL ───────────────
+   Vistazo de Victor en el S25 (21-sep): los botones ya no se pisan —eso lo
+   arregló A4 en apaisado— pero en vertical se ven amontonados. Medido en
+   360×640 antes de tocar nada: la fila de montos y la de acciones **pegadas,
+   0,00 px**, y el cronómetro pegado a las acciones, **otros 0,00 px**. Tres
+   cajas seguidas sin una separación entre ellas.
+
+   LO QUE SE ACHICA ES EL ÁREA, NO LA LETRA (regla 1 del rector). Los montos
+   siguen a 13 px y las acciones a 12; lo que baja es el relleno lateral de los
+   montos —de 8 a 6 px por lado— y, para pagar los 24 px de aire que se meten
+   entre las filas, el relleno de la tarjeta, los dos márgenes de la cabecera y
+   el interlineado del título y el subtítulo. El alto de los botones no baja:
+   36 px es el piso táctil de la casa y ya estaban en él.
+
+   EL PRESUPUESTO ES DURO Y SE MIDE, no se estima. La tarjeta se apoya a 8 px
+   del borde inferior y las cartas del jugador acaban en 470,83: todo lo que
+   hay es esa banda. La vara de A2 sigue en pie —0 px² sobre las cartas— y es
+   la que decide cuánto aire cabe.
+
+   Los mínimos se escriben con 2 px de holgura, que es E-32: la vara pide ≥10
+   dentro de la fila, ≥12 entre filas y ≥8 hasta el cronómetro, y en CSS van
+   12, 14 y 10. Pedir el mínimo justo es fabricarse un rojo que depende del
+   texto que haya en pantalla. */
+@media (max-width: 480px) and (orientation: portrait) {
+  .bankrupt-overlay.apu-suave { padding-bottom: 6px; }
+
+  .bankrupt-overlay.apu-suave .bankrupt-modal { padding: 4px 12px; }
+
+  /* El título conserva sus 14 px de §5: la regla es no bajar la letra, y
+     aunque la ficha sólo nombra la de los botones, el píxel que costaba
+     bajarla (1,15 de alto) cabía en los 7,44 que quedan sobre las cartas. */
+  .bankrupt-overlay.apu-suave .bankrupt-title {
+    line-height: 1.15; margin-bottom: 0;
+  }
+  .bankrupt-overlay.apu-suave .bankrupt-sub {
+    line-height: 1.25; margin-bottom: 4px;
+  }
+
+  .bankrupt-overlay.apu-suave .apu-montos { gap: 12px; }
+  .bankrupt-overlay.apu-suave .apu-monto { padding: 6px 6px; }
+
+  /* La fila de acciones hereda `gap: 10px` de `gameTable.css`, que es JUSTO el
+     mínimo de la vara. Se sube a 12 por E-32, y el margen de arriba es el aire
+     que separa las dos filas de botones. */
+  .bankrupt-overlay.apu-suave .bankrupt-actions { margin-top: 14px; gap: 12px; }
+
+  /* El cronómetro, de pie de tarjeta. Alineado a la izquierda con el mismo
+     margen interior que el subtítulo —los dos ocupan la caja de contenido
+     entera, así que basta con el `text-align`— y separado de los botones, que
+     es lo que lo convierte en pie en vez de en un tercer renglón de la fila. */
+  .bankrupt-overlay.apu-suave .apu-plazo { margin-top: 10px; text-align: left; }
+}
+
+/* ── 8 · 1f-A5 · LA FORZOSA, EN EL TELÉFONO ─────────────────────────────────
+   Esta lámina no había vuelto a mirarse desde 1e-ii, y el vistazo la destapó.
+   Medida en 360×640: hereda de `gameTable.css` el relleno del modal de
+   bancarrota —`38px 42px 34px`— que en 360 px de ancho deja una caja de
+   contenido de 272, y con ella **«Al techo» se cae solo a una segunda fila**.
+   Las dos filas de acciones van pegadas al cronómetro (0,00 px) y a los
+   montos (0,00 px). Y hay un defecto que la ficha no nombraba porque no se
+   sabía: **«Salir con mis fichas» mide 28 px de alto**, por debajo de los 36
+   que esta casa exige para un botón que se toca con el dedo — y es el botón
+   que decide si el jugador se levanta de la mesa.
+
+   No hay problema de sitio: la forzosa bloquea a propósito (§5.4), va centrada
+   y le sobra pantalla. Así que aquí se sube, no se achica: los cinco botones a
+   42 px, que es el centro del 40–44 que la ficha pide, y el relleno de la
+   tarjeta baja para que los tres montos quepan en UNA fila.
+
+   Cuelga de `:not(.apu-suave)`, que es la frontera que §3b ya traza entre las
+   dos láminas — sin tocar `gameTable.css` ni añadir una clase al JSX. */
+@media (max-width: 480px) {
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-modal.apu-recarga {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 22px 14px 20px;
+  }
+
+  .bankrupt-overlay:not(.apu-suave) .apu-montos { gap: 14px; }
+  .bankrupt-overlay:not(.apu-suave) .apu-monto { min-height: 42px; padding: 8px 6px; }
+
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-actions { margin-top: 18px; gap: 14px; }
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-actions .btn { min-height: 42px; }
+
+  .bankrupt-overlay:not(.apu-suave) .apu-plazo { margin-top: 16px; }
+}

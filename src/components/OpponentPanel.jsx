@@ -3,6 +3,8 @@ import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
 import { DECK_ANCHORS } from '../config/seatLayouts'
 import { vozResto } from '../hooks/resultadoCore'
+import { marcadoAllIn } from '../hooks/mesaCore'
+import { t } from '../config/textos'
 
 // Panel compacto de rival (mesas 3-5). Diseñado conforme a docs/AJILEI_Sistema_Diseno_v1.2.md.
 // Muestra solo: nombre, saldo, 5 cartas pequeñas con solape, estado breve, badge Mano.
@@ -144,10 +146,32 @@ export default function OpponentPanel({
       {/* Rótulo de estado (doblado en C4.3.1). En la transición a la mano
           siguiente (resetting) se limpia para no arrastrar "Se retiró" ni la
           última acción de la mano previa durante el barajado. */}
-      <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}${isEliminating ? ' opp-status-elim' : ''}`}>
+      {/* APU-1 §4.3 · LA MARCA DE ALL-IN VA EN EL HUECO QUE YA ESTABA RESERVADO.
+          No estrena caja: esta ranura existe desde C4.3.1, mide 18 px fijos y
+          `.table-five/-four/-three` la sacan de flujo con `position: absolute`
+          (opponentPanel.css §H5), así que lo que diga no mueve un píxel. Medido
+          antes de escribirla (informe 1e-ii §D): «ALL-IN» ocupa 69,56 px y el
+          hueco más estrecho —mesas 4 y 5 a 1024, 1280 y 1366— son 151. Cabe en
+          una línea en las cuatro mesas y los cuatro viewports, y es MÁS CORTA
+          que «Descartó 4» (108 px), que ya vivía aquí. Ni «ALL IN» ni «A-I»
+          hicieron falta, y `opponentPanel.css` —protegida— no se abre.
+
+          El orden importa. La marca va DEBAJO de `folded` —un asiento no puede
+          estar en las dos, pero si alguna vez lo estuviera, lo que manda es que
+          se retiró— y ENCIMA de `isTurn` y de la última acción: un all-in no
+          recibe turno nunca más en esa mano (§4.3), así que la ranura es suya
+          hasta que la mano acabe. Y tiene que serlo: es la única señal de que
+          ese asiento sigue disputando su capa aunque no vuelva a hablar. */}
+      <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}${isEliminating ? ' opp-status-elim' : ''}${marcadoAllIn(player) && !resetting && !isEliminating ? ' opp-status-allin' : ''}`}>
         {isEliminating
           ? 'Sin saldo'
-          : resetting ? ' ' : (player.folded ? 'Se retiró' : (isTurn ? 'Pensando…' : (lastAction ?? ' ')))}
+          : resetting
+            ? ' '
+            : player.folded
+              ? 'Se retiró'
+              : marcadoAllIn(player)
+                ? t('ia.mesa.marca.allin')
+                : (isTurn ? 'Pensando…' : (lastAction ?? ' '))}
       </span>
 
       <span className="opp-score" style={{ visibility: showScore && score && !resetting ? 'visible' : 'hidden' }}>

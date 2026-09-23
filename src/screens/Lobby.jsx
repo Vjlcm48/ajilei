@@ -27,7 +27,7 @@ import BarraSuperior from '../components/BarraSuperior'
 import {
   IconoUsuario, IconoTrofeo, IconoTienda, IconoLibro,
 } from '../components/IconosLobby'
-import { AJILEI_CONFIG } from '../config/ajileiConfig'
+import { saldoDelJugador } from '../lib/saldo'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { useIdioma } from '../hooks/useIdioma'
 import { enmascararCorreo } from '../hooks/lobbyCore'
@@ -71,7 +71,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
 
-export default function Lobby({ cuenta, onJugarIA, onJugarPvP, onCerrarSesion }) {
+export default function Lobby({ cuenta, saldo, onJugarIA, onJugarPvP, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -165,12 +165,18 @@ export default function Lobby({ cuenta, onJugarIA, onJugarPvP, onCerrarSesion })
           las tres pantallas de salas monten LA MISMA barra y no una copia
           (rector SAL-B1 §3.1). Lo que se pinta es idéntico a lo de antes: las
           mismas clases `lob-*`, los mismos tres `data-accion` y la misma
-          píldora con su `BalanceDisplay`. `saldoInicial` sigue siendo la
-          constante de `ajileiConfig.js` que este lobby ya pintaba — el lobby NO
-          pasa por `lib/saldo.js`, que es el lector reservado a SAL. */}
+          píldora con su `BalanceDisplay`.
+
+          APU-1 1e · el saldo ENTRA POR PROP y ya no se lee de `ajileiConfig`
+          aquí (rector 1e §2.3). Sigue siendo provisional —ECO-1 no existe— pero
+          dentro de la sesión SE MUEVE: baja al sentarse a una mesa y sube con
+          lo que el jugador se levanta. Un lobby que siguiera pintando la
+          constante diría 5.000 justo después de que el jugador perdiera 2.500,
+          que es peor que no enseñar nada. El defecto conserva la conducta vieja
+          para cualquier montaje que todavía no pase la prop. */}
       <BarraSuperior
         usuario={usuario}
-        saldo={AJILEI_CONFIG.economy.saldoInicial}
+        saldo={saldo ?? saldoDelJugador()}
         onPerfil={pronto}
         onTienda={pronto}
         onAjustes={() => setHojaAbierta(true)}

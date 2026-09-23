@@ -10,8 +10,11 @@
 // cliente; lo que un componente necesita saber lo pide con una función. El
 // precedente es `niveles.js` con `apuestasDe(id)`: la pantalla no filtra tablas,
 // pregunta. La lección de dónde acaba lo contrario está en la Fase 0 §5.2 —
-// `saldoInicial` se lee hoy en SEIS sitios, uno de ellos dentro de un archivo
-// protegido, y por eso ECO-1 no puede cambiarlo sin tocar seis manos.
+// `saldoInicial` se leía en SEIS sitios, uno de ellos dentro de un archivo
+// protegido, y por eso ECO-1 no podía cambiarlo sin tocar seis manos. APU-1
+// 1e-iii lo partió en dos: `economy.pilaPruebas` para el banco y las pruebas, y
+// el bolsillo con nombre propio dentro de `lib/saldo.js`, que es el único que
+// ECO-1 tendrá que tocar.
 //
 // ── EL ESPEJO DEL SERVIDOR ──────────────────────────────────────────────────
 // Estas mismas cifras están del otro lado, en `check` de columna y en las

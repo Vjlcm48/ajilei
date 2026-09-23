@@ -135,8 +135,8 @@ function pantallaDe(estado) {
 // informe. Dentro de una función que el `return null` de arriba deja inalcanzable,
 // se van con ella por construcción.
 //
-// El saldo contra el que se juzgan es `AJILEI_CONFIG.economy.saldoInicial` =
-// 5.000, que es lo que devuelve `saldoDelJugador()`. De ahí salen las cifras de
+// El saldo contra el que se juzgan es el que devuelve `saldoDelJugador()`,
+// 5.000 mientras ECO-1 no exista. De ahí salen las cifras de
 // §8.3: alcanzan 100/200/500/1000; no alcanzan 2000 ni 5000; y una mesa de 5000
 // pide 25.000, así que faltan exactamente 20.000.
 

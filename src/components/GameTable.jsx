@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, createRef } from 'react'
 import '../styles/gameTable.css'
+import '../styles/apu.css'
 import PlayingCard from './PlayingCard'
 import OpponentPanel from './OpponentPanel'
 import { SoundButton } from './SoundButton'
@@ -17,8 +18,17 @@ import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore
 import { conNivel } from '../hooks/nivelCore'
 import { puntosDe } from '../config/niveles'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
-import { componeCronica } from '../hooks/cronicaCore'
+import { componeCronica, componeCapas } from '../hooks/cronicaCore'
 import { siembraCEL } from '../dev/siembraCEL'
+import { siembraMesaAPU } from '../dev/siembraAPU'
+import {
+  ASIENTO_HUMANO, filaAcciones, multiplicadoresDe, marcadoAllIn, ritmoDe,
+  mesaClavada, pideRecarga, RECARGA,
+  opcionesRecarga, topeRecarga, recargaValida, plazoRecarga, nivelarLasIAS,
+  repartoPorCapas,
+} from '../hooks/mesaCore'
+import { t } from '../config/textos'
+import { jugadoresVsIA } from '../engine/entrada'
 import {
   useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
   ALTO_SELECTOR_REACCIONES, ALTO_CUENTA,
@@ -42,7 +52,13 @@ import {
   startHand,
   advanceFromDeal,
   applyPlayerBetAction,
+  applyBetAction,
   applyAIBetAction,
+  // APU-1 1e-ii · `decidirIA` decide y `aplicarRecarga` cobra. Las dos existen
+  // desde 1b/1c sin un solo consumidor: el ritmo de §6.9 y la recarga de §5 son
+  // los que estaban esperando.
+  decidirIA,
+  aplicarRecarga,
   applyDiscard,
   toggleDiscard,
   // DSK-U0 · `maxDiscard` ya no se importa: la UI no recalcula reglas, las lee
@@ -277,7 +293,7 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) 
 }
 
 // ── GameTable ─────────────────────────────────────────────────────────────────
-export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuenta }) {
+export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, onRecargar }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -303,7 +319,18 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     // la URL; ahí siembra a los rivales sin fichas para que la mesa cierre en
     // el primer "Iniciar mano". No hay rama de render ni condición nueva: lo
     // único que cambia es con cuánto saldo nacen los rivales.
-    const inicial = siembraCEL(conNivel(createInitialState(stake, numPlayers), nivel))
+    // ── APU-1 1e · LA MESA SE CREA CON LA LISTA, NUNCA CON EL NÚMERO ──────
+    // Rector 1e §2.3. `jugadoresVsIA` sienta al asiento 0 con la entrada que el
+    // jugador eligió y a cada IA con `min(round(entrada × 1,5), techo)` — el
+    // factor que 1c-2 selló. La forma NUMÉRICA de `createInitialState` sigue
+    // existiendo para las pruebas y el banco, pero la app ya no la usa: aquí
+    // era el último sitio donde los cinco asientos nacían con 5.000 iguales.
+    //
+    // El `?? numPlayers` no es una cortesía: es la red para un montaje sin
+    // entrada —un fixture futuro, una prueba— que caería en la forma vieja en
+    // vez de en una lista de `undefined`.
+    const lista = entrada !== null ? jugadoresVsIA(entrada, numPlayers, stake) : numPlayers
+    const inicial = siembraMesaAPU(siembraCEL(conNivel(createInitialState(stake, lista), nivel)))
     return { game: inicial, cronica: componeCronica(null, inicial) }
   })
   const game    = motor.game
@@ -333,6 +360,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   const [reflowing,    setReflowing]    = useState(false)  // asentado suave del nuevo layout
   const [noteFlash,    setNoteFlash]    = useState(0)      // destello del chip de comodín
   const [bankruptModal, setBankruptModal] = useState(false)// Caso B: humano sin fichas (≥2 vivos)
+  // ── APU-1 §5 · LA RECARGA ENTRE MANOS ────────────────────────────
+  // `recarga` es la pregunta ABIERTA: `{ motivo, monto }`, o `null` si no hay
+  // ninguna. El motivo lo decide `pideRecarga` y manda en todo lo demás —si hay
+  // cuenta atrás, si se puede decir que no, qué pasa al decirlo—, así que se
+  // guarda ÉL y no tres banderas que podrían contradecirse.
+  const [recarga,    setRecarga]    = useState(null)
+  const [recargaSeg, setRecargaSeg] = useState(0)     // cuenta atrás de la automática
+  const [recargaHecha, setRecargaHecha] = useState(0) // nº de recargas de esta mesa (tarjeta y arnés)
   const [displayedSeat, setDisplayedSeat] = useState(null) // Reveal Manos: IA elegida por tap (null = ganadora)
   const [shakeSeat,     setShakeSeat]     = useState(null) // Reveal Manos R2: IA cuyo nombre "sacude" ahora
   const [revealAnim,    setRevealAnim]    = useState(null) // R2.b: {fase, from, to} — coreografía de volteo (lock de taps)
@@ -412,6 +447,15 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
 
   const { phase, currentBet } = game
   const human        = game.players[0]
+
+  // ── APU-1 1e · SALIR DEVUELVE LAS FICHAS ─────────────────────────────────
+  // Rector 1e §2.3. `onLeave` recibe con cuántas fichas se levanta el humano,
+  // para que el saldo de la sesión suba con lo ganado. Las cuatro salidas de
+  // la mesa pasan por aquí y no por `onLeave` a pelo, y eso arregla de paso un
+  // defecto latente: tres de ellas eran `onClick={onLeave}`, así que le
+  // entregaban el EVENTO DE CLIC como primer argumento. Mientras nadie leyera
+  // ese argumento daba igual; desde esta tanda se lee.
+  const salir = useCallback(() => { onLeave?.(human.chips) }, [onLeave, human.chips])
   // MSG-U1 · El resultado se COMPONE desde el estado, no se hereda del motor.
   // Vale null fuera de PAYOUT/GAME_OVER, y ahí toma el relevo `cronica`
   // (MSG-U2/REN-2): el interruptor sigue siendo la fase, jamás el texto.
@@ -723,7 +767,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
       if (next === 0) {
         if (isPlayerTurnEarly) {
           if (gameRef.current.currentBet > 0) play('cardFold')   // timeout → se retira
-          setGame(prev => applyPlayerBetAction(prev, prev.currentBet === 0 ? 'pasar' : 'retirarse', prev.unit))
+          setGame(prev => applyPlayerBetAction(prev, prev.currentBet === 0 ? 'pasar' : 'retirarse'))
         } else {
           startDiscardAnim(gameRef.current, [])
         }
@@ -856,6 +900,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   // 0. Sin volteo la espera es cero, así que las dos cosas pasan en el mismo
   // fotograma y se ve lo de siempre.
   const pozoMostrado = retencion && !retencion.volando ? retencion.pozo : game.pot
+
   // Sólo el GANADOR retiene, y sólo para pintar: `playerChips` —el que gobierna
   // qué apuestas se pueden hacer— sigue leyendo el valor real del motor.
   const saldoMostrado = (i, chips) => chips - (retencion && retencion.winner === i ? retencion.pozo : 0)
@@ -908,16 +953,34 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     const isBet = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
     const active = game.players[game.activePlayerIndex]
     if (isBet && game.activePlayerIndex !== 0 && !active.folded) {
+      // ── APU-1 §6.9 · EL RITMO SALE DEL PESO DE LA DECISIÓN ──────────────
+      //
+      // Hasta aquí toda acción de IA esperaba `AI_ACTION_MS` —1.125 ms— pasara
+      // lo que pasara: una IA que pasa y una IA que empuja su pila entera
+      // tardaban IGUAL. `decidirIA` devuelve `{action, k, peso}` desde 1c
+      // precisamente para esto, y hasta hoy nadie había leído el `peso`.
+      //
+      // SE DECIDE ANTES Y SE APLICA DESPUÉS, y el orden no es un detalle: para
+      // saber cuánto esperar hay que saber QUÉ va a hacer, y la decisión de la
+      // IA consume azar. Llamar a `decidirIA` para medir el peso y luego a
+      // `applyAIBetAction` —que vuelve a decidir por dentro— gastaría dos
+      // tiradas y podría aplicar una acción DISTINTA de la que se cronometró.
+      // Así se consume exactamente una, la misma que consumía antes.
+      const seat = game.activePlayerIndex
+      const decision = decidirIA(game, seat)
       const t = setTimeout(() => {
         const prev = gameRef.current
-        const seat = prev.activePlayerIndex
-        const next = applyAIBetAction(prev)
+        // La mesa pudo moverse mientras se esperaba (una mano nueva, un
+        // descongelado que reprograma). Si ya no es su turno, la decisión
+        // caduca: se descarta en vez de aplicarse sobre otro estado.
+        if (prev.activePlayerIndex !== seat || prev.phase !== phase) return
+        const next = applyBetAction(prev, seat, decision.action, decision.k)
         const action = inferAction(prev, next, seat)
         if (next.pot > prev.pot) play('coinBet')
         if (action === 'Se retiró') play('cardFold')
         setLastActions(la => ({ ...la, [seat]: action }))
         setGame(next)
-      }, AI_ACTION_MS)
+      }, ritmoDe(decision.peso))
       return () => clearTimeout(t)
     }
   }, [phase, game.activePlayerIndex, congelado]) // eslint-disable-line
@@ -950,6 +1013,22 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     return () => clearTimeout(t)
   }, [phase, game.activePlayerIndex]) // eslint-disable-line
 
+  // ── APU-1 §4.3 · LA RONDA SIN JUEGO YA NO LLEGA AQUÍ ────────────────
+  //
+  // Aquí vivía un efecto que pasaba por el único asiento con fichas cuando la
+  // ronda no tenía juego: pulsaba «pasar» por él para que el motor viera la
+  // ronda cerrada y avanzara de fase. Funcionaba, y aun así estaba en el sitio
+  // equivocado —§4.3 dice que esas rondas NO EXISTEN, y existir o no existir es
+  // cosa del motor—. Desde 1e-iii el motor no abre una fase de apuesta que nadie
+  // pueda jugar (`abrirApuesta`), así que la pantalla no tiene por qué fingir
+  // una acción que nadie tomó, y el caso hermano —que no quede NADIE con
+  // fichas— queda cerrado por la misma puerta, que es algo que desde fuera del
+  // motor no se podía hacer.
+  //
+  // Lo que queda de aquello es el vigía: `data-clavada`, abajo, que tiene que
+  // valer `0` siempre.
+
+
   // Human folded during DISCARD (N≥3): rivals discard on their own
   // FRZ-1 §2.3 · Mismo trato que el salto de retirado: si estamos a oscuras, al
   // slot. El precio declarado es que la vuelta arranca el descarte en el acto en
@@ -968,18 +1047,138 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   const toCall       = toCallEarly
   const isBetPhase   = isBetPhaseEarly
   const isPlayerTurn = isPlayerTurnEarly
-  const playerChips  = human.chips
-  const canPass  = isPlayerTurn && toCall === 0
-  const canBet   = isPlayerTurn && currentBet === 0 && playerChips >= betAmount
-  const canCall  = isPlayerTurn && toCall > 0 && playerChips >= toCall
-  const raiseTo  = currentBet + betAmount
-  const canRaise = isPlayerTurn && currentBet > 0 && playerChips >= (raiseTo - human.contrib)
+
+  // ── APU-1 §3.1 · LOS BOTONES SON LA LEGALIDAD, NO UNA COPIA SUYA ────────
+  //
+  // Aquí vivían `canPass`, `canBet`, `canCall` y `canRaise`: cuatro condiciones
+  // escritas a mano con la aritmética del motor copiada dentro —`playerChips >=
+  // toCall`, `playerChips >= (raiseTo - human.contrib)`—. Es literalmente el
+  // riesgo R-5 del diagnóstico, y lo que lo cierra es preguntar en vez de
+  // calcular: `pozos.esLegal` es el mismo árbitro que el motor consulta antes de
+  // aplicar y que la IA consulta antes de decidir, así que la fila de botones y
+  // lo que la mesa acepta no pueden divergir NUNCA.
+  //
+  // El botón All-in sale de aquí sin una condición nueva. §4.1: el all-in es
+  // defensivo —existe sólo cuando hay apuesta viva y la pila no la cubre— y en
+  // ese mismo estado `igualar` se rechaza con `no_alcanza`. Los dos son
+  // EXCLUYENTES por construcción: donde antes no había botón de pago y al
+  // jugador sólo le quedaba retirarse —perdiendo lo que ya había puesto, que es
+  // el defecto que APU-1 corrige— ahora hay All-in.
+  const kElegido   = Math.max(1, Math.round(betAmount / (unit || 1)))
+  const fila       = filaAcciones(game, kElegido)
+  const puedeHacer = (id) => fila.some(a => a.id === id)
+  const costoAccion = (id) => fila.find(a => a.id === id)?.costo ?? 0
+  const raiseTo    = currentBet + betAmount
+  const mults      = multiplicadoresDe(game)
 
   function act(action) {
-    if (['apostar', 'igualar', 'subir'].includes(action)) play('coinBet')
+    // §1 de la ficha: el all-in REUTILIZA `coinBet`. No estrena sonido —es
+    // dinero al pozo como cualquier otro— y lo que lo distingue es el compás,
+    // no el timbre.
+    if (['apostar', 'igualar', 'subir', 'allIn'].includes(action)) play('coinBet')
     if (action === 'retirarse') play('cardFold')
-    setGame(prev => applyPlayerBetAction(prev, action, betAmount))
+    // 1e-iii · al motor va el MULTIPLICADOR, no el monto. Es el mismo `k` con
+    // el que `filaAcciones` acaba de preguntar si esta acción era legal, así que
+    // lo que se aplica y lo que se ofreció no pueden separarse.
+    setGame(prev => applyPlayerBetAction(prev, action, kElegido))
   }
+
+  // ── APU-1 §5 · LA RECARGA ENTRE MANOS ────────────────────────────
+  //
+  // Releva al modal de bancarrota con sus dos «Próximamente» (§5.4 nombra esa
+  // superficie como la que se reemplaza) y estrena el otro lado de la moneda de
+  // APU-1: si la entrada es lo que arriesgas, la recarga es el segundo round.
+  //
+  // Las tres formas salen de UNA función pura, `pideRecarga`, que mira la fase,
+  // la pila, el techo de la mesa y el bolsillo. La pantalla no vuelve a decidir
+  // nada: pinta lo que esa función dice y cobra por `aplicarRecarga`.
+  const motivoRec  = pideRecarga(game, saldo)
+  const opcRecarga = opcionesRecarga(human.chips, unit, saldo)
+  const topeRec    = topeRecarga(human.chips, unit, saldo)
+
+  function confirmarRecarga(monto) {
+    if (!recargaValida(monto, human.chips, unit, saldo).ok) return
+    // §1 de la ficha: la recarga REUTILIZA `chipsCollect`. Es el sonido de
+    // fichas que llegan, y eso es exactamente lo que pasa.
+    play('chipsCollect')
+    setGame(prev => {
+      // §5.3 · ASIENTO POR ASIENTO, y por la puerta del motor. Primero el
+      // humano —que es quien fija la referencia— y después cada IA viva, que se
+      // COMPLETA HACIA ARRIBA: a la que ya va por encima no se le quita nada,
+      // porque la pila de una IA no se reduce por regla, sólo por perder. Las
+      // eliminadas no vuelven: `nivelarLasIAS` las deja fuera.
+      //
+      // `aplicarRecarga` sube también la `entrada` de cada asiento, y eso es lo
+      // que hace que la cuenta final siga siendo honesta: lo recargado es dinero
+      // PUESTO, no ganado, y `fichasNetas` lo resta como tal.
+      let g = aplicarRecarga(prev, ASIENTO_HUMANO, monto)
+      for (const { seat, monto: cuanto } of nivelarLasIAS(g)) g = aplicarRecarga(g, seat, cuanto)
+      return g
+    })
+    onRecargar?.(monto)
+    setRecargaHecha(n => n + 1)
+    setRecarga(null)
+  }
+
+  function rechazarRecarga() {
+    const eraForzosa = recarga?.motivo === RECARGA.FORZOSA
+    setRecarga(null)
+    // §5.4 · «Si no recarga, la mesa termina.» Se termina por la MISMA puerta
+    // que la ✕ de la cabecera y que el modal de bancarrota, así que las fichas
+    // que queden vuelven al bolsillo (§2.5). No se pierde nada por decir que no:
+    // se pierde la mano que no se llegó a jugar.
+    if (eraForzosa) salir()
+  }
+
+  // La pregunta se hace UNA VEZ POR MANO. Sin esta memoria, decir «no» cerraba
+  // el panel y el efecto lo volvía a abrir en el render siguiente —la condición
+  // que lo dispara sigue siendo verdad—, que es una pregunta que no se puede
+  // responder. `handCount` es la identidad de la mano, la misma que `sesionCore`
+  // usa para no contar dos veces.
+  //
+  // Las dos funciones de arriba van DELANTE de los efectos que las llaman, y no
+  // por gusto: con la declaración detrás, el compilador de `react-hooks` se
+  // rendía con el componente entero y sus DOCE diagnósticos de la familia `refs`
+  // desaparecían sin decir palabra. Ver §E-11 del informe.
+  const recargaPedidaRef = useRef(-1)
+
+  useEffect(() => {
+    if (recarga) return
+    if (motivoRec !== RECARGA.AUTOMATICA && motivoRec !== RECARGA.FORZOSA) return
+    // §5.1: la automática sale AL TERMINAR UNA MANO. En `WAITING` no terminó
+    // ninguna, así que ahí sólo se abre la forzosa —que no es una oferta sino
+    // un hecho: con esas fichas no se puede repartir—.
+    if (phase === PHASES.WAITING && motivoRec !== RECARGA.FORZOSA) return
+    if (recargaPedidaRef.current === game.handCount) return
+    recargaPedidaRef.current = game.handCount
+    const primera = opcRecarga.find(o => !o.disabled)
+    setRecarga({ motivo: motivoRec, monto: primera?.monto ?? 0 })
+    setRecargaSeg(Math.round(plazoRecarga() / 1000))
+  }, [motivoRec, phase, game.handCount, recarga]) // eslint-disable-line
+
+  // §5.1 · DIEZ SEGUNDOS Y «No» POR DEFECTO. El plazo corre igual en la
+  // automática y en la forzosa (§5.4: «misma pantalla, mismo plazo»); lo que
+  // cambia es lo que significa que venza. Aquí, seguir jugando; allá, levantarse
+  // de la mesa con lo que se tenga, que por §2.5 vuelve entero al bolsillo.
+  //
+  // FRZ-1 · a oscuras NO corre, por la misma razón que el reloj de turno: volver
+  // y encontrarse la mesa terminada porque el plazo se consumió en segundo plano
+  // es justo el defecto que aquella campaña midió y cerró.
+  useEffect(() => {
+    if (!recarga || congelado) return
+    // La voluntaria no tiene plazo: la abrió él y se cierra cuando él quiera.
+    if (recarga.motivo === RECARGA.VOLUNTARIA) return
+    if (recargaSeg <= 0) return
+    // El vencimiento se decide DENTRO del tic, no en el cuerpo del efecto, que
+    // es el mismo molde del reloj de turno doce líneas más arriba: un `setState`
+    // síncrono aquí encadena un render de más y `react-hooks` lo dice.
+    const t = setTimeout(() => {
+      const quedan = recargaSeg - 1
+      setRecargaSeg(quedan)
+      if (quedan <= 0) rechazarRecarga()
+    }, 1000)
+    return () => clearTimeout(t)
+  }, [recarga, recargaSeg, congelado]) // eslint-disable-line
 
   // ── Discard (secuencial, jugador por jugador en orden Mano→Pie) ───────────
   // Por jugador: cartas vuelan boca abajo hacia el mazo → slots vacíos un
@@ -1080,6 +1279,23 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
 
   const isDiscardPhase = phase === PHASES.DISCARD
   const isPayoutPhase  = phase === PHASES.PAYOUT
+
+  // ── APU-1 §4.2 · LAS CAPAS DEL POZO, Y LA FRASE QUE LAS CUENTA ─────────
+  // Sólo en el pago: durante la mano el pozo se enseña entero, que es como se
+  // apuesta. `capasDe` lee `contribMano`, que el motor NO resetea al pagar —se
+  // resetea en la mano siguiente—, así que en `PAYOUT` la cuenta sigue en pie.
+  //
+  // VA AQUÍ Y NO ARRIBA, junto al pozo que enseña. Nació trescientas líneas más
+  // arriba, al lado de `pozoMostrado`, que es donde temáticamente pertenece —y
+  // leía `isPayoutPhase` antes de esta línea. Eso no es un detalle de estilo:
+  // es la zona muerta temporal de un `const`, o sea un ReferenceError en cada
+  // render de la mesa. No lo cazó ni `vitest` (no hay jsdom) ni el `build` (Vite
+  // no lo mira), sino el LINTER —y de la forma más callada posible: el
+  // compilador de `react-hooks` dejó de poder compilar el componente y sus
+  // dieciocho diagnósticos desaparecieron de golpe. Una vara que BAJA sin que
+  // nadie haya arreglado nada es una vara que hay que ir a mirar.
+  const capasPozo  = isPayoutPhase ? repartoPorCapas(game) : []
+  const capasTexto = isPayoutPhase ? componeCapas(capasPozo, game.players, game.winner) : null
 
   // ── Showdown winner emphasis ──────────────────────────────────────────────
   // Active until "Siguiente mano" (isClearing). Only when the hand reached
@@ -1503,15 +1719,22 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
             el payout, cuando el .score-tag ocupa la misma franja centrada).
             Absoluto y centrado vía CSS .table-two; con el chip abierto cede
             el renglón al saldo (clase chip-open en la sección). */}
+        {/* §4.3 · la misma marca por la vía legacy `.ai-zone` de la mesa de 2.
+            Las dos rutas de render del rival llevan la misma línea y el mismo
+            orden —retirado, all-in, turno, última acción— porque son la misma
+            regla contada dos veces por una división que es de layout, no de
+            producto. Aquí el hueco mide 726 px: sobra sitio. */}
         {(isPortraitTable || isDesktopTable) && (
-          <span className={`opp-status${turnSeat === seat ? ' opp-status-turn' : ''}`}>
+          <span className={`opp-status${turnSeat === seat ? ' opp-status-turn' : ''}${marcadoAllIn(rival) && !inReset ? ' opp-status-allin' : ''}`}>
             {inReset || (isPayoutPhase && rival.score)
               ? ' '
               : rival.folded
                 ? 'Se retiró'
-                : turnSeat === seat
-                  ? 'Pensando…'
-                  : (lastActions[seat] ?? ' ')}
+                : marcadoAllIn(rival)
+                  ? t('ia.mesa.marca.allin')
+                  : turnSeat === seat
+                    ? 'Pensando…'
+                    : (lastActions[seat] ?? ' ')}
           </span>
         )}
         {/* M2-2 · Ficha de esquina (reemplazo consultable del saldo desmontado
@@ -1614,7 +1837,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     // crónica compuesta por `cronicaCore` con su estilo por tipo de acción
     // (Tanda C4.3). Una sola función de clase para las dos rutas — el aviso del
     // censo, saldado. Ninguna de las dos ramas lee ya `game.message`.
-    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? cronica)
+    // §4.2 · la cola de capas se AÑADE al resultado, no lo sustituye: quien ganó
+    // la mano sigue siendo la cabeza de la frase y lo que se suma es el resto
+    // del dinero, que es justo lo que el jugador no puede deducir mirando.
+    const centerMsg  = resultado ? [resultado.texto, capasTexto].filter(Boolean).join(' ') : (discardMsg ?? cronica)
     const actionKind = resultado ? null : messageActionKind(centerMsg)
     const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
@@ -1648,7 +1874,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
             {/* data-tono: afidávit para el arnés (molde U3). No pinta nada — un
                 atributo no mueve un píxel — y permite verificar que el color
                 aplicado y el tono compuesto son el mismo hecho, sin leer prosa. */}
-            <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} key={actionKind ? centerMsg : 'msg'}>
+            <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} data-capas={capasPozo.length} key={actionKind ? centerMsg : 'msg'}>
               {centerMsg}
             </p>
             {/* C4.4: el chip refleja el estado real según jugadores vivos. Solo en
@@ -1687,7 +1913,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
     // MSG-U1 · misma composición y misma función de clase que center-zone: esta
     // ruta sólo existe en mesa 2 landscape móvil, y la voz es una sola en todo
     // el juego (alcance multiplataforma deliberado, v1.0 §4).
-    const centerMsg  = resultado ? resultado.texto : (discardMsg ?? cronica)
+    // §4.2 · la cola de capas se AÑADE al resultado, no lo sustituye: quien ganó
+    // la mano sigue siendo la cabeza de la frase y lo que se suma es el resto
+    // del dinero, que es justo lo que el jugador no puede deducir mirando.
+    const centerMsg  = resultado ? [resultado.texto, capasTexto].filter(Boolean).join(' ') : (discardMsg ?? cronica)
     const actionKind = resultado ? null : messageActionKind(centerMsg)
     const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
@@ -1709,7 +1938,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
           </div>
         </section>
         <section className="felt-oval oval-right">
-          <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} key={actionKind ? centerMsg : 'msg'}>
+          <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} data-capas={capasPozo.length} key={actionKind ? centerMsg : 'msg'}>
             {centerMsg}
           </p>
         </section>
@@ -1725,7 +1954,21 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
   // árbol queda intacto: ni una clase, ni un atributo, ni una caja.
   return (
     <main className="game-table-screen">
-      <section className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}${aliveN === 2 ? ' table-two' : ''}`}>
+      {/* ── AFIDÁVITS DE APU-1 PARA EL ARNÉS ────────────────────────
+          Mismo molde que `data-tono` (U3): un atributo no mueve un píxel y
+          permite verificar un hecho sin leer prosa ni deducirlo de la pantalla.
+
+          `data-clavada` es el más importante de los tres y ojalá valga siempre
+          `0`: dice que la fase de apuesta abierta no tiene un solo asiento que
+          pueda hablar. Es D-12, y el arnés lo vigila en cada mano que juega
+          porque es la única forma de que, si alguna vez ocurre, salga en un
+          informe y no en un jugador mirando una mesa que no avanza. */}
+      <section
+        className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}${aliveN === 2 ? ' table-two' : ''}`}
+        data-clavada={mesaClavada(game) ? '1' : '0'}
+        data-recargas={recargaHecha}
+        data-allin={game.players.filter(marcadoAllIn).length}
+      >
 
         <header className="table-header">
           {/* AJ-1 · en landscape mesa 5 este bloque se monta dentro de .table-mid
@@ -1763,13 +2006,19 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
             que la de derrota no hereda una sola regla de la nueva. */}
         {isGameOver ? (
           esVictoriaDeMesa ? (
+            /* §2.5 · `netas` se mide CONTRA LA ENTRADA, ya no contra los 5.000 de
+               `economy.saldoInicial`. Con las entradas de APU-1 esa resta había
+               pasado a mentir en las dos direcciones: quien entra con 750 y se
+               levanta con 900 había «perdido 4.100». `entrada` la escribe el
+               motor al sentar el asiento y la sube cada recarga, así que una
+               mesa con segundo round también cuadra. */
             <PantallaVictoria
               sesion={sesion}
-              netas={fichasNetas(human.chips)}
+              netas={fichasNetas(human.chips, human.entrada)}
               saldo={human.chips}
               puntos={sesion.manosGanadas * puntosDe(game.nivelIA)}
               precedente={precedenteToc}
-              onLeave={onLeave}
+              onLeave={salir}
             />
           ) : (
           <div className="game-over-screen">
@@ -1784,7 +2033,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
             >
               {resultado ? resultado.texto : cronica}
             </p>
-            <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
+            <SoundButton className="btn btn-primary" onClick={salir}>Salir de la mesa</SoundButton>
           </div>
           )
         ) : (
@@ -1901,7 +2150,21 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
                 <div className="action-area thinking">Repartiendo cartas…</div>
               )}
 
-              {isBetPhase && !humanIsTurn && !human.folded && !game.players[game.activePlayerIndex].folded && (
+              {/* §4.3 · EL HUMANO EN ALL-IN TAMBIÉN VA MARCADO, y su marca no es un
+                  badge: es esta línea. Un rival en all-in se reconoce porque su
+                  ranura de estado lo dice; el humano no tiene ranura, tiene la
+                  fila de botones — y en all-in la fila está vacía. Sin esto ve
+                  «La IA está pensando…» y ninguna explicación de por qué a él no
+                  le toca, que es exactamente el momento en que hay que decirle
+                  que sus cartas siguen jugando por lo que ya puso. Ocupa el
+                  mismo hueco que el «pensando» al que releva: ni una caja más. */}
+              {isBetPhase && marcadoAllIn(human) && (
+                <div className="action-area thinking" data-accion="allin-humano">
+                  {t('ia.mesa.humano.allin')}
+                </div>
+              )}
+
+              {isBetPhase && !marcadoAllIn(human) && !humanIsTurn && !human.folded && !game.players[game.activePlayerIndex].folded && (
                 <div className="action-area thinking">
                   {numPlayers === 2
                     ? 'La IA está pensando…'
@@ -1915,26 +2178,35 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
                     <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
                       {timeLeft}s
                     </div>
-                    {[1, 2, 5, 10].map((mult) => {
-                      const val = unit * mult
-                      return (
-                        <SoundButton
-                          key={mult}
-                          className={`btn btn-mult${betAmount === val ? ' btn-mult-active' : ''}`}
-                          onClick={() => setBetAmount(val)}
-                          disabled={val > playerChips}
-                        >
-                          ×{mult}
-                        </SoundButton>
-                      )
-                    })}
+                    {/* §3.1 · el gris del multiplicador también lo dice el árbitro.
+                        `val > playerChips` preguntaba si la pila cubre el MONTO, y
+                        el monto no es lo que cuesta: subir cuesta la diferencia con
+                        lo ya puesto, no el multiplicador entero, así que un ×10 que
+                        sí se podía pagar salía en gris. `multiplicadoresDe` le
+                        pregunta a la acción que ese multiplicador va a servir. */}
+                    {mults.map((m) => (
+                      <SoundButton
+                        key={m.k}
+                        className={`btn btn-mult${betAmount === m.monto ? ' btn-mult-active' : ''}`}
+                        onClick={() => setBetAmount(m.monto)}
+                        disabled={!m.disponible}
+                      >
+                        ×{m.k}
+                      </SoundButton>
+                    ))}
                   </div>
                   <div className="action-buttons">
-                    {canPass  && <SoundButton className="btn btn-pass"  onClick={() => act('pasar')}>Pasar</SoundButton>}
-                    {canBet   && <SoundButton className="btn btn-bet"   onClick={() => act('apostar')}>Apostar {betAmount}</SoundButton>}
-                    {canCall  && <SoundButton className="btn btn-call"  onClick={() => act('igualar')}>Igualar ({toCall})</SoundButton>}
-                    {canRaise && <SoundButton className="btn btn-raise" onClick={() => act('subir')}>Subir a {raiseTo}</SoundButton>}
-                    <SoundButton className="btn btn-fold" onClick={() => act('retirarse')}>Retirarse</SoundButton>
+                    {puedeHacer('pasar')   && <SoundButton className="btn btn-pass"  data-accion="pasar"   onClick={() => act('pasar')}>Pasar</SoundButton>}
+                    {puedeHacer('apostar') && <SoundButton className="btn btn-bet"   data-accion="apostar" onClick={() => act('apostar')}>Apostar {betAmount}</SoundButton>}
+                    {puedeHacer('igualar') && <SoundButton className="btn btn-call"  data-accion="igualar" onClick={() => act('igualar')}>Igualar ({toCall})</SoundButton>}
+                    {/* §4.1 · EN EL SITIO DE «Igualar», y no al lado. Es el botón de
+                        PAGAR cuando la pila no llega: hereda `btn-call` —el verde
+                        del pago, y con él el `order: -1` que gameTable.css le da en
+                        las mesas anchas— y añade lo suyo en `apu.css`, que es hoja
+                        nueva. Ninguna regla se escribe en la protegida. */}
+                    {puedeHacer('allIn')   && <SoundButton className="btn btn-call btn-allin" data-accion="allin" onClick={() => act('allIn')}>{t('ia.mesa.allin', { hc: costoAccion('allIn') })}</SoundButton>}
+                    {puedeHacer('subir')   && <SoundButton className="btn btn-raise" data-accion="subir"   onClick={() => act('subir')}>Subir a {raiseTo}</SoundButton>}
+                    {puedeHacer('retirarse') && <SoundButton className="btn btn-fold" data-accion="retirarse" onClick={() => act('retirarse')}>Retirarse</SoundButton>}
                   </div>
                 </div>
               )}
@@ -1997,7 +2269,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
 
               {/* C4.5: durante la salida digna (ceremony) o el modal de bancarrota
                   no se ofrece "Siguiente mano" — la mesa no continúa. */}
-              {isPayoutPhase && !isClearing && !isShuffling && !ceremony && !bankruptModal && (
+              {/* §5.1 · LA QUINTA CONDICIÓN DEL GATE. «Bloquea Siguiente mano», dice
+                  el normativo, y no es un detalle de cortesía: la recarga sólo
+                  existe ENTRE manos, así que dejar el botón vivo mientras la
+                  pregunta está abierta es ofrecer la única acción que la anula. */}
+              {isPayoutPhase && !isClearing && !isShuffling && !ceremony && !bankruptModal && !recarga && (
                 <div className="action-area">
                   {/* FRZ-1 §2.4 · El otro extremo del arranque de mano. Handle
                       para poder cancelarlo, y si al vencer estamos a oscuras la
@@ -2021,10 +2297,31 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
                   }}>
                     Siguiente mano
                   </SoundButton>
+                  {/* §5.1 · la VOLUNTARIA: «el jugador la pide entre manos, cuando
+                      quiera». Sólo se monta cuando de verdad hay algo que
+                      recargar —`pideRecarga` devuelve `NINGUNA` sin bolsillo o
+                      con la pila ya en el techo—, porque un botón que no puede
+                      hacer nada es peor que ninguno. */}
+                  {motivoRec === RECARGA.VOLUNTARIA && (
+                    <SoundButton className="btn btn-recarga" data-accion="recargar" onClick={() => {
+                      const primera = opcRecarga.find(o => !o.disabled)
+                      setRecarga({ motivo: RECARGA.VOLUNTARIA, monto: primera?.monto ?? 0 })
+                      setRecargaSeg(0)
+                    }}>
+                      {t('ia.recarga.pedir')}
+                    </SoundButton>
+                  )}
                 </div>
               )}
 
-              {((isPayoutPhase && isClearing) || ceremony) && (
+              {/* O1 · LA CAJA SE RESERVA TAMBIÉN CON LA RECARGA ABIERTA. La quinta
+                  condición del gate quita «Siguiente mano» mientras la pregunta
+                  vive, y sin este `|| recarga` no quedaba nadie pintando esa
+                  ranura: la barra del jugador la perdía entera y todo lo de al
+                  lado se movía justo cuando el dedo va hacia los botones del
+                  panel. Es la misma regla que ya cubría el barajado y la
+                  ceremonia de eliminación, con un caso más. */}
+              {((isPayoutPhase && isClearing) || ceremony || !!recarga) && (
                 <div className="action-area" />
               )}
             </div>
@@ -2221,12 +2518,83 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
                 onClick={() => {
                   // TODO: sync balance to Supabase (Step 7)
                   setConfirmLeave(false)
-                  onLeave()
+                  salir()
                 }}
               >
                 Abandonar mesa
               </SoundButton>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── APU-1 §5 · LA RECARGA ────────────────────────────────
+          Hereda la CAJA del modal de bancarrota —`bankrupt-overlay`/`-modal`/
+          `-title`/`-sub`/`-actions`, que gameTable.css ya define y que §5.4
+          señala como la superficie a reemplazar— y añade lo suyo en `apu.css`,
+          que es hoja NUEVA. Así la lámina es la que Victor ya aprobó para un
+          modal bloqueante de esta mesa y no hay una regla en hoja protegida.
+
+          Los tres montos tienen la misma forma que los de la entrada (§5.2: «se
+          elige como una entrada») y se APAGAN en vez de esconderse: es E-2 otra
+          vez —una fila que cambia de número de botones mueve lo que hay debajo
+          justo cuando el dedo va bajando—. */}
+      {recarga && (
+        <div
+          className={`bankrupt-overlay${recarga.motivo === RECARGA.FORZOSA ? '' : ' apu-suave'}`}
+          data-accion="recarga"
+          data-motivo={recarga.motivo}
+        >
+          <div className="bankrupt-modal apu-recarga">
+            <p className="bankrupt-title">{t('ia.recarga.titulo')}</p>
+            <p className="bankrupt-sub" data-accion="recarga-sub">
+              {recarga.motivo === RECARGA.FORZOSA
+                ? t('ia.recarga.sub.forzosa')
+                : recarga.motivo === RECARGA.AUTOMATICA
+                  ? t('ia.recarga.sub.automatica', { hc: human.chips })
+                  : t('ia.recarga.sub.voluntaria', { hc: topeRec })}
+            </p>
+
+            <div className="apu-montos">
+              {opcRecarga.map((o) => (
+                <SoundButton
+                  key={o.id}
+                  className={`btn btn-mult apu-monto${recarga.monto === o.monto ? ' btn-mult-active' : ''}`}
+                  data-accion="recarga-monto"
+                  disabled={o.disabled}
+                  onClick={() => setRecarga(r => ({ ...r, monto: o.monto }))}
+                >
+                  {t(`ia.recarga.opcion.${o.id}`, { hc: o.monto })}
+                </SoundButton>
+              ))}
+            </div>
+
+            {/* 1f-A4 · Aquí vivía la nota de §5.3, en su propio renglón. La
+                promesa se dice ahora en el SUBTÍTULO de las dos recargas
+                blandas (A3), que siempre se pinta; este párrafo sólo se veía en
+                escritorio y repetía la misma frase dos renglones más abajo
+                (E-31). Se retira con su clave y con sus reglas de `apu.css`. */}
+
+            <div className="bankrupt-actions">
+              <SoundButton
+                className="btn btn-primary"
+                data-accion="recarga-si"
+                disabled={!recargaValida(recarga.monto, human.chips, unit, saldo).ok}
+                onClick={() => confirmarRecarga(recarga.monto)}
+              >
+                {t('ia.recarga.si', { hc: recarga.monto })}
+              </SoundButton>
+              <SoundButton className="btn btn-pass" data-accion="recarga-no" onClick={rechazarRecarga}>
+                {recarga.motivo === RECARGA.FORZOSA ? t('ia.recarga.no.forzosa') : t('ia.recarga.no')}
+              </SoundButton>
+            </div>
+
+            {/* O1 · el plazo RESERVA su renglón aunque la voluntaria no lo use: sin
+                la reserva, los dos botones de arriba bailarían 20 px entre una
+                forma de la pregunta y otra. */}
+            <p className="apu-plazo" data-accion="recarga-plazo" style={{ visibility: recarga.motivo === RECARGA.VOLUNTARIA ? 'hidden' : 'visible' }}>
+              {t('ia.recarga.plazo', { s: Math.max(0, recargaSeg) })}
+            </p>
           </div>
         </div>
       )}
@@ -2239,7 +2607,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, onLeave, cuent
             <p className="bankrupt-title">Te quedaste sin Heptacoins</p>
             <p className="bankrupt-sub">Necesitas más Heptacoins para seguir jugando.</p>
             <div className="bankrupt-actions">
-              <SoundButton className="btn btn-primary" onClick={onLeave}>
+              <SoundButton className="btn btn-primary" onClick={salir}>
                 Volver al lobby
               </SoundButton>
               <button className="btn btn-soon" disabled>

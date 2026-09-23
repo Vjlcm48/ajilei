@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import '../styles/salas.css'
+import { useCallback, useEffect, useState } from 'react'
 
-import BarraSuperior from '../components/BarraSuperior'
-import { IconoVolver, IconoCasa, IconoGlobo } from '../components/IconosSalas'
+import PantallaChips from '../components/PantallaChips'
+import FilaChips from '../components/FilaChips'
+import { IconoGlobo } from '../components/IconosSalas'
 import { IconoCandado } from '../components/IconosLobby'
 import { useIdioma } from '../hooks/useIdioma'
 import { montoTexto } from '../config/tapetes'
@@ -13,7 +13,7 @@ import {
   JUGADORES_PVP,
   saldoMinimo,
 } from '../config/salas'
-import { leerConfig, guardarConfig } from '../config/salaRecordada'
+import { MEMORIA_PVP } from '../config/salaRecordada'
 import { saldoDelJugador } from '../lib/saldo'
 import { claveDeError } from '../lib/salasApi'
 import {
@@ -35,6 +35,18 @@ import {
 // existe, porque una segunda mesa idéntica no la quiere nadie —parte a la mitad
 // a los que esperan y las dos tardan el doble en llenarse—.
 //
+// ── APU-1 1e · LA CARCASA Y LAS FILAS SE COMPARTEN CON «RETAR A LAS IAS» ────
+// Rector 1e §2.1 (K-3a). Lo que era marcado a mano aquí pasa a `PantallaChips`
+// y `FilaChips`, y esta pantalla queda con lo suyo: las tres decisiones, la
+// consulta de mesas abiertas y el CTA que cambia de nombre. La extracción es
+// NEUTRA —las mismas clases, los mismos `data-accion`, el mismo orden— y quien
+// lo prueba es `diagSAL`: sus tres estados de `armar` no cambiaron una línea.
+//
+// El bloque de modos NO se convierte en `FilaChips`: sus botones son
+// `.sal-modo` con dos líneas y un icono, no chips de píldora. Forzarlo en el
+// molde de los chips habría cambiado su marcado, que es justo lo que la
+// neutralidad prohíbe.
+//
 // ── LA REGLA SELLADA VIVE EN EL SERVIDOR, NO AQUÍ ──────────────────────────
 // Lo que esta pantalla hace es ENSEÑAR la regla antes de tiempo. Quien decide es
 // `crear_sala`, que ante una `abierta` con la combinación ocupada llama a
@@ -55,7 +67,7 @@ export default function ArmarMesa({
   cuenta,
   // §8.2 · el arnés inyecta la configuración inicial para poder fotografiar
   // `armar-aviso` y `armar-unirme` sin tocar el almacenamiento del navegador.
-  // En producción es `null` y manda `salaRecordada`.
+  // En producción es `null` y manda la memoria.
   configInicial = null,
   onEntrarSala,
   onVolver,
@@ -70,29 +82,13 @@ export default function ArmarMesa({
   // repetido, y peor, dejaría que un cambio de saldo a mitad de pantalla
   // reescribiera bajo el dedo lo que el jugador acaba de elegir.
   const [config, setConfig] = useState(
-    () => (configInicial ? normalizarConfig(configInicial, saldo) : leerConfig(saldo))
+    () => (configInicial ? normalizarConfig(configInicial, saldo) : MEMORIA_PVP.leer(saldo))
   )
   const { jugadores, apuesta, tipo } = config
 
   const [mesas, setMesas] = useState([])
   const [error, setError] = useState(null)
   const [ocupado, setOcupado] = useState(false)
-  const [toast, setToast] = useState(null)
-
-  const relojToast = useRef(null)
-
-  useEffect(() => {
-    document.body.classList.add('sal-activa')
-    return () => { document.body.classList.remove('sal-activa') }
-  }, [])
-
-  useEffect(() => () => clearTimeout(relojToast.current), [])
-
-  const avisar = useCallback((claveTexto) => {
-    setToast(claveTexto)
-    clearTimeout(relojToast.current)
-    relojToast.current = setTimeout(() => setToast(null), 2600)
-  }, [])
 
   // ── Qué mesas abiertas hay ───────────────────────────────────────────────
   // §4.3 permitía «vía `salas_abiertas` filtrada en cliente, o vía la función de
@@ -156,7 +152,7 @@ export default function ArmarMesa({
     if (!respuesta.error) {
       // §4.4 · se recuerda lo que el jugador llegó a USAR, no por dónde paseó el
       // dedo. Por eso se guarda aquí y no en `elegir`.
-      guardarConfig(config)
+      MEMORIA_PVP.guardar(config)
       onEntrarSala?.(respuesta.data)
       return
     }
@@ -200,163 +196,104 @@ export default function ArmarMesa({
   }
 
   return (
-    <main className="sal">
-      <div className="sal-fondo" aria-hidden="true" />
-
-      <BarraSuperior
-        usuario={cuenta?.username ?? ''}
-        saldo={saldo}
-        onPerfil={() => avisar('lob.toast.pronto')}
-        onTienda={() => avisar('lob.toast.pronto')}
-        onAjustes={() => avisar('lob.toast.pronto')}
+    <PantallaChips
+      titulo={t('sal.armar.titulo')}
+      clase="es-armar"
+      cuenta={cuenta}
+      saldo={saldo}
+      // Aquí la flecha y la casa DEJAN de coincidir: la flecha deshace un paso
+      // —vuelve a `SalaOpciones`, §4.5— y la casa salta al lobby de un tirón
+      // (§5.1). Tener las dos es lo que hace que el jugador que entró a mirar
+      // pueda salir sin desandar.
+      onVolver={onVolver}
+      onLobby={onLobby}
+      cta={{
+        etiqueta: t(rotuloCta),
+        disabled: ocupado,
+        onClick: pulsar,
+        nota: notaCta,
+        alerta: Boolean(error),
+      }}
+    >
+      {/* ── Jugadores ────────────────────────────────────────────────────── */}
+      <FilaChips
+        titulo={t('sal.armar.jugadores')}
+        accion="jugadores"
+        claseChips="es-jugadores"
+        opciones={JUGADORES_PVP.map((n) => ({ id: n, etiqueta: n }))}
+        valor={jugadores}
+        onChange={(n) => elegir({ jugadores: n })}
       />
 
-      <div className="sal-cab">
-        {/* Aquí la flecha y la casa DEJAN de coincidir: la flecha deshace un
-            paso —vuelve a `SalaOpciones`, §4.5— y la casa salta al lobby de un
-            tirón (§5.1). Tener las dos es lo que hace que el jugador que entró a
-            mirar pueda salir sin desandar. */}
-        <button
-          type="button"
-          className="sal-volver"
-          data-accion="volver"
-          aria-label={t('sal.volver.aria')}
-          onClick={() => onVolver?.()}
-        >
-          <IconoVolver />
-        </button>
-        <h1>{t('sal.armar.titulo')}</h1>
-      </div>
+      {/* ── Apuesta ──────────────────────────────────────────────────────── */}
+      {/* O1 · dos líneas de caja reservada. El texto es largo y aparecer no
+          puede empujar el bloque de modos ni el CTA. */}
+      <FilaChips
+        titulo={t('sal.armar.apuesta')}
+        accion="apuesta"
+        opciones={APUESTAS_PVP.map((hc) => ({
+          id: hc,
+          etiqueta: montoTexto(hc),
+          // La regla 5× apaga el chip. Es CORTESÍA (§3.5), no validación: el
+          // servidor la comprueba otra vez y su `saldo_insuficiente` se pinta
+          // como cualquier otro error.
+          disabled: !alcanza(hc, saldo),
+        }))}
+        valor={apuesta}
+        onChange={(hc) => elegir({ apuesta: hc })}
+        accionAviso="aviso-nuevos"
+        claseAviso="es-anfitrion"
+        nota={avisoNuevos
+          ? t('sal.armar.aviso.nuevos', {
+              hc: montoTexto(apuesta),
+              bono: montoTexto(BONO_BIENVENIDA),
+              // Se DERIVA de `ALCANCE_NUEVOS`, que a su vez se deriva del bono y
+              // de la regla. Escribir «100 o 200» a mano aquí sería dejar una
+              // frase que mentiría el día que suba el bono.
+              alcance: ALCANCE_NUEVOS.map(montoTexto).join(' o '),
+            })
+          : null}
+      />
 
-      <div className="sal-cuerpo es-armar">
-
-        {/* ── Jugadores ──────────────────────────────────────────────────── */}
-        <section className="sal-bloque">
-          <h2>{t('sal.armar.jugadores')}</h2>
-          <div className="sal-chips es-jugadores" role="group" aria-label={t('sal.armar.jugadores')}>
-            {JUGADORES_PVP.map((n) => (
-              <button
-                key={n}
-                type="button"
-                className="sal-chip"
-                data-accion="jugadores"
-                aria-pressed={jugadores === n}
-                onClick={() => elegir({ jugadores: n })}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* ── Apuesta ────────────────────────────────────────────────────── */}
-        <section className="sal-bloque">
-          <h2>{t('sal.armar.apuesta')}</h2>
-          <div className="sal-chips" role="group" aria-label={t('sal.armar.apuesta')}>
-            {APUESTAS_PVP.map((hc) => (
-              <button
-                key={hc}
-                type="button"
-                className="sal-chip"
-                data-accion="apuesta"
-                aria-pressed={apuesta === hc}
-                // La regla 5× apaga el chip. Es CORTESÍA (§3.5), no validación:
-                // el servidor la comprueba otra vez y su `saldo_insuficiente` se
-                // pinta como cualquier otro error.
-                disabled={!alcanza(hc, saldo)}
-                onClick={() => elegir({ apuesta: hc })}
-              >
-                {montoTexto(hc)}
-              </button>
-            ))}
-          </div>
-          {/* O1 · dos líneas de caja reservada. El texto es largo y aparecer no
-              puede empujar el bloque de modos ni el CTA. */}
-          <p className={`sal-aviso es-anfitrion${avisoNuevos ? ' is-on' : ''}`} data-accion="aviso-nuevos">
-            {avisoNuevos
-              ? t('sal.armar.aviso.nuevos', {
-                  hc: montoTexto(apuesta),
-                  bono: montoTexto(BONO_BIENVENIDA),
-                  // Se DERIVA de `ALCANCE_NUEVOS`, que a su vez se deriva del
-                  // bono y de la regla. Escribir «100 o 200» a mano aquí sería
-                  // dejar una frase que mentiría el día que suba el bono.
-                  alcance: ALCANCE_NUEVOS.map(montoTexto).join(' o '),
-                })
-              : ' '}
-          </p>
-        </section>
-
-        {/* ── ¿Cómo la llenamos? ─────────────────────────────────────────── */}
-        <section className="sal-bloque">
-          <h2>{t('sal.armar.como')}</h2>
-          <div className="sal-modos" role="group" aria-label={t('sal.armar.como')}>
-            <button
-              type="button"
-              className="sal-modo"
-              data-accion="modo-privada"
-              aria-pressed={tipo === 'privada'}
-              onClick={() => elegir({ tipo: 'privada' })}
-            >
-              <span className="sal-modo-t">
-                <IconoCandado /><span>{t('sal.armar.privada')}</span>
-              </span>
-              <span className="sal-modo-d">{t('sal.armar.privada.d')}</span>
-            </button>
-            <button
-              type="button"
-              className="sal-modo"
-              data-accion="modo-abierta"
-              aria-pressed={tipo === 'abierta'}
-              onClick={() => elegir({ tipo: 'abierta' })}
-            >
-              <span className="sal-modo-t">
-                <IconoGlobo /><span>{t('sal.armar.abierta')}</span>
-              </span>
-              <span className="sal-modo-d">{t('sal.armar.abierta.d')}</span>
-            </button>
-          </div>
-          <p className={`sal-aviso es-recuerdo${recuerdo ? ' is-on' : ''}`} data-accion="recuerdo">
-            {recuerdo
-              ? t('sal.armar.recuerdo', {
-                  n: recuerdo.jugadores,
-                  hc: montoTexto(recuerdo.apuesta),
-                  x: recuerdo.sentados,
-                })
-              : ' '}
-          </p>
-        </section>
-
-        {/* ── El CTA ─────────────────────────────────────────────────────── */}
-        <section className="sal-accion">
+      {/* ── ¿Cómo la llenamos? ───────────────────────────────────────────── */}
+      <section className="sal-bloque">
+        <h2>{t('sal.armar.como')}</h2>
+        <div className="sal-modos" role="group" aria-label={t('sal.armar.como')}>
           <button
             type="button"
-            className="sal-cta"
-            data-accion="cta"
-            disabled={ocupado}
-            onClick={pulsar}
+            className="sal-modo"
+            data-accion="modo-privada"
+            aria-pressed={tipo === 'privada'}
+            onClick={() => elegir({ tipo: 'privada' })}
           >
-            {t(rotuloCta)}
+            <span className="sal-modo-t">
+              <IconoCandado /><span>{t('sal.armar.privada')}</span>
+            </span>
+            <span className="sal-modo-d">{t('sal.armar.privada.d')}</span>
           </button>
-          <small data-accion="cta-nota" role={error ? 'alert' : undefined}>
-            {notaCta ?? ' '}
-          </small>
-        </section>
-
-      </div>
-
-      <button
-        type="button"
-        className="sal-casa"
-        data-accion="casa"
-        aria-label={t('sal.casa.aria')}
-        onClick={() => onLobby?.()}
-      >
-        <IconoCasa />
-      </button>
-
-      <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
-        {toast !== null ? t(toast) : ' '}
-      </div>
-    </main>
+          <button
+            type="button"
+            className="sal-modo"
+            data-accion="modo-abierta"
+            aria-pressed={tipo === 'abierta'}
+            onClick={() => elegir({ tipo: 'abierta' })}
+          >
+            <span className="sal-modo-t">
+              <IconoGlobo /><span>{t('sal.armar.abierta')}</span>
+            </span>
+            <span className="sal-modo-d">{t('sal.armar.abierta.d')}</span>
+          </button>
+        </div>
+        <p className={`sal-aviso es-recuerdo${recuerdo ? ' is-on' : ''}`} data-accion="recuerdo">
+          {recuerdo
+            ? t('sal.armar.recuerdo', {
+                n: recuerdo.jugadores,
+                hc: montoTexto(recuerdo.apuesta),
+                x: recuerdo.sentados,
+              })
+            : ' '}
+        </p>
+      </section>
+    </PantallaChips>
   )
 }

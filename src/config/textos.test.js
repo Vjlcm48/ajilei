@@ -71,7 +71,13 @@ describe('IDI-0 · diccionario es', () => {
     // La lista es una PUERTA, no un inventario: se amplía a propósito cuando una
     // tanda trae una superficie nueva, y así una clave suelta sin prefijo —o con
     // uno inventado a medias— sigue cayendo aquí.
-    const PREFIJOS = ['lob.', 'sal.']
+    //
+    // APU-1 1e es la tercera campaña que llama: `ia.*` cubre «Retar a las IAS» y
+    // la mesa contra máquinas. Es el prefijo que IDI-0 llamaba `mesa.*` cuando
+    // escribió la frase de arriba; se nombra por CONTRA QUIÉN se juega y no por
+    // dónde se pinta, porque el mismo copy sirve a la pantalla de entrada y a la
+    // mesa, y `mesa.` habría dejado fuera a la primera.
+    const PREFIJOS = ['lob.', 'sal.', 'ia.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
@@ -127,7 +133,34 @@ describe('IDI-0 · diccionario es', () => {
     //     (SAL-1) y la etiqueta sobre el código que se COMPARTE (SAL-3). Un
     //     idioma futuro puede querer el sustantivo suelto en una y la frase en
     //     la otra.
+    //
+    //   ia.retar.apuesta   = sal.armar.apuesta     (APU-1 1e)
+    //   ia.retar.jugadores = sal.armar.jugadores   (APU-1 1e)
+    //     Las dos pantallas de chips preguntan lo mismo —cuántos y cuánto— y en
+    //     español se dice igual. Se mantienen separadas por la misma razón que
+    //     el par `sal.armar.privada = sal.espera.tipo.privada`: son dos
+    //     superficies de dos campañas distintas, y la de vs-IA todavía puede
+    //     querer decir «Apuesta por mano» sin arrastrar a la del PvP. Lo que NO
+    //     se duplica es el rótulo de los tres retos: ése vive en `niveles.js`.
+    //
+    //   ia.recarga.opcion.piso  = ia.retar.entrada.piso   (APU-1 1e-ii)
+    //   ia.recarga.opcion.medio = ia.retar.entrada.medio  (APU-1 1e-ii)
+    //     «Mínimo {hc}» y «Medio {hc}» dicen lo mismo en las dos superficies, y
+    //     eso NO es casualidad: §5.2 del normativo dice que la recarga «se elige
+    //     como una entrada», y son literalmente las mismas dos cifras de
+    //     `entrada.js` —piso 10× y medio 20× desde 1f-A4—. Quien aprendió a sentarse sabe
+    //     leer esto sin aprender nada nuevo.
+    //     Se duplican en vez de compartir clave porque son de dos pantallas
+    //     distintas: `ia.retar.*` es la pantalla previa y `ia.recarga.*` la
+    //     mesa, y un idioma que abrevie en el modal no tiene por qué abreviar en
+    //     la pantalla ancha. El TERCERO no se duplica y ahí se ve el motivo: en
+    //     la entrada «Techo» es una cifra fija de la mesa, y en la recarga es lo
+    //     que FALTA para llenarla, así que dice «Al techo».
     expect(repetidos.sort()).toEqual([
+      'ia.recarga.opcion.medio = ia.retar.entrada.medio',
+      'ia.recarga.opcion.piso = ia.retar.entrada.piso',
+      'ia.retar.apuesta = sal.armar.apuesta',
+      'ia.retar.jugadores = sal.armar.jugadores',
       'lob.ajustes.aria = lob.cfg.titulo',
       'lob.cta.pvp = sal.opciones.titulo',
       'sal.armar.abierta = sal.espera.tipo.abierta',
@@ -138,6 +171,29 @@ describe('IDI-0 · diccionario es', () => {
       'sal.espera.fin.entrar.nota = sal.partida.pronto',
       'sal.espera.sentados = sal.opciones.mesa.estado',
     ])
+  })
+
+  // ── APU-1 1f-A4 · LA PROMESA DE §5.3, EN UNA SOLA VOZ ───────────────────
+  // Vivía en `ia.recarga.nivelado`, un renglón aparte bajo los montos. En el
+  // teléfono no cabía y se retiraba por CSS (1f-A2), así que la promesa se
+  // callaba justo donde va a jugar casi todo el mundo; en escritorio sí se
+  // pintaba, y desde 1f-A3 —que la metió en los subtítulos— repetía la misma
+  // frase dos renglones más abajo (E-31). La clave se retira y la promesa se
+  // dice una vez, en el subtítulo, que siempre se pinta.
+  //
+  // Esta prueba sella las dos mitades de esa decisión, porque son la misma: si
+  // alguien devuelve la clave, o si alguien recorta el subtítulo y se lleva la
+  // promesa por delante, aquí se entera.
+  it('la promesa de §5.3 la dicen los dos subtítulos blandos, y nadie más', () => {
+    expect(TEXTOS_ES['ia.recarga.nivelado']).toBeUndefined()
+    expect(TEXTOS_ES['ia.recarga.sub.automatica']).toContain('Las IAS se nivelan contigo.')
+    expect(TEXTOS_ES['ia.recarga.sub.voluntaria']).toContain('Las IAS se nivelan contigo.')
+    // La forzosa NO la lleva, y es deliberado: ahí no hay nivelación que
+    // prometer — o se recarga o se sale de la mesa (§5.4).
+    expect(TEXTOS_ES['ia.recarga.sub.forzosa']).not.toContain('nivelan')
+    // Y nadie más la dice: una sola voz en todas las pantallas.
+    const dicen = Object.keys(TEXTOS_ES).filter((k) => /se nivelan/.test(TEXTOS_ES[k]))
+    expect(dicen.sort()).toEqual(['ia.recarga.sub.automatica', 'ia.recarga.sub.voluntaria'])
   })
 })
 
