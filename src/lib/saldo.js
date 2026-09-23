@@ -12,9 +12,12 @@
 // aquí y de ningún otro sitio; el día que ECO-1 conecte Supabase, cambia esta
 // función y las tres pantallas de salas no se enteran.
 //
-// LOS SEIS SITIOS EXISTENTES NO SE TOCAN. Son de vs-IA, funcionan, y moverlos
-// ahora sería una migración de toda la app metida de contrabando en una tanda de
-// cimientos. Se quedan donde están hasta ECO-1.
+// LOS SEIS SITIOS EXISTENTES NO SE TOCARON en aquella tanda: eran de vs-IA,
+// funcionaban, y moverlos habría sido una migración de toda la app metida de
+// contrabando en una tanda de cimientos. APU-1 los deshizo por otra vía —las
+// fichas de mesa salen de la entrada (§2.2) y las de prueba de
+// `economy.pilaPruebas`— y en 1e-iii la constante del BOLSILLO bajó aquí, que
+// es donde siempre debió estar: un solo sitio para que ECO-1 toque uno solo.
 //
 // ── EL ESPEJO DEL SERVIDOR ──────────────────────────────────────────────────
 // `public.saldo_de(uuid)` en la migración de esta misma tanda hace lo mismo del
@@ -23,12 +26,11 @@
 // duplicación ociosa —el cliente apaga botones, el servidor decide— pero sí
 // obliga a que las dos constantes se muevan juntas el día que se muevan.
 
-import { AJILEI_CONFIG } from '../config/ajileiConfig'
 
 /**
  * El saldo del jugador, en Heptacoins.
  *
- * PROVISIONAL: hoy devuelve la constante de config porque no hay billetera —el
+ * PROVISIONAL: hoy devuelve una constante porque no hay billetera —el
  * producto no tiene ledger y una cifra que no se mueve es lo único honesto hasta
  * que exista—. ECO-1 lo conecta a Supabase; espejo de `saldo_de()` en la base.
  *
@@ -39,6 +41,14 @@ import { AJILEI_CONFIG } from '../config/ajileiConfig'
  *
  * @returns {number}
  */
+// APU-1 1e-iii · la cifra vive AQUÍ y ya no en `ajileiConfig.economy`. Mientras
+// se llamó `saldoInicial` la misma constante era el saldo del jugador y las
+// fichas de cada asiento, y por eso «retirar saldoInicial» dejaba al saldo real
+// sin fuente (D-5 de 1a). Separadas: las fichas de mesa salen de la entrada,
+// las de prueba de `economy.pilaPruebas`, y esto —el bolsillo— es un
+// PROVISIONAL con nombre propio que ECO-1 sustituye por la consulta de verdad.
+const SALDO_PROVISIONAL = 5000
+
 export function saldoDelJugador() {
-  return AJILEI_CONFIG.economy.saldoInicial
+  return SALDO_PROVISIONAL
 }

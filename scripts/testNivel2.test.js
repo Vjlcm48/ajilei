@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import {
   decideBetAction, decideDiscard, getPersonalityName,
-  _resetForTesting, _CURVAS_PARA_TEST, _DIAG_PRO,
+  _resetForTesting, _CURVAS_PARA_TEST, _DIAG_PRO, _CONT_APU1,
 } from '../src/engine/aiPlayer.js'
 import { getBestSuitScore, isAjilei } from '../src/engine/handEvaluator.js'
 import { PALOS, VALORES, getCardPoints } from '../src/engine/deck.js'
@@ -22,6 +22,8 @@ import {
   createInitialState, startHand, advanceFromDeal, applyPlayerBetAction,
   applyAIBetAction, applyDiscard, makeHandRules, PHASES,
 } from '../src/engine/gameEngine.js'
+import { accionesDe, esLegal, costoDe } from '../src/engine/pozos.js'
+import { AJILEI_CONFIG } from '../src/config/ajileiConfig.js'
 
 // ── Utilería ─────────────────────────────────────────────────────────────────
 
@@ -334,31 +336,139 @@ function bateria() {
   return casos
 }
 
-describe('1. Test de oro doble — Básico y Avanzado contra su referencia vigente', () => {
+// ── APU-1 1c · por dónde puede cambiar el oro doble ──────────────────────────
+//
+// BÁSICO (y el estado sin pasajero) conserva la exigencia entera salvo las dos
+// puertas de `testNivel1.test.js §1`: la respuesta anterior ya no es legal, o la
+// pila no cubre el pago y existe el all-in defensivo, que no existía cuando la
+// lógica se transcribió.
+//
+// AVANZADO es otra cosa: APU-1 le cambió las reglas A PROPÓSITO —§6.3 le da una
+// subida por puntaje, §6.5 le quita la matemática de bote como criterio de pago
+// y §6.8 le da el pase-trampa—, así que exigirle identidad sería exigirle que la
+// tanda no hubiera hecho su trabajo. Lo que esta prueba le exige en su lugar es
+// que CADA divergencia tenga nombre: si una no encaja en ninguna de las reglas
+// nuevas, es un fallo y la prueba lo dice. Y el nombre no se regala —se
+// comprueba contra la regla—:
+//
+//   · `subidaFuerte`: sube, y con el MAYOR multiplicador legal. La escalera del
+//     temperamento siempre sube de ×1, así que el monto es la firma de §6.3.
+//   · `trampa`: en BET_2, con el dado por debajo de `p`, donde antes subía.
+//   · `cuartoDelPozo`: el costo es ≤ ¼ del pozo, y la respuesta es quedarse.
+//   · `sinCuarto`: no es barato, luego decide el listón del temperamento — y
+//     entonces la respuesta tiene que ser EXACTAMENTE la de Básico, porque el
+//     listón de Básico es lo único que queda cuando ④ se va. Aquí no hay margen:
+//     se compara contra la transcripción de rango 0, decisión por decisión.
+const MULTS_TEST = AJILEI_CONFIG.betting.multiplicadores
+const FRACCION_AV = AJILEI_CONFIG.ia.fraccionPozo.avanzado
+
+function mayorKLegal(s, asiento, accion) {
+  for (let i = MULTS_TEST.length - 1; i >= 0; i--) {
+    if (esLegal(s, asiento, accion, MULTS_TEST[i]).ok) return MULTS_TEST[i]
+  }
+  return null
+}
+
+// DESDE 1c-2-iii ESTAS SEIS YA NO SON PUERTAS: son ETIQUETAS.
+//
+// El rector re-derivó el oro al cerrar 1c-2 y lo pidió «con identidad exacta y
+// sin puertas». La diferencia importa: una puerta excusa una divergencia por su
+// CATEGORÍA, y mientras la divergencia siga cayendo en la categoría, cualquier
+// cifra futura pasa sin que nadie la vea. Lo que hay ahora es una FOTOGRAFÍA:
+// cada decisión que se aparta de la lógica anterior está escrita, con su caso,
+// su antes, su ahora, su multiplicador y su etiqueta, y la prueba compara contra
+// la lista entera. La etiqueta sigue viva —sigue diciendo POR QUÉ se movió—
+// pero ya no perdona nada: si cambia la etiqueta de una decisión, el `diff`
+// también lo canta.
+//
+// Y LA IDENTIDAD INCLUYE EL MULTIPLICADOR desde 1c-2-iii: la lógica transcrita
+// subía siempre de una unidad, así que su `k` es 1 por definición. Sin esto,
+// una IA que antes subía ×1 y ahora sube ×10 decía «subir» las dos veces y
+// pasaba por idéntica —justo el agujero del tamaño de §6.3—.
+function motivoOro(s, asiento, antes, vivo, rango, dado, basico) {
+  const enTurno  = { ...s, activePlayerIndex: asiento }
+  const acciones = accionesDe(enTurno, asiento)
+  if (vivo.action === antes.action) return 'multiplicador'
+  // Fuera de jurisdicción (`DISCARD` y compañía, fixtures que el motor no
+  // produce) no hay legalidad que invocar: de Avanzado sólo se explica lo que
+  // deja el retiro de ④ —el listón del temperamento, o sea Básico—.
+  if (!acciones.length) return (rango > 0 && vivo.action === basico.action) ? 'sinCuarto' : 'regla-APU1'
+  if (!acciones.includes(antes.action)) return 'ilegal'
+  if (acciones.includes('allIn')) return 'allIn'
+  if (rango === 0) return 'regla-APU1'
+
+  const sube = vivo.action === 'subir' || vivo.action === 'apostar'
+  if (sube && vivo.k === mayorKLegal(enTurno, asiento, vivo.action)) return 'subidaFuerte'
+
+  const subiaAntes = antes.action === 'subir' || antes.action === 'apostar'
+  if (s.phase === 'BET_2' && subiaAntes && dado < AJILEI_CONFIG.ia.pasarConManoGrande.avanzado &&
+      (vivo.action === 'igualar' || vivo.action === 'pasar')) return 'trampa'
+
+  const barato = s.currentBet > 0 &&
+    (acciones.includes('igualar') ? costoDe(enTurno, asiento, 'igualar') : 0) <= FRACCION_AV * (s.pot ?? 0)
+  if (barato && (vivo.action === 'igualar' || vivo.action === 'pasar')) return 'cuartoDelPozo'
+  if (!barato && vivo.action === basico.action) return 'sinCuarto'
+  return 'regla-APU1'
+}
+
+function lineaOro(i, caso, asiento, pasajero, perfil, chips, antes, vivo, motivo) {
+  return [
+    String(i).padStart(5, '0'),
+    `mesa${caso.numPlayers}`,
+    caso.phase.padEnd(7),
+    `a${asiento}`,
+    (pasajero ?? 'sinPasajero').padEnd(11),
+    perfil.padEnd(12),
+    `cb${String(caso.currentBet).padStart(3)}`,
+    `pot${String(caso.pot).padStart(4)}`,
+    `ch${String(chips).padStart(4)}`,
+    `${antes.action} -> ${vivo.action} x${vivo.k ?? 1}`.padEnd(28),
+    motivo,
+  ].join(' ')
+}
+
+describe('1. Test de oro doble — Básico intacto, Avanzado sólo donde APU-1 manda', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it.each([0.05, 0.5, 0.95])('Math.random=%s · decideBetAction sin pasajero, `basico` y `avanzado`', (dado) => {
+  it.each([0.05, 0.5, 0.95])('Math.random=%s · decideBetAction sin pasajero, `basico` y `avanzado`', async (dado) => {
+    _resetForTesting()                       // el farol por bloques es memoria
     vi.spyOn(Math, 'random').mockReturnValue(dado)
     const casos = bateria()
     expect(casos.length).toBeGreaterThan(1500)
     let comparados = 0
+    const porMotivo = {}
+    const lineas = []
+    let i = -1
     for (const caso of casos) {
       const asiento = caso._asiento
       for (const [pasajero, rango] of [[undefined, 0], ['basico', 0], ['avanzado', 1]]) {
+        i++
         const s = pasajero === undefined ? caso : { ...caso, nivelIA: pasajero }
         const vivo = decideBetAction(s, asiento)
         const perfil = getPersonalityName(asiento)
         const antes = decideBetAntes(s, asiento, perfil, rango)
-        if (vivo.action !== antes.action) {
-          throw new Error(
-            `${pasajero ?? 'SIN PASAJERO'} CAMBIÓ · mesa ${caso.numPlayers} ${caso.phase} asiento ${asiento} ` +
-            `perfil ${perfil} currentBet ${caso.currentBet} pot ${caso.pot} ` +
-            `chips ${s.players[asiento].chips} · antes ${antes.action} → ahora ${vivo.action}`)
-        }
-        comparados++
+        if (vivo.action === antes.action && (vivo.k ?? 1) === 1) { comparados++; continue }
+        const basico = decideBetAntes(s, asiento, perfil, 0)
+        const motivo = motivoOro(s, asiento, antes, vivo, rango, dado, basico)
+        porMotivo[motivo] = (porMotivo[motivo] ?? 0) + 1
+        lineas.push(lineaOro(i, caso, asiento, pasajero, perfil,
+          s.players[asiento].chips, antes, vivo, motivo))
       }
     }
-    expect(comparados).toBe(casos.length * 3)
+    // La mayoría de la batería sigue midiéndose decisión contra decisión: si eso
+    // dejara de ser cierto, el oro se habría convertido en un sello de goma.
+    expect(comparados + lineas.length).toBe(casos.length * 3)
+    expect(comparados / (casos.length * 3)).toBeGreaterThan(0.5)
+    // Y ninguna divergencia se queda sin nombre: `regla-APU1` es la etiqueta de
+    // lo que no encaja en ninguna regla conocida, y en Avanzado no debe existir.
+    const cabecera = [
+      `# ORO DOBLE · APU-1 1c-2-iii · Math.random = ${dado}`,
+      `# ${casos.length * 3} decisiones · ${comparados} idénticas a la lógica anterior · ${lineas.length} cambiadas`,
+      `# por motivo: ${Object.entries(porMotivo).sort().map(([k, n]) => `${k}=${n}`).join(' · ')}`,
+      '#',
+    ]
+    await expect(cabecera.concat(lineas).join('\n') + '\n')
+      .toMatchFileSnapshot(`oro/nivel2_doble_${dado}.txt`)
   })
 
   it('decideDiscard: mismos índices en Básico y en Avanzado', () => {
@@ -391,7 +501,20 @@ describe('1. Test de oro doble — Básico y Avanzado contra su referencia vigen
             const s = rondaDeDescarte(numPlayers, ds, dHumano, {
               currentBet, pot: 1000, cartasEnBet3: { 1: M5.media }, nivelIA: 'avanzado' })
             const perfil = getPersonalityName(1)
-            expect(decideBetAction(s, 1).action).toBe(decideBetAntes(s, 1, perfil, 1).action)
+            const vivo   = decideBetAction(s, 1)
+            const antes  = decideBetAntes(s, 1, perfil, 1)
+            // APU-1 1c: la comparación usa las mismas etiquetas que el oro
+            // doble. Ninguna de ellas mira el puntaje de la mano —la del cuarto
+            // del pozo es pura aritmética de pozo, y la otra compara contra la
+            // respuesta de Básico, que tampoco recibe ②—, así que la prueba
+            // sigue cazando exactamente lo que vino a cazar: que la lectura de
+            // descartes no se le escape a Avanzado.
+            if (vivo.action !== antes.action) {
+              const motivo = motivoOro(s, 1, antes, vivo, 1, 0.5, decideBetAntes(s, 1, perfil, 0))
+              expect(motivo, `mesa ${numPlayers} currentBet ${currentBet}: ` +
+                `${antes.action} → ${vivo.action} sin regla de APU-1 que lo explique`)
+                .not.toBe('regla-APU1')
+            }
           }
         }
       }
@@ -605,9 +728,14 @@ function rondaDeDescarte(numPlayers, dPorAsiento, dHumano, over = {}) {
     cards: i === 0 ? (over.manoHumano ?? MANO_D[3]) : MANO_D[dPorAsiento[i]],
     contrib: 0,
   }))
+  // La mano es la 12 y el reparto se sondea en la 3 — misma razón que en
+  // `mesaDeFarol`: el farol por bloques de §6.4 (APU-1 1c) sortea una mano por
+  // bloque, y la llamada que reparte perfiles corre con el azar de verdad. Con
+  // el sondeo en otro bloque anterior, el bloque de la mano 12 se sortea ya con
+  // el dado fijo de cada prueba y A-6 no se cruza con lo que se está midiendo.
   const base = {
     players, numPlayers, unit: 50, manoIndex: 0, pieIndex: numPlayers - 1,
-    handCount: over.handCount ?? 4, aliveCount: numPlayers, pot: over.pot ?? 400,
+    handCount: over.handCount ?? 12, aliveCount: numPlayers, pot: over.pot ?? 400,
     handRules: makeHandRules(numPlayers), nivelIA: over.nivelIA ?? 'pro',
   }
   const sDescarte = { ...base, phase: 'DISCARD', currentBet: 0, deck: taco(L0) }
@@ -616,7 +744,7 @@ function rondaDeDescarte(numPlayers, dPorAsiento, dHumano, over = {}) {
   // corre los perfiles ya están puestos. Sin esta llamada, el arranque en frío de
   // `_ensurePersonalities` borraría la memoria recién anotada — cosa que en la
   // aplicación no puede ocurrir, pero en una fixture sintética sí.
-  decideBetAction({ ...base, phase: 'BET_2', currentBet: 0, deck: taco(L0) }, 1)
+  decideBetAction({ ...base, handCount: 3, phase: 'BET_2', currentBet: 0, deck: taco(L0) }, 1)
   for (let i = 1; i < numPlayers; i++) {
     const idx = decideDiscard(sDescarte, i)
     if (idx.length !== dPorAsiento[i]) throw new Error(`fixture mala: asiento ${i} cambió ${idx.length}, se pidió ${dPorAsiento[i]}`)
@@ -785,8 +913,23 @@ describe('4. ② Memoria de descartes', () => {
 
 // ══ 5. ⑥ Farol estratégico ═══════════════════════════════════════════════════
 describe('5. ⑥ Farol estratégico', () => {
-  beforeEach(() => _resetForTesting())
-  afterEach(() => vi.restoreAllMocks())
+  // EL PISO DE R-A (1c-2) SE APARTA EN ESTE BLOQUE, A PROPÓSITO. Las siete
+  // pruebas de abajo sellan las TRES condiciones de ⑥ —lectura viva, respaldo
+  // que cubre el precio, dado— con una mano de 16 puntos, que es la que hace
+  // que un farol sea un farol. R-A añade una cuarta condición independiente;
+  // entrelazarla aquí obligaría a cambiar la mano de la fixture y estas siete
+  // pruebas dejarían de medir lo que dicen medir. R-A se mide sola, en la
+  // última prueba del bloque, con el piso de verdad puesto.
+  const PISO_REAL = AJILEI_CONFIG.ia.farol.pisoPuntajePorMesa
+
+  beforeEach(() => {
+    _resetForTesting()
+    AJILEI_CONFIG.ia.farol.pisoPuntajePorMesa = {}
+  })
+  afterEach(() => {
+    AJILEI_CONFIG.ia.farol.pisoPuntajePorMesa = PISO_REAL
+    vi.restoreAllMocks()
+  })
 
   // Duelo: un solo rival, que es donde el respaldo puede llegar a cubrir el
   // precio. Mano propia flojísima y bote gordo: sin farol, se pasa o se retira.
@@ -796,14 +939,21 @@ describe('5. ⑥ Farol estratégico', () => {
       jugador({ id: 0, isHuman: true, cards: MANO_D[dRival], contrib: currentBet }),
       jugador({ id: 1, cards: cartas, contrib: 0 }),
     ]
+    // APU-1 1c · la mano de la prueba es la 12 y el reparto de perfiles se
+    // sondea en la 3. No es capricho: el farol POR BLOQUES de §6.4 sortea una
+    // mano por bloque de 8 en Pro, y la llamada que reparte perfiles corre con
+    // el azar de verdad. Sondeando en otro bloque —y en uno anterior, para que
+    // `handCount` no retroceda y no se re-repartan los perfiles—, el bloque de
+    // la mano 12 se sortea ya con el dado fijo de cada prueba, que nunca cae en
+    // la 12. Así ⑥ se mide sin que A-6 se le cruce.
     const base = {
       players, numPlayers: 2, unit: 50, manoIndex: 0, pieIndex: 1,
-      handCount: 4, aliveCount: 2, pot,
+      handCount: 12, aliveCount: 2, pot,
       handRules: makeHandRules(2), nivelIA: 'pro',
     }
     // El rival es el HUMANO: su descarte se deduce del taco, no se registra.
     const sDescarte = { ...base, phase: 'DISCARD', currentBet: 0, deck: taco(L0) }
-    decideBetAction({ ...base, phase: 'BET_2', currentBet: 0, deck: taco(L0) }, 1)   // reparte perfiles
+    decideBetAction({ ...base, handCount: 3, phase: 'BET_2', currentBet: 0, deck: taco(L0) }, 1)
     const propio = decideDiscard(sDescarte, 1).length                                // y anota lo propio
     return { ...base, phase: 'BET_3', currentBet, deck: taco(L0 - propio - dRival) }
   }
@@ -862,6 +1012,23 @@ describe('5. ⑥ Farol estratégico', () => {
     for (const nivel of ['basico', 'avanzado']) {
       expect(decideBetAction({ ...s, nivelIA: nivel }, 1).action).toBe('pasar')
     }
+  })
+
+  // R-A (1c-2) · la cuarta condición, medida sola y con el piso real puesto.
+  // SIN TRASLADO: ⑥ es reactivo, así que una mano floja simplemente no farolea
+  // y el bloque no tiene nada que reprogramar.
+  it('R-A · con el piso de verdad, la misma mesa ya no farolea', () => {
+    AJILEI_CONFIG.ia.farol.pisoPuntajePorMesa = PISO_REAL
+    const s = mesaDeFarol({ dRival: 3, pot: 3000, currentBet: 0 })
+    vi.spyOn(Math, 'random').mockReturnValue(0.1)
+    const antes = { ..._CONT_APU1 }
+    expect(decideBetAction(s, 1).action).toBe('pasar')
+    // La lectura y el precio SÍ respaldaban, y el dado SÍ autorizó: lo único que
+    // faltó fue la mano. Si alguna de las otras tres fallara, este contador
+    // quedaría en cero y la prueba estaría midiendo otra cosa.
+    expect(_DIAG_PRO.farolRespaldado).toBeGreaterThan(0)
+    expect(_CONT_APU1.farolSeisBloqueado - antes.farolSeisBloqueado).toBe(1)
+    expect(_CONT_APU1.farolTrasladadoPiso - antes.farolTrasladadoPiso).toBe(0)
   })
 
   it('el farol nunca convierte una mano que iba a pagar: sólo retiros y pasos', () => {
@@ -964,8 +1131,14 @@ describe('7. El rider de NIV-1 sigue en pie con Pro', () => {
         let n = 0
         while (s.phase === fase) {
           if (++n > 500) throw new Error('ronda sin converger')
+          // APU-1 §4.1: sin fichas para cubrir, la acción de pago es el all-in,
+          // no el retiro forzoso. Cambia el conductor, no el veredicto.
+          const toCall = s.currentBet - s.players[0].contrib
+          const accion = toCall > 0
+            ? (s.players[0].chips >= toCall ? 'igualar' : 'allIn')
+            : 'pasar'
           s = s.activePlayerIndex === 0
-            ? applyPlayerBetAction(s, s.currentBet - s.players[0].contrib > 0 ? 'igualar' : 'pasar')
+            ? applyPlayerBetAction(s, accion)
             : applyAIBetAction(s)
         }
         repartos.add(Array.from({ length: 4 }, (_, i) => getPersonalityName(i)).join('|'))
@@ -989,19 +1162,33 @@ describe('7. El rider de NIV-1 sigue en pie con Pro', () => {
   it('una partida entera de nivel Pro corre por la API pública sin romper nada', () => {
     // Prueba de integración: es la ÚNICA vía por la que ② recibe estados reales
     // —el taco de verdad, la ronda de descarte de verdad— en toda la red.
-    let s = { ...createInitialState(50, 5), nivelIA: 'pro' }
+    const nuevaPartida = () => ({ ...createInitialState(50, 5), nivelIA: 'pro' })
+    let s = nuevaPartida()
     const fichasIniciales = s.players.reduce((a, p) => a + p.chips, 0)
     let manos = 0
     for (let h = 0; h < 40; h++) {
       s = startHand(s)
-      if (s.phase === PHASES.GAME_OVER) break
+      // APU-1 1c · con la subida fuerte (§6.3), el farol por bloques (§6.4) y
+      // el all-in, una mesa de cinco se liquida MUCHO antes que antes: se han
+      // visto partidas de cinco manos donde el mínimo de esta prueba eran diez.
+      // Lo que mide es que la API pública aguante 40 manos seguidas, no que una
+      // partida dure 40, así que cuando una se acaba se abre otra. El total de
+      // fichas de la mesa nueva es el mismo, y la conservación se sigue
+      // exigiendo mano a mano.
+      if (s.phase === PHASES.GAME_OVER) s = startHand(nuevaPartida())
       s = advanceFromDeal(s)
       const ronda = (fase) => {
         let n = 0
         while (s.phase === fase) {
           if (++n > 500) throw new Error('ronda sin converger')
+          // APU-1 §4.1: sin fichas para cubrir, la acción de pago es el all-in,
+          // no el retiro forzoso. Cambia el conductor, no el veredicto.
+          const toCall = s.currentBet - s.players[0].contrib
+          const accion = toCall > 0
+            ? (s.players[0].chips >= toCall ? 'igualar' : 'allIn')
+            : 'pasar'
           s = s.activePlayerIndex === 0
-            ? applyPlayerBetAction(s, s.currentBet - s.players[0].contrib > 0 ? 'igualar' : 'pasar')
+            ? applyPlayerBetAction(s, accion)
             : applyAIBetAction(s)
         }
       }
@@ -1112,6 +1299,106 @@ describe('8. D-5 · aislamiento de información', () => {
       })
     }
   }
+
+  // ── APU-1 1c §3.6 · la trampa, extendida a las ramas nuevas ────────────────
+  //
+  // Puerta obligatoria: ninguna capacidad entra sin ampliar la vigilancia a los
+  // caminos que abre. 1c abre cuatro que las FASES de arriba no recorren —el
+  // all-in ajeno en la mesa, la mano en que toca farol, el `BET_3` con la
+  // trampa de §6.8 armada, y la ronda donde lo único que cabe es empujar la
+  // pila—, y en las cuatro la IA sigue sin ver una sola carta ajena ni el
+  // contenido del taco. Los tres retos, porque las reglas son por reto pero la
+  // frontera no.
+  it('las ramas nuevas de APU-1 tampoco leen cartas ajenas ni el contenido del taco', () => {
+    // La mano en que cae el farol depende del tamaño del bloque de cada reto:
+    // con el dado fijo en 0,2 sale `1 + floor(0,2 × B)`.
+    // Básico entra con bloque de 15 (1c-2): 1 + floor(0,2 × 15) = 4.
+    const manoDeFarol = { basico: 4, avanzado: 3, pro: 2 }
+
+    const situaciones = (nivel) => [
+      // (a) un rival EN ALL-IN, con la mano en marcha.
+      { nombre: 'all-in ajeno', handCount: 6,
+        f: { phase: 'BET_3', currentBet: 200, cards: M5.media, pot: 1200 },
+        ajeno: { allIn: true, chips: 0, contribMano: 200 } },
+      // (b) la mano elegida para farolear: la IA que decide es la de mayor pila.
+      // La mano lleva 31 puntos y no 16: con R-A (1c-2) el farol por debajo del
+      // piso de la mesa se traslada en vez de ejecutarse, y esta prueba
+      // necesita que la RAMA SE RECORRA para que la trampa vigile algo.
+      { nombre: 'mano de farol', handCount: manoDeFarol[nivel],
+        f: { phase: 'BET_2', currentBet: 0, cards: M5.buena, pot: 600 },
+        propio: { chips: 9000 }, ajeno: { chips: 800 } },
+      // (b2) LA MISMA mano de farol sin humano vivo: recorre R-D, que lee
+      // `isHuman` de los tres asientos. Información pública —la trampa la deja
+      // pasar—; las cartas ajenas siguen tapadas.
+      { nombre: 'farol sin humano', handCount: manoDeFarol[nivel], sinHumano: true,
+        f: { phase: 'BET_2', currentBet: 0, cards: M5.buena, pot: 600 },
+        propio: { chips: 9000 }, ajeno: { chips: 800 } },
+      // (c) `BET_3` con la trampa armada — se arma en la llamada previa.
+      { nombre: 'trampa armada', handCount: 9, armarEnBet2: true,
+        f: { phase: 'BET_3', currentBet: 100, cards: M5.fuerte, pot: 400 } },
+      // (d) la pila no cubre el pago: sólo caben all-in y retirarse.
+      { nombre: 'sólo all-in', handCount: 6,
+        f: { phase: 'BET_3', currentBet: 4000, cards: M5.media, pot: 3000 },
+        propio: { chips: 300 } },
+    ]
+
+    for (const nivel of ['basico', 'avanzado', 'pro']) {
+      for (const caso of situaciones(nivel)) {
+        _resetForTesting()
+        vi.spyOn(Math, 'random').mockReturnValue(0.2)   // sortea el bloque y arma la trampa
+
+        const trampas = []
+        const players = Array.from({ length: 3 }, (_, i) => {
+          if (i === 1) return jugador({ id: i, cards: caso.f.cards, contrib: 0, ...(caso.propio ?? {}) })
+          const t = trampaJugador({
+            id: i, isHuman: i === 0 && !caso.sinHumano, cards: M5.fuerte,
+            contrib: i === 0 ? caso.f.currentBet : 0,
+            ...(i === 2 ? (caso.ajeno ?? {}) : {}),
+          })
+          trampas.push(t)
+          return t
+        })
+        const base = {
+          players, numPlayers: 3, currentBet: caso.f.currentBet, phase: caso.f.phase,
+          pot: caso.f.pot, manoIndex: 0, pieIndex: 2, unit: 50,
+          handCount: caso.handCount, aliveCount: 3,
+          handRules: makeHandRules(3), nivelIA: nivel,
+        }
+        // La trampa se arma con una decisión de `BET_2` sobre la MISMA mano.
+        if (caso.armarEnBet2) decideBetAction({ ...base, phase: 'BET_2', currentBet: 0 }, 1)
+
+        const s = { ...base }
+        const mazo = conTrampaDeMazo(s)
+        const d = decideBetAction(s, 1)
+
+        // Que la situación sea la que la prueba cree, y no una fixture que pasa
+        // por vacía: una trampa Proxy sobre una rama que no se recorre no vigila
+        // nada.
+        if (caso.nombre === 'sólo all-in') {
+          expect(accionesDe({ ...s, activePlayerIndex: 1 }, 1)).toEqual(['allIn', 'retirarse'])
+        }
+        // Ahora los TRES retos tienen bloque de farol (1c-2), así que la rama se
+        // recorre en los tres y la trampa vigila de verdad en los tres.
+        if (caso.nombre === 'mano de farol') {
+          expect(d.action, `${nivel}: el farol no se disparó`).toBe('apostar')
+          expect(d.k).toBeGreaterThan(1)
+        }
+        // Y sin humano, Básico —y sólo Básico— suspende el plan: R-D recorrida.
+        // Se mide por el MONTO y no por la acción: 31 puntos abren por mérito en
+        // los cuatro temperamentos, así que «apostar» no distingue nada. Lo que
+        // sí distingue es el multiplicador: el farol pone ×k delante, la apertura
+        // de la escalera pone ×1.
+        if (caso.nombre === 'farol sin humano' && nivel === 'basico') {
+          expect(d.k, 'básico faroleó sin humano en la mano').toBe(1)
+        }
+
+        trampas.forEach(t => expect(t.__cardsAccessed,
+          `${nivel} · ${caso.nombre}: leyó cartas ajenas`).toBe(false))
+        expect(mazo.contenido, `${nivel} · ${caso.nombre}: leyó el contenido del taco`).toBe(false)
+        vi.restoreAllMocks()
+      }
+    }
+  })
 
   it('Básico y Avanzado no tocan el taco NI PARA LA LONGITUD', () => {
     for (const nivel of ['basico', 'avanzado']) {

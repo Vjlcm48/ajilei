@@ -3,7 +3,7 @@
  * La IA NO está mockeada — estas pruebas ejercen las decisiones reales.
  * Ejecutar: npm test
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import {
   decideBetAction,
@@ -11,7 +11,12 @@ import {
   initPersonalities,
   getPersonalityName,
   _resetForTesting,
+  setRng,
+  resetRng,
 } from '../src/engine/aiPlayer.js'
+
+// La siembra del mazo es de 1b; la de la IA, de 1c. La prueba §7 necesita las dos.
+import { setRng as setRngMazo, resetRng as resetRngMazo } from '../src/engine/deck.js'
 
 import {
   createInitialState,
@@ -68,8 +73,14 @@ function simBettingPhase(state, phase) {
   while (s.phase === phase) {
     if (++cap > 600) throw new Error(`${phase} no terminó en 600 iteraciones`)
     if (s.activePlayerIndex === 0) {
+      // APU-1 §4.1 · desde que la IA elige monto (§6.2) el humano recibe subidas
+      // que su pila no cubre, y desde que el motor dejó de reescribir acciones
+      // ilegales (1c, E-12) una `igualar` impagable devolvería el mismo estado y
+      // la ronda no terminaría. La respuesta a lo que no se cubre es el all-in.
       const toCall = s.currentBet - (s.players[0]?.contrib ?? 0)
-      const action = toCall > 0 ? 'igualar' : 'pasar'
+      const action = toCall > 0
+        ? ((s.players[0]?.chips ?? 0) >= toCall ? 'igualar' : 'allIn')
+        : 'pasar'
       s = applyPlayerBetAction(s, action)
     } else {
       s = applyAIBetAction(s)
@@ -455,9 +466,9 @@ describe('6. Regresión N=2 (con IA real)', () => {
       s = startHand(s)
       s = advanceFromDeal(s)   // → BET_1
 
-      // Humano abre con apuesta mínima (1 unit)
+      // Humano abre con apuesta mínima (×1)
       if (s.activePlayerIndex === 0 && s.phase === PHASES.BET_1) {
-        s = applyPlayerBetAction(s, 'apostar', 10)
+        s = applyPlayerBetAction(s, 'apostar', 1)
       }
 
       // Ahora es turno de la IA en BET_1 con solo 2 cartas
@@ -478,6 +489,56 @@ describe('6. Regresión N=2 (con IA real)', () => {
       s = simHand(s)
       const total = s.players.reduce((sum, p) => sum + p.chips, 0) + s.pot
       expect(total).toBe(initialTotal)
+    }
+  })
+})
+
+// ── 7. Siembra del azar · APU-1 1c, A-9 ──────────────────────────────────────
+//
+// `aiPlayer.js` gana el mismo par `setRng`/`resetRng` que `deck.js` en 1b. No
+// cambia ninguna decisión —por defecto `rng === Math.random`—; lo que da es
+// REPETIBILIDAD, que es lo que el banco necesita para que `--seed N` valga
+// como evidencia y no como anécdota.
+describe('7. Siembra del azar (A-9)', () => {
+  // mulberry32: el mismo generador que usa el banco. Seis líneas, sin
+  // dependencias, y se escribe aquí a propósito para que la prueba no dependa
+  // de un guion de `scripts/`.
+  function mulberry32(a) {
+    return function () {
+      a = (a + 0x6D2B79F5) | 0
+      let t = Math.imul(a ^ (a >>> 15), 1 | a)
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+  }
+
+  afterEach(() => { resetRng(); resetRngMazo(); _resetForTesting() })
+
+  it('con la misma semilla, dos manos completas salen idénticas', () => {
+    // Se siembran las DOS fuentes: sin el mazo las cartas cambiarían y la
+    // prueba no sabría distinguir una IA repetible de una baraja repetida.
+    const corrida = () => {
+      _resetForTesting()
+      resetRngMazo(); resetRng()
+      setRngMazo(mulberry32(1234))
+      setRng(mulberry32(1234))
+      return simHand(startHand(createInitialState(10, 4)))
+    }
+    expect(JSON.stringify(corrida())).toBe(JSON.stringify(corrida()))
+  })
+
+  it('resetRng devuelve el azar a Math.random', () => {
+    const espia = vi.spyOn(Math, 'random')
+    try {
+      setRng(() => 0.5)
+      initPersonalities(5)          // consume azar en `_shuffled`
+      expect(espia).not.toHaveBeenCalled()
+
+      resetRng()
+      initPersonalities(5)
+      expect(espia).toHaveBeenCalled()
+    } finally {
+      espia.mockRestore()
     }
   })
 })

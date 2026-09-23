@@ -9,8 +9,15 @@
 import { describe, it, expect, vi } from 'vitest'
 
 // Mock aiPlayer: AI siempre pasa y nunca descarta (tests deterministas de motor)
+//
+// APU-1 1c · el mock es AJUSTABLE. Hasta 1b el motor reescribía una acción
+// ilegal antes de aplicarla, así que un mock que siempre decía `pasar` servía
+// también para probar ramas donde pasar no es legal. Ese puente se retiró
+// (E-12): lo que la IA diga es lo que el motor aplica, y una acción ilegal
+// devuelve el mismo estado. La prueba que necesita otra decisión la pone aquí.
+const ia = vi.hoisted(() => ({ decision: { action: 'pasar', k: 1, peso: 'leve' } }))
 vi.mock('../src/engine/aiPlayer.js', () => ({
-  decideBetAction: () => ({ action: 'pasar' }),
+  decideBetAction: () => ia.decision,
   decideDiscard:   () => [],
 }))
 
@@ -321,9 +328,12 @@ describe('5. Comodín', () => {
   })
 })
 
-// ── 6. Jugador sin fondos → retiro forzoso ────────────────────────────────────
-describe('6. Fondos insuficientes → retiro forzoso', () => {
-  it('N=2: player con 0 fichas intenta igualar → retiro automático → AI gana', () => {
+// ── 6. Jugador sin fondos → all-in defensivo (APU-1 §4.1) ─────────────────────
+// CAMBIO DE VEREDICTO (APU-1 1b, E-10b): el motor ya no reescribe en
+// `retirarse` la acción que no se puede pagar. Quien no cubre tiene dos
+// acciones, retirarse o all-in, y el all-in conserva lo que ya puso.
+describe('6. Fondos insuficientes → all-in defensivo', () => {
+  it('N=2: player con 0 fichas ya no se retira a la fuerza — igualar es ilegal y el all-in lo sostiene', () => {
     let s = createInitialState(10, 2)
     s = startHand(s)
     s = advanceFromDeal(s)  // BET_1, human es Mano
@@ -347,10 +357,18 @@ describe('6. Fondos insuficientes → retiro forzoso', () => {
       ),
       activePlayerIndex: 0,
     }
-    // Player intenta igualar — no tiene fichas, debe retirarse automáticamente
+    // Igualar sin fichas es ilegal: el motor devuelve EL MISMO objeto de estado
+    // y no reescribe la acción en otra.
+    const antes = s
     s = applyPlayerBetAction(s, 'igualar')
-    expect(s.phase).toBe(PHASES.PAYOUT)
-    expect(s.winner).toBe(1)
+    expect(s).toBe(antes)
+    expect(s.players[0].folded).toBe(false)
+
+    // La acción que sí procede es el all-in, y no termina la mano.
+    s = applyPlayerBetAction(s, 'allIn')
+    expect(s.players[0].allIn).toBe(true)
+    expect(s.players[0].folded).toBe(false)
+    expect(s.phase).not.toBe(PHASES.PAYOUT)
   })
 
   it('N=3: jugador con 0 chips ante → auto-folded en startHand', () => {
@@ -430,7 +448,10 @@ describe('7. Regresión N=2', () => {
     expect(s.message).toBe('Te retiras. La IA gana el pozo.')
   })
 
-  it('AI se retira → player gana, PAYOUT, winner=0', () => {
+  // CAMBIO DE VEREDICTO (APU-1 1b, E-10b): la IA sin fichas ante una apuesta ya
+  // no se retira a la fuerza. Va all-in, conserva lo que ya puso en el pozo y
+  // la mano sigue hasta el showdown.
+  it('AI sin fichas ya no se retira: va all-in y la mano continúa', () => {
     // Para que AI "se retire" necesitamos que esté ante una apuesta que no puede pagar
     let s = createInitialState(10)
     s = startHand(s)
@@ -446,10 +467,16 @@ describe('7. Regresión N=2', () => {
       activePlayerIndex: 1,
       pot: s.pot + 10,
     }
+    // Lo que esta prueba mide es el MOTOR: que aplique el all-in, marque al
+    // asiento y deje la mano viva. Que la IA lo ELIJA es regla de IA y lo mide
+    // `testIAAPU1.test.js` (A-5) con la IA de verdad, no con este mock.
+    ia.decision = { action: 'allIn', k: 1, peso: 'grande' }
     s = applyAIBetAction(s)
-    expect(s.phase).toBe(PHASES.PAYOUT)
-    expect(s.winner).toBe(0)
-    expect(s.message).toBe('¡La IA se retira! Ganaste el pozo.')
+    ia.decision = { action: 'pasar', k: 1, peso: 'leve' }
+    expect(s.players[1].folded).toBe(false)
+    expect(s.players[1].allIn).toBe(true)
+    expect(s.phase).toBe(PHASES.DEAL_3)   // la ronda cierra, la mano sigue
+    expect(s.winner).toBe(null)
   })
 
   it('applyDiscard: message contiene conteos y llega a BET_3', () => {

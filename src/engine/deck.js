@@ -39,10 +39,30 @@ export function drawRank(rank) {
   return rank
 }
 
+// APU-1 §6.11 · REPRODUCIBILIDAD. El generador es inyectable para que la
+// simulación de la Fase 1d pueda repetir una corrida al byte. Cubierto por la
+// excepción pre-autorizada de `AJILEI_Protegidos_v1.0.md §6`.
+//
+// Límite de la excepción: con `rng` por defecto NADA cambia — mismo algoritmo,
+// mismo número de llamadas, mismo orden. Lo mide el test de oro de
+// `scripts/testNivel1.test.js §1`.
+//
+// LIGADO TARDE (APU-1 1d §2.1). `let rng = Math.random` capturaba la funcion
+// ORIGINAL en el momento de cargar el modulo, asi que un `vi.spyOn(Math,'random')`
+// posterior no se veia desde aqui: el barajado seguia corriendo contra el azar
+// real mientras la prueba creia haberlo fijado. El envoltorio resuelve
+// `Math.random` en cada llamada. Mismo algoritmo, mismo numero de llamadas,
+// mismo orden: el consumo del azar no cambia.
+const AZAR_POR_DEFECTO = () => Math.random()
+let rng = AZAR_POR_DEFECTO
+
+export function setRng(fn) { rng = typeof fn === 'function' ? fn : AZAR_POR_DEFECTO }
+export function resetRng() { rng = AZAR_POR_DEFECTO }
+
 export function shuffleDeck(deck) {
   const shuffled = [...deck]
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rng() * (i + 1))
     ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
   return shuffled

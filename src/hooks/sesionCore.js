@@ -44,10 +44,27 @@ function mejorDe(actual, score) {
   return actual
 }
 
-// Fichas netas contra el saldo con el que se entra a la mesa. Es un delta con
+// Fichas netas CONTRA LA ENTRADA (APU-1 §2.5, 1e-ii §3.6). Es un delta con
 // signo: perder también se informa, sin adornos.
-export function fichasNetas(chips) {
-  return chips - AJILEI_CONFIG.economy.saldoInicial
+//
+// Hasta aquí la vara era `economy.saldoInicial` —5.000— y era la vara correcta
+// mientras TODO EL MUNDO se sentaba con esa cifra: no había entrada, así que
+// restar la constante y restar lo que pusiste eran la misma resta. Desde 1e el
+// jugador elige con cuánto se sienta, entre 5 y 50 apuestas, y esa resta pasó a
+// mentir en las dos direcciones: quien entra con 750 y sale con 900 había
+// «perdido 4.100».
+//
+// `entrada` la escribe `makePlayer` al sentar el asiento y la sube
+// `aplicarRecarga`, así que una mesa con recargas también cuadra: lo recargado
+// es dinero puesto, no ganado.
+//
+// El segundo argumento es OPCIONAL y cae a `economy.pilaPruebas` a propósito:
+// las mesas del banco y las pruebas del motor siguen naciendo por la forma
+// numérica de `createInitialState`, donde todos se sientan con esa pila y no hay
+// `entrada` que leer. Ahí las dos varas dan lo mismo, que es lo que hace segura
+// la caída.
+export function fichasNetas(chips, entrada = AJILEI_CONFIG.economy.pilaPruebas) {
+  return chips - (Number.isFinite(entrada) ? entrada : AJILEI_CONFIG.economy.pilaPruebas)
 }
 
 // ── Conteo ascendente sereno ────────────────────────────────────────────────

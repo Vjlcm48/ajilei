@@ -1,5 +1,11 @@
 import { getBestSuitScore, isAjilei } from './handEvaluator.js'
 import { PALOS, VALORES } from './deck.js'
+// APU-1 1c · A-2: la legalidad y el costo ya no se calculan aquí, se preguntan.
+// `pozos.js` es PURO y no importa el motor, así que no hay ciclo (ficha 1b, R-5).
+import { accionesDe, esLegal, costoDe } from './pozos.js'
+// Las cifras de conducta son PARÁMETRO por reto (normativo §10, ficha 1c §2.2).
+// Módulo de datos plano, como en `pozos.js` (D-1 de 1b).
+import { AJILEI_CONFIG } from '../config/ajileiConfig.js'
 
 // Local copy to avoid circular import with gameEngine.js (which also exports maxDiscard)
 // ── Personality profiles ──────────────────────────────────────────────────────
@@ -42,6 +48,123 @@ const RANGO_PRO      = 2
 
 function rangoDe(state) {
   return RANGO_NIVEL[state.nivelIA ?? 'basico'] ?? 0
+}
+
+// ══ APU-1 · CIFRAS DE CONDUCTA POR RETO (ficha 1c §2.2) ═══════════════════════
+//
+// Cada regla nueva de 1c está PARAMETRIZADA POR RETO, y en Básico el parámetro
+// vale el NEUTRO: `false`, `null` o `0`. Con el neutro la rama no se ejecuta, no
+// consume azar y la decisión cae en la lógica de NIV-2 sin moverse una coma —
+// que es lo que deja intacto el test de oro de `testNivel1.test.js §1` hasta que
+// 1d encienda Básico CON DATOS. Encender Básico es cambiar un número en
+// `ajileiConfig.js`, no una línea de este archivo.
+//
+// El nombre del reto se normaliza igual que `rangoDe`: lo que no esté en la
+// tabla es Básico (lo exige `testNivel1 §2`, «un pasajero basura no cambia
+// nada»).
+function retoDe(state) {
+  const n = state.nivelIA ?? 'basico'
+  return RANGO_NIVEL[n] === undefined ? 'basico' : n
+}
+
+const CFG_IA   = () => AJILEI_CONFIG.ia ?? {}
+const MULTS    = () => AJILEI_CONFIG.betting?.multiplicadores ?? [1]
+
+// §6.3 · ¿está encendida la subida fuerte para ese reto? Es también el
+// interruptor del monto del Ajilei: ver la nota en `decideBetAction`.
+function subidaFuerteActiva(reto) {
+  return ((CFG_IA().subidaFuerte ?? {}).porReto ?? {})[reto] === true
+}
+
+// §6.3 · umbral de subida fuerte para esa mesa, ya desplazado por temperamento.
+// `null` = la regla está apagada para ese reto.
+function umbralSubidaFuerte(reto, numPlayers, perfil) {
+  const cfg = CFG_IA().subidaFuerte ?? {}
+  if (!subidaFuerteActiva(reto)) return null
+  // R-B (1c-2) · `porMesa` admite DOS formas y la de reto gana cuando existe:
+  //
+  //   plana    { 2: 41, 3: 40, … }                      ← la de 1c
+  //   anidada  { basico: { 2: 33, … }, avanzado: { … } } ← la de 1c-2
+  //
+  // Hasta 1c esto leía un solo mapa para los tres retos, así que encender
+  // Básico le daba EL UMBRAL DE AVANZADO: medido en 1d (D.9), la caída de V3
+  // pasaba de 38,02 a 0,84 pp en mesa 4. «Encender Básico con `porMesa` propio»
+  // —lo que pedía la ficha 1d §3.2— no se podía escribir, y eso es D-17.
+  //
+  // RETROCOMPATIBLE POR CONSTRUCCIÓN, y no de palabra: con la forma plana el
+  // índice `mapa[reto]` es `undefined`, no es un objeto, y se lee el mapa de
+  // siempre. Un reto SIN entrada anidada en un mapa mixto cae también a la
+  // plana. Lo cubre la primera prueba de R-B (200 estados, decisión a decisión).
+  const mapa   = cfg.porMesa ?? {}
+  const propio = mapa[reto]
+  const fuente = (propio !== null && typeof propio === 'object') ? propio : mapa
+  const base   = fuente[numPlayers]
+  if (typeof base !== 'number') return null
+  return base + desplazamientoDe(perfil)
+}
+
+// §6.7 · lo que el temperamento suma al umbral de §6.3 y al de §6.6.
+function desplazamientoDe(perfil) {
+  return (CFG_IA().desplazamiento ?? {})[perfil] ?? 0
+}
+
+// §6.5 y §6.6 · la fracción del pozo que se paga sin mirar cartas. `null` =
+// apagada.
+function fraccionPozoDe(reto) {
+  const f = (CFG_IA().fraccionPozo ?? {})[reto]
+  return typeof f === 'number' ? f : null
+}
+
+// §6.6 · puntaje desde el que se empuja la pila aunque cueste más que la
+// fracción. `null` = solo por fracción.
+function puntajeAllInDe(reto, perfil) {
+  const p = ((CFG_IA().allIn ?? {}).puntajeMin ?? {})[reto]
+  return typeof p === 'number' ? p + desplazamientoDe(perfil) : null
+}
+
+// §6.4 · tamaño del bloque de manos con un farol sorteado. `null` = sin farol
+// por bloques.
+function bloqueFarolDe(reto) {
+  const b = ((CFG_IA().farol ?? {}).bloquePorReto ?? {})[reto]
+  return Number.isInteger(b) && b > 0 ? b : null
+}
+
+// §6.4 · R-A (1c-2) · piso de puntaje por mesa por debajo del cual NO se
+// farolea, en NINGUNA de las dos vías. Sin el mapa devuelve 0, o sea sin piso y
+// con la conducta exacta de 1c.
+//
+// Por qué existe (informe 1d, D.4 y D-18): el farol de §6.4 se adjudica por
+// SORTEO DE BLOQUE sin consultar el puntaje, y el de ⑥ se dispara por la
+// lectura del RIVAL. Ninguna de las dos mira la propia mano, y eso es
+// exactamente lo que V4 mide: las subidas respaldadas por menos de 26 puntos
+// pierden entre el 65 y el 88 % de las veces que alguien las paga. Ningún
+// tamaño de bloque lo movía, porque el bloque elige CUÁNDO y no CON QUÉ.
+function pisoFarolDe(numPlayers) {
+  const p = ((CFG_IA().farol ?? {}).pisoPuntajePorMesa ?? {})[numPlayers]
+  return typeof p === 'number' ? p : 0
+}
+
+// R-D (1c-2) · ¿este reto sólo compromete fichas cuando hay un humano delante?
+function soloContraHumanoDe(reto) {
+  return ((CFG_IA().soloContraHumano ?? {})[reto]) === true
+}
+
+// R-D (1c-2) · ¿queda un humano VIVO en esta mano? «Vivo» es lo mismo que para
+// el sorteo del farol: ni retirado ni eliminado.
+//
+// `isHuman`, `folded` y `eliminated` son información PÚBLICA de la mesa —la
+// trampa Proxy de las pruebas las deja leer y sigue tapando `cards` ajenas y el
+// mazo—, así que esta lectura no abre ninguna vía de información privada.
+function humanoEnMano(state) {
+  return (state.players ?? []).some(
+    p => p.isHuman === true && !p.folded && !p.eliminated
+  )
+}
+
+// §6.8 · probabilidad de jugar lento con mano grande en BET_2. 0 = nunca.
+function probPasarConManoGrandeDe(reto) {
+  const p = (CFG_IA().pasarConManoGrande ?? {})[reto]
+  return typeof p === 'number' ? p : 0
 }
 
 // ── ③ Estrategia completa de comodín · Avanzado+ (rector §5.2) ────────────────
@@ -455,6 +578,30 @@ function puntajeEquivalente(eqCorregida, score, phase, k, tope = Math.round(scor
   return alto
 }
 
+// ── A-9 · Siembra del azar (APU-1 1c §2.3, molde de `deck.js`) ────────────────
+//
+// Cubierta por `docs/AJILEI_Protegidos_v1.0.md` §6.1. Todo el azar de este
+// archivo —el reparto de perfiles, el jitter de IMPREDECIBLE, el disimulo del
+// Ajilei, el dado del farol y los dos dados de subida— pasa por aquí, para que
+// el banco pueda repetir una corrida byte a byte con `--seed`.
+//
+// NO cambia ni una decisión: por defecto se llama a `Math.random`, y el número
+// de llamadas y su orden son los mismos de antes. `_resetForTesting` NO lo toca
+// — la semilla es del que corre la prueba, no del módulo, y borrarla al aislar
+// tests rompería justo la repetibilidad que esta pieza existe para dar.
+//
+// EL DEFECTO SE LIGA TARDE, y no es cosmética. `deck.js` guarda la función
+// (`let rng = Math.random`) porque nadie le espía el azar; aquí NUEVE pruebas
+// de NIV-1 y NIV-2 —el test de oro incluido— mockean `Math.random` con
+// `vi.spyOn` DESPUÉS de que este módulo se cargue. Guardar la referencia las
+// dejaría sordas de golpe: el módulo seguiría llamando a la original. Con el
+// envoltorio, `Math.random` se resuelve en cada llamada y el espía se ve.
+const AZAR_POR_DEFECTO = () => Math.random()
+let rng = AZAR_POR_DEFECTO
+
+export function setRng(fn) { rng = typeof fn === 'function' ? fn : AZAR_POR_DEFECTO }
+export function resetRng() { rng = AZAR_POR_DEFECTO }
+
 // ── Personality module state ──────────────────────────────────────────────────
 // Keyed by seat index → profile name.  Re-initialised on new game detection.
 
@@ -471,6 +618,135 @@ let _lastAliveCount  = -1     // -1 = never seen; segunda señal del límite
 let _descartes = null
 
 function _olvidarDescartes() { _descartes = null }
+
+// ── A-6 · El farol por bloques · estado de módulo (normativo §6.4) ────────────
+//
+// La partida se parte en bloques fijos de B manos y en cada bloque se sortea UNA
+// mano para que farolee la IA de mayor pila. Vive fuera de la decisión porque
+// es memoria de PARTIDA, no de mano: el sorteo del bloque tiene que sobrevivir a
+// las ~12 decisiones de las manos que lo componen.
+//
+// `idElegido` GUARDA UN `player.id`, NO UNA CASILLA, y es la misma lección que
+// ② aprendió midiendo (ver `_idDe`): el banco conduce el asiento 0 con un estado
+// ESPEJO que permuta 0↔1, y cualquier memoria indexada por posición se lee
+// cruzada en cuanto la permutación entra. El `id` viaja dentro del objeto del
+// jugador y el espejo no lo toca.
+//
+// Se borra con las dos señales de partida nueva de `_ensurePersonalities`: un
+// farol sorteado para una mesa no puede ejecutarse en otra.
+let _farol = { bloque: -1, manoElegida: -1, idElegido: null, vivo: false }
+
+// ── A-8 · La trampa: pasé con mano grande, cobro en BET_3 ─────────────────────
+// `{ [player.id]: handCount }` — el número de mano en que ese jugador jugó lento
+// a propósito. Sólo la lee `BET_3` de la MISMA mano; se limpia con la partida.
+let _trampa = {}
+
+function _olvidarPlanes() {
+  _farol  = { bloque: -1, manoElegida: -1, idElegido: null, vivo: false }
+  _trampa = {}
+}
+
+// ── Contadores de 1c-2 · NO participan en ninguna decisión ───────────────────
+// Los pide la ficha §2.3 para el banco y §2.4 para las pruebas. Como `_DIAG_PRO`,
+// sólo se escriben: ninguna rama los lee. Viven aparte porque `_DIAG_PRO` cuenta
+// SÓLO decisiones de Pro y estos cuentan en los tres retos.
+export const _CONT_APU1 = {
+  farolBloqueEjecutado: 0,   // planes de bloque que llegaron a poner dinero
+  farolTrasladadoPiso: 0,    // ...trasladados porque la mano no llegaba al piso
+  farolTrasladadoSinHumano: 0, // ...suspendidos por R-D (no había humano vivo)
+  farolBloqueAgotado: 0,     // ...de los trasladados, los que ya no cabían
+  farolSeisBloqueado: 0,     // faroles de ⑥ que el dado autorizó y el piso frenó
+  decisionesSinHumano: 0,    // decisiones con R-D activa y sin humano en la mano
+}
+
+// R-A y R-D (1c-2) · EL PLAN NO SE EJECUTA AQUÍ: SE TRASLADA.
+//
+// Un farol que no se puede ejecutar no se pierde, porque el normativo §6.4
+// promete UN farol por bloque y no «un intento por bloque». Se re-sortea entre
+// las manos que QUEDAN del bloque —`handCount+1 … inicio+B−1`—; si esta era la
+// última, el bloque se queda sin farol y se cuenta.
+//
+// El sorteo nuevo se pega dentro del mismo bloque a propósito: `_planFarol` sólo
+// re-sortea cuando cambia la IDENTIDAD del bloque, así que `manoElegida` nueva
+// sobrevive a las decisiones que faltan y a las manos siguientes.
+//
+// Consume un `rng()` por traslado, y sólo cuando hay adónde trasladar. Es la
+// razón por la que el oro puede moverse en esta tanda: no es que la IA decida
+// distinto en las manos que farolea, es que la baraja avanza distinto en las que
+// dejó de farolear. Se re-deriva UNA vez, en STOP-3.
+function _trasladarFarol(state, B, motivo) {
+  if (motivo === 'piso') _CONT_APU1.farolTrasladadoPiso++
+  else                   _CONT_APU1.farolTrasladadoSinHumano++
+
+  const handCount = state.handCount ?? 0
+  const ultima    = _farol.bloque * B + B      // última mano del bloque
+  const restantes = ultima - handCount
+
+  if (restantes <= 0) {
+    _CONT_APU1.farolBloqueAgotado++
+    _farol = { ..._farol, manoElegida: -1, idElegido: null, vivo: false }
+    return
+  }
+  _farol = {
+    ..._farol,
+    manoElegida: handCount + 1 + Math.floor(rng() * restantes),
+    idElegido: null,
+    vivo: false,
+  }
+}
+
+// Sortea el bloque y adjudica el farol. Se llama en CADA decisión y es idempotente
+// dentro de un bloque y dentro de una mano; el azar se consume exactamente dos
+// veces por bloque como mucho: una al sortear la mano y otra sólo si hay empate
+// de pilas al elegir asiento. Con `B === null` (Básico, hoy) no consume ninguna,
+// que es lo que mantiene intacto el test de oro.
+//
+// El bloque se cuenta como manda el normativo §6.4 —manos 1…B, B+1…2B—, o sea
+// `floor((handCount − 1) / B)`, y se detecta por IDENTIDAD del bloque y no por
+// el suceso de abrirlo: si nadie pide decisiones en la primera mano de un bloque
+// (todos se retiran antes), el sorteo se hace igual en la siguiente y el bloque
+// no se queda sin farol por un hueco de llamadas.
+function _planFarol(state, B) {
+  if (B === null) return
+  const handCount = state.handCount ?? 0
+  const bloque    = Math.floor(Math.max(0, handCount - 1) / B)
+
+  if (_farol.bloque !== bloque) {
+    const inicio = bloque * B + 1
+    _farol = {
+      bloque,
+      manoElegida: inicio + Math.floor(rng() * B),
+      idElegido: null,
+      vivo: false,
+    }
+  }
+
+  if (handCount !== _farol.manoElegida) { _farol.vivo = false; return }
+  if (_farol.idElegido !== null || state.phase !== 'BET_2') return
+
+  // §6.4 · la IA VIVA DE MAYOR PILA en el momento de ejecutarlo; empate, azar.
+  // «Viva» es no retirada y no eliminada: una IA corta de pila entra igual, y
+  // esa es la regla («si solo queda una IA y va corta, se aplica igual»).
+  //
+  // El humano queda fuera por `isHuman`, que viaja en el objeto del jugador y
+  // no en la casilla. Consecuencia declarada: bajo el ESTADO ESPEJO del banco,
+  // el asiento conducido lleva el `isHuman` del humano real y nunca sale
+  // elegido, así que el duelo mide un asiento 0 que no farolea. Es un límite del
+  // adaptador, no de la regla — y arreglarlo tocaría la semántica del espejo,
+  // que sostiene bandas ya selladas.
+  const vivas = state.players
+    .map((p, i) => ({ p, i }))
+    .filter(({ p }) => p.isHuman !== true && !p.folded && !p.eliminated)
+  if (!vivas.length) return
+
+  const tope    = Math.max(...vivas.map(({ p }) => p.chips ?? 0))
+  const empatan = vivas.filter(({ p }) => (p.chips ?? 0) === tope)
+  const elegida = empatan.length === 1
+    ? empatan[0]
+    : empatan[Math.min(empatan.length - 1, Math.floor(rng() * empatan.length))]
+
+  _farol = { ..._farol, idElegido: _idDe(state, elegida.i), vivo: true }
+}
 
 // ── Diagnóstico de Pro · NO participa en ninguna decisión ────────────────────
 // Contadores de frecuencia efectiva para el banco (`--nivel pro`) y las pruebas.
@@ -491,7 +767,7 @@ export const _DIAG_PRO = {
 function _shuffled(arr) {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rng() * (i + 1))
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
@@ -520,9 +796,11 @@ export function _resetForTesting() {
   _lastHandCount  = -1
   _lastAliveCount = -1
   _olvidarDescartes()
+  _olvidarPlanes()
   for (const k of Object.keys(_DIAG_PRO)) {
     _DIAG_PRO[k] = k === 'farolPorAsiento' ? {} : 0
   }
+  for (const k of Object.keys(_CONT_APU1)) _CONT_APU1[k] = 0
 }
 
 // ── RIDER NIV-1 §4 · re-sorteo de perfiles por PARTIDA ────────────────────────
@@ -568,6 +846,9 @@ function _ensurePersonalities(state) {
     // NIV-2 §1: la memoria de descartes es de MESA, no sólo de mano. Las mismas
     // dos señales que reparten rivales nuevos tiran la lectura vieja.
     _olvidarDescartes()
+    // APU-1 1c: y por lo mismo tiran el bloque de farol sorteado y las trampas
+    // armadas. Son planes de ESTA partida.
+    _olvidarPlanes()
   }
   _lastHandCount  = state.handCount
   _lastAliveCount = vivos
@@ -641,17 +922,28 @@ function lecturaDeDescartes(state, aiIndex) {
 // Apply ±noise% variance to a threshold — called once per decision, not at assignment
 function _jitter(value, noise) {
   if (noise === 0) return value
-  const factor = 1 + (Math.random() * 2 - 1) * noise
+  const factor = 1 + (rng() * 2 - 1) * noise
   return value * factor
 }
 
 // ── Core decision functions ───────────────────────────────────────────────────
 
+// A-1 · CONTRATO DE LA DECISIÓN (ficha 1c §3.1, normativo §6.2):
+//
+//     { action, k, peso }
+//
+//   · `action` ∈ `pozos.accionesDe(state, aiIndex)` — regla 1.4 de la ficha, y
+//     es invariante DURA: el motor ya no reescribe nada, así que una acción
+//     ilegal es una mesa clavada. Lo garantiza `fin()` por construcción.
+//   · `k` ∈ `betting.multiplicadores`, y sólo significa algo en `apostar` y
+//     `subir`; en cualquier otra acción vale 1.
+//   · `peso` ∈ 'leve' | 'media' | 'grande'. NO entra al motor: lo consume 1e
+//     para el ritmo (§6.9). La IA solo declara «cuán grande» fue la decisión.
 export function decideBetAction(state, aiIndex) {
   const { players, currentBet, phase, manoIndex, pieIndex, unit } = state
   const ai = players[aiIndex]
 
-  if (ai.folded) return { action: 'pasar' }
+  if (ai.folded) return { action: 'pasar', k: 1, peso: 'leve' }
 
   // HR-1: las reglas vienen del snapshot congelado en el barajado. Solo cambia
   // de dónde se leen; la estrategia (umbrales, perfiles) no se toca.
@@ -659,15 +951,88 @@ export function decideBetAction(state, aiIndex) {
   const comodinEnabled = state.handRules.comodinValue !== null
   const { points: score } = getBestSuitScore(ai.cards, ruleN, comodinEnabled)
   const toCall = currentBet - ai.contrib
+  const reto   = retoDe(state)
 
-  // Engine will force-fold if chips < toCall, but we mirror it here for safety
-  if (toCall > 0 && ai.chips < toCall) return { action: 'retirarse' }
+  // ── A-2 · PASO 0: la legalidad se PREGUNTA, no se calcula ─────────────────
+  //
+  // Las cuatro guardas de saldo de NIV-2 (el retiro forzoso por no cubrir, el
+  // `canAffordRaise`, y los dos `chips >= unit` de la apertura) desaparecen:
+  // repetían aritmética del motor y eran justo el riesgo R-5 que `pozos.js`
+  // existe para cerrar. Desde aquí, lo que se puede hacer lo dice el árbitro.
+  //
+  // SE FUERZA EL TURNO, y no es un atajo. `accionesDe` mezcla dos preguntas —
+  // «¿es tuyo el turno?» y «¿qué es legal?»— y a esta función sólo le importa
+  // la segunda: el motor nunca la llama fuera de turno, pero SÍ la llaman con
+  // estados sintéticos las ~1.500 fixtures del oro (que no traen
+  // `activePlayerIndex`) y el ESTADO ESPEJO del banco (que permuta asientos sin
+  // remapearlo). Sin forzarlo, la fila saldría vacía en todos esos casos y la
+  // IA se quedaría muda justo donde más se la mide.
+  const enTurno  = state.activePlayerIndex === aiIndex
+    ? state
+    : { ...state, activePlayerIndex: aiIndex }
+  const acciones = accionesDe(enTurno, aiIndex)
+  const puede    = a => acciones.includes(a)
 
-  // Saldo (defensa en profundidad): solo intentar 'subir' si alcanza para el
-  // monto TOTAL de la subida (toCall + unit). Si no, se degrada a 'igualar'
-  // (la igualada ya está garantizada por la guarda de arriba). No se intenta
-  // ninguna acción impagable; el motor es la garantía dura de saldo ≥ 0.
-  const canAffordRaise = ai.chips >= toCall + unit
+  // FUERA DE JURISDICCIÓN. En `DISCARD`, `PAYOUT` o cualquier fase sin apuesta
+  // la fila sale vacía porque no hay nada que arbitrar, no porque el asiento no
+  // pueda actuar. El motor no pide decisiones de apuesta ahí; las fixtures
+  // sintéticas del oro sí. Con la fila vacía se conserva la conducta anterior
+  // al pie de la letra —incluidas las guardas de saldo— y ninguna regla nueva
+  // se ejecuta: no hay legalidad contra la que proyectarlas.
+  const arbitra = acciones.length > 0
+  if (!arbitra && toCall > 0 && ai.chips < toCall) return { action: 'retirarse', k: 1, peso: 'media' }
+
+  // El mayor multiplicador que la pila cubre para esa acción (§6.3 y §6.4:
+  // «sube con el mayor k que su pila cubra»). `null` si no cubre ni el ×1.
+  const mayorK = (accion) => {
+    const mults = MULTS()
+    for (let i = mults.length - 1; i >= 0; i--) {
+      if (esLegal(enTurno, aiIndex, accion, mults[i]).ok) return mults[i]
+    }
+    return null
+  }
+
+  // Referencia del `peso`: la fracción del pozo de §6.5. Aunque el reto tenga
+  // la regla apagada, el ritmo necesita una vara para separar «igualar barato»
+  // de «igualar caro», y se usa la misma cifra.
+  const refFraccion = (fraccionPozoDe(reto) ?? 0.25) * (state.pot ?? 0)
+  const pesoDe = (accion, k) => {
+    if (accion === 'pasar')     return 'leve'
+    if (accion === 'allIn')     return 'grande'
+    if (accion === 'retirarse') return toCall > 0 ? 'media' : 'leve'
+    if (accion === 'igualar')   return costoDe(enTurno, aiIndex, 'igualar') <= refFraccion ? 'leve' : 'media'
+    return k > 1 ? 'grande' : 'media'
+  }
+
+  // PROYECCIÓN — la red que hace verdadera la regla 1.4 sin obligar a cada rama
+  // a comprobar su propia legalidad. Cada acción tiene su escalera de repuesto,
+  // ordenada por cercanía de intención: quien quería subir prefiere igualar
+  // antes que pasar, y quien quería abrir prefiere pasar antes que pagar. Con
+  // la fila vacía (fuera de jurisdicción) no proyecta nada.
+  const ESCALERA = {
+    subir:     ['subir', 'igualar', 'allIn', 'pasar', 'retirarse'],
+    apostar:   ['apostar', 'pasar', 'igualar', 'retirarse'],
+    igualar:   ['igualar', 'allIn', 'pasar', 'retirarse'],
+    pasar:     ['pasar', 'igualar', 'allIn', 'retirarse'],
+    allIn:     ['allIn', 'igualar', 'pasar', 'retirarse'],
+    retirarse: ['retirarse', 'pasar'],
+  }
+  const fin = (accion, k = 1, peso = null) => {
+    const elegida = (!arbitra || puede(accion))
+      ? accion
+      : ((ESCALERA[accion] ?? []).find(puede) ?? 'retirarse')
+    const kFinal = (elegida === 'apostar' || elegida === 'subir')
+      ? (esLegal(enTurno, aiIndex, elegida, k).ok ? k : 1)
+      : 1
+    return {
+      action: elegida,
+      k: kFinal,
+      peso: (peso !== null && elegida === accion) ? peso : pesoDe(elegida, kFinal),
+    }
+  }
+
+  // Lo que era `canAffordRaise`: una pregunta al árbitro cuando lo hay.
+  const canAffordRaise = arbitra ? puede('subir') : ai.chips >= toCall + unit
 
   // Nivel de esta mesa. `avanzado` abre ③ y ④; `pro` abre ②, ⑥ y el Ajilei
   // disimulado. Pro hereda lo de Avanzado por RANGO —el `>=`—, sin repetir una
@@ -690,15 +1055,45 @@ export function decideBetAction(state, aiIndex) {
   //
   // INVARIANTE ABSOLUTA, compartida con los tres niveles: con Ajilei en la mano
   // no se retira jamás. Las dos ramas de abajo devuelven acciones que se quedan.
+  // ── R-D (1c-2) · ¿hay alguien a quien este empuje le importe? ─────────────
+  //
+  // Se calcula AQUÍ ARRIBA y no junto al resto de los listones porque §6.2 —la
+  // rama del Ajilei, justo debajo— también cuelga de él desde la decisión del
+  // rector sobre D-19. Con `soloContraHumano` apagado —Avanzado y Pro— vale
+  // `true` siempre y no cambia absolutamente nada.
+  const empuja = !soloContraHumanoDe(reto) || humanoEnMano(state)
+  if (!empuja) _CONT_APU1.decisionesSinHumano++
+
   if (isAjilei(ai.cards, ruleN)) {
     if (pro) {
       _DIAG_PRO.ajileis++
-      if (phase !== 'BET_3' && Math.random() < FREC_DISIMULO) {
+      if (phase !== 'BET_3' && rng() < FREC_DISIMULO) {
         _DIAG_PRO.disimulos++
-        return { action: currentBet > 0 ? 'igualar' : 'pasar' }
+        return fin(currentBet > 0 ? 'igualar' : 'pasar')
       }
     }
-    return { action: currentBet > 0 ? 'subir' : 'apostar' }
+    // §6.2 · con la mano invencible se sube con el mayor multiplicador que la
+    // pila cubra: es la única mano donde el tamaño no tiene contraindicación.
+    //
+    // Va detrás del mismo interruptor que la subida fuerte (A-3) y no de uno
+    // propio: el Ajilei son 51 puntos, o sea que SIEMPRE pasa cualquier umbral
+    // de §6.3, y esta rama no es más que A-3 adelantada. Encender el monto aquí
+    // y no allí —o al revés— sería que la mano perfecta subiera distinto que
+    // una mano de 45, sin ninguna razón.
+    //
+    // R-D (1c-2, decisión del rector sobre D-19) · Y POR ESO MISMO también va
+    // detrás de `empuja`. El argumento de arriba se lee en las dos direcciones:
+    // si §6.2 no es más que §6.3 adelantada, lo que apague §6.3 tiene que apagar
+    // §6.2, o un Básico entre IAS subiría ×1 con 45 puntos y ×10 con 51 —que es
+    // exactamente la mesa que se liquida sola y que V7 existe para impedir—.
+    // El Ajilei es raro, pero no es cero: con cinco Básicos empujando la pila
+    // cada vez que a uno le toca la mano perfecta, V7 se paga la diferencia.
+    //
+    // LA INVARIANTE NO SE TOCA: con el Ajilei no se retira jamás, haya humano o
+    // no. Lo único que R-D cambia aquí es el MONTO, nunca la acción.
+    const accion = currentBet > 0 ? 'subir' : 'apostar'
+    const kAj    = (empuja && subidaFuerteActiva(reto)) ? (mayorK(accion) ?? 1) : 1
+    return fin(accion, kAj, kAj > 1 ? 'grande' : null)
   }
 
   _ensurePersonalities(state)
@@ -750,21 +1145,28 @@ export function decideBetAction(state, aiIndex) {
     ? puntajeEquivalente(eqMano, score, phase, kRivales, lectura ? Infinity : Math.round(score))
     : score
 
-  // ④ · el veredicto del bote. Sólo Avanzado+, y sólo cuando hay bote que medir:
-  // sin bote no hay matemática de bote y se cae al listón de Básico (estado
-  // sintético, no situación de juego real — el motor cobra antes en cada mano).
-  // Con `toCall <= 0` igualar es GRATIS y retirarse no puede ser correcto nunca:
-  // Básico sí se retira ahí (`score < callMin` en el tramo final), y eso es
-  // regalar la mano sin que nadie la cobre.
+  // ── A-4 · LO QUE MURIÓ AQUÍ: la matemática de bote de ④ ───────────────────
+  //
+  // Hasta 1c, Avanzado+ decidía cada pago comparando la equidad de la mano con
+  // el precio que cobraba la mesa (`pagaElBote`, con `porIgualar` leyendo los
+  // `contrib` ajenos). El normativo §6.5 la retira COMO CRITERIO DE PAGO y la
+  // sustituye por la regla del cuarto del pozo, que es la misma idea con una
+  // sola cifra y para los tres retos: si lo que debo poner es barato respecto
+  // al pozo, pago sin mirar cartas; si no, decido por el listón de mi
+  // temperamento. «La equidad de mano deja de intervenir en el pago.»
+  //
+  // Lo que NO murió: `eqMano` sigue viva porque `scoreEf` la usa —la amenaza
+  // del comodín (③) y la lectura de descartes (②) se cobran en el PUNTAJE, no
+  // en el pago—, así que las dos capacidades de NIV-1/NIV-2 siguen enteras.
+  // Lo único retirado es `boteDecide`, `porIgualar` y `pagaElBote`.
   const bote = state.pot ?? 0
-  const boteDecide = avanzado && bote > 0
-  // Lectura de `contrib` ajenos: lo que los vivos aún deben para quedarse.
-  const porIgualar = !boteDecide ? 0 : players.reduce((suma, p, i) => (
-    i === aiIndex || p.folded ? suma : suma + Math.min(Math.max(currentBet - p.contrib, 0), p.chips)
-  ), 0)
-  const pagaElBote = boteDecide && (
-    toCall <= 0 || eqMano >= toCall / (bote + toCall + porIgualar)
-  )
+
+  // R-A (1c-2) · el piso del farol, calculado antes de ⑥ porque ⑥ lo usa.
+  // Gobierna LAS DOS vías; si sólo entrara en una, la otra seguiría faroleando
+  // con 21, y es ⑥ la que farolea más flojo (1d, V4b: puntaje medio 23,1 en Pro
+  // contra 26,1 en Básico). `empuja` ya vino calculado de más arriba, porque
+  // §6.2 también cuelga de él.
+  const pisoFarol = pisoFarolDe(players.length)
 
   // ── ⑥ FAROL ESTRATÉGICO · Pro (rector §5.3) ───────────────────────────────
   //
@@ -800,7 +1202,18 @@ export function decideBetAction(state, aiIndex) {
   const farolRespaldado = lectura !== null && bote > 0 &&
     respaldoFarol >= costoFarol / (costoFarol + bote)
   if (farolRespaldado) _DIAG_PRO.farolRespaldado++
-  const farolar = farolRespaldado && Math.random() < FREC_FAROL
+
+  // R-A (1c-2) · el farol de ⑥ pasa por el mismo piso, y SIN TRASLADO: este
+  // farol es reactivo —lo dispara la lectura del rival, no un plan de bloque—,
+  // así que «no con esta mano» es sencillamente no farolear.
+  //
+  // EL DADO SE TIRA ANTES DEL PISO, y el orden es deliberado: así el consumo de
+  // azar de esta rama es byte a byte el de 1c y lo único que el piso cambia es
+  // la decisión, nunca la baraja. Al revés —piso primero— cada mano floja se
+  // ahorraría un `rng()` y desplazaría todo lo que viene después.
+  const dadoFarol = farolRespaldado && rng() < FREC_FAROL
+  const farolar   = dadoFarol && scoreEf >= pisoFarol
+  if (dadoFarol && !farolar) _CONT_APU1.farolSeisBloqueado++
 
   // Convierte un retiro en subida cuando el farol está autorizado y hay saldo.
   const conFarol = (decision) => {
@@ -808,7 +1221,131 @@ export function decideBetAction(state, aiIndex) {
     _DIAG_PRO.faroles++
     _DIAG_PRO.farolSube++
     _DIAG_PRO.farolPorAsiento[aiIndex] = true
-    return { action: 'subir' }
+    return fin('subir', 1, 'grande')
+  }
+
+  // ══ LA FILA DE DECISIÓN DE APU-1 (ficha 1c §3.2) ══════════════════════════
+  //
+  // Va en el orden exacto de la ficha, y todas sus ramas están apagadas en
+  // Básico por configuración: con `porReto.basico = false` y los `null`, ni una
+  // sola se ejecuta ni consume un `rng()`. Sólo corre con jurisdicción: sin fila
+  // de acciones no hay nada contra lo que proyectar.
+  const nombrePerfil = _assignments[aiIndex]
+  const idPropio     = _idDe(state, aiIndex)
+  const bloqueFarol  = bloqueFarolDe(reto)
+  const umbralFuerte = umbralSubidaFuerte(reto, players.length, nombrePerfil)
+  const fraccion     = fraccionPozoDe(reto)
+  const enApuestaAlta = phase === 'BET_2' || phase === 'BET_3'
+
+  if (arbitra) {
+    // ── 2 · Farol en curso (A-6, normativo §6.4) ─────────────────────────────
+    // El plan se sortea y se adjudica aquí dentro, en la primera decisión de
+    // `BET_2` de la mano elegida. FAROLEAR ES SUBIR: si la fila no ofrece
+    // `subir`, se pasa; y si sólo cabe empujar la pila, el plan MUERE y decide
+    // la regla del all-in (§6.4, «all-in es responder»).
+    _planFarol(state, bloqueFarol)
+    if (bloqueFarol !== null && _farol.vivo && _farol.idElegido === idPropio && enApuestaAlta) {
+      // R-A y R-D (1c-2) · DOS RAZONES PARA NO FAROLEAR AHORA, UN MISMO
+      // REMEDIO: el plan se traslada a otra mano del bloque en vez de gastarse.
+      //   · R-D primero, porque es más fuerte: sin humano en la mano, esta IA
+      //     no compromete fichas en absoluto y la pregunta del piso sobra.
+      //   · R-A después: la mano no llega al listón de la mesa.
+      if (!empuja || scoreEf < pisoFarol) {
+        _trasladarFarol(state, bloqueFarol, empuja ? 'piso' : 'sinHumano')
+      } else {
+        // «Subir» en el sentido del normativo es PONER DINERO DELANTE, y eso se
+        // llama `apostar` cuando la ronda está sin abrir. La distinción es de
+        // `pozos.js`, no del farol: leer el §6.4 al pie de la letra dejaría la
+        // regla muerta, porque `BET_2` empieza SIEMPRE con la apuesta en cero
+        // (el motor resetea `currentBet` al cambiar de ronda) y el plan se
+        // convertiría en un `pasar` en la inmensa mayoría de las manos elegidas.
+        const accion = puede('subir') ? 'subir' : (puede('apostar') ? 'apostar' : null)
+        const k      = accion ? mayorK(accion) : null
+        if (accion && k !== null) {
+          _CONT_APU1.farolBloqueEjecutado++
+          return fin(accion, k, 'grande')
+        }
+        if (puede('pasar')) return fin('pasar')
+      }
+    }
+
+    // ── 3 · Solo cabe all-in o retirarse (A-5, normativo §6.6) ───────────────
+    // `allIn` es legal exactamente cuando la pila no cubre el pago (§4.1), así
+    // que su sola presencia en la fila define este caso.
+    //
+    // ES LA ÚNICA RAMA QUE TAMBIÉN GOBIERNA A BÁSICO, y a propósito: aquí no
+    // hay conducta anterior que conservar. Antes de APU-1 el all-in no existía
+    // y quien no cubría PERDÍA lo ya apostado; «no hacer nada» no es una opción
+    // neutra sino la vieja regla, que 1b ya retiró del motor. Por eso la
+    // fracción entra con `?? ¼` aunque el reto la tenga apagada: Básico
+    // necesita alguna regla para responder a una pregunta que antes no se le
+    // hacía. Lo que sigue apagado en Básico es el `puntajeMin`, o sea la parte
+    // que exige LEER LA MANO; con la pila cara respecto al pozo, se retira.
+    if (puede('allIn')) {
+      const puntajeMin = puntajeAllInDe(reto, nombrePerfil)
+      if ((ai.chips ?? 0) <= (fraccion ?? 0.25) * bote)  return fin('allIn', 1, 'grande')
+      if (puntajeMin !== null && scoreEf >= puntajeMin)  return fin('allIn', 1, 'grande')
+      return fin('retirarse')
+    }
+
+    // ── 4 · Trampa armada (A-8) ──────────────────────────────────────────────
+    // Pasé con mano grande en `BET_2`; en `BET_3` cobro AUNQUE EL DESCARTE ME
+    // HAYA EMPEORADO. Si la subida no cabe, la trampa se descarta y la decisión
+    // sigue el orden normal: quedarse esperándola sería jugar dos veces la
+    // misma mentira.
+    if (phase === 'BET_3' && _trampa[idPropio] === state.handCount) {
+      delete _trampa[idPropio]
+      const k = mayorK('subir')
+      if (k !== null) return fin('subir', k, 'grande')
+    }
+
+    // ── 5 y 6 · Subida fuerte (A-3) y pasar con mano grande (A-8) ────────────
+    // `BET_1` NO entra: con dos cartas no hay puntaje que justifique una subida
+    // fuerte, y la IA sigue reactiva (§6.3).
+    //
+    // El dado de §6.8 se tira DENTRO de esta rama, no antes ni después: «pasar
+    // con mano grande» sólo tiene sentido cuando la mano ES grande, y así el
+    // orden 5→6 de la ficha deja de importar —son la misma bifurcación—. Con
+    // `p = 0` (Básico) no se tira ningún dado.
+    //
+    // R-D (1c-2) · `empuja` va DELANTE de todo lo demás. Sin humano vivo en la
+    // mano, un reto con `soloContraHumano` no evalúa ni la subida fuerte ni la
+    // trampa: la decisión sigue hasta el paso 7 y de ahí a la lógica de NIV-2,
+    // que sube ×1. Es lo que impide que cinco Básicos se liquiden entre ellos
+    // en 3 manos (informe 1d, E.2b) sin quitarle a Básico el empuje contra el
+    // humano, que es lo que D-13 pedía.
+    if (empuja && umbralFuerte !== null && enApuestaAlta && scoreEf >= umbralFuerte) {
+      const p = probPasarConManoGrandeDe(reto)
+      if (phase === 'BET_2' && p > 0 && rng() < p) {
+        _trampa[idPropio] = state.handCount
+        return fin(puede('igualar') ? 'igualar' : 'pasar')
+      }
+      const accion = puede('subir') ? 'subir' : (puede('apostar') ? 'apostar' : null)
+      const k      = accion ? mayorK(accion) : null
+      if (accion && k !== null) return fin(accion, k, 'grande')
+    }
+
+    // ── 7 · Regla del cuarto del pozo (A-4, normativo §6.5) ──────────────────
+    // Para TODO pago y en todos los retos que la tengan encendida: si lo que
+    // hay que poner es barato respecto al pozo, se paga sin mirar las cartas.
+    // Si es caro, cae a los umbrales del temperamento, que es el paso 8.
+    //
+    // QUEDARSE GRATIS TAMBIÉN ES UN PAGO de coste cero, y por eso entra aquí.
+    // Es lo único que sobrevive de ④, y sobrevive porque no es matemática de
+    // bote sino aritmética: con la apuesta ya cubierta, retirarse regala la
+    // mano sin que nadie la cobre. Ahí la acción legal no es `igualar` —no hay
+    // apuesta viva que igualar— sino `pasar`; hasta 1b el nombre equivocado lo
+    // arreglaba el puente del motor, que ya no existe.
+    //
+    // Sólo con apuesta EN LA MESA: sin ella no hay pago que abaratar y la
+    // pregunta es otra —abrir o no abrir—, que decide el umbral de apertura. Sin
+    // esta condición, un `pasar` de coste cero se llevaría por delante toda la
+    // lógica de apertura y la IA no abriría jamás.
+    if (fraccion !== null && currentBet > 0) {
+      const quedarse = puede('igualar') ? 'igualar' : (puede('pasar') ? 'pasar' : null)
+      const costo    = quedarse === 'igualar' ? costoDe(enTurno, aiIndex, 'igualar') : 0
+      if (quedarse !== null && costo <= fraccion * bote) return fin(quedarse, 1, 'leve')
+    }
   }
 
   // ── No bet yet: open or pass ──────────────────────────────────────────────
@@ -827,33 +1364,35 @@ export function decideBetAction(state, aiIndex) {
   // rector §5.4 hasta que exista gancho de showdown (deuda de motor, v1.0 §8).
   // Se declara para que ninguna tanda futura crea que es un descuido.
   if (currentBet === 0) {
-    // Saldo: no abrir si no se puede cubrir la apuesta de apertura (unit) → pasar.
-    if (scoreEf >= openMin && ai.chips >= unit) return { action: 'apostar' }
-    if (farolar && ai.chips >= unit) {
+    // A-2: ya no se comprueba el saldo. Si abrir no es legal —pila corta, o
+    // nadie a quien cobrarle (`sin_rival`)—, la proyección lo convierte en
+    // `pasar`, que es exactamente lo que hacía la guarda retirada. Sin árbitro
+    // (fase sin apuesta, sólo fixtures sintéticas) no hay proyección que lo
+    // haga, así que ahí la guarda vieja sigue en pie tal cual estaba.
+    if (scoreEf >= openMin && (arbitra || ai.chips >= unit)) return fin('apostar')
+    if (farolar && (arbitra ? puede('apostar') : ai.chips >= unit)) {
       _DIAG_PRO.faroles++
       _DIAG_PRO.farolAbre++
       _DIAG_PRO.farolPorAsiento[aiIndex] = true
-      return { action: 'apostar' }
+      return fin('apostar')
     }
-    return { action: 'pasar' }
+    return fin('pasar')
   }
 
   // ── BET_1: only 2 cards — call liberally; fold only on big raise + weak hand
   if (phase === 'BET_1') {
-    if (scoreEf >= raiseMin)             return canAffordRaise ? { action: 'subir' } : { action: 'igualar' }
-    if (boteDecide)                      return pagaElBote ? { action: 'igualar' } : { action: 'retirarse' }
-    if (scoreEf >= callMin)              return { action: 'igualar' }
-    if (toCall <= unit * 2)              return { action: 'igualar' }  // cheap-call safety
-    return { action: 'retirarse' }
+    if (scoreEf >= raiseMin)             return canAffordRaise ? fin('subir') : fin('igualar')
+    if (scoreEf >= callMin)              return fin('igualar')
+    if (toCall <= unit * 2)              return fin('igualar')  // cheap-call safety
+    return fin('retirarse')
   }
 
   // ── BET_2: 5 cards — real hand evaluation ────────────────────────────────
   if (phase === 'BET_2') {
-    if (scoreEf >= raiseMin) return (canAffordRaise && Math.random() < 0.6) ? { action: 'subir' } : { action: 'igualar' }
-    if (boteDecide)                      return pagaElBote ? { action: 'igualar' } : { action: 'retirarse' }
-    if (scoreEf >= callMin + 4)          return { action: 'igualar' }
-    if (scoreEf >= callMin) return toCall <= unit * 2 ? { action: 'igualar' } : { action: 'retirarse' }
-    return { action: 'retirarse' }
+    if (scoreEf >= raiseMin) return (canAffordRaise && rng() < 0.6) ? fin('subir') : fin('igualar')
+    if (scoreEf >= callMin + 4)          return fin('igualar')
+    if (scoreEf >= callMin) return toCall <= unit * 2 ? fin('igualar') : fin('retirarse')
+    return fin('retirarse')
   }
 
   // ── BET_3: post-discard — highest bar ────────────────────────────────────
@@ -861,15 +1400,13 @@ export function decideBetAction(state, aiIndex) {
   // tiene algo que leer, y sin lectura no hay farol (`farolar` sale falso).
   // Envolver las otras fases sería escribir una rama muerta.
   if (phase === 'BET_3') {
-    if (scoreEf >= raiseMin) return (canAffordRaise && Math.random() < 0.7) ? { action: 'subir' } : { action: 'igualar' }
-    if (boteDecide)                      return conFarol(pagaElBote ? { action: 'igualar' } : { action: 'retirarse' })
-    if (scoreEf >= callMin + 4)          return { action: 'igualar' }
-    if (scoreEf >= callMin) return conFarol(toCall <= unit ? { action: 'igualar' } : { action: 'retirarse' })
-    return conFarol({ action: 'retirarse' })
+    if (scoreEf >= raiseMin) return (canAffordRaise && rng() < 0.7) ? fin('subir') : fin('igualar')
+    if (scoreEf >= callMin + 4)          return fin('igualar')
+    if (scoreEf >= callMin) return conFarol(toCall <= unit ? fin('igualar') : fin('retirarse'))
+    return conFarol(fin('retirarse'))
   }
 
-  if (boteDecide) return pagaElBote ? { action: 'igualar' } : { action: 'retirarse' }
-  return scoreEf >= callMin ? { action: 'igualar' } : { action: 'retirarse' }
+  return scoreEf >= callMin ? fin('igualar') : fin('retirarse')
 }
 
 export function decideDiscard(state, aiIndex) {

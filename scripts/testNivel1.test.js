@@ -21,6 +21,8 @@ import {
   createInitialState, startHand, advanceFromDeal, applyPlayerBetAction,
   applyAIBetAction, applyDiscard, makeHandRules, PHASES,
 } from '../src/engine/gameEngine.js'
+import { accionesDe } from '../src/engine/pozos.js'
+import { AJILEI_CONFIG } from '../src/config/ajileiConfig.js'
 
 // ── Utilería ─────────────────────────────────────────────────────────────────
 
@@ -192,35 +194,264 @@ function bateria() {
   return casos
 }
 
+// ── APU-1 1c · las DOS puertas por las que el oro puede cambiar ──────────────
+//
+// El oro sella que Básico decide hoy lo mismo que antes de NIV-1. APU-1 no toca
+// la estrategia de Básico —sus curvas siguen calibradas y sus umbrales
+// intactos—, pero sí cambia las REGLAS DEL JUEGO debajo de ella, y hay estados
+// de la batería donde la pregunta que se le hace ya no es la misma:
+//
+//   1. LA RESPUESTA DE ANTES YA NO ES LEGAL. El caso real: Ajilei en la mano y
+//      la pila por debajo de la apuesta de apertura. La lógica anterior
+//      devolvía `apostar` sin mirar el saldo, y el motor lo tapaba con el
+//      retiro forzoso (`gameEngine.js:255-262`, retirado en 1b). Sin esa red,
+//      devolver `apostar` sería devolver una acción que nadie puede aplicar.
+//   2. LA PILA NO CUBRE EL PAGO. Antes se perdía lo ya apostado; desde §4.1
+//      existe el all-in defensivo, y el árbitro lo ofrece en la fila. La lógica
+//      transcrita NO TIENE OPINIÓN sobre el all-in porque el all-in no existía
+//      cuando se transcribió: comparar ahí no es medir si Básico cambió, es
+//      preguntarle por una regla que no conocía.
+//
+// DESDE 1c-2-iii ESTAS DOS YA NO SON PUERTAS: son ETIQUETAS.
+//
+// El rector re-derivó el oro al cerrar 1c-2 y lo pidió «con identidad exacta y
+// sin puertas». Una puerta excusa una divergencia por su CATEGORÍA —«aquí el
+// all-in existe, así que lo que salga vale»— y eso, con el tiempo, es un sello
+// de goma: mientras la divergencia caiga en la categoría, cualquier cifra nueva
+// pasa sin que nadie la vea. Lo que hay ahora es una FOTOGRAFÍA: cada decisión
+// que se aparta de la lógica anterior a NIV-1 está escrita, una por línea, con
+// su caso, su antes, su ahora, su multiplicador y su motivo. La prueba compara
+// contra esa lista entera. Si una sola decisión se mueve —o aparece, o
+// desaparece— el `diff` la señala con nombre y apellido.
+//
+// Y LA IDENTIDAD AHORA INCLUYE EL MULTIPLICADOR. Hasta 1c-2 el oro comparó sólo
+// la ACCIÓN, y eso dejaba un agujero del tamaño de §6.3: una Básica que antes
+// subía ×1 y ahora sube ×10 decía «subir» las dos veces y pasaba por idéntica.
+// La lógica transcrita no conoce los multiplicadores —subía siempre de una
+// unidad—, así que su `k` es 1 por definición y comparar contra él es legítimo.
+const MOTIVOS_ORO = {
+  // La respuesta de antes ya no es legal (el caso real: Ajilei con la pila por
+  // debajo de la apertura; el motor lo tapaba con un retiro forzoso que 1b
+  // retiró).
+  ilegal: 'ilegal',
+  // La pila no cubre el pago y desde §4.1 existe el all-in defensivo, que no
+  // existía cuando la lógica se transcribió.
+  allIn: 'allIn',
+  // Misma acción, otro monto: la firma de §6.3 (R-B) y del Ajilei de §6.2.
+  multiplicador: 'multiplicador',
+  // Lo demás: una regla de APU-1 cambió la decisión de Básico. En 1c-2 son
+  // `fraccionPozo` (§6.5) y la subida fuerte encendida (§6.3).
+  regla: 'regla-APU1',
+}
+
+function motivoOro(s, asiento, antes, vivo) {
+  const acciones = accionesDe({ ...s, activePlayerIndex: asiento }, asiento)
+  if (vivo.action === antes.action) return MOTIVOS_ORO.multiplicador
+  if (!acciones.length) return MOTIVOS_ORO.regla
+  if (!acciones.includes(antes.action)) return MOTIVOS_ORO.ilegal
+  if (acciones.includes('allIn')) return MOTIVOS_ORO.allIn
+  return MOTIVOS_ORO.regla
+}
+
+// Una línea de la fotografía. Lleva lo justo para reproducir el caso a mano.
+function lineaOro(i, caso, asiento, pasajero, perfil, chips, antes, vivo, motivo) {
+  return [
+    String(i).padStart(5, '0'),
+    `mesa${caso.numPlayers}`,
+    caso.phase.padEnd(7),
+    `a${asiento}`,
+    (pasajero ?? 'sinPasajero').padEnd(11),
+    perfil.padEnd(12),
+    `cb${String(caso.currentBet).padStart(3)}`,
+    `pot${String(caso.pot).padStart(4)}`,
+    `ch${String(chips).padStart(4)}`,
+    `${antes.action} -> ${vivo.action} x${vivo.k ?? 1}`.padEnd(28),
+    motivo,
+  ].join(' ')
+}
+
 describe('1. Test de oro — Básico es idéntico a antes de NIV-1', () => {
   afterEach(() => vi.restoreAllMocks())
 
   // Los dados (0.6/0.7 de las subidas y el ruido ±15% de IMPREDECIBLE) se fijan
   // por mock. Tres valores: uno por debajo de ambos umbrales, uno en medio, uno
   // por encima — así se recorren los dos lados de cada rama con dado.
-  it.each([0.05, 0.5, 0.95])('Math.random=%s · decideBetAction sin pasajero y con `basico`', (dado) => {
+  it.each([0.05, 0.5, 0.95])('Math.random=%s · decideBetAction sin pasajero y con `basico`', async (dado) => {
+    _resetForTesting()                       // el farol por bloques es memoria
     vi.spyOn(Math, 'random').mockReturnValue(dado)
     const casos = bateria()
     expect(casos.length).toBeGreaterThan(1500)
     let comparados = 0
+    const porMotivo = {}
+    const lineas = []
+    let i = -1
     for (const caso of casos) {
       const asiento = caso._asiento
       for (const pasajero of [undefined, 'basico']) {
+        i++
         const s = pasajero === undefined ? caso : { ...caso, nivelIA: pasajero }
         const vivo = decideBetAction(s, asiento)
         const perfil = getPersonalityName(asiento)
         const antes = decideBetAntes(s, asiento, perfil)
-        if (vivo.action !== antes.action) {
-          throw new Error(
-            `BÁSICO CAMBIÓ · mesa ${caso.numPlayers} ${caso.phase} asiento ${asiento} ` +
-            `perfil ${perfil} currentBet ${caso.currentBet} pot ${caso.pot} ` +
-            `chips ${s.players[asiento].chips} · antes ${antes.action} → ahora ${vivo.action}`)
-        }
-        comparados++
+        if (vivo.action === antes.action && (vivo.k ?? 1) === 1) { comparados++; continue }
+        const motivo = motivoOro(s, asiento, antes, vivo)
+        porMotivo[motivo] = (porMotivo[motivo] ?? 0) + 1
+        lineas.push(lineaOro(i, caso, asiento, pasajero, perfil,
+          s.players[asiento].chips, antes, vivo, motivo))
       }
     }
-    expect(comparados).toBe(casos.length * 2)
+    // La inmensa mayoría de la batería sigue saliendo IDÉNTICA a la lógica
+    // anterior a NIV-1, acción y monto. Si eso dejara de ser cierto, Básico
+    // habría dejado de ser Básico.
+    expect(comparados + lineas.length).toBe(casos.length * 2)
+    expect(comparados / (casos.length * 2)).toBeGreaterThan(0.6)
+
+    // Y lo que NO sale idéntico está sellado una por una, con su motivo.
+    const cabecera = [
+      `# ORO DE BÁSICO · APU-1 1c-2-iii · Math.random = ${dado}`,
+      `# ${casos.length * 2} decisiones · ${comparados} idénticas a la lógica anterior a NIV-1 · ${lineas.length} cambiadas`,
+      `# por motivo: ${Object.entries(porMotivo).sort().map(([k, n]) => `${k}=${n}`).join(' · ')}`,
+      '#',
+    ]
+    await expect(cabecera.concat(lineas).join('\n') + '\n')
+      .toMatchFileSnapshot(`oro/nivel1_basico_${dado}.txt`)
   })
+
+  // ══ APU-1 1c-2 §2.5 · LA CONTABILIDAD DEL ORO (D-22) ════════════════
+  //
+  // Nació como recibo provisional: entre STOP-1 y STOP-3 el oro estuvo rojo por
+  // decisión del rector, y esta prueba afirmaba lo único que podía afirmarse sin
+  // re-derivar nada —que la MÁQUINA nueva no mueve el oro, que lo mueven las
+  // CIFRAS—. El rector decidió en STOP-2 (D-22) que se quedara después de
+  // sellar, apuntando ya a las cifras selladas. Esto es eso.
+  //
+  // QUÉ AFIRMA AHORA. Con `ajileiConfig.js` devuelto a los valores de 1d —mapa
+  // plano, Básico neutro, sin piso, sin R-D— toda decisión que las cifras de
+  // 1c-2 habían movido VUELVE a ser idéntica a la lógica anterior a NIV-1, y no
+  // aparece ninguna nueva. Es decir: R-A, R-B y R-D son retrocompatibles, y todo
+  // lo que el oro re-derivado consigna sale de las CIFRAS, no del código. Si
+  // alguna vez dejara de cumplirse, sería un fallo de verdad.
+  //
+  // Lo que NO vuelve al oro al revertir son las divergencias de LEGALIDAD —la
+  // respuesta de antes ya no es legal, o existe el all-in defensivo—: ésas son
+  // de APU-1 1b, viven en las dos configuraciones por igual y se cancelan solas
+  // en la resta.
+  //
+  // Y atribuye: cuántas decisiones devuelve al oro cada cifra por separado.
+  const CIFRAS_1D = {
+    'porMesa plano (R-B en su forma vieja)':
+      (ia) => { ia.subidaFuerte.porMesa = { 2: 41, 3: 40, 4: 36, 5: 33 } },
+    'subidaFuerte.porReto.basico = false':
+      (ia) => { ia.subidaFuerte.porReto.basico = false },
+    'fraccionPozo.basico = null':
+      (ia) => { ia.fraccionPozo.basico = null },
+    'farol.bloquePorReto.basico = null':
+      (ia) => { ia.farol.bloquePorReto.basico = null },
+    'sin farol.pisoPuntajePorMesa (R-A)':
+      (ia) => { delete ia.farol.pisoPuntajePorMesa },
+    'sin soloContraHumano (R-D)':
+      (ia) => { delete ia.soloContraHumano },
+  }
+
+  it.each([0.05, 0.5, 0.95])(
+    'Math.random=%s · revertir a las cifras de 1d devuelve al oro lo que ellas movieron, y la tanda lo atribuye',
+    async (dado) => {
+      const casos = bateria()
+      const ORIGINAL = structuredClone(AJILEI_CONFIG.ia)
+
+      // Una corrida entera de la batería con la configuración que haya puesta.
+      // Se recorre EN EL MISMO ORDEN que el oro y sin reiniciar entre casos: el
+      // farol por bloques es memoria de partida, así que una decisión aislada
+      // no reproduce el estado en que el oro la tomó.
+      const corrida = () => {
+        _resetForTesting()
+        vi.spyOn(Math, 'random').mockReturnValue(dado)
+        const filas = []
+        for (const caso of casos) {
+          const asiento = caso._asiento
+          for (const pasajero of [undefined, 'basico']) {
+            const s = pasajero === undefined ? caso : { ...caso, nivelIA: pasajero }
+            const vivo   = decideBetAction(s, asiento)
+            const perfil = getPersonalityName(asiento)
+            const antes  = decideBetAntes(s, asiento, perfil)
+            filas.push(vivo.action === antes.action && (vivo.k ?? 1) === 1)
+          }
+        }
+        vi.restoreAllMocks()
+        return filas
+      }
+
+      try {
+        const conNuevo = corrida()
+
+        // (1) LO QUE IMPORTA: al revertir las cifras, todo lo que ellas movieron
+        //     vuelve al oro, y no aparece NINGUNA divergencia nueva.
+        for (const revertir of Object.values(CIFRAS_1D)) revertir(AJILEI_CONFIG.ia)
+        const conViejo = corrida()
+        const recuperadas = conViejo.reduce((a, ok, i) => a + (ok && !conNuevo[i] ? 1 : 0), 0)
+        const nuevas      = conViejo.reduce((a, ok, i) => a + (!ok && conNuevo[i] ? 1 : 0), 0)
+        expect(nuevas,
+          'revertir a las cifras de 1d ha CREADO divergencias: R-A, R-B o R-D ' +
+          'han dejado de ser retrocompatibles').toBe(0)
+
+        // (2) Y las cifras movieron algo: si no, la batería no mediría nada.
+        expect(recuperadas).toBeGreaterThan(0)
+
+        // (3) ATRIBUCIÓN, por dos caminos, porque ninguno solo dice la verdad
+        //     entera.
+        //
+        //     SOLA: cada cifra revertida por su cuenta, con las demás en su
+        //     valor sellado. Es la lectura natural —«cuántas decisiones mueve
+        //     esta cifra»— pero NO suma: dos cifras pueden explicar la misma
+        //     decisión, y otras sólo hacen efecto acompañadas. El caso real es
+        //     `porMesa`: revertirlo solo, con la subida fuerte aún encendida, no
+        //     devuelve una sola decisión al oro —cambia el umbral, no lo apaga—.
+        //
+        //     MARGINAL: las cifras se revierten ACUMULANDO en un orden fijo, y a
+        //     cada una se le apunta lo que añade sobre las anteriores. Suma
+        //     exactamente lo recuperado, por construcción, a cambio de depender
+        //     del orden. Es la que se puede sellar.
+        const porRegla = {}
+        for (const [nombre, revertir] of Object.entries(CIFRAS_1D)) {
+          AJILEI_CONFIG.ia = structuredClone(ORIGINAL)
+          revertir(AJILEI_CONFIG.ia)
+          const filas = corrida()
+          porRegla[nombre] = filas.reduce(
+            (a, ok, i) => a + (ok && !conNuevo[i] ? 1 : 0), 0)
+        }
+
+        const marginal = {}
+        AJILEI_CONFIG.ia = structuredClone(ORIGINAL)
+        let acumulado = conNuevo
+        for (const [nombre, revertir] of Object.entries(CIFRAS_1D)) {
+          revertir(AJILEI_CONFIG.ia)
+          const filas = corrida()
+          marginal[nombre] = filas.reduce(
+            (a, ok, i) => a + (ok && !acumulado[i] ? 1 : 0), 0)
+          acumulado = filas
+        }
+        const suma = Object.values(marginal).reduce((a, n) => a + n, 0)
+        expect(suma, `la atribución marginal no cuadra: ${JSON.stringify(marginal)}`)
+          .toBe(recuperadas)
+
+        // Sellado, para que el informe lo cite y para que nadie mueva una cifra
+        // sin que se vea cuántas decisiones de Básico se lleva por delante.
+        const ancho = Math.max(...Object.keys(CIFRAS_1D).map(k => k.length))
+        await expect([
+          `# CONTABILIDAD DEL ORO DE BÁSICO · APU-1 1c-2-iii · Math.random = ${dado}`,
+          `# ${conNuevo.length} decisiones · ${recuperadas} las mueven las cifras de 1c-2`,
+          '#',
+          '# cifra revertida'.padEnd(ancho + 2) + '  sola  marginal',
+          ...Object.keys(CIFRAS_1D).map(k =>
+            `  ${k.padEnd(ancho)}  ${String(porRegla[k]).padStart(4)}  ${String(marginal[k]).padStart(8)}`),
+          `  ${'TOTAL'.padEnd(ancho)}  ${String(Object.values(porRegla).reduce((a, n) => a + n, 0)).padStart(4)}  ${String(suma).padStart(8)}`,
+        ].join('\n') + '\n').toMatchFileSnapshot(`oro/nivel1_atribucion_${dado}.txt`)
+      } finally {
+        AJILEI_CONFIG.ia = ORIGINAL
+        vi.restoreAllMocks()
+        _resetForTesting()
+      }
+    })
 
   it('decideDiscard sin pasajero y con `basico`: mismos índices', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
@@ -424,11 +655,16 @@ describe('5. ③ Comodín · apuesta', () => {
     fijarPerfil('CONSERVADORA', { ...conC, nivelIA: 'avanzado' }, 1)   // raiseMin 44
     vi.spyOn(Math, 'random').mockReturnValue(0.5)                      // el dado deja subir
 
-    // Con el comodín EN LA MANO no hay amenaza: el 47 vale 47 y sube.
+    // CAMBIO DE VEREDICTO (APU-1 1c, A-3). La subida fuerte de §6.3 pone el
+    // listón de mesa 4 en 36 (+2 de CONSERVADORA = 38), por DEBAJO de los dos
+    // puntajes de este gemelo: el 47 y el 42-efectivo suben los dos, y aquí ③
+    // deja de decidir. No ha muerto —sigue moviendo `scoreEf` exactamente
+    // `comodinValue` puntos, y eso se sella en §3 y en la prueba de abajo—; lo
+    // que pasó es que la regla nueva puso su bar por debajo del gemelo entero.
+    // Mover el gemelo para que volviera a straddlear sería re-derivar la prueba
+    // con el mismo agente que movió el código, que es justo lo que no se hace.
     expect(decideBetAction({ ...conC, nivelIA: 'avanzado' }, 1).action).toBe('subir')
-    // Sin él, el mismo 47 vale 42 efectivos —el listón de subida queda fuera de
-    // alcance— y la mano se limita a pagar. Ese es el «47-con ≠ 47-sin».
-    expect(decideBetAction({ ...sinC, nivelIA: 'avanzado' }, 1).action).toBe('igualar')
+    expect(decideBetAction({ ...sinC, nivelIA: 'avanzado' }, 1).action).toBe('subir')
 
     // Básico no distingue: para él los dos 47 son el mismo 47, y sube en ambos.
     expect(decideBetAction({ ...conC, nivelIA: 'basico' }, 1).action).toBe('subir')
@@ -446,9 +682,26 @@ describe('5. ③ Comodín · apuesta', () => {
 
     fijarPerfil('CONSERVADORA', { ...apagado, nivelIA: 'avanzado' }, 1)
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    // Mismo cambio de veredicto que arriba: con §6.3 en vigor los dos suben.
     expect(decideBetAction({ ...apagado, nivelIA: 'avanzado' }, 1).action).toBe('subir')
-    expect(decideBetAction({ ...activo,  nivelIA: 'avanzado' }, 1).action).toBe('igualar')
+    expect(decideBetAction({ ...activo,  nivelIA: 'avanzado' }, 1).action).toBe('subir')
   })
+
+  // DÓNDE QUEDÓ ③ DESPUÉS DE APU-1, medido y declarado (hallazgo de 1c):
+  //
+  // La amenaza del comodín sigue restando exactamente `comodinValue` puntos a
+  // `scoreEf` —lo derivan y lo comparan las curvas de §3—, pero con las cifras
+  // de TRABAJO de §6.3 esa resta ya no cambia ninguna ACCIÓN en las mesas
+  // grandes: el listón de subida fuerte (36 en mesa 4, 33 en mesa 5) queda por
+  // debajo del `raiseMin` de los cuatro temperamentos (40..44 con el `+2` por
+  // rival), así que cualquier mano que antes distinguía las dos versiones del
+  // gemelo hoy las sube las dos. Ni en `BET_1` se ve: con dos cartas el máximo
+  // es 21 y el tramo que mira el puntaje empieza en 26.
+  //
+  // El propio normativo §6.3 lo deja abierto —«no es contradicción (abrir no es
+  // subir fuerte), pero la simulación decide la relación entre ambos»—, y es
+  // 1d quien la decide. Se escribe aquí para que la próxima tanda no crea que
+  // ③ se perdió por descuido: está viva en el puntaje y tapada en la acción.
 })
 
 // ══ 6. ④ Disciplina de bote ══════════════════════════════════════════════════
@@ -467,27 +720,48 @@ describe('6. ④ Disciplina de bote', () => {
     })
   }
 
-  it('odds a favor: bote gordo y precio barato → iguala donde el listón crudo se retiraba', () => {
+  // CAMBIO DE VEREDICTO (APU-1 1c-2, §2.1). Hasta 1d el contraste era real:
+  // `fraccionPozo.basico` valía `null`, así que Básico se iba y Avanzado se
+  // quedaba. La ficha 1c-2 le da a Básico su propia fracción —era el único
+  // mando que metía V4 de Básico en rango en las cuatro mesas (informe 1d,
+  // D.8)— y los dos retos coinciden. LA CONDUCTA DE AVANZADO NO SE HA MOVIDO:
+  // lo que cambió es que Básico dejó de ser el negativo de esta prueba.
+  //
+  // Lo que el paso 7 sigue sin mirar, y es lo que esta prueba sella: las
+  // cartas. Se paga por barato, no por bueno.
+  it('odds a favor: bote gordo y precio barato → los TRES retos se quedan', () => {
     // Puntaje 21 (equidad 0,569 contra un rival) frente a un precio de
-    // 150/3150 = 4,8%. Básico se va porque `toCall > unit`; el bote no lo mira.
+    // 150/3150 = 4,8%.
     const s = duelo({ cards: M5.media, pot: 3000, currentBet: 150 })
     fijarPerfil('CONSERVADORA', { ...s, nivelIA: 'avanzado' }, 1)
-    expect(decideBetAction({ ...s, nivelIA: 'basico' }, 1).action).toBe('retirarse')
+    expect(decideBetAction({ ...s, nivelIA: 'basico' }, 1).action).toBe('igualar')
     expect(decideBetAction({ ...s, nivelIA: 'avanzado' }, 1).action).toBe('igualar')
   })
 
-  it('odds en contra: bote flaco y subida cara → se retira donde el listón crudo pagaba', () => {
-    // Puntaje 16 frente a un precio de 600/700 = 86%: no lo paga ninguna mano.
-    // Básico iguala porque 16 supera su `callMin + 4`; el precio le da igual.
+  it('odds en contra: bote flaco y precio caro → decide el temperamento, no la equidad', () => {
+    // CAMBIO DE VEREDICTO (APU-1 1c, A-4 · normativo §6.5). Puntaje 16 frente a
+    // un precio de 600/700 = 86%. Avanzado se retiraba aquí porque la equidad
+    // no cubría el precio; §6.5 retira esa matemática COMO CRITERIO DE PAGO y
+    // deja una sola cifra: barato respecto al pozo se paga sin mirar cartas, y
+    // caro se decide por el listón del temperamento. 600 no es ≤ ¼ de 100, así
+    // que cae al listón — y ahí un 16 supera el `callMin + 4` de AGRESIVA, como
+    // en Básico. Los dos retos coinciden, y esa coincidencia es el efecto.
     const s = duelo({ cards: M5.floja, pot: 100, currentBet: 600 })
     fijarPerfil('AGRESIVA', { ...s, nivelIA: 'avanzado' }, 1)
     expect(decideBetAction({ ...s, nivelIA: 'basico' }, 1).action).toBe('igualar')
-    expect(decideBetAction({ ...s, nivelIA: 'avanzado' }, 1).action).toBe('retirarse')
+    expect(decideBetAction({ ...s, nivelIA: 'avanzado' }, 1).action).toBe('igualar')
   })
 
-  it('igualar GRATIS nunca se cambia por un retiro (Básico sí lo hace)', () => {
+  // CAMBIO DE VEREDICTO (APU-1 1c-2, §2.1). Igual que arriba: con su propia
+  // `fraccionPozo`, Básico tampoco regala ya una mano que puede quedarse gratis.
+  it('quedarse GRATIS nunca se cambia por un retiro, en ningún reto', () => {
     // toCall = 0: la apuesta ya está cubierta. Retirarse ahí es regalar la mano
-    // sin que nadie la cobre, y Básico lo hace en el tramo final de BET_3.
+    // sin que nadie la cobre —que es lo que Básico hacía hasta 1d—.
+    //
+    // CAMBIO DE VEREDICTO (APU-1 1c, A-4 y §3.2 de `pozos.js`): la acción se
+    // llama `pasar`, no `igualar`. Sin apuesta viva que igualar, `igualar` es
+    // ilegal (`sin_apuesta`) — hasta 1b el nombre equivocado lo tapaba el
+    // puente del motor, que E-12 retiró. La conducta es la misma: quedarse.
     const s = estado({
       numPlayers: 2, phase: 'BET_3', pot: 500, currentBet: 100,
       players: [
@@ -496,8 +770,8 @@ describe('6. ④ Disciplina de bote', () => {
       ],
     })
     fijarPerfil('CONSERVADORA', { ...s, nivelIA: 'avanzado' }, 1)
-    expect(decideBetAction({ ...s, nivelIA: 'basico' }, 1).action).toBe('retirarse')
-    expect(decideBetAction({ ...s, nivelIA: 'avanzado' }, 1).action).toBe('igualar')
+    expect(decideBetAction({ ...s, nivelIA: 'basico' }, 1).action).toBe('pasar')
+    expect(decideBetAction({ ...s, nivelIA: 'avanzado' }, 1).action).toBe('pasar')
   })
 
   it('sin bote no hay matemática de bote: cae al listón de Básico', () => {
@@ -511,19 +785,30 @@ describe('6. ④ Disciplina de bote', () => {
     // Rival pasivo: nunca sube. La IA con mano fuerte no puede irse jamás.
     vi.restoreAllMocks()
     _resetForTesting()
-    let s = { ...createInitialState(50, 2), nivelIA: 'avanzado' }
+    const nuevaPartida = () => ({ ...createInitialState(50, 2), nivelIA: 'avanzado' })
+    let s = nuevaPartida()
     let retiros = 0, manos = 0
     for (let h = 0; h < 60; h++) {
       s = startHand(s)
-      if (s.phase === PHASES.GAME_OVER) break
+      // APU-1 1c · la subida fuerte vacía las pilas mucho más rápido, así que un
+      // duelo se acaba antes de las 60 manos. Se abre otro: lo que la prueba
+      // mide es que la IA no suelte una mano ganadora, no cuánto dura una mesa.
+      if (s.phase === PHASES.GAME_OVER) s = startHand(nuevaPartida())
       s = advanceFromDeal(s)
       const jugarRonda = (fase) => {
         let n = 0
         while (s.phase === fase) {
           if (++n > 500) throw new Error('ronda sin converger')
           if (s.activePlayerIndex === 0) {
+            // APU-1 §4.1 · el conductor pasivo tiene que poder responder a una
+            // subida que no cubre: la respuesta es el all-in, no una `igualar`
+            // ilegal que el motor ya no reescribe (E-12) y que dejaría la ronda
+            // dando vueltas.
             const toCall = s.currentBet - s.players[0].contrib
-            s = applyPlayerBetAction(s, toCall > 0 ? 'igualar' : 'pasar')
+            const accion = toCall > 0
+              ? (s.players[0].chips >= toCall ? 'igualar' : 'allIn')
+              : 'pasar'
+            s = applyPlayerBetAction(s, accion)
           } else {
             const antes = s.players[1].folded
             const fuerte = getBestSuitScore(s.players[1].cards, s.handRules.ruleN,
@@ -564,9 +849,14 @@ describe('7. Re-sorteo de perfiles por partida', () => {
         while (s.phase === fase) {
           if (++n > 500) throw new Error('ronda sin converger')
           if (s.players[s.activePlayerIndex].folded || s.activePlayerIndex === 0) {
+            // APU-1 §4.1: si el humano no cubre lo que falta, ya no hay retiro
+            // forzoso — la acción de pago es el all-in. El conductor de la
+            // prueba lo refleja; el veredicto de la prueba no cambia.
             const toCall = s.currentBet - (s.players[0].contrib ?? 0)
+            const cubre  = s.players[0].chips >= toCall
+            const accion = toCall > 0 ? (cubre ? 'igualar' : 'allIn') : 'pasar'
             s = s.activePlayerIndex === 0
-              ? applyPlayerBetAction(s, toCall > 0 ? 'igualar' : 'pasar')
+              ? applyPlayerBetAction(s, accion)
               : applyAIBetAction(s)
           } else {
             s = applyAIBetAction(s)
@@ -728,12 +1018,24 @@ describe('8. D-5 · aislamiento de información en Avanzado', () => {
       })),
     })
     _resetForTesting()
-    // (a) bote de 2000 y los tres rivales ya pagados: nada más va a entrar.
-    expect(decideBetAction(conBote(2000, 400), 1).action).toBe('retirarse')
-    // (b) el mismo bote, pero los tres rivales deben todavía 400 cada uno: el
-    //     bote de cierre es 1200 mayor y el mismo precio se vuelve pagable.
-    expect(decideBetAction(conBote(2000, 0), 1).action).toBe('igualar')
-    // (c) y con `pot` gordo, iguala aunque nadie deba nada.
+    // CAMBIO DE VEREDICTO (APU-1 1c, A-4 · normativo §6.5). Lo que esta prueba
+    // declara es QUÉ LEE la IA, y APU-1 le quitó un lector: la regla del cuarto
+    // del pozo mira `pot` y el costo propio, y ya no necesita sumar lo que los
+    // rivales aún deben. El contraste se reescribe en esa dirección —`pot` sí,
+    // `contrib` ajeno ya no—, que es una frontera MÁS ESTRECHA que la anterior,
+    // no más ancha: la IA de APU-1 lee menos información pública que la de
+    // NIV-1, y esta prueba es la que lo sella.
+    fijarPerfil('CONSERVADORA', conBote(100, 400), 1)
+    // (a) pozo flaco: 400 no es ≤ ¼ de 100, decide el listón y un 31 se suelta.
+    expect(decideBetAction(conBote(100, 400), 1).action).toBe('retirarse')
+    // (b) pozo gordo: el mismo precio es ≤ ¼ del pozo y se paga sin mirar mano.
+    //     Luego `pot` se lee, y se lee para esto.
     expect(decideBetAction(conBote(30000, 400), 1).action).toBe('igualar')
+    // (c) los `contrib` ajenos ya NO mueven la decisión, en ninguno de los dos
+    //     extremos: mismo pozo, deudas ajenas distintas, misma respuesta.
+    expect(decideBetAction(conBote(100, 0), 1).action)
+      .toBe(decideBetAction(conBote(100, 400), 1).action)
+    expect(decideBetAction(conBote(30000, 0), 1).action)
+      .toBe(decideBetAction(conBote(30000, 400), 1).action)
   })
 })

@@ -191,11 +191,15 @@ describe('C4.4 · Condiciones terminales', () => {
     expect(s.winner).toBe(2)
   })
 
-  it('humano eliminado con ≥2 vivos → GAME_OVER, winner=null (stop)', () => {
+  // CAMBIO DE VEREDICTO (APU-1 1b, E-11c · normativo §5.4): el humano quebrado
+  // con ≥2 vivos YA NO termina la mesa desde el motor. La mesa termina solo con
+  // ≤1 vivos, sea quien sea. El caso del humano pasa por la pregunta de recarga
+  // forzosa, que es pantalla (1e) y cobra por `aplicarRecarga`.
+  it('humano eliminado con ≥2 vivos → la mesa SIGUE, ya no es GAME_OVER', () => {
     let s = createInitialState(10, 3)
     s = setChips(s, 0, 0)
     s = startHand(s)
-    expect(s.phase).toBe(PHASES.GAME_OVER)
+    expect(s.phase).toBe(PHASES.DEAL_2)
     expect(s.winner).toBe(null)
     expect(s.players[0].eliminated).toBe(true)
     expect(s.aliveCount).toBe(2)

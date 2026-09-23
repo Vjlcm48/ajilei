@@ -228,6 +228,19 @@ describe('TB-1 · bancarrota diferida', () => {
     let s = createInitialState(10, 5)
     s = startHand(s)                    // ante ya cobrado
     s = setChips(s, 4, 0)               // se queda a cero DURANTE la mano
+    // INTERMITENCIA CAZADA (APU-1 1c, latente desde 1b). El retiro se hacía con
+    // el mock —`ctl.foldSeats`—, y desde que `primerTurno`/`nextActiveIndex`
+    // saltan a los asientos sin fichas (E-6/E-9 de 1b), al 4 no le llega el
+    // turno JAMÁS: el mock no se ejecutaba y el asiento llegaba al showdown vivo
+    // y elegible. Como sus cartas son aleatorias, ganaba el pozo de los antes una
+    // de cada cinco corridas y la prueba fallaba sin tocar nada. Se retira en el
+    // estado, que es lo que la prueba quería decir desde el principio.
+    //
+    // Lo que esto destapa y NO se arregla aquí: el ante puede dejar una pila en
+    // cero sin marcar `allIn` (el motor sólo lo marca en `applyBetAction`), y
+    // ese asiento entra en las capas como si pudiera cubrir lo que se aposte
+    // después. La cura vive en `startHand`, fuera de los rangos de 1c.
+    s = { ...s, players: s.players.map((p, i) => (i === 4 ? { ...p, folded: true } : p)) }
     ctl.foldSeats = new Set([4])
 
     s = advanceFromDeal(s); s = playBettingPhase(s, PHASES.BET_1)

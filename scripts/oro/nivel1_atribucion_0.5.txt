@@ -1,0 +1,11 @@
+# CONTABILIDAD DEL ORO DE BÁSICO · APU-1 1c-2-iii · Math.random = 0.5
+# 12672 decisiones · 2286 las mueven las cifras de 1c-2
+#
+# cifra revertida                        sola  marginal
+  porMesa plano (R-B en su forma vieja)     0         0
+  subidaFuerte.porReto.basico = false    1452      1452
+  fraccionPozo.basico = null              378       834
+  farol.bloquePorReto.basico = null         0         0
+  sin farol.pisoPuntajePorMesa (R-A)        0         0
+  sin soloContraHumano (R-D)                0         0
+  TOTAL                                  1830      2286

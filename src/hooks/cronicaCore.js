@@ -33,6 +33,22 @@ export const MONEDA = 'Heptacoins'
 // motor (call impagable, apertura impagable, subida impagable) ya convirtieron
 // la acción en 'retirarse' ANTES de escribir su mensaje, así que mirar `folded`
 // las cubre las tres sin repetir aritmética.
+//
+// SEIS VERBOS, NO CINCO (L-7, decisión 6 del rector al cerrar 1c-2). El motor
+// escribe una línea propia para el all-in —«Vas all-in con N fichas.»— desde
+// APU-1 §4.1, y esta crónica no la sabía decir: un all-in defensivo salía
+// rotulado como «sube» o «iguala», que es exactamente lo contrario de lo que
+// pasó. Lo consignó D-20 del informe 1c-2 y vivía en silencio porque las
+// pilas del banco eran iguales y hondísimas; con `--entrada` y con la mesa que
+// Victor juega, el all-in defensivo es corriente.
+//
+// CÓMO SE RECONOCE, sin leer `game.message` ni un campo de acción que el
+// estado no guarda: el all-in de §4.1 es el único camino que deja al asiento
+// con la pila en CERO y la contribución POR DEBAJO de la apuesta viva. Es
+// exacto, no heurístico —`pozos.esLegal` sólo lo permite cuando la pila no
+// cubre lo que falta, así que por construcción queda corto— y distingue el
+// all-in del `igualar` que gasta hasta la última ficha, que llega a
+// `contrib === currentBet` clavado.
 function verboDe(prev, next, seat) {
   const p = prev.players[seat]
   const n = next.players[seat]
@@ -40,6 +56,7 @@ function verboDe(prev, next, seat) {
   const puesto = p.chips - n.chips
   if (puesto > 0) {
     if (prev.currentBet === 0) return 'apostar'
+    if (n.chips === 0 && n.contrib < prev.currentBet) return 'allIn'
     return puesto > prev.currentBet - p.contrib ? 'subir' : 'igualar'
   }
   // Sin dinero puesto no hay forma de distinguir "pasar" de un "igualar" con
@@ -70,6 +87,10 @@ export function componeAccion(prev, next, seat) {
   const verbo   = verboDe(prev, next, seat)
   const apuesta = prev.currentBet
   const nueva   = next.currentBet
+  // Lo que el all-in cuesta es la pila entera de antes, que es lo que el motor
+  // llama `costo` en esa rama. Sale de la transición, como todos los demás
+  // montos de este módulo: no se recalcula nada.
+  const costo   = jugador.chips - next.players[seat].chips
 
   if (prev.numPlayers === 2) {
     const h = jugador.isHuman
@@ -78,6 +99,7 @@ export function componeAccion(prev, next, seat) {
       case 'apostar':   return h ? `Apuestas ${nueva} ${MONEDA}.`    : `La IA apuesta ${nueva}. ¿Qué haces?`
       case 'igualar':   return h ? `Igualas a ${apuesta}.`           : `La IA iguala a ${apuesta}.`
       case 'subir':     return h ? `Subes a ${nueva}.`               : `La IA sube a ${nueva}. ¿Qué haces?`
+      case 'allIn':     return h ? `Vas all-in con ${costo} ${MONEDA}.` : `La IA va all-in con ${costo}.`
       case 'retirarse': return h ? 'Te retiras. La IA gana el pozo.' : '¡La IA se retira! Ganaste el pozo.'
     }
   }
@@ -87,6 +109,7 @@ export function componeAccion(prev, next, seat) {
     case 'apostar':   return `${n} apuesta ${nueva}.`
     case 'igualar':   return `${n} iguala a ${apuesta}.`
     case 'subir':     return `${n} sube a ${nueva}.`
+    case 'allIn':     return `${n} va all-in con ${costo}.`
     case 'retirarse': return `${n} se retira.`
   }
   return null
@@ -136,6 +159,52 @@ export function componeFase(estado, prev = null) {
     // GameTable produce anulando `winner`— y en blanco tiene que quedarse.
     default: return ''
   }
+}
+
+// ── APU-1 §4.2 · CUANDO EL POZO SE PARTE, SE DICE ───────────────────
+//
+// Un all-in que no cubre la apuesta viva parte el pozo en capas: cada una tiene
+// sus elegibles y su ganador, y pueden ser personas distintas. Sin esta línea
+// el óvalo diría «¡Ganas con Copas, 41 pts!» mientras las fichas se reparten
+// entre dos asientos —y el jugador vería su saldo subir menos de lo que el
+// mensaje promete, sin ninguna forma de saber por qué—.
+//
+// SE CUENTA LO QUE NO SE VE. La capa que gana el ganador principal ya la dice
+// el resultado, así que aquí sólo salen las OTRAS: las que se lleva alguien
+// distinto y la que no se lleva nadie. Esa última no se pierde —es la apuesta
+// que nadie igualó y vuelve a quien la puso (D-7)— y decirlo importa: es
+// dinero que el jugador vio salir de su pila y le vuelve.
+//
+// `capas` llega ya resuelta (`mesaCore.repartoPorCapas`), que es quien sabe con
+// qué puntaje se decide cada una. Aquí sólo se pone en palabras.
+export function componeCapas(capas, players, ganadorPrincipal) {
+  if (!Array.isArray(capas) || capas.length <= 1) return null
+  const nombre = (seat) => (seat === 0 ? 'Tú' : (players?.[seat]?.name ?? 'la mesa'))
+
+  // APU-1 1e-iv · E-23. SE AGRUPA POR GANADOR Y SE SUMA. Un asiento puede
+  // llevarse más de una capa, y recorrer la lista sin agrupar lo nombraba una
+  // vez por capa: «IA 2 se lleva 200. IA 2 se lleva 300.» La información era
+  // correcta y se leía como un tartamudeo. Cuántas capas fueron es mecánica
+  // del reparto; lo que esta frase existe para explicar es por qué el saldo
+  // sube menos de lo que promete el resultado, y para eso lo que importa es
+  // CUÁNTO y A QUIÉN. Se conserva el orden de primera aparición para que la
+  // frase siga leyendo el pozo de abajo arriba, como se reparte.
+  const suma = new Map()
+  for (const capa of capas) {
+    if (capa.ganador === ganadorPrincipal) continue
+    const clave = capa.ganador < 0 ? -1 : capa.ganador
+    suma.set(clave, (suma.get(clave) ?? 0) + capa.monto)
+  }
+
+  const frases = []
+  for (const [ganador, monto] of suma) {
+    if (ganador < 0) { frases.push(`${monto} vuelven sin igualar.`); continue }
+    frases.push(ganador === 0
+      ? `Te llevas otros ${monto} ${MONEDA}.`
+      : `${nombre(ganador)} se lleva ${monto}.`)
+  }
+  if (!frases.length) return null
+  return `El pozo se partió: ${frases.join(' ')}`
 }
 
 // ── La crónica de una transición ────────────────────────────────────────────
