@@ -20,9 +20,32 @@
 //            MAESTRO —no cuadrado— y `src` apuntando a `ajilei-isotipo`; (6) la
 //            hoja ⚙ abre ANCLADA BAJO EL ENGRANAJE (borde superior por debajo de
 //            él, borde derecho a plomo ±2px), «Acerca de» despliega el CC BY y
-//            los créditos Pixabay, y `Escape` cierra; (7) el CTA lleva a
-//            `.nivel-grid`. Deja capturas en `capturas-lob/`. Consola limpia
+//            los créditos Pixabay, y `Escape` cierra; (7) el CTA lleva a la
+//            fila de retos de «Retar a las IAS». Deja capturas en `capturas-lob/`. Consola limpia
 //            entra en el veredicto.
+//   retar  → APU-1 1e: «Retar a las IAS» en los seis viewports — las cuatro
+//            filas, la cascada en los dos sentidos, el CTA que nombra las tres
+//            cifras, el gris por saldo con `?apu=saldo:<n>`, el contador de
+//            «Otra…» y la geometría. Capturas en `capturas-retar/`.
+//   apu    → APU-1 1e-ii/1f: la mesa con dinero de verdad, en SIETE viewports
+//            (los tres de móvil de la familia de `lob`/`retar`/`diagSAL` y los
+//            cuatro de escritorio). Siete puntos en todos: la marca ALL-IN del
+//            asiento, el botón All-in en el sitio de Igualar, el all-in que se
+//            responde (E-13), la recarga con su gate y su nivelado, la ronda
+//            sin juego de §4.3, las capas del pozo y la geometría. En PORTRAIT,
+//            cuatro medidas más (1f §A.2): la marca contra el hueco de CADA
+//            mesa —`.opp-panel` en 5/4/3, `.ai-zone` en la de 2—, el botón con
+//            el monto de cuatro y cinco cifras (construido, receta O2), la
+//            pregunta de recarga AUTOMÁTICA contra las cartas y el óvalo en
+//            píxeles cuadrados, y la línea del humano en all-in contra el alto
+//            del «pensando» al que releva. Los cuatro entran en el veredicto de
+//            la celda (E-26). En APAISADO de teléfono, una quinta (1f §A4.4):
+//            los CINCO botones de la tarjeta de recarga —tres montos y dos
+//            acciones— con su alto (36–40 px), la separación mínima entre cajas
+//            (≥8 px, dentro de cada fila y entre las dos) y el solape entre
+//            pares de botones, que tiene que ser 0 px². También entra en el
+//            veredicto. Argumento opcional: una celda (`apu 360x640`).
+//            Capturas en `capturas-apu/` y las de teléfono en `capturas-apu/tel/`.
 //   b1     → DSK-B1: presupuesto vertical por fila + overflow por viewport
 //   tactil → verificación táctil coarse: hit-boxes REALES (::after, vía
 //            elementFromPoint) validados ≥40px (estándar campaña, NO WCAG) +
@@ -47,7 +70,7 @@
 //   o2     → DSK-O2: óvalo congelado en mesas 4/3/2. 15 celdas (los 4 viewports de
 //            campaña + CENTINELA 1440×850: la banda 801..900, root 18 con carta 76,
 //            donde una constante por tier se rompe sin que la matriz de 4 lo note).
-//            El peor caso se CONSTRUYE, no se juega: pozo 25000 (5×saldoInicial),
+//            El peor caso se CONSTRUYE, no se juega: pozo 25000 (5×pilaPruebas),
 //            "A igualar" visible, las 15 familias con su CLASE real (msgPop apagada
 //            —su scale(0.8) del primer frame acorta los rects un 20%—), pastilla de
 //            rol en un solo lateral, pastilla de comodín inyectada en 3/2 (su
@@ -229,7 +252,11 @@ import { getBestSuitScore, isAjilei } from '../src/engine/handEvaluator.js'
 // niveles de la MISMA fuente única que la app (mismo criterio que consultas.js)
 // para no clavar ni el orden de la rejilla ni los montos: los `id` son el
 // CONTRATO del producto y los rótulos son copy declarado provisional.
-import { NIVELES, NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
+import { NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
+// APU-1 1e · la ruta a la mesa sale de este archivo y pasa a `rutaMesa.mjs`,
+// para que deje de ser un secreto de `diagDSK` y la compartan los demás arneses
+// (la avería de NIV-UI, contada en la cabecera de aquel módulo).
+import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES } from './rutaMesa.mjs'
 // MOV-1b-a · las entradas del menú y qué está vivo en cada rama salen de la
 // MISMA fuente única que la app (mismo criterio que consultas.js, niveles.js y
 // tapetes.js). El modo `menu-movil` DERIVA de aquí lo que espera, así que
@@ -303,6 +330,9 @@ const argNamed = (nombre, porDefecto) => {
 }
 const ARNES_NIVEL = argNamed('nivel', NIVEL_POR_DEFECTO)
 const ARNES_STAKE_IDX = Number(argNamed('stake', 0))
+// APU-1 1e · la CUARTA decisión. `--entrada piso|medio|techo`; por defecto el
+// medio (20× desde 1f-A4; era 15× cuando 1c-2 midió V2 y V3 con él).
+const ARNES_ENTRADA = argNamed('entrada', ENTRADA_ARNES)
 
 const VIEWPORTS = [
   { w: 1024, h: 768 },
@@ -330,8 +360,14 @@ let RUTA_USADA = null
 // nadie se enteró hasta EMB-1. Un arnés a oscuras es peor que no tenerlo: da
 // rojos que no significan nada y entrena a ignorarlos.
 //
-// RUTA CANÓNICA (desde LOB-1):
-//   Lobby → CTA «Jugar contra la IA» → NivelSelect → nivel → ModeSelect → «Mesa de N» → apuesta
+// RUTA CANÓNICA (desde APU-1 1e):
+//   Lobby → «Jugar contra la IA» → Retar a las IAS → reto → jugadores →
+//   apuesta → entrada → CTA
+//
+// Son CINCO clics donde antes eran tres, y el último —con cuánto se sienta el
+// jugador— no existía: hasta 1e todos los asientos nacían con 5.000 fichas
+// iguales. Las cuatro filas van en CASCADA, así que no se puede pulsar la
+// tercera antes de que la segunda esté elegida.
 //
 // Nivel y apuesta se eligen por ÍNDICE DERIVADO de `config/niveles.js`, jamás
 // por el rótulo visible: los `id` son el contrato del producto («no se renombran
@@ -348,45 +384,25 @@ let RUTA_USADA = null
 // en cuanto exista `textos.en.js`, un arnés colgado del texto se rompería otra
 // vez y por la misma causa. `data-accion` viaja en los trece controles del lobby
 // y es lo que consume el modo `lob`.
-async function gotoMesa(page, n = 5, nivel = ARNES_NIVEL, stakeIdx = ARNES_STAKE_IDX) {
-  const iNivel = NIVELES.findIndex(x => x.id === nivel)
-  if (iNivel < 0) throw new Error(`gotoMesa: nivel desconocido "${nivel}"`)
-  const montos = apuestasDe(nivel)
-  if (!montos[stakeIdx]) throw new Error(`gotoMesa: stake ${stakeIdx} fuera de ${nivel}`)
-
+async function gotoMesa(page, n = 5, nivel = ARNES_NIVEL, stakeIdx = ARNES_STAKE_IDX, entrada = ARNES_ENTRADA) {
   await page.goto(BASE)
-  await recorrerRuta(page, n, iNivel, stakeIdx)
+  RUTA_USADA = await recorrerRuta(page, n, nivel, stakeIdx, entrada)
   await page.mouse.move(5, 5) // neutraliza hover de cartas
-  RUTA_USADA = { nivel, stakeIdx, monto: montos[stakeIdx] }
   return RUTA_USADA
 }
 const gotoMesa5 = (page) => gotoMesa(page, 5)
 
-// Los tres clics de la ruta, sin el `goto`. Se comparte con `volverALaMesa`
-// para que exista UN SOLO sitio que sepa cómo se llega a la mesa: la avería de
-// NIV-UI se coló, entre otras cosas, porque `runU1` tenía su propia copia.
-async function recorrerRuta(page, n, iNivel, stakeIdx) {
-  // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo.
-  await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
-  await page.click('[data-accion="jugar-ia"]')
-  // Pantalla 1 · nivel. `nth-of-type` sobre la rejilla: los hijos de
-  // `.nivel-grid` son los tres <button>, en el orden de NIVELES.
-  await page.waitForSelector('.nivel-grid button')
-  await page.click(`.nivel-grid button:nth-of-type(${iNivel + 1})`)
-  // Pantalla 2 · mesa y monto en la MISMA superficie: la rejilla de apuesta
-  // RELEVA a la de mesas en vez de apilarse debajo, así que hay que esperar el
-  // relevo antes de pulsar el monto o se clica sobre el DOM anterior.
-  await page.click(`button:has-text("Mesa de ${n} jugadores")`)
-  await page.waitForSelector('.mode-stake-btn')
-  await page.click(`.mode-stake-grid button:nth-of-type(${stakeIdx + 1})`)
-  await page.waitForSelector('.game-table')
+// Los clics de la ruta, sin el `goto`. Desde 1e el Único sitio que sabe cómo se
+// llega a la mesa es `scripts/rutaMesa.mjs`, fuera de este archivo: lo que aquí
+// queda es el alias que conservan los ~40 puntos de llamada de este arnés.
+async function recorrerRuta(page, n, nivel, stakeIdx, entrada = ARNES_ENTRADA) {
+  return recorrerRutaComun(page, n, nivel, stakeIdx, entrada)
 }
 
 // Re-navega SIN recargar ni tocar storage (la app ya está en Welcome tras un
 // `reload`). La usa la prueba de persistencia de sonido de `u1`.
 async function volverALaMesa(page, n = 5, nivel = ARNES_NIVEL, stakeIdx = ARNES_STAKE_IDX) {
-  const iNivel = NIVELES.findIndex(x => x.id === nivel)
-  await recorrerRuta(page, n, iNivel, stakeIdx)
+  await recorrerRuta(page, n, nivel, stakeIdx)
   await page.mouse.move(5, 5)
 }
 
@@ -1035,22 +1051,25 @@ async function runLob(browser) {
 
     // ── lob.7 · el CTA lleva a la selección de nivel ───────────────────────
     // El punto que reemplaza a lo que el arnés daba por sentado: que desde la
-    // primera pantalla se llega a `NivelSelect` de un clic. Con la hoja ya
-    // cerrada, para que el clic sea el del lobby y no el del velo.
+    // primera pantalla se llega a la entrada a la mesa de un clic. Con la hoja
+    // ya cerrada, para que el clic sea el del lobby y no el del velo.
+    //
+    // APU-1 1e · el destino cambió de `NivelSelect` a `RetarIAS`, y el selector
+    // con él: la fila de retos, por `data-accion` y no por clase de rejilla.
     let nivelOk = false
     try {
       await page.click('[data-accion="jugar-ia"]')
-      await page.waitForSelector('.nivel-grid button', { timeout: 4000 })
+      await page.waitForSelector('[data-accion="reto"]:not([disabled])', { timeout: 4000 })
       nivelOk = true
     } catch { /* queda en false y el veredicto lo canta */ }
-    c['lob.7'] = { llegaANivelSelect: nivelOk, ok: nivelOk }
+    c['lob.7'] = { llegaARetarIAS: nivelOk, ok: nivelOk }
 
     c.consola = consola
     c.ok = LOB_PUNTOS.every(k => c[k].ok) && consola.length === 0
 
     // Captura del lobby en cada viewport, para que Victor valide contra la
     // lámina sin tener que abrir seis ventanas. Se toma antes de navegar, así
-    // que se rehace la carga: cuesta un segundo y evita fotografiar NivelSelect.
+    // que se rehace la carga: cuesta un segundo y evita fotografiar RetarIAS.
     await page.goto(BASE)
     await page.waitForSelector('main.lobby')
     await page.waitForTimeout(500)
@@ -1067,6 +1086,1455 @@ async function runLob(browser) {
   for (const c of celdas) {
     const fallos = LOB_PUNTOS.filter(k => !c[k].ok)
     console.log(`  ${c.ok ? 'OK  ' : 'FALLA'} ${c.vp} (${c.note})${fallos.length ? ' · ' + fallos.join(', ') : ''}${c.consola.length ? ' · consola: ' + c.consola[0] : ''}`)
+  }
+  return { celdas, ok }
+}
+
+// ── APU-1 1e · modo `retar` · «Retar a las IAS» ─────────────────────────────
+// Rector: AJILEI_APU-1_Fase1e_v1.0.md §2.5.
+//
+// Mide lo que una pantalla de decisión tiene que cumplir: que las cuatro filas
+// estén, que la CASCADA funcione en los dos sentidos —habilitar hacia abajo,
+// apagar al cambiar arriba—, que el gris por saldo se explique con su cifra,
+// que el contador de «Otra…» no se salga del rango legal, que nada desborde y
+// que la consola calle. Y deja las tres capturas que Victor tiene que mirar.
+//
+// Los seis viewports son los de `lob` y los de `diagSAL`: es la familia de
+// pantallas previas a la mesa, y comparar contra otra lista haría incomparables
+// las capturas de las tres.
+const RETAR_OUT_DIR = 'capturas-retar'
+const RETAR_PUNTOS = ['retar.1', 'retar.2', 'retar.3', 'retar.4', 'retar.5', 'retar.6']
+
+// El saldo sembrado para el estado en gris. 1f-A4 subió el piso de 5× a 10×,
+// así que las mesas de Pro —200 · 400 · 600 · 1.000— piden hoy 2.000 · 4.000 ·
+// 6.000 · 10.000 y no 1.000 · 2.000 · 3.000 · 5.000. Con los mismos 2.400 la
+// foto pasa de dos encendidas y dos apagadas a UNA y TRES: se mantiene el
+// sembrado porque 2.400 sigue cayendo justo por encima del piso de la mesa más
+// barata, que es la frontera que esta celda existe para enseñar — y porque es
+// casi el bono de bienvenida (2.500), o sea el bolsillo con el que de verdad
+// llega alguien nuevo.
+const RETAR_SALDO_GRIS = 2400
+
+// ── EL RUIDO QUE YA HABÍA, NOMBRADO UNO A UNO ─────────────────────────
+// Este modo es el primero de `diagDSK` que escucha `console` y no sólo
+// `pageerror` —`lob` mira lo segundo—, y al encenderlo aparecieron DOS voces que
+// no son de 1e. Se filtran por NOMBRE y se cuentan aparte, nunca en bloque:
+//
+//   1. `inert` — un aviso de React en el primer render de la app. Se reproduce
+//      en una carga pelada de `/`, ANTES de tocar nada, y el nodo culpable ya no
+//      está en el DOM cuando el lobby asienta. No es de esta campaña; queda
+//      consignado en §E para quien sea dueño de la cáscara.
+//   2. `mi_sala` — 401 y `permission denied`. Es la consecuencia DOCUMENTADA de
+//      correr con `VITE_AUTH_BYPASS`: el uuid de `PERFIL_DEV` no existe en la
+//      base y cualquier clave foránea lo rechaza (cabecera de `diagSAL`).
+const RETAR_RUIDO_CONOCIDO = [
+  /boolean attribute/,
+  // El aviso de `salasApi` lleva el nombre de la función; la línea de red que
+  // lo precede no —su URL vive en `location`, no en el texto—, así que hacen
+  // falta los dos patrones para tapar UNA sola causa.
+  /mi_sala/,
+  /status of 401/,
+]
+
+// La geometría de la pantalla, medible en cualquier estado. Se toma DOS veces
+// —con el contador abierto y con la pantalla en reposo— porque §E-8 salió de
+// tomarla una sola: el estado que rompía era justo el que no se medía.
+async function medirGeoRetar(page) {
+  return page.evaluate(async () => {
+
+        const de = document.scrollingElement || document.documentElement
+        const sal = document.querySelector('main.sal')
+        const cta = document.querySelector('[data-accion="cta"]')
+        const chips = [...document.querySelectorAll('.sal-chip')]
+        const r0 = cta?.getBoundingClientRect()
+        // El traje apaisado bajo de §13 de `salas.css`: ahí la columna es más alta
+        // que la ventana a propósito y es `.sal` quien desplaza («lo que no cabe NO
+        // se scrollea, se aprieta — salvo en el apaisado bajo»).
+        const apaisado = window.matchMedia('(orientation: landscape) and (max-height: 520px)').matches
+        // ¿Se LLEGA al CTA? En el traje normal tiene que estar ya dentro; en el
+        // apaisado basta con que desplazando se alcance, que es la promesa de ese
+        // traje. Un CTA al que no se llega de ninguna de las dos formas es una
+        // pantalla sin salida.
+        if (apaisado && sal) sal.scrollTop = sal.scrollHeight
+        await new Promise((ok) => requestAnimationFrame(ok))
+        const r1 = cta?.getBoundingClientRect()
+        return {
+          apaisado,
+          desbordaH: de.scrollWidth > de.clientWidth + 1,
+          desbordaDoc: de.scrollHeight > de.clientHeight + 1,
+          salDesplaza: sal ? sal.scrollHeight > sal.clientHeight + 1 : false,
+          ctaDentroSinTocar: r0 ? (r0.bottom <= window.innerHeight + 1 && r0.top >= 0) : false,
+          ctaAlcanzable: r1 ? (r1.bottom <= window.innerHeight + 1 && r1.top >= 0) : false,
+          chipMin: chips.length ? Math.min(...chips.map((b) => b.getBoundingClientRect().height)) : 0,
+          rotos: (sal?.innerText.match(/⟦[^⟧]*⟧/g) ?? []).length,
+        }
+  })
+}
+
+async function runRetar(browser) {
+  const celdas = []
+  try { mkdirSync(RETAR_OUT_DIR, { recursive: true }) } catch {}
+
+  for (const vp of LOB_VIEWPORTS) {
+    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    const consola = []
+    page.on('pageerror', e => consola.push(`pageerror: ${e.message}`))
+    page.on('console', m => {
+      if (m.type() !== 'error' && m.type() !== 'warning') return
+      const texto = m.text()
+      if (RETAR_RUIDO_CONOCIDO.some((r) => r.test(texto))) { conocido.push(texto); return }
+      consola.push(`${m.type()}: ${texto}`)
+    })
+
+    const conocido = []
+    const c = { vp: `${vp.w}x${vp.h}`, note: vp.note }
+
+    // ── Estado base ────────────────────────────────────────────────────────
+    // Se entra SIEMPRE con el almacenamiento limpio: la memoria de la pantalla
+    // preselecciona jugadores y apuesta, y una corrida que heredara la memoria
+    // de la anterior mediría una cascada ya resuelta.
+    await page.goto(BASE)
+    await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+    await page.evaluate(() => { try { window.localStorage.removeItem('ajilei.retoConfig'); window.localStorage.removeItem('ajilei.nivel') } catch { /* denegado */ } })
+    await page.goto(BASE)
+    await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+    await page.click('[data-accion="jugar-ia"]')
+    await page.waitForSelector('[data-accion="reto"]')
+    await page.waitForTimeout(200)
+
+    // retar.1 · las cuatro filas, con sus chips y su estado inicial
+    const filas = await page.evaluate(() => {
+      const cuenta = (a) => [...document.querySelectorAll(`[data-accion="${a}"]`)]
+      const vivos = (a) => cuenta(a).filter((b) => !b.disabled).length
+      return {
+        reto: cuenta('reto').length, jugadores: cuenta('jugadores').length,
+        apuesta: cuenta('apuesta').length, entrada: cuenta('entrada').length,
+        retoVivos: vivos('reto'), jugVivos: vivos('jugadores'),
+        apuVivos: vivos('apuesta'), entVivos: vivos('entrada'),
+        titulo: document.querySelector('.sal-cab h1')?.textContent?.trim() ?? '',
+      }
+    })
+    c['retar.1'] = {
+      ...filas,
+      // Tres retos, cuatro tamaños de mesa, cuatro mesas, cuatro entradas. Las
+      // dos de abajo NACEN APAGADAS porque nadie ha elegido mesa todavía.
+      ok: filas.reto === 3 && filas.jugadores === 4 && filas.apuesta === 4 && filas.entrada === 4
+        && filas.retoVivos === 3 && filas.jugVivos === 4
+        && filas.apuVivos === 0 && filas.entVivos === 0,
+    }
+
+    // retar.2 · la cascada, en los dos sentidos
+    const casc = { }
+    await page.click('[data-accion="jugadores"]:nth-of-type(3)')   // mesa de 4
+    await page.waitForTimeout(120)
+    casc.trasJugadores = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-accion="apuesta"]')].filter((b) => !b.disabled).length)
+    await page.click('[data-accion="apuesta"]:nth-of-type(1)')
+    await page.waitForTimeout(120)
+    casc.trasApuesta = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-accion="entrada"]')].filter((b) => !b.disabled).length)
+    // Y ahora hacia atrás. E-6 (sellada por Victor): cambiar el reto limpia lo
+    // que DEPENDE de él —la apuesta elegida y la entrada— y CONSERVA el tamaño de
+    // mesa, que no depende. Así que la fila de jugadores sigue con su chip
+    // marcado, la de apuesta sigue VIVA pero sin elegir —sus dos filas de arriba
+    // están decididas— y la de entrada vuelve a apagarse, porque la suya no.
+    await page.click('[data-accion="reto"]:nth-of-type(3)')        // Pro
+    await page.waitForTimeout(120)
+    casc.trasCambiarReto = await page.evaluate(() => ({
+      jug: [...document.querySelectorAll('[data-accion="jugadores"][aria-pressed="true"]')].length,
+      jugEtiqueta: document.querySelector('[data-accion="jugadores"][aria-pressed="true"]')?.textContent?.trim() ?? '',
+      apuPress: [...document.querySelectorAll('[data-accion="apuesta"][aria-pressed="true"]')].length,
+      apuVivos: [...document.querySelectorAll('[data-accion="apuesta"]')].filter((b) => !b.disabled).length,
+      entVivos: [...document.querySelectorAll('[data-accion="entrada"]')].filter((b) => !b.disabled).length,
+    }))
+    c['retar.2'] = {
+      ...casc,
+      ok: casc.trasJugadores === 4 && casc.trasApuesta > 0
+        && casc.trasCambiarReto.jug === 1 && casc.trasCambiarReto.jugEtiqueta === '4'
+        && casc.trasCambiarReto.apuPress === 0 && casc.trasCambiarReto.apuVivos > 0
+        && casc.trasCambiarReto.entVivos === 0,
+    }
+
+    // retar.3 · el CTA: apagado hasta las cuatro, y entonces nombra las cifras
+    const apagado = await page.evaluate(() => ({
+      disabled: document.querySelector('[data-accion="cta"]')?.disabled ?? null,
+      nota: document.querySelector('[data-accion="cta-nota"]')?.textContent?.trim() ?? '',
+    }))
+    await page.click('[data-accion="jugadores"]:nth-of-type(4)')   // mesa de 5
+    await page.click('[data-accion="apuesta"]:nth-of-type(1)')     // Pro · 200
+    await page.waitForTimeout(120)
+    await page.click('[data-accion="entrada"]:nth-of-type(2)')     // Medio · 20×
+    await page.waitForTimeout(150)
+    const encendido = await page.evaluate(() => ({
+      disabled: document.querySelector('[data-accion="cta"]')?.disabled ?? null,
+      texto: document.querySelector('[data-accion="cta"]')?.textContent?.trim() ?? '',
+      pila: document.querySelector('[data-accion="aviso-pila"]')?.textContent?.trim() ?? '',
+    }))
+    c['retar.3'] = {
+      apagado, encendido,
+      // 1f-A4 · 4 IAS · mesa 200 · entrada 4.000 (20 × 200, el medio nuevo) ·
+      // pila de cada IA 6.000 (round(4.000 × 1,5), bajo el techo de 10.000).
+      // Eran 3.000 y 4.500 con el medio de 15×. Las cifras se comprueban porque
+      // son el contrato de APU-1, no adorno del rótulo.
+      ok: apagado.disabled === true && apagado.nota.length > 0
+        && encendido.disabled === false
+        && encendido.texto.includes('4 IAS') && encendido.texto.includes('200')
+        && encendido.texto.includes('4.000')
+        && encendido.pila.includes('6.000'),
+    }
+
+    c.shotBase = `${RETAR_OUT_DIR}/retar_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shotBase })
+
+    // retar.5 · el contador de «Otra…»
+    // Se mide ANTES del estado en gris porque comparte la mesa de 200: el piso
+    // es 2.000 desde 1f-A4 (era 1.000), y el tope el techo de la mesa (10.000)
+    // topado por el saldo (5.000).
+    await page.click('[data-accion="entrada"]:nth-of-type(4)')     // Otra…
+    await page.waitForTimeout(150)
+    const abre = await page.evaluate(() => document.querySelector('[data-accion="entrada-monto"]')?.textContent?.trim() ?? '')
+    await page.click('[data-accion="entrada-mas"]')
+    await page.click('[data-accion="entrada-mas"]')
+    await page.waitForTimeout(150)
+    const subido = await page.evaluate(() => document.querySelector('[data-accion="entrada-monto"]')?.textContent?.trim() ?? '')
+    // Al piso no se baja, y la prueba de que no se baja es que el botón se
+    // APAGA al llegar: pedirle a Playwright un tercer clic sobre un `disabled`
+    // no mediría el tope, mediría su paciencia (y agota los 30 s de espera).
+    await page.click('[data-accion="entrada-menos"]')
+    await page.click('[data-accion="entrada-menos"]')
+    await page.waitForTimeout(150)
+    const suelo = await page.evaluate(() => ({
+      monto: document.querySelector('[data-accion="entrada-monto"]')?.textContent?.trim() ?? '',
+      menosApagado: document.querySelector('[data-accion="entrada-menos"]')?.disabled ?? null,
+    }))
+    c.shotContador = `${RETAR_OUT_DIR}/retar_contador_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shotContador })
+    // Con el contador ABIERTO se vuelve a medir la columna: es el estado que
+    // §E-8 encontró roto, y el que la reserva de caja arregló.
+    const geoContador = await medirGeoRetar(page)
+    c['retar.5'] = {
+      abre, subido, suelo, geoContador,
+      ok: abre === '2.000' && subido === '2.400'
+        && suelo.monto === '2.000' && suelo.menosApagado === true
+        && !geoContador.desbordaH
+        && (geoContador.apaisado
+          ? geoContador.ctaAlcanzable
+          : (geoContador.ctaDentroSinTocar && !geoContador.desbordaDoc)),
+    }
+
+    // retar.4 · el gris por saldo, con la siembra de `?apu`
+    await page.goto(`${BASE}/?apu=saldo:${RETAR_SALDO_GRIS}`)
+    await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+    await page.click('[data-accion="jugar-ia"]')
+    await page.waitForSelector('[data-accion="reto"]')
+    await page.click('[data-accion="reto"]:nth-of-type(3)')        // Pro
+    await page.click('[data-accion="jugadores"]:nth-of-type(1)')   // mesa de 2
+    await page.waitForTimeout(180)
+    const gris = await page.evaluate(() => ({
+      apagadas: [...document.querySelectorAll('[data-accion="apuesta"]')].filter((b) => b.disabled).length,
+      aviso: document.querySelector('[data-accion="aviso-mesa"]')?.textContent?.trim() ?? '',
+      avisoOn: document.querySelector('[data-accion="aviso-mesa"]')?.classList.contains('is-on') ?? false,
+      saldo: document.querySelector('.lob-pildora')?.textContent?.trim() ?? '',
+    }))
+    c.shotGris = `${RETAR_OUT_DIR}/retar_gris_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shotGris })
+    c['retar.4'] = {
+      ...gris,
+      // 1f-A4 · Pro pide 2.000 · 4.000 · 6.000 · 10.000 de piso. Con 2.400
+      // sobrevive SÓLO la primera y el aviso nombra la MÁS BARATA de las
+      // apagadas (4.000), que es la que el jugador está más cerca de alcanzar.
+      ok: gris.apagadas === 3 && gris.avisoOn && gris.aviso.includes('4.000')
+        && !gris.aviso.includes('⟦') && gris.saldo.includes('2.400'),
+    }
+
+    // retar.6 · geometría y silencio
+    const geo = await medirGeoRetar(page)
+    c['retar.6'] = {
+      ...geo,
+      // El piso táctil de la campaña son 40px (no WCAG). Nada desborda a lo
+      // ANCHO en ningún traje; a lo alto, el apaisado bajo desplaza por diseño y
+      // el resto tiene que caber — que es lo que la columna de cuatro filas pone
+      // en riesgo, y la razón del `row-gap` propio de `.es-retar`.
+      ok: !geo.desbordaH && geo.chipMin >= 40 && geo.rotos === 0
+        && (geo.apaisado
+          ? geo.ctaAlcanzable
+          : (geo.ctaDentroSinTocar && !geo.desbordaDoc)),
+    }
+
+    c.consola = consola
+    // Lo conocido se INFORMA, no se esconde: sigue en el JSON con su cuenta, y
+    // el día que una de las dos causas se arregle, la cifra baja a cero sola.
+    c.consolaConocida = conocido.length
+    c.ok = RETAR_PUNTOS.every((k) => c[k].ok) && consola.length === 0
+    celdas.push(c)
+    await page.close()
+  }
+
+  const ok = celdas.every((c) => c.ok)
+  console.log(`\n── retar · «Retar a las IAS» ── ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas`)
+  for (const c of celdas) {
+    const fallos = RETAR_PUNTOS.filter((k) => !c[k].ok)
+    console.log(`  ${c.ok ? 'OK  ' : 'FALLA'} ${c.vp} (${c.note})${fallos.length ? ' · ' + fallos.join(', ') : ''}${c.consola.length ? ' · consola: ' + c.consola[0] : ''}`)
+  }
+  return { celdas, ok }
+}
+
+// ══ APU-1 1e-ii · MODO `apu` · LA MESA CON DINERO DE VERDAD ═══════════════
+//
+// Rector 1e §3.7. Mide lo que 1e-ii estrena y que ninguna prueba de Vitest puede
+// ver, porque vive dentro de `GameTable.jsx` y este proyecto no tiene jsdom:
+// el botón All-in, la marca del asiento, el panel de recarga con su gate, el
+// enrutado de §4.3 y la frase de las capas.
+//
+// ── LOS ESTADOS NO SE JUEGAN, SE SIEMBRAN ────────────────────────────────
+// Llegar a mano a una mesa con un all-in cuesta minutos, no es determinista y da
+// una regresión visual irrepetible — la misma razón por la que existe
+// `siembraCEL`. `?apu=<molde>` siembra PILAS y deja que el motor haga el resto
+// por su propia regla: quien se sienta con la apuesta justa la pone entera en el
+// ante y `startHand` lo marca `allIn` él solo. Lo que se fotografía es la mesa
+// de verdad, montada por el camino de verdad.
+const APU_OUT_DIR = 'capturas-apu'
+const APU_PUNTOS = ['apu.1', 'apu.2', 'apu.7', 'apu.3', 'apu.4', 'apu.5', 'apu.6']
+
+// ── APU-1 1f §A.1 · LOS VIEWPORTS DE `apu` ─────────────────────────────────
+// 1e midió este modo SÓLO en escritorio: las veinte capturas y los 69,56 px de
+// la marca ALL-IN contra un hueco de 151 salieron de ahí. Victor juega en un
+// teléfono, y `.opp-status` en 360 de ancho no es el hueco de un 1024 — medir
+// uno y sellar el otro es la avería de NIV-UI otra vez.
+//
+// Se añaden los TRES de móvil de la familia de `lob` / `retar` / `diagSAL`
+// (portrait y las dos apaisadas) a los cuatro de escritorio que `apu` ya cubría.
+// Son SIETE y no diez porque tres de los seis de aquella familia son de
+// escritorio y ya estaban: comparar contra otra lista haría incomparables las
+// capturas de las cuatro pantallas.
+//
+// `movil` no es una etiqueta: enciende `hasTouch`/`isMobile`, que es lo que hace
+// existir la media query táctil de `gameTable.css` y con ella el piso de 40 px.
+// Sin eso se mediría un escritorio estrecho, no un teléfono.
+const APU_VIEWPORTS = [
+  { w: 360, h: 640, movil: true,  nota: 'móvil portrait' },
+  { w: 640, h: 360, movil: true,  nota: 'móvil landscape' },
+  { w: 844, h: 390, movil: true,  nota: 'móvil landscape' },
+  ...VIEWPORTS.map((v) => ({ ...v, movil: false, nota: 'escritorio' })),
+]
+
+// Las capturas de teléfono van a su propio cajón. Las de escritorio son la línea
+// base de 1e y no se pisan.
+const APU_TEL_DIR = `${APU_OUT_DIR}/tel`
+
+// El mismo ruido de fondo que `retar` nombró uno a uno: el aviso `inert` de
+// React en el primer render y el 401 de `mi_sala` bajo `VITE_AUTH_BYPASS`.
+// Ninguno es de APU-1. Se filtran por NOMBRE y se cuentan aparte.
+const APU_RUIDO_CONOCIDO = RETAR_RUIDO_CONOCIDO
+
+// Espera activa a que la mesa llegue a un estado. Las manos duran segundos —hay
+// IAS pensando con el compás nuevo, que además YA NO ES FIJO— y un
+// `waitForTimeout` calculado a ojo sería o lento o frágil.
+async function esperarMesa(page, cond, limite = 25000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < limite) {
+    if (await page.evaluate(cond)) return true
+    await page.waitForTimeout(200)
+  }
+  return false
+}
+
+// Juega manos pulsando lo que haya, hasta que se cumpla `cond` o se agoten. No
+// decide nada de estrategia: si el humano tiene fila, iguala o pasa. La recarga
+// NO se pulsa aquí — su punto la mide aparte, y tocarla de paso cambiaría el
+// estado que ese punto va a fotografiar.
+//
+// `agresivo` hace que el humano APUESTE cuando puede, en vez de pasar. No es un
+// capricho: el pozo sólo se parte en capas cuando alguien pone por encima del
+// nivel del asiento en all-in, y el ante no sirve —todos pagan el mismo—. Dejar
+// eso al criterio de las IAS hacía que `apu.5` dependiera de la suerte: pasó en
+// las cuatro celdas de una corrida y falló en una de la siguiente, sin que nada
+// cambiara. Con el humano apostando, la segunda capa es SEGURA en cuanto pone
+// una ficha de más, y el punto deja de ser una moneda al aire.
+async function jugarHasta(page, cond, manos = 6, agresivo = false) {
+  for (let i = 0; i < manos * 40; i++) {
+    if (await page.evaluate(cond)) return true
+    const hecho = await page.evaluate((agresivo) => {
+      const pulsa = (sel) => {
+        const b = document.querySelector(sel)
+        if (b && !b.disabled) { b.click(); return true }
+        return false
+      }
+      const porTexto = (t) => {
+        const b = [...document.querySelectorAll('.btn')].find(x => x.textContent.trim().startsWith(t) && !x.disabled)
+        if (b) { b.click(); return true }
+        return false
+      }
+      if (document.querySelector('[data-accion="recarga"]')) return false
+      if (agresivo && (pulsa('[data-accion="apostar"]') || pulsa('[data-accion="subir"]'))) return true
+      return porTexto('Iniciar mano') || porTexto('Siguiente mano')
+        || pulsa('[data-accion="igualar"]') || pulsa('[data-accion="pasar"]')
+        || porTexto('Descartar') || porTexto('Sin descartar')
+    }, agresivo)
+    await page.waitForTimeout(hecho ? 320 : 240)
+    // Se vuelve a mirar AQUÍ, y no sólo al principio del giro. Los estados que
+    // este modo caza —el pozo partido, por ejemplo— viven en el PAGO, y el pago
+    // dura lo que tarde el bucle en pulsar «Siguiente mano»: mirando una sola vez
+    // por vuelta se pasaba de largo la mitad de las veces.
+    if (await page.evaluate(cond)) return true
+  }
+  return page.evaluate(cond)
+}
+
+// Algunos moldes duran UNA mano y dependen de que alguien apueste. `allinHumano`
+// es el caso: el humano se sienta con media apuesta de sobra sobre el ante, así
+// que si esa mano pasa sin una sola apuesta se queda sin fichas para la
+// siguiente y el estado no vuelve a existir. No es un defecto del molde —es
+// aritmética: para que una apuesta no se pueda cubrir hace falta tener menos de
+// una apuesta, y con menos de una apuesta no se paga el ante siguiente—. Se
+// reintenta la mesa entera, que es barato y determinista de leer.
+async function conReintento(page, prepara, cond, intentos = 4) {
+  for (let i = 0; i < intentos; i++) {
+    await prepara()
+    if (await jugarHasta(page, cond, 2)) return { logrado: true, intentos: i + 1 }
+  }
+  return { logrado: false, intentos }
+}
+
+// El pago, reconocido por lo que ofrece y no por una fase que el DOM no publica.
+const APU_EN_PAGO = () => !!document.querySelector('[data-accion="recargar"]')
+  || !!document.querySelector('[data-accion="recarga"]')
+  || [...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano')
+
+// ══ APU-1 1f §A.2 · LAS MEDIDAS QUE SÓLO EXISTEN EN UN TELÉFONO ═══════════
+//
+// Los siete puntos de `apu` corren en los siete viewports sin cambiar. Lo que
+// sigue son medidas AÑADIDAS, y sólo en portrait: son las cuatro cosas que la
+// ficha nombra, y las cuatro dependen de un ancho que el escritorio nunca tiene.
+
+// ── La marca ALL-IN, medida contra SU hueco ───────────────────────────────
+// El hueco no es el mismo en las cuatro mesas: 5/4/3 pintan el rival por
+// `OpponentPanel` y el rótulo vive en `.opp-status` dentro de `.opp-panel`; la
+// mesa de 2 EN VERTICAL lo pinta por la vía legacy `.ai-zone`, donde el mismo
+// `.opp-status` cuelga de otra caja. Se mide el texto con un `Range` —el ancho
+// del RÓTULO, no el de su caja— contra el ancho útil de las dos, y se dice por
+// cuál de las dos vías salió: una medida que no diga contra qué hueco se tomó no
+// es comparable con la siguiente.
+async function medirMarcaAllIn(page) {
+  return page.evaluate(() => {
+    const red = (x) => Math.round(x * 100) / 100
+    const st = [...document.querySelectorAll('.opp-status')].find((e) => e.textContent.trim() === 'ALL-IN')
+    if (!st) return { hay: false, marcados: Number(document.querySelector('.game-table')?.dataset.allin ?? 0) }
+    const r = document.createRange()
+    r.selectNodeContents(st)
+    const zona = st.closest('.ai-zone')
+    const panel = st.closest('.opp-panel')
+    return {
+      hay: true,
+      via: zona ? '.ai-zone' : (panel ? '.opp-panel' : '?'),
+      texto: st.textContent.trim(),
+      anchoTexto: red(r.getBoundingClientRect().width),
+      hueco: red(st.clientWidth),
+      huecoZona: zona ? red(zona.clientWidth) : (panel ? red(panel.clientWidth) : null),
+      lineas: r.getClientRects().length,
+      recorta: st.scrollWidth > st.clientWidth + 1,
+      color: getComputedStyle(st).color,
+      marcados: Number(document.querySelector('.game-table')?.dataset.allin ?? 0),
+    }
+  })
+}
+
+// Las cuatro mesas, una por una, con el molde `allinIA`: una IA se sienta con la
+// apuesta justa, el ante la deja en cero y `startHand` la marca ella sola. No se
+// fabrica el estado, se alimenta — la misma disciplina que el resto del modo.
+async function marcaPorMesa(page, dir, tag) {
+  const filas = []
+  for (const n of [5, 4, 3, 2]) {
+    await page.goto(`${BASE}/?apu=allinIA`)
+    await recorrerRuta(page, n, 'basico', 0, 'medio')
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('.btn')].find((x) => x.textContent.trim() === 'Iniciar mano')
+      if (b) b.click()
+    })
+    // La ranura va en blanco durante barajado y reparto (`resetting`, C4.3.1):
+    // medir ahí daría «no hay marca» siendo mentira.
+    await esperarMesa(page, () => document.querySelector('.game-table')?.dataset.allin !== '0')
+    const llego = await esperarMesa(page, () => [...document.querySelectorAll('.opp-status')]
+      .some((e) => e.textContent.trim() === 'ALL-IN'), 20000)
+    await page.mouse.move(5, 5)
+    const m = await medirMarcaAllIn(page)
+    if (m.hay) await page.screenshot({ path: `${dir}/apu_allin_m${n}_${tag}.png` })
+    filas.push({
+      mesa: n, llego, ...m,
+      // Una línea, sin recorte, y el rótulo más estrecho que su hueco. Es la
+      // misma puerta que 1e aplicó en escritorio, con el hueco de cada mesa.
+      ok: !!m.hay && m.lineas === 1 && !m.recorta && m.anchoTexto < m.hueco,
+    })
+  }
+  return filas
+}
+
+// ── El monto de cuatro cifras, CONSTRUIDO ─────────────────────────────────
+// El botón dice la pila entera, y la que el molde `allinHumano` deja son media
+// apuesta: tres cifras en la mesa más cara que Básico ofrece. Las cuatro cifras
+// existen de sobra en el producto —Pro a 1.000 con entrada de techo sienta al
+// jugador con 50.000— pero llegar a ellas jugando no es determinista y haría de
+// este punto una moneda al aire. Receta O2: el peor caso se CONSTRUYE. Se le
+// cambia el rótulo al botón VIVO, en su fila viva, con sus hermanos y su
+// tipografía, se mide, y se le devuelve el suyo. No hay estado inventado: la
+// única diferencia con el producto es el número que el jugador leería.
+async function medirBotonLargo(page, rotulos) {
+  return page.evaluate((rotulos) => {
+    const red = (x) => Math.round(x * 100) / 100
+    const b = document.querySelector('[data-accion="allin"]')
+    if (!b) return { hay: false }
+    const original = b.textContent
+    const fila = b.closest('.action-buttons')
+    const medidas = []
+    for (const rot of rotulos) {
+      b.textContent = rot
+      const rect = b.getBoundingClientRect()
+      const rango = document.createRange()
+      rango.selectNodeContents(b)
+      const hermanos = [...document.querySelectorAll('.action-buttons .btn')].filter((x) => x !== b)
+      medidas.push({
+        rotulo: rot,
+        ancho: red(rect.width),
+        alto: red(rect.height),
+        anchoTexto: red(rango.getBoundingClientRect().width),
+        lineas: rango.getClientRects().length,
+        dentro: rect.left >= -0.5 && rect.right <= innerWidth + 0.5 && rect.bottom <= innerHeight + 0.5,
+        recorta: b.scrollWidth > b.clientWidth + 1,
+        // «Sin ser el raro de su fila» es la regla de 1e y aquí se conserva: el
+        // piso de 40 px no aplica en escritorio y exigirlo sería pedirle al
+        // botón nuevo algo que ninguno de sus hermanos cumple.
+        mismoAlto: hermanos.every((h) => Math.abs(h.getBoundingClientRect().height - rect.height) <= 1),
+        filaDesborda: fila ? fila.scrollWidth > fila.clientWidth + 1 : false,
+      })
+    }
+    b.textContent = original
+    return { hay: true, medidas }
+  }, rotulos)
+}
+
+// ── La pregunta de recarga en un teléfono ─────────────────────────────────
+// En escritorio la tarjeta apoyada abajo sobra de sitio. En 360×640 el tapete
+// mide lo que mide, y lo que hay que comprobar es que la oferta no se coma lo
+// que el jugador está mirando cuando se la hacen: sus cartas y el óvalo. Se mide
+// el ÁREA de solape en píxeles cuadrados, que es lo único que no admite
+// interpretación — «tapa un poco» no es una medida.
+async function medirRecargaTelefono(page) {
+  return page.evaluate(() => {
+    const red = (x) => Math.round(x * 100) / 100
+    const modal = document.querySelector('[data-accion="recarga"] .bankrupt-modal')
+    if (!modal) return { hay: false }
+    const m = modal.getBoundingClientRect()
+    const solape = (el) => {
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      const w = Math.max(0, Math.min(m.right, r.right) - Math.max(m.left, r.left))
+      const h = Math.max(0, Math.min(m.bottom, r.bottom) - Math.max(m.top, r.top))
+      return red(w * h)
+    }
+    const cartas = [...document.querySelectorAll('.player-zone .cards-row .card, .player-zone .cards-row img')]
+    const plazo = document.querySelector('[data-accion="recarga-plazo"]')
+    const rp = plazo ? plazo.getBoundingClientRect() : null
+    const ranura = document.querySelector('.player-bar .action-area')
+    const rr = ranura ? ranura.getBoundingClientRect() : null
+    const zona = document.querySelector('.player-zone')
+    const rz = zona ? zona.getBoundingClientRect() : null
+    return {
+      hay: true,
+      cartas: cartas.length,
+      solapeCartas: red(cartas.reduce((a, c) => a + (solape(c) ?? 0), 0)),
+      // El área de las cartas, para poder decir qué FRACCIÓN se come. «Tapa
+      // 24.591 px²» no dice nada sin saber que las cartas miden 24.591.
+      areaCartas: red(cartas.reduce((a, c) => {
+        const r = c.getBoundingClientRect()
+        return a + r.width * r.height
+      }, 0)),
+      solapeOvalo: solape(document.querySelector('.center-zone')) ?? solape(document.querySelector('.two-ovals')),
+      solapePozo: solape(document.querySelector('.pot-box')),
+      // El contador de 15 s (10 hasta 1f-A4): montado, VISIBLE (la voluntaria
+      // `visibility`, que deja la caja y quita el texto) y dentro de la ventana.
+      plazoVisible: !!plazo && getComputedStyle(plazo).visibility !== 'hidden'
+        && !!rp && rp.width > 0 && rp.top >= 0 && rp.bottom <= innerHeight + 0.5,
+      plazoTexto: plazo ? plazo.textContent.trim() : '',
+      // O1 · la ranura de «Siguiente mano» sigue pintada mientras la pregunta
+      // vive, vacía, para que la barra del jugador no pierda su renglón.
+      ranuraReservada: !!ranura && rr.height > 0,
+      ranuraAlto: rr ? red(rr.height) : null,
+      sinSiguiente: ![...document.querySelectorAll('.btn')].some((b) => b.textContent.trim() === 'Siguiente mano'),
+      zonaJugador: rz ? { top: red(rz.top), alto: red(rz.height) } : null,
+      modal: { top: red(m.top), alto: red(m.height), ancho: red(m.width) },
+      // 1f-A4 · donde estaba `notaVisible` va ahora el subtítulo, que es quien
+      // carga la promesa de §5.3 desde A3. Un segundo renglón aquí es lo que
+      // hacía crecer la tarjeta hasta comerse las cartas (E-29).
+      subTexto: (() => {
+        const e = document.querySelector('[data-accion="recarga-sub"]')
+        return e ? e.textContent.trim() : ''
+      })(),
+      subLineas: (() => {
+        const e = document.querySelector('[data-accion="recarga-sub"]')
+        if (!e) return 0
+        const g = document.createRange(); g.selectNodeContents(e)
+        return g.getClientRects().length
+      })(),
+    }
+  })
+}
+
+// ── Los cinco botones de la tarjeta de recarga, en un teléfono apaisado ───
+// Observación 2 de Victor en la Parte B: en apaisado los botones se le hacían
+// pequeños. 360 px de alto es la ventana donde el traje corto aprieta más, y
+// apretar tiene un suelo: por debajo de 36 px un botón deja de ser tocable. Se
+// miden los cinco —los tres montos y las dos acciones— con el criterio que no
+// admite interpretación: alto de cada caja, separación entre cajas y si algún
+// PAR de rectángulos llega a intersecarse.
+async function medirBotonesRecarga(page) {
+  return page.evaluate(() => {
+    const red = (x) => Math.round(x * 100) / 100
+    const modal = document.querySelector('[data-accion="recarga"] .bankrupt-modal')
+    if (!modal) return { hay: false }
+    const caja = (e) => {
+      const r = e.getBoundingClientRect()
+      return { top: red(r.top), bottom: red(r.bottom), left: red(r.left), right: red(r.right), alto: red(r.height), ancho: red(r.width) }
+    }
+    const montos = [...modal.querySelectorAll('[data-accion="recarga-monto"]')]
+    const acciones = [...modal.querySelectorAll('.bankrupt-actions .btn')]
+    const todos = [...montos, ...acciones]
+    if (!todos.length) return { hay: false }
+    const cajas = todos.map((b) => ({ rotulo: b.textContent.trim(), fs: getComputedStyle(b).fontSize, ...caja(b) }))
+    // El solape entre DOS botones: si el área es > 0 se están pisando.
+    let solapeBotones = 0
+    let paresQueSePisan = []
+    for (let i = 0; i < cajas.length; i++) {
+      for (let j = i + 1; j < cajas.length; j++) {
+        const a = cajas[i], b = cajas[j]
+        const w = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
+        const h = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
+        if (w * h > 0) { solapeBotones += w * h; paresQueSePisan.push([a.rotulo, b.rotulo]) }
+      }
+    }
+    // Separación horizontal dentro de cada fila, y vertical entre las dos filas.
+    //
+    // 1f-A5 · AGRUPA POR RENGLÓN ANTES DE RESTAR. La versión de A4 ordenaba
+    // todos los botones por `left` y restaba consecutivos, que vale mientras la
+    // fila sea UNA fila. La forzosa pone sus dos acciones en columna —las dos a
+    // todo el ancho, mismo `left` y mismo `right`— y la resta daba −321 px: un
+    // rojo que no era un rojo. Se agrupa por `top` con una tolerancia de medio
+    // píxel, porque las cajas caen en posiciones fraccionarias (E-32).
+    const renglones = (fila) => {
+      const out = []
+      for (const b of [...fila].sort((x, y) => x.top - y.top || x.left - y.left)) {
+        const ult = out[out.length - 1]
+        if (ult && Math.abs(ult[0].top - b.top) <= 0.5) ult.push(b)
+        else out.push([b])
+      }
+      return out
+    }
+    const sepFila = (fila) => {
+      const gs = []
+      for (const ren of renglones(fila)) {
+        const orden = [...ren].sort((a, b) => a.left - b.left)
+        for (let i = 1; i < orden.length; i++) gs.push(red(orden[i].left - orden[i - 1].right))
+      }
+      return gs
+    }
+    const cm = cajas.slice(0, montos.length)
+    const ca = cajas.slice(montos.length)
+    const sepMontos = sepFila(cm)
+    const sepAcciones = sepFila(ca)
+    // 1f-A5 · la separación entre FILAS, que es la que faltaba. `.bankrupt-actions`
+    // es columna en la forzosa y fila en la blanda, así que se mide igual en las
+    // dos: por los `top` distintos que haya, no por la dirección declarada.
+    const sepEntreRenglones = (fila) => {
+      const rs = renglones(fila)
+      const out = []
+      for (let i = 1; i < rs.length; i++) {
+        out.push(red(Math.min(...rs[i].map((x) => x.top)) - Math.max(...rs[i - 1].map((x) => x.bottom))))
+      }
+      return out
+    }
+    const sepMontosV = sepEntreRenglones(cm)
+    const sepAccionesV = sepEntreRenglones(ca)
+    const sepEntreFilas = (cm.length && ca.length)
+      ? red(Math.min(...ca.map((x) => x.top)) - Math.max(...cm.map((x) => x.bottom)))
+      : null
+    const dentroVentana = (r) => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight
+    const sub = document.querySelector('[data-accion="recarga-sub"]')
+    const plazo = document.querySelector('[data-accion="recarga-plazo"]')
+    // 1f-A5 · el cronómetro como PIE de la tarjeta: separado de los botones y,
+    // en la blanda, alineado a la izquierda con el mismo margen interior que el
+    // subtítulo. «El mismo margen» se comprueba comparando bordes, no reglas.
+    const sepAccionesPlazo = plazo
+      ? red(plazo.getBoundingClientRect().top - Math.max(...ca.map((x) => x.bottom)))
+      : null
+    // Lo que la tarjeta le quita a la mano del jugador. Victor aceptó que en
+    // apaisado tape; se mide para saber CUÁNTO, no para exigir cero.
+    const m = modal.getBoundingClientRect()
+    const cartas = [...document.querySelectorAll('.player-zone .cards-row .card, .player-zone .cards-row img')]
+    const areaDe = (r) => {
+      const w = Math.max(0, Math.min(m.right, r.right) - Math.max(m.left, r.left))
+      const h = Math.max(0, Math.min(m.bottom, r.bottom) - Math.max(m.top, r.top))
+      return w * h
+    }
+    const solapeCartas = red(cartas.reduce((t, c) => t + areaDe(c.getBoundingClientRect()), 0))
+    const areaCartas = red(cartas.reduce((t, c) => { const r = c.getBoundingClientRect(); return t + r.width * r.height }, 0))
+    return {
+      hay: true,
+      botones: cajas,
+      altoMin: red(Math.min(...cajas.map((c) => c.alto))),
+      altoMax: red(Math.max(...cajas.map((c) => c.alto))),
+      sepMontos, sepAcciones, sepEntreFilas,
+      sepMontosV, sepAccionesV, sepAccionesPlazo,
+      // Dentro de una fila y entre los renglones de una misma fila: todo lo que
+      // separa un botón de otro botón.
+      sepBotones: red(Math.min(...[...sepMontos, ...sepAcciones, ...sepMontosV, ...sepAccionesV,
+                                   ...(sepEntreFilas === null ? [] : [sepEntreFilas])])),
+      sepMin: red(Math.min(...[...sepMontos, ...sepAcciones, ...(sepEntreFilas === null ? [] : [sepEntreFilas])])),
+      fuentes: cajas.map((c) => ({ rotulo: c.rotulo, fs: c.fs })),
+      plazoAlign: plazo ? getComputedStyle(plazo).textAlign : null,
+      plazoLeft: plazo ? red(plazo.getBoundingClientRect().left) : null,
+      subLeft: sub ? red(sub.getBoundingClientRect().left) : null,
+      motivo: document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? '?',
+      filasMontos: renglones(cm).length,
+      filasAcciones: renglones(ca).length,
+      solapeBotones: red(solapeBotones),
+      paresQueSePisan,
+      subVisible: !!sub && getComputedStyle(sub).visibility !== 'hidden' && dentroVentana(sub.getBoundingClientRect()),
+      plazoVisible: !!plazo && getComputedStyle(plazo).visibility !== 'hidden' && dentroVentana(plazo.getBoundingClientRect()),
+      plazoTexto: plazo ? plazo.textContent.trim() : '',
+      modal: { top: red(m.top), alto: red(m.height), ancho: red(m.width) },
+      cartas: cartas.length,
+      solapeCartas, areaCartas,
+      dentro: dentroVentana(m),
+    }
+  })
+}
+
+// ── La línea del humano en all-in ─────────────────────────────────────────
+// «Ocupa el mismo hueco que el pensando al que releva: ni una caja más», dice el
+// JSX. En 360 de ancho eso deja de ser gratis: son cuarenta caracteres en la
+// ranura donde cabían dieciocho. Se mide el renglón y se compara contra el alto
+// del pensando medido en la MISMA ventana — que es lo que la promesa dice.
+async function medirLineaAllinHumano(page) {
+  return page.evaluate(() => {
+    const red = (x) => Math.round(x * 100) / 100
+    const l = document.querySelector('[data-accion="allin-humano"]')
+    if (!l) return { hay: false }
+    const r = document.createRange()
+    r.selectNodeContents(l)
+    const caja = l.getBoundingClientRect()
+    return {
+      hay: true,
+      texto: l.textContent.trim(),
+      anchoTexto: red(r.getBoundingClientRect().width),
+      hueco: red(l.clientWidth),
+      lineas: r.getClientRects().length,
+      alto: red(caja.height),
+      recorta: l.scrollWidth > l.clientWidth + 1,
+      dentro: caja.left >= -0.5 && caja.right <= innerWidth + 0.5 && caja.bottom <= innerHeight + 0.5,
+    }
+  })
+}
+
+// El alto de la ranura del «pensando», tomado en la misma ventana y sin molde:
+// «Barajando…» sale sola al iniciar la mano y usa exactamente la misma caja
+// (`action-area thinking`). Es la vara contra la que se mide la línea de arriba.
+async function altoDelPensando(page) {
+  await page.goto(`${BASE}/`)
+  await recorrerRuta(page, 3, 'basico', 0, 'medio')
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.btn')].find((x) => x.textContent.trim() === 'Iniciar mano')
+    if (b) b.click()
+  })
+  const hubo = await esperarMesa(page, () => !!document.querySelector('.action-area.thinking'), 20000)
+  if (!hubo) return { hay: false }
+  return page.evaluate(() => {
+    const t = document.querySelector('.action-area.thinking')
+    const r = t.getBoundingClientRect()
+    return {
+      hay: true,
+      texto: t.textContent.trim(),
+      alto: Math.round(r.height * 100) / 100,
+      hueco: Math.round(t.clientWidth * 100) / 100,
+    }
+  })
+}
+
+// ── La pregunta SUAVE, que es la única que promete no tapar ────────────────
+// §3b de `apu.css` parte la pregunta en dos láminas y sólo una hace la promesa:
+// la FORZOSA bloquea a propósito —releva al modal de bancarrota y detrás no hay
+// nada que valga la pena mirar—, y medirle el solape sería un rojo que no
+// significa nada. La automática y la voluntaria son las que se apoyan sin velo
+// «con la mesa viva y consultable detrás». Así que primero se consigue una de
+// esas dos, y sólo entonces se mide.
+// Y dentro de las dos suaves se busca la AUTOMÁTICA, que es la que trae el
+// contador de diez segundos y la que sale SOLA encima del resultado que el
+// jugador está mirando: la voluntaria la pide él, con la mano ya cerrada y
+// sabiendo lo que va a salir. Si tras los intentos sólo aparece la voluntaria se
+// mide ésa y se dice cuál fue — una medida con la etiqueta cambiada es peor que
+// ninguna.
+async function recargaSuave(page, intentos = 5) {
+  let caida = null
+  for (let i = 0; i < intentos; i++) {
+    await page.goto(`${BASE}/?apu=recarga`)
+    await recorrerRuta(page, 3, 'basico', 0, 'medio')
+    await jugarHasta(page, APU_EN_PAGO, 5)
+    await page.waitForTimeout(400)
+    let motivo = await page.evaluate(() =>
+      document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? null)
+    if (motivo === 'automatica') return { motivo, intentos: i + 1 }
+    if (motivo === 'forzosa') continue
+    if (!motivo) {
+      // No saltó sola: se pide la voluntaria, que abre el MISMO panel.
+      await page.evaluate(() => {
+        const b = document.querySelector('[data-accion="recargar"]')
+        if (b) b.click()
+      })
+      await page.waitForTimeout(400)
+      motivo = await page.evaluate(() =>
+        document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? null)
+    }
+    if (motivo && motivo !== 'forzosa' && !caida) caida = motivo
+    if (motivo && motivo !== 'forzosa' && i === intentos - 1) return { motivo, intentos: i + 1 }
+  }
+  return { motivo: caida, intentos, soloVoluntaria: !!caida }
+}
+
+// ── La recarga FORZOSA, que hay que ir a buscar ───────────────────────────
+// 1f-A5 · La forzosa (§5.4) es la única lámina de la recarga que no se había
+// vuelto a medir desde 1e-ii, y es la que decide si el jugador se levanta de la
+// mesa. No sale sola: hay que dejar que la pila se agote, o sea declinar las
+// blandas una tras otra hasta que el humano no cubra el ante. En la forzosa
+// declinar es IRSE, así que en cuanto aparece se mide y no se toca.
+async function recargaForzosa(page, intentos = 6) {
+  for (let i = 0; i < intentos; i++) {
+    await page.goto(`${BASE}/?apu=recarga`)
+    await recorrerRuta(page, 3, 'basico', 0, 'medio')
+    for (let paso = 0; paso < 400; paso++) {
+      const motivo = await page.evaluate(() =>
+        document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? null)
+      if (motivo === 'forzosa') return { motivo, intentos: i + 1, pasos: paso }
+      if (motivo) {
+        await page.evaluate(() => document.querySelector('[data-accion="recarga-no"]')?.click())
+        await page.waitForTimeout(260)
+        continue
+      }
+      await page.evaluate(() => {
+        const p = (sel) => { const x = document.querySelector(sel); if (x && !x.disabled) { x.click(); return true } return false }
+        const t = (q) => { const x = [...document.querySelectorAll('.btn')].find((y) => y.textContent.trim().startsWith(q) && !y.disabled); if (x) { x.click(); return true } return false }
+        t('Siguiente mano') || t('Iniciar mano') || p('[data-accion="igualar"]') || p('[data-accion="pasar"]') || t('Descartar') || t('Sin descartar')
+      })
+      await page.waitForTimeout(200)
+    }
+  }
+  return { motivo: null, intentos }
+}
+
+// ── 1f-A5 · Medir la tarjeta QUIETA ───────────────────────────────────────
+// `.bankrupt-modal` entra con `bankruptRise` (0,32 s, de `scale(0.96)` a 1), y
+// `getBoundingClientRect` devuelve la caja TRANSFORMADA. `recargaForzosa` sale
+// en cuanto la lámina aparece, así que la primera medida de A5 cayó en el
+// fotograma cero: todo ×0,96 —«Recargar» a 34,56 en vez de 36, la tarjeta a
+// 345,6 de ancho en una ventana de 360—. Un rojo que no era de la lámina sino
+// del reloj. Se espera a que no quede ninguna animación viva en la tarjeta.
+async function esperarTarjetaQuieta(page, limite = 3000) {
+  return esperarMesa(page, () => {
+    const m = document.querySelector('[data-accion="recarga"] .bankrupt-modal')
+    if (!m) return false
+    return m.getAnimations({ subtree: true }).every((a) => a.playState !== 'running')
+  }, limite)
+}
+
+// La S25 de Victor en vertical, en píxeles CSS. La ficha la pide como FOTO y no
+// como vara: la vara es 360×640, que es la ventana más apretada. Se toma
+// redimensionando la MISMA página —con la tarjeta abierta— para no tener que
+// volver a cazar la forzosa, que cuesta decenas de manos.
+const S25_VERTICAL = { width: 412, height: 915 }
+
+async function fotoS25(page, ruta, vuelta) {
+  await page.setViewportSize(S25_VERTICAL)
+  await page.waitForTimeout(350)
+  await page.mouse.move(5, 5)
+  await page.screenshot({ path: ruta })
+  const m = await medirBotonesRecarga(page)
+  await page.setViewportSize(vuelta)
+  await page.waitForTimeout(350)
+  return m
+}
+
+// ── 1f-A5 · La vara de los botones, que depende de la lámina ──────────────
+// Las dos tarjetas no piden lo mismo, y no es capricho: la blanda vive en la
+// banda que queda bajo las cartas del jugador —todo lo que crece se lo come a
+// la mano— y la forzosa bloquea a propósito y tiene la pantalla entera. Así que
+// la blanda se aprieta al piso táctil y la forzosa se estira.
+const VARA_BOTONES = {
+  blanda:  { altoMin: 36, altoMax: 40, sepBotones: 10, entreFilas: 12, hastaPlazo: 8,  align: 'left' },
+  forzosa: { altoMin: 40, altoMax: 44, sepBotones: 12, entreFilas: 16, hastaPlazo: 14, align: 'center' },
+}
+
+function varaBotones(b, esPortrait) {
+  if (!b?.hay) return { ok: false, motivo: b?.motivo ?? null }
+  const v = VARA_BOTONES[b.motivo === 'forzosa' ? 'forzosa' : 'blanda']
+  const fallos = []
+  if (!(b.altoMin >= v.altoMin && b.altoMax <= v.altoMax)) fallos.push(`alto ${b.altoMin}–${b.altoMax} fuera de ${v.altoMin}–${v.altoMax}`)
+  if (!(b.sepBotones >= v.sepBotones)) fallos.push(`entre botones ${b.sepBotones} < ${v.sepBotones}`)
+  if (!(b.sepEntreFilas >= v.entreFilas)) fallos.push(`entre filas ${b.sepEntreFilas} < ${v.entreFilas}`)
+  if (!(b.sepAccionesPlazo >= v.hastaPlazo)) fallos.push(`hasta el cronómetro ${b.sepAccionesPlazo} < ${v.hastaPlazo}`)
+  if (b.plazoAlign !== v.align) fallos.push(`cronómetro ${b.plazoAlign}, se pide ${v.align}`)
+  // La blanda lo pide de pie a la izquierda CON EL MISMO margen interior que el
+  // subtítulo: se comprueba con los bordes, no con la regla que los produce.
+  if (v.align === 'left' && b.plazoLeft !== b.subLeft) fallos.push(`cronómetro en ${b.plazoLeft}, subtítulo en ${b.subLeft}`)
+  if (b.solapeBotones !== 0) fallos.push(`botones que se pisan: ${b.solapeBotones} px²`)
+  if (!b.plazoVisible || !b.subVisible || !b.dentro) fallos.push('algo fuera de la ventana o escondido')
+  // Y la vara de A2, que sigue mandando en vertical: la blanda no toca la mano.
+  if (esPortrait && b.motivo !== 'forzosa' && b.solapeCartas !== 0) fallos.push(`tapa ${b.solapeCartas} px² de la mano`)
+  return { ok: fallos.length === 0, fallos, lamina: b.motivo === 'forzosa' ? 'forzosa' : 'blanda' }
+}
+
+// ── La línea del humano en all-in, donde de verdad existe ─────────────────
+// En la mesa de DOS no existe nunca, y no es un fallo: cuando el humano empuja
+// su pila, el único rival responde y a partir de ahí queda UN asiento capaz de
+// poner una ficha — `abrirApuesta` no abre esa fase (§4.3), así que no hay
+// ninguna ronda de apuesta en la que el humano esté en all-in. Hace falta una
+// mesa donde queden DOS rivales con fichas, y la de 4 lo garantiza.
+async function lineaAllinEnMesa4(page, dir, tag) {
+  for (let intento = 0; intento < 3; intento++) {
+    await page.goto(`${BASE}/?apu=allinHumano`)
+    await recorrerRuta(page, 4, 'basico', 0, 'medio')
+    // Bucle propio y no `jugarHasta`: aquél se DETIENE en seco ante el panel de
+    // recarga —a propósito, para no cambiarle el estado al punto que lo mide— y
+    // aquí la recarga sale sola cada dos manos, porque el humano se sienta con
+    // media apuesta. Se rechaza la suave (la pila corta es justo lo que hace
+    // falta) y se empieza de nuevo si sale la forzosa, que es una mesa acabada.
+    let forzosa = false
+    for (let i = 0; i < 160 && !forzosa; i++) {
+      const st = await page.evaluate(() => ({
+        boton: !!document.querySelector('[data-accion="allin"]'),
+        motivo: document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? null,
+      }))
+      if (st.motivo === 'forzosa') { forzosa = true; break }
+      if (st.boton) {
+        await page.click('[data-accion="allin"]')
+        const salio = await esperarMesa(page, () => !!document.querySelector('[data-accion="allin-humano"]'), 12000)
+        if (!salio) break
+        await page.mouse.move(5, 5)
+        const m = await medirLineaAllinHumano(page)
+        if (m.hay) {
+          await page.screenshot({ path: `${dir}/apu_lineahumano_${tag}.png` })
+          return { ...m, intentos: intento + 1 }
+        }
+        break
+      }
+      await page.evaluate(() => {
+        const pulsa = (s) => { const b = document.querySelector(s); if (b && !b.disabled) { b.click(); return true } return false }
+        const txt = (t) => {
+          const b = [...document.querySelectorAll('.btn')].find((x) => x.textContent.trim().startsWith(t) && !x.disabled)
+          if (b) { b.click(); return true }
+          return false
+        }
+        if (document.querySelector('[data-accion="recarga"]')) { pulsa('[data-accion="recarga-no"]'); return }
+        txt('Iniciar mano') || txt('Siguiente mano') || pulsa('[data-accion="igualar"]')
+          || pulsa('[data-accion="pasar"]') || txt('Descartar') || txt('Sin descartar')
+      })
+      await page.waitForTimeout(300)
+    }
+  }
+  return { hay: false, intentos: 3 }
+}
+
+async function runApu(browser) {
+  const celdas = []
+  try { mkdirSync(APU_OUT_DIR, { recursive: true }) } catch { /* ya existe */ }
+  try { mkdirSync(APU_TEL_DIR, { recursive: true }) } catch { /* ya existe */ }
+
+  // Filtro de celda, como el de los modos matriciales: `apu 360x640` corre una
+  // sola. El JSON se autoetiqueta con las celdas corridas, así que una corrida
+  // filtrada no se puede confundir con la entera.
+  const vpFilter = process.argv[3] || null
+  for (const vp of APU_VIEWPORTS) {
+    if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
+    // 1f §A.1 · `hasTouch`/`isMobile` sólo en las celdas de teléfono: es lo que
+    // hace existir la media query táctil y el piso de 40 px. Las cuatro de
+    // escritorio se abren exactamente como en 1e, para que sus cifras sigan
+    // siendo comparables con las de entonces.
+    const page = await browser.newPage({
+      viewport: { width: vp.w, height: vp.h },
+      ...(vp.movil ? { hasTouch: true, isMobile: true } : {}),
+    })
+    const consola = []
+    const conocido = []
+    page.on('pageerror', e => consola.push(`pageerror: ${e.message}`))
+    page.on('console', m => {
+      if (m.type() !== 'error' && m.type() !== 'warning') return
+      const texto = m.text()
+      if (APU_RUIDO_CONOCIDO.some((r) => r.test(texto))) { conocido.push(texto); return }
+      consola.push(`${m.type()}: ${texto}`)
+    })
+    const tag = `${vp.w}x${vp.h}`
+    // Las capturas de teléfono a su cajón; las de escritorio donde 1e las dejó.
+    const dir = vp.movil ? APU_TEL_DIR : APU_OUT_DIR
+    const esPortrait = vp.h > vp.w
+    const c = { vp: tag, nota: vp.nota, movil: vp.movil }
+
+    // ── apu.1 · La marca ALL-IN en el asiento (§4.3) ──────────────────────
+    // Mesa de 4 para que la marca salga por la vía `opp-panel`, que es la del
+    // hueco estrecho (151 px, medidos antes de escribir la marca). Una IA se
+    // sienta con la apuesta justa: el ante la deja en cero y el motor la marca.
+    await page.goto(`${BASE}/?apu=allinIA`)
+    await recorrerRuta(page, 4, 'basico', 0, 'medio')
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('.btn')].find(x => x.textContent.trim() === 'Iniciar mano')
+      if (b) b.click()
+    })
+    // El afidávit se enciende con el ANTE, pero la ranura de estado va en blanco
+    // durante el barajado y el reparto —`resetting`, de C4.3.1— para no arrastrar
+    // el rótulo de la mano anterior. Medir ahí daría «no hay marca» siendo
+    // mentira, así que se espera a que la mano asiente y la marca se pinte.
+    await esperarMesa(page, () => document.querySelector('.game-table')?.dataset.allin !== '0')
+    await esperarMesa(page, () => [...document.querySelectorAll('.opp-status')]
+      .some(e => e.textContent.trim() === 'ALL-IN'), 20000)
+    await page.mouse.move(5, 5)
+    const marca = await page.evaluate(() => {
+      const st = [...document.querySelectorAll('.opp-status')].find(e => e.textContent.trim() === 'ALL-IN')
+      if (!st) return { hay: false, marcados: Number(document.querySelector('.game-table')?.dataset.allin ?? 0) }
+      const r = document.createRange()
+      r.selectNodeContents(st)
+      const red = (x) => Math.round(x * 100) / 100
+      return {
+        hay: true,
+        texto: st.textContent.trim(),
+        anchoTexto: red(r.getBoundingClientRect().width),
+        hueco: red(st.clientWidth),
+        lineas: r.getClientRects().length,
+        recorta: st.scrollWidth > st.clientWidth + 1,
+        color: getComputedStyle(st).color,
+        marcados: Number(document.querySelector('.game-table')?.dataset.allin ?? 0),
+      }
+    })
+    await page.screenshot({ path: `${dir}/apu_allin_${tag}.png` })
+    c['apu.1'] = {
+      ...marca,
+      // Cabe en UNA línea y no se recorta. El hueco lo reserva `opponentPanel.css`
+      // desde C4.3.1 y está fuera de flujo: diga lo que diga, no mueve un píxel.
+      ok: !!marca.hay && marca.lineas === 1 && !marca.recorta
+        && marca.anchoTexto < marca.hueco && marca.marcados >= 1,
+    }
+
+    // ── apu.2 · El botón All-in EN EL SITIO de «Igualar» (§3.1, §4.1) ─────
+    // El humano se sienta con 1,5 apuestas: tras el ante le queda media, y media
+    // apuesta no cubre ni el ×1 de nadie. En cuanto una IA abre, su fila trae
+    // All-in y NO trae Igualar — que es la propiedad del núcleo llegando entera
+    // a la pantalla, sin una condición escrita en el JSX.
+    const reintentos = await conReintento(page, async () => {
+      await page.goto(`${BASE}/?apu=allinHumano`)
+      await recorrerRuta(page, 2, 'basico', 0, 'medio')
+    }, () => !!document.querySelector('[data-accion="allin"]'))
+    await page.mouse.move(5, 5)
+    const boton = await page.evaluate(() => {
+      const b = document.querySelector('[data-accion="allin"]')
+      const hermanos = [...document.querySelectorAll('.action-buttons .btn')]
+      const fila = hermanos.map(x => x.dataset.accion ?? '?')
+      if (!b) return { hay: false, fila }
+      const red = (x) => Math.round(x * 100) / 100
+      const r = b.getBoundingClientRect()
+      const otros = hermanos.filter(x => x !== b).map(x => red(x.getBoundingClientRect().height))
+      return {
+        hay: true,
+        texto: b.textContent.trim(),
+        alto: red(r.height),
+        altoHermanos: otros,
+        dentro: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+        hayIgualar: !!document.querySelector('[data-accion="igualar"]'),
+        fila,
+      }
+    })
+    if (boton.hay) await page.screenshot({ path: `${dir}/apu_boton_${tag}.png` })
+    c['apu.2'] = {
+      ...reintentos,
+      ...boton,
+      // EL PISO DE 40 PX NO APLICA AQUÍ, y la primera corrida lo dijo: en
+      // escritorio los botones de la fila miden 37, porque el `min-height: 40px`
+      // de `gameTable.css` vive dentro de la media query táctil. Exigir 40 en un
+      // 1024×768 habría sido pedirle al botón nuevo algo que ninguno de sus
+      // hermanos cumple. Lo que SÍ se exige es que no sea el raro de su fila:
+      // misma altura que los demás, que es la regla de verdad.
+      ok: !!boton.hay && !boton.hayIgualar && boton.dentro
+        && boton.altoHermanos.every(h => Math.abs(h - boton.alto) <= 1)
+        && /^All-in \(\d+\)$/.test(boton.texto),
+    }
+
+    // ── 1f §A.2 · el mismo botón, con el monto de CUATRO CIFRAS ───────────
+    // Sólo en portrait, que es donde la fila va justa. Dos rótulos: el de la
+    // ficha —cuatro cifras— y el techo de verdad que el producto puede emitir,
+    // que son cinco (Pro a 1.000 con entrada de techo sienta al jugador con
+    // 50.000). Si el de cuatro cabe y el de cinco no, eso es una medida útil y
+    // no un rojo: el de cinco es margen, no requisito.
+    if (esPortrait && boton.hay) {
+      c['apu.2'].largo = await medirBotonLargo(page, ['All-in (2250)', 'All-in (50000)'])
+      const cuatro = c['apu.2'].largo.medidas?.[0]
+      c['apu.2'].okCuatroCifras = !!cuatro && cuatro.lineas === 1 && !cuatro.recorta
+        && cuatro.dentro && cuatro.mismoAlto && !cuatro.filaDesborda
+      // La captura tiene que enseñar el rótulo LARGO, no el que el helper
+      // devuelve al salir: se pone, se fotografía y se devuelve el suyo.
+      await page.evaluate(() => {
+        const b = document.querySelector('[data-accion="allin"]')
+        if (b) { window.__rotuloApu = b.textContent; b.textContent = 'All-in (2250)' }
+      })
+      await page.screenshot({ path: `${dir}/apu_boton4_${tag}.png` })
+      await page.evaluate(() => {
+        const b = document.querySelector('[data-accion="allin"]')
+        if (b && window.__rotuloApu) b.textContent = window.__rotuloApu
+      })
+    }
+
+    // ── apu.7 · 1e-iii · UN ALL-IN QUE SÍ SE RESPONDE (E-13) ───────────
+    // El mismo estado de apu.2, un clic más tarde. Es la fotografía de lo que
+    // 1e-iii cambió y lo único de esta tanda que se puede VER: antes, el humano
+    // empujaba su pila y el motor cerraba la ronda en el acto —el rival se
+    // quedaba con la suya sin haber dicho si pagaba—. Ahora la mano sigue hasta
+    // que alguien decide, y el asiento del humano lleva su marca mientras tanto.
+    //
+    // Lo que se exige es lo que se puede leer desde fuera sin adivinar: que el
+    // humano queda MARCADO (`data-allin` lo cuenta), que la mesa no se clava en
+    // ningún instante del camino, y que la mano LLEGA AL PAGO —o sea que el
+    // rival contestó y el reparto ocurrió—. Quién gana cada capa lo sella
+    // Vitest, que es donde el reparto se puede fijar a mano.
+    let alPago = false, allinTrasPulsar = 0, clavadaTrasPulsar = false
+    if (c['apu.2'].ok) {
+      await page.click('[data-accion="allin"]')
+      await esperarMesa(page, () => {
+        const t = document.querySelector('.game-table')
+        return !!t && Number(t.dataset.allin || 0) >= 1
+      }, 8000)
+      const foto = await page.evaluate(() => {
+        const t = document.querySelector('.game-table')
+        return { allin: Number(t?.dataset.allin || 0), clavada: t?.dataset.clavada ?? '?' }
+      })
+      allinTrasPulsar = foto.allin
+      clavadaTrasPulsar = foto.clavada === '1'
+      await page.screenshot({ path: `${dir}/apu_respondido_${tag}.png` })
+      alPago = await esperarMesa(page, APU_EN_PAGO, 30000)
+      if (!clavadaTrasPulsar) {
+        const d = await page.evaluate(() => document.querySelector('.game-table')?.dataset.clavada)
+        clavadaTrasPulsar = d === '1'
+      }
+    }
+    c['apu.7'] = {
+      pulsado: !!c['apu.2'].ok,
+      allinTrasPulsar,
+      clavada: clavadaTrasPulsar ? '1' : '0',
+      alPago,
+      ok: !!c['apu.2'].ok && allinTrasPulsar >= 1 && !clavadaTrasPulsar && alPago,
+    }
+
+    // ── apu.3 · La recarga: panel, gate y nivelado (§5) ───────────────────
+    await page.goto(`${BASE}/?apu=recarga`)
+    await recorrerRuta(page, 3, 'basico', 0, 'medio')
+    const llegoAlPago = await jugarHasta(page, APU_EN_PAGO, 5)
+    // La automática sale sola bajo el listón de §5.1; si la mano se ganó y la
+    // pila subió, se pide la voluntaria. Las dos abren el MISMO panel.
+    await page.evaluate(() => {
+      const b = document.querySelector('[data-accion="recargar"]')
+      if (b) b.click()
+    })
+    await page.waitForTimeout(400)
+    const panel = await page.evaluate(() => {
+      const p = document.querySelector('[data-accion="recarga"]')
+      if (!p) return { hay: false }
+      const montos = [...p.querySelectorAll('[data-accion="recarga-monto"]')]
+      // 1f · el MOTIVO, que es lo que decide qué lámina se está midiendo. Sin él
+      // no se puede distinguir un velo que bloquea a propósito (§5.4) de uno que
+      // rompió su promesa de no tapar (§3b).
+      const motivo = p.dataset.motivo ?? '?'
+      const r = p.querySelector('.bankrupt-modal').getBoundingClientRect()
+      return {
+        hay: true,
+        motivo,
+        montos: montos.length,
+        montosVivos: montos.filter(b => !b.disabled).length,
+        etiquetas: montos.map(b => b.textContent.trim()),
+        // 1f-A4 · La promesa de §5.3 ya no tiene renglón propio: vive DENTRO del
+        // subtítulo de las dos recargas blandas. Lo que se comprueba es que esté
+        // dicha y que quepa en UNA línea — el renglón que la tarjeta reserva—.
+        // La forzosa no la lleva y no se le pide: ahí no hay nada que nivelar.
+        sub: p.querySelector('[data-accion="recarga-sub"]')?.textContent?.trim() ?? '',
+        subLineas: (() => {
+          const e = p.querySelector('[data-accion="recarga-sub"]')
+          if (!e) return 0
+          const g = document.createRange(); g.selectNodeContents(e)
+          return g.getClientRects().length
+        })(),
+        plazo: p.querySelector('[data-accion="recarga-plazo"]')?.textContent?.trim() ?? '',
+        // §5.1 · LA QUINTA CONDICIÓN DEL GATE: mientras la pregunta esté abierta,
+        // «Siguiente mano» NO existe. Es la única acción que la anularía.
+        gate: ![...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano'),
+        dentro: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight,
+        pasoTactil: Math.round(Math.min(...montos.map(b => b.getBoundingClientRect().height)) * 100) / 100,
+      }
+    })
+    if (panel.hay) await page.screenshot({ path: `${dir}/apu_recarga_${tag}.png` })
+    // Y se confirma, para ver el otro lado: §5.3 sube a las IAS vivas y el gate
+    // vuelve a abrirse.
+    let tras = {}
+    if (panel.hay) {
+      await page.evaluate(() => {
+        const b = document.querySelector('[data-accion="recarga-si"]')
+        if (b && !b.disabled) b.click()
+      })
+      await page.waitForTimeout(600)
+      tras = await page.evaluate(() => ({
+        recargas: Number(document.querySelector('.game-table')?.dataset.recargas ?? 0),
+        cerrado: !document.querySelector('[data-accion="recarga"]'),
+        gateVuelve: [...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano'),
+      }))
+    }
+    c['apu.3'] = {
+      llegoAlPago, ...panel, ...tras,
+      promesa: panel.motivo === 'forzosa' || /se nivelan contigo/.test(panel.sub ?? ''),
+      ok: !!panel.hay && panel.montos === 3 && panel.montosVivos >= 1 && panel.gate
+        && panel.dentro && panel.pasoTactil >= 36
+        && (panel.motivo === 'forzosa' || /se nivelan contigo/.test(panel.sub ?? ''))
+        && panel.subLineas === 1
+        // El plazo sólo se le exige a la AUTOMÁTICA: la voluntaria no cuenta
+        // nada —su renglón está reservado pero escondido con `visibility`— y su
+        // contador se lee en cero. Es la misma distinción que `pideContador`.
+        && (panel.motivo !== 'automatica' || /15 s/.test(panel.plazo ?? ''))
+        && tras.recargas === 1 && !!tras.cerrado && !!tras.gateVuelve,
+    }
+
+    // ── apu.4 · §4.3 · una ronda sin juego se resuelve SOLA ───────────────
+    // Todas las IAS con la apuesta justa: el ante las deja en all-in y el humano
+    // se queda solo con fichas. La mano tiene que AVANZAR sin que nadie pulse un
+    // botón de apuesta — y `data-clavada` tiene que valer 0 en todo momento, que
+    // es la vigilancia de D-12.
+    await page.goto(`${BASE}/?apu=sinRival`)
+    await recorrerRuta(page, 4, 'basico', 0, 'medio')
+    await page.evaluate(() => {
+      window.__clavada = false
+      const b = [...document.querySelectorAll('.btn')].find(x => x.textContent.trim() === 'Iniciar mano')
+      if (b) b.click()
+    })
+    const avanzo = await esperarMesa(page, () => {
+      if (document.querySelector('.game-table')?.dataset.clavada === '1') window.__clavada = true
+      return !!document.querySelector('.discard-area')
+        || [...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano')
+    }, 30000)
+    const sinRival = await page.evaluate(() => ({
+      clavadaVista: !!window.__clavada,
+      allin: Number(document.querySelector('.game-table')?.dataset.allin ?? 0),
+      clavada: document.querySelector('.game-table')?.dataset.clavada ?? '?',
+    }))
+    await page.screenshot({ path: `${dir}/apu_sinrival_${tag}.png` })
+    c['apu.4'] = {
+      avanzo, ...sinRival,
+      // Que la mano avance SIN intervención es la prueba de §4.3; que `clavada`
+      // no valga 1 en ningún instante es la de D-12.
+      ok: avanzo && !sinRival.clavadaVista && sinRival.clavada === '0' && sinRival.allin >= 3,
+    }
+
+    // ── apu.5 · Las capas del pozo, contadas (§4.2) ───────────────────────
+    // Una IA corta y otra a media profundidad: el ante hace la primera capa y la
+    // segunda aparece en cuanto la ronda pase de ahí.
+    await page.goto(`${BASE}/?apu=capas`)
+    await recorrerRuta(page, 4, 'basico', 0, 'medio')
+    // El pozo se parte cuando alguien pone por encima del nivel de la IA corta, y
+    // eso pide que la ronda pase del ante. Depende de que las IAS apuesten, así
+    // que se le da cuerda: doce manos es un minuto largo y sobra para verlo.
+    const huboCapas = await jugarHasta(page, () => Number(document.querySelector('.game-message')?.dataset.capas ?? 0) > 1, 12, true)
+    const capas = await page.evaluate(() => {
+      const m = document.querySelector('.game-message')
+      return {
+        capas: Number(m?.dataset.capas ?? 0),
+        texto: m?.textContent?.trim() ?? '',
+        tono: m?.dataset.tono ?? '',
+      }
+    })
+    if (huboCapas) await page.screenshot({ path: `${dir}/apu_capas_${tag}.png` })
+    c['apu.5'] = {
+      huboCapas, ...capas,
+      // QUÉ SE EXIGE, Y QUÉ NO. Que el pozo se parta en capas NO obliga a decir
+      // nada: si las dos se las lleva el mismo, el resultado ya lo cuenta entero
+      // y añadir una frase sería ruido. La primera corrida cayó justo ahí —dos
+      // capas, un solo ganador, texto corriente— y el rojo era del arnés.
+      // Así que aquí se mide lo que el arnés PUEDE ver desde fuera: que el molde
+      // parte el pozo de verdad y que, cuando la frase sale, sale bien formada.
+      // Quién gana cada capa y cuándo toca nombrarlo es puro y lo sella Vitest
+      // (`testMesaAPU1` §6), que es donde se puede fijar el reparto a mano.
+      ok: huboCapas && capas.capas > 1 && capas.texto.length > 0
+        && (!capas.texto.includes('El pozo se partió') || /se lleva|vuelven|Te llevas/.test(capas.texto)),
+    }
+
+    // ── apu.6 · Geometría: nada se sale, nada queda bajo el dedo ──────────
+    const geo = await page.evaluate(() => {
+      const red = (x) => Math.round(x * 100) / 100
+      const doc = document.documentElement
+      const botones = [...document.querySelectorAll('.action-buttons .btn, [data-accion="recarga-monto"]')]
+      return {
+        desbordaDoc: doc.scrollWidth > doc.clientWidth + 1,
+        botonMin: botones.length ? red(Math.min(...botones.map(b => b.getBoundingClientRect().height))) : null,
+        fuera: botones.filter(b => {
+          const x = b.getBoundingClientRect()
+          return x.right > innerWidth + 1 || x.bottom > innerHeight + 1
+        }).length,
+      }
+    })
+    c['apu.6'] = {
+      ...geo,
+      ok: !geo.desbordaDoc && geo.fuera === 0 && (geo.botonMin === null || geo.botonMin >= 36),
+    }
+
+    // ── 1f §A.2 · las medidas de portrait que faltan ──────────────────────
+    // Van al final del giro porque navegan: la marca recorre las CUATRO mesas y
+    // el alto del «pensando» pide una mesa limpia. Ponerlas antes obligaría a
+    // rehacer todo lo de arriba.
+    if (esPortrait) {
+      c.pensando = await altoDelPensando(page)
+      c.marcaPorMesa = await marcaPorMesa(page, dir, tag)
+      c.lineaAllinHumano = await lineaAllinEnMesa4(page, dir, tag)
+      // La línea del humano, contra la vara del «pensando»: sin recorte, dentro
+      // de la ventana y con la MISMA caja. Que se parta en dos renglones no es
+      // un rojo de por sí —la caja podría dar de sí— pero SÍ lo es si la caja
+      // crece: eso es «una caja más», que es lo que el JSX promete que no pasa.
+      const l = c.lineaAllinHumano
+      c.lineaAllinHumano = {
+        ...l,
+        altoPensando: c.pensando?.alto ?? null,
+        creceLaCaja: !!(l.hay && c.pensando?.hay && l.alto > c.pensando.alto + 1),
+        ok: !!l.hay && !l.recorta && l.dentro
+          && !!(c.pensando?.hay && l.alto <= c.pensando.alto + 1),
+      }
+      // La pregunta suave: se consigue una que no sea forzosa y se le mide el
+      // solape con las cartas y el óvalo, el contador y la ranura reservada.
+      const suave = await recargaSuave(page)
+      if (suave.motivo) {
+        const t = await medirRecargaTelefono(page)
+        // 1f-A5 · con el panel todavía abierto, los cinco botones de la blanda.
+        await esperarTarjetaQuieta(page)
+        const bl = await medirBotonesRecarga(page)
+        c.botonesBlanda = { ...bl, ...varaBotones(bl, true) }
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: `${dir}/apu_blanda_${tag}.png` })
+        c.fotoS25Blanda = await fotoS25(page, `${dir}/apu_blanda_412x915.png`, { width: vp.w, height: vp.h })
+        const antes = t.zonaJugador
+        await page.evaluate(() => {
+          const b = document.querySelector('[data-accion="recarga-no"]')
+          if (b) b.click()
+        })
+        await page.waitForTimeout(400)
+        const despues = await page.evaluate(() => {
+          const zz = document.querySelector('.player-zone')
+          if (!zz) return null
+          const r = zz.getBoundingClientRect()
+          return { top: Math.round(r.top * 100) / 100, alto: Math.round(r.height * 100) / 100 }
+        })
+        c.recargaTel = {
+          ...suave, ...t, zonaDespues: despues,
+          deltaZona: (despues && antes)
+            ? { top: Math.round((despues.top - antes.top) * 100) / 100,
+                alto: Math.round((despues.alto - antes.alto) * 100) / 100 }
+            : null,
+        }
+        // El contador sólo se le exige a la AUTOMÁTICA: la voluntaria lo
+        // esconde con `visibility` a propósito —no hay plazo que contar cuando
+        // la pregunta la hizo el jugador— y su renglón sigue reservado.
+        const pideContador = c.recargaTel.motivo === 'automatica'
+        c.recargaTel.ok = c.recargaTel.solapeCartas === 0 && (c.recargaTel.solapeOvalo ?? 0) === 0
+          && (!pideContador || c.recargaTel.plazoVisible)
+          && c.recargaTel.ranuraReservada && c.recargaTel.sinSiguiente
+          && !!c.recargaTel.deltaZona && c.recargaTel.deltaZona.top === 0 && c.recargaTel.deltaZona.alto === 0
+      } else {
+        c.recargaTel = { hay: false, ...suave, ok: false }
+      }
+      // 1f-A5 · y la FORZOSA, que hay que ir a buscar. Va la última porque deja
+      // la mesa en un estado del que no se vuelve: declinar ahí es levantarse.
+      const forz = await recargaForzosa(page)
+      if (forz.motivo === 'forzosa') {
+        await esperarTarjetaQuieta(page)
+        const bf = await medirBotonesRecarga(page)
+        c.botonesForzosa = { ...forz, ...bf, ...varaBotones(bf, true) }
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: `${dir}/apu_forzosa_${tag}.png` })
+        c.fotoS25Forzosa = await fotoS25(page, `${dir}/apu_forzosa_412x915.png`, { width: vp.w, height: vp.h })
+      } else {
+        c.botonesForzosa = { hay: false, ...forz, ok: false }
+      }
+
+      // E-26 · una cuenta que no entra en el veredicto no sirve de nada. Los
+      // seis puntos de teléfono entran en el `ok` de la celda como los siete.
+      c.telPuntos = [
+        { id: 'tel.marca',   ok: c.marcaPorMesa.every((f) => f.ok) },
+        { id: 'tel.boton4',  ok: c['apu.2'].okCuatroCifras === true },
+        { id: 'tel.recarga', ok: c.recargaTel?.ok === true },
+        { id: 'tel.linea',   ok: c.lineaAllinHumano.ok === true },
+        { id: 'tel.blanda',  ok: c.botonesBlanda?.ok === true },
+        { id: 'tel.forzosa', ok: c.botonesForzosa?.ok === true },
+      ]
+    }
+
+    // ── 1f §A4.4 · el teléfono APAISADO: los cinco botones de la tarjeta ──
+    // Observación 2 de la Parte B. Aquí no se exige que la tarjeta no tape —en
+    // 360 de alto no hay sitio y Victor lo aceptó—: se exige que lo que ofrece
+    // se pueda TOCAR. Cinco medidas, y las cinco entran en el veredicto.
+    if (vp.movil && !esPortrait) {
+      const suave = await recargaSuave(page)
+      if (suave.motivo) {
+        const b = await medirBotonesRecarga(page)
+        c.botonesRecarga = {
+          ...suave, ...b,
+          ok: !!b.hay && b.altoMin >= 36 && b.altoMax <= 40
+            && b.sepMin >= 8 && b.solapeBotones === 0
+            && b.subVisible && b.plazoVisible && b.dentro,
+        }
+        if (b.hay) await page.screenshot({ path: `${dir}/apu_recarga_${tag}.png` })
+      } else {
+        c.botonesRecarga = { hay: false, ...suave, ok: false }
+      }
+      c.telPuntos = [
+        { id: 'tel.botones', ok: c.botonesRecarga?.ok === true },
+      ]
+    }
+
+    c.consola = consola
+    c.consolaConocida = conocido.length
+    c.ok = APU_PUNTOS.every((k) => c[k].ok) && consola.length === 0
+      && (c.telPuntos ? c.telPuntos.every((p) => p.ok) : true)
+    celdas.push(c)
+    await page.close()
+  }
+
+  const ok = celdas.every((c) => c.ok)
+  console.log(`\n── apu · la mesa de APU-1 ── ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas`)
+  for (const c of celdas) {
+    const fallos = [
+      ...APU_PUNTOS.filter((k) => !c[k].ok),
+      ...(c.telPuntos ?? []).filter((p) => !p.ok).map((p) => p.id),
+    ]
+    console.log(`  ${c.ok ? 'OK  ' : 'FALLA'} ${c.vp.padEnd(9)} ${String(c.nota).padEnd(16)}${fallos.length ? ' · ' + fallos.join(', ') : ''}${c.consola.length ? ' · consola: ' + c.consola[0] : ''}`)
+    // 1f §A.5 · la tabla de la marca ALL-IN por mesa, que es la que va al
+    // informe. Se imprime aquí y no se deja sólo en el JSON: es la medida por la
+    // que la ficha pone un STOP, y un STOP tiene que verse sin abrir un archivo.
+    for (const f of c.marcaPorMesa ?? []) {
+      console.log(`      mesa ${f.mesa} · ${String(f.via).padEnd(10)} texto ${String(f.anchoTexto).padStart(6)} px / hueco ${String(f.hueco).padStart(6)} px · ${f.lineas} línea(s)${f.recorta ? ' · RECORTA' : ''} · ${f.ok ? 'cabe' : 'NO CABE'}`)
+    }
+    if (c.lineaAllinHumano?.hay) {
+      const l = c.lineaAllinHumano
+      console.log(`      línea all-in humano · texto ${l.anchoTexto} px / hueco ${l.hueco} px · ${l.lineas} línea(s) · caja ${l.alto} vs pensando ${l.altoPensando} · ${l.ok ? 'cabe' : 'NO CABE'}`)
+    }
+    // 1f §A4.4 · los cinco botones del apaisado, por la misma razón: es la
+    // medida que sale de una queja de Victor y tiene que leerse sin abrir el JSON.
+    for (const [eti, b] of [['blanda', c.botonesBlanda], ['forzosa', c.botonesForzosa]]) {
+      if (!b?.hay) continue
+      console.log(`      ${eti} · alto ${b.altoMin}–${b.altoMax} px · entre botones ${b.sepBotones} · entre filas ${b.sepEntreFilas} · hasta el cronómetro ${b.sepAccionesPlazo} (${b.plazoAlign}) · ${b.ok ? 'con aire' : 'NO: ' + (b.fallos ?? []).join('; ')}`)
+      console.log(`      tarjeta ${b.modal.ancho}×${b.modal.alto} en ${b.modal.top} · montos en ${b.filasMontos} fila(s) · tapa ${b.solapeCartas} px² de ${b.areaCartas} de la mano`)
+    }
+    // 1f-A5 · la foto de la S25: se imprime lo medido, pero no es vara.
+    for (const [eti, b] of [['blanda 412×915', c.fotoS25Blanda], ['forzosa 412×915', c.fotoS25Forzosa]]) {
+      if (!b?.hay) continue
+      console.log(`      foto ${eti} · alto ${b.altoMin}–${b.altoMax} px · entre botones ${b.sepBotones} · entre filas ${b.sepEntreFilas} · hasta el cronómetro ${b.sepAccionesPlazo} · montos en ${b.filasMontos} fila(s) · tapa ${b.solapeCartas} px² (sólo foto)`)
+    }
+    if (c.botonesRecarga?.hay) {
+      const b = c.botonesRecarga
+      console.log(`      botones recarga (${b.motivo}) · alto ${b.altoMin}–${b.altoMax} px · separación mín ${b.sepMin} px (montos ${b.sepMontos.join('/')}, entre filas ${b.sepEntreFilas}) · solape ${b.solapeBotones} px² · ${b.ok ? 'tocables' : 'NO'}`)
+      console.log(`      tarjeta ${b.modal.ancho}×${b.modal.alto} en ${b.modal.top} · tapa ${b.solapeCartas} px² de ${b.areaCartas} de la mano`)
+    }
   }
   return { celdas, ok }
 }
@@ -2752,6 +4220,28 @@ async function runM1(browser) {
   return out
 }
 
+// ── APU-1 C-0.5 · CONTESTAR LA PREGUNTA DE RECARGA ──────────────────────────
+// Los modos de linea base de pixel (`a1`, `a2`, `f1`) se escribieron cuando el
+// pago solo tenia «Siguiente mano». APU-1 metio en medio la pregunta de recarga,
+// que BLOQUEA esa accion a proposito (§5.1), asi que un bucle que no la contesta
+// se queda esperando: la mano no cierra (`SINCERRAR` en a2) y los frames se
+// muestrean con el panel abierto, que es otra pantalla.
+//
+// Se contesta que SI mientras haya saldo —estos modos quieren la mesa VIVA tres
+// manos enteras, no pilas cortas— y que no cuando ya no lo haya. Es la misma
+// disciplina del modo `apu`, que la declina por la razon contraria y por eso lo
+// dice en su propio bucle.
+async function contestarRecarga(page) {
+  return page.evaluate(() => {
+    if (!document.querySelector('[data-accion="recarga"]')) return false
+    const si = document.querySelector('[data-accion="recarga-si"]')
+    if (si && !si.disabled) { si.click(); return true }
+    const no = document.querySelector('[data-accion="recarga-no"]')
+    if (no) { no.click(); return true }
+    return false
+  })
+}
+
 // ── A1 · Anclaje arriba-izquierda del abanico humano ─────────────────────────
 // Verifica, en las 16 celdas y a lo largo de una rotación COMPLETA de PIE (3
 // manos, todas las fases, con y sin cartas repartidas):
@@ -2801,8 +4291,35 @@ async function a1Snap(page) {
     const R = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: rnd(b.x), y: rnd(b.y), w: rnd(b.width), h: rnd(b.height), top: rnd(b.top), right: rnd(b.right), bottom: rnd(b.bottom), left: rnd(b.left) } }
     const B = s => R(document.querySelector(s))
     const zone = document.querySelector('.player-zone')
+    // APU-1 C-0.5 · LA MESA PUEDE DEJAR DE ESTAR. Con las pilas cortas de esta
+    // campaña una rotación de tres manos puede acabar en bancarrota o en la
+    // recarga forzosa, y entonces `.player-zone` no existe. Antes eso reventaba
+    // el modo entero con un `getBoundingClientRect` de null y se perdían las
+    // dieciséis celdas; ahora el frame se marca ausente y el bucle lo sabe.
+    if (!zone) return { ausente: true }
     const z = zone.getBoundingClientRect()
     const rel = o => o ? { dx: rnd(o.left - z.left), dy: rnd(o.top - z.top), dr: rnd(o.right - z.right) } : null
+    // E-33 · CAJA SIN EL `transform`. `getBoundingClientRect` devuelve la caja
+    // PINTADA, con la escala de cualquier animación en vuelo dentro. El
+    // cronómetro tiene una: a ≤5 s se le pone `timer-warning` y arranca
+    // `timerPulse`, 0,7 s que lo escalan hasta 1,15 —la caja crece 3,48 px de
+    // alto y su borde superior sube la mitad—. Muestrear ahí no mide dónde
+    // está el cronómetro: mide en qué fotograma del latido se le cayó encima el
+    // arnés. Es la misma trampa que `bankruptRise` en 1f-A5, y se resuelve
+    // igual: A1_PRE sella la MAQUETA, así que la maqueta es lo que se mide.
+    // El pulso escala respecto del centro (`transform-origin` por defecto), de
+    // modo que deshacerlo es exacto: mismo centro, dimensiones divididas.
+    const sinEscala = (e) => {
+      if (!e) return null
+      const b = e.getBoundingClientRect()
+      const t = getComputedStyle(e).transform
+      if (t === 'none') return b
+      const m = new DOMMatrixReadOnly(t)
+      if (m.a === 1 && m.d === 1) return b
+      const cx = b.left + b.width / 2, cy = b.top + b.height / 2
+      const w = b.width / m.a, h = b.height / m.d
+      return { left: cx - w / 2, top: cy - h / 2, right: cx + w / 2, bottom: cy + h / 2, width: w, height: h }
+    }
     const pile = document.querySelector('.player-zone .deck-pile')
     const tag = document.querySelector('.player-zone .score-tag-player')
     const slot1 = document.querySelector('.player-zone .cards-row .card-slot-wrapper')
@@ -2818,7 +4335,7 @@ async function a1Snap(page) {
       bar: B('.player-bar'),
       relBar: rel(B('.player-bar')), relLeft: rel(B('.player-bar-left')),
       relCenter: rel(B('.player-bar-center')), relRight: rel(B('.player-bar-right')),
-      relTimer: rel(B('.timer-display')), relTag: rel(B('.player-zone .score-tag-player')),
+      relTimer: rel(sinEscala(document.querySelector('.timer-display'))), relTag: rel(B('.player-zone .score-tag-player')),
       // OJO: 'tagBox', no 'tag' — el frame ya usa 'tag' como etiqueta de estado y
       // el spread del snapshot la pisaría (los deltas reportarían una caja en vez
       // del frame culpable).
@@ -2880,12 +4397,18 @@ async function runA1(browser) {
     // Rotación completa de PIE: 3 manos (mismo ciclo que M1) → el humano es
     // MANO, PIE y sin rol, y se recorren todas las fases con y sin cartas.
     const states = [{ tag: 'reposo', ...(await a1Snap(page)) }]
-    for (let hand = 0; hand < 3; hand++) {
+    // Se cuenta y se dice: una celda que midió menos frames porque la mesa se
+    // acabó no es lo mismo que una celda entera, y callarlo sería fabricar un
+    // verde con menos evidencia de la que la vara cree tener.
+    let mesaSeAcabo = false
+    for (let hand = 0; hand < 3 && !mesaSeAcabo; hand++) {
       await clickIf(page, 'button:has-text("Iniciar mano")')
       let closed = false
       for (let i = 0; i < 340; i++) {
         await page.waitForTimeout(230); await page.mouse.move(5, 5)
+        if (await contestarRecarga(page)) { await page.waitForTimeout(260); continue }
         if (i % 2 === 0) states.push({ tag: `h${hand}t${i}`, ...(await a1Snap(page)) })
+        if (states[states.length - 1].ausente) { mesaSeAcabo = true; break }
         if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
           states.push({ tag: `h${hand}t${i}f`, ...(await a1Snap(page)) }); closed = true; break
         }
@@ -2894,9 +4417,10 @@ async function runA1(browser) {
           await clickIf(page, '.action-buttons button:has-text("Apostar")')
         await clickIf(page, 'button:has-text("Sin descartar")')
       }
-      if (!closed || !await clickIf(page, 'button:has-text("Siguiente mano")')) break
+      if (mesaSeAcabo || !closed || !await clickIf(page, 'button:has-text("Siguiente mano")')) break
       await page.waitForTimeout(1500); await page.mouse.move(5, 5)
       states.push({ tag: `h${hand}-post`, ...(await a1Snap(page)) })
+      if (states[states.length - 1].ausente) mesaSeAcabo = true
     }
 
     const worstOf = (get) => {
@@ -2939,8 +4463,10 @@ async function runA1(browser) {
     const tagCycleOk = tagFrames.length > 0 && states.some(s => s.tagVis === 'hidden')
     const tagFits = tagFrames.every(s => !s.tagClipped)
     // (6) nada más movido (baseline PRE-tanda)
-    const dZoneTop = worstOf(s => s.zone.top - pre.zoneTop)
-    const dZoneH = worstOf(s => s.zone.h - pre.zoneH)
+    // Null-safe como las demás: un frame `ausente` (la mesa se acabó, C-0.5) no
+    // trae zona, y `worstOf` ya sabe saltarse lo que venga en null.
+    const dZoneTop = worstOf(s => s.zone ? s.zone.top - pre.zoneTop : null)
+    const dZoneH = worstOf(s => s.zone ? s.zone.h - pre.zoneH : null)
     const dBar = worstOf(s => s.relBar ? s.relBar.dy - pre.barDy : null)
     const dLeftX = worstOf(s => s.relLeft ? s.relLeft.dx - pre.leftDx : null)
     const dLeftY = worstOf(s => s.relLeft ? s.relLeft.dy - pre.leftDy : null)
@@ -2996,6 +4522,8 @@ async function runA1(browser) {
 
     out.push({
       table: n, vp, pre, tokens: tok, a2: live, frames: states.length,
+      // Frames que no se pudieron medir porque la mesa ya no estaba (C-0.5).
+      framesAusentes: states.filter(s => s.ausente).length, mesaSeAcabo,
       origin: { x: base.card1.x, y: base.card1.y, dX: dOriginX, dY: dOriginY, originConst },
       gaps: { left: round(base.card1.left - base.deck.right), top: round(base.card1.top - base.zone.top), dGapLeft, dGapTop, gapsOk },
       slotCard: { dSlotCardX, dSlotCardY, slotCardShared },
@@ -3004,7 +4532,7 @@ async function runA1(browser) {
       untouchedDeltas: { dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY, timerDys, timerInsideCenter, sawTimer, untouched },
       overflowOk, tokensOk, passed,
     })
-    console.log(`T${n} ${vp.w}x${vp.h} origen (${base.card1.x},${base.card1.y}) Δ=${Math.max(dOriginX.max, dOriginY.max)} · gaps pila→c1=${round(base.card1.left - base.deck.right)}/${tok.gapLeft} T=${round(base.card1.top - base.zone.top)}/${tok.gapTop} · mazo (${base.deck.x},${base.deck.y}) esp ${deckExpX} Δ=${Math.max(dDeckX.max, dDeckY.max)} · línea ${tagFrames.length}f fit=${tagFits} peor=${worstCase?.contentW}/${live.bandW} · resto Δ=${Math.max(...[dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY].map(d => d.max))} · ${passed ? 'OK' : 'FAIL'}`)
+    console.log(`T${n} ${vp.w}x${vp.h} origen (${base.card1.x},${base.card1.y}) Δ=${Math.max(dOriginX.max, dOriginY.max)} · gaps pila→c1=${round(base.card1.left - base.deck.right)}/${tok.gapLeft} T=${round(base.card1.top - base.zone.top)}/${tok.gapTop} · mazo (${base.deck.x},${base.deck.y}) esp ${deckExpX} Δ=${Math.max(dDeckX.max, dDeckY.max)} · línea ${tagFrames.length}f fit=${tagFits} peor=${worstCase?.contentW}/${live.bandW} · resto Δ=${Math.max(...[dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY].map(d => d.max))}${mesaSeAcabo ? ` · mesa acabada (${states.filter(s => s.ausente).length} frame(s) sin medir)` : ''} · ${passed ? 'OK' : 'FAIL'}`)
     await page.close()
   }
   return out
@@ -3684,7 +5212,7 @@ async function runO2(browser) {
       if (e) esc.push({ tag, ...e })
     }
     await add('reposo')
-    // pozo al tope (5 × saldoInicial) + "A igualar" visible
+    // pozo al tope (5 × pilaPruebas) + "A igualar" visible
     await page.evaluate(() => window.__o2pot(25000))
     await add('pozo25000+igualar')
     // 15 familias con su clase real
@@ -3949,6 +5477,7 @@ async function runA2(browser) {
       let closed = false
       for (let i = 0; i < 240; i++) {
         await page.waitForTimeout(230); await page.mouse.move(5, 5)
+        if (await contestarRecarga(page)) { await page.waitForTimeout(260); continue }
         states.push({ tag: `h${hand}t${i}`, ...(await a2Snap(page)) })
         if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
           states.push({ tag: `h${hand}-pago`, ...(await a2Snap(page)) }); closed = true; break
@@ -3985,7 +5514,8 @@ async function runA2(browser) {
     const oof = await a2OutOfFlow(page, A2_WORST_TAG)
 
     const F = states.filter(s => s.card1)
-    const pago = F.filter(s => s.btn === 'Siguiente mano')
+    // Por PERTENENCIA, no por igualdad: el pago de APU-1 lleva dos botones.
+    const pago = F.filter(s => s.btn.split('|').includes('Siguiente mano'))
     const apuesta = F.filter(s => s.kind.includes('action-col'))
     const worstOf = (get) => {
       let max = 0, who = null
@@ -4024,7 +5554,17 @@ async function runA2(browser) {
     const bandNoBtn = bandFrames.every(s => s.olapBtns.length === 0)
     const bandNoPaint = bandFrames.every(s => !s.olapPaint)
     // (9) ciclo de visibility: viva SÓLO en pago
-    const visOnlyPayout = bandFrames.length > 0 && bandFrames.every(s => s.btn === 'Siguiente mano') &&
+    //
+    // APU-1 C-0.5 · EL PAGO YA NO TIENE UN SOLO BOTON. `s.btn` es la lista de
+    // rotulos del area de accion unidos por `|`, y esta comparacion pedia que
+    // fuera EXACTAMENTE «Siguiente mano». En el pago de APU-1 hay dos: el de
+    // seguir y el de la recarga voluntaria (`btn-recarga`, 1e-ii §5.2), asi que
+    // las veinte celdas daban FAIL sin que la banda se hubiera movido un pixel
+    // —todas sus demas medidas salen a 0,07 px o menos—. Lo que A2 quiere decir
+    // es que la banda vive SOLO en el pago, y eso se pregunta por PERTENENCIA:
+    // que «Siguiente mano» este entre los botones, no que sea el unico.
+    const enPago = (s) => s.btn.split('|').includes('Siguiente mano')
+    const visOnlyPayout = bandFrames.length > 0 && bandFrames.every(enPago) &&
       F.some(s => s.tagVis === 'hidden')
     // (10) guardia de la fase de apuesta: nunca visible sobre la fila de mults
     const betGuardOk = apuesta.length > 0 && apuesta.every(s => s.tagVis === 'hidden')
@@ -7538,6 +9078,10 @@ const msgLee = (page) => page.evaluate(() => {
     clase: el ? el.className : null,
     color: el ? getComputedStyle(el).color : null,
     ruta: document.querySelector('.two-ovals') ? 'two-ovals' : 'center-zone',
+    // APU-1 1e-ii · en cuántas capas se partió el pozo de esta mano. Es un
+    // afidávit, igual que `data-tono`: no pinta nada y dice un hecho que desde
+    // fuera no se puede deducir.
+    capas: el ? Number(el.getAttribute('data-capas') || 0) : 0,
     zonas, vozVieja,
   }
 })
@@ -7744,6 +9288,19 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
   // la rotación. Se registran las dos SIEMPRE y se exige que concuerden.
   const manoVista   = juego.manoVista
   const manoRotada  = msgManoPorRotacion(n, mano)
+  // ── APU-1 1e · LA MESA PUEDE HABER ENCOGIDO ────────────────────────
+  // Este modo nació cuando TODOS los asientos empezaban con 5.000 fichas a una
+  // mesa de 50: en tres manos no se quebraba nadie, así que `n` —el tamaño de
+  // arranque— valía como tamaño vivo y la rotación de la Mano era una cuenta
+  // limpia. Con las entradas de APU-1 la mesa de 50 se juega con 1.000 fichas
+  // al medio (750 hasta 1f-A4, que subió el medio de 15× a 20×), un all-in
+  // desploma a alguien en una mano y la mesa encoge de verdad (C4.2.14).
+  //
+  // A partir de aquí el tamaño se LEE del producto en cada mano, igual que ya se
+  // leían las reglas del comodín: el layout sigue a los vivos, así que las zonas
+  // pintadas SON los vivos.
+  const vivos = l.zonas.length || n
+  const encogio = vivos !== n
   // La pastilla en el SHOWDOWN — la vieja fuente. Donde el producto no la
   // esconde debe decir lo mismo que se leyó en vuelo; donde la esconde (mesa 5
   // portrait, mesa 2 landscape móvil) no hay nada que cruzar y se declara. Así
@@ -7782,20 +9339,51 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
     if (cartasLeidas && cartasCuadran) {
       // Reconstrucción completa desde la página, ahora también las cartas.
       via = 're-derivado'
-      const players = conScore.map((z, i) => ({
-        id: i, name: z.nombre, isHuman: z.quien === 'humano',
-        cards: lectura.leidas[z.nombre].cartas,
-        score: { palo: z.score.palo, points: z.score.pts }, eliminated: false,
+      // ── APU-1 1e · LOS ASIENTOS VAN ENTEROS, NO SÓLO LOS DEL SHOWDOWN ─────
+      // `deShowdown` decide «ganaste tú» con `winner === 0`, porque en el producto
+      // `players` es la mesa ENTERA y el asiento 0 es el humano. El arnés pasaba
+      // sólo a los que llegaron a comparación, así que en cuanto el humano se
+      // RETIRABA el índice 0 pasaba a ser una IA y el compositor escribía
+      // «¡Ganas…!» contra un producto que nombraba correctamente a la IA.
+      //
+      // Nunca se había visto porque hasta 1e el humano del arnés no se retiraba:
+      // con 5.000 fichas siempre podía igualar. Con 1.000 hay apuestas que no
+      // alcanza, el reloj lo retira, y el asiento 0 desaparece del showdown.
+      //
+      // Se reconstruye la mesa entera —retirados incluidos, con `score: null`,
+      // que es como el motor los deja— y se GARANTIZA que el asiento 0 es el
+      // humano: si su zona no está (eliminado), se pone un hueco. `enJuego` lo
+      // ignora por no tener score, exactamente igual que en el producto.
+      const zonaHumana = l.zonas.find(z => z.quien === 'humano') ?? null
+      const resto = l.zonas.filter(z => z !== zonaHumana)
+      const orden = [zonaHumana, ...resto]
+      const players = orden.map((z, i) => ({
+        id: i,
+        name: z ? z.nombre : 'Tú',
+        isHuman: i === 0,
+        cards: (z && lectura.leidas[z.nombre]?.cartas) || [],
+        score: (z && z.score) ? { palo: z.score.palo, points: z.score.pts } : null,
+        eliminated: !z,
       }))
+      const idxGanaEnMesa = orden.findIndex(z => z && z.gana)
       esperado = dep.composeResultado({
-        phase: dep.FASES.PAYOUT, winner: idxGana, players, numPlayers: n,
+        // `numPlayers` y `ruleN` salen de lo VIVO, no del tamaño de arranque: la
+        // voz de la mesa de dos y la tabla de reglas dependen de cuántos quedan,
+        // y componérselo con el cinco de origen hacía que el arnés desmintiera a
+        // un producto sano en cuanto alguien quebraba.
+        phase: dep.FASES.PAYOUT, winner: idxGanaEnMesa, players, numPlayers: vivos,
         // El nombre del asiento Mano traducido al índice de `players`, que aquí
         // es el de `conScore` —los que llegaron a comparación— y no el del
         // asiento. Si la Mano se retiró no figura en conScore y esto da -1:
         // nunca iguala a `winner`, que es exactamente la verdad (el ganador no
         // es la Mano → «el más cercano a la Mano»).
-        manoIndex: conScore.findIndex(z => z.nombre === manoVista),
-        ruleN: n,
+        // La Mano, traducida al ÍNDICE DE LA MESA —que es contra lo que
+        // `deShowdown` compara `winner`—. Si la Mano se retiró sigue estando en
+        // la lista, con su score en nulo, así que el índice es real y el
+        // desempate «por ser la Mano» se juzga con la verdad.
+        manoIndex: orden.findIndex(z => z && z.nombre === manoVista),
+        // Las reglas VIVAS del DOM, las mismas con las que se cruzan las cartas.
+        ruleN: reglas?.ruleN ?? vivos,
       })
     } else {
       // Sin cartas fiables NO se compone nada: antes se rellenaba con una mano
@@ -7810,7 +9398,7 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
     esperado: esperado ? esperado.texto : null,
     // ARN-2 · trazabilidad del insumo, para que el registro de corridas pueda
     // demostrar que la condición que mordía se ejercitó de verdad.
-    manoVista, manoRotada, manoEnChapa,
+    manoVista, manoRotada, manoEnChapa, vivos, encogio,
     // Cuántas pastillas de Mano había en la lectura en vuelo. Se registra para
     // que un `manoLeida` en falso diga POR QUÉ: 0 = no se alcanzó ninguna fase
     // de apuesta limpia, >1 = dos asientos se declaran Mano (imposible con un
@@ -7827,7 +9415,16 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
     // Puerta 1: la Mano se LEYÓ. Sin dato no hay re-derivación honesta.
     manoLeida: manoVista !== null,
     // Puerta 2: observación y rotación determinista coinciden.
-    manoConcuerda: manoVista !== null && manoVista === manoRotada,
+    //
+    // APU-1 1e · la rotación de referencia cuenta asientos de ARRANQUE, y en
+    // cuanto uno queda eliminado deja de describir al producto —que rota entre
+    // los vivos—. Donde la mesa encogió, la puerta se DECLARA no aplicable en
+    // vez de disfrazarse de verde: exactamente el trato que `manoCruce` ya da a
+    // la pastilla escondida. Reconstruir la rotación sobre los vivos pediría
+    // llevar la historia de quién murió en qué mano, y eso ya no sería un
+    // modelo independiente del producto sino una copia suya.
+    rotacionAplicable: !encogio,
+    manoConcuerda: manoVista !== null && (encogio || manoVista === manoRotada),
     // Puerta 3 (cruce): donde la pastilla sobrevive al showdown, dice lo mismo.
     manoCruce: manoEnChapa === null || manoEnChapa === manoVista,
     // ARN-3 · el registro con el que se demuestra que el verde incluye cartas
@@ -7841,8 +9438,24 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
     // comprueba pertenencia a las plantillas conservadas y coherencia de tono.
     // Se DECLARA, no se disfraza de re-derivación. Y `sin-cartas` no coincide
     // con nada: sin insumo no hay veredicto que dar.
+    // ── APU-1 1e-ii · EL POZO PARTIDO, DECLARADO NO APLICABLE ───────────
+    // Cuando la mano acaba con capas de distinto dueño, el óvalo añade una frase
+    // —«El pozo se partió: IA 2 se lleva 300.»— que este arnés NO puede
+    // re-derivar: la fórmula de §4.2 se calcula sobre `contribMano`, y eso no
+    // está en la pantalla ni puede estarlo. Exigir la igualdad exacta ahí
+    // acusaría al producto de un texto correcto, que es EXACTAMENTE el defecto
+    // que §E-9 de 1e-i costó tres corridas descubrir: un arnés que modela una
+    // situación distinta de la del producto y le echa la culpa.
+    // Así que donde hay capas se comprueba lo que SÍ se puede: que el resultado
+    // re-derivado sea el PRINCIPIO del texto y que la cola hable de capas. El
+    // contenido de la cola lo sella Vitest (`testMesaAPU1` §6), donde el reparto
+    // se puede fijar a mano.
+    capas: l.capas,
+    pozoPartido: l.capas > 1,
     coincide: via === 're-derivado'
-      ? l.texto === esperado.texto && l.tono === esperado.tono
+      ? (l.capas > 1
+        ? l.texto.startsWith(esperado.texto) && l.tono === esperado.tono
+        : l.texto === esperado.texto && l.tono === esperado.tono)
       : via === 'plantilla'
         ? /Ganaste el pozo|gana el pozo|Los demás se retiran/.test(l.texto)
         : false,
@@ -8200,7 +9813,7 @@ async function runMSG(browser) {
     // ARN-2 · la Mano se imprime en cada mano junto con si su pastilla estaba
     // oculta y si el desempate lo ganó ella: ése es el registro con el que se
     // demuestra que la condición del hallazgo ① se ejercitó, y no un "confía".
-    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} ${msgCartasResumen(m)}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.encogio ? ` (mesa de ${m.vivos}, rotación n/a)` : (m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`)}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} ${msgCartasResumen(m)}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
@@ -9350,7 +10963,7 @@ const report = {
     chromiumDeriva: chromiumVivo !== ARNES.chromiumBaselines
       ? `AVISO: baselines tomadas con ${ARNES.chromiumBaselines}`
       : false,
-    ruta: { nivel: ARNES_NIVEL, stakeIdx: ARNES_STAKE_IDX, monto: apuestasDe(ARNES_NIVEL)[ARNES_STAKE_IDX] },
+    ruta: { nivel: ARNES_NIVEL, stakeIdx: ARNES_STAKE_IDX, monto: apuestasDe(ARNES_NIVEL)[ARNES_STAKE_IDX], entrada: ARNES_ENTRADA },
   },
 }
 if (report.arnes.chromiumDeriva) console.log(`⚠ ${report.arnes.chromiumDeriva} · vivo ${chromiumVivo}`)
@@ -9369,6 +10982,8 @@ try {
   // qué. Que este punto caiga primero es lo que convierte esa cascada en un
   // diagnóstico. Es barato: seis viewports sin llegar a la mesa.
   if (MODE === 'lob' || MODE === 'all') report.lob = await runLob(browser)
+  if (MODE === 'retar' || MODE === 'all') report.retar = await runRetar(browser)
+  if (MODE === 'apu' || MODE === 'all') report.apu = await runApu(browser)
   if (MODE === 'b1') report.b1 = await runB1(browser)
   if (MODE === 'tactil') report.tactil = await runTactil(browser)
   if (MODE === 'p1') report.p1 = await runP1(browser)

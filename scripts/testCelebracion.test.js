@@ -264,7 +264,7 @@ describe('VC2 · sesión', () => {
   })
 
   it('fichas netas es un delta con signo contra el saldo de entrada', () => {
-    const inicial = AJILEI_CONFIG.economy.saldoInicial
+    const inicial = AJILEI_CONFIG.economy.pilaPruebas
     expect(fichasNetas(inicial)).toBe(0)
     expect(fichasNetas(inicial + 1200)).toBe(1200)
     expect(fichasNetas(inicial - 800)).toBe(-800)

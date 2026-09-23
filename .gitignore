@@ -112,3 +112,18 @@ supabase/.branches/
 # capturas-lob y capturas-pue: son REGENERABLES —una corrida del modo `sal` las
 # rehace todas— y pesan 54 PNG por tanda (9 estados × 6 viewports).
 capturas-sal/
+
+# APU-1 1e · capturas de «Retar a las IAS» (scripts/diagDSK.mjs modo `retar`).
+# Mismo criterio que capturas-lob y capturas-sal: REGENERABLES —una corrida del
+# modo las rehace las 18— y sin valor de archivo hasta que Victor selle una
+# lámina de esta pantalla, que es cuando tocará abrir su `evidencia/`.
+capturas-retar/
+
+# APU-1 1e-ii · capturas de la mesa (scripts/diagDSK.mjs modo `apu`): la marca
+# de all-in, el botón, el panel de recarga, la ronda sin rival y el pozo partido,
+# en los cuatro viewports. Mismo criterio: REGENERABLES con una corrida.
+capturas-apu/
+
+# MOT-1 Fase 1-0 · sonda de empaquetado DESECHABLE. No viaja nunca; Victor la
+# borra al cerrar la fase, y con ella esta línea.
+supabase/functions/sonda_mot1/

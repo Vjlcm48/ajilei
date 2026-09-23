@@ -22,6 +22,9 @@
 // trabajo de la lámina, no evidencia sellada, y el árbol ya carga con tres
 // carpetas de arnés.
 import { chromium } from 'playwright-core'
+import { recorrerRuta } from './rutaMesa.mjs'
+import { apuestasDe } from '../src/config/niveles.js'
+import { pisoDe } from '../src/engine/entrada.js'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 
 const BASE = 'http://localhost:5173'
@@ -139,15 +142,16 @@ async function alaVictoria(page, mesa, semilla = '', opciones = {}) {
   await page.goto(`${BASE}/?cel${semilla}`, { waitUntil: 'networkidle' })
   // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo: el
   // texto sale ahora de un diccionario (IDI-0) y cambiará con el idioma.
-  await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
-  await page.click('[data-accion="jugar-ia"]')
-  await page.waitForSelector('.nivel-grid button')
-  await page.click('.nivel-grid button:nth-of-type(1)')
-  await page.waitForSelector('.mode-select-card')
-  await page.click(`button:has-text("Mesa de ${mesa} jugadores")`)
-  await page.waitForSelector('.mode-stake-btn')
-  await page.click('.mode-stake-grid button:nth-of-type(1)')
-  await page.waitForSelector('.game-table')
+  // APU-1 1e · la ruta a la mesa son ahora CUATRO filas en cascada y vive en
+  // `scripts/rutaMesa.mjs`: este arnés tenía su propia copia de los tres clics
+  // viejos, que es exactamente lo que aquel módulo viene a impedir.
+  //
+  // Reto 0 (Básico) y apuesta 0 (la más barata del reto), como antes. La
+  // entrada es el PISO y no el medio, y aquí sí importa: `?cel` sienta a los
+  // rivales sin fichas y la mesa muere en el primer «Iniciar mano», así que lo
+  // único que cambia al entrar con más es cuánto dice la tarjeta que se lleva
+  // el jugador —y esa cifra la comparan las puertas de CEL-1 y CEL-2.
+  await recorrerRuta(page, mesa, 'basico', 0, 'piso')
   // EL PASO. Uno.
   await page.click('button:has-text("Iniciar mano")')
   // CEL-1 partió la pantalla terminal en dos: la VICTORIA es `.cel-screen` y la
@@ -193,7 +197,25 @@ const LAMINA = {
   movilHorizontal: { ajilei: 32, cifra: 34, moneda: 60, frase: 18 },
 }
 const TOL = 0.6
-const SALDO_INICIAL = 5000   // AJILEI_CONFIG.economy.saldoInicial
+// ── APU-1 1e · EL SALDO DE LA TARJETA YA NO ES UNA CONSTANTE ────────────
+// Era `economy.saldoInicial` —1e-iii la partió en `economy.pilaPruebas` y el
+// bolsillo de `lib/saldo.js`— y estaba bien mientras TODO EL MUNDO se
+// sentaba con esa cifra. Desde 1e el jugador elige con cuánto se sienta, la mesa
+// se crea con `jugadoresVsIA` y `fichasNetas` se mide contra la ENTRADA (§2.5),
+// así que las tres cosas que este arnés cruza —saldo pintado, netas y entrada—
+// giran ahora alrededor de este número y no de aquella constante.
+//
+// Se DERIVA de la ruta que el arnés recorre, no se escribe a mano: `recorrerRuta`
+// entra siempre por `basico`, apuesta 0 y entrada `piso`, y el piso lo dice
+// `entrada.js`. Si mañana la ruta del arnés cambia de mesa, esta cifra la sigue
+// sola — que es justo lo que la constante de 5.000 no hacía.
+//
+// C-0.1 · y el MULTIPLICADOR también sale de ahí. Estaba escrito a mano (`5 *`),
+// así que cuando 1f-A4 subió el piso de 5× a 10× este arnés se quedó midiendo
+// contra una entrada que la app ya no cobra: la promesa de derivar estaba en el
+// comentario, no en el código.
+const ENTRADA_ARNES_CEL = pisoDe(apuestasDe('basico')[0])
+const SALDO_INICIAL = ENTRADA_ARNES_CEL
 // CEL-1b · el hueco fijo entre la moneda de aterrizaje y la cifra del saldo.
 // Constante LOCAL declarada en celebracion.css §CEL-1b: el Sistema de Diseno
 // v1.2 no define escala de espaciado, asi que no hay token que citar. Vive aqui
@@ -1360,7 +1382,9 @@ async function puertaSalto(browser, fallos) {
     r.cosecha = await page.evaluate(cosechaArco)
     // Y el botón de salir responde, que es la promesa que acompaña al salto.
     await page.click('.cel-screen .btn-primary')
-    await page.waitForSelector('.mode-select-card', { timeout: 5000 })
+    // APU-1 1e · salir de la mesa aterriza en «Retar a las IAS», no en
+    // `ModeSelect`, que se retiró del árbol.
+    await page.waitForSelector('[data-accion="reto"]', { timeout: 5000 })
     r.salida = true
   } catch (e) { fallos.push(`salto: ${e.message}`); r.salida = false }
   await ctx.close()
@@ -1741,15 +1765,7 @@ async function controlNegativo(browser) {
     await page.goto(BASE, { waitUntil: 'networkidle' })   // SIN ?cel
     // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo: el
     // texto sale ahora de un diccionario (IDI-0) y cambiará con el idioma.
-    await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
-    await page.click('[data-accion="jugar-ia"]')
-    await page.waitForSelector('.nivel-grid button')
-    await page.click('.nivel-grid button:nth-of-type(1)')
-    await page.waitForSelector('.mode-select-card')
-    await page.click('button:has-text("Mesa de 5 jugadores")')
-    await page.waitForSelector('.mode-stake-btn')
-    await page.click('.mode-stake-grid button:nth-of-type(1)')
-    await page.waitForSelector('.game-table')
+    await recorrerRuta(page, 5, 'basico', 0, 'piso')
     await page.click('button:has-text("Iniciar mano")')
     await page.waitForTimeout(3500)   // ante + barajado + reparto
     r.termina = await page.locator('.game-over-screen').count() > 0
