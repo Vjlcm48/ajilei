@@ -127,3 +127,6 @@ capturas-apu/
 # MOT-1 Fase 1-0 · sonda de empaquetado DESECHABLE. No viaja nunca; Victor la
 # borra al cerrar la fase, y con ella esta línea.
 supabase/functions/sonda_mot1/
+
+# IDX-1 · salida de scripts/gen-idx.mjs (hoja de contacto) y capturas de revisión.
+capturas-idx/

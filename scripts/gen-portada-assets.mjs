@@ -25,11 +25,23 @@
 // entra en su techo por bisección, y reporta la que usó. Fijar una calidad a ojo
 // y esperar que entre es cómo se pasan los techos sin que nadie se entere.
 //
-// Uso:  node scripts/gen-portada-assets.mjs
+// ── LAS CINCO COPAS LLEVAN EL ÍNDICE DIGITAL (IDX-1 Fase 1b, B-4) ───────────
+// Las cartas de la Portada son las del juego: salen de sus maestros PNG
+// pasando por IDX-1 en memoria (aplanar, borrar los índices viejos, factor
+// SELLADO, número nuevo) con el mismo núcleo que `gen-cards.mjs`, y después
+// se reducen y se pesan como siempre. Si una no pasa la comprobación de
+// holgura (B-2) o le quedan restos del número viejo, no se escribe ninguna.
+// Las tres capturas (`mesav`, `mesapc`, `og-image`) no cambian de método.
+//
+// Uso:  node scripts/gen-portada-assets.mjs               los ocho
+//       node scripts/gen-portada-assets.mjs uno_copa ...  sólo esos ids
+//       node scripts/gen-portada-assets.mjs cartas        sólo las cinco copas
 import { chromium } from 'playwright-core'
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs'
 import { resolve, dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CARTAS as CARTAS_IDX } from './idx/idxCore.mjs'
+import { abrirIdx, procesarCarta, motivosDeParada, avisosDeRegla } from './idx/idxNavegador.mjs'
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SALIDA_SRC = resolve(RAIZ, 'src/assets/portada')
@@ -63,6 +75,7 @@ const TRABAJOS = [
     techo: 25 * 1024,
     tipo: 'image/webp',
     recorte: null,
+    idx: true,                // pasa por el índice digital (IDX-1)
   })),
   {
     id: 'mesav',
@@ -99,6 +112,15 @@ const TRABAJOS = [
   },
 ]
 
+// Qué se regenera: todo, o sólo los ids pedidos («cartas» = las cinco copas).
+const pedidos = process.argv.slice(2).flatMap((a) => (a === 'cartas' ? CARTAS : [a]))
+const desconocidos = pedidos.filter((id) => !TRABAJOS.some((t) => t.id === id))
+if (desconocidos.length) {
+  console.log(`STOP :: ids desconocidos: ${desconocidos.join(', ')} (válidos: ${TRABAJOS.map((t) => t.id).join(', ')}, cartas)`)
+  process.exit(1)
+}
+const trabajos = pedidos.length ? TRABAJOS.filter((t) => pedidos.includes(t.id)) : TRABAJOS
+
 const TIPOS = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.webp': 'image/webp', '.svg': 'image/svg+xml',
@@ -118,7 +140,46 @@ mkdirSync(SALIDA_SRC, { recursive: true })
 mkdirSync(SALIDA_PUB, { recursive: true })
 
 const informe = []
-for (const t of TRABAJOS) {
+
+// ── Las copas, por IDX-1 ────────────────────────────────────────────────────
+// Todas en memoria primero; se escriben sólo si todas pasan la comprobación.
+const conIdx = trabajos.filter((t) => t.idx)
+if (conIdx.length) {
+  const idx = await abrirIdx()
+  const resultados = []
+  for (const t of conIdx) {
+    const carta = CARTAS_IDX.find((c) => c.nombre === t.id)
+    if (!carta) throw new Error(`${t.id} no es una carta de IDX-1`)
+    resultados.push(await procesarCarta(idx.pagina, carta, { derivados: [{ clave: 'portada', ancho: t.ancho, techo: t.techo, calidadTope: t.calidadTope ?? 0.92 }] }))
+  }
+  await idx.navegador.close()
+  for (const a of avisosDeRegla(resultados)) console.log(`REGLA :: ${a}`)
+  const paradas = motivosDeParada(resultados)
+  if (paradas.length) {
+    console.log(`STOP :: ${paradas.length} carta(s) no pasan la comprobación (B-2); no se escribe ninguna`)
+    for (const m of paradas) console.log(`   ${m}`)
+    await navegador.close()
+    process.exit(1)
+  }
+  for (const [i, t] of conIdx.entries()) {
+    const r = resultados[i]
+    const d = r.derivados.portada
+    writeFileSync(t.destino, Buffer.from(d.b64, 'base64'))
+    const real = statSync(t.destino).size
+    const antes = statSync(resolve(RAIZ, t.origen)).size
+    const veredicto = real <= t.techo ? 'DENTRO' : 'PASADO'
+    const f = typeof r.factor === 'number' ? r.factor.toFixed(2) : r.factor
+    console.log(
+      `${veredicto === 'DENTRO' ? 'OK   ' : 'TECHO'} :: ${t.id.padEnd(12)} IDX factor ${f} · holgura ${r.holguraDespues.px} px → ` +
+      `${String(d.ancho).padStart(4)}×${String(d.alto).padEnd(4)} · q=${d.calidad.toFixed(3)} · ${String(real).padStart(7)} B ` +
+      `(techo ${t.techo}) · maestro ${antes} B · −${(100 - real / antes * 100).toFixed(1)} %`
+    )
+    informe.push({ id: t.id, bytes: real, techo: t.techo, calidad: d.calidad, veredicto })
+  }
+}
+
+// ── Las capturas, como siempre ──────────────────────────────────────────────
+for (const t of trabajos.filter((x) => !x.idx)) {
   const rutaOrigen = resolve(RAIZ, t.origen)
   if (!existsSync(rutaOrigen)) {
     console.log(`FALTA :: ${t.id} — no existe ${t.origen}`)
@@ -245,5 +306,5 @@ await navegador.close()
 const total = informe.reduce((a, x) => a + (x.bytes ?? 0), 0)
 const pasados = informe.filter((x) => x.veredicto === 'PASADO' || x.error)
 console.log(`\nTOTAL :: ${informe.length} derivados · ${total} B (${(total / 1024).toFixed(1)} KiB)`)
-console.log(pasados.length ? `AVISO :: ${pasados.length} fuera de techo o sin maestro` : 'TECHOS :: los ocho DENTRO')
+console.log(pasados.length ? `AVISO :: ${pasados.length} fuera de techo o sin maestro` : `TECHOS :: ${informe.length === TRABAJOS.length ? 'los ocho' : `los ${informe.length} regenerados`} DENTRO`)
 process.exit(pasados.length ? 1 : 0)

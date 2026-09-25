@@ -22,11 +22,23 @@
 // original a tamaño de mesa. El escape a q90 que el rector se reservó es
 // cambiar CALIDAD aquí y volver a correr: un número, no una excursión.
 //
+// ── EL ÍNDICE DIGITAL (IDX-1 Fase 1b, B-4) ──────────────────────────────────
+// Cada carta pasa por IDX-1 EN MEMORIA antes de reducirse: se aplana la crema,
+// se borran los dos índices viejos, se aplica el factor SELLADO del dibujo
+// (`FACTORES_SELLADOS`, B-1) y se pinta el número nuevo. Sin segundo maestro:
+// en el repo no hay ningún PNG con índice, sólo los maestros de siempre y
+// estos WebP. El núcleo es el de `scripts/idx/`, el mismo de la hoja de
+// contacto (`gen-idx.mjs`) y de la Portada (`gen-portada-assets.mjs`).
+//
+// Si una carta baja de 17,0 px de holgura con su factor sellado, o le quedan
+// restos del número viejo, el script se detiene SIN escribir ni un WebP (B-2).
+//
 // Uso:  node scripts/gen-cards.mjs
-import { chromium } from 'playwright-core'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CARTAS } from './idx/idxCore.mjs'
+import { abrirIdx, procesarCarta, motivosDeParada, avisosDeRegla } from './idx/idxNavegador.mjs'
 
 const ANCHO   = 320     // Fase 0 §2: máximo pintado 250 px físicos; 320 da un 28 % de margen.
 const CALIDAD = 0.80    // Fase 0 §6: q80 indistinguible a tamaño de mesa; q90 es el escape.
@@ -42,64 +54,61 @@ const TECHO_TOTAL = 0.80 * 1024 * 1024
 
 const maestros = readdirSync(ORIGEN).filter((n) => n.toLowerCase().endsWith('.png')).sort()
 console.log(`MAESTROS :: ${maestros.length} PNG en src/assets/cards/`)
-if (maestros.length !== 40) console.log(`AVISO :: se esperaban 40, hay ${maestros.length}`)
+// Las 40 del índice y los 40 maestros han de ser el mismo conjunto: una carta
+// sin factor sellado, o un maestro sin carta, es algo que cambió bajo los pies.
+const esperadas = CARTAS.map((c) => `${c.nombre}.png`).sort()
+if (maestros.join() !== esperadas.join()) {
+  console.log(`STOP :: los maestros no son las 40 cartas de IDX-1 (sobran: ${maestros.filter((m) => !esperadas.includes(m)).join(', ') || '—'}; faltan: ${esperadas.filter((m) => !maestros.includes(m)).join(', ') || '—'})`)
+  process.exit(1)
+}
 
 mkdirSync(SALIDA, { recursive: true })
 
 // Una sola sesión de navegador para las 40. Abrir Edge por carta serían 40
-// arranques para el mismo canvas.
-const navegador = await chromium.launch({ channel: 'msedge', headless: true })
-const pagina = await navegador.newPage()
+// arranques para el mismo canvas. La página IDX sólo ve archivos del repo.
+const { navegador, pagina, versionEdge } = await abrirIdx()
+console.log(`EDGE :: ${versionEdge}`)
 
 const comoDataURI = (ruta, tipo) => `data:${tipo};base64,${readFileSync(ruta).toString('base64')}`
 
+// Primero las 40 en memoria; se escribe sólo si TODAS pasan la comprobación.
+// Una parada a mitad dejaría el juego con media baraja vieja y media nueva.
+const resultados = []
+for (const carta of CARTAS) {
+  const r = await procesarCarta(pagina, carta, { derivados: [{ clave: 'juego', ancho: ANCHO, calidad: CALIDAD }] })
+  resultados.push(r)
+  const f = typeof r.factor === 'number' ? r.factor.toFixed(2) : r.factor
+  console.log(`IDX  :: ${r.nombre.padEnd(14)} factor ${f.padEnd(12)} holgura ${String(r.holguraDespues.px).padStart(6)} px · ${r.estado}`)
+}
+
+for (const a of avisosDeRegla(resultados)) console.log(`REGLA :: ${a}`)
+const paradas = motivosDeParada(resultados)
+if (paradas.length) {
+  console.log(`\nSTOP :: ${paradas.length} carta(s) no pasan la comprobación (B-2); no se escribe ningún WebP`)
+  for (const m of paradas) console.log(`   ${m}`)
+  await navegador.close()
+  process.exit(1)
+}
+
 const informe = []
-for (const nombre of maestros) {
-  const rutaOrigen = resolve(ORIGEN, nombre)
-
-  const salida = await pagina.evaluate(async ({ uri, ancho, calidad }) => {
-    const img = new Image()
-    img.src = uri
-    await img.decode()
-    const alto = Math.round((ancho * img.naturalHeight) / img.naturalWidth)
-
-    const lienzo = document.createElement('canvas')
-    lienzo.width = ancho
-    lienzo.height = alto
-    const ctx = lienzo.getContext('2d')
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, 0, 0, ancho, alto)
-
-    const d = lienzo.toDataURL('image/webp', calidad)
-    return {
-      dataURL: d,
-      // Si este Chromium no supiera codificar WebP, `toDataURL` devolvería un
-      // PNG sin avisar. Se PREGUNTA por el tipo que salió, no se supone.
-      tipo: d.slice(5, d.indexOf(';')),
-      origenW: img.naturalWidth, origenH: img.naturalHeight,
-      salidaW: ancho, salidaH: alto,
-    }
-  }, { uri: comoDataURI(rutaOrigen, 'image/png'), ancho: ANCHO, calidad: CALIDAD })
-
-  if (salida.tipo !== 'image/webp') {
-    console.log(`STOP :: ${nombre} — el canvas devolvió ${salida.tipo}, no image/webp`)
-    await navegador.close()
-    process.exit(1)
-  }
-
-  const destino = resolve(SALIDA, nombre.replace(/\.png$/i, '.webp'))
-  writeFileSync(destino, Buffer.from(salida.dataURL.slice(salida.dataURL.indexOf(',') + 1), 'base64'))
-
+for (const r of resultados) {
+  const d = r.derivados.juego
+  const rutaOrigen = resolve(ORIGEN, `${r.nombre}.png`)
+  const destino = resolve(SALIDA, `${r.nombre}.webp`)
+  writeFileSync(destino, Buffer.from(d.b64, 'base64'))
   informe.push({
-    nombre: nombre.replace(/\.png$/i, ''),
+    nombre: r.nombre,
     destino,
     bytesOrigen: statSync(rutaOrigen).size,
     bytes: statSync(destino).size,
-    origenW: salida.origenW, origenH: salida.origenH,
-    salidaW: salida.salidaW, salidaH: salida.salidaH,
+    origenW: 1055, origenH: 1491,
+    salidaW: d.ancho, salidaH: d.alto,
   })
 }
+
+// La verificación decodifica con `data:` URIs, que la página IDX no deja
+// cargar (aborta todo lo que no sea su origen): va en una página en blanco.
+const paginaVerif = await navegador.newPage()
 
 // ── Verificación sobre lo ESCRITO, no sobre lo que se creyó escribir ────────
 // Se vuelven a decodificar los 40 ficheros desde disco: dimensiones reales y
@@ -107,7 +116,7 @@ for (const nombre of maestros) {
 const fallos = []
 for (const f of informe) {
   if (f.bytes === 0) { fallos.push(`${f.nombre}: 0 bytes`); continue }
-  const dim = await pagina.evaluate(async (uri) => {
+  const dim = await paginaVerif.evaluate(async (uri) => {
     const img = new Image()
     img.src = uri
     await img.decode()
@@ -123,7 +132,7 @@ await navegador.close()
 
 // ── La tabla ────────────────────────────────────────────────────────────────
 const kb = (b) => (b / 1024).toFixed(1)
-console.log(`\n=== CAR-1 · baraja a ${ANCHO} px · WebP q${CALIDAD} ===`)
+console.log(`\n=== CAR-1 + IDX-1 · baraja a ${ANCHO} px · WebP q${CALIDAD} ===`)
 console.log('carta'.padEnd(16), 'px'.padStart(9), 'KB origen'.padStart(10), 'KB WebP'.padStart(9), 'ratio'.padStart(8))
 for (const f of informe) {
   console.log(
