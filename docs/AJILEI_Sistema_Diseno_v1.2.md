@@ -313,3 +313,69 @@ inexistente **en verde**. Ahora reconocen por nombre base, que es lo estable. Y
 el comentario de `public/_headers` ponía `heptacoin.webp` de ejemplo de fichero
 sin hash; se cambió por los iconos de `icons/`, que sí siguen en `public/`.
 Ninguna regla cambió.
+
+**6 · Índice digital de las cartas (IDX-1) — adenda del 2026-09-25, sin cambio
+de versión.** *(La ficha de cierre la llama «§12.5»; como la nota 5 ya existía,
+entra como 6 para no renumerar nada.)*
+
+**Los PNG maestros no cambian de papel, pero los derivados del juego sí.** Los
+40 PNG de `src/assets/cards/` siguen siendo la fuente de la baraja y son,
+además, **la baraja clásica**: la que vale para imprenta, con sus dos índices
+viejos. Se matiza la nota 4: los derivados del juego **ya no son una simple
+reducción** del maestro. `scripts/gen-cards.mjs` pasa cada carta por IDX-1 **en
+memoria** antes de reducirla, y lo mismo hace `scripts/gen-portada-assets.mjs`
+con las cinco copas de la Portada. **No hay segundo maestro:** en el repo no
+existe ningún PNG con el índice nuevo.
+
+**La regla del índice.**
+
+| Qué | Valor |
+|---|---|
+| Letra | Roboto Condensed 600 (`scripts/fonts/`, OFL) |
+| Alto de la tinta de la cifra | 16 % del alto de la carta del 1 al 7 · 12 % en 10, 11 y 12 |
+| Posición | la tinta empieza en y = 93 y acaba en x = 976 (px del maestro de 1055×1491), la misma para el 1 y el 11 |
+| Contorno | crema `#F5EDD8`, 9 px por lado |
+| Lo que desaparece | el índice inferior girado y el símbolo de palo: un solo número, arriba a la derecha |
+
+**Colores por palo** (todas las cartas del palo, figuras incluidas):
+
+| Palo | Color |
+|---|---|
+| Oros | `#CF142B` |
+| Copas | `#235C38` |
+| Espadas | `#003893` |
+| Bastos | `#7A5200` |
+
+Ninguno es el oro de marca.
+
+**Holgura y factores.**
+
+- **El dibujo ha de quedar a ≥ 18 px del número.** Cuando no llegaba, se encogió
+  el dibujo entero de 1 en 1 %, con un **suelo del 85 %**. El 4 de oros es
+  aparte: se recolocan sus cuatro monedas al 84 %.
+- **El resultado está SELLADO** en la tabla `FACTORES_SELLADOS` de
+  `scripts/idx/idxCore.mjs`: 31 cartas a 1 y 9 encogidas (la que más, al 90 %).
+  El generador aplica la tabla y **no recalcula**.
+- **La regla queda como comprobación:** si una carta baja de **17,0 px** con su
+  factor sellado, o le quedan restos del número viejo, el generador **se
+  detiene sin escribir nada**.
+
+**Cómo se regenera.**
+
+| Comando | Qué hace |
+|---|---|
+| `node scripts/gen-cards.mjs` | Las 40 de `src/assets/cards/webp/` (320 px, WebP q80, techo de alarma 0,80 MB) |
+| `node scripts/gen-portada-assets.mjs cartas` | Sólo las cinco copas de la Portada (techo de 25 KB por archivo) |
+| `node scripts/gen-idx.mjs` | La hoja de contacto de revisión (`capturas-idx/hoja.html`, ignorada): la baraja clásica («Hoy») frente a la nueva, a tamaño de mesa |
+
+Los tres usan el mismo núcleo, `scripts/idx/`: `idxCore.mjs` para la lógica pura
+con pruebas, `idxPagina.mjs` para lo que corre en Edge e `idxNavegador.mjs`
+para abrir la página. Sólo hace falta regenerar si cambian los maestros.
+
+*Aviso medido:* en las 9 cartas encogidas Edge rasteriza el número por GPU, y
+entre corridas el borde de antialias varía ±1 nivel. Esa variación sólo aparece
+al regenerar. Lo commiteado es, al byte, lo que Victor aprobó (IDX-1, C-1).
+Detalle en `docs/reportes/AJILEI_IDX-1_Fase1b_Informe_v1.0.md` §4.
+
+*Pendiente (IDX-1 Fase 1c, D-14):* las capturas `mesav`, `mesapc` y
+`public/og-image.jpg` siguen enseñando la baraja clásica hasta que se rehagan.
