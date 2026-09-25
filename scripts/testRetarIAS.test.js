@@ -12,6 +12,7 @@ import { proyectar, crearMemoria } from '../src/config/memoriaChips.js'
 import {
   CLAVE_RETO, CLAVE_RETO_LEGADO, JUGADORES_IA, CONFIG_RETO_DEFECTO, ORDEN_FILAS,
   MOTIVO_SIN_SALDO, MEMORIA_RETO,
+  CASO_ALCANZA, CASO_RETO_MENOR, CASO_SIN_MESA, avisoDeSaldo, alcanzaAlgunReto,
   normalizarReto, alcanzaMesa, elegir, filaHabilitada, listo, hayComodin,
   opcionesReto, opcionesJugadores, opcionesApuesta, opcionesEntrada,
   topeEntrada, idEntrada, pasoEntrada, entradaDeLaSesion, pilaDeCadaIA,
@@ -333,5 +334,89 @@ describe('6. Lo que el aviso de la cuarta fila promete', () => {
 
   it('sin entrada elegida no hay promesa que enseñar', () => {
     expect(pilaDeCadaIA(null, 100)).toBe(null)
+  })
+})
+
+describe('7. RET-A · El aviso de saldo (§ tanda corta, decisiones de Victor)', () => {
+  // Los pisos de HOY, derivados y no escritos: Básico 10×50 = 500 · Avanzado
+  // 10×100 = 1.000 · Pro 10×200 = 2.000. Los bordes se prueban en los dos lados
+  // porque un `>=` mal puesto sólo se ve en el borde, nunca en el medio.
+  const PISO_BASICO   = pisoDe(Math.min(...apuestasDe('basico')))
+  const PISO_AVANZADO = pisoDe(Math.min(...apuestasDe('avanzado')))
+  const PISO_PRO      = pisoDe(Math.min(...apuestasDe('pro')))
+
+  it('los pisos de los tres retos son los que la regla da por supuestos', () => {
+    // La regla del rector —«en Básico sólo puede darse el caso 2»— se apoya en
+    // que los pisos crecen con el reto. Si una tabla de `niveles.js` se moviera
+    // y dejara de ser así, esto salta aquí y no en la pantalla.
+    expect([PISO_BASICO, PISO_AVANZADO, PISO_PRO]).toEqual([500, 1000, 2000])
+    expect(PISO_BASICO).toBeLessThan(PISO_AVANZADO)
+    expect(PISO_AVANZADO).toBeLessThan(PISO_PRO)
+  })
+
+  it('un reto es alcanzable en cuanto lo es su mesa más barata', () => {
+    expect(alcanzaAlgunReto('pro', PISO_PRO)).toBe(true)
+    expect(alcanzaAlgunReto('pro', PISO_PRO - 1)).toBe(false)
+  })
+
+  it('caso 0 · con una mesa del reto a tiro no hay aviso', () => {
+    expect(avisoDeSaldo(4500, 'pro')).toEqual({ caso: CASO_ALCANZA, retoSugerido: null })
+  })
+
+  it('el borde de Pro: 1.999 avisa, 2.000 no', () => {
+    expect(avisoDeSaldo(2000, 'pro').caso).toBe(CASO_ALCANZA)
+    expect(avisoDeSaldo(1999, 'pro')).toEqual({ caso: CASO_RETO_MENOR, retoSugerido: 'avanzado' })
+  })
+
+  it('el borde de Avanzado: 999 avisa, 1.000 no', () => {
+    expect(avisoDeSaldo(1000, 'avanzado').caso).toBe(CASO_ALCANZA)
+    expect(avisoDeSaldo(999, 'avanzado')).toEqual({ caso: CASO_RETO_MENOR, retoSugerido: 'basico' })
+  })
+
+  it('el borde de los 500, en los tres retos', () => {
+    // Por debajo del piso de Básico no hay mesa en ninguna parte: caso 2 en los
+    // tres. Justo en 500, Básico se abre y los otros dos pasan a sugerirlo.
+    for (const reto of NIVELES.map((n) => n.id)) {
+      expect(avisoDeSaldo(499, reto)).toEqual({ caso: CASO_SIN_MESA, retoSugerido: null })
+    }
+    expect(avisoDeSaldo(500, 'basico').caso).toBe(CASO_ALCANZA)
+    expect(avisoDeSaldo(500, 'avanzado')).toEqual({ caso: CASO_RETO_MENOR, retoSugerido: 'basico' })
+    expect(avisoDeSaldo(500, 'pro')).toEqual({ caso: CASO_RETO_MENOR, retoSugerido: 'basico' })
+  })
+
+  it('el salto de Pro a Básico cuando Avanzado tampoco alcanza', () => {
+    // 800: no llega a Pro (2.000) ni a Avanzado (1.000), pero sí a Básico (500).
+    // Se nombra el MÁS ALTO alcanzable, no el siguiente hacia abajo: saltar un
+    // peldaño es exactamente lo que este caso existe para hacer.
+    expect(avisoDeSaldo(800, 'pro')).toEqual({ caso: CASO_RETO_MENOR, retoSugerido: 'basico' })
+  })
+
+  it('en Básico no existe el caso 1: o alcanza, o no hay mesa en ninguna parte', () => {
+    for (const saldo of [0, 1, 499, 500, 2500, 100000]) {
+      expect(avisoDeSaldo(saldo, 'basico').caso).not.toBe(CASO_RETO_MENOR)
+    }
+  })
+
+  it('el reto sugerido es siempre uno de los declarados, y más bajo que el elegido', () => {
+    const ids = NIVELES.map((n) => n.id)
+    for (const reto of ids) {
+      for (const saldo of [0, 499, 500, 999, 1000, 1999, 2000, 9999]) {
+        const { caso, retoSugerido } = avisoDeSaldo(saldo, reto)
+        if (caso !== CASO_RETO_MENOR) { expect(retoSugerido).toBe(null); continue }
+        expect(ids).toContain(retoSugerido)
+        expect(ids.indexOf(retoSugerido)).toBeLessThan(ids.indexOf(reto))
+        // Y lo que se sugiere se puede jugar de verdad: un aviso que nombre un
+        // reto igual de inalcanzable sería peor que no avisar.
+        expect(alcanzaAlgunReto(retoSugerido, saldo)).toBe(true)
+      }
+    }
+  })
+
+  it('sin reto elegido no hay aviso, ni siquiera con el bolsillo vacío', () => {
+    // La regla del rector es literal: «Sin reto elegido, no hay aviso». Con 0 en
+    // el bolsillo la tentación sería devolver el caso 2 igualmente, y es justo
+    // lo que no se hace — un aviso sobre un reto que nadie eligió.
+    expect(avisoDeSaldo(0, null)).toEqual({ caso: CASO_ALCANZA, retoSugerido: null })
+    expect(avisoDeSaldo(0, 'inventado')).toEqual({ caso: CASO_ALCANZA, retoSugerido: null })
   })
 })

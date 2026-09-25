@@ -1095,7 +1095,8 @@ async function runLob(browser) {
 //
 // Mide lo que una pantalla de decisión tiene que cumplir: que las cuatro filas
 // estén, que la CASCADA funcione en los dos sentidos —habilitar hacia abajo,
-// apagar al cambiar arriba—, que el gris por saldo se explique con su cifra,
+// apagar al cambiar arriba—, que el gris por saldo aparezca donde toca y que el
+// aviso de saldo (RET-A) salga con su botón sólo cuando no hay mesa a tiro,
 // que el contador de «Otra…» no se salga del rango legal, que nada desborde y
 // que la consola calle. Y deja las tres capturas que Victor tiene que mirar.
 //
@@ -1114,6 +1115,13 @@ const RETAR_PUNTOS = ['retar.1', 'retar.2', 'retar.3', 'retar.4', 'retar.5', 're
 // casi el bono de bienvenida (2.500), o sea el bolsillo con el que de verdad
 // llega alguien nuevo.
 const RETAR_SALDO_GRIS = 2400
+
+// RET-A · El saldo del CASO 1. Con 1.500 en Pro no hay mesa a tiro —la más
+// barata pide 2.000— pero Avanzado sí (1.000), así que el aviso tiene que
+// nombrar a Avanzado. Se elige 1.500 y no 1.999 porque es una cifra que un
+// jugador reconoce como suya; el borde exacto lo sella Vitest, que es quien
+// sabe probar bordes.
+const RETAR_SALDO_AVISO = 1500
 
 // ── EL RUIDO QUE YA HABÍA, NOMBRADO UNO A UNO ─────────────────────────
 // Este modo es el primero de `diagDSK` que escucha `console` y no sólo
@@ -1323,28 +1331,119 @@ async function runRetar(browser) {
     }
 
     // retar.4 · el gris por saldo, con la siembra de `?apu`
-    await page.goto(`${BASE}/?apu=saldo:${RETAR_SALDO_GRIS}`)
-    await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
-    await page.click('[data-accion="jugar-ia"]')
-    await page.waitForSelector('[data-accion="reto"]')
-    await page.click('[data-accion="reto"]:nth-of-type(3)')        // Pro
-    await page.click('[data-accion="jugadores"]:nth-of-type(1)')   // mesa de 2
-    await page.waitForTimeout(180)
-    const gris = await page.evaluate(() => ({
-      apagadas: [...document.querySelectorAll('[data-accion="apuesta"]')].filter((b) => b.disabled).length,
-      aviso: document.querySelector('[data-accion="aviso-mesa"]')?.textContent?.trim() ?? '',
-      avisoOn: document.querySelector('[data-accion="aviso-mesa"]')?.classList.contains('is-on') ?? false,
-      saldo: document.querySelector('.lob-pildora')?.textContent?.trim() ?? '',
-    }))
+    //
+    // ── RET-A · ESTA CELDA CAMBIÓ DE PREGUNTA ──────────────────────────────
+    // Medía que «el gris se explique con su cifra»: el aviso naranja bajo la
+    // fila de mesas que nombraba el piso de la primera apagada. Ese aviso se
+    // retiró —el chip en gris ES el mensaje— así que la celda ya no puede
+    // buscarlo; lo que mide ahora es que NO esté, y que en su lugar aparezca,
+    // cuando toca, el aviso de saldo con su botón. Quien mueve la ruta recablea
+    // el metro: la celda no se afloja, cambia de objeto.
+    const irAPro = async (saldo) => {
+      await page.goto(`${BASE}/?apu=saldo:${saldo}`)
+      await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+      await page.click('[data-accion="jugar-ia"]')
+      await page.waitForSelector('[data-accion="reto"]')
+      await page.click('[data-accion="reto"]:nth-of-type(3)')        // Pro
+      await page.click('[data-accion="jugadores"]:nth-of-type(1)')   // mesa de 2
+      await page.waitForTimeout(180)
+    }
+    const leerSaldo = () => page.evaluate(() => {
+      const bloque = document.querySelector('[data-accion="aviso-saldo"]')
+      return {
+        apagadas: [...document.querySelectorAll('[data-accion="apuesta"]')].filter((b) => b.disabled).length,
+        // El aviso viejo vivía aquí. Que el nodo no exista es la mitad de lo
+        // que esta celda defiende ahora.
+        avisoMesa: Boolean(document.querySelector('[data-accion="aviso-mesa"]')),
+        hayBloque: Boolean(bloque),
+        texto: bloque?.querySelector('p')?.textContent?.trim() ?? '',
+        boton: bloque?.querySelector('[data-accion="mas-monedas"]')?.textContent?.trim() ?? '',
+        botonAlto: Math.round(bloque?.querySelector('[data-accion="mas-monedas"]')?.getBoundingClientRect().height ?? 0),
+        // Sin rojo ni naranja en ninguna de las dos piezas: la casa reserva esos
+        // dos para los problemas, y un bolsillo corto no lo es.
+        colores: [...(bloque?.querySelectorAll('p, button') ?? [])].map((n) => getComputedStyle(n).color),
+        // La nota bajo el CTA. Con el aviso puesto se oculta —dice «Elige reto,
+        // jugadores, apuesta y entrada» y no hay nada que elegir—, y sin él se
+        // queda como siempre.
+        //
+        // Se mide por lo que el OJO recibe, no por la clase ni por la caja: la
+        // caja sigue puesta a propósito (está debajo del CTA y soltarla lo
+        // bajaría), así que contar rectángulos diría «visible» siempre. Se
+        // pregunta por `visibility` y por que haya caja, que juntas son las dos
+        // maneras de esconder algo.
+        notaVisible: (() => {
+          const n = document.querySelector('[data-accion="cta-nota"]')
+          if (!n || n.getClientRects().length === 0) return false
+          return getComputedStyle(n).visibility === 'visible'
+        })(),
+        saldo: document.querySelector('.lob-pildora')?.textContent?.trim() ?? '',
+      }
+    })
+
+    await irAPro(RETAR_SALDO_GRIS)
+    const gris = await leerSaldo()
     c.shotGris = `${RETAR_OUT_DIR}/retar_gris_${vp.w}x${vp.h}.png`
     await page.screenshot({ path: c.shotGris })
+
+    // El caso 1: con 1.500 ninguna mesa de Pro está a tiro y el aviso manda a
+    // Avanzado. Se mide la geometría AQUÍ también, porque es el estado con un
+    // bloque de más en la columna — el que de verdad puede empujar el CTA.
+    await irAPro(RETAR_SALDO_AVISO)
+    const aviso = await leerSaldo()
+    const geoAviso = await medirGeoRetar(page)
+    c.shotAviso = `${RETAR_OUT_DIR}/retar_aviso_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shotAviso })
+
+    // ── Y QUE EL BOTÓN HAGA ALGO ───────────────────────────────────────────
+    // Esta línea existe por un fallo real de esta misma tanda: el botón se pintó
+    // bien, con su rótulo y su alto, y no hacía NADA —el manejador viaja por un
+    // contexto que monta la carcasa, y el bloque se había escrito en el
+    // componente que está por ENCIMA de ella, donde el contexto todavía no
+    // existe—. No lo cazó ninguna vara: lo cazó una captura. Un botón que se
+    // mide sólo por su aspecto es un botón a medio medir.
+    await page.click('[data-accion="mas-monedas"]')
+    await page.waitForTimeout(220)
+    const toast = await page.evaluate(() => {
+      const n = document.querySelector('.sal-toast')
+      return { on: n?.classList.contains('is-on') ?? false, texto: n?.textContent?.trim() ?? '' }
+    })
+    c.shotPronto = `${RETAR_OUT_DIR}/retar_pronto_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shotPronto })
+
+    const sinRojo = (colores) => colores.length > 0 && colores.every((col) => {
+      const [r, g, b] = col.match(/\d+/g).map(Number)
+      // Naranja y rojo de la casa: mucho rojo, poco azul. El dorado de la marca
+      // (232,184,75) no pasa por aquí porque su verde va pegado al rojo.
+      return !(r > 180 && b < 90 && r - g > 70)
+    })
+
     c['retar.4'] = {
-      ...gris,
+      gris, aviso, geoAviso, toast,
       // 1f-A4 · Pro pide 2.000 · 4.000 · 6.000 · 10.000 de piso. Con 2.400
-      // sobrevive SÓLO la primera y el aviso nombra la MÁS BARATA de las
-      // apagadas (4.000), que es la que el jugador está más cerca de alcanzar.
-      ok: gris.apagadas === 3 && gris.avisoOn && gris.aviso.includes('4.000')
-        && !gris.aviso.includes('⟦') && gris.saldo.includes('2.400'),
+      // sobrevive SÓLO la primera: tres chips apagados y NINGÚN aviso, porque
+      // hay mesa a tiro. Es el caso 0 del rector.
+      ok: gris.apagadas === 3 && !gris.avisoMesa && !gris.hayBloque
+        && gris.saldo.includes('2.400')
+        // Caso 0: la nota de la cascada sigue en su sitio.
+        && gris.notaVisible
+        // Caso 1: las cuatro apagadas, el bloque puesto, nombrando Avanzado, con
+        // su botón al mínimo táctil de la casa y sin un hueco sin llenar.
+        && aviso.apagadas === 4 && aviso.hayBloque && !aviso.avisoMesa
+        && aviso.texto.includes('Avanzado') && !aviso.texto.includes('⟦')
+        && aviso.boton === 'Conseguir más monedas' && aviso.botonAlto >= 40
+        && sinRojo(aviso.colores)
+        // …y al pulsarlo sale el MISMO «Pronto» que el `+` dorado de la
+        // cabecera, que es de donde lo toma prestado.
+        && toast.on && toast.texto === 'Pronto'
+        // …y la nota del CTA se ha ido, que es el ajuste del rector al revisar
+        // RET-A: no puede convivir con un aviso que dice que no hay nada que
+        // elegir.
+        && !aviso.notaVisible
+        // …y el bloque de más no deja el CTA fuera de la ventana.
+        && !geoAviso.desbordaH && geoAviso.rotos === 0
+        && (geoAviso.apaisado
+          ? geoAviso.ctaAlcanzable
+          : (geoAviso.ctaDentroSinTocar && !geoAviso.desbordaDoc)),
     }
 
     // retar.6 · geometría y silencio

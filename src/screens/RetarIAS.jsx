@@ -3,13 +3,16 @@ import { useState } from 'react'
 import PantallaChips from '../components/PantallaChips'
 import FilaChips from '../components/FilaChips'
 import { useIdioma } from '../hooks/useIdioma'
+import { usePronto } from '../hooks/usePronto'
 import { montoTexto } from '../config/tapetes'
+import { nivelPorId } from '../config/niveles'
 import { MOTIVOS_ENTRADA } from '../engine/entrada'
 import {
   MEMORIA_RETO, MOTIVO_SIN_SALDO, normalizarReto,
   elegir, filaHabilitada, listo,
   opcionesReto, opcionesJugadores, opcionesApuesta, opcionesEntrada,
   idEntrada, pasoEntrada, topeEntrada, entradaDeLaSesion, pilaDeCadaIA,
+  avisoDeSaldo, CASO_ALCANZA, CASO_RETO_MENOR,
 } from './retarCore'
 
 // ── APU-1 1e · «Retar a las IAS» ────────────────────────────────────────────
@@ -37,6 +40,39 @@ import {
 // la pantalla con el techo puesto de ayer puede sentarse con cincuenta veces la
 // apuesta sin haberlo decidido hoy. La política vive en `config/memoriaChips.js`
 // y esta pantalla sólo la declara.
+// ── RET-A · El aviso de saldo y su única salida ────────────────────────────
+// Componente aparte, y NO es gusto: `usePronto` lee el contexto que monta
+// `PantallaChips`, y `RetarIAS` está POR ENCIMA de esa carcasa en el árbol, así
+// que allí el hook devuelve `null` y el botón no haría nada. Medido con sonda:
+// el botón estaba y el toast no salía. Aquí abajo el bloque es hijo del Provider
+// y el manejador llega.
+//
+// La DECISIÓN —qué caso y qué frase— se queda en la pantalla: esto sólo pinta.
+function AvisoSaldo({ texto }) {
+  const { t } = useIdioma()
+  // El «Pronto» de la carcasa, el mismo del `+` dorado de la cabecera. Fuera de
+  // `PantallaChips` sería `null` y el botón no haría nada, que es preferible a
+  // tumbar la pantalla por un toast.
+  const pronto = usePronto()
+
+  return (
+    <section className="sal-saldo" data-accion="aviso-saldo">
+      {/* El aviso NO es un botón: quien cambia de reto son los chips de la fila
+          de arriba, y convertir la frase en un atajo dejaría dos maneras de
+          hacer lo mismo y un párrafo que se pulsa sin parecerlo. */}
+      <p className="sal-saldo-txt">{texto}</p>
+      <button
+        type="button"
+        className="sal-saldo-cta"
+        data-accion="mas-monedas"
+        onClick={pronto}
+      >
+        {t('ia.retar.saldo.cta')}
+      </button>
+    </section>
+  )
+}
+
 export default function RetarIAS({
   cuenta,
   saldoSesion,
@@ -96,6 +132,12 @@ export default function RetarIAS({
   const mover = (direccion) => {
     cambiar('entrada', pasoEntrada(entrada, unit, saldoSesion, direccion))
   }
+
+  // ── RET-A · El aviso de saldo ─────────────────────────────────────────────
+  // La regla entera está en `retarCore.avisoDeSaldo` y aquí sólo se pinta. Mira
+  // el SALDO y el RETO, nada más: ni la apuesta ni la entrada, que son las dos
+  // filas que el jugador recorre con el dedo.
+  const aviso = avisoDeSaldo(saldoSesion, reto)
 
   // ── El CTA y su nota ──────────────────────────────────────────────────────
   const completo = listo(config)
@@ -185,20 +227,28 @@ export default function RetarIAS({
       {/* Una mesa va en gris cuando el saldo de la sesión no cubre su PISO de
           entrada —10× la apuesta desde 1f-A4, §2.2 del normativo v1.1—, no
           cuando no cubre la apuesta: sentarse a la mesa de 150 cuesta 1.500, y
-          con 1.400 esa mesa no se puede jugar. */}
+          con 1.400 esa mesa no se puede jugar.
+
+          ── RET-A · ESTA FILA YA NO TIENE AVISO, Y NO ES UN OLVIDO ──────────
+          Llevaba uno que nombraba el piso de la primera mesa apagada, en el
+          naranja de los problemas. El chip en gris ya dice «esta mesa no», así
+          que el párrafo era el mismo mensaje dos veces; y lo que le faltaba al
+          jugador no era la cifra sino la salida, que ahora está abajo con su
+          botón. Se retira `accionAviso` entero en vez de dejarlo vacío porque
+          FilaChips sólo reserva la caja cuando la fila la declara, y una caja
+          reservada para algo que nunca se escribe son 1,4em de aire en una
+          columna que ya se aprieta para caber en un 1024×768. Tocar un chip
+          gris no hace nada: no hay pista ni toast, a propósito. */}
       <FilaChips
         titulo={t('ia.retar.apuesta')}
         accion="apuesta"
         opciones={opcionesApuesta(reto, saldoSesion).map((o) => ({
           ...o,
           etiqueta: montoTexto(o.etiqueta),
-          aviso: o.disabled ? t('ia.retar.aviso.saldo', { min: montoTexto(o.minimo) }) : null,
         }))}
         valor={apuesta}
         onChange={(hc) => cambiar('apuesta', hc)}
         deshabilitada={!filaHabilitada(config, 'apuesta')}
-        accionAviso="aviso-mesa"
-        claseAviso="es-anfitrion"
       />
 
       {/* ── 4 · Entrada ──────────────────────────────────────────────────── */}
@@ -266,6 +316,33 @@ export default function RetarIAS({
           </button>
         </span>
       </FilaChips>
+
+      {/* ── RET-A · El aviso de saldo y su única salida ─────────────────
+        Depende SÓLO del saldo y del reto (`retarCore.avisoDeSaldo`), así que
+        aparece y desaparece al tocar la PRIMERA fila, nunca al pasear por la
+        tercera o la cuarta.
+
+        ── POR QUÉ NO RESERVA CAJA, SIENDO O1 LA DOCTRINA ───────────────
+        O1 existe para que nada se mueva bajo el dedo que va a pulsar. Aquí
+        no puede pasar, y es mecánico: lo único que enciende o apaga este
+        bloque es cambiar de reto, y cambiar de reto LIMPIA apuesta y entrada
+        (la cascada de §2.2), o sea que el CTA queda apagado sí o sí en ese
+        mismo gesto. Nada que el jugador estuviera a punto de pulsar cambia
+        de sitio; las tres filas que hay por encima no se mueven, porque el
+        bloque crece hacia abajo. Reservarle caja, en cambio, costaría ~70 px
+        permanentes en una columna que ya se aprieta para caber en 768 de
+        alto, y se los cobraría al 100 % de las partidas para un estado que
+        casi nadie ve.
+
+        El botón es el ÚNICO nuevo de la pantalla y entra por el `pronto` de
+        la carcasa — el mismo «Pronto» del `+` dorado de la cabecera. */}
+      {aviso.caso !== CASO_ALCANZA && (
+        <AvisoSaldo
+          texto={aviso.caso === CASO_RETO_MENOR
+            ? t('ia.retar.saldo.reto', { reto: nivelPorId(aviso.retoSugerido).nombre })
+            : t('ia.retar.saldo.ninguno')}
+        />
+      )}
     </PantallaChips>
   )
 }

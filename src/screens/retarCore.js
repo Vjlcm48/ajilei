@@ -92,6 +92,73 @@ export function alcanzaMesa(apuesta, saldo) {
   return saldo >= pisoDe(apuesta)
 }
 
+// Un reto es alcanzable cuando ALGUNA de sus cuatro mesas lo es. Por la forma
+// de las tablas eso es siempre la más barata, pero se pregunta por las cuatro y
+// no por el mínimo: el día que una tabla deje de estar ordenada —o que un reto
+// tenga cinco mesas— la respuesta sigue siendo la correcta sin que nadie se
+// acuerde de este archivo.
+export function alcanzaAlgunReto(reto, saldo) {
+  return apuestasDe(reto).some((hc) => alcanzaMesa(hc, saldo))
+}
+
+// ── El aviso de saldo (RET-A) ─────────────────────────────────────────────
+// Rector: tanda corta post-APU-1, decisiones de Victor.
+//
+// ── QUÉ SE RETIRÓ Y POR QUÉ ────────────────────────────────────────────────
+// Hasta aquí el gris se explicaba chip a chip: «Te faltan fichas: sentarte a esa
+// mesa pide 4.000 HC», en naranja, bajo la fila de mesas. Eran dos mensajes para
+// un solo hecho —el chip ya estaba apagado— y el segundo llegaba en el color con
+// el que esta casa avisa de un problema, para algo que no lo es: un bolsillo
+// corto no es un error del jugador. El chip en gris ES el mensaje; lo que
+// faltaba era la salida, y ésa es la que se escribe aquí.
+//
+// ── DE QUÉ DEPENDE, Y DE QUÉ NO ────────────────────────────────────────────
+// Del SALDO y del RETO elegido. No de la apuesta ni de la entrada, y ésa es la
+// diferencia dura con el aviso viejo: aquél nacía de una mesa concreta, así que
+// se movía mientras el jugador paseaba el dedo por la tercera fila. Éste habla
+// del reto entero y sólo cambia cuando se cambia de reto — una fila arriba, que
+// además limpia las de abajo.
+//
+// Los tres casos son excluyentes y salen por su número, no por un booleano por
+// cada uno: pintar el aviso es UNA decisión con tres resultados.
+export const CASO_ALCANZA = 0      // alguna mesa del reto elegido está a tiro
+export const CASO_RETO_MENOR = 1   // ninguna, pero un reto inferior sí
+export const CASO_SIN_MESA = 2     // ninguna mesa de ningún reto
+
+/**
+ * Qué decirle al jugador sobre su bolsillo, dado el saldo y el reto elegido.
+ *
+ * Devuelve `{ caso, retoSugerido }`. `retoSugerido` es el id del reto —nunca su
+ * rótulo: los nombres viven en `niveles.js` desde NIV-UI y duplicarlos aquí
+ * sería abrir la puerta a que el chip diga una cosa y el aviso otra.
+ *
+ * SIN RETO no hay aviso. El reto de esta pantalla nunca es nulo —`preseleccion`
+ * lo cae a Básico— pero la función no lo da por hecho: un id desconocido pasaría
+ * por `apuestasDe`, que cae a Básico por su cuenta, y entonces esta función
+ * estaría respondiendo sobre un reto que el jugador no eligió.
+ *
+ * El «más alto por debajo» se busca en el orden de `NIVELES`, que es el orden de
+ * contrato de NIV-UI, y hacia abajo desde el elegido. No se ordena por piso: si
+ * un día las tablas dejaran de ser monótonas, lo que el jugador entiende por
+ * «un reto más fácil» seguiría siendo el que está antes en la fila de chips.
+ */
+export function avisoDeSaldo(saldo, reto) {
+  const i = NIVELES.findIndex((n) => n.id === reto)
+  if (i < 0) return { caso: CASO_ALCANZA, retoSugerido: null }
+  if (alcanzaAlgunReto(reto, saldo)) return { caso: CASO_ALCANZA, retoSugerido: null }
+
+  for (let j = i - 1; j >= 0; j -= 1) {
+    if (alcanzaAlgunReto(NIVELES[j].id, saldo)) {
+      return { caso: CASO_RETO_MENOR, retoSugerido: NIVELES[j].id }
+    }
+  }
+  // Por la monotonía de los pisos de hoy —Básico 500 · Avanzado 1.000 · Pro
+  // 2.000— esto es exactamente «saldo < 500», y en Básico es el ÚNICO caso
+  // posible. Se llega por búsqueda y no por esa constante para que el día que
+  // una tabla se mueva no haya que acordarse de un 500 escrito a mano.
+  return { caso: CASO_SIN_MESA, retoSugerido: null }
+}
+
 // ── La cascada de §2.2 ───────────────────────────────────
 // «Elegir una fila habilita la siguiente; cambiar una superior limpia las
 // inferiores.» El orden de las filas se escribe una sola vez y de él sale todo:
@@ -150,6 +217,11 @@ export function opcionesJugadores() {
 /**
  * Las cuatro mesas del reto. Una mesa va en gris cuando el saldo de la sesión no
  * cubre su PISO de entrada, y lleva escrito cuánto hace falta.
+ *
+ * RET-A · `minimo` ya no lo pinta nadie: el aviso que lo enseñaba se retiró y el
+ * gris del chip es el mensaje. Se conserva porque es el DATO del que sale el
+ * gris —la razón junto a la consecuencia— y porque es lo que el test sella para
+ * que nadie vuelva a confundir el piso con la apuesta.
  */
 export function opcionesApuesta(reto, saldo) {
   return apuestasDe(reto).map((hc) => ({

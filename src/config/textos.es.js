@@ -253,9 +253,6 @@ export const TEXTOS_ES = {
   'ia.retar.comodin.si':      'Con esta mesa juega el comodín (7 de Oros).',
   'ia.retar.comodin.no':      'Sin comodín: el 7 de Oros es una carta más.',
 
-  // El gris se explica solo. `{min}` es el PISO de entrada de esa mesa —5 veces
-  // su apuesta—, no su apuesta: es la cifra que de verdad hace falta tener.
-  'ia.retar.aviso.saldo':     'Te faltan fichas: sentarte a esa mesa pide {min} HC.',
   // Lo que la cuarta fila promete antes de pulsar. Sale de `entrada.pilaIA`.
   'ia.retar.aviso.pila':      'Cada IA se sienta con {hc} HC.',
 
@@ -266,6 +263,21 @@ export const TEXTOS_ES = {
   'ia.retar.cta.una':         'Retar a 1 IA · mesa {hc} · entras con {entrada}',
   'ia.retar.cta.vacio':       'Elige tu mesa',
   'ia.retar.cta.falta':       'Elige reto, jugadores, apuesta y entrada.',
+
+  // ── RET-A · El aviso de saldo ─────────────────────────────────────────────
+  // Releva a `ia.retar.aviso.saldo`, que explicaba el gris mesa a mesa y en
+  // naranja. Lo que faltaba no era la explicación —el chip apagado ya la da—
+  // sino la salida, y son estas dos frases más el botón que va debajo.
+  //
+  // `{reto}` es el RÓTULO del nivel y sale de `niveles.js`, que es donde NIV-UI
+  // selló los tres nombres. `retarCore.avisoDeSaldo` devuelve el id y la
+  // pantalla lo traduce: aquí no hay ninguna lista de retos que mantener.
+  //
+  // Ninguna de las dos culpa al jugador ni usa el rojo de los errores: un
+  // bolsillo corto no es un fallo, es un estado del que se sale.
+  'ia.retar.saldo.reto':      'Tu saldo no alcanza para este reto. Puedes jugar en {reto} o conseguir más monedas.',
+  'ia.retar.saldo.ninguno':   'Te faltan fichas para sentarte en una mesa.',
+  'ia.retar.saldo.cta':       'Conseguir más monedas',
 
   // Los tres motivos de `entrada.entradaValida` más el cuarto que añade la
   // pantalla (§2.2). El motor no puede juzgar el bolsillo —no lo conoce— y por

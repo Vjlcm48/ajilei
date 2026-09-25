@@ -1405,6 +1405,93 @@ body.sal-activa #root {
    tampoco se alcanza con el teclado. */
 .sal-contador.is-off { visibility: hidden; }
 
+/* ── RET-A · EL AVISO DE SALDO Y SU SALIDA ────────────────────────────────
+   Releva al `.sal-aviso.es-anfitrion` que la fila de mesas llevaba en naranja.
+   Dos piezas: una frase y un botón, entre la última fila y el CTA.
+
+   SIN ROJO NI NARANJA, que en esta casa son el color de los problemas. Un
+   bolsillo corto no es un error del jugador: la frase va en el secundario del
+   texto y el botón en el dorado de la marca, que es el color de lo que se puede
+   hacer. El botón es SECUNDARIO a propósito —contorno, no relleno—: el relleno
+   dorado es del CTA, y dos botones macizos a dos dedos uno de otro se disputan
+   el mismo gesto.
+
+   NO RESERVA CAJA (O1): el bloque sólo aparece o desaparece al cambiar de reto,
+   y ese mismo gesto apaga el CTA porque limpia la cascada — así que no hay nada
+   a punto de pulsarse que se mueva. El porqué largo está en `RetarIAS.jsx`. */
+.sal-saldo {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 1.4);
+  text-align: center;
+}
+.sal-saldo-txt {
+  margin: 0;
+  max-width: 44ch;
+  font-size: calc(var(--u) * 2.9);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+/* El piso táctil de la casa sale del mismo token que el chip —`--chip-h` ya es
+   `max(40px, …)`— y no de un 40 escrito a mano: el día que la casa suba su
+   mínimo, este botón sube con ella. */
+.sal-saldo-cta {
+  min-height: var(--chip-h);
+  padding: 0 calc(var(--u) * 3.4);
+  border-radius: 999px;
+  border: 1px solid var(--gold-brand);
+  background: transparent;
+  color: var(--gold-brand);
+  font: inherit;
+  font-weight: 500;
+  font-size: calc(var(--u) * 3.2);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+.sal-saldo-cta:hover { background: rgba(var(--gold-brand-rgb), 0.12); }
+.sal-saldo-cta:active { transform: translateY(1px); }
+.sal-saldo-cta:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+
+/* ── LO QUE NO PUEDE APARECER TAMPOCO SE RESERVA ───────────────────────────
+   El bloque son ~135 px, y con él puesto el CTA se salía 100 px de un 1024×768
+   —medido con sonda, no supuesto—. La respuesta NO es apretar la pantalla
+   entera: es que en este estado hay dos cajas reservadas para cosas que ya no
+   pueden pasar, y O1 reserva para lo que PUEDE aparecer, no para lo imposible.
+
+     · el aviso de la cuarta fila promete con cuánto se sienta cada IA, y no hay
+       entrada que elegir porque no hay mesa a tiro;
+     · el contador de «Otra…» se reserva para que abrirlo no añada una línea de
+       flex, y «Otra…» no se puede abrir con la fila apagada. Es justo esa línea
+       de más la que hacía que la cuarta fila midiera 126 px en vez de 57.
+
+   Son 96 px que vuelven, y el CTA cabe. Se apagan con `:has(.sal-saldo)` —o
+   sea, sólo mientras el aviso esté— y en todos los tamaños, no sólo en el traje
+   corto: la razón es la misma en un 1920 que en un 1024, y hacer que la columna
+   cambie de forma al cruzar los 800 px sería dos pantallas otra vez. */
+.sal-cuerpo.es-retar:has(.sal-saldo) .sal-bloque:has(.sal-contador) .sal-aviso {
+  min-height: 0;
+  margin-top: 0;
+}
+.sal-cuerpo.es-retar:has(.sal-saldo) .sal-contador { display: none; }
+
+/* ── Y LA NOTA DEL CTA, QUE SE OCULTA PERO NO SE SUELTA ────────────────────
+   Decidido por el rector al revisar RET-A. La nota dice «Elige reto, jugadores,
+   apuesta y entrada» —es la de la cascada incompleta— y con el aviso puesto no
+   hay nada que elegir: contradice al párrafo que tiene justo encima. Se oculta
+   mientras el aviso esté; no se reescribe ni se sustituye por otra frase.
+
+   `visibility: hidden` y NO `display: none`, y aquí la diferencia se midió: esta
+   caja está DEBAJO del CTA, así que devolverla no regala margen, lo cobra. Con
+   `display: none` la columna se acortaba 15 px y el CTA bajaba con ella —de 54
+   px de margen a 39 en un 360×640—, justo al revés de lo que el ajuste busca.
+   Ocultar sin soltar la caja deja la geometría intacta al píxel, saca la frase
+   del árbol de accesibilidad igual —un lector de pantalla no debe leer una
+   instrucción imposible— y es el mismo idioma que `.sal-aviso` usa desde SAL-2
+   para su hueco reservado. En el caso 0 la nota sigue exactamente como estaba. */
+.sal-cuerpo.es-retar:has(.sal-saldo) .sal-accion small { visibility: hidden; }
+
 /* ── EL TRAJE CORTO DE `.es-retar` ─────────────────────────────────────────
    Cuatro filas con su aviso, más el contador reservado, más el CTA. En un
    1024×768 —y en cualquier escritorio de 768 de alto— esa columna se pasaba 33
@@ -1434,4 +1521,8 @@ body.sal-activa #root {
   /* El CTA envuelve en dos líneas cuando hace falta, así que su relleno es lo
      último que se aprieta: quitarlo de más lo dejaría pegado al texto. */
   .sal-cta.es-retar { padding-block: calc(var(--u) * 1.1); }
+  /* RET-A · el bloque de saldo se aprieta con el resto. Aparece justo en los
+     bolsillos cortos, que es cuando la columna ya está llena de filas apagadas:
+     si no se apretara, sería él quien empujara el CTA fuera de un 1024×768. */
+  .sal-saldo { gap: calc(var(--u) * 0.9); }
 }
