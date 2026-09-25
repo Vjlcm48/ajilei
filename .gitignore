@@ -130,3 +130,8 @@ supabase/functions/sonda_mot1/
 
 # IDX-1 · salida de scripts/gen-idx.mjs (hoja de contacto) y capturas de revisión.
 capturas-idx/
+
+# LUZ-1 · capturas de la Fase 0 (capturaLuz.mjs, geometria.json) y del modo `luz`
+# de scripts/diagDSK.mjs (capturas-luz/fase1/: 24 PNG y la hoja de contacto).
+# REGENERABLES, mismo criterio que capturas-lob y capturas-idx.
+capturas-luz/

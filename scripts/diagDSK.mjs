@@ -226,6 +226,26 @@
 //            gesto real— y por Esc; y Sonido que alterna, cierra al ejecutar y
 //            persiste en la MISMA clave que escritorio. Args: [mesa] [WxH].
 //            Capturas a MOV1A_OUT (por defecto capturas-dsk/).
+//   luz    → LUZ-1 Fase 1: la hoja `src/styles/luz.css` (luz cenital, cuerpo
+//            del óvalo, sombras de contacto y ajustes de legibilidad). 20
+//            celdas (mesas 5/4/3/2 × pc 1920x1080 · s25v 412x915 · s25h 915x412
+//            · 390x844 · 360x640, DPR 2) en el estado sembrado de la Fase 0
+//            (semilla 20260925, descarte con la primera carta seleccionada) +
+//            4 extras de m5_s25v con los tapetes grafito/azul/vinotinto/
+//            tricolor. CINCO puertas, midiendo cada celda con la hoja ENCENDIDA
+//            y APAGADA en caliente (`sheet.disabled` de su <style> de Vite):
+//            (1) Δ=0 exacto de TODAS las cajas de la mesa y del scroll; (2)
+//            contraste muestreado en la captura —nada que esté en ≥4,5 baja de
+//            4,5, nada por debajo empeora, «Mano #N» y todo «Pasó» ≥4,5—; (3)
+//            `box-shadow` idéntico de las cartas seleccionada, ganadora, vacía
+//            y (en D) jugable con hover, y `turnBreath` sólo en los paneles; (4)
+//            fugas: lobby, sala de espera (`?sal=espera-anfitrion`) y Portada
+//            idénticos con y sin la hoja —la Portada no existe con bypass, así
+//            que se mide contra LUZ_BASE_PORTADA (por defecto :5174, un vite
+//            dev con `VITE_AUTH_BYPASS=` vacío)—; (5) las propiedades con
+//            `calc(… var(--luz-k))` computan a valores válidos. Sólo DEV (el
+//            <style> por hoja). Args: [mesas] [tamaños]. Capturas y la hoja de
+//            contacto `hoja.html` en LUZ_OUT (por defecto capturas-luz/fase1/).
 // Salida: JSON a stdout y a scratchpad; PNGs a capturas-dsk/.
 import { register } from 'node:module'
 // El motor importa sin extensión y es archivo PROTEGIDO: el arnés se adapta
@@ -256,7 +276,7 @@ import { NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
 // APU-1 1e · la ruta a la mesa sale de este archivo y pasa a `rutaMesa.mjs`,
 // para que deje de ser un secreto de `diagDSK` y la compartan los demás arneses
 // (la avería de NIV-UI, contada en la cabecera de aquel módulo).
-import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES } from './rutaMesa.mjs'
+import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa } from './rutaMesa.mjs'
 // MOV-1b-a · las entradas del menú y qué está vivo en cada rama salen de la
 // MISMA fuente única que la app (mismo criterio que consultas.js, niveles.js y
 // tapetes.js). El modo `menu-movil` DERIVA de aquí lo que espera, así que
@@ -11037,6 +11057,445 @@ async function runVuelo(browser) {
   return { cells, verde, VIAJE_N }
 }
 
+// ── LUZ-1 Fase 1 · modo `luz` · la hoja de luz, encendida y apagada ─────────
+// Rector: AJILEI_LUZ-1_Fase1_v1.0.md §7. La hoja `src/styles/luz.css` es
+// ADITIVA: todo lo que promete (cajas quietas, estados de carta intactos, cero
+// fugas, contraste que no baja) se comprueba comparando la MISMA página con la
+// hoja encendida y apagada. En DEV cada hoja es su propio <style
+// data-vite-dev-id>, y `sheet.disabled` la saca de la cascada sin recargar.
+//
+// LO QUE HACE EXACTA LA COMPARACIÓN: encendido y apagado se miden en UN MISMO
+// `evaluate` síncrono. Entre las dos lecturas no corre ni un tick de React, así
+// que el reloj del descarte, los pensando de las IAS o un vuelo no pueden
+// colarse como Δ. Y durante la medición se inyecta `transition: none`: la carta
+// tiene `transition: box-shadow .18s` (playingCard.css:9) y, sin esto,
+// `getComputedStyle` justo después de apagar la hoja devuelve el valor de
+// ARRANQUE de la transición —el de antes—, que es exactamente el falso verde
+// que la puerta 3 tiene que ser capaz de ver.
+//
+// El estado es el sembrado de la Fase 0 (§I de su informe): misma semilla, misma
+// ruta (`irALaMesa`, nivel básico, primera apuesta), descarte con la primera
+// carta seleccionada. Los estados que el descarte no tiene —ganadora y vacía—
+// se prueban poniendo su clase a una carta en reposo DENTRO del mismo evaluate
+// y quitándola antes de devolver: React no llega a enterarse.
+const LUZ_OUT = process.env.LUZ_OUT || 'capturas-luz/fase1'
+const LUZ_BASE_PORTADA = process.env.LUZ_BASE_PORTADA || 'http://localhost:5174'
+const LUZ_SEMILLA = 20260925
+const LUZ_TAMANOS = {
+  pc:   { w: 1920, h: 1080, movil: false },
+  s25v: { w: 412,  h: 915,  movil: true },   // S25_VERTICAL (fotoS25)
+  s25h: { w: 915,  h: 412,  movil: true },
+  390:  { w: 390,  h: 844,  movil: true },
+  360:  { w: 360,  h: 640,  movil: true },
+}
+const LUZ_TAPETES_EXTRA = ['grafito', 'azul', 'vinotinto', 'tricolor']
+const LUZ_SIN_TRANSICION = '*, *::before, *::after { transition: none !important; }'
+
+async function luzSembrar(page) {
+  await page.evaluate((s) => {
+    let a = s
+    Math.random = () => {
+      a |= 0; a = a + 0x6D2B79F5 | 0
+      let t = Math.imul(a ^ a >>> 15, 1 | a)
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+      return ((t ^ t >>> 14) >>> 0) / 4294967296
+    }
+  }, LUZ_SEMILLA)
+}
+
+const luzClicSi = async (page, sel) => {
+  const b = page.locator(sel).first()
+  if (await b.count() && await b.isVisible().catch(() => false) && await b.isEnabled().catch(() => false)) {
+    await b.click({ timeout: 2000 }).catch(() => {}); return true
+  }
+  return false
+}
+
+// Copia de `llevarAlDescarte` de capturas-luz/capturaLuz.mjs (Fase 0): el
+// humano pasa o iguala hasta su descarte y selecciona la PRIMERA carta.
+async function luzLlevarAlDescarte(page) {
+  await luzClicSi(page, 'button:has-text("Iniciar mano")')
+  for (let i = 0; i < 400; i++) {
+    await page.waitForTimeout(250)
+    const st = await page.evaluate(() => ({
+      descarte: !!document.querySelector('.discard-area .timer-display'),
+      clicable: document.querySelectorAll('.player-zone .playing-card.card-clickable').length,
+      apuesta: !!document.querySelector('.action-buttons button:not([disabled])'),
+      siguiente: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Siguiente mano'),
+    }))
+    if (st.descarte && st.clicable >= 5) {
+      await page.waitForTimeout(700)
+      await page.locator('.player-zone .playing-card.card-clickable').first().click()
+      await page.waitForTimeout(450)
+      return { estado: 'descarte', iter: i }
+    }
+    if (st.apuesta) {
+      await luzClicSi(page, '.action-buttons button:has-text("Pasar")') ||
+        await luzClicSi(page, '.action-buttons button:has-text("Igualar")')
+    } else if (st.siguiente) {
+      await luzClicSi(page, 'button:has-text("Siguiente mano")')
+    }
+  }
+  return { estado: 'NO-ALCANZADO' }
+}
+
+// Deja en la página `window.__luzHoja(on)` y el <style> sin transiciones.
+async function luzInstalar(page) {
+  return page.evaluate((css) => {
+    const el = [...document.querySelectorAll('style[data-vite-dev-id]')]
+      .find(s => /[\\/]luz\.css$/.test(s.getAttribute('data-vite-dev-id')))
+    if (!el || !el.sheet) return false
+    window.__luzHoja = (on) => { el.sheet.disabled = !on; void document.body.offsetHeight }
+    let t = document.getElementById('luz-sin-transicion')
+    if (!t) {
+      t = document.createElement('style'); t.id = 'luz-sin-transicion'; t.textContent = css
+      document.head.appendChild(t)
+    }
+    void document.body.offsetHeight
+    return true
+  }, LUZ_SIN_TRANSICION)
+}
+const luzHoja = (page, on) => page.evaluate(async (on) => {
+  window.__luzHoja(on)
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+}, on)
+const luzDesinstalar = (page) => page.evaluate(() => {
+  window.__luzHoja && window.__luzHoja(true)
+  document.getElementById('luz-sin-transicion')?.remove()
+})
+
+// Puertas 1, 3 y 5 en un solo pase síncrono (encendida → apagada → encendida).
+async function luzMedirMesa(page) {
+  return page.evaluate(() => {
+    const hoja = window.__luzHoja
+    const cs = (el) => getComputedStyle(el)
+    const nombre = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') +
+      (el.classList.length ? '.' + [...el.classList].join('.') : '')
+    const scr = document.querySelector('.game-table-screen')
+    const root = document.getElementById('root')
+    const capas = (v) => { let n = 1, d = 0; for (const c of v) { if (c === '(') d++; else if (c === ')') d--; else if (c === ',' && d === 0) n++ } return v === 'none' ? 0 : n }
+
+    // (1) Todas las cajas de la mesa + #root + scroll.
+    const els = [root, ...scr.querySelectorAll('*')]
+    const cajas = () => els.map(el => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })
+    const scroll = () => ({ scrW: scr.scrollWidth, scrH: scr.scrollHeight, scrCW: scr.clientWidth, scrCH: scr.clientHeight,
+      docW: document.documentElement.scrollWidth, docH: document.documentElement.scrollHeight,
+      rootBorde: cs(root).borderLeftWidth + ' ' + cs(root).borderRightWidth })
+    const cOn = cajas(), sOn = scroll()
+    hoja(false)
+    const cOff = cajas(), sOff = scroll()
+    hoja(true)
+    let max = 0, peor = null, distintos = 0
+    cOn.forEach((a, i) => {
+      const b = cOff[i]; let d = 0
+      for (let k = 0; k < 4; k++) d = Math.max(d, Math.abs(a[k] - b[k]))
+      if (d > 0) distintos++
+      if (d > max) { max = d; peor = nombre(els[i]) }
+    })
+    const delta = { elementos: els.length, distintos, max, peor, scrollOn: sOn, scrollOff: sOff,
+      scrollIgual: JSON.stringify(sOn) === JSON.stringify(sOff) }
+
+    // (3) Estados de carta. Con clase prestada si el descarte no la tiene.
+    const mano = [...document.querySelectorAll('.player-zone .playing-card')]
+    const reposo = mano.filter(c => !c.classList.contains('card-selected'))
+    const estado = (el, cls) => {
+      if (!el) return null
+      if (cls) el.classList.add(cls)
+      const on = cs(el).boxShadow; hoja(false); const off = cs(el).boxShadow; hoja(true)
+      if (cls) el.classList.remove(cls)
+      return { on, off, igual: on === off, prestada: !!cls }
+    }
+    const estados = {
+      seleccionada: estado(document.querySelector('.player-zone .playing-card.card-selected'), null),
+      ganadora: estado(reposo[0], 'card-winner'),
+      vacia: estado(reposo[1], 'card-empty'),
+    }
+
+    // turnBreath: quién lo declara (en la cascada con la hoja encendida) y que
+    // la hoja de luz no diga ni una palabra de animaciones.
+    const hojaLuz = [...document.styleSheets].find(s => s.ownerNode && /[\\/]luz\.css$/.test(s.ownerNode.getAttribute('data-vite-dev-id') || ''))
+    const conTurnBreath = []
+    const recorre = (reglas, src) => {
+      for (const r of reglas) {
+        if (r.style && /turnBreath/.test(r.style.animationName + ' ' + r.style.animation)) conTurnBreath.push({ sel: r.selectorText, hoja: src })
+        if (r.cssRules) recorre(r.cssRules, src)
+      }
+    }
+    for (const s of document.styleSheets) { try { recorre(s.cssRules, (s.ownerNode?.getAttribute('data-vite-dev-id') || '').split(/[\\/]/).pop()) } catch { /* */ } }
+    const textoLuz = hojaLuz ? [...hojaLuz.cssRules].map(r => r.cssText).join('\n') : ''
+    const turnBreath = { reglas: conTurnBreath,
+      soloPaneles: conTurnBreath.length > 0 && conTurnBreath.every(r => /opp-|ai-zone|panel/.test(r.sel) && r.hoja !== 'luz.css'),
+      luzSinAnimacion: !!hojaLuz && !/animation|@keyframes/.test(textoLuz) }
+
+    // (5) Validez del token: cada capa computa, sin `var(` colgando, y cambia
+    // algo respecto de la hoja apagada.
+    const pide = {
+      mesa:   [document.querySelector('.game-table'), 'backgroundImage'],
+      ovalo:  [document.querySelector('.center-zone') || document.querySelector('.felt-oval.oval-left'), 'boxShadow'],
+      reflejos: [document.querySelector('.center-zone') || document.querySelector('.felt-oval.oval-left'), 'backgroundImage'],
+      carta:  [reposo[2] || reposo[0], 'boxShadow'],
+      dorso:  [document.querySelector('.opp-panel .playing-card, .ai-zone .playing-card'), 'boxShadow'],
+      pozo:   [document.querySelector('.pot-box'), 'boxShadow'],
+      mazo:   [[...document.querySelectorAll('.deck-pile')].find(e => e.getBoundingClientRect().width > 0), 'boxShadow'],
+      ficha:  [document.querySelector('.game-table-screen .chip-token'), 'filter'],
+      manoN:  [document.querySelector('.hand-badge'), 'color'],
+      paso:   [document.querySelector('.opp-status:not(.opp-status-turn):not(.opp-status-allin):not(.opp-status-elim)'), 'color'],
+      rootBorde: [root, 'borderLeftColor'],
+    }
+    const validez = { k: cs(scr).getPropertyValue('--luz-k').trim() }
+    for (const [k, [el, p]] of Object.entries(pide)) {
+      if (!el) { validez[k] = { falta: true }; continue }
+      const on = cs(el)[p]; hoja(false); const off = cs(el)[p]; hoja(true)
+      validez[k] = { on, off, capasOn: capas(on), cambia: on !== off, valido: on !== 'none' && on !== '' && !/var\(|calc\(/.test(on) }
+    }
+    return { delta, estados, turnBreath, validez }
+  })
+}
+
+// Hover de una carta jugable (sólo D): el `:hover` lo pone el ratón real.
+async function luzMedirHover(page) {
+  const loc = page.locator('.player-zone .playing-card.card-clickable:not(.card-selected)').nth(1)
+  if (!await loc.count()) return null
+  await loc.hover()
+  await page.waitForTimeout(60)
+  const r = await page.evaluate(() => {
+    const el = document.querySelector('.player-zone .playing-card.card-clickable:hover')
+    if (!el) return null
+    const on = getComputedStyle(el).boxShadow; window.__luzHoja(false)
+    const off = getComputedStyle(el).boxShadow; window.__luzHoja(true)
+    return { on, off, igual: on === off }
+  })
+  await page.mouse.move(2, 2)
+  await page.waitForTimeout(60)
+  return r
+}
+
+// Contraste por muestreo de la captura: la MISMA función que la Fase 0
+// (capturaLuz.mjs `contraste`) — moda del fondo a 4 bits/canal y WCAG.
+async function luzContraste(page, png, dpr) {
+  const b64 = png.toString('base64')
+  return page.evaluate(async ({ b64, dpr }) => {
+    const img = new Image()
+    img.src = 'data:image/png;base64,' + b64
+    await img.decode()
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height
+    const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(img, 0, 0)
+    const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b) }
+    const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return Math.round((x + 0.05) / (y + 0.05) * 100) / 100 }
+    const parse = (s) => { const m = s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { rgb: p.slice(0, 3), a: p[3] ?? 1 } }
+    const fondo = (r) => {
+      const x0 = Math.max(0, Math.floor(r.x * dpr)), y0 = Math.max(0, Math.floor(r.y * dpr))
+      const w = Math.min(cv.width - x0, Math.ceil(r.width * dpr)), h = Math.min(cv.height - y0, Math.ceil(r.height * dpr))
+      if (w <= 0 || h <= 0) return null
+      const d = cx.getImageData(x0, y0, w, h).data
+      const cub = new Map()
+      for (let i = 0; i < d.length; i += 4 * 3) {
+        const k = (d[i] >> 4) << 8 | (d[i + 1] >> 4) << 4 | (d[i + 2] >> 4)
+        const e = cub.get(k) || [0, 0, 0, 0]; e[0] += d[i]; e[1] += d[i + 1]; e[2] += d[i + 2]; e[3]++; cub.set(k, e)
+      }
+      const top = [...cub.values()].sort((a, b) => b[3] - a[3])[0]
+      return top.slice(0, 3).map(v => Math.round(v / top[3]))
+    }
+    const out = []
+    const raiz = document.querySelector('.game-table-screen') || document.body
+    for (const el of raiz.querySelectorAll('*')) {
+      const propio = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim()
+      if (!propio) continue
+      const cs = getComputedStyle(el)
+      if (cs.visibility === 'hidden' || cs.display === 'none') continue
+      const rg = document.createRange(); rg.selectNodeContents(el)
+      const r = rg.getBoundingClientRect()
+      if (r.width < 1 || r.height < 1 || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue
+      let op = 1; for (let e = el; e; e = e.parentElement) op *= parseFloat(getComputedStyle(e).opacity)
+      if (op < 0.05) continue
+      const bg = fondo(r)
+      const col = parse(cs.color)
+      const txt = col && bg ? col.rgb.map((v, i) => Math.round(v * col.a + bg[i] * (1 - col.a))) : null
+      out.push({ nodo: el.tagName.toLowerCase() + '.' + [...el.classList].join('.'), texto: propio.slice(0, 40),
+        color: cs.color, contraste: txt && bg ? ratio(txt, bg) : null })
+    }
+    return out
+  }, { b64, dpr })
+}
+
+// Puerta 2: se emparejan los textos por nodo y orden de aparición.
+function luzPuertaContraste(on, off) {
+  const clave = (lista) => { const n = new Map(); return lista.map(t => { const i = n.get(t.nodo) || 0; n.set(t.nodo, i + 1); return [`${t.nodo}#${i}`, t] }) }
+  const mOff = new Map(clave(off))
+  const fallos = [], objetivo = [], sinPareja = []
+  for (const [k, t] of clave(on)) {
+    const o = mOff.get(k)
+    if (!o || t.contraste == null || o.contraste == null) { sinPareja.push(k); continue }
+    if (o.contraste >= 4.5 && t.contraste < 4.5) fallos.push({ k, texto: t.texto, off: o.contraste, on: t.contraste, motivo: 'baja de 4,5' })
+    else if (o.contraste < 4.5 && t.contraste < o.contraste - 0.01) fallos.push({ k, texto: t.texto, off: o.contraste, on: t.contraste, motivo: 'empeora' })
+    const esPaso = /\.opp-status(\.|$)/.test(t.nodo) && !/opp-status-(turn|allin|elim)/.test(t.nodo)
+    if (/\.hand-badge/.test(t.nodo) || esPaso) {
+      objetivo.push({ k, texto: t.texto, off: o.contraste, on: t.contraste, ok: t.contraste >= 4.5 })
+    }
+  }
+  const objetivoOk = objetivo.length > 0 && objetivo.every(x => x.ok) && objetivo.some(x => /hand-badge/.test(x.k))
+  return { ok: fallos.length === 0 && objetivoOk, fallos, objetivo, sinPareja, n: on.length }
+}
+
+async function luzCelda(browser, n, clave, tapete = null) {
+  const t = LUZ_TAMANOS[clave]
+  const id = `m${n}_${clave}${tapete ? '_' + tapete : ''}`
+  const ctx = await browser.newContext({ viewport: { width: t.w, height: t.h }, deviceScaleFactor: 2,
+    ...(t.movil ? { hasTouch: true, isMobile: true } : {}) })
+  const page = await ctx.newPage()
+  if (tapete) await tapSiembra(page, tapete, TAP_TODOS)
+  const c = { id, mesa: n, tamano: clave, tapete: tapete || 'verde', viewport: { w: t.w, h: t.h } }
+  try {
+    c.ruta = await irALaMesa(page, BASE, n, 'basico', 0)
+    await luzSembrar(page)
+    c.alcance = await luzLlevarAlDescarte(page)
+    await page.mouse.move(2, 2)
+    if (!await luzInstalar(page)) throw new Error('no encuentro el <style> de luz.css (¿servidor DEV?)')
+    await page.waitForTimeout(80)
+    c.tapeteVivo = await page.evaluate(() => document.body.dataset.tapete || null)
+    const m = await luzMedirMesa(page)
+    if (!t.movil) m.estados.hover = await luzMedirHover(page)
+    Object.assign(c, m)
+    const pngOn = await page.screenshot({ path: `${LUZ_OUT}/${id}.png` })
+    const txOn = await luzContraste(page, pngOn, 2)
+    await luzHoja(page, false)
+    const pngOff = await page.screenshot()
+    const txOff = await luzContraste(page, pngOff, 2)
+    await luzHoja(page, true)
+    await luzDesinstalar(page)
+    c.contraste = luzPuertaContraste(txOn, txOff)
+    c.png = { on: `${id}.png`, pngOn, pngOff }
+    const est = c.estados
+    c.puertas = {
+      p1_delta: c.delta.max === 0 && c.delta.distintos === 0 && c.delta.scrollIgual,
+      p2_contraste: c.contraste.ok,
+      p3_estados: !!(est.seleccionada?.igual && est.ganadora?.igual && est.vacia?.igual &&
+        (t.movil || est.hover?.igual) && c.turnBreath.soloPaneles && c.turnBreath.luzSinAnimacion),
+      p5_token: c.validez.k === '1' && ['mesa', 'ovalo', 'reflejos', 'carta', 'dorso', 'pozo', 'mazo', 'ficha', 'manoN', 'paso', 'rootBorde']
+        .every(k => c.validez[k] && !c.validez[k].falta && c.validez[k].valido && c.validez[k].cambia),
+    }
+  } catch (e) { c.error = String(e && e.message || e).slice(0, 400); c.puertas = { error: false } }
+  await ctx.close()
+  return c
+}
+
+// Puerta 4: otra pantalla, con la hoja cargada y sin ella. TODOS los elementos
+// del documento: fondo, sombra, borde, filtro, color y caja.
+async function luzFuga(browser, nombre, url, espera, vp) {
+  const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 1 })
+  const page = await ctx.newPage()
+  const r = { pantalla: nombre, url, vp: `${vp.width}x${vp.height}` }
+  try {
+    await page.goto(url, { waitUntil: 'networkidle' })
+    await page.waitForSelector(espera, { timeout: 15000 })
+    await page.waitForTimeout(600)
+    if (!await luzInstalar(page)) throw new Error('sin <style> de luz.css en esta pantalla')
+    Object.assign(r, await page.evaluate(() => {
+      const props = ['background-image', 'background-color', 'box-shadow', 'border-top-color', 'border-right-color',
+        'border-bottom-color', 'border-left-color', 'border-inline-start-width', 'filter', 'color']
+      const els = [document.documentElement, ...document.querySelectorAll('body, body *')]
+      const foto = () => els.map(el => { const cs = getComputedStyle(el); const b = el.getBoundingClientRect()
+        return props.map(p => cs.getPropertyValue(p)).join('|') + `|${b.x},${b.y},${b.width},${b.height}` })
+      const on = foto(); window.__luzHoja(false); const off = foto(); window.__luzHoja(true)
+      const difieren = []
+      on.forEach((v, i) => { if (v !== off[i]) difieren.push(els[i].tagName.toLowerCase() + '.' + [...els[i].classList].join('.')) })
+      const rootCs = getComputedStyle(document.getElementById('root'))
+      return { elementos: els.length, difieren: difieren.slice(0, 10), nDifieren: difieren.length,
+        mesaMontada: !!document.querySelector('.game-table-screen'),
+        root: { borde: rootCs.borderLeftWidth + ' ' + rootCs.borderLeftColor, bodyClases: document.body.className } }
+    }))
+    await luzDesinstalar(page)
+    r.ok = r.nDifieren === 0 && !r.mesaMontada
+  } catch (e) { r.error = String(e && e.message || e).slice(0, 300); r.ok = false }
+  await ctx.close()
+  return r
+}
+
+// Hoja de contacto: WebP q90 codificadas por el propio Edge (sin dependencias).
+async function luzHojaContacto(browser, celdas, fugas, resumen) {
+  const page = await browser.newPage()
+  const webp = (png) => page.evaluate(async (b64) => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode()
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height
+    cv.getContext('2d').drawImage(img, 0, 0)
+    return cv.toDataURL('image/webp', 0.9)
+  }, png.toString('base64'))
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const marca = (v) => v ? '<b class="ok">✓</b>' : '<b class="ko">✗</b>'
+  const filas = celdas.map(c => `<tr><td>${c.id}</td>${['p1_delta', 'p2_contraste', 'p3_estados', 'p5_token'].map(k => `<td>${marca(c.puertas[k])}</td>`).join('')}</tr>`).join('')
+  const bloques = []
+  for (const c of celdas) {
+    if (!c.png) { bloques.push(`<section><h2>${c.id}</h2><p class="ko">${esc(c.error || 'sin captura')}</p></section>`); continue }
+    const [a, b] = [await webp(c.png.pngOff), await webp(c.png.pngOn)]
+    const obj = c.contraste.objetivo.map(o => `${esc(o.texto)} ${o.off}→<b>${o.on}</b>`).join(' · ')
+    bloques.push(`<section><h2>${c.id} <small>${c.viewport.w}×${c.viewport.h} · tapete ${c.tapete}</small></h2>
+<p class="obj">${obj}</p>
+<div class="par"><figure><figcaption>hoy</figcaption><img src="${a}" width="${c.viewport.w}" height="${c.viewport.h}" alt="${c.id} hoy"></figure>
+<figure><figcaption>con luz</figcaption><img src="${b}" width="${c.viewport.w}" height="${c.viewport.h}" alt="${c.id} con luz"></figure></div></section>`)
+  }
+  await page.close()
+  const fugasTxt = fugas.map(f => `<li>${marca(f.ok)} ${esc(f.pantalla)} ${f.vp} — ${f.error ? esc(f.error) : `${f.elementos} elementos, ${f.nDifieren} difieren`}</li>`).join('')
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUZ-1 · Hoja de contacto</title><style>
+:root{--bg:#f6f4ef;--fg:#1d1b18;--mut:#6b655c;--ok:#1d7a3a;--ko:#b3261e;--bd:#d9d4c9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15140f;--fg:#eee9df;--mut:#a39d92;--ok:#6fd08c;--ko:#ff8a80;--bd:#37332c}}
+:root[data-theme="dark"]{--bg:#15140f;--fg:#eee9df;--mut:#a39d92;--ok:#6fd08c;--ko:#ff8a80;--bd:#37332c}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:28px 0 4px}small,.obj{color:var(--mut)}
+table{border-collapse:collapse;font-size:12px}td,th{border:1px solid var(--bd);padding:2px 6px;text-align:center}
+.ok{color:var(--ok)}.ko{color:var(--ko)}.par{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
+figure{margin:0;flex:none}figcaption{font-size:12px;color:var(--mut)}img{display:block;max-width:none;border:1px solid var(--bd)}
+</style></head><body>
+<h1>LUZ-1 · Fase 1 · hoy | con luz</h1><p class="obj">${esc(resumen)}</p>
+<table><tr><th>celda</th><th>1 Δ=0</th><th>2 contraste</th><th>3 estados</th><th>5 token</th></tr>${filas}</table>
+<p>Puerta 4 · fugas:</p><ul>${fugasTxt}</ul>
+<p class="obj">Cada imagen va a su ancho real en px CSS (DPR 2). En teléfono, las de escritorio se desplazan en horizontal.</p>
+${bloques.join('\n')}
+</body></html>`
+}
+
+async function runLuz(browser) {
+  const { mkdirSync: mk } = await import('node:fs')
+  mk(LUZ_OUT, { recursive: true })
+  const mesas = (process.argv[3] || '5,4,3,2').split(',').map(Number)
+  const tams = (process.argv[4] || Object.keys(LUZ_TAMANOS).join(',')).split(',')
+  const completo = !process.argv[3]
+  const celdas = []
+  for (const n of mesas) for (const k of tams) {
+    const c = await luzCelda(browser, n, k)
+    celdas.push(c)
+    const p = c.puertas
+    console.log(`luz ${c.id.padEnd(8)} · ${c.alcance?.estado} · Δmax=${c.delta?.max} (${c.delta?.distintos}) · contraste ${c.contraste ? (c.contraste.ok ? 'OK' : 'FALLA ' + c.contraste.fallos.length) : '-'} [${(c.contraste?.objetivo || []).map(o => o.texto + ' ' + o.on).join(', ')}] · estados ${p.p3_estados ? 'OK' : 'FALLA'} · token ${p.p5_token ? 'OK' : 'FALLA'}${c.error ? ' · ERROR ' + c.error : ''}`)
+  }
+  const extras = []
+  if (completo) for (const tp of LUZ_TAPETES_EXTRA) {
+    const c = await luzCelda(browser, 5, 's25v', tp)
+    extras.push(c)
+    console.log(`luz ${c.id} · tapete vivo ${c.tapeteVivo} · Δmax=${c.delta?.max} · contraste ${c.contraste?.ok ? 'OK' : 'FALLA'} · token ${c.puertas.p5_token ? 'OK' : 'FALLA'} · mesa ${c.validez?.mesa?.capasOn} capas${c.error ? ' · ERROR ' + c.error : ''}`)
+  }
+  const fugas = []
+  for (const vp of [{ width: 390, height: 844 }, { width: 1920, height: 1080 }]) {
+    fugas.push(await luzFuga(browser, 'lobby', BASE, 'main.lobby', vp))
+    fugas.push(await luzFuga(browser, 'sala de espera', `${BASE}/?sal=espera-anfitrion`, 'main.sal', vp))
+    fugas.push(await luzFuga(browser, 'Portada', LUZ_BASE_PORTADA, 'body.portada-activa', vp))
+  }
+  for (const f of fugas) console.log(`luz fuga ${f.pantalla} ${f.vp} · ${f.ok ? 'OK' : 'FALLA'} · ${f.error || `${f.elementos} elementos, ${f.nDifieren} difieren ${f.difieren.join(' ')}`}`)
+  const todas = [...celdas, ...extras]
+  const verdeDe = (k) => celdas.length > 0 && celdas.every(c => c.puertas[k])
+  const puertas = {
+    p1_delta: verdeDe('p1_delta'), p2_contraste: verdeDe('p2_contraste'), p3_estados: verdeDe('p3_estados'),
+    p4_fugas: fugas.every(f => f.ok), p5_token: verdeDe('p5_token'),
+  }
+  const extrasVerdes = extras.every(c => c.puertas.p1_delta && c.puertas.p2_contraste && c.puertas.p5_token)
+  const verde = Object.values(puertas).every(Boolean) && (!completo || extrasVerdes)
+  const resumen = `${verde ? 'VERDE' : 'ROJO'} · ${celdas.length} celdas + ${extras.length} tapetes · ` +
+    Object.entries(puertas).map(([k, v]) => `${k} ${v ? '✓' : '✗'}`).join(' · ') + ` · extras ${extrasVerdes ? '✓' : '✗'} · ${new Date().toISOString()}`
+  if (completo) writeFileSync(`${LUZ_OUT}/hoja.html`, await luzHojaContacto(browser, todas, fugas, resumen))
+  console.log(`── LUZ · ${resumen}`)
+  for (const c of todas) if (c.png) c.png = c.png.on   // los PNG no viajan al JSON
+  return { verde, puertas, extrasVerdes, celdas, extras, fugas, semilla: LUZ_SEMILLA, portada: LUZ_BASE_PORTADA }
+}
+
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
 // de 15px del área es invisible al arnés (falso verde comprobado). El modo r2 —
@@ -11105,6 +11564,7 @@ try {
   if (MODE === 'msg') report.msg = await runMSG(browser)
   if (MODE === 'tapetes') report.tapetes = await runTapetes(browser)
   if (MODE === 'vuelo') report.vuelo = await runVuelo(browser)
+  if (MODE === 'luz') report.luz = await runLuz(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }
