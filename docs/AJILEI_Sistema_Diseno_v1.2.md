@@ -379,3 +379,56 @@ Detalle en `docs/reportes/AJILEI_IDX-1_Fase1b_Informe_v1.0.md` §4.
 
 *Pendiente (IDX-1 Fase 1c, D-14):* las capturas `mesav`, `mesapc` y
 `public/og-image.jpg` siguen enseñando la baraja clásica hasta que se rehagan.
+
+**7 · Luz y cuerpo de la mesa (LUZ-1) — adenda del 2026-09-25, sin cambio de
+versión.** La mesa recibe luz cenital (viñeta, luz central cálida y cuatro
+focos), un riel oscuro en el óvalo con cuatro reflejos y sombras de contacto
+en cartas, mazo, POZO y fichas. Todo vive en una sola hoja aditiva,
+`src/styles/luz.css`, importada como último import de `GameTable.jsx`; ningún
+archivo protegido cambia. Lámina sellada: **AJILEI · LUZ-1 · Lámina v1.0**
+(<https://claude.ai/artifact/J27hUARTqQJeT7Kw4z8Ktg>). La lámina **no entra en el
+repositorio**: pesa unos 3 MB, por encima del tope de 2 MB que fijó el
+precedente de la Portada.
+
+**El token `--luz-k`.** Se declara en `.game-table-screen` y vale `1`, que es la
+lámina. Todos los alfas de la luz, del riel y de las sombras de contacto se
+escriben como `calc(<alfa> * var(--luz-k))`: `0` apaga la luz, y `1.5` es el
+techo que la lámina midió sin regresiones de contraste. Hay dos cosas que
+**no escalan** con él:
+
+- **los reflejos del óvalo**, porque son SVG en data URI y ahí no llegan las
+  custom properties;
+- **el filtro de las fichas**, que va horneado para poder retirarlo solo.
+
+No se redefine en `:root`: los tokens del fieltro son compartidos con otras
+pantallas.
+
+`calc(<alfa> * var(--luz-k))` es válido en Chromium (Edge 153) y en WebKit 26.5;
+el iPhone sigue siendo la prueba visual final.
+
+**La viñeta sube el contraste y la luz lo baja.** Los textos del borde de la
+mesa son claros sobre fondo oscuro. Oscurecer el borde los ayuda; iluminar el
+centro (luz central y focos) los perjudica, porque la luz cae sobre los paneles
+translúcidos de las IAS. Por eso la luz trae dos ajustes que son condición de
+ella, no adorno:
+
+| Texto | Antes | Con LUZ-1 |
+|---|---|---|
+| «Mano #N» (`.hand-badge`) | `rgba(var(--text-primary-rgb), 0.45)` | alfa **0,62** |
+| «Pasó» (`.opp-status` sin variante) | `var(--text-muted)` = alfa 0,55 | alfa **0,64** del mismo color |
+
+El token `--text-muted` **no cambia**: es compartido. Quien añada otra fuente de
+luz sobre la mesa tiene que volver a medir estos dos textos con las capas
+encendidas (modo `luz` de `diagDSK.mjs`).
+
+**Sin sombras en los paneles mientras exista `turnBreath`.** La animación de
+turno anima el `box-shadow` de `.opp-panel`, `.ai-zone` y `.player-zone`, y
+durante el pulso sustituye cualquier sombra que se les ponga. Una sombra de
+contacto en los paneles aparecería y desaparecería con el turno. Quedan fuera
+de LUZ-1 hasta que `turnBreath` deje de usar `box-shadow`.
+
+**La carta seleccionada no lleva sombra de contacto.** Conserva su halo dorado
+`!important` (`playingCard.css:23-27`). Tampoco hay `drop-shadow` en las cartas.
+La sombra de contacto va con `:where()` en 0,1,0 y excluye `.card-winner` y
+`.card-empty`, que tienen esa misma especificidad y cargan antes: sin la
+exclusión, el orden de carga les quitaría el halo y el `none`.
