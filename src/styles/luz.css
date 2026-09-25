@@ -1,0 +1,250 @@
+/* ── LUZ-1 · Luz y cuerpo de la mesa ───────────────────────────────────────────
+   Ficha LUZ-1 Fase 1 v1.0 sobre la lámina sellada v1.0 (al 100 %):
+     A  · luz cenital    → capas de `background-image` en `.game-table`
+     B1 · cuerpo del óvalo → riel (`box-shadow`) + cuatro reflejos (capas de fondo)
+     C  · sombras de contacto → cartas en reposo, mazo, POZO y fichas
+   más los Ajustes de legibilidad que la lámina demostró necesarios.
+
+   HOJA ADITIVA ESTRICTA. gameTable.css, opponentPanel.css y playingCard.css no
+   se tocan (los dos primeros son protegidos): aquí se GANA por especificidad —o
+   por orden donde la ficha lo sella—, sin `!important`, sin blend, sin filtros
+   nuevos, sin animaciones y sin mover una caja. Se importa como ÚLTIMO import de
+   GameTable.jsx para cargar detrás de gameTable.css, opponentPanel.css,
+   playingCard.css y ChipToken.css.
+
+   CUANDO SE PISA una propiedad que ya tenía valor, se repite su valor de hoy
+   copiado LITERAL de la fuente (archivo:línea al lado) y la capa nueva va
+   DETRÁS. `box-shadow` y `background-image` sustituyen, no suman: olvidar la
+   copia borra el hilo dorado o el brillo interno sin que nada avise.
+
+   BLOQUES DE MEDIOS: los mismos cuatro de gameTable.css.
+     B · base (sin media)            — también retrato ≥768 (tableta)
+     P · (max-width: 767px) and (orientation: portrait)
+     L · (orientation: landscape) and (max-height: 600px)
+     D · (orientation: landscape) and (min-height: 601px)
+   La lámina midió P, L y D. B no tenía celda: toma los valores COMPACTOS de P
+   (riel sólo hacia dentro), que no pueden pisar a ningún vecino. */
+
+
+/* ── 0 · Intensidad ────────────────────────────────────────────────────────────
+   Un solo número. Todos los alfas de A, B1 y C son `calc(<alfa> * var(--luz-k))`:
+   0 apaga la luz, 1 es la lámina, 1.5 es el techo que la lámina midió sin
+   regresiones de contraste. Los REFLEJOS del óvalo no escalan (son SVG en data
+   URI, fuera del alcance de las custom properties) — límite documentado en la
+   adenda del Sistema de Diseño. Las FICHAS tampoco: su filtro va horneado, como
+   lo trae la ficha (§5.3), para poder retirarlo solo. */
+.game-table-screen {
+  --luz-k: 1;
+
+  /* A · radio de cada foco (varía por bloque, ver abajo) */
+  --luz-foco: 80px;
+
+  /* A · las seis capas, en una pieza: la usan la regla general y la del
+     tricolor (§6), que necesita anteponerlas a sus propias bandas. */
+  --luz-capa-a:
+    /* cuatro focos */
+    radial-gradient(circle var(--luz-foco) at 20% 16%, rgba(255, 238, 205, calc(0.055 * var(--luz-k))) 0, rgba(255, 238, 205, calc(0.019 * var(--luz-k))) 55%, transparent 100%),
+    radial-gradient(circle var(--luz-foco) at 80% 16%, rgba(255, 238, 205, calc(0.055 * var(--luz-k))) 0, rgba(255, 238, 205, calc(0.019 * var(--luz-k))) 55%, transparent 100%),
+    radial-gradient(circle var(--luz-foco) at 20% 76%, rgba(255, 238, 205, calc(0.055 * var(--luz-k))) 0, rgba(255, 238, 205, calc(0.019 * var(--luz-k))) 55%, transparent 100%),
+    radial-gradient(circle var(--luz-foco) at 80% 76%, rgba(255, 238, 205, calc(0.055 * var(--luz-k))) 0, rgba(255, 238, 205, calc(0.019 * var(--luz-k))) 55%, transparent 100%),
+    /* luz central */
+    radial-gradient(ellipse 55% 50% at 50% 46%, rgba(255, 238, 205, calc(0.07 * var(--luz-k))) 0, rgba(255, 238, 205, calc(0.03 * var(--luz-k))) 45%, transparent 100%),
+    /* viñeta */
+    radial-gradient(ellipse 64% 66% at 50% 46%, transparent 0, transparent 50%, rgba(0, 0, 0, calc(0.10 * var(--luz-k))) 80%, rgba(0, 0, 0, calc(0.24 * var(--luz-k))) 100%);
+
+  /* B1 · sombras NUEVAS del riel, que van detrás de las dos de hoy */
+  --luz-riel: inset 0 1px 8px rgba(0, 0, 0, calc(0.55 * var(--luz-k)));
+
+  /* C · difusa + apoyo (cartas y POZO) y la capa negra del mazo */
+  --luz-contacto:
+    1px 3px 6px rgba(0, 0, 0, calc(0.42 * var(--luz-k))),
+    0 1px 1.5px rgba(0, 0, 0, calc(0.30 * var(--luz-k)));
+  --luz-mazo-negra: 2px 5px 6px rgba(0, 0, 0, calc(0.42 * var(--luz-k)));
+  --luz-ficha: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.42)) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.30));
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .game-table-screen {
+    --luz-foco: 85px;
+    --luz-riel: inset 0 1px 6px rgba(0, 0, 0, calc(0.55 * var(--luz-k)));
+  }
+}
+
+/* D: el único bloque con sitio para el riel EXTERIOR (10 px libres arriba y
+   abajo del óvalo, Fase 0 §D.3). En P y L hay 1,8–4 px: pisaría a los vecinos. */
+@media (orientation: landscape) and (min-height: 601px) {
+  .game-table-screen {
+    --luz-foco: 180px;
+    --luz-riel:
+      inset 0 1px 17px rgba(0, 0, 0, calc(0.55 * var(--luz-k))),
+      0 4px 12px rgba(0, 0, 0, calc(0.45 * var(--luz-k)));
+    --luz-contacto:
+      2px 5px 10px rgba(0, 0, 0, calc(0.42 * var(--luz-k))),
+      0 1.5px 2.5px rgba(0, 0, 0, calc(0.30 * var(--luz-k)));
+    --luz-mazo-negra: 4px 8px 10px rgba(0, 0, 0, calc(0.42 * var(--luz-k)));
+    --luz-ficha: drop-shadow(1.5px 3px 3px rgba(0, 0, 0, 0.42)) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.30));
+  }
+}
+
+
+/* ── 1 · Ajustes de legibilidad ────────────────────────────────────────────────
+   Van PRIMERO porque son la condición de la luz, no un adorno: la luz central y
+   los focos caen sobre los paneles translúcidos de las IAS y bajan «Pasó» de
+   4,42–4,53 a 4,15–4,44. La viñeta SUBE el contraste de los textos claros; la
+   luz lo BAJA. Con 0,62 y 0,64 la lámina midió cero regresiones en las 20
+   celdas, incluso al 150 %. */
+
+/* «Mano #N» — GT:589 `rgba(var(--text-primary-rgb), 0.45)`: mismo token, alfa 0,62. */
+.game-table-screen .hand-badge {
+  color: rgba(var(--text-primary-rgb), 0.62);
+}
+
+/* «Pasó» — OP:1051 `var(--text-muted)` = rgba(245, 237, 216, 0.55), que es el
+   color de `--text-primary-rgb` al 0,55 (theme.css:79/81). El TOKEN no se toca:
+   es compartido. Las tres variantes quedan FUERA del selector y conservan su
+   color por construcción, sin competir:
+     .opp-status-turn                  OP:1057  var(--gold-brand)
+     .opp-status.opp-status-allin      apu:66   var(--gold-brand)
+     .opp-status.opp-status-elim       OP:46    var(--lose-red)
+   Cubre las dos vías de dibujo del rival: el `opp-panel` y la `.ai-zone` de la
+   mesa 2 (GameTable.jsx:1728 usa las mismas clases). 0,3,0. */
+.game-table-screen .opp-status:not(.opp-status-turn, .opp-status-allin, .opp-status-elim) {
+  color: rgba(var(--text-primary-rgb), 0.64);
+}
+
+/* Las dos líneas claras a los lados de la mesa en escritorio (Fase 0 §J-3) son
+   el `border-inline` de #root (index.css:62). Sólo el COLOR: el ancho de 1 px
+   se queda, así que ninguna caja se mueve. `:has` lo limita a la mesa montada:
+   lobby, Portada y salas ya ponen `border-inline: 0` con su clase de body. Es la
+   única regla de la hoja fuera de `.game-table-screen` (ficha §4.3). */
+#root:has(.game-table-screen) {
+  border-inline-color: transparent;
+}
+
+
+/* ── 2 · A · Luz cenital ───────────────────────────────────────────────────────
+   Sólo `background-image`. `background-color` sigue siendo `var(--surface-game)`
+   (GT:25, vía el shorthand), que es por donde los tapetes verde, grafito, azul
+   y vinotinto cambian el color. 0,2,0 gana a GT (0,1,0). El óvalo es opaco y
+   tapa la capa: tiene su propia luz (B1). */
+.game-table-screen .game-table {
+  background-image: var(--luz-capa-a);
+  background-repeat: no-repeat;
+}
+
+/* Tricolor (§6): tapetes.css:267 sustituye el fondo entero con 0,2,1. Aquí 0,3,1:
+   primero las seis capas de A y después las dos capas de imagen del tricolor,
+   copiadas literales de tapetes.css:268-278. Su shorthand no declara color de
+   fondo (queda `transparent`), así que las capas componen sin reescribir nada. */
+body[data-tapete="tricolor"] .game-table-screen .game-table {
+  background-image:
+    var(--luz-capa-a),
+    radial-gradient(ellipse at center,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, var(--tap-tri-vineta-mesa)) 100%),
+    linear-gradient(to bottom,
+      var(--tap-tri-amarillo) 0%,
+      var(--tap-tri-amarillo) var(--tap-tri-p1),
+      var(--tap-tri-azul)     var(--tap-tri-p2),
+      var(--tap-tri-azul)     var(--tap-tri-p3),
+      var(--tap-tri-rojo)     var(--tap-tri-p4),
+      var(--tap-tri-rojo)     100%);
+}
+
+
+/* ── 3 · B1 · Cuerpo del óvalo ─────────────────────────────────────────────────
+   La piel está declarada cuatro veces (GT:118 B, GT:1286 P, GT:2666 L y
+   GT:4045 `.table-two .felt-oval` de la mesa 2 en L) con el MISMO valor. 0,2,0
+   gana a las tres de 0,1,0 y 0,3,0 a la de 0,2,0. Las dos sombras de hoy van
+   primero, literales; el riel del bloque va detrás. */
+.game-table-screen .center-zone,
+.game-table-screen .table-two .felt-oval {
+  box-shadow:
+    inset 0 0 44px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10),
+    var(--luz-riel);
+}
+
+/* Los cuatro reflejos: dos SVG 1:1 con `background-size: auto 100%` ocupan un
+   cuadrado del alto del óvalo en cada extremo, que es el círculo de la curva.
+   Detrás, el radial de hoy literal (GT:111 = GT:1279 = GT:2659 = GT:4038). El
+   `.oval-right` de la mesa 2 en L NO entra: es un rectángulo de radio 14
+   (GT:4133) y el cálculo por cuadrados no le corresponde; lleva sólo el riel. */
+.game-table-screen .center-zone,
+.game-table-screen .table-two .felt-oval.oval-left {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='a'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.32'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.11'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='b'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.16'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.056'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cellipse cx='16.8' cy='16.8' rx='11' ry='2.2' fill='url(%23a)' transform='rotate(-45 16.8 16.8)'/%3E%3Cellipse cx='16.8' cy='83.2' rx='11' ry='2.2' fill='url(%23b)' transform='rotate(45 16.8 83.2)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='a'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.32'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.11'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='b'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.16'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.056'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cellipse cx='83.2' cy='16.8' rx='11' ry='2.2' fill='url(%23a)' transform='rotate(45 83.2 16.8)'/%3E%3Cellipse cx='83.2' cy='83.2' rx='11' ry='2.2' fill='url(%23b)' transform='rotate(-45 83.2 83.2)'/%3E%3C/svg%3E"),
+    radial-gradient(
+      ellipse at center,
+      var(--green-bright) 0%,
+      var(--green-base) 48%,
+      var(--green-deep) 100%
+    );
+  background-size: auto 100%, auto 100%, auto;
+  background-position: left top, right top, center;
+  background-repeat: no-repeat;
+}
+
+
+/* ── 4 · C · Sombras de contacto ───────────────────────────────────────────────
+   Cartas en reposo, mano humana y dorsos de las IAS. `:where` deja la regla en
+   0,1,0, que EMPATA con la base (playingCard.css:7) y gana sólo por orden. Así
+   todo estado con regla propia sigue mandando:
+     .card-clickable:hover  PC:20  0,2,0          → gana por especificidad
+     .card-selected         PC:26  !important     → gana siempre (K-2: sin contacto)
+     .card-winner           PC:32  0,1,0          → EXCLUIDA en el :not
+     .card-empty            PC:39  0,1,0          → EXCLUIDA en el :not
+   Las dos últimas empatan en 0,1,0 y cargan ANTES que esta hoja: sin la
+   exclusión, el orden les quitaría el halo dorado y el `none`. Dentro de
+   `:where` la exclusión no suma especificidad. `.flying-card` y
+   `.shuffle-fan-card` no llevan `.playing-card` (GameTable.jsx:258/277): el
+   `:not` es inocuo y se queda como seguro. La transición `box-shadow .18s`
+   (PC:9) no se toca. */
+.game-table-screen :where(.playing-card:not(.flying-card, .shuffle-fan-card, .card-winner, .card-empty)) {
+  box-shadow: var(--luz-contacto);
+}
+
+/* POZO — hoy sin sombra (GT:128 sólo pinta el fondo). */
+.game-table-screen .pot-box {
+  box-shadow: var(--luz-contacto);
+}
+
+/* Mazo — las tres capas sólidas vinotinto se repiten IDÉNTICAS y sólo cambia la
+   capa negra final. Tres listas, cada una con su gemela de hoy:
+     .deck-pile            GT:644   2/4/6 px   (P y L; B)
+     .deck-pile.opp-deck   OP:203   1/2/3 px   (todos)
+     D .player-zone/.ai-zone .deck-pile  GT:4703  1/2/3 px */
+.game-table-screen .deck-pile {
+  box-shadow:
+    2px 2px 0px 0px #7a0000,
+    4px 4px 0px 0px #8B0000,
+    6px 6px 0px 0px #6b0000,
+    var(--luz-mazo-negra);
+}
+
+.game-table-screen .deck-pile.opp-deck {
+  box-shadow:
+    1px 1px 0px 0px #7a0000,
+    2px 2px 0px 0px #8B0000,
+    3px 3px 0px 0px #6b0000,
+    var(--luz-mazo-negra);
+}
+
+@media (orientation: landscape) and (min-height: 601px) {
+  .game-table-screen .player-zone .deck-pile,
+  .game-table-screen .ai-zone .deck-pile {
+    box-shadow:
+      1px 1px 0px 0px #7a0000,
+      2px 2px 0px 0px #8B0000,
+      3px 3px 0px 0px #6b0000,
+      var(--luz-mazo-negra);
+  }
+}
+
+/* Fichas — SUSTITUYE el filtro de ChipToken.css:5 (no añade uno nuevo). 0,1,0
+   por `:where`: empata y gana por orden. No estaba en la lámina: si no convence
+   en el teléfono, se retira esta regla y nada más cambia. */
+.game-table-screen :where(.chip-token) {
+  filter: var(--luz-ficha);
+}

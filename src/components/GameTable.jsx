@@ -65,6 +65,7 @@ import {
   // del snapshot congelado de la mano (game.handRules). Quitar el import es
   // parte del arreglo — mientras la función esté a mano, el patrón vuelve.
 } from '../engine/gameEngine'
+import '../styles/luz.css'
 
 const TURN_TIME  = 20
 const WARNING_AT = 5
