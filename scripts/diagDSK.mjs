@@ -46,6 +46,13 @@
 //            pares de botones, que tiene que ser 0 px². También entra en el
 //            veredicto. Argumento opcional: una celda (`apu 360x640`).
 //            Capturas en `capturas-apu/` y las de teléfono en `capturas-apu/tel/`.
+//            REC-1: las varas de la tarjeta también en escritorio y en la
+//            forzosa compacta del apaisado (y 915×412 dentro de 640×360); la
+//            pregunta llega como burbuja y se abre con `abrirRecarga`.
+//   rec    → REC-1 Fase 1: la recarga como burbuja. Siete puertas (no tapa,
+//            Δ = 0, reloj desde el fin de la revelación, un solo reloj,
+//            apertura sola a 5 s, vence, sin velo) + vara del anillo. Partes:
+//            `rec celdas|reloj|hoja [celda|caso]`. Salida `capturas-rec/fase1/`.
 //   b1     → DSK-B1: presupuesto vertical por fila + overflow por viewport
 //   tactil → verificación táctil coarse: hit-boxes REALES (::after, vía
 //            elementFromPoint) validados ≥40px (estándar campaña, NO WCAG) +
@@ -266,7 +273,10 @@ import { register } from 'node:module'
 // con un gancho de resolución propio (ver scripts/_resolveExt.mjs).
 register('./_resolveExt.mjs', import.meta.url)
 import { chromium } from 'playwright-core'
-import { writeFileSync, readFileSync } from 'node:fs'
+// REC-1 · `mkdirSync` y `existsSync` para el modo `rec`. `mkdirSync` ya se usaba en
+// `retar` y `apu` sin importarse: el `try` se tragaba el ReferenceError y los
+// cajones sólo existían porque alguien los había creado antes.
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs'
 // La versión del instrumento se LEE del paquete instalado, no se copia a mano:
 // una copia a mano miente en cuanto alguien actualiza el pin.
 const PW_VERSION = JSON.parse(
@@ -1599,6 +1609,9 @@ async function jugarHasta(page, cond, manos = 6, agresivo = false) {
         return false
       }
       if (document.querySelector('[data-accion="recarga"]')) return false
+      // REC-1 · la pregunta pendiente (burbuja o revelación en curso) también
+      // detiene el bucle: tocarla es cosa del punto que la mide.
+      if (document.querySelector('.game-table[data-rec-motivo]')) return false
       if (agresivo && (pulsa('[data-accion="apostar"]') || pulsa('[data-accion="subir"]'))) return true
       return porTexto('Iniciar mano') || porTexto('Siguiente mano')
         || pulsa('[data-accion="igualar"]') || pulsa('[data-accion="pasar"]')
@@ -1630,9 +1643,46 @@ async function conReintento(page, prepara, cond, intentos = 4) {
 }
 
 // El pago, reconocido por lo que ofrece y no por una fase que el DOM no publica.
+// REC-1 · y por la pregunta PENDIENTE (`data-rec-motivo` en la mesa): desde
+// REC-1 la automática y la forzosa no pintan nada hasta que termina la
+// revelación, y después son una burbuja, no la tarjeta.
 const APU_EN_PAGO = () => !!document.querySelector('[data-accion="recargar"]')
   || !!document.querySelector('[data-accion="recarga"]')
+  || !!document.querySelector('.game-table[data-rec-motivo]')
   || [...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano')
+
+// REC-1 · el motivo de la pregunta, esté pintada o no.
+const APU_MOTIVO = () => document.querySelector('[data-accion="recarga"]')?.dataset.motivo
+  ?? document.querySelector('.game-table')?.dataset.recMotivo ?? null
+
+// REC-1 · lleva la pregunta hasta la TARJETA, que es lo que miden los puntos
+// de `apu`: espera a que termine la revelación y toca la burbuja. Es el gesto
+// del jugador («tocar la burbuja abre la tarjeta», v1.2 §5.5.4), así que la
+// tarjeta medida es la de verdad, con «Ver la mesa» si queda más de 5 s.
+async function abrirRecarga(page, limite = 9000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < limite) {
+    const st = await page.evaluate(() => ({
+      tarjeta: !!document.querySelector('[data-accion="recarga"]'),
+      burbuja: !!document.querySelector('[data-accion="recarga-burbuja"]'),
+    }))
+    // Recién abierta entra con `bankruptRise` (scale 0,96): se espera quieta,
+    // que es la lección de A5, y 450 ms tras apartar el ratón (Fase 0 §J-7).
+    if (st.tarjeta) {
+      await esperarTarjetaQuieta(page)
+      await page.mouse.move(5, 5)
+      await page.waitForTimeout(450)
+      return true
+    }
+    if (st.burbuja) {
+      await page.evaluate(() => document.querySelector('[data-accion="recarga-burbuja"]')?.click())
+      await page.waitForTimeout(120)
+      continue
+    }
+    await page.waitForTimeout(120)
+  }
+  return false
+}
 
 // ══ APU-1 1f §A.2 · LAS MEDIDAS QUE SÓLO EXISTEN EN UN TELÉFONO ═══════════
 //
@@ -1895,9 +1945,19 @@ async function medirBotonesRecarga(page) {
     // 1f-A5 · el cronómetro como PIE de la tarjeta: separado de los botones y,
     // en la blanda, alineado a la izquierda con el mismo margen interior que el
     // subtítulo. «El mismo margen» se comprueba comparando bordes, no reglas.
-    const sepAccionesPlazo = plazo
-      ? red(plazo.getBoundingClientRect().top - Math.max(...ca.map((x) => x.bottom)))
+    // REC-1 · el cronómetro vive en una FILA (apu.css §9) que también lleva
+    // «Ver la mesa»: la separación que cuenta es la de la fila, que es la que
+    // tiene el botón más alto. Sin fila (arnés viejo), la del `<p>`.
+    const filaPlazo = plazo ? (plazo.closest('.apu-plazo-fila') ?? plazo) : null
+    const sepAccionesPlazo = filaPlazo
+      ? red(filaPlazo.getBoundingClientRect().top - Math.max(...ca.map((x) => x.bottom)))
       : null
+    const ver = modal.querySelector('[data-accion="recarga-ver-mesa"]')
+    const verMesa = ver ? (() => {
+      const r = ver.getBoundingClientRect(); const f = filaPlazo.getBoundingClientRect(); const p = plazo.getBoundingClientRect()
+      return { hay: true, alto: red(r.height), ancho: red(r.width), mismaFila: r.top >= f.top - 0.5 && r.bottom <= f.bottom + 0.5, aLaDerecha: r.left >= p.left, sepAcciones: red(r.top - Math.max(...ca.map((x) => x.bottom))) }
+    })() : { hay: false }
+    const mejorPalo = document.querySelector('.score-tag-player')
     // Lo que la tarjeta le quita a la mano del jugador. Victor aceptó que en
     // apaisado tape; se mide para saber CUÁNTO, no para exigir cero.
     const m = modal.getBoundingClientRect()
@@ -1937,6 +1997,14 @@ async function medirBotonesRecarga(page) {
       cartas: cartas.length,
       solapeCartas, areaCartas,
       dentro: dentroVentana(m),
+      // REC-1 · lo que la Parte A necesita además: el alto de las acciones por
+      // separado (la compacta pide más que a los montos), el aire bajo la
+      // tarjeta, «Ver la mesa» y lo que se come de «Tu mejor palo».
+      altoAccionesMin: ca.length ? red(Math.min(...ca.map((c) => c.alto))) : null,
+      aireAbajo: red(innerHeight - m.bottom),
+      verMesa,
+      solapeMejorPalo: mejorPalo ? red(areaDe(mejorPalo.getBoundingClientRect())) : null,
+      areaMejorPalo: mejorPalo ? red(mejorPalo.getBoundingClientRect().width * mejorPalo.getBoundingClientRect().height) : null,
     }
   })
 }
@@ -2011,9 +2079,8 @@ async function recargaSuave(page, intentos = 5) {
     await recorrerRuta(page, 3, 'basico', 0, 'medio')
     await jugarHasta(page, APU_EN_PAGO, 5)
     await page.waitForTimeout(400)
-    let motivo = await page.evaluate(() =>
-      document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? null)
-    if (motivo === 'automatica') return { motivo, intentos: i + 1 }
+    let motivo = await page.evaluate(APU_MOTIVO)
+    if (motivo === 'automatica') { await abrirRecarga(page); return { motivo, intentos: i + 1 } }
     if (motivo === 'forzosa') continue
     if (!motivo) {
       // No saltó sola: se pide la voluntaria, que abre el MISMO panel.
@@ -2042,10 +2109,10 @@ async function recargaForzosa(page, intentos = 6) {
     await page.goto(`${BASE}/?apu=recarga`)
     await recorrerRuta(page, 3, 'basico', 0, 'medio')
     for (let paso = 0; paso < 400; paso++) {
-      const motivo = await page.evaluate(() =>
-        document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? null)
-      if (motivo === 'forzosa') return { motivo, intentos: i + 1, pasos: paso }
+      const motivo = await page.evaluate(APU_MOTIVO)
+      if (motivo === 'forzosa') { await abrirRecarga(page); return { motivo, intentos: i + 1, pasos: paso } }
       if (motivo) {
+        await abrirRecarga(page)
         await page.evaluate(() => document.querySelector('[data-accion="recarga-no"]')?.click())
         await page.waitForTimeout(260)
         continue
@@ -2098,16 +2165,32 @@ async function fotoS25(page, ruta, vuelta) {
 // banda que queda bajo las cartas del jugador —todo lo que crece se lo come a
 // la mano— y la forzosa bloquea a propósito y tiene la pantalla entera. Así que
 // la blanda se aprieta al piso táctil y la forzosa se estira.
+// REC-1 · la forzosa pasa de `center` a `left`: v1.2 §5.4 pone el cronómetro
+// a la izquierda en las dos tarjetas y en todas las pantallas. Y una tercera
+// lámina, la forzosa COMPACTA del teléfono apaisado (apu.css §11): acciones en
+// fila de ≥ 40 con ≥ 12 entre ellas, montos de ≥ 36 con ≥ 10, ≥ 12 de los
+// montos a las acciones y ≥ 8 hasta el cronómetro, entera en la ventana con ≥ 8
+// de aire arriba y abajo.
 const VARA_BOTONES = {
   blanda:  { altoMin: 36, altoMax: 40, sepBotones: 10, entreFilas: 12, hastaPlazo: 8,  align: 'left' },
-  forzosa: { altoMin: 40, altoMax: 44, sepBotones: 12, entreFilas: 16, hastaPlazo: 14, align: 'center' },
+  forzosa: { altoMin: 40, altoMax: 44, sepBotones: 12, entreFilas: 16, hastaPlazo: 14, align: 'left' },
+  compacta: { altoMin: 36, altoMax: 44, altoAcciones: 40, sepMontos: 10, sepAcciones: 12, sepBotones: 10, entreFilas: 12, hastaPlazo: 8, align: 'left', accionesEnFila: true, aire: 8 },
 }
 
-function varaBotones(b, esPortrait) {
+function varaBotones(b, esPortrait, lamina = null) {
   if (!b?.hay) return { ok: false, motivo: b?.motivo ?? null }
-  const v = VARA_BOTONES[b.motivo === 'forzosa' ? 'forzosa' : 'blanda']
+  const nombre = lamina ?? (b.motivo === 'forzosa' ? 'forzosa' : 'blanda')
+  const v = VARA_BOTONES[nombre]
   const fallos = []
   if (!(b.altoMin >= v.altoMin && b.altoMax <= v.altoMax)) fallos.push(`alto ${b.altoMin}–${b.altoMax} fuera de ${v.altoMin}–${v.altoMax}`)
+  if (v.altoAcciones && !(b.altoAccionesMin >= v.altoAcciones)) fallos.push(`acciones a ${b.altoAccionesMin} < ${v.altoAcciones}`)
+  if (v.sepMontos && !(Math.min(...b.sepMontos) >= v.sepMontos)) fallos.push(`entre montos ${Math.min(...b.sepMontos)} < ${v.sepMontos}`)
+  if (v.sepAcciones && !(Math.min(...b.sepAcciones, ...b.sepAccionesV) >= v.sepAcciones)) fallos.push(`entre acciones ${Math.min(...b.sepAcciones, ...b.sepAccionesV)} < ${v.sepAcciones}`)
+  if (v.accionesEnFila && b.filasAcciones !== 1) fallos.push(`acciones en ${b.filasAcciones} filas`)
+  if (v.aire && !(b.modal.top >= v.aire && b.aireAbajo >= v.aire)) fallos.push(`aire ${b.modal.top}/${b.aireAbajo} < ${v.aire}`)
+  // REC-1 · «Ver la mesa», cuando está, también es botón de la tarjeta: piso
+  // táctil de 36 (v1.2 §5.4), en la fila del cronómetro y a su derecha.
+  if (b.verMesa?.hay && !(b.verMesa.alto >= 36 && b.verMesa.mismaFila && b.verMesa.aLaDerecha)) fallos.push(`«Ver la mesa» ${b.verMesa.alto} px${b.verMesa.mismaFila ? '' : ', fuera de la fila'}${b.verMesa.aLaDerecha ? '' : ', no a la derecha'}`)
   if (!(b.sepBotones >= v.sepBotones)) fallos.push(`entre botones ${b.sepBotones} < ${v.sepBotones}`)
   if (!(b.sepEntreFilas >= v.entreFilas)) fallos.push(`entre filas ${b.sepEntreFilas} < ${v.entreFilas}`)
   if (!(b.sepAccionesPlazo >= v.hastaPlazo)) fallos.push(`hasta el cronómetro ${b.sepAccionesPlazo} < ${v.hastaPlazo}`)
@@ -2119,7 +2202,7 @@ function varaBotones(b, esPortrait) {
   if (!b.plazoVisible || !b.subVisible || !b.dentro) fallos.push('algo fuera de la ventana o escondido')
   // Y la vara de A2, que sigue mandando en vertical: la blanda no toca la mano.
   if (esPortrait && b.motivo !== 'forzosa' && b.solapeCartas !== 0) fallos.push(`tapa ${b.solapeCartas} px² de la mano`)
-  return { ok: fallos.length === 0, fallos, lamina: b.motivo === 'forzosa' ? 'forzosa' : 'blanda' }
+  return { ok: fallos.length === 0, fallos, lamina: nombre }
 }
 
 // ── La línea del humano en all-in, donde de verdad existe ─────────────────
@@ -2138,12 +2221,17 @@ async function lineaAllinEnMesa4(page, dir, tag) {
     // media apuesta. Se rechaza la suave (la pila corta es justo lo que hace
     // falta) y se empieza de nuevo si sale la forzosa, que es una mesa acabada.
     let forzosa = false
-    for (let i = 0; i < 160 && !forzosa; i++) {
+    // REC-1 · 400 y no 160: cada blanda cuesta ahora la revelación entera antes
+    // de poder rechazarla, y en tres sondas el All-in salió en 75, 116 y 319.
+    for (let i = 0; i < 400 && !forzosa; i++) {
       const st = await page.evaluate(() => ({
         boton: !!document.querySelector('[data-accion="allin"]'),
-        motivo: document.querySelector('[data-accion="recarga"]')?.dataset.motivo ?? null,
+        motivo: document.querySelector('[data-accion="recarga"]')?.dataset.motivo
+          ?? document.querySelector('.game-table')?.dataset.recMotivo ?? null,
       }))
       if (st.motivo === 'forzosa') { forzosa = true; break }
+      // REC-1 · la blanda llega como burbuja: se abre para poder rechazarla.
+      if (st.motivo) await abrirRecarga(page)
       if (st.boton) {
         await page.click('[data-accion="allin"]')
         const salio = await esperarMesa(page, () => !!document.querySelector('[data-accion="allin-humano"]'), 12000)
@@ -2364,6 +2452,8 @@ async function runApu(browser) {
     const llegoAlPago = await jugarHasta(page, APU_EN_PAGO, 5)
     // La automática sale sola bajo el listón de §5.1; si la mano se ganó y la
     // pila subió, se pide la voluntaria. Las dos abren el MISMO panel.
+    // REC-1 · la automática (y la forzosa) llegan como burbuja: se toca.
+    if (await page.evaluate(APU_MOTIVO)) await abrirRecarga(page)
     await page.evaluate(() => {
       const b = document.querySelector('[data-accion="recargar"]')
       if (b) b.click()
@@ -2429,7 +2519,9 @@ async function runApu(browser) {
         // El plazo sólo se le exige a la AUTOMÁTICA: la voluntaria no cuenta
         // nada —su renglón está reservado pero escondido con `visibility`— y su
         // contador se lee en cero. Es la misma distinción que `pideContador`.
-        && (panel.motivo !== 'automatica' || /15 s/.test(panel.plazo ?? ''))
+        // REC-1 · ya no se lee «15 s»: la tarjeta se abre tocando la burbuja,
+        // con el tiempo que quede (v1.2 §5.5.4). Se exige un plazo en marcha.
+        && (panel.motivo !== 'automatica' || /Se cierra en ([1-9]|1[0-5]) s/.test(panel.plazo ?? ''))
         && tras.recargas === 1 && !!tras.cerrado && !!tras.gateVuelve,
     }
 
@@ -2620,8 +2712,66 @@ async function runApu(browser) {
       } else {
         c.botonesRecarga = { hay: false, ...suave, ok: false }
       }
+      // REC-1 §2.3 · la FORZOSA COMPACTA (apu.css §11), aquí y en el S25
+      // apaisado (915×412), que se toma redimensionando la misma página como
+      // hace `fotoS25` —cazar la forzosa cuesta decenas de manos—.
+      const forz = await recargaForzosa(page)
+      if (forz.motivo === 'forzosa') {
+        await page.mouse.move(5, 5)
+        await page.waitForTimeout(450)
+        const bf = await medirBotonesRecarga(page)
+        c.botonesForzosa = { ...forz, ...bf, ...varaBotones(bf, false, 'compacta') }
+        await page.screenshot({ path: `${dir}/apu_forzosa_${tag}.png` })
+        if (vp.w === 640) {
+          await page.setViewportSize({ width: 915, height: 412 })
+          await page.waitForTimeout(350)
+          await page.mouse.move(5, 5)
+          await page.waitForTimeout(450)
+          const bs = await medirBotonesRecarga(page)
+          c.botonesForzosaS25h = { ...bs, ...varaBotones(bs, false, 'compacta') }
+          await page.screenshot({ path: `${dir}/apu_forzosa_915x412.png` })
+          await page.setViewportSize({ width: vp.w, height: vp.h })
+          await page.waitForTimeout(350)
+        }
+      } else {
+        c.botonesForzosa = { hay: false, ...forz, ok: false }
+      }
       c.telPuntos = [
         { id: 'tel.botones', ok: c.botonesRecarga?.ok === true },
+        { id: 'tel.forzosa', ok: c.botonesForzosa?.ok === true },
+        ...(c.botonesForzosaS25h ? [{ id: 'tel.forzosa915', ok: c.botonesForzosaS25h.ok === true }] : []),
+      ]
+    }
+
+    // ── REC-1 §2.4 · el ESCRITORIO, contra las mismas varas (apu.css §10) ──
+    // La blanda se mide además contra lo que tapa: crece hacia arriba (está
+    // anclada abajo) y la Fase 0 la tenía ya encima de «Tu mejor palo» y de un
+    // 24–27 % de la mano en 1366/1280/1024. Se reporta, no se da por bueno.
+    if (!vp.movil) {
+      const suave = await recargaSuave(page)
+      if (suave.motivo) {
+        await esperarTarjetaQuieta(page)
+        await page.mouse.move(5, 5)
+        await page.waitForTimeout(450)
+        const bl = await medirBotonesRecarga(page)
+        c.botonesBlanda = { ...suave, ...bl, ...varaBotones(bl, false) }
+        await page.screenshot({ path: `${dir}/apu_blanda_${tag}.png` })
+      } else {
+        c.botonesBlanda = { hay: false, ...suave, ok: false }
+      }
+      const forz = await recargaForzosa(page)
+      if (forz.motivo === 'forzosa') {
+        await page.mouse.move(5, 5)
+        await page.waitForTimeout(450)
+        const bf = await medirBotonesRecarga(page)
+        c.botonesForzosa = { ...forz, ...bf, ...varaBotones(bf, false) }
+        await page.screenshot({ path: `${dir}/apu_forzosa_${tag}.png` })
+      } else {
+        c.botonesForzosa = { hay: false, ...forz, ok: false }
+      }
+      c.telPuntos = [
+        { id: 'esc.blanda', ok: c.botonesBlanda?.ok === true },
+        { id: 'esc.forzosa', ok: c.botonesForzosa?.ok === true },
       ]
     }
 
@@ -12122,6 +12272,671 @@ async function runRev(browser) {
   return { verde, puertas, resumen, oclusion, oclusionProbada, fuera, vueloReal: vueloReal && { ...vueloReal, sinPintar: vueloReal.sinPintar?.length } }
 }
 
+// ══ REC-1 Fase 1 · MODO `rec` · LA RECARGA QUE NO TAPA LA MESA ════════════════
+// Ficha: AJILEI_REC-1_Fase1_v1.0.md §3.4. Normativo: AJILEI_APU-1_Reglas_v1.2
+// §5.4 y §5.5. Toma la sonda de línea de tiempo y la caza de la forzosa real de
+// `capturas-rec/diagREC.mjs` (Fase 0): molde `allinHumano` con un conductor que
+// pulsa All-in para la forzosa, y `recarga` con un conductor que NUNCA pulsa
+// All-in para la automática (Fase 0 §B.1: perderlo daría la forzosa).
+//
+//   node scripts/diagDSK.mjs rec            las siete puertas + anillo + hoja
+//   node scripts/diagDSK.mjs rec celdas     puertas 1–2 (y 7 de paso) en las 13 celdas
+//   node scripts/diagDSK.mjs rec reloj      puertas 3–7 en pc y S25 v, forzosa y automática
+//   node scripts/diagDSK.mjs rec hoja       sólo rehace la hoja con lo ya medido
+//
+// Salida: `capturas-rec/fase1/` (capturas, `datos/*.json` y `hoja.html`).
+//
+// Verde solo si pasan las siete puertas:
+//   1 · no tapa     — la burbuja pisa 0 px² de lo protegido (Fase 0 §C.1)
+//   2 · Δ = 0       — zona del jugador, barra, cartas, óvalo y la ranura, con la
+//                     burbuja montada frente a la ranura sin ella
+//   3 · el reloj    — el primer «15» cae ≥ el aterrizaje del vuelo y ≥ t0 + 3 s
+//   4 · un reloj    — abrir enseña N (±1) y plegar devuelve el mismo reloj
+//   5 · apertura    — a 5 s la tarjeta está montada sola y sin «Ver la mesa»
+//   6 · vence       — la forzosa desmonta la mesa; la automática, «Siguiente mano»
+//   7 · sin velo    — con burbuja no hay `.bankrupt-overlay`, y un toque en el
+//                     nombre de una IA no ganadora la destapa (mesa 5)
+
+const REC_OUT = 'capturas-rec/fase1'
+const REC_VPS = {
+  pc:    { w: 1920, h: 1080, movil: false },
+  d1366: { w: 1366, h: 768,  movil: false },
+  d1280: { w: 1280, h: 720,  movil: false },
+  d1024: { w: 1024, h: 768,  movil: false },
+  s25v:  { w: 412,  h: 915,  movil: true },
+  s25h:  { w: 915,  h: 412,  movil: true },
+  m390:  { w: 390,  h: 844,  movil: true },
+  m360:  { w: 360,  h: 640,  movil: true },
+}
+const REC_CELDAS = ['pc-5', 'pc-2', 'd1366-5', 'd1280-5', 'd1024-5', 's25v-5', 's25v-2', 's25h-5', 's25h-2', 'm390-5', 'm390-2', 'm360-5', 'm360-2']
+// Donde además se abre la tarjeta y se fotografía con «Ver la mesa».
+const REC_ABRE = ['pc-5', 's25v-5', 's25h-5', 'd1366-5', 'd1280-5', 'd1024-5', 'm360-5']
+const recDuerme = (ms) => new Promise((r) => setTimeout(r, ms))
+
+const REC_SONDA = `(() => {
+  if (window.__rec) return
+  const ev = []
+  window.__rec = { ev, last: {} }
+  const q = (s) => document.querySelector(s)
+  const firma = () => {
+    const g = q('.game-table')
+    const msg = q('.game-message')
+    const bub = q('[data-accion="recarga-burbuja"]')
+    return {
+      mesa: !!g,
+      tono: msg?.dataset.tono ?? '',
+      pendiente: g?.dataset.recMotivo ?? '',
+      lista: g?.dataset.recLista ?? '',
+      red: g?.dataset.recRed ?? '',
+      vcCapa: !!q('.vc-capa'),
+      burbuja: bub ? bub.dataset.seg : '',
+      tarjeta: q('[data-accion="recarga"]')?.dataset.motivo ?? '',
+      velo: document.querySelectorAll('.bankrupt-overlay').length,
+      plazo: (q('[data-accion="recarga-plazo"]')?.textContent ?? '').trim(),
+      verMesa: !!q('[data-accion="recarga-ver-mesa"]'),
+      siguiente: [...document.querySelectorAll('.btn')].some((b) => b.textContent.trim() === 'Siguiente mano'),
+    }
+  }
+  const tick = () => {
+    try {
+      const f = firma()
+      const t = performance.timeOrigin + performance.now()
+      for (const k in f) if (window.__rec.last[k] !== f[k]) { ev.push({ t, k, v: f[k] }); window.__rec.last[k] = f[k] }
+    } catch { /* entre pantallas */ }
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+})()`
+
+async function recPagina(browser, vp) {
+  const ctx = await browser.newContext({
+    viewport: { width: vp.w, height: vp.h },
+    deviceScaleFactor: 1,
+    ...(vp.movil ? { isMobile: true, hasTouch: true } : {}),
+  })
+  await ctx.addInitScript(REC_SONDA)
+  const page = await ctx.newPage()
+  const consola = []
+  page.on('pageerror', (e) => consola.push(`pageerror: ${e.message}`))
+  return { ctx, page, consola }
+}
+
+const REC_PASO = () => {
+  const p = (s) => { const x = document.querySelector(s); if (x && !x.disabled) { x.click(); return s } return null }
+  const t = (q) => { const x = [...document.querySelectorAll('.btn')].find((y) => y.textContent.trim().startsWith(q) && !y.disabled); if (x) { x.click(); return q } return null }
+  return p('[data-accion="allin"]') || p('[data-accion="igualar"]') || p('[data-accion="pasar"]')
+    || t('Iniciar mano') || t('Sin descartar')
+}
+const REC_PASO_BLANDO = () => {
+  const p = (s) => { const x = document.querySelector(s); if (x && !x.disabled) { x.click(); return s } return null }
+  const t = (q) => { const x = [...document.querySelectorAll('.btn')].find((y) => y.textContent.trim().startsWith(q) && !y.disabled); if (x) { x.click(); return q } return null }
+  return p('[data-accion="pasar"]') || p('[data-accion="igualar"]') || p('[data-accion="retirarse"]')
+    || t('Iniciar mano') || t('Sin descartar')
+}
+// La pregunta PENDIENTE se lee de la mesa (`data-rec-motivo`): desde REC-1 no
+// hay tarjeta ni burbuja hasta que termina la revelación.
+const REC_ESTADO = () => {
+  const g = document.querySelector('.game-table')
+  return {
+    motivo: g?.dataset.recMotivo || null,
+    siguiente: [...document.querySelectorAll('.btn')].some((b) => b.textContent.trim() === 'Siguiente mano'),
+    mesa: !!g,
+  }
+}
+
+async function recCazar(page, mesa, molde, busca, intentos = 12, alPaso = null) {
+  for (let i = 0; i < intentos; i++) {
+    await page.goto(`${BASE}/?apu=saldo:5000,${molde}`)
+    await recorrerRuta(page, mesa, 'basico', 0, 'medio')
+    await page.mouse.move(5, 5)
+    await page.evaluate(() => { window.__rec.ev.length = 0; window.__rec.last = {} })
+    if (alPaso) await alPaso('inicio')
+    for (let paso = 0; paso < 600; paso++) {
+      const st = await page.evaluate(REC_ESTADO)
+      if (st.motivo === busca) return { intentos: i + 1 }
+      if (st.motivo || st.siguiente || !st.mesa) break
+      await page.evaluate(busca === 'automatica' ? REC_PASO_BLANDO : REC_PASO)
+      await recDuerme(120)
+    }
+    if (alPaso) await alPaso('fallo')
+  }
+  return null
+}
+
+async function recQuieta(page, sel, limite = 3000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < limite) {
+    const ok = await page.evaluate((sel) => {
+      const e = document.querySelector(sel)
+      if (!e) return false
+      const anims = [...e.getAnimations({ subtree: true })]
+      const ov = e.closest('[data-accion="recarga"]')
+      if (ov) anims.push(...ov.getAnimations())
+      return anims.every((a) => a.playState !== 'running')
+    }, sel)
+    if (ok) return true
+    await recDuerme(60)
+  }
+  return false
+}
+
+// Lo protegido de la Fase 0 §C.1, con la barra por sus HOJAS (su caja entera
+// incluye la ranura vacía) y sin nada de dentro de la ranura.
+const REC_MEDIR_MESA = () => {
+  const red = (x) => Math.round(x * 100) / 100
+  const vis = (e) => {
+    const r = e.getBoundingClientRect(); const cs = getComputedStyle(e)
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.05
+  }
+  const caja = (e) => { const r = e.getBoundingClientRect(); return { x: red(r.left), y: red(r.top), w: red(r.width), h: red(r.height) } }
+  const todos = (s) => [...document.querySelectorAll(s)].filter(vis).map(caja)
+  const header = document.querySelector('.table-header')
+  const hojasHeader = header ? [...header.querySelectorAll('*')].filter((e) => vis(e) && (e.children.length === 0 || e.tagName === 'BUTTON' || e.tagName === 'svg')).filter((e) => !e.closest('svg') || e.tagName === 'svg').map(caja) : []
+  const allin = [...document.querySelectorAll('.opp-status')].filter((e) => vis(e) && e.textContent.trim() === 'ALL-IN').map((e) => { const g = document.createRange(); g.selectNodeContents(e); const r = g.getBoundingClientRect(); return { x: red(r.left), y: red(r.top), w: red(r.width), h: red(r.height) } })
+  const bub = document.querySelector('[data-accion="recarga-burbuja"]')
+  return {
+    vp: { w: innerWidth, h: innerHeight },
+    burbuja: bub ? caja(bub) : null,
+    capas: {
+      cartasIA: todos('.opp-panel .playing-card, .ai-zone .playing-card'),
+      panelesIA: todos('.opp-panel, .ai-zone'),
+      allin,
+      mensaje: todos('.game-message'),
+      pozo: todos('.pot-box'),
+      winChip: todos('.win-score-chip'),
+      scoreTag: todos('.score-tag'),
+      manoJugador: todos('.player-zone .cards-row'),
+      barraJugador: [...document.querySelectorAll('.player-bar *')]
+        .filter((e) => vis(e) && !e.closest('.action-area') && (e.children.length === 0 || e.classList.contains('pbr-name') || e.classList.contains('seat-badge')) && (e.textContent.trim() || e.tagName === 'svg' || e.tagName === 'IMG'))
+        .filter((e) => !e.closest('svg') || e.tagName === 'svg')
+        .map(caja),
+      mejorPalo: todos('.score-tag-player'),
+      menu: todos('.utilities-trigger'),
+      cabecera: hojasHeader,
+    },
+  }
+}
+
+function recSolape(rect, med) {
+  const out = {}
+  let total = 0
+  for (const [k, arr] of Object.entries(med.capas)) {
+    let a = 0
+    for (const c of arr) {
+      const w = Math.max(0, Math.min(rect.x + rect.w, c.x + c.w) - Math.max(rect.x, c.x))
+      const h = Math.max(0, Math.min(rect.y + rect.h, c.y + c.h) - Math.max(rect.y, c.y))
+      a += w * h
+    }
+    if (a > 0) { out[k] = round(a); total += a }
+  }
+  return { total: round(total), por: out }
+}
+
+// Puerta 2 · las cajas que no se pueden mover, con y sin la burbuja. «Sin» es
+// la misma ranura reservada con la burbuja en `display: none` por inyección, en
+// el mismo instante: así la única diferencia entre las dos medidas es la
+// burbuja. Se mide con `getBoundingClientRect`, que INCLUYE los transform de
+// los ancestros (lección E-33), así que antes se exige que ninguna de estas
+// cajas tenga una animación corriendo.
+const REC_CAJAS = () => {
+  const red = (x) => Math.round(x * 100) / 100
+  const sels = ['.player-zone', '.player-bar', '.player-zone .cards-row', '.center-zone', '.two-ovals', '.player-bar .action-area.rec-ranura']
+  const out = {}
+  let anim = 0
+  for (const s of sels) {
+    const e = document.querySelector(s)
+    if (!e) continue
+    const r = e.getBoundingClientRect()
+    out[s] = { x: red(r.left), y: red(r.top), w: red(r.width), h: red(r.height) }
+    anim += e.getAnimations().filter((a) => a.playState === 'running').length
+  }
+  return { cajas: out, anim }
+}
+
+async function recDelta(page) {
+  const con = await page.evaluate(REC_CAJAS)
+  await page.evaluate(() => {
+    const st = document.createElement('style'); st.id = '__rec_sin'; st.textContent = '.rec-burbuja{display:none !important}'
+    document.head.appendChild(st)
+  })
+  const sin = await page.evaluate(REC_CAJAS)
+  await page.evaluate(() => document.getElementById('__rec_sin')?.remove())
+  let max = 0
+  const dif = {}
+  for (const [k, a] of Object.entries(con.cajas)) {
+    const b = sin.cajas[k]
+    if (!b) { dif[k] = 'falta'; max = Infinity; continue }
+    const d = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h))
+    dif[k] = round(d)
+    max = Math.max(max, d)
+  }
+  return { max: round(max), dif, cajas: con.cajas, animaciones: con.anim + sin.anim }
+}
+
+// Varas del anillo (§0 de la ficha): diámetro ≥ 32, número ≥ 12 px y 700,
+// contraste ≥ 4,5 del número y del trazo contra el fondo de la burbuja. El fondo
+// es translúcido (0,94): se compone sobre el negro y sobre el verde más claro
+// del tapete, y vale el peor de los dos.
+const REC_ANILLO = () => {
+  const b = document.querySelector('[data-accion="recarga-burbuja"]')
+  if (!b) return { hay: false }
+  const an = b.querySelector('.rec-anillo').getBoundingClientRect()
+  const seg = b.querySelector('.rec-seg')
+  const tr = b.querySelector('.rec-anillo-trazo')
+  const cs = getComputedStyle(seg)
+  return {
+    hay: true,
+    ancho: an.width, alto: an.height,
+    fs: parseFloat(cs.fontSize), fw: Number(cs.fontWeight),
+    colorNumero: cs.color,
+    colorTrazo: getComputedStyle(tr).stroke,
+    fondo: getComputedStyle(b).backgroundColor,
+    burbuja: (() => { const r = b.getBoundingClientRect(); return { w: r.width, h: r.height } })(),
+  }
+}
+
+function recRGBA(s) {
+  const m = String(s).match(/rgba?\(([^)]+)\)/)
+  if (!m) return null
+  const [r, g, b, a = 1] = m[1].split(/[ ,/]+/).filter(Boolean).map(Number)
+  return { r, g, b, a }
+}
+function recLum({ r, g, b }) {
+  const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+function recContraste(fg, bg) {
+  const a = recLum(fg), b = recLum(bg)
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
+function recVaraAnillo(a) {
+  if (!a?.hay) return { ok: false, motivo: 'sin burbuja' }
+  const fondo = recRGBA(a.fondo)
+  const sobre = [{ r: 0, g: 0, b: 0 }, { r: 0x23, g: 0x5c, b: 0x38 }]
+  const compuesto = sobre.map((s) => ({ r: fondo.r * fondo.a + s.r * (1 - fondo.a), g: fondo.g * fondo.a + s.g * (1 - fondo.a), b: fondo.b * fondo.a + s.b * (1 - fondo.a) }))
+  const cN = Math.min(...compuesto.map((c) => recContraste(recRGBA(a.colorNumero), c)))
+  const cT = Math.min(...compuesto.map((c) => recContraste(recRGBA(a.colorTrazo), c)))
+  const fallos = []
+  if (!(Math.min(a.ancho, a.alto) >= 32)) fallos.push(`anillo ${a.ancho}×${a.alto} < 32`)
+  if (!(a.fs >= 12)) fallos.push(`número ${a.fs} px < 12`)
+  if (!(a.fw >= 700)) fallos.push(`peso ${a.fw} < 700`)
+  if (!(cN >= 4.5)) fallos.push(`contraste número ${cN.toFixed(2)}`)
+  if (!(cT >= 4.5)) fallos.push(`contraste trazo ${cT.toFixed(2)}`)
+  return { ok: fallos.length === 0, fallos, diametro: round(Math.min(a.ancho, a.alto)), fs: a.fs, fw: a.fw, contrasteNumero: round(cN), contrasteTrazo: round(cT), burbuja: a.burbuja }
+}
+
+// «Ver la mesa»: su caja y el piso táctil de 36 (v1.2 §5.4).
+const REC_VER_MESA = () => {
+  const b = document.querySelector('[data-accion="recarga-ver-mesa"]')
+  if (!b) return { hay: false }
+  const r = b.getBoundingClientRect()
+  const fila = b.closest('.apu-plazo-fila')?.getBoundingClientRect()
+  const plazo = document.querySelector('[data-accion="recarga-plazo"]')?.getBoundingClientRect()
+  return {
+    hay: true, alto: Math.round(r.height * 100) / 100, ancho: Math.round(r.width * 100) / 100,
+    mismaFila: !!fila && r.top >= fila.top - 0.5 && r.bottom <= fila.bottom + 0.5,
+    aLaDerecha: !!plazo && r.left >= plazo.left,
+  }
+}
+
+async function recEventos(page) { return page.evaluate(() => window.__rec.ev.slice()) }
+
+// Línea de tiempo relativa al primer fotograma con resultado (t0).
+function recLinea(ev) {
+  const t0e = ev.find((e) => e.k === 'tono' && e.v !== '')
+  const t0 = t0e ? t0e.t : (ev[0]?.t ?? 0)
+  const rel = (e) => (e ? Math.round(e.t - t0) : null)
+  const bub15 = ev.find((e) => e.k === 'burbuja' && e.v === '15')
+  const bub = ev.find((e) => e.k === 'burbuja' && e.v !== '')
+  const vueloSale = ev.find((e) => e.k === 'vcCapa' && e.v === true && e.t >= t0)
+  const aterriza = ev.filter((e) => e.k === 'vcCapa' && e.v === false && e.t >= t0 && (!bub || e.t <= bub.t + 50)).at(-1)
+  const redE = ev.find((e) => e.k === 'red' && e.v === '1')
+  return {
+    t0,
+    vueloSale: rel(vueloSale), aterriza: rel(aterriza),
+    primeraBurbuja: rel(bub), primer15: rel(bub15),
+    lista: rel(ev.find((e) => e.k === 'lista' && e.v === '1')),
+    redSalto: redE ? rel(redE) : null,
+    tarjeta5: rel(ev.find((e) => e.k === 'plazo' && /\b5 s/.test(e.v))),
+    tarjeta0: rel(ev.find((e) => e.k === 'plazo' && /\b0 s/.test(e.v))),
+    mesaFuera: rel(ev.filter((e) => e.k === 'mesa' && e.v === false && e.t > t0).at(0)),
+    siguiente: rel(ev.filter((e) => e.k === 'siguiente' && e.v === true && e.t > t0).at(0)),
+    eventos: ev.filter((e) => e.t >= t0 - 500).map((e) => ({ ms: Math.round(e.t - t0), k: e.k, v: e.v })).slice(0, 300),
+  }
+}
+
+// Puerta 7 · el nombre de una IA NO ganadora, con sus cartas boca abajo, se
+// toca con un clic de verdad (Playwright comprueba que nada lo tapa) y tiene
+// que destaparse. Sin candidato (todas retiradas) se dice «sin caso».
+async function recDestapa(page) {
+  const idx = await page.evaluate(() => {
+    const ps = [...document.querySelectorAll('.opp-panel')]
+    return ps.findIndex((p) => p.querySelector('.opp-name-tappable')
+      && p.querySelectorAll('.playing-card').length > 0
+      && [...p.querySelectorAll('.playing-card')].every((c) => c.classList.contains('card-back')))
+  })
+  if (idx < 0) return { caso: false }
+  const nombre = page.locator('.opp-panel').nth(idx).locator('.opp-name-tappable')
+  let clic = true
+  try { await nombre.click({ timeout: 2500 }) } catch (e) { clic = String(e.message).split('\n')[0] }
+  let caras = 0
+  for (let i = 0; i < 20 && !caras; i++) {
+    await recDuerme(150)
+    caras = await page.evaluate((idx) => [...document.querySelectorAll('.opp-panel')[idx].querySelectorAll('.playing-card')].filter((c) => !c.classList.contains('card-back') && !c.classList.contains('card-empty')).length, idx)
+  }
+  return { caso: true, clic, caras, ok: clic === true && caras > 0 }
+}
+
+async function recEsperaSeg(page, cond, limite = 20000, arg = null) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < limite) {
+    // Tras salir de la mesa la página navega: un contexto destruido no es un fallo.
+    const v = await page.evaluate(cond, arg).catch(() => null)
+    if (v) return v
+    await recDuerme(80)
+  }
+  return null
+}
+
+const REC_SEG = () => {
+  const b = document.querySelector('[data-accion="recarga-burbuja"]')
+  if (b) return { forma: 'burbuja', seg: Number(b.dataset.seg) }
+  const p = document.querySelector('[data-accion="recarga-plazo"]')
+  if (p) { const m = p.textContent.match(/(\d+)\s*s/); return { forma: 'tarjeta', seg: m ? Number(m[1]) : null, verMesa: !!document.querySelector('[data-accion="recarga-ver-mesa"]') } }
+  return { forma: null, seg: null }
+}
+
+async function recFoto(page, nombre) {
+  await page.mouse.move(2, 2)
+  await page.screenshot({ path: `${REC_OUT}/${nombre}.png` })
+  return `${nombre}.png`
+}
+
+// ── Puertas 1 y 2 (y la 7 de paso en mesa 5) en las 13 celdas, forzosa ──────
+async function recCeldas(browser, solo) {
+  const out = {}
+  for (const id of REC_CELDAS) {
+    if (solo && id !== solo) continue
+    const [vpId, m] = id.split('-')
+    const vp = REC_VPS[vpId]
+    const { ctx, page, consola } = await recPagina(browser, vp)
+    const r = { id, vp: { w: vp.w, h: vp.h }, mesa: Number(m) }
+    try {
+      const caza = await recCazar(page, Number(m), 'allinHumano', 'forzosa')
+      r.caza = caza
+      if (!caza) { r.error = 'sin forzosa'; out[id] = r; continue }
+      await page.waitForSelector('[data-accion="recarga-burbuja"]', { timeout: 9000 })
+      await recQuieta(page, '[data-accion="recarga-burbuja"]')
+      await page.mouse.move(2, 2)
+      await recDuerme(450)
+      const med = await page.evaluate(REC_MEDIR_MESA)
+      r.burbuja = med.burbuja
+      r.dentro = !!med.burbuja && med.burbuja.x >= 0 && med.burbuja.y >= 0 && med.burbuja.x + med.burbuja.w <= vp.w && med.burbuja.y + med.burbuja.h <= vp.h
+      r.solape = recSolape(med.burbuja, med)
+      r.med = med
+      r.velo = await page.evaluate(() => document.querySelectorAll('.bankrupt-overlay').length)
+      r.foto = await recFoto(page, `burbuja_${id}`)
+      if (vpId === 's25v' || vpId === 'm360') r.anillo = recVaraAnillo(await page.evaluate(REC_ANILLO))
+      // La foto va ANTES de Δ: el `display: none` de la medida reinicia la
+      // animación de entrada de la burbuja al volver.
+      r.delta = await recDelta(page)
+      await recQuieta(page, '[data-accion="recarga-burbuja"]')
+      r.p1 = r.solape.total === 0 && r.dentro
+      r.p2 = r.delta.max === 0 && r.delta.animaciones === 0
+      if (REC_ABRE.includes(id)) {
+        await page.click('[data-accion="recarga-burbuja"]')
+        await page.waitForSelector('[data-accion="recarga"] .bankrupt-modal', { timeout: 3000 })
+        await esperarTarjetaQuieta(page)
+        await page.mouse.move(2, 2)
+        await recDuerme(450)
+        r.tarjeta = { ...(await medirBotonesRecarga(page)), verMesa: await page.evaluate(REC_VER_MESA), seg: await page.evaluate(REC_SEG) }
+        r.fotoAbierta = await recFoto(page, `abierta_${id}`)
+      }
+    } catch (e) {
+      r.error = String(e.message).split('\n')[0]
+    }
+    r.consola = consola
+    r.ok = !r.error && !!r.p1 && !!r.p2 && consola.length === 0
+    out[id] = r
+    console.log(`  rec · ${id.padEnd(8)} ${r.ok ? 'OK  ' : 'FALLA'} · solape ${r.solape?.total ?? '—'} px² · Δ ${r.delta?.max ?? '—'} · velo ${r.velo ?? '—'}${r.anillo ? ` · anillo ${r.anillo.ok ? 'ok' : r.anillo.fallos.join(', ')}` : ''}${r.error ? ' · ' + r.error : ''}`)
+    await ctx.close()
+  }
+  return out
+}
+
+// ── Puertas 3–7 en pc y S25 v, forzosa y automática ─────────────────────────
+async function recReloj(browser, solo) {
+  const casos = [
+    { id: 'forzosa-pc', vp: 'pc', molde: 'allinHumano', busca: 'forzosa', tira: true },
+    { id: 'forzosa-s25v', vp: 's25v', molde: 'allinHumano', busca: 'forzosa', tira: true },
+    { id: 'automatica-pc', vp: 'pc', molde: 'recarga', busca: 'automatica' },
+    { id: 'automatica-s25v', vp: 's25v', molde: 'recarga', busca: 'automatica' },
+  ].filter((c) => !solo || c.id === solo)
+  const out = {}
+  for (const c of casos) {
+    const vp = REC_VPS[c.vp]
+    const { ctx, page, consola } = await recPagina(browser, vp)
+    const r = { id: c.id, vp: { w: vp.w, h: vp.h }, mesa: 5 }
+    const tira = []
+    let grabar = false, parar = false
+    const tirador = c.tira ? (async () => {
+      while (!parar) {
+        if (!grabar) { await recDuerme(40); continue }
+        const t = Date.now()
+        try {
+          const n = String(tira.length).padStart(3, '0')
+          await page.screenshot({ path: `${REC_OUT}/tira/${c.id}_${n}.jpg`, type: 'jpeg', quality: 55 })
+          tira.push({ t, archivo: `tira/${c.id}_${n}.jpg` })
+        } catch { /* cambio de página */ }
+        const resto = 250 - (Date.now() - t)
+        if (resto > 0) await recDuerme(resto)
+      }
+    })() : null
+    try {
+      r.caza = await recCazar(page, 5, c.molde, c.busca)
+      if (!r.caza) throw new Error(`sin ${c.busca}`)
+      grabar = true
+      await page.waitForSelector('[data-accion="recarga-burbuja"]', { timeout: 9000 })
+      // Puerta 7 · con la burbuja: sin overlay en el DOM y un nombre que se destapa.
+      await recDuerme(350)
+      r.veloConBurbuja = await page.evaluate(() => document.querySelectorAll('.bankrupt-overlay').length)
+      r.redAlAparecer = await page.evaluate(() => document.querySelector('.game-table')?.dataset.recRed === '1')
+      if (c.busca === 'forzosa') r.destapa = await recDestapa(page)
+      await recDuerme(1200)
+      grabar = false
+      // Puerta 4 · abrir con N en la burbuja.
+      await recEsperaSeg(page, () => { const b = document.querySelector('[data-accion="recarga-burbuja"]'); return b && Number(b.dataset.seg) <= 12 ? true : null })
+      const antes = await page.evaluate(REC_SEG)
+      await page.click('[data-accion="recarga-burbuja"]')
+      await page.waitForSelector('[data-accion="recarga-plazo"]', { timeout: 3000 })
+      const abierta = await page.evaluate(REC_SEG)
+      await recDuerme(700)
+      r.fotoAbierta = await recFoto(page, `reloj_abierta_${c.id}`)
+      const antesPlegar = await page.evaluate(REC_SEG)
+      await page.click('[data-accion="recarga-ver-mesa"]')
+      await page.waitForSelector('[data-accion="recarga-burbuja"]', { timeout: 3000 })
+      const plegada = await page.evaluate(REC_SEG)
+      r.continuidad = { antes, abierta, antesPlegar, plegada }
+      r.p4 = antes.forma === 'burbuja' && abierta.forma === 'tarjeta' && Math.abs(abierta.seg - antes.seg) <= 1
+        && abierta.verMesa === true && plegada.forma === 'burbuja' && Math.abs(plegada.seg - antesPlegar.seg) <= 1
+      // Puerta 5 · a 5 s, sin tocar nada.
+      const a5 = await recEsperaSeg(page, () => {
+        const p = document.querySelector('[data-accion="recarga-plazo"]')
+        const m = p?.textContent.match(/(\d+)\s*s/)
+        return m && Number(m[1]) <= 5 ? { seg: Number(m[1]), verMesa: !!document.querySelector('[data-accion="recarga-ver-mesa"]'), burbuja: !!document.querySelector('[data-accion="recarga-burbuja"]') } : null
+      }, 15000)
+      await recDuerme(500)
+      r.fotoUltimos5 = await recFoto(page, `ultimos5_${c.id}`)
+      r.apertura = a5
+      r.p5 = !!a5 && a5.seg === 5 && !a5.verMesa && !a5.burbuja
+      // Puerta 6 · vence.
+      const fin = await recEsperaSeg(page, (busca) => {
+        const g = document.querySelector('.game-table')
+        if (busca === 'forzosa') return !g ? 'fuera' : null
+        return [...document.querySelectorAll('.btn')].some((b) => b.textContent.trim() === 'Siguiente mano') ? 'siguiente' : null
+      }, 9000, c.busca)
+      r.vence = fin
+      r.p6 = c.busca === 'forzosa' ? fin === 'fuera' : fin === 'siguiente'
+      await recDuerme(300)
+      r.fotoVence = await recFoto(page, `vence_${c.id}`)
+    } catch (e) {
+      r.error = String(e.message).split('\n')[0]
+    }
+    parar = true
+    if (tirador) await tirador
+    const ev = await recEventos(page).catch(() => [])
+    const L = recLinea(ev)
+    r.linea = L
+    r.tira = tira.map((f) => ({ ms: Math.round(f.t - L.t0), archivo: f.archivo }))
+    // Puerta 3 · el primer 15 visible, contra el aterrizaje del vuelo y t0 + 3 s.
+    r.p3 = L.primer15 !== null && (L.aterriza === null
+      ? L.vueloSale === null
+      : L.primer15 >= L.aterriza && L.primer15 >= 3000)
+    r.p7 = r.veloConBurbuja === 0 && (c.busca !== 'forzosa' || r.destapa?.ok === true)
+    r.consola = consola
+    r.ok = !r.error && r.p3 && r.p4 && r.p5 && r.p6 && r.p7 && consola.length === 0
+    out[c.id] = r
+    console.log(`  rec · ${c.id.padEnd(16)} ${r.ok ? 'OK  ' : 'FALLA'} · p3 ${r.p3 ? '✓' : '✗'} (15 a +${L.primer15} ms, vuelo aterriza +${L.aterriza}${r.redAlAparecer ? ', RED' : ''}) · p4 ${r.p4 ? '✓' : '✗'} · p5 ${r.p5 ? '✓' : '✗'} · p6 ${r.p6 ? '✓' : '✗'} · p7 ${r.p7 ? '✓' : '✗'}${r.error ? ' · ' + r.error : ''}`)
+    await ctx.close()
+  }
+  return out
+}
+
+async function recHoja(browser) {
+  const leer = (n) => existsSync(`${REC_OUT}/datos/${n}.json`) ? JSON.parse(readFileSync(`${REC_OUT}/datos/${n}.json`, 'utf8')) : {}
+  const celdas = leer('celdas'), reloj = leer('reloj'), apu = leer('apu')
+  const page = await browser.newPage()
+  const uri = (p) => `data:${p.endsWith('.jpg') ? 'image/jpeg' : 'image/png'};base64,${readFileSync(p).toString('base64')}`
+  const lienzo = (src, ancho, recorte = null, marco = null, calidad = 0.72) => page.evaluate(async ({ src, ancho, recorte, marco, calidad }) => {
+    const img = new Image(); img.src = src; await img.decode()
+    const rc = recorte || { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight }
+    const k = Math.min(1, ancho / rc.w)
+    const cv = document.createElement('canvas'); cv.width = Math.round(rc.w * k); cv.height = Math.round(rc.h * k)
+    const g = cv.getContext('2d')
+    g.drawImage(img, rc.x, rc.y, rc.w, rc.h, 0, 0, cv.width, cv.height)
+    if (marco) { g.strokeStyle = '#4aa0ff'; g.lineWidth = 3; g.setLineDash([7, 4]); g.strokeRect((marco.x - rc.x) * k - 4, (marco.y - rc.y) * k - 4, marco.w * k + 8, marco.h * k + 8) }
+    return cv.toDataURL('image/jpeg', calidad)
+  }, { src, ancho, recorte, marco, calidad })
+  const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const si = (v) => v === true ? '<b class="v">✓</b>' : v === false ? '<b class="r">✗</b>' : '—'
+  let html = ''
+
+  // 1 · Puertas
+  const filasC = REC_CELDAS.map((id) => { const c = celdas[id]; return c ? `<tr><td>${id}</td><td>${si(c.p1)} ${c.solape?.total ?? '—'} px²</td><td>${si(c.p2)} ${c.delta?.max ?? '—'} px</td><td>${c.velo ?? '—'}</td><td>${c.anillo ? (c.anillo.ok ? `✓ ${c.anillo.diametro} px · ${c.anillo.fs} px/${c.anillo.fw} · ${c.anillo.contrasteNumero}:1` : esc(c.anillo.fallos.join(', '))) : ''}</td></tr>` : `<tr><td>${id}</td><td colspan="4">sin medir</td></tr>` }).join('')
+  const filasR = Object.values(reloj).filter((r) => r?.linea).map((r) => `<tr><td>${r.id}</td><td>${si(r.p3)} +${r.linea?.primer15} (vuelo +${r.linea?.aterriza})${r.redAlAparecer ? ' RED' : ''}</td><td>${si(r.p4)} ${r.continuidad ? `${r.continuidad.antes.seg}→${r.continuidad.abierta.seg} · ${r.continuidad.antesPlegar.seg}→${r.continuidad.plegada.seg}` : ''}</td><td>${si(r.p5)}</td><td>${si(r.p6)} ${esc(r.vence)}</td><td>${si(r.p7)}${r.destapa ? ` (${r.destapa.caso ? r.destapa.caras + ' caras' : 'sin caso'})` : ''}</td></tr>`).join('')
+  html += `<section><h2>Las siete puertas</h2>
+<div class="tabla"><table><tr><th>Celda (forzosa)</th><th>1 · no tapa</th><th>2 · Δ</th><th>velo</th><th>anillo</th></tr>${filasC}</table></div>
+<div class="tabla"><table><tr><th>Caso</th><th>3 · 15 visible</th><th>4 · un reloj</th><th>5 · a 5 s</th><th>6 · vence</th><th>7 · sin velo</th></tr>${filasR}</table></div></section>`
+
+  // 2 · Tira del final de mano
+  for (const r of Object.values(reloj).filter((r) => r?.linea)) {
+    if (!r.tira?.length) continue
+    const fr = []
+    const ancho = r.vp.w > 1000 ? 300 : 150
+    let marcado = false
+    for (const f of r.tira.filter((f) => f.ms >= -600 && f.ms <= (r.linea.primer15 ?? 4000) + 1300)) {
+      const primera = !marcado && r.linea.primeraBurbuja !== null && f.ms >= r.linea.primeraBurbuja
+      if (primera) marcado = true
+      fr.push(`<figure class="fr${primera ? ' aparece' : ''}"><img src="${await lienzo(uri(`${REC_OUT}/${f.archivo}`), ancho, null, null, 0.6)}" alt=""><figcaption>${f.ms >= 0 ? '+' : ''}${(f.ms / 1000).toFixed(2)} s${primera ? ' · burbuja' : ''}</figcaption></figure>`)
+    }
+    html += `<section><h2>Tira · ${esc(r.id)} <small>${r.vp.w}×${r.vp.h} · resultado en t = 0 · vuelo aterriza +${r.linea.aterriza} ms · primer 15 +${r.linea.primer15} ms</small></h2><div class="tira">${fr.join('')}</div></section>`
+  }
+
+  // 3 · La burbuja en las 13 celdas
+  let bur = ''
+  for (const id of REC_CELDAS) {
+    const c = celdas[id]
+    if (!c?.foto || !existsSync(`${REC_OUT}/${c.foto}`)) continue
+    const ancho = c.vp.w > 1000 ? 640 : (c.vp.w > 800 ? 520 : 260)
+    bur += `<figure class="cel"><img src="${await lienzo(uri(`${REC_OUT}/${c.foto}`), ancho, null, c.burbuja, 0.66)}" alt=""><figcaption><b>${id.replace('-', ' · mesa ')}</b> · ${c.vp.w}×${c.vp.h} · pisa ${c.solape.total} px² · Δ ${c.delta.max}</figcaption></figure>`
+  }
+  html += `<section><h2>La burbuja al terminar la revelación <small>(forzosa, recuadro azul)</small></h2><div class="rejilla">${bur}</div></section>`
+
+  // 4 · Abierta con «Ver la mesa», y los últimos 5 s
+  let ab = ''
+  const abiertas = [
+    ...['pc-5', 's25v-5', 's25h-5'].map((id) => ({ t: `forzosa abierta · ${id}`, f: celdas[id]?.fotoAbierta, m: celdas[id]?.tarjeta?.modal })),
+    ...Object.values(reloj).filter((r) => r?.linea).map((r) => ({ t: `${r.id} · abierta`, f: r.fotoAbierta })),
+    ...Object.values(reloj).filter((r) => r?.linea).map((r) => ({ t: `${r.id} · últimos 5 s (se abrió sola)`, f: r.fotoUltimos5 })),
+  ]
+  for (const a of abiertas) {
+    if (!a.f || !existsSync(`${REC_OUT}/${a.f}`)) continue
+    ab += `<figure class="cel"><img src="${await lienzo(uri(`${REC_OUT}/${a.f}`), 520, null, null, 0.7)}" alt=""><figcaption>${esc(a.t)}</figcaption></figure>`
+  }
+  html += `<section><h2>La tarjeta abierta y los últimos 5 s</h2><div class="rejilla">${ab}</div></section>`
+
+  // 5 · Antes | después
+  let ad = ''
+  const recorteDe = (m, vp) => m ? { x: Math.max(0, m.x ?? 0), y: Math.max(0, (m.top ?? m.y) - 14), w: Math.min(vp.w, (m.ancho ?? m.w) + 28), h: Math.min(vp.h - Math.max(0, (m.top ?? m.y) - 14), (m.alto ?? m.h) + 28) } : null
+  for (const p of (apu.pares ?? [])) {
+    if (!existsSync(p.antes) || !existsSync(p.despues)) continue
+    const a = await lienzo(uri(p.antes), 460, p.recA ?? null, null, 0.75)
+    const d = await lienzo(uri(p.despues), 460, p.recD ?? null, null, 0.75)
+    ad += `<div class="par"><h3>${esc(p.titulo)}</h3><div class="ad"><figure><img src="${a}" alt=""><figcaption>antes (Fase 0)</figcaption></figure><figure><img src="${d}" alt=""><figcaption>después · ${esc(p.cifras ?? '')}</figcaption></figure></div></div>`
+  }
+  void recorteDe
+  if (ad) html += `<section><h2>Tarjetas antes | después</h2>${ad}</section>`
+
+  const doc = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REC-1 · Fase 1</title>
+<style>
+:root{--bg:#0e1a14;--fg:#e8efe9;--mut:#9fb3a6;--acc:#e8b84a;--line:#27402f}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f6f4ee;--fg:#1a2a20;--mut:#5a6b60;--acc:#8a5a00;--line:#d8d2c2}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif;padding:16px;overflow-x:hidden}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 8px;color:var(--acc)}h2 small{color:var(--mut);font-weight:400;font-size:13px}h3{font-size:14px;margin:12px 0 6px}
+.nota{color:var(--mut);font-size:13px;margin:4px 0 10px}
+.tabla{overflow-x:auto;margin-bottom:12px}table{border-collapse:collapse;font-size:13px}td,th{padding:3px 10px 3px 0;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+b.v{color:#3cdc78}b.r{color:#ff5a5a}
+.tira{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px}
+.fr{margin:0;flex:0 0 auto}.fr img{display:block;border:2px solid transparent;border-radius:4px}.fr figcaption{font-size:11px;color:var(--mut);text-align:center}
+.fr.aparece img{border-color:#4aa0ff}.fr.aparece figcaption{color:#4aa0ff;font-weight:700}
+.rejilla{display:flex;flex-wrap:wrap;gap:14px}.cel{margin:0;max-width:100%}.cel img,.ad img{max-width:100%;height:auto;display:block;border-radius:6px}
+.cel figcaption,.ad figcaption{font-size:12px;color:var(--mut);max-width:520px;margin-top:4px}
+.ad{display:flex;flex-wrap:wrap;gap:10px}.ad figure{margin:0;flex:1 1 280px;max-width:460px}
+</style></head><body>
+<h1>REC-1 · Fase 1 · La burbuja y las tarjetas con aire</h1>
+<p class="nota">Modo <code>rec</code> de <code>scripts/diagDSK.mjs</code> contra 5173 con bypass · Edge ${esc(browser.version())} · base 736eb63 + cambios sin commit. Tiempos relativos al primer fotograma con el resultado de la mano.</p>
+${html}
+</body></html>`
+  writeFileSync(`${REC_OUT}/hoja.html`, doc)
+  await page.close()
+  console.log(`  rec · hoja ${(doc.length / 1024 / 1024).toFixed(2)} MB`)
+}
+
+async function runRec(browser) {
+  for (const d of ['', 'tira', 'datos']) mkdirSync(`${REC_OUT}/${d}`, { recursive: true })
+  const parte = process.argv[3] || 'todo'
+  const solo = process.argv[4] || null
+  const res = {}
+  if (parte === 'todo' || parte === 'celdas') {
+    res.celdas = await recCeldas(browser, solo)
+    if (!solo) writeFileSync(`${REC_OUT}/datos/celdas.json`, JSON.stringify(res.celdas, null, 1))
+    else writeFileSync(`${REC_OUT}/datos/celdas_${solo}.json`, JSON.stringify(res.celdas, null, 1))
+  }
+  if (parte === 'todo' || parte === 'reloj') {
+    res.reloj = await recReloj(browser, solo)
+    if (!solo) writeFileSync(`${REC_OUT}/datos/reloj.json`, JSON.stringify(res.reloj, null, 1))
+    else writeFileSync(`${REC_OUT}/datos/reloj_${solo}.json`, JSON.stringify(res.reloj, null, 1))
+  }
+  if (parte === 'todo' || parte === 'hoja') await recHoja(browser)
+  const c = res.celdas ? Object.values(res.celdas) : []
+  const r = res.reloj ? Object.values(res.reloj) : []
+  const puertas = {
+    p1: c.length ? c.every((x) => x.p1) : null,
+    p2: c.length ? c.every((x) => x.p2) : null,
+    p3: r.length ? r.every((x) => x.p3) : null,
+    p4: r.length ? r.every((x) => x.p4) : null,
+    p5: r.length ? r.every((x) => x.p5) : null,
+    p6: r.length ? r.every((x) => x.p6) : null,
+    p7: r.length ? r.every((x) => x.p7) : null,
+    anillo: c.some((x) => x.anillo) ? c.filter((x) => x.anillo).every((x) => x.anillo.ok) : null,
+  }
+  const verde = Object.values(puertas).every((v) => v !== false) && c.every((x) => x.ok) && r.every((x) => x.ok)
+  const resumen = `${verde ? 'VERDE' : 'ROJO'} · ` + Object.entries(puertas).map(([k, v]) => `${k} ${v == null ? '—' : v ? '✓' : '✗'}`).join(' · ')
+  console.log(`── REC · ${resumen}`)
+  return { verde, puertas, resumen }
+}
+
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
 // de 15px del área es invisible al arnés (falso verde comprobado). El modo r2 —
@@ -12192,6 +13007,7 @@ try {
   if (MODE === 'vuelo') report.vuelo = await runVuelo(browser)
   if (MODE === 'luz') report.luz = await runLuz(browser)
   if (MODE === 'rev') report.rev = await runRev(browser)
+  if (MODE === 'rec') report.rec = await runRec(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }

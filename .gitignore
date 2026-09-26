@@ -141,3 +141,8 @@ capturas-luz/
 # REGENERABLES, mismo criterio que capturas-luz. Las sondas y hoja.mjs se quedan
 # fuera: el instrumento permanente es el modo `rev`.
 capturas-rev/
+
+# REC-1 · capturas de la Fase 0 y del modo `rec` de scripts/diagDSK.mjs
+# (capturas-rec/fase1/: burbuja, tarjetas, reloj, datos y la hoja de contacto).
+# REGENERABLES, mismo criterio que capturas-luz y capturas-rev.
+capturas-rec/
