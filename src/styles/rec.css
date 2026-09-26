@@ -1,0 +1,153 @@
+/* ── REC-1 · La recarga que no tapa la mesa ──────────────────────────────────
+   Ficha REC-1 Fase 1 v1.0 (§3.3). Normativo: AJILEI_APU-1_Reglas_v1.2 §5.4 y
+   §5.5. Lámina REC-1 v1.0, variante C.
+
+   HOJA ADITIVA ESTRICTA, como luz.css y rev.css: sin `!important` y sin mover
+   una caja de la mesa. Se importa como ÚLTIMO import de GameTable.jsx, detrás
+   de rev.css. Lo que es de la TARJETA (el aire de A5 fuera del teléfono, la
+   fila del cronómetro) vive en apu.css §9–§11, junto a las demás reglas de la
+   tarjeta; aquí sólo la burbuja y el botón «Ver la mesa». */
+
+/* ── 1 · LA RANURA ──────────────────────────────────────────────────────────
+   La caja que O1 reserva para «Siguiente mano» mientras la pregunta vive
+   (Fase 0 §C.4: libre en las 13 celdas). Es `static` y mide 0 de ancho en
+   escritorio y 0 de alto en el S25 apaisado, así que la burbuja NO puede ir en
+   flujo: se ancla aquí en absoluto y la ranura conserva su tamaño.
+   `relative` sin desplazamientos no mueve la caja (Δ = 0). Se limita a la
+   ranura reservada (`rec-ranura`) y no a toda `.action-area` de la barra: la
+   de las apuestas tiene hijos que no deben cambiar de caja contenedora. */
+.game-table-screen .player-bar .action-area.rec-ranura {
+  position: relative;
+}
+
+/* ── 2 · LA BURBUJA (variante C) ────────────────────────────────────────────
+   Doctrina `<button>`: `font: inherit; padding: 0; line-height: 1`, y encima
+   lo propio. No lleva `.btn` a propósito: el `translateY(-2px)` del hover de
+   `.btn` pelearía con el `translate(-50%, -50%)` que la centra. */
+.rec-burbuja {
+  font: inherit;
+  padding: 0;
+  line-height: 1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  box-sizing: border-box;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 0 2px;
+  border-radius: 999px;
+  background: rgba(9, 23, 14, 0.94);
+  border: 1.5px solid rgba(var(--gold-brand-rgb), 0.7);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* Entrada: una vez, fundido y 8 px de subida. Sólo transform y opacity. */
+  animation: recEntra 0.32s ease-out both;
+}
+
+@keyframes recEntra {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-burbuja { animation: none; }
+}
+
+.rec-burbuja:focus-visible {
+  outline: 2px solid var(--gold-brand);
+  outline-offset: 2px;
+}
+
+/* El anillo: 34 px (vara ≥ 32, E-32). El trazo se actualiza una vez por
+   segundo desde el JSX y NO lleva transición: deslizarse entre dos segundos
+   enseñaría un tiempo que no es. */
+.rec-anillo {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 34px;
+}
+
+.rec-anillo svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.rec-anillo-fondo {
+  fill: none;
+  stroke: rgba(var(--gold-brand-rgb), 0.22);
+  stroke-width: 2.6;
+}
+
+.rec-anillo-trazo {
+  fill: none;
+  stroke: var(--gold-brand);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+/* Los segundos: 14 px y 700 (vara ≥ 12, E-32), oro sobre el fondo de la
+   burbuja. */
+.rec-seg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gold-brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.rec-icono {
+  display: flex;
+  flex: none;
+  color: var(--gold-brand);
+}
+
+.rec-icono svg,
+.rec-icono img {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+/* ── 3 · «VER LA MESA» ──────────────────────────────────────────────────────
+   A la derecha del cronómetro, en su fila (apu.css §9). Secundario: sin oro de
+   fondo, que en la tarjeta es sólo de «Recargar». Piso táctil: 38 px (36 por
+   E-32) fuera del teléfono vertical, 36 dentro (apu.css §9). */
+.rec-ver-mesa {
+  flex: none;
+  box-sizing: border-box;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 0 11px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid rgba(var(--text-primary-rgb), 0.28);
+  color: rgba(var(--text-primary-rgb), 0.88);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rec-ver-mesa svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+  flex: none;
+}

@@ -26,6 +26,7 @@ import {
   mesaClavada, pideRecarga, RECARGA,
   opcionesRecarga, topeRecarga, recargaValida, plazoRecarga, nivelarLasIAS,
   repartoPorCapas,
+  recargaLista, formaRecarga, abrirRecarga, plegarRecarga, RED_REVELACION_MS,
 } from '../hooks/mesaCore'
 import { t } from '../config/textos'
 import { jugadoresVsIA } from '../engine/entrada'
@@ -43,6 +44,7 @@ import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
+import BurbujaRecarga from './BurbujaRecarga'
 import { Wordmark } from './Wordmark'
 import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
@@ -67,6 +69,7 @@ import {
 } from '../engine/gameEngine'
 import '../styles/luz.css'
 import '../styles/rev.css'
+import '../styles/rec.css'
 
 const TURN_TIME  = 20
 const WARNING_AT = 5
@@ -363,12 +366,17 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const [noteFlash,    setNoteFlash]    = useState(0)      // destello del chip de comodín
   const [bankruptModal, setBankruptModal] = useState(false)// Caso B: humano sin fichas (≥2 vivos)
   // ── APU-1 §5 · LA RECARGA ENTRE MANOS ────────────────────────────
-  // `recarga` es la pregunta ABIERTA: `{ motivo, monto }`, o `null` si no hay
+  // `recarga` es la pregunta ABIERTA: `{ motivo, monto, abierta }`, o `null` si no hay
   // ninguna. El motivo lo decide `pideRecarga` y manda en todo lo demás —si hay
   // cuenta atrás, si se puede decir que no, qué pasa al decirlo—, así que se
   // guarda ÉL y no tres banderas que podrían contradecirse.
   const [recarga,    setRecarga]    = useState(null)
-  const [recargaSeg, setRecargaSeg] = useState(0)     // cuenta atrás de la automática
+  const [recargaSeg, setRecargaSeg] = useState(0)     // cuenta atrás de la automática y la forzosa
+  // REC-1 · lo que la revelación de ESTA mano lleva hecho, para `recargaLista`:
+  // si la celebración llegó a armarse, si ya se descargó y si saltó la red.
+  // Va con la identidad de la mano (`handCount`), así que una mano nueva
+  // empieza de cero sin que nadie tenga que acordarse de limpiarlo.
+  const [revelacion, setRevelacion] = useState({ mano: -1, armada: false, descargada: false, red: false })
   const [recargaHecha, setRecargaHecha] = useState(0) // nº de recargas de esta mesa (tarjeta y arnés)
   const [displayedSeat, setDisplayedSeat] = useState(null) // Reveal Manos: IA elegida por tap (null = ganadora)
   const [shakeSeat,     setShakeSeat]     = useState(null) // Reveal Manos R2: IA cuyo nombre "sacude" ahora
@@ -1125,7 +1133,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   function rechazarRecarga() {
     const eraForzosa = recarga?.motivo === RECARGA.FORZOSA
     setRecarga(null)
-    // §5.4 · «Si no recarga, la mesa termina.» Se termina por la MISMA puerta
+    // v1.2 §5.1 · «Rechazarla o dejar vencer el plazo […] termina la mesa y
+    // devuelve las fichas al saldo.» Se termina por la MISMA puerta
     // que la ✕ de la cabecera y que el modal de bancarrota, así que las fichas
     // que queden vuelven al bolsillo (§2.5). No se pierde nada por decir que no:
     // se pierde la mano que no se llegó a jugar.
@@ -1154,20 +1163,73 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     if (recargaPedidaRef.current === game.handCount) return
     recargaPedidaRef.current = game.handCount
     const primera = opcRecarga.find(o => !o.disabled)
-    setRecarga({ motivo: motivoRec, monto: primera?.monto ?? 0 })
+    // REC-1 · nace PLEGADA: sin `abierta` y antes de que acabe la revelación
+    // no se pinta nada (§5.5.1), y después, burbuja. El reloj se carga aquí a
+    // 15 pero NO corre hasta `recargaLista` (el tic de abajo), así que el
+    // primer segundo que se ve es el 15 y cae al terminar la revelación.
+    setRecarga({ motivo: motivoRec, monto: primera?.monto ?? 0, abierta: false })
     setRecargaSeg(Math.round(plazoRecarga() / 1000))
   }, [motivoRec, phase, game.handCount, recarga]) // eslint-disable-line
 
-  // §5.1 · DIEZ SEGUNDOS Y «No» POR DEFECTO. El plazo corre igual en la
-  // automática y en la forzosa (§5.4: «misma pantalla, mismo plazo»); lo que
-  // cambia es lo que significa que venza. Aquí, seguir jugando; allá, levantarse
-  // de la mesa con lo que se tenga, que por §2.5 vuelve entero al bolsillo.
+  // ── REC-1 · ¿Terminó la revelación? (normativo v1.2 §5.5.1) ─────────────
+  // Se deriva de la celebración, que ya sabe cuándo aterriza el vuelo: se
+  // anota si llegó a armarse y si después se descargó, y `recargaLista` (pura)
+  // decide. Sin vuelo previsto —mano ganada por retiros, o la forzosa entre
+  // manos, que no viene de ningún pago— lista en el acto.
+  const enPago     = phase === PHASES.PAYOUT
+  const vueloMano  = enPago && llevaViaje(decideCelebracion({
+    phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN,
+  }))
+  const celebrando = !!celebracion.activa
+  // Se anota DURANTE el render y no en un efecto: es el molde de React para
+  // guardar algo del render anterior, y un `setState` síncrono en un efecto
+  // encadena un render de más (`react-hooks/set-state-in-effect`). Converge
+  // en una vuelta: cada rama sólo escribe si el valor cambia.
+  if (enPago) {
+    const mano = game.handCount
+    const base = revelacion.mano === mano ? revelacion : { mano, armada: false, descargada: false, red: false }
+    let siguiente = base
+    if (celebrando && !base.armada) siguiente = { ...base, armada: true }
+    else if (!celebrando && base.armada && !base.descargada) siguiente = { ...base, descargada: true }
+    if (siguiente !== revelacion) setRevelacion(siguiente)
+  }
+
+  // La red: 6 s desde el primer render del pago. Si la celebración no llegó a
+  // armarse (sin geometría) o no avisó, la pregunta sale igual y el reloj no se
+  // queda colgado. `data-rec-red` lo publica para el arnés.
+  useEffect(() => {
+    if (!enPago) return
+    const mano = game.handCount
+    const t = setTimeout(() => {
+      setRevelacion(r => (r.mano === mano ? { ...r, red: true } : { mano, armada: false, descargada: false, red: true }))
+    }, RED_REVELACION_MS)
+    return () => clearTimeout(t)
+  }, [enPago, game.handCount])
+
+  const revMano = revelacion.mano === game.handCount ? revelacion : { armada: false, descargada: false, red: false }
+  const recListaRevelacion = !enPago || recargaLista({
+    vuelo: vueloMano, armada: revMano.armada, descargada: revMano.descargada,
+    ms: revMano.red ? RED_REVELACION_MS : 0,
+  })
+  // La voluntaria la pide el jugador con la mano ya leída: no espera a nada.
+  const recLista = !!recarga && (recarga.motivo === RECARGA.VOLUNTARIA || recListaRevelacion)
+  const recForma = recLista ? formaRecarga({ seg: recargaSeg, abierta: recarga.abierta, motivo: recarga.motivo }) : null
+
+  // §5.1 · QUINCE SEGUNDOS Y «No» POR DEFECTO. El plazo corre igual en la
+  // automática y en la forzosa (v1.2 §5.1: «el mismo plazo de 15 segundos
+  // contado desde que termina la revelación»); lo que cambia es lo que
+  // significa que venza. Aquí, seguir jugando; allá, levantarse de la mesa con
+  // lo que se tenga, que por §2.5 vuelve entero al bolsillo.
   //
   // FRZ-1 · a oscuras NO corre, por la misma razón que el reloj de turno: volver
   // y encontrarse la mesa terminada porque el plazo se consumió en segundo plano
   // es justo el defecto que aquella campaña midió y cerró.
+  //
+  // REC-1 · y NO corre antes de que termine la revelación (§5.5.1). Es el único
+  // cambio del tic: abrir o plegar la tarjeta no lo tocan, así que burbuja y
+  // tarjeta leen un solo reloj (§5.5.4).
   useEffect(() => {
-    if (!recarga || congelado) return
+    if (!recarga || congelado || !recLista) return
     // La voluntaria no tiene plazo: la abrió él y se cierra cuando él quiera.
     if (recarga.motivo === RECARGA.VOLUNTARIA) return
     if (recargaSeg <= 0) return
@@ -1180,7 +1242,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       if (quedan <= 0) rechazarRecarga()
     }, 1000)
     return () => clearTimeout(t)
-  }, [recarga, recargaSeg, congelado]) // eslint-disable-line
+  }, [recarga, recargaSeg, congelado, recLista]) // eslint-disable-line
 
   // ── Discard (secuencial, jugador por jugador en orden Mano→Pie) ───────────
   // Por jugador: cartas vuelan boca abajo hacia el mazo → slots vacíos un
@@ -1969,6 +2031,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         className={`game-table${aliveN >= 4 ? ' table-wide' : ''}${aliveN === 5 ? ' table-five' : ''}${aliveN === 4 ? ' table-four' : ''}${aliveN === 3 ? ' table-three' : ''}${aliveN === 2 ? ' table-two' : ''}`}
         data-clavada={mesaClavada(game) ? '1' : '0'}
         data-recargas={recargaHecha}
+        data-rec-motivo={recarga?.motivo}
+        data-rec-lista={recarga ? (recLista ? 1 : 0) : undefined}
+        data-rec-red={enPago && vueloMano && revMano.red && !(revMano.armada && revMano.descargada) ? 1 : undefined}
         data-allin={game.players.filter(marcadoAllIn).length}
       >
 
@@ -2136,7 +2201,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             </strong>
 
             <div className="player-bar-center">
-              {phase === PHASES.WAITING && !isShuffling && (
+              {/* REC-1 · con una recarga pendiente tampoco se ofrece «Iniciar
+                  mano». La forzosa entre manos (v1.2 §5.1) la tapaba el velo de
+                  la tarjeta; como burbuja no hay velo y el botón quedaría vivo al
+                  lado de la ranura reservada, ofreciendo repartir con una pila
+                  que no cubre el ante. Mismo gate que «Siguiente mano». */}
+              {phase === PHASES.WAITING && !isShuffling && !recarga && (
                 <div className="action-area">
                   <SoundButton className="btn btn-primary" onClick={beginHand}>
                     Iniciar mano
@@ -2307,7 +2377,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   {motivoRec === RECARGA.VOLUNTARIA && (
                     <SoundButton className="btn btn-recarga" data-accion="recargar" onClick={() => {
                       const primera = opcRecarga.find(o => !o.disabled)
-                      setRecarga({ motivo: RECARGA.VOLUNTARIA, monto: primera?.monto ?? 0 })
+                      setRecarga({ motivo: RECARGA.VOLUNTARIA, monto: primera?.monto ?? 0, abierta: true })
                       setRecargaSeg(0)
                     }}>
                       {t('ia.recarga.pedir')}
@@ -2324,7 +2394,19 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   panel. Es la misma regla que ya cubría el barajado y la
                   ceremonia de eliminación, con un caso más. */}
               {((isPayoutPhase && isClearing) || ceremony || !!recarga) && (
-                <div className="action-area" />
+                <div className="action-area rec-ranura">
+                  {/* REC-1 · la burbuja vive DENTRO de la ranura que O1 ya
+                      reservaba, en absoluto (rec.css): la ranura no cambia de
+                      tamaño y no se mueve nada (normativo v1.2 §5.5.2). */}
+                  {recForma?.forma === 'burbuja' && (
+                    <BurbujaRecarga
+                      motivo={recarga.motivo}
+                      seg={recargaSeg}
+                      total={Math.round(plazoRecarga() / 1000)}
+                      onAbrir={() => setRecarga(abrirRecarga)}
+                    />
+                  )}
+                </div>
               )}
             </div>
 
@@ -2541,11 +2623,17 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           elige como una entrada») y se APAGAN en vez de esconderse: es E-2 otra
           vez —una fila que cambia de número de botones mueve lo que hay debajo
           justo cuando el dedo va bajando—. */}
-      {recarga && (
+      {/* REC-1 · la tarjeta se MONTA sólo cuando su forma es tarjeta. Mientras
+          es burbuja, o antes de que acabe la revelación, el overlay no existe:
+          se desmonta, no se esconde, porque el cronómetro lleva `visibility`
+          en línea y sobreviviría a un `visibility: hidden` heredado (Fase 0
+          §J-8). Sin overlay no hay velo y la mesa queda tocable (§5.5.3). */}
+      {recarga && recForma?.forma === 'tarjeta' && (
         <div
           className={`bankrupt-overlay${recarga.motivo === RECARGA.FORZOSA ? '' : ' apu-suave'}`}
           data-accion="recarga"
           data-motivo={recarga.motivo}
+          data-plegable={recForma.plegable ? '1' : '0'}
         >
           <div className="bankrupt-modal apu-recarga">
             <p className="bankrupt-title">{t('ia.recarga.titulo')}</p>
@@ -2593,10 +2681,33 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
 
             {/* O1 · el plazo RESERVA su renglón aunque la voluntaria no lo use: sin
                 la reserva, los dos botones de arriba bailarían 20 px entre una
-                forma de la pregunta y otra. */}
-            <p className="apu-plazo" data-accion="recarga-plazo" style={{ visibility: recarga.motivo === RECARGA.VOLUNTARIA ? 'hidden' : 'visible' }}>
-              {t('ia.recarga.plazo', { s: Math.max(0, recargaSeg) })}
-            </p>
+                forma de la pregunta y otra.
+                REC-1 · el renglón pasa a FILA: el cronómetro a la izquierda y, a
+                su derecha, «Ver la mesa» mientras la tarjeta se pueda plegar
+                (v1.2 §5.4). La fila no hereda `visibility` de nadie: el
+                cronómetro conserva su estilo en línea y el botón se monta o no.
+                La fila de la automática y la forzosa guarda el alto del botón
+                aunque no esté (rec.css), para que a los 5 s, cuando se va, la
+                tarjeta no cambie de tamaño. */}
+            <div className={`apu-plazo-fila${recarga.motivo === RECARGA.VOLUNTARIA ? '' : ' rec-plazo-fila'}`}>
+              <p className="apu-plazo" data-accion="recarga-plazo" style={{ visibility: recarga.motivo === RECARGA.VOLUNTARIA ? 'hidden' : 'visible' }}>
+                {t('ia.recarga.plazo', { s: Math.max(0, recargaSeg) })}
+              </p>
+              {recForma.plegable && (
+                <SoundButton
+                  type="button"
+                  className="btn rec-ver-mesa"
+                  data-accion="recarga-ver-mesa"
+                  onClick={() => setRecarga(r => plegarRecarga(r, recargaSeg))}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" stroke="currentColor" strokeWidth="1.8" />
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                  </svg>
+                  {t('ia.recarga.vermesa')}
+                </SoundButton>
+              )}
+            </div>
           </div>
         </div>
       )}

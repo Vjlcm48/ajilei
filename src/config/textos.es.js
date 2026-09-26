@@ -350,6 +350,12 @@ export const TEXTOS_ES = {
   'ia.recarga.no.forzosa':     'Salir con mis fichas',
   'ia.recarga.plazo':          'Se cierra en {s} s',
   'ia.recarga.pedir':          'Recargar',
+  // REC-1 · la burbuja (normativo v1.2 §5.5). Su rótulo visible es el mismo
+  // «Recargar» de `ia.recarga.pedir`, que se reutiliza; lo propio es el pliegue
+  // de la tarjeta y lo que oye un lector de pantalla, que no ve el anillo.
+  'ia.recarga.vermesa':        'Ver la mesa',
+  'ia.recarga.aria.forzosa':   'Recargar fichas, quedan {s} segundos',
+  'ia.recarga.aria.automatica': 'Recargar fichas (opcional), quedan {s} segundos',
   // 1f-A4 · `ia.recarga.nivelado` SE RETIRA. Era la promesa de §5.3 en un
   // renglón aparte, y desde A3 la dicen los dos subtítulos blandos. En el
   // teléfono no se pintaba (no cabía) y en escritorio se pintaba justo debajo

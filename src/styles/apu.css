@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════════════════
    apu.css · LO QUE APU-1 AÑADE A LA MESA
-   Rector: AJILEI_APU-1_Fase1e_v1.0.md §3 · Normativo: AJILEI_APU-1_Reglas_v1.1
+   Rector: AJILEI_APU-1_Fase1e_v1.0.md §3 · Normativo: AJILEI_APU-1_Reglas_v1.2 (REC-1: §9–§12)
 
    ── POR QUÉ ESTA HOJA EXISTE ────────────────────────────────────────────────
    `gameTable.css` y `opponentPanel.css` son PROTEGIDAS (docs/AJILEI_Protegidos
@@ -353,4 +353,120 @@
   .bankrupt-overlay:not(.apu-suave) .bankrupt-actions .btn { min-height: 42px; }
 
   .bankrupt-overlay:not(.apu-suave) .apu-plazo { margin-top: 16px; }
+}
+
+/* ── 9 · REC-1 · LA FILA DEL CRONÓMETRO ─────────────────────────────────────
+   Normativo v1.2 §5.4: en las dos tarjetas y en todas las pantallas el
+   cronómetro va a la IZQUIERDA y, a su derecha, «Ver la mesa» mientras la
+   tarjeta se pueda plegar (§5.5.5). El renglón del plazo pasa a ser una fila
+   (`.apu-plazo-fila`) y el aire que la separa de las acciones se le da a la
+   FILA, no al texto: con el margen en el `<p>` el botón de al lado quedaría
+   pegado a las acciones.
+
+   La fila no depende de la herencia de `visibility` (Fase 0 §J-8): el
+   cronómetro conserva su estilo en línea y el botón se monta o no se monta.
+
+   `.rec-plazo-fila` (automática y forzosa) guarda el alto del botón aunque no
+   esté: a los 5 s el botón se va y la tarjeta no puede encoger, porque está
+   anclada abajo y todo lo de encima bajaría bajo el dedo. La voluntaria no
+   tiene plazo ni pliegue y conserva su renglón de siempre. */
+.apu-plazo { text-align: left; }
+
+.apu-plazo-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bankrupt-modal.apu-recarga .apu-plazo-fila > .apu-plazo {
+  margin-top: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.apu-plazo-fila.rec-plazo-fila { min-height: 38px; }
+
+/* El aire que A5 le daba al `<p>`, llevado a la fila, en los dos medios de
+   teléfono donde existía (§7 y §8). */
+@media (max-width: 480px) and (orientation: portrait) {
+  .bankrupt-overlay.apu-suave .apu-plazo-fila { margin-top: 10px; }
+  /* En el teléfono vertical la blanda vive en la banda bajo las cartas: el
+     botón va al piso táctil justo, sin holgura. */
+  .apu-plazo-fila.rec-plazo-fila { min-height: 36px; }
+  .apu-plazo-fila .rec-ver-mesa { min-height: 36px; }
+}
+@media (max-width: 480px) {
+  .bankrupt-overlay:not(.apu-suave) .apu-plazo-fila { margin-top: 16px; }
+}
+
+/* ── 10 · REC-1 · EL AIRE DE A5, EN ESCRITORIO ──────────────────────────────
+   Fase 0 §D: las cuatro celdas de escritorio medían 0 px entre montos y
+   acciones y 0 px hasta el cronómetro, 8 entre montos y «Salir con mis fichas»
+   a 33 px de alto. Las reglas de A5 vivían sólo bajo `max-width: 480px`. Aquí
+   van las mismas cifras, con el medio de escritorio de la casa (DSK) para no
+   pisar el apaisado del teléfono, que tiene su presupuesto en §6 y §11.
+   Mínimos con +2 de E-32:
+     forzosa  40–44 · ≥12 · ≥16 · ≥14  →  42 · 14 · 18 · 16
+     blanda   36–40 · ≥10 · ≥12 · ≥8   →  (40) · 12 · 14 · 10 */
+@media (orientation: landscape) and (min-height: 601px) {
+  .bankrupt-overlay:not(.apu-suave) .apu-montos { gap: 14px; }
+  .bankrupt-overlay:not(.apu-suave) .apu-monto { min-height: 42px; }
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-actions { margin-top: 18px; gap: 14px; }
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-actions .btn { min-height: 42px; }
+  .bankrupt-overlay:not(.apu-suave) .apu-plazo-fila { margin-top: 16px; }
+
+  .bankrupt-overlay.apu-suave .apu-montos { gap: 12px; }
+  .bankrupt-overlay.apu-suave .bankrupt-actions { margin-top: 14px; gap: 12px; }
+  .bankrupt-overlay.apu-suave .apu-plazo-fila { margin-top: 10px; }
+}
+
+/* ── 11 · REC-1 · LA FORZOSA COMPACTA, TELÉFONO APAISADO ────────────────────
+   Fase 0 §J-3: en el S25 horizontal la forzosa heredaba el traje de escritorio
+   de 1e —«Salir con mis fichas» a 28 px, 6 px entre montos y 0 y 0 hacia las
+   acciones y el cronómetro—, porque §8 sólo mira `max-width: 480px` y §6 sólo
+   la blanda. Mismo medio que §6. Las dos acciones en FILA, y lo que cuesta el
+   aire se paga en la cabecera: la tarjeta tiene que caber entera en 360 px de
+   alto con 8 de aire arriba y abajo.
+   Varas con +2 de E-32: acciones ≥40 → 42 y ≥12 entre ellas → 14; montos ≥36
+   → 38 y ≥10 → 12; montos→acciones ≥12 → 14; acciones→cronómetro ≥8 → 10. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-modal.apu-recarga {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 468px;
+    padding: 14px 22px 10px;
+  }
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-title {
+    font-size: 18px; line-height: 1.2; margin-bottom: 4px;
+  }
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-sub {
+    font-size: 13px; line-height: 1.3; margin-bottom: 10px;
+  }
+  .bankrupt-overlay:not(.apu-suave) .apu-montos { gap: 12px; margin-top: 0; }
+  .bankrupt-overlay:not(.apu-suave) .apu-monto { min-height: 38px; }
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-actions {
+    flex-direction: row; margin-top: 14px; gap: 14px;
+  }
+  .bankrupt-overlay:not(.apu-suave) .bankrupt-actions .btn { flex: 1 1 0; min-height: 42px; }
+  .bankrupt-overlay:not(.apu-suave) .apu-plazo-fila { margin-top: 10px; }
+
+  /* La blanda apaisada: el aire hasta el cronómetro que §6 no le daba (0 px),
+     ahora que la fila lleva «Ver la mesa» y tiene que separarse de las
+     acciones como cualquier otra fila de botones. */
+  .bankrupt-overlay.apu-suave .apu-plazo-fila { margin-top: 10px; }
+}
+
+/* ── 12 · REC-1 · LA AUTOMÁTICA EN EL TELÉFONO VERTICAL, SIN TÍTULO ─────────
+   La fila del cronómetro ahora guarda el alto de «Ver la mesa» (36 px, el
+   piso táctil) donde antes medía 14: +22 px en una tarjeta que A5 dejó con
+   6,28 px de holgura sobre las cartas en 360×640 (156,89 de alto, arriba en
+   477,11; las cartas acaban en 470,83). Medido con la fila nueva: 179,09 de
+   alto y 15,6 px encima de la mano, contra la vara de A2 (0 px²).
+   Se paga con el título, que es lo que la lámina sellada de REC-1 ya dibuja en
+   esta pantalla: la blanda vertical sin «Recargar fichas», con el subtítulo y
+   los botones diciendo lo mismo. Sólo la automática —la voluntaria no tiene
+   plazo ni pliegue y su fila no crece— y sólo en vertical estrecho. */
+@media (max-width: 480px) and (orientation: portrait) {
+  .bankrupt-overlay.apu-suave .bankrupt-modal:has(.rec-plazo-fila) .bankrupt-title { display: none; }
 }
