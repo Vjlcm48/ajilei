@@ -66,6 +66,7 @@ import {
   // parte del arreglo — mientras la función esté a mano, el patrón vuelve.
 } from '../engine/gameEngine'
 import '../styles/luz.css'
+import '../styles/rev.css'
 
 const TURN_TIME  = 20
 const WARNING_AT = 5

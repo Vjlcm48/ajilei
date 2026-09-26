@@ -1,0 +1,24 @@
+/* ── REV-1 · Reverso único en la mesa ──────────────────────────────────────────
+   Ficha REV-1 Fase 1 v1.0 (§3.2). El mazo, la carta voladora y el abanico pintan
+   la COPIA DE MESA del reverso (`reverso_carta_mesa.svg`, 1005×1420 = 0,708, la
+   proporción de las caras): el mismo dibujo, con la tela ensanchada. Las cartas
+   la toman por el import de PlayingCard.jsx. El original sigue en la Portada y
+   en la sala de espera.
+
+   HOJA ADITIVA ESTRICTA, como luz.css: sin `!important` y sin mover una caja.
+   Se importa como ÚLTIMO import de GameTable.jsx, detrás de luz.css.
+
+   Especificidad 0,2,0 frente al shorthand 0,1,0 de gameTable.css:642 (mazo),
+   :664 (voladora) y :1080 (abanico), que son las únicas declaraciones de
+   `background` que alcanzan estas clases (ni las variantes D, ni `.opp-deck`, ni
+   `table-five` lo redeclaran). Solo se pisan la imagen y el color: el tamaño
+   (`cover`), la posición y la repetición del shorthand se conservan.
+
+   `background-color` (causa (d) de la Fase 0): bajo el dibujo, el campo del
+   reverso en vez del fieltro que dejaba ver el `transparent` del shorthand. La
+   sombra de pila de LUZ-1 es `box-shadow` y no se cruza. */
+
+.game-table-screen :is(.deck-pile, .flying-card, .shuffle-fan-card) {
+  background-image: url('../assets/cards/reverso_carta_mesa.svg');
+  background-color: #41101c;
+}
