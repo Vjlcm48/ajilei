@@ -505,3 +505,51 @@ reescribe:
 
 Desde REV-1, además, la ruta `<img>` de `PlayingCard.jsx:3` apunta a la copia
 de mesa, no al original.
+
+**9 · La pregunta que no tapa (REC-1) — adenda del 2026-09-26, sin cambio de
+versión.** Normativo: `AJILEI_APU-1_Reglas_v1.2.md` §5.4 y §5.5. Una pregunta
+con plazo que llega en un **momento de lectura de la mesa** (el resultado de
+una mano, una revelación) no se presenta encima de lo que el jugador está
+mirando. Se presenta así:
+
+- **Burbuja, sin velo,** en una **caja reservada** que ya existía (O1): no se
+  abre sitio nuevo ni se mueve nada. Si la caja no tiene tamaño propio (en la
+  mesa, la ranura de «Siguiente mano» mide 0 de ancho en escritorio y 0 de
+  alto en el teléfono apaisado), la burbuja va **absoluta y centrada** dentro
+  de ella, nunca en el flujo.
+- **Aparece cuando termina la lectura**, no cuando se decide la pregunta. En la
+  mesa, al aterrizar el vuelo de fichas; sin vuelo, en el acto; con una red de
+  6 s por si la señal no llega.
+- **Un solo reloj.** Burbuja y tarjeta leen el mismo contador; abrir o plegar
+  no lo reinicia.
+- **Abrible y plegable.** Tocar la burbuja abre la tarjeta con el tiempo que
+  quede; «Ver la mesa», a la derecha del cronómetro, la vuelve a plegar.
+- **Apertura sola al final.** En los últimos 5 s la tarjeta se abre sola y ya
+  no se pliega: la decisión nunca vence sin que el jugador la vea.
+- **Una pregunta que el jugador pidió** (la recarga voluntaria) no pasa por
+  burbuja: se abre directamente.
+
+**La variante C** (lámina REC-1 v1.0, elegida por Victor): 40 px de alto,
+fondo `rgba(9,23,14,.94)`, filo de 1,5 px `rgba(232,184,75,.7)`, radio 999,
+sombra `0 4px 14px rgba(0,0,0,.5)`, Arial 700 a 15 px. A la izquierda, el reloj
+en un **anillo** que se vacía (fondo del trazo al 22 %, trazo `--gold-brand`,
+arranca arriba), con los segundos dentro; a la derecha, el icono y el rótulo.
+Icono: **triángulo de alerta** si la pregunta es obligatoria y **la Heptacoin
+del juego** (`heptacoin.svg?no-inline`, nunca una moneda dibujada) si es una
+sugerencia. El anillo se actualiza una vez por segundo **sin transición**.
+Entrada: fundido y 8 px de subida en 0,32 s, y ninguna con
+`prefers-reduced-motion`. Vive en `src/components/BurbujaRecarga.jsx` y
+`src/styles/rec.css`.
+
+**Vara de legibilidad del anillo** (medida por el modo `rec` de `diagDSK.mjs`
+en S25 vertical y 360×640): diámetro ≥ 32 px (se escribe 34), número ≥ 12 px y
+peso 700 (se escribe 14), y contraste ≥ 4,5 del número y del trazo contra el
+fondo de la burbuja, compuesto sobre negro y sobre el verde más claro del
+tapete.
+
+**Desmontar, no esconder.** Mientras la pregunta es burbuja, la tarjeta y su
+velo **no existen en el DOM**; no se esconden con `visibility`. El cronómetro de
+la tarjeta lleva `visibility: visible` en línea (reserva su renglón en la
+voluntaria) y sobreviviría a cualquier `visibility: hidden` heredado (Fase 0 de
+REC-1, §J-8). La regla vale para cualquier capa con un hijo que fije su propia
+visibilidad.
