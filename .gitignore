@@ -135,3 +135,9 @@ capturas-idx/
 # de scripts/diagDSK.mjs (capturas-luz/fase1/: 24 PNG y la hoja de contacto).
 # REGENERABLES, mismo criterio que capturas-lob y capturas-idx.
 capturas-luz/
+
+# REV-1 · capturas de la Fase 0 (capturaRev.mjs), la lámina de la 1a (fase1a/) y
+# el modo `rev` de scripts/diagDSK.mjs (fase1b/: celdas, recortes y la hoja).
+# REGENERABLES, mismo criterio que capturas-luz. Las sondas y hoja.mjs se quedan
+# fuera: el instrumento permanente es el modo `rev`.
+capturas-rev/

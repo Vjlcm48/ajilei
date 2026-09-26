@@ -246,6 +246,20 @@
 //            `calc(… var(--luz-k))` computan a valores válidos. Sólo DEV (el
 //            <style> por hoja). Args: [mesas] [tamaños]. Capturas y la hoja de
 //            contacto `hoja.html` en LUZ_OUT (por defecto capturas-luz/fase1/).
+//   rev    → REV-1: el reverso de la mesa, en las 10 celdas de la Fase 0
+//            (mesas 5 y 2 × pc, s25v, s25h, 390, 360) y sus 4 estados congelados
+//            (reposo, reparto, vuelo, abanico). Cinco puertas: (1) Δ=0 de todas
+//            las cajas con rev.css encendida y apagada, y el <img> igual a su
+//            .card-back; (2) marco dorado 100 % visible en cartas y voladora,
+//            ≥ 99 % en mazo y abanico (caja, encaje computado y viewBox del asset
+//            en uso); (3) cartas con `reverso_carta_mesa`, y mazo, voladora y
+//            abanico con la copia y fondo rgb(65, 16, 28); (4) dibujo fiel: Δ
+//            contra el SVG en uso rasterizado a su caja ≤ 12 a DPR 3; (5) Portada
+//            (REV_BASE_PORTADA, por defecto :5174) y sala de espera intactas.
+//            Oclusión por intersección de cajas, probada con el mazo en «reparto».
+//            Sin argumentos corre además la voladora en tiempo real (screencast
+//            de CDP). Args: [mesas] [tamaños]; REV_DPR/REV_SUF para otra
+//            densidad. Salida en REV_OUT (por defecto capturas-rev/fase1b/).
 // Salida: JSON a stdout y a scratchpad; PNGs a capturas-dsk/.
 import { register } from 'node:module'
 // El motor importa sin extensión y es archivo PROTEGIDO: el arnés se adapta
@@ -11496,6 +11510,618 @@ async function runLuz(browser) {
   return { verde, puertas, extrasVerdes, celdas, extras, fugas, semilla: LUZ_SEMILLA, portada: LUZ_BASE_PORTADA }
 }
 
+// ── REV-1 · Modo `rev`: el reverso de la mesa ────────────────────────────────
+// Rector: AJILEI_REV-1_Fase1_v1.0.md §3.4. Mismas celdas y estados que la
+// Fase 0 (capturas-rev/capturaRev.mjs): mesas 5 y 2 × los cinco tamaños de LUZ,
+// estados reposo, reparto, vuelo y abanico (barajado), azar sembrado con
+// 20260925 y congelación por `getAnimations()`. Correcciones de instrumento de
+// la Fase 0: se recorta con opacidad efectiva 1 (el arnés neutraliza
+// `turn-dimmed` sólo durante el recorte, §J-5) y la oclusión se decide por
+// INTERSECCIÓN DE CAJAS, no con `elementFromPoint`, que no ve los
+// `pointer-events: none` (§J-6).
+//
+// `transition: none` se inyecta como en `luz`, pero NO sobre `.flying-card`: su
+// `transitionend` es lo que retira la voladora (GameTable.jsx:292) y cancelarle
+// la transición congela el reparto. La voladora sólo transiciona `transform`,
+// así que la hoja encendida/apagada no le arranca ninguna transición.
+const REV_OUT = process.env.REV_OUT || 'capturas-rev/fase1b'
+const REV_DPR = Number(process.env.REV_DPR || 3)
+const REV_SUF = process.env.REV_SUF || ''
+const REV_BASE_PORTADA = process.env.REV_BASE_PORTADA || LUZ_BASE_PORTADA
+const REV_SIN_TRANSICION = '*:not(.flying-card), *::before, *::after { transition: none !important; }'
+const REV_LUGARES = {
+  ia_opp:    '.opp-card-slot .playing-card.card-back',
+  ia_aizone: '.ai-zone .card-slot-wrapper .playing-card.card-back',
+  humano:    '.player-zone .card-slot-wrapper .playing-card.card-back',
+  mazo:      '.deck-pile:not(.deck-hidden)',
+  vuelo:     '.flying-card',
+  abanico:   '.shuffle-fan-card',
+}
+const REV_CARTAS = ['ia_opp', 'ia_aizone', 'humano']
+// Marco dorado del dibujo, en unidades del ORIGINAL (910×1420): el filete
+// exterior con su trazo de 10 (x 53–857, y 67–1353). Con los broches: 42–868 ×
+// 42–1378. En la copia de mesa el dibujo va desplazado (vbW − 910) / 2 = 47,5.
+const REV_MARCO = { x0: 53, y0: 67, x1: 857, y1: 1353 }
+const REV_BROCHES = { x0: 42, y0: 42, x1: 868, y1: 1378 }
+// Lugares con causa (b) en la Fase 0 (json/_causas.json): su Δ contra el
+// canónico tiene que bajar a la franja del control (3,0–13,2).
+const REV_CAUSA_B = ['m2_pc_vuelo', 'm2_pc_humano', 'm2_s25h_vuelo', 'm2_s25h_ia_opp', 'm2_s25h_humano',
+  'm5_pc_vuelo', 'm5_pc_humano', 'm5_s25h_vuelo', 'm5_s25h_humano']
+const REV_FASE0 = 'capturas-rev'
+
+// El congelador de la Fase 0, literal (capturaRev.mjs `instalarCongelador`),
+// más el interruptor de rev.css.
+async function revInstalar(page) {
+  return page.evaluate(() => {
+    const R = window.__rev = { pendiente: null, hechos: {}, log: [] }
+    const pausar = () => document.getAnimations().forEach(a => { try { a.pause() } catch { /* */ } })
+    const t0 = performance.now()
+    const mira = () => {
+      if (R.pendiente) return
+      if (!R.hechos.abanico) {
+        const f = document.querySelectorAll('.shuffle-fan-card')
+        if (f.length) {
+          pausar()
+          for (const a of document.getAnimations()) if (a.animationName === 'fanOut') a.currentTime = 975
+          R.pendiente = 'abanico'; R.log.push(['abanico', Math.round(performance.now() - t0)]); return
+        }
+      }
+      if (!R.hechos.reparto && document.querySelector('.player-zone .card-slot-wrapper .playing-card.card-back')) {
+        pausar(); R.pendiente = 'reparto'; R.log.push(['reparto', Math.round(performance.now() - t0)]); return
+      }
+      if (!R.hechos.vuelo) {
+        const v = document.querySelector('.flying-card')
+        if (v && !R._esperaVuelo) {
+          R._esperaVuelo = true
+          const tick = () => {
+            const an = v.isConnected ? v.getAnimations() : []
+            if (!v.isConnected) { R._esperaVuelo = false; return }
+            if (!an.length) { requestAnimationFrame(tick); return }
+            pausar()
+            const d = an[0].effect.getTiming().duration
+            an[0].currentTime = 0.4 * d
+            R.vueloDur = d
+            R.pendiente = 'vuelo'; R.log.push(['vuelo', Math.round(performance.now() - t0), d])
+          }
+          requestAnimationFrame(tick)
+        }
+      }
+    }
+    new MutationObserver(mira).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+    window.__revSeguir = (estado) => {
+      R.hechos[estado] = true; R.pendiente = null; R._esperaVuelo = false
+      document.getAnimations().forEach(a => { try { a.play() } catch { /* */ } })
+    }
+    const el = [...document.querySelectorAll('style[data-vite-dev-id]')]
+      .find(s => /[\\/]rev\.css$/.test(s.getAttribute('data-vite-dev-id')))
+    if (!el || !el.sheet) return false
+    window.__revHoja = (on) => { el.sheet.disabled = !on; void document.body.offsetHeight }
+    return true
+  })
+}
+
+// Puertas 1 y 3 y los datos de la 2, en UN evaluate síncrono.
+async function revMedir(page) {
+  return page.evaluate(({ LUGARES, css }) => {
+    const hoja = window.__revHoja
+    const t = document.createElement('style'); t.id = 'rev-sin-transicion'; t.textContent = css
+    document.head.appendChild(t); void document.body.offsetHeight
+    const r4 = (n) => Math.round(n * 10000) / 10000
+    const scr = document.querySelector('.game-table-screen')
+    const nombre = (el) => el.tagName.toLowerCase() + (el.classList.length ? '.' + [...el.classList].join('.') : '')
+    const visible = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' }
+    const opEf = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= parseFloat(getComputedStyle(e).opacity); return r4(o) }
+    // (1) Todas las cajas de la mesa, encendida → apagada.
+    const els = [scr, ...scr.querySelectorAll('*')]
+    const cajas = () => els.map(el => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })
+    const cOn = cajas(); hoja(false); const cOff = cajas(); hoja(true)
+    let max = 0, peor = null, distintos = 0
+    cOn.forEach((a, i) => { let d = 0; for (let k = 0; k < 4; k++) d = Math.max(d, Math.abs(a[k] - cOff[i][k])); if (d > 0) distintos++; if (d > max) { max = d; peor = nombre(els[i]) } })
+    const delta = { elementos: els.length, distintos, max, peor }
+    // Oclusores: lo que pinta ENCIMA por capa (voladora, abanico) o por orden
+    // del documento entre hermanos de flujo (la carta siguiente de la fila).
+    const pintables = [...document.querySelectorAll('.flying-card, .shuffle-fan-card, .deck-pile:not(.deck-hidden), .playing-card')].filter(visible)
+    const inter = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.y, b.y))
+    const encima = (o, el) => {
+      if (o === el || o.contains(el) || el.contains(o)) return false
+      if (el.classList.contains('flying-card')) return o.classList.contains('flying-card') && !!(el.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING)
+      if (o.classList.contains('flying-card')) return true
+      if (o.classList.contains('shuffle-fan-card') && !el.classList.contains('shuffle-fan-card')) return true
+      return !!(el.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING)
+    }
+    const out = {}
+    for (const [k, sel] of Object.entries(LUGARES)) {
+      out[k] = [...document.querySelectorAll(sel)].filter(visible).map((el, i) => {
+        const cs = getComputedStyle(el), r = el.getBoundingClientRect()
+        const img = el.querySelector(':scope > img'), ci = img && getComputedStyle(img)
+        const bl = parseFloat(cs.borderLeftWidth), br = parseFloat(cs.borderRightWidth), bt = parseFloat(cs.borderTopWidth), bb = parseFloat(cs.borderBottomWidth)
+        const pl = parseFloat(cs.paddingLeft), pr = parseFloat(cs.paddingRight), pt = parseFloat(cs.paddingTop), pb = parseFloat(cs.paddingBottom)
+        const bs = cs.boxSizing === 'border-box'
+        // Caja de pintado del reverso: el área de posicionamiento del fondo
+        // (padding-box) o la caja del <img>. Con medidas de layout, no con el
+        // rect transformado (el abanico gira).
+        const pw = parseFloat(cs.width) + (bs ? -bl - br : pl + pr), ph = parseFloat(cs.height) + (bs ? -bt - bb : pt + pb)
+        const rOn = [r.x, r.y, r.width, r.height]; hoja(false)
+        const r2 = el.getBoundingClientRect(); const rOff = [r2.x, r2.y, r2.width, r2.height]
+        const offImg = cs.backgroundImage, offColor = cs.backgroundColor
+        hoja(true)
+        const oclusores = pintables.filter(o => encima(o, el)).map(o => ({ o: nombre(o).slice(0, 60), area: inter(o.getBoundingClientRect(), r) })).filter(x => x.area > 1)
+        const ir = img && img.getBoundingClientRect()
+        return {
+          i, clases: el.className, caja: { x: r.x, y: r.y, w: r.width, h: r.height },
+          cajaIgual: rOn.every((v, j) => v === rOff[j]),
+          pintura: { w: r4(img ? ci.width === 'auto' ? ir.width : parseFloat(ci.width) : pw), h: r4(img ? parseFloat(ci.height) : ph) },
+          ruta: img ? 'img' : 'background',
+          fuente: img ? img.currentSrc : cs.backgroundImage, fuenteSinHoja: img ? img.currentSrc : offImg,
+          encaje: img ? { fit: ci.objectFit, pos: ci.objectPosition } : { fit: cs.backgroundSize, pos: cs.backgroundPosition, rep: cs.backgroundRepeat, origin: cs.backgroundOrigin },
+          fondo: cs.backgroundColor, fondoSinHoja: offColor,
+          imgIgualCaja: img ? Math.max(Math.abs(ir.x - (r.x + bl)), Math.abs(ir.y - (r.y + bt)), Math.abs(ir.width - (r.width - bl - br)), Math.abs(ir.height - (r.height - bt - bb))) : null,
+          borde: [bl, bt], bordeCss: `${cs.borderTopWidth} ${cs.borderTopStyle} ${cs.borderTopColor}`, radio: cs.borderRadius,
+          opacidadEfectiva: opEf(el), animada: el.getAnimations().length > 0, atenuada: !!el.closest('.turn-dimmed'),
+          oclusores, tapada: oclusores.length > 0,
+          dentroVp: r.x >= 0 && r.y >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5,
+        }
+      })
+    }
+    t.remove(); void document.body.offsetHeight
+    return { delta, lugares: out }
+  }, { LUGARES: REV_LUGARES, css: REV_SIN_TRANSICION })
+}
+
+// viewBox del asset EN USO: se pide la URL que el navegador pinta.
+async function revViewBox(page, cache, fuente) {
+  const url = (fuente.match(/url\("?([^")]+)"?\)/) || [null, fuente])[1]
+  if (!cache.has(url)) {
+    cache.set(url, await page.evaluate(async (u) => {
+      const s = await (await fetch(u)).text()
+      const m = s.match(/viewBox="([\d.\s-]+)"/)
+      return m ? m[1].trim().split(/\s+/).map(Number) : null
+    }, url))
+  }
+  return { url, vb: cache.get(url) }
+}
+
+// Fracción visible de un rectángulo del dibujo, con la caja, el encaje y el
+// viewBox. Sirve igual para `object-fit` que para `background-size`.
+function revFraccion(w, h, fit, pos, vb, rect) {
+  const [, , vw, vh] = vb
+  let s
+  if (/cover/.test(fit)) s = Math.max(w / vw, h / vh)
+  else if (/contain/.test(fit)) s = Math.min(w / vw, h / vh)
+  else return null
+  const dw = vw * s, dh = vh * s
+  const p = (pos || '50% 50%').split(/\s+/)
+  const off = (v, libre) => /%$/.test(v) ? libre * parseFloat(v) / 100 : parseFloat(v)
+  const L = off(p[0], w - dw), T = off(p[1] ?? '50%', h - dh)
+  const u0 = Math.max(0, -L) / s, u1 = Math.min(dw, w - L) / s
+  const v0 = Math.max(0, -T) / s, v1 = Math.min(dh, h - T) / s
+  const dx = (vw - 910) / 2
+  const a = { x0: rect.x0 + dx, x1: rect.x1 + dx, y0: rect.y0, y1: rect.y1 }
+  const iw = Math.max(0, Math.min(a.x1, u1) - Math.max(a.x0, u0)), ih = Math.max(0, Math.min(a.y1, v1) - Math.max(a.y0, v0))
+  return {
+    fraccion: Math.round(iw * ih / ((a.x1 - a.x0) * (a.y1 - a.y0)) * 100000) / 100000,
+    recorteXPorLado: Math.round(Math.max(0, (vw - (u1 - u0)) / 2) / vw * 10000) / 100,
+    recorteYPorLado: Math.round(Math.max(0, (vh - (v1 - v0)) / 2) / vh * 10000) / 100,
+  }
+}
+
+// Recorte limpio de cada lugar: la instancia sin oclusores, dentro del
+// viewport y con opacidad efectiva 1 (el arnés neutraliza `turn-dimmed`
+// SÓLO mientras dispara, §J-5). Empate → la última (la de encima de la fila).
+async function revRecortar(page, med, celda, estado) {
+  const hechos = []
+  await page.evaluate(() => {
+    const s = document.createElement('style'); s.id = 'rev-sin-atenuar'
+    s.textContent = '.turn-dimmed { opacity: 1 !important; }'; document.head.appendChild(s); void document.body.offsetHeight
+  })
+  for (const [k, lista] of Object.entries(med.lugares)) {
+    const ok = lista.filter(x => !x.tapada && x.dentroVp)
+    if (!ok.length) continue
+    const m = ok[ok.length - 1]
+    const op = await page.evaluate(({ sel, i }) => { const el = [...document.querySelectorAll(sel)].filter(e => e.getBoundingClientRect().width > 0)[i]; let o = 1; for (let e = el; e; e = e.parentElement) o *= parseFloat(getComputedStyle(e).opacity); return o }, { sel: REV_LUGARES[k], i: m.i })
+    const f = `recortes/${celda}_${estado}_${k}.png`
+    await page.screenshot({ path: `${REV_OUT}/${f}`, clip: { x: m.caja.x, y: m.caja.y, width: m.caja.w, height: m.caja.h } })
+    hechos.push({ lugar: k, archivo: f, i: m.i, caja: m.caja, pintura: m.pintura, fuente: m.fuente, encaje: m.encaje, borde: m.borde,
+      bordeCss: m.bordeCss, radio: m.radio, fondo: m.fondo, ruta: m.ruta, animada: m.animada, opacidadRecorte: Math.round(op * 1000) / 1000, atenuadaEnJuego: m.atenuada })
+  }
+  await page.evaluate(() => document.getElementById('rev-sin-atenuar')?.remove())
+  return hechos
+}
+
+async function revCelda(browser, n, clave) {
+  const { mkdirSync: mk } = await import('node:fs')
+  const t = LUZ_TAMANOS[clave]
+  const id = `m${n}_${clave}${REV_SUF}`
+  const ctx = await browser.newContext({ viewport: { width: t.w, height: t.h }, deviceScaleFactor: REV_DPR,
+    ...(t.movil ? { hasTouch: true, isMobile: true } : {}) })
+  const page = await ctx.newPage()
+  const c = { id, mesa: n, tamano: clave, viewport: { w: t.w, h: t.h }, dpr: REV_DPR, estados: {} }
+  const vbCache = new Map()
+  const t0 = Date.now()
+  for (const d of ['completas', 'recortes']) mk(`${REV_OUT}/${d}`, { recursive: true })
+  const captura = async (estado) => {
+    await page.screenshot({ path: `${REV_OUT}/completas/${id}_${estado}.png` })
+    const med = await revMedir(page)
+    for (const lista of Object.values(med.lugares)) for (const x of lista) {
+      const { url, vb } = await revViewBox(page, vbCache, x.fuente)
+      x.asset = url.split('/').pop().split('?')[0]; x.viewBox = vb
+      x.marco = vb ? revFraccion(x.pintura.w, x.pintura.h, x.encaje.fit, x.encaje.pos, vb, REV_MARCO) : null
+      x.broches = vb ? revFraccion(x.pintura.w, x.pintura.h, x.encaje.fit, x.encaje.pos, vb, REV_BROCHES) : null
+      x.ratio = Math.round(x.pintura.w / x.pintura.h * 10000) / 10000
+    }
+    let rec = await revRecortar(page, med, id, estado)
+    if (estado === 'abanico') {
+      // Como la Fase 0: el recorte del abanico a 0 ms (las cinco a 0°).
+      await page.evaluate(() => { for (const a of document.getAnimations()) if (a.animationName === 'fanOut') a.currentTime = 0 })
+      const m0 = await revMedir(page)
+      rec = rec.concat(await revRecortar(page, { lugares: { abanico: m0.lugares.abanico } }, id, 'abanico0'))
+    }
+    c.estados[estado] = { ...med, recortes: rec }
+  }
+  try {
+    c.ruta = await irALaMesa(page, BASE, n, 'basico', 0)
+    await luzSembrar(page)
+    if (!await revInstalar(page)) throw new Error('no encuentro el <style> de rev.css (¿servidor DEV?)')
+    await page.mouse.move(2, 2)
+    await luzClicSi(page, 'button:has-text("Iniciar mano")')
+    let reposo = false, descartado = false
+    for (let it = 0; it < 600 && Date.now() - t0 < 180000; it++) {
+      const st = await page.evaluate(() => ({
+        pend: window.__rev.pendiente, hechos: window.__rev.hechos,
+        descarte: !!document.querySelector('.discard-area .timer-display'),
+        clicable: document.querySelectorAll('.player-zone .playing-card.card-clickable').length,
+        apuesta: !!document.querySelector('.action-buttons button:not([disabled])'),
+        siguiente: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Siguiente mano'),
+        dorsosIA: document.querySelectorAll('.opp-card-slot .card-back, .ai-zone .card-back').length,
+        mazo: !!document.querySelector('.deck-pile:not(.deck-hidden)'),
+        vuelo: !!document.querySelector('.flying-card'), abanico: !!document.querySelector('.shuffle-fan-card'),
+      }))
+      if (st.pend) {
+        await captura(st.pend)
+        await page.evaluate((e) => window.__revSeguir(e), st.pend)
+        continue
+      }
+      if (!reposo && st.apuesta && st.dorsosIA >= 5 && st.mazo && !st.vuelo && !st.abanico) {
+        await page.waitForTimeout(600)
+        await page.evaluate(() => document.getAnimations().forEach(a => { try { a.pause() } catch { /* */ } }))
+        await captura('reposo')
+        await page.evaluate(() => document.getAnimations().forEach(a => { try { a.play() } catch { /* */ } }))
+        reposo = true
+      }
+      const h = st.hechos
+      if (reposo && h.abanico && h.reparto && h.vuelo) break
+      if (st.descarte && st.clicable >= 5 && !descartado) {
+        await page.locator('.player-zone .playing-card.card-clickable').first().click().catch(() => {})
+        await page.waitForTimeout(200)
+        await luzClicSi(page, 'button:has-text("Descartar")'); descartado = true
+      } else if (st.apuesta) {
+        await luzClicSi(page, '.action-buttons button:has-text("Pasar")') || await luzClicSi(page, '.action-buttons button:has-text("Igualar")')
+      } else if (st.siguiente) {
+        await luzClicSi(page, 'button:has-text("Siguiente mano")'); descartado = false
+      }
+      await page.waitForTimeout(60)
+    }
+    c.log = await page.evaluate(() => ({ log: window.__rev.log, vueloDur: window.__rev.vueloDur }))
+  } catch (e) { c.error = String(e && e.message || e).slice(0, 400) }
+  c.ms = Date.now() - t0
+  await ctx.close()
+  return c
+}
+
+// Puertas 1–3 de una celda, lugar a lugar. Las cajas intermedias (0,642–0,656,
+// decisión del rector sobre el STOP 1) cuentan según su lugar y se marcan.
+function revPuertasCelda(c) {
+  const fallos = []
+  let d1 = true, d2 = true, d3 = true
+  const marcos = []
+  for (const [estado, e] of Object.entries(c.estados)) {
+    if (!(e.delta.max === 0 && e.delta.distintos === 0)) { d1 = false; fallos.push(`${estado} Δ ${e.delta.max} ${e.delta.peor}`) }
+    for (const [k, lista] of Object.entries(e.lugares)) for (const x of lista) {
+      if (!x.cajaIgual) { d1 = false; fallos.push(`${estado} ${k}#${x.i} caja`) }
+      if (x.ruta === 'img' && !(x.imgIgualCaja <= 0.01)) { d1 = false; fallos.push(`${estado} ${k}#${x.i} img≠caja ${x.imgIgualCaja}`) }
+      const carta = REV_CARTAS.includes(k) || k === 'vuelo'
+      const f = x.marco?.fraccion ?? 0
+      const ok2 = carta ? f >= 0.99999 : f >= 0.99
+      if (!ok2) { d2 = false; fallos.push(`${estado} ${k}#${x.i} marco ${f}`) }
+      marcos.push({ estado, lugar: k, i: x.i, ratio: x.ratio, w: x.pintura.w, h: x.pintura.h, marco: f, broches: x.broches?.fraccion,
+        recorteX: x.marco?.recorteXPorLado, recorteY: x.marco?.recorteYPorLado, intermedia: x.ratio > 0.6409 && x.ratio < 0.69 })
+      const esMesa = /reverso_carta_mesa/.test(x.fuente)
+      const ok3 = REV_CARTAS.includes(k) ? esMesa : (esMesa && x.fondo === 'rgb(65, 16, 28)')
+      if (!ok3) { d3 = false; fallos.push(`${estado} ${k}#${x.i} asset ${x.asset} fondo ${x.fondo}`) }
+    }
+  }
+  return { p1_delta: d1, p2_marco: d2, p3_asset: d3, fallos: fallos.slice(0, 20), marcos }
+}
+
+// Comparación en un lienzo (la de la Fase 0, capturaRev.mjs `comparaPar`).
+async function revComparar(page, pngA, pngB) {
+  return page.evaluate(async ({ A, B }) => {
+    const carga = async (s) => { const i = new Image(); i.src = 'data:image/png;base64,' + s; await i.decode(); return i }
+    const ia = await carga(A), ib = await carga(B)
+    const H = ia.height, wb = Math.round(ib.width * H / ib.height), W = Math.min(ia.width, wb)
+    const lienzo = (img, w) => { const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(img, -(w - W) / 2, 0, w, H); return x.getImageData(0, 0, W, H).data }
+    const da = lienzo(ia, ia.width), db = lienzo(ib, wb)
+    let s = 0, n = 0
+    for (let p = 0; p < da.length; p += 4) { s += (Math.abs(da[p] - db[p]) + Math.abs(da[p + 1] - db[p + 1]) + Math.abs(da[p + 2] - db[p + 2])) / 3; n++ }
+    return Math.round(s / n * 100) / 100
+  }, { A: pngA.toString('base64'), B: pngB.toString('base64') })
+}
+async function revSinBorde(page, png, b, dpr) {
+  const r = await page.evaluate(async ({ s, b, dpr }) => {
+    const i = new Image(); i.src = 'data:image/png;base64,' + s; await i.decode()
+    const p = Math.round(b * dpr); const c = document.createElement('canvas'); c.width = i.width - 2 * p; c.height = i.height - 2 * p
+    c.getContext('2d').drawImage(i, -p, -p); return c.toDataURL('image/png').split(',')[1]
+  }, { s: png.toString('base64'), b, dpr })
+  return Buffer.from(r, 'base64')
+}
+
+// Puerta 4 + informativas: cada recorte limpio contra el SVG EN USO
+// rasterizado solo, a su caja de contenido y con su encaje (§F-7 de la Fase 0).
+async function revDibujo(browser, celdas) {
+  const { existsSync } = await import('node:fs')
+  const lab = await (await browser.newContext({ viewport: { width: 800, height: 800 }, deviceScaleFactor: REV_DPR })).newPage()
+  const cmp = await (await browser.newContext()).newPage()
+  const svgs = new Map()
+  const canon = existsSync(`${REV_FASE0}/lab/_canon__cont.png`) ? readFileSync(`${REV_FASE0}/lab/_canon__cont.png`) : null
+  const fase0 = existsSync(`${REV_FASE0}/json/_comparacion.json`) ? JSON.parse(readFileSync(`${REV_FASE0}/json/_comparacion.json`, 'utf8')).filas : []
+  const filas = []
+  for (const c of celdas) {
+    const porLugar = {}
+    for (const [estado, e] of Object.entries(c.estados)) for (const r of (e.recortes || [])) {
+      const est = r.archivo.includes('_abanico0_') ? 'abanico0' : estado
+      if (r.lugar === 'abanico' && est !== 'abanico0') continue
+      if (r.lugar === 'vuelo' && est !== 'vuelo') continue
+      ;(porLugar[r.lugar] ||= []).push({ ...r, estado: est })
+    }
+    const PREF = ['reparto', 'vuelo', 'reposo', 'abanico0'], PREF_MAZO = ['vuelo', 'reposo', 'reparto', 'abanico0']
+    for (const [lugar, xs] of Object.entries(porLugar)) {
+      const orden = lugar === 'mazo' ? PREF_MAZO : PREF
+      xs.sort((a, b) => orden.indexOf(a.estado) - orden.indexOf(b.estado))
+      const x = xs[0]
+      const url = (x.fuente.match(/url\("?([^")]+)"?\)/) || [null, x.fuente])[1]
+      if (!svgs.has(url)) svgs.set(url, 'data:image/svg+xml;base64,' + Buffer.from(await (await fetch(url)).text()).toString('base64'))
+      const { w, h } = x.pintura
+      const fit = /contain/.test(x.encaje.fit) ? 'contain' : 'cover'
+      // La caja PROPIA (corrección de instrumento de la 1b): un fondo se pinta
+      // con su borde, su radio y su color, porque el borde mueve la fase de
+      // píxel de la imagen intermedia (con la copia, ~1 px de dispositivo a
+      // 27×42: Δ 11,3 sin borde frente a 0,1 con él); una carta es un <img>
+      // con su `object-fit`, dentro de un .card-back con su borde. Y en la
+      // MISMA fase de subpíxel que la caja real: un mazo en x = 127,5 cae a
+      // medio píxel de dispositivo del de x = 10 (Δ 12,81 en entero frente a
+      // 0,05 en su fase, m2 s25h). Si está animada (abanico, voladora) vive en
+      // su propia capa compuesta, que se ajusta a la rejilla de dispositivo: el
+      // laboratorio también (abanico de m2 s25h: 14,79 sin capa, 0,15 con ella).
+      const b = x.borde[0], P = 20 + (x.caja.x % 1), Q = 20 + (x.caja.y % 1)
+      const capa = x.animada ? 'will-change:transform;' : ''
+      const html = x.ruta === 'img'
+        ? `<div style="position:absolute;left:${P}px;top:${Q}px;width:${w}px;height:${h}px;border:${x.bordeCss};border-radius:${x.radio};background:${x.fondo};overflow:hidden;${capa}"><img src="${svgs.get(url)}" style="width:100%;height:100%;display:block;object-fit:${fit}"></div>`
+        : `<div style="position:absolute;left:${P}px;top:${Q}px;width:${w}px;height:${h}px;border:${x.bordeCss};border-radius:${x.radio};background:url('${svgs.get(url)}') center/${fit} no-repeat;background-color:${x.fondo};${capa}"></div>`
+      await lab.setContent(`<html><body style="margin:0;background:#000">${html}</body></html>`)
+      await lab.waitForTimeout(60)
+      const pngLab = await lab.screenshot({ clip: { x: P + b, y: Q + b, width: w, height: h } })
+      const cont = await revSinBorde(cmp, readFileSync(`${REV_OUT}/${x.archivo}`), x.borde[0], REV_DPR)
+      writeFileSync(`${REV_OUT}/recortes/${c.id}_${lugar}__cont.png`, cont)
+      const labVsReal = await revComparar(cmp, pngLab, cont)
+      const idF0 = `${c.id.replace(REV_SUF, '')}_${lugar}`
+      const f0 = fase0.find(f => f.id === idF0)
+      const canonDespues = canon ? await revComparar(cmp, canon, cont) : null
+      filas.push({ id: `${c.id}_${lugar}`, celda: c.id, lugar, estado: x.estado, archivo: x.archivo, asset: url.split('/').pop().split('?')[0],
+        pintura: x.pintura, opacidadRecorte: x.opacidadRecorte, animada: !!x.animada, labVsReal, p4: labVsReal <= 12,
+        canonAntes: f0 ? f0.contenidoDelta : null, canonDespues, causaB: REV_CAUSA_B.includes(idF0),
+        archivoAntes: f0 ? f0.archivo : null })
+    }
+  }
+  return filas
+}
+
+// Puerta 5: la Portada y la sala de espera, con rev.css encendida y apagada,
+// y con el original en todos sus <img>.
+async function revFuera(browser, nombre, url, espera, vp) {
+  const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 1 })
+  const page = await ctx.newPage()
+  const r = { pantalla: nombre, url, vp: `${vp.width}x${vp.height}` }
+  try {
+    await page.goto(url, { waitUntil: 'networkidle' })
+    await page.waitForSelector(espera, { timeout: 15000 })
+    await page.waitForTimeout(600)
+    Object.assign(r, await page.evaluate(() => {
+      const el = [...document.querySelectorAll('style[data-vite-dev-id]')].find(s => /[\\/]rev\.css$/.test(s.getAttribute('data-vite-dev-id')))
+      const hoja = (on) => { if (el) { el.sheet.disabled = !on; void document.body.offsetHeight } }
+      const props = ['background-image', 'background-color', 'background-size', 'object-fit', 'box-shadow', 'filter', 'opacity', 'color']
+      const els = [document.documentElement, ...document.querySelectorAll('body, body *')]
+      const foto = () => els.map(e => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect()
+        return props.map(p => cs.getPropertyValue(p)).join('|') + `|${b.x},${b.y},${b.width},${b.height}|${e.currentSrc || ''}` })
+      const on = foto(); hoja(false); const off = foto(); hoja(true)
+      const difieren = []
+      on.forEach((v, i) => { if (v !== off[i]) difieren.push(els[i].tagName.toLowerCase() + '.' + [...els[i].classList].join('.')) })
+      const imgs = [...document.querySelectorAll('img')].map(i => i.currentSrc || i.src).filter(s => /reverso/.test(s))
+      return { hojaCargada: !!el, elementos: els.length, nDifieren: difieren.length, difieren: difieren.slice(0, 10),
+        reversos: imgs.length, conOriginal: imgs.filter(s => /reverso_carta\.svg/.test(s)).length,
+        conCopia: imgs.filter(s => /reverso_carta_mesa/.test(s)).length, ejemplo: imgs[0] || null,
+        mesaMontada: !!document.querySelector('.game-table-screen') }
+    }))
+    r.ok = r.nDifieren === 0 && !r.mesaMontada && r.reversos > 0 && r.conOriginal === r.reversos && r.conCopia === 0
+  } catch (e) { r.error = String(e && e.message || e).slice(0, 300); r.ok = false }
+  await ctx.close()
+  return r
+}
+
+// §3.3 · La voladora en tiempo real: un reparto completo de mesa 2 escritorio
+// SIN pausar nada. Los fotogramas salen del screencast de CDP (cada frame que
+// compone el navegador, con su hora de pantalla) y un bucle de rAF en la
+// página anota, con la misma hora de pared, dónde está cada `.flying-card`.
+// Casar un fotograma con «el último rAF anterior a su hora» falla por un
+// fotograma: la hora de pantalla del frame N llega DESPUÉS del rAF N+1, y la
+// voladora recién nacida sale «sin pintar» cuando en realidad es el frame
+// anterior (primera pasada de la 1b: 3 de 4 voladoras, todas a 2–3 ms del
+// rAF). Por eso cada rAF pinta su número (módulo 16) en una SONDA de 24 px en
+// la esquina y cada fotograma se casa con el rAF cuyo número lleva impreso.
+// Se mira el centro de cada voladora: «pintada» si domina el vinotinto.
+async function revVueloReal(browser) {
+  const { mkdirSync: mk } = await import('node:fs')
+  mk(`${REV_OUT}/vuelo`, { recursive: true })
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 })
+  const page = await ctx.newPage()
+  const r = { celda: 'm2_pc', dpr: 1 }
+  try {
+    await irALaMesa(page, BASE, 2, 'basico', 0)
+    await luzSembrar(page)
+    await page.mouse.move(2, 2)
+    await page.evaluate(() => {
+      const L = window.__vlog = []
+      const vistas = new Map(); let n = 0, k = 0
+      const sonda = document.createElement('div')
+      sonda.style.cssText = 'position:fixed;left:0;top:0;width:24px;height:24px;z-index:2147483647;pointer-events:none'
+      document.body.appendChild(sonda)
+      const paso = () => {
+        k++
+        sonda.style.background = `rgb(${(k % 16) * 16 + 8},0,0)`
+        const fs = [...document.querySelectorAll('.flying-card')]
+        const t = performance.timeOrigin + performance.now()
+        const vis = fs.map(f => { if (!vistas.has(f)) vistas.set(f, { id: n++, t0: t }); const b = f.getBoundingClientRect(); return { id: vistas.get(f).id, x: b.x, y: b.y, w: b.width, h: b.height } })
+        L.push({ k, t, vis })
+        requestAnimationFrame(paso)
+      }
+      requestAnimationFrame(paso)
+    })
+    const cdp = await ctx.newCDPSession(page)
+    const frames = []
+    cdp.on('Page.screencastFrame', (f) => {
+      frames.push({ t: f.metadata.timestamp * 1000, data: f.data })
+      cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {})
+    })
+    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 85, everyNthFrame: 1 })
+    const tIni = Date.now()
+    await luzClicSi(page, 'button:has-text("Iniciar mano")')
+    // Hasta que el humano tenga sus cinco cartas y no quede nada volando.
+    for (let i = 0; i < 120; i++) {
+      await page.waitForTimeout(100)
+      const st = await page.evaluate(() => ({ cartas: document.querySelectorAll('.player-zone .card-slot-wrapper .playing-card:not(.card-empty)').length, vuelo: !!document.querySelector('.flying-card'), n: window.__vlog.length }))
+      if (st.cartas >= 5 && !st.vuelo && Date.now() - tIni > 2500) break
+    }
+    await page.waitForTimeout(300)
+    await cdp.send('Page.stopScreencast')
+    const log = await page.evaluate(() => window.__vlog)
+    r.ahoraMenosUltimoFrame = frames.length ? Date.now() - frames[frames.length - 1].t : null
+    r.frames = frames.length
+    r.raf = log.length
+    const cmp = await (await browser.newContext()).newPage()
+    // El número impreso en la sonda de cada fotograma.
+    for (const f of frames) {
+      f.k = await cmp.evaluate(async (b64) => {
+        const i = new Image(); i.src = 'data:image/jpeg;base64,' + b64; await i.decode()
+        const c = document.createElement('canvas'); c.width = 24; c.height = 24
+        const x = c.getContext('2d'); x.drawImage(i, 0, 0)
+        const d = x.getImageData(12, 12, 1, 1).data
+        return Math.max(0, Math.min(15, Math.floor(d[0] / 16)))
+      }, f.data)
+    }
+    const conVuelo = []
+    const primeros = new Map()
+    let casados = 0
+    for (const f of frames) {
+      // El rAF más reciente, anterior al fotograma y con su número: el que lo produjo.
+      let e = null
+      for (let q = log.length - 1; q >= 0; q--) { const l = log[q]; if (l.t > f.t) continue; if (f.t - l.t > 250) break; if (l.k % 16 === f.k) { e = l; break } }
+      if (!e) continue
+      casados++
+      if (e.vis.length) conVuelo.push({ f, e })
+    }
+    r.framesCasados = casados
+    r.framesConVuelo = conVuelo.length
+    const analisis = []
+    for (const { f, e } of conVuelo) {
+      const res = await cmp.evaluate(async ({ b64, vis }) => {
+        const i = new Image(); i.src = 'data:image/jpeg;base64,' + b64; await i.decode()
+        const c = document.createElement('canvas'); c.width = i.width; c.height = i.height
+        const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(i, 0, 0)
+        return vis.map(v => {
+          // El 40 % central: lejos del borde y de la sombra.
+          const x0 = Math.round(v.x + v.w * 0.3), y0 = Math.round(v.y + v.h * 0.3), w = Math.max(1, Math.round(v.w * 0.4)), h = Math.max(1, Math.round(v.h * 0.4))
+          if (x0 < 0 || y0 < 0 || x0 + w > c.width || y0 + h > c.height) return { id: v.id, fuera: true }
+          const d = x.getImageData(x0, y0, w, h).data
+          let rojo = 0, n = 0
+          for (let p = 0; p < d.length; p += 4) { n++; if (d[p] > d[p + 1] + 15 && d[p] >= d[p + 2]) rojo++ }
+          return { id: v.id, rojo: Math.round(rojo / n * 1000) / 1000 }
+        })
+      }, { b64: f.data, vis: e.vis })
+      for (const m of res) {
+        const a = { t: Math.round(f.t), id: m.id, rojo: m.rojo, fuera: !!m.fuera, msDesdeRaf: Math.round(f.t - e.t), rafK: e.k }
+        analisis.push(a)
+        if (!primeros.has(m.id)) primeros.set(m.id, { ...a, frame: f })
+      }
+    }
+    r.voladoras = primeros.size
+    r.sinPintar = analisis.filter(a => !a.fuera && a.rojo < 0.8)
+    r.minRojo = Math.min(...analisis.filter(a => !a.fuera).map(a => a.rojo))
+    r.primerFotograma = [...primeros.values()].map(p => ({ id: p.id, rojo: p.rojo, msDesdeRaf: p.msDesdeRaf }))
+    // Evidencia: el primer fotograma de las tres primeras voladoras y todo el que salga sin pintar.
+    const guarda = [...primeros.values()].slice(0, 3).map(p => [p.frame, `primero_v${p.id}`])
+    for (const a of r.sinPintar.slice(0, 6)) { const fr = frames.find(x => Math.round(x.t) === a.t); if (fr) guarda.push([fr, `sinpintar_v${a.id}_${a.t}`]) }
+    r.evidencia = []
+    for (const [fr, nombre] of guarda) { writeFileSync(`${REV_OUT}/vuelo/${nombre}.jpg`, Buffer.from(fr.data, 'base64')); r.evidencia.push(`vuelo/${nombre}.jpg`) }
+    r.ok = r.voladoras > 0 && r.sinPintar.length === 0
+  } catch (e) { r.error = String(e && e.stack || e).slice(0, 400); r.ok = false }
+  await ctx.close()
+  return r
+}
+
+async function runRev(browser) {
+  const { mkdirSync: mk } = await import('node:fs')
+  mk(REV_OUT, { recursive: true })
+  const mesas = (process.argv[3] || '5,2').split(',').map(Number)
+  const tams = (process.argv[4] || Object.keys(LUZ_TAMANOS).join(',')).split(',')
+  const completo = !process.argv[3] && !process.argv[4] && !REV_SUF
+  const celdas = []
+  for (const n of mesas) for (const k of tams) {
+    const c = await revCelda(browser, n, k)
+    c.puertas = c.error ? { error: false } : revPuertasCelda(c)
+    writeFileSync(`${REV_OUT}/${c.id}.json`, JSON.stringify(c, null, 1))
+    const tap = Object.entries(c.estados).map(([e, v]) => `${e}:${Object.entries(v.lugares).map(([l, xs]) => `${l}${xs.length}${xs.some(x => x.tapada) ? '*' : ''}`).join('+')}`).join(' ')
+    console.log(`rev ${c.id} · ${c.ms} ms${c.error ? ' · ERROR ' + c.error : ''} · p1 ${c.puertas.p1_delta} p2 ${c.puertas.p2_marco} p3 ${c.puertas.p3_asset} · ${tap}`)
+    celdas.push(c)
+  }
+  const dibujo = await revDibujo(browser, celdas)
+  for (const f of dibujo) console.log(`rev dibujo ${f.id.padEnd(20)} ${f.estado.padEnd(8)} lab↔real ${String(f.labVsReal).padStart(5)} · canónico ${f.canonAntes} → ${f.canonDespues}${f.causaB ? ' (b)' : ''}`)
+  // Prueba de la puerta de oclusión (§J-6): el mazo en «reparto», con la
+  // voladora recién nacida encima, tiene que salir TAPADO.
+  const oclusion = celdas.map(c => {
+    const e = c.estados.reparto; if (!e) return { celda: c.id, sinEstado: true }
+    const mazos = e.lugares.mazo || [], vuelos = e.lugares.vuelo || []
+    const bajoVuelo = mazos.filter(m => vuelos.some(v => Math.min(m.caja.x + m.caja.w, v.caja.x + v.caja.w) > Math.max(m.caja.x, v.caja.x) && Math.min(m.caja.y + m.caja.h, v.caja.y + v.caja.h) > Math.max(m.caja.y, v.caja.y)))
+    return { celda: c.id, mazos: mazos.length, vuelos: vuelos.length, bajoVuelo: bajoVuelo.length, tapados: bajoVuelo.filter(m => m.tapada).length }
+  })
+  const fuera = completo ? [] : null
+  if (completo) for (const vp of [{ width: 1920, height: 1080 }, { width: 412, height: 915 }]) {
+    fuera.push(await revFuera(browser, 'Portada', REV_BASE_PORTADA, 'body.portada-activa', vp))
+    fuera.push(await revFuera(browser, 'Sala de espera', `${BASE}/?sal=espera-anfitrion`, '.sal-esp-mazo img', vp))
+  }
+  if (fuera) for (const f of fuera) console.log(`rev fuera ${f.pantalla} ${f.vp} · ${f.ok ? 'OK' : 'FALLA'} · ${f.error || `${f.reversos} reversos (${f.conOriginal} original, ${f.conCopia} copia), ${f.nDifieren} difieren`}`)
+  const vueloReal = completo ? await revVueloReal(browser) : null
+  if (vueloReal) console.log(`rev vuelo real · ${vueloReal.frames} frames, ${vueloReal.framesConVuelo} con voladora, ${vueloReal.voladoras} voladoras, ${vueloReal.sinPintar?.length} sin pintar, mín ${vueloReal.minRojo}`)
+  const vivas = celdas.filter(c => !c.error)
+  const verdeDe = (k) => celdas.length > 0 && celdas.every(c => c.puertas[k])
+  const puertas = {
+    p1_delta: verdeDe('p1_delta'), p2_marco: verdeDe('p2_marco'), p3_asset: verdeDe('p3_asset'),
+    p4_dibujo: dibujo.length > 0 && dibujo.every(f => f.p4),
+    p5_fuera: fuera ? fuera.every(f => f.ok) : null,
+  }
+  // Sin ningún mazo bajo la voladora no hay caso que probar: en la corrida
+  // completa eso es rojo (la puerta no se habría demostrado); en una parcial,
+  // «—».
+  const hayCaso = oclusion.some(o => o.bajoVuelo > 0)
+  const oclusionProbada = hayCaso ? oclusion.every(o => o.tapados === (o.bajoVuelo || 0)) : (completo ? false : null)
+  const verde = vivas.length === celdas.length && Object.values(puertas).every(v => v !== false) && oclusionProbada !== false
+  const resumen = `${verde ? 'VERDE' : 'ROJO'} · ${celdas.length} celdas · ` + Object.entries(puertas).map(([k, v]) => `${k} ${v == null ? '—' : v ? '✓' : '✗'}`).join(' · ') +
+    ` · oclusión ${oclusionProbada == null ? '— (sin caso)' : oclusionProbada ? '✓' : '✗'} · ${new Date().toISOString()}`
+  console.log(`── REV · ${resumen}`)
+  const out = { verde, puertas, resumen, oclusion, oclusionProbada, dibujo, fuera, vueloReal: vueloReal && { ...vueloReal },
+    celdas: celdas.map(c => ({ id: c.id, error: c.error, ms: c.ms, log: c.log, puertas: c.puertas })), semilla: LUZ_SEMILLA, dpr: REV_DPR }
+  writeFileSync(`${REV_OUT}/_rev${REV_SUF}.json`, JSON.stringify(out, null, 1))
+  return { verde, puertas, resumen, oclusion, oclusionProbada, fuera, vueloReal: vueloReal && { ...vueloReal, sinPintar: vueloReal.sinPintar?.length } }
+}
+
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
 // de 15px del área es invisible al arnés (falso verde comprobado). El modo r2 —
@@ -11565,6 +12191,7 @@ try {
   if (MODE === 'tapetes') report.tapetes = await runTapetes(browser)
   if (MODE === 'vuelo') report.vuelo = await runVuelo(browser)
   if (MODE === 'luz') report.luz = await runLuz(browser)
+  if (MODE === 'rev') report.rev = await runRev(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }
