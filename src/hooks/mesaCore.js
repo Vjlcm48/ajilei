@@ -1,6 +1,6 @@
 // ── mesaCore.js · Lo que la MESA decide y el motor no ──────────────────────
 // Rector: AJILEI_APU-1_Fase1e_v1.0.md §3 (1e-ii). Normativo:
-// `docs/AJILEI_APU-1_Reglas_v1.1.md` §3.2, §4.1, §4.3, §5 y §6.9.
+// `docs/AJILEI_APU-1_Reglas_v1.2.md` §3.2, §4.1, §4.3, §5 y §6.9.
 //
 // Módulo PURO, sin React ni DOM — el molde de `cronicaCore`, `resultadoCore` y
 // `sesionCore`, y por la misma razón que aquéllos: este proyecto NO tiene jsdom
@@ -215,7 +215,7 @@ export const RECARGA = Object.freeze({
  * Qué recarga toca AHORA, entre manos. Sólo entre manos: dentro de una, nunca
  * (§5.1), y por eso lo primero que se mira es la fase.
  *
- *   `forzosa`    — o el humano no cubre el ante (§5.4), o la mano que viene no
+ *   `forzosa`    — o el humano no cubre el ante (v1.2 §5.1), o la mano que viene no
  *                  tendría una sola decisión posible porque el ante dejaría a
  *                  todos mudos (D-12). Son el mismo hecho contado dos veces:
  *                  la mesa no puede continuar como un juego de decisiones, y
@@ -301,3 +301,66 @@ export function pozoPartido(state) {
 // mesa para preguntar por un asiento cualquiera (el salto en silencio), no sólo
 // por el humano.
 export { accionesDe }
+
+// ── REC-1 · La pregunta que no tapa la mano (normativo v1.2 §5.5) ──────────
+//
+// La automática y la forzosa se decidían y se pintaban en el MISMO fotograma
+// que el resultado (Fase 0 de REC-1: t = 0 del pago), así que la tarjeta tapaba
+// la revelación y el reloj gastaba 3,7 de sus 15 s mientras el jugador aún
+// miraba las cartas. Aquí viven las dos decisiones que lo corrigen, puras para
+// que Vitest las selle: CUÁNDO se puede enseñar la pregunta y CON QUÉ FORMA.
+
+// §10 · «Apertura sola de la tarjeta: en los últimos 5 s del plazo».
+export const APERTURA_SOLA_S = 5
+
+// La red de `recargaLista`: si en este tiempo desde el primer render del pago
+// la revelación no dio señal de terminar, la pregunta sale igual. El reloj de
+// la recarga no puede quedarse colgado de una celebración que no llegó a
+// armarse (sin geometría, por ejemplo) o que no avisó al descargarse.
+export const RED_REVELACION_MS = 6000
+
+/**
+ * §5.5.1 · ¿Terminó la revelación? Se deriva de lo que la mesa ya sabe:
+ *
+ *   `vuelo`      — la celebración de esta mano lleva viaje de fichas
+ *                  (`llevaViaje(decideCelebracion(...))`). Sin vuelo previsto,
+ *                  lista en el acto: no hay nada que esperar.
+ *   `armada`     — la celebración llegó a existir (`celebracion.activa`).
+ *   `descargada` — y después volvió a null: aterrizó, se cortó o venció.
+ *   `ms`         — lo que lleva la fase de pago; a partir de la red, lista.
+ */
+export function recargaLista({ vuelo, armada, descargada, ms = 0 }) {
+  if (!vuelo) return true
+  if (armada && descargada) return true
+  return ms >= RED_REVELACION_MS
+}
+
+/**
+ * §5.5 · Qué forma tiene la pregunta ahora mismo.
+ *
+ *   voluntaria           → tarjeta, sin plegar y sin plazo (§5.5.8);
+ *   seg ≤ 0              → vence (lo resuelve el tic, como siempre);
+ *   seg ≤ APERTURA_SOLA_S → tarjeta fija: se abre sola y ya no se pliega;
+ *   abierta              → tarjeta que se puede plegar con «Ver la mesa»;
+ *   si no                → burbuja.
+ *
+ * `seg` no se toca aquí ni en ningún sitio que abra o pliegue: burbuja y
+ * tarjeta leen el MISMO reloj (§5.5.4), y la continuidad sale por construcción.
+ */
+export function formaRecarga({ seg, abierta, motivo }) {
+  if (motivo === RECARGA.VOLUNTARIA) return { forma: 'tarjeta', plegable: false }
+  if (seg <= 0) return { forma: 'vence', plegable: false }
+  if (seg <= APERTURA_SOLA_S) return { forma: 'tarjeta', plegable: false }
+  if (abierta) return { forma: 'tarjeta', plegable: true }
+  return { forma: 'burbuja', plegable: false }
+}
+
+// Abrir y plegar sólo cambian `abierta`. Devuelven la pregunta entera para que
+// la pantalla las use tal cual en su `setRecarga`, y así la prueba de que el
+// reloj no se toca es la de estas dos funciones: no reciben `seg` para
+// escribirlo, sólo para negarse a plegar cuando ya no se puede (§5.5.5).
+export const abrirRecarga = (r) => (r ? { ...r, abierta: true } : r)
+export function plegarRecarga(r, seg) {
+  if (!r || !formaRecarga({ seg, abierta: r.abierta, motivo: r.motivo }).plegable) return r
+  return { ...r, abierta: false }
+}
