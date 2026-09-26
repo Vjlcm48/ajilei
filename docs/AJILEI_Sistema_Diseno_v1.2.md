@@ -432,3 +432,76 @@ de LUZ-1 hasta que `turnBreath` deje de usar `box-shadow`.
 La sombra de contacto va con `:where()` en 0,1,0 y excluye `.card-winner` y
 `.card-empty`, que tienen esa misma especificidad y cargan antes: sin la
 exclusión, el orden de carga les quitaría el halo y el `none`.
+
+**8 · El reverso de mesa (REV-1) — adenda del 2026-09-25, sin cambio de
+versión.** Dentro de la mesa el reverso es una **copia de mesa**,
+`src/assets/cards/reverso_carta_mesa.svg` (1005×1420, 7 498 B). El original,
+`reverso_carta.svg` (910×1420, 6 994 B), no cambia y sigue siendo el reverso de
+la **Portada** y de la **sala de espera**.
+
+**Por qué existe.** El original mide 910:1420 = 0,641 y su propio comentario lo
+declara seguro con `cover` hasta 0,693. Las cartas del humano en escritorio y en
+teléfono apaisado tienen la proporción de las caras de la baraja, 1055:1491 =
+0,699–0,708, y la voladora que va hacia ellas y la IA de mesa 2 en apaisado,
+también. En esas cajas `cover` escalaba por el ancho y cortaba un 4,2 % arriba y
+otro abajo: los broches quedaban fuera y el marco tocaba el filo (Fase 0 de
+REV-1, causa (b)). La copia tiene la proporción de las caras (1420 × 1055/1491 =
+1004,8 → 1005), así que con el **mismo** `cover`:
+
+- en las cajas estrechas (≤ 0,641) la escala la fija el alto y se ve igual que
+  el original, porque la tela añadida cae fuera;
+- en las anchas (0,699–0,708) la tela añadida llena el ancho y el dibujo se ve
+  entero;
+- en las intermedias (0,642–0,656: mazos de móvil y el humano en vertical) el
+  dibujo se ve entero y ligeramente más pequeño, porque la copia deja de
+  recortar el 0,1–1,2 % por lado que recortaba el original. Aceptado por el
+  rector.
+
+**La regla de la copia: sólo se ensancha la tela.** El campo vinotinto y su
+raya diplomática llegan hasta el filo; el marco, los broches, el isotipo y las
+estrellas son **los mismos, en las mismas coordenadas, centrados**. No es un
+segundo diseño: es el mismo dibujo en un lienzo más ancho.
+
+**Cómo se regenera si cambia el original** (Fase 1 de REV-1, §2.1):
+
+1. `viewBox="0 0 1005 1420"`, y `width="1005"` en el raíz.
+2. Todo el contenido del original, `<defs>` incluidas, dentro de
+   `<g transform="translate(47.5 0)">`, sin cambiar una coordenada.
+3. Sólo las capas de fondo (las dos `rect` del campo: el color y el `pattern`
+   de la raya) pasan a `x="-47.5" width="1005"`. La raya es un `pattern` en
+   `userSpaceOnUse` que vive dentro del grupo, así que su fase se traslada con
+   él y queda continua en las costuras.
+4. Ningún elemento que no sea fondo se toca, y los `id` se conservan: cada
+   archivo viaja aislado (`<img>` o `url()`).
+5. Si algún elemento del dibujo tocara x = 0 o x = 910, ensancharlo sería
+   rediseñar: se para y se consulta.
+
+Se regenera con `node scripts/gen-reverso-mesa.mjs`; `--comprobar` verifica sin escribir.
+
+El generador que hace exactamente eso, idempotente al byte, es
+`scripts/gen-reverso-mesa.mjs`. La comprobación: la franja central de la copia (x de 47,5 a 957,5)
+rasterizada contra el original da Δ medio 0 y máximo 1 a DPR 1 y 3.
+
+**Dónde entra.** Las cartas boca abajo (IAS por las dos vías y humano) la
+toman por el import de `PlayingCard.jsx:3`, con el mismo `object-fit: cover`
+inline de la línea 9. El mazo, la voladora y el abanico, por
+`src/styles/rev.css` (último import de `GameTable.jsx`, detrás de `luz.css`):
+`background-image` a la copia y `background-color: #41101c` en 0,2,0, que pisa
+sólo la imagen y el color del shorthand 0,1,0 de `gameTable.css` 642, 664 y
+1080. Esas tres son las únicas declaraciones de `background` que alcanzan esas
+clases. El color de fondo corrige la causa (d) de la Fase 0: bajo el dibujo del
+mazo se veía el fieltro. Quien añada otra regla de `background` a `.deck-pile`,
+`.flying-card` o `.shuffle-fan-card` tiene que volver a correr el modo `rev` de
+`diagDSK.mjs`.
+
+**Dos correcciones a la nota 2** (Fase 0 de REV-1, §J-1). La nota 2 no se
+reescribe:
+
+- El reverso tiene un **tercer consumidor `<img>`**:
+  [SalaEspera.jsx:3](../src/screens/SalaEspera.jsx#L3), con `?no-inline`.
+- De las tres líneas de `gameTable.css`, **la 1080 es el abanico**
+  (`.shuffle-fan-card`), no el mazo ni la voladora: 642 es el mazo y 664 la
+  voladora.
+
+Desde REV-1, además, la ruta `<img>` de `PlayingCard.jsx:3` apunta a la copia
+de mesa, no al original.
