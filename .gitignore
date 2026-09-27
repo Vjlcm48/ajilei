@@ -146,3 +146,7 @@ capturas-rev/
 # (capturas-rec/fase1/: burbuja, tarjetas, reloj, datos y la hoja de contacto).
 # REGENERABLES, mismo criterio que capturas-luz y capturas-rev.
 capturas-rec/
+
+# CAP-1 · candidatas, derivados de prueba y hoja de revisión (modo `cap`).
+# REGENERABLES con semilla sellada, mismo criterio que capturas-rec.
+capturas-cap/

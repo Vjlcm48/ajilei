@@ -21,8 +21,18 @@
 //       node scripts/diagPUE.mjs 1.8        (un punto suelto)
 //       node scripts/diagPUE.mjs puerta     (la puerta: el visitante anónimo llega a la portada)
 //       node scripts/diagPUE.mjs mon        (MON-2: el render 3D con alfa de la escena 4 obedece al rotor)
+//       node scripts/diagPUE.mjs cap [--sellar]  (CAP-1: las tres maestras de la mesa; NO entra en `todo`)
+//       node scripts/diagPUE.mjs capvis          (CAP-1: cuánto de cada captura se ve en la escena 5; SÍ entra en `todo`)
 import { chromium } from 'playwright-core'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
+import {
+  VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
+  TOLERANCIA_CAP, pasadaCap, compararPng, equivalentes, derivarComoGenerador,
+} from './cap/capMesa.mjs'
+
+// CAP-1 Addendum 1 §2.3 · lo más que la og-image (caja dorada de mesah
+// CUBIERTA a 1200×630) puede recortar por lado, en px CSS. En 1a se midieron 4,6.
+const OG_RECORTE_MAX_CSS = 6
 import { gzipSync, inflateSync } from 'node:zlib'
 
 const BASE = process.env.PUE_BASE || 'http://localhost:4173'
@@ -129,6 +139,9 @@ async function esperarEscena(page, i, msExtra) {
 // ── Arranque ────────────────────────────────────────────────────────────────
 const modo = process.argv[2] || 'todo'
 const hacer = (id) => modo === 'todo' || modo === id
+// `cap` escribe maestras y tarda seis pasadas de mesa: sólo corre si se pide por
+// su nombre, nunca dentro de `todo`.
+const hacerSolo = (id) => modo === id
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true })
 
@@ -1097,9 +1110,13 @@ if (hacer('1.8')) {
   const suma = (lista, campo) => lista.reduce((acc, b) => acc + (b[campo] > 0 ? b[campo] : 0), 0)
   const criticoCable = suma(criticas, 'cable')
   const criticoCrudo = suma(criticas, 'bytes')
-  anota('1.8b camino crítico hasta el primer pintado', criticoCable <= TECHO_CRITICO_KIB * 1024,
+  // CAP-1 · ROJO CONOCIDO. El techo NO se re-sella (decisión del rector): el
+  // rojo tiene que seguir viéndose hasta que una tanda propia adelgace el bundle.
+  const dentroCritico = criticoCable <= TECHO_CRITICO_KIB * 1024
+  anota('1.8b camino crítico hasta el primer pintado', dentroCritico,
     `FCP=${fcp}ms · ${criticas.length} recursos · ${(criticoCable / 1024).toFixed(1)} KiB en el cable ` +
-    `(${(criticoCrudo / 1024).toFixed(1)} KiB en crudo) · techo ${TECHO_CRITICO_KIB} KiB`)
+    `(${(criticoCrudo / 1024).toFixed(1)} KiB en crudo) · techo ${TECHO_CRITICO_KIB} KiB` +
+    (dentroCritico ? '' : ' · rojo conocido desde CAP-1 (219,0 KiB, anterior a la campaña); pendiente de tanda propia'))
   anota('1.8c lo que llega DESPUÉS de pintar', true,
     `diferido ${(suma(despues, 'cable') / 1024).toFixed(1)} KiB (rasgueo incluido) · ` +
     `perezoso ${(suma(perezosas, 'cable') / 1024).toFixed(1)} KiB`)
@@ -1115,6 +1132,174 @@ if (hacer('1.8')) {
 
   resultados.bloques['1.8'] = { fcp, bitacora, perezosas, criticoCable, criticoCrudo, todasPerezosas }
   await ctx.close()
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// capvis · CAP-1 · cuánto de cada captura se VE en la escena 5
+// ════════════════════════════════════════════════════════════════════════════
+// Rector: AJILEI_CAP-1_Fase1_v1.0.md §1b.5 + Addendum 1 §3. Los dos marcos de la
+// escena 5 pintan `mesav.webp` y `mesapc.webp` con `object-fit: cover`, así que
+// lo que no cabe en el hueco se recorta en silencio: con la captura a mano de
+// antes la laptop enseñaba el 60–64 % del alto (sin cabecera ni botonera). Este
+// modo mide la fracción VISIBLE del alto de cada derivado —caja del <img> frente
+// a su tamaño natural— con los derivados reales de `src/`, en la escena 5 viva.
+// Vara: teléfono ≥ 90 % en los cuatro tamaños. Laptop ≥ 91 % —91: margen frente
+// a la variación de la escena 5; protege que la laptop enseñe cabecera y
+// botonera (ficha de commits de CAP-1, D-1; se midió 92,09 en el S25)—, salvo a
+// 360×640, donde el hueco mide 1,977 y el techo razonable es 89 % (Addendum 1,
+// D-2). Entra en `todo` porque no escribe nada; `cap` no.
+if (hacer('capvis')) {
+  console.log('\n── capvis · la mesa dentro de los marcos de la escena 5 ──')
+  const CAPVIS = [
+    { etiqueta: 'S25 360x780', width: 360, height: 780, movil: true, laptop: 0.91 },
+    { etiqueta: '390x844',     width: 390, height: 844, movil: true, laptop: 0.91 },
+    { etiqueta: '360x640',     width: 360, height: 640, movil: true, laptop: 0.89 },
+    { etiqueta: '1920x1080',   width: 1920, height: 1080, movil: false, laptop: 0.91 },
+  ]
+  const TELEFONO_MIN = 0.90
+  const medidas = await Promise.all(CAPVIS.map(async (vp) => {
+    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.movil ? 3 : 1, ...(vp.movil ? { isMobile: true, hasTouch: true } : {}) })
+    const page = await ctx.newPage()
+    await page.goto(URL_LAMINA, { waitUntil: 'load' })
+    // La escena 5 (índice 4) con sus dos imágenes ya decodificadas.
+    await esperarEscena(page, 4)
+    await page.waitForFunction(() => [...document.querySelectorAll('.pue-duo img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 10000 })
+    const m = await page.evaluate(() => ['.pue-pantalla img', '.pue-laptop-pantalla img'].map((s) => {
+      const i = document.querySelector(s)
+      const r = i.getBoundingClientRect()
+      const esc = Math.max(r.width / i.naturalWidth, r.height / i.naturalHeight)
+      return {
+        marco: s.includes('laptop') ? 'laptop' : 'teléfono', src: i.currentSrc.split('/').pop(),
+        caja: [+r.width.toFixed(2), +r.height.toFixed(2)], natural: [i.naturalWidth, i.naturalHeight],
+        alto: r.height / esc / i.naturalHeight, ancho: r.width / esc / i.naturalWidth,
+      }
+    }))
+    await ctx.close()
+    return { vp, m }
+  }))
+  for (const { vp, m } of medidas) {
+    for (const x of m) {
+      const min = x.marco === 'laptop' ? vp.laptop : TELEFONO_MIN
+      anota(`capvis ${x.marco} ${vp.etiqueta}`, x.alto >= min && x.ancho >= 0.999,
+        `${x.src} ${x.natural.join('×')} en caja ${x.caja.join('×')} (${(x.caja[0] / x.caja[1]).toFixed(3)}) · visible ${(x.alto * 100).toFixed(2)} % del alto (≥ ${min * 100} %) y ${(x.ancho * 100).toFixed(1)} % del ancho`)
+    }
+  }
+  resultados.bloques.capvis = medidas
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// cap · CAP-1 · las tres maestras de la mesa (Portada y og-image)
+// ════════════════════════════════════════════════════════════════════════════
+// Rector: AJILEI_CAP-1_Fase1_v1.0.md §1a.1 + Addendum 1. El único modo de este
+// arnés que NO mira la Portada: entra a la MESA con una sesión simulada (ver la
+// cabecera de `scripts/cap/capMesa.mjs`) y la fotografía en el momento de las
+// capturas viejas —mesa 5, «A las 3 — Tú abre.», las cuatro IAS «Igualó», pozo
+// 2000— con la semilla sellada. Por cada vista hace DOS pasadas en contextos
+// nuevos; las puertas de contenido tienen que salir verdes en las dos, y las
+// dos fotos tienen que ser EQUIVALENTES por tolerancia (Addendum 1, D-1: el
+// raster de los degradados tiene más de un estado y la huella no sirve).
+//
+// Salida: `capturas-cap/maestras/{mesav,mesah,mesapc}.png` siempre. Con
+// `--sellar`, y SÓLO con todas las puertas en verde, se copia la PRIMERA pasada
+// a `maestras/portada/` (versionada: DIS-1 las reutiliza a resolución nativa)
+// junto a `cap.json`, que es TRAZABILIDAD y no puerta. Sin `--sellar`, si ya
+// hay maestras selladas, cada pasada se compara con la suya por la misma vara
+// (`cap.regresion`): la mesa de hoy tiene que seguir siendo la sellada.
+if (hacerSolo('cap')) {
+  const sellar = process.argv.includes('--sellar')
+  const DIR_CAP = 'capturas-cap/maestras'
+  const DIR_SELLO = 'maestras/portada'
+  mkdirSync(DIR_CAP, { recursive: true })
+  console.log(`\n── cap · semilla ${SEMILLA_CAP} · ${Object.entries(VISTAS_CAP).map(([k, v]) => `${k} ${v.w}×${v.h}@${v.dpr}`).join(' / ')}${sellar ? ' · --sellar' : ''} ──`)
+  const fallosAntes = fallos.length
+  const lienzo = await browser.newPage()     // para comparar y derivar, sin red
+  const cap = {}
+  const pct = (x) => `${(x * 100).toFixed(3)} %`
+  for (const [vista, v] of Object.entries(VISTAS_CAP)) {
+    const ps = [await pasadaCap(browser, vista, URL_LAMINA), await pasadaCap(browser, vista, URL_LAMINA)]
+    const et = `${vista} ${v.w}×${v.h}@${v.dpr}`
+    const ambas = (f) => ps.every(f)
+    const igualo = (p) => p.lectura.rivales.filter((r) => /Igualó/.test(r)).length
+    anota(`cap.escena ${et}`, ambas((p) => p.etapa === 2 && /A las 3 — Tú abre\./.test(p.lectura.mensaje)),
+      ps.map((p) => `«${p.lectura.mensaje}» quieta ${p.quieta} ms`).join(' · '))
+    anota(`cap.mano ${et}`, ambas((p) => JSON.stringify(p.lectura.mano) === JSON.stringify(MANO_CAP)),
+      ps[0].lectura.mano.join(' · ') || '(sin cartas)')
+    anota(`cap.pozo ${et}`, ambas((p) => p.lectura.pozo === POZO_CAP), `pozo ${ps.map((p) => p.lectura.pozo).join(' / ')}`)
+    anota(`cap.ias ${et}`, ambas((p) => p.lectura.rivales.length === 4 && igualo(p) === 4),
+      ps.map((p) => `${igualo(p)} de ${p.lectura.rivales.length}`).join(' / ') + ' con «Igualó»')
+    anota(`cap.saldo ${et}`, ambas((p) => p.lectura.texto.includes(SALDO_CAP) && p.lectura.texto.includes(MESA_CAP)),
+      ps.map((p) => `«${SALDO_CAP}» ${p.lectura.texto.includes(SALDO_CAP) ? 'sí' : 'NO'} · «${MESA_CAP}» ${p.lectura.texto.includes(MESA_CAP) ? 'sí' : 'NO'}`).join(' / '))
+    const notas = ps.flatMap((p) => p.notas)
+    anota(`cap.crono ${et}`, ambas((p) => p.lectura.cronos.length > 0 && p.lectura.cronos.every((c) => c === CRONO_CAP)),
+      `${ps.map((p) => p.lectura.cronos.join('/')).join(' · ')} · intentos ${ps.map((p) => p.intento).join('/')}${notas.length ? ' · ' + notas.join(' | ') : ''}`)
+    const fuera = ps.flatMap((p) => [...p.red.fuera, ...p.red.sockets])
+    anota(`cap.red ${et}`, fuera.length === 0,
+      fuera.length ? `FUERA: ${fuera.slice(0, 3).join(' · ')}`
+        : `0 fuera · ${ps.reduce((a, p) => a + p.red.supabase.length, 0)} a Supabase, todas contestadas por la ruta (${[...new Set(ps[0].red.supabase)].join(', ')})`)
+    const errores = ps.flatMap((p) => p.errores)
+    anota(`cap.errores ${et}`, errores.length === 0, errores.length ? errores.slice(0, 3).join(' · ') : '0 errores de página y de consola')
+    const cmp = await compararPng(lienzo, ps[0].png, ps[1].png)
+    const estable = equivalentes(cmp)
+    anota(`cap.estable ${et}`, estable,
+      cmp.mismasDim
+        ? `Δ≤${TOLERANCIA_CAP.deltaFino}: ${pct(cmp.fraccionFina)} (≥ ${pct(TOLERANCIA_CAP.fraccionFina)}) · Δmáx ${cmp.deltaMax} (≤ ${TOLERANCIA_CAP.deltaMax}) · ${cmp.distintos} px distintos de ${cmp.pixeles} · ${ps[0].sha.slice(0, 16)} / ${ps[1].sha.slice(0, 16)}`
+        : `dimensiones distintas ${cmp.dimA} / ${cmp.dimB}`)
+    writeFileSync(`${DIR_CAP}/${v.maestra}`, ps[0].png)
+    // La segunda pasada sólo se guarda si la vara sale ROJA: es para diagnóstico.
+    if (!estable) writeFileSync(`${DIR_CAP}/${v.maestra.replace('.png', '')}_pasada2.png`, ps[1].png)
+    cap[vista] = {
+      maestra: v.maestra, viewport: { w: v.w, h: v.h, dpr: v.dpr }, dim: cmp.dim, bytes: ps[0].png.length,
+      sha256: ps[0].sha, sha256Pasada2: ps[1].sha, tiradas: ps[0].lectura.tiradas, fijadas: ps[0].fijadas,
+      estable: { fraccionDeltaFino: cmp.fraccionFina, deltaMax: cmp.deltaMax, distintos: cmp.distintos, verde: estable },
+    }
+    // og-image (Addendum 1 §2.3): la caja dorada de mesah, CUBIERTA a 1200×630
+    // con el cuerpo literal del generador, no puede perder más de 6 px CSS por
+    // lado. Se mide en los dos ejes: el corte cae donde la caja sobra.
+    if (vista === 'h') {
+      const d = await derivarComoGenerador(lienzo, ps[0].png, { id: 'og-image', ancho: 1200, alto: 630, techo: 200 * 1024, tipo: 'image/jpeg', calidadTope: 0.85, recorte: 'juego', encaje: 'cubrir' })
+      const usaW = Math.min(d.recorteW, d.recorteH * 1200 / 630), usaH = Math.min(d.recorteH, d.recorteW * 630 / 1200)
+      const porLado = { x: (d.recorteW - usaW) / 2 / v.dpr, y: (d.recorteH - usaH) / 2 / v.dpr }
+      const peor = Math.max(porLado.x, porLado.y)
+      anota(`cap.ogRecorte ${et}`, peor <= OG_RECORTE_MAX_CSS,
+        `caja dorada ${d.recorteW}×${d.recorteH} (${(d.recorteW / d.recorteH).toFixed(3)} frente a 1,905) · cubrir corta ${porLado.x.toFixed(1)} px CSS por lado en x y ${porLado.y.toFixed(1)} en y (≤ ${OG_RECORTE_MAX_CSS})`)
+      cap[vista].ogRecorte = { caja: [d.cajaX, d.cajaY, d.recorteW, d.recorteH], cssPorLado: { x: +porLado.x.toFixed(2), y: +porLado.y.toFixed(2) } }
+    }
+    // Regresión (1b.5): sin --sellar, contra la maestra sellada, misma vara.
+    if (!sellar && existsSync(`${DIR_SELLO}/${v.maestra}`)) {
+      const r = await compararPng(lienzo, readFileSync(`${DIR_SELLO}/${v.maestra}`), ps[0].png)
+      anota(`cap.regresion ${et}`, equivalentes(r),
+        r.mismasDim ? `contra ${DIR_SELLO}/${v.maestra}: Δ≤${TOLERANCIA_CAP.deltaFino} ${pct(r.fraccionFina)} · Δmáx ${r.deltaMax} · ${r.distintos} px distintos`
+          : `dimensiones distintas ${r.dimA} / ${r.dimB}`)
+      cap[vista].regresion = r
+    }
+  }
+  await lienzo.close()
+  const verde = fallos.length === fallosAntes
+  if (sellar) {
+    if (verde) {
+      mkdirSync(DIR_SELLO, { recursive: true })
+      for (const v of Object.values(VISTAS_CAP)) copyFileSync(`${DIR_CAP}/${v.maestra}`, `${DIR_SELLO}/${v.maestra}`)
+      // cap.json · trazabilidad del sello (Addendum 1 §2.2). NINGÚN modo compara
+      // huellas contra este archivo: el sha256 dice QUÉ se selló, no qué debe salir.
+      const traza = {
+        campana: 'CAP-1', generado: new Date().toISOString(), edge: browser.version(),
+        semilla: SEMILLA_CAP, prng: 'mulberry32 sobre Math.random (addInitScript); crypto sin tocar',
+        receta: `mesa ${RECETA_CAP.jugadores} · reto ${RECETA_CAP.nivel} · apuesta índice ${RECETA_CAP.stakeIdx} (200) · entrada ${RECETA_CAP.entrada}; «A las 2» Apostar ×1; las cuatro IAS igualan; foto en «A las 3 — Tú abre.» con la mesa quieta (getAnimations y vuelos a cero), «20s» comprobado y turnBreath fijada a ${FASE_RESPIRACION_MS} ms. Sesión simulada: red a Supabase interceptada entera.`,
+        vara: { ...TOLERANCIA_CAP, nota: 'cap.estable por tolerancia (Addendum 1, D-1); se sella la primera pasada' },
+        maestras: Object.fromEntries(Object.entries(cap).map(([k, c]) => [c.maestra, {
+          vista: k, viewport: c.viewport, dimensiones: c.dim, bytes: c.bytes, sha256: c.sha256,
+          estable: { fraccionDeltaFino: c.estable.fraccionDeltaFino, deltaMax: c.estable.deltaMax, distintos: c.estable.distintos },
+          ...(c.ogRecorte ? { ogRecorte: c.ogRecorte } : {}),
+        }])),
+      }
+      writeFileSync(`${DIR_SELLO}/cap.json`, JSON.stringify(traza, null, 2) + '\n')
+      console.log(`  SELLADO · ${Object.values(VISTAS_CAP).map((v) => v.maestra).join(', ')} + cap.json → ${DIR_SELLO}/`)
+    } else {
+      console.log(`  --sellar SIN EFECTO · ${fallos.length - fallosAntes} puerta(s) en rojo: no se escribe nada en ${DIR_SELLO}/`)
+    }
+  }
+  resultados.bloques.cap = { semilla: SEMILLA_CAP, sellado: sellar && verde, vistas: cap }
+  writeFileSync(`${DIR_CAP}/cap.json`, JSON.stringify(resultados.bloques.cap, null, 2))
 }
 
 // ── Cierre ──────────────────────────────────────────────────────────────────
