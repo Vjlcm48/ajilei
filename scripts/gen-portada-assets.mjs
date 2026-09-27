@@ -1,12 +1,19 @@
 // ── gen-portada-assets.mjs · Derivados de la Portada-Entrada (campaña PUE) ───
 // Documento rector: AJILEI_PUE_Fase1_v1.0 §1.3.
 //
-// Los MAESTROS son de Victor y viven en la RAÍZ sin rastrearse:
-//   PUE_mesav_demo.jpg   captura del S25 vertical
-//   PUE_mesah_demo.jpg   captura del S25 horizontal
-//   PUE_mesapc_demo.png  captura de escritorio
-// De ellos salen los derivados que la portada sí publica. El día que Victor
-// cambie una captura, `node scripts/gen-portada-assets.mjs` reescribe los ocho
+// ── CAP-1 · las capturas las toma el ARNÉS, y están versionadas ─────────────
+// Las tres maestras de la mesa viven en `maestras/portada/` (MAESTRAS, abajo) y
+// las fabrica `node scripts/diagPUE.mjs cap --sellar` contra `vite preview`:
+// semilla sellada, tamaño exacto, sin barras del sistema y reproducibles. Su
+// trazabilidad (semilla, receta, Edge, sha256) está en `maestras/portada/cap.json`.
+//   mesav.png   360×704 @3  (1080×2112) · teléfono de la escena 5
+//   mesapc.png  1366×768 @2 (2732×1536) · laptop de la escena 5 · DIS-1
+//   mesah.png   686×360 @3  (2058×1080) · sólo la og-image
+// Las capturas a mano de antes (`PUE_*_demo.*`, raíz) SÍ están versionadas
+// desde DOC-1b —este comentario decía lo contrario— y se quedan donde están:
+// alimentan la lámina histórica `PUE_lamina_v1.7.html`. Este script ya no las lee.
+// De las maestras salen los derivados que la portada sí publica. El día que
+// cambie una maestra, `node scripts/gen-portada-assets.mjs` reescribe los ocho
 // y nadie tiene que acordarse de cuál faltaba. Fórmula sobre constante.
 //
 // ── SIN SHARP, Y NO POR GUSTO ───────────────────────────────────────────────
@@ -65,6 +72,18 @@ const BANDA_OG = '#09170e'     // --green-abyss · el marco de la tarjeta social
 
 const CARTAS = ['uno_copa', 'tres_copa', 'cinco_copa', 'diez_copa', 'doce_copa']
 
+// CAP-1 · el origen de las tres capturas: las maestras que sella el modo `cap`.
+const MAESTRAS = 'maestras/portada'
+
+// CAP-1 · el nombre de la tarjeta social, VERSIONADO A MANO. Tiene que coincidir
+// con `og:image` y `twitter:image` de `index.html` (líneas 51 y 61): WhatsApp,
+// Facebook y compañía cachean la tarjeta por URL, así que una imagen nueva con
+// el nombre viejo seguiría mostrando la vieja durante días. Al cambiar la
+// imagen se sube el número aquí y en `index.html`, y la versión anterior
+// (`og-image.jpg`) se conserva en `public/` una campaña para las tarjetas que ya
+// la tienen en caché.
+const OG_DESTINO = 'og-image-v2.jpg'
+
 // nombre · origen · ancho de salida · techo en bytes · formato · recorte
 const TRABAJOS = [
   ...CARTAS.map((c) => ({
@@ -79,7 +98,7 @@ const TRABAJOS = [
   })),
   {
     id: 'mesav',
-    origen: 'PUE_mesav_demo.jpg',
+    origen: `${MAESTRAS}/mesav.png`,
     destino: `${SALIDA_SRC}/mesav.webp`,
     ancho: 340,
     techo: 80 * 1024,
@@ -88,7 +107,7 @@ const TRABAJOS = [
   },
   {
     id: 'mesapc',
-    origen: 'PUE_mesapc_demo.png',
+    origen: `${MAESTRAS}/mesapc.png`,
     destino: `${SALIDA_SRC}/mesapc.webp`,
     ancho: 820,
     techo: 120 * 1024,
@@ -100,15 +119,19 @@ const TRABAJOS = [
     // cachea la tarjeta por URL, y la URL con hash de Vite cambia en cada build
     // — sería una tarjeta que se rompe sola. Nombre estable, ruta estable.
     id: 'og-image',
-    origen: 'PUE_mesah_demo.jpg',
-    destino: `${SALIDA_PUB}/og-image.jpg`,
+    origen: `${MAESTRAS}/mesah.png`,
+    destino: `${SALIDA_PUB}/${OG_DESTINO}`,
     ancho: 1200,
     alto: 630,                // encuadre fijo de la tarjeta social
     techo: 200 * 1024,
     tipo: 'image/jpeg',
     calidadTope: 0.85,
     recorte: 'juego',
-    encaje: 'contener',
+    // CAP-1 · CUBRIR (variante C, elegida por Victor): la maestra horizontal se
+    // toma a 686×360 para que su caja dorada mida ~1,93, casi el 1,905 de la
+    // tarjeta, y cubrirla sólo corta ~4,6 px CSS por lado (lo vigila la puerta
+    // `cap.ogRecorte`). «contener» sigue disponible abajo, sin trabajo que lo use.
+    encaje: 'cubrir',
   },
 ]
 
@@ -253,7 +276,13 @@ for (const t of trabajos.filter((x) => !x.idx)) {
       const escala = Math.min(dw / sw, dh / sh)
       const iw = Math.round(sw * escala), ih = Math.round(sh * escala)
       ctx.drawImage(img, sx, sy, sw, sh, Math.round((dw - iw) / 2), Math.round((dh - ih) / 2), iw, ih)
-    } else if (trabajo.alto) {
+    } else if (trabajo.encaje === 'cubrir' || trabajo.alto) {
+      // CUBRIR, centrado (CAP-1). Lo que el 2,23 de la captura a mano hacía
+      // inaceptable dejó de ocurrir cuando la maestra horizontal se tomó a
+      // 686×360: su caja mide ~1,93 y cubrir corta unos pocos px por lado
+      // (puerta `cap.ogRecorte` de diagPUE). Es también lo que ya hacía
+      // cualquier trabajo con `alto` y sin encaje, así que se nombra sin
+      // cambiar de comportamiento.
       const escala = Math.max(dw / sw, dh / sh)
       const cw = dw / escala, ch = dh / escala
       ctx.drawImage(img, sx + (sw - cw) / 2, sy + (sh - ch) / 2, cw, ch, 0, 0, dw, dh)

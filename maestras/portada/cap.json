@@ -1,0 +1,85 @@
+{
+  "campana": "CAP-1",
+  "generado": "2026-09-26T20:51:53.129Z",
+  "edge": "154.0.4258.37",
+  "semilla": 5,
+  "prng": "mulberry32 sobre Math.random (addInitScript); crypto sin tocar",
+  "receta": "mesa 5 · reto pro · apuesta índice 0 (200) · entrada medio; «A las 2» Apostar ×1; las cuatro IAS igualan; foto en «A las 3 — Tú abre.» con la mesa quieta (getAnimations y vuelos a cero), «20s» comprobado y turnBreath fijada a 1200 ms. Sesión simulada: red a Supabase interceptada entera.",
+  "vara": {
+    "deltaFino": 2,
+    "fraccionFina": 0.999,
+    "deltaMax": 40,
+    "nota": "cap.estable por tolerancia (Addendum 1, D-1); se sella la primera pasada"
+  },
+  "maestras": {
+    "mesav.png": {
+      "vista": "v",
+      "viewport": {
+        "w": 360,
+        "h": 704,
+        "dpr": 3
+      },
+      "dimensiones": [
+        1080,
+        2112
+      ],
+      "bytes": 1169975,
+      "sha256": "198289a8f290fca3bc603e5e2b4b941fd3b34bc21c3323101a0573e431ad43bc",
+      "estable": {
+        "fraccionDeltaFino": 1,
+        "deltaMax": 0,
+        "distintos": 0
+      }
+    },
+    "mesah.png": {
+      "vista": "h",
+      "viewport": {
+        "w": 686,
+        "h": 360,
+        "dpr": 3
+      },
+      "dimensiones": [
+        2058,
+        1080
+      ],
+      "bytes": 1097468,
+      "sha256": "1e13575a3f10a1f1b3afb37db63d10584250f99762bf8b3ed489d49aaaae2710",
+      "estable": {
+        "fraccionDeltaFino": 0.9998285822265414,
+        "deltaMax": 22,
+        "distintos": 502639
+      },
+      "ogRecorte": {
+        "caja": [
+          21,
+          18,
+          2016,
+          1044
+        ],
+        "cssPorLado": {
+          "x": 4.57,
+          "y": 0
+        }
+      }
+    },
+    "mesapc.png": {
+      "vista": "pc",
+      "viewport": {
+        "w": 1366,
+        "h": 768,
+        "dpr": 2
+      },
+      "dimensiones": [
+        2732,
+        1536
+      ],
+      "bytes": 1757307,
+      "sha256": "6bca77f6bb092d3c3a0e36f9cc0cc47d6a495e96a0d441ace14f991a9d6761a6",
+      "estable": {
+        "fraccionDeltaFino": 1,
+        "deltaMax": 0,
+        "distintos": 0
+      }
+    }
+  }
+}
