@@ -37,8 +37,18 @@
 
          La imagen NO es un derivado con hash de Vite: vive en `public/` con
          nombre estable porque un rastreador la cachea por URL, y una URL que
-         cambia en cada build es una tarjeta que se rompe sola. La escribe
-         `node scripts/gen-portada-assets.mjs` desde `PUE_mesah_demo.jpg`. -->
+         cambia en cada build es una tarjeta que se rompe sola.
+
+         CAP-1 · pero estable no es eterno: el nombre se VERSIONA A MANO
+         (`og-image-v2.jpg`) cada vez que cambia la imagen. WhatsApp, Facebook y
+         compañía guardan la tarjeta por URL durante días o semanas, así que una
+         imagen nueva con el nombre viejo seguiría enseñando la vieja. El nombre
+         sale de `OG_DESTINO` en `scripts/gen-portada-assets.mjs`, que la escribe
+         desde la maestra sellada `maestras/portada/mesah.png`; al subir el
+         número allí, se sube en las DOS líneas de abajo. La versión anterior
+         (`og-image.jpg`) se conserva en `public/` una campaña para las tarjetas
+         que ya la tienen en caché. `_headers` limita a un día la caché de
+         `/og-image*` en los intermediarios. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="AJILEI" />
     <meta property="og:locale" content="es_VE" />
@@ -48,7 +58,7 @@
       content="AJILEI, el juego de cartas venezolano. Gratis y sin descargas: entra con tu correo y juega."
     />
     <meta property="og:url" content="https://ajilei.io/" />
-    <meta property="og:image" content="https://ajilei.io/og-image.jpg" />
+    <meta property="og:image" content="https://ajilei.io/og-image-v2.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="La mesa de AJILEI con las cartas repartidas." />
@@ -58,7 +68,7 @@
       name="twitter:description"
       content="AJILEI, el juego de cartas venezolano. Gratis y sin descargas: entra con tu correo y juega."
     />
-    <meta name="twitter:image" content="https://ajilei.io/og-image.jpg" />
+    <meta name="twitter:image" content="https://ajilei.io/og-image-v2.jpg" />
 
     <!-- ══ El seguro de una línea del standalone en iOS (Fase 0 §3.4) ════════
          Safari NO lee `display: standalone` del manifest: para iOS la señal

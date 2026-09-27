@@ -9,7 +9,16 @@
   Cache-Control: public, max-age=31536000, immutable
 
 # Y sólo aquí. Lo que NO lleva regla es deliberado: `index.html`,
-# `manifest.webmanifest`, `icons.svg`, los iconos de `icons/`,
-# `og-image.jpg`, los sonidos — todo lo de `public/` viaja SIN hash, con nombre
-# estable, y tiene que seguir revalidando. Darles `immutable` sería dejar una
-# versión vieja cacheada un año tras cada despliegue, sin forma de desalojarla.
+# `manifest.webmanifest`, `icons.svg`, los iconos de `icons/`, los sonidos —
+# todo lo de `public/` viaja SIN hash, con nombre estable, y tiene que seguir
+# revalidando. Darles `immutable` sería dejar una versión vieja cacheada un año
+# tras cada despliegue, sin forma de desalojarla. (La tarjeta social tiene su
+# propia regla corta desde CAP-1, abajo.)
+
+# ── CAP-1 · la tarjeta social ────────────────────────────────────────────────
+# `og-image*` tampoco lleva hash, pero su nombre se versiona A MANO al cambiar
+# la imagen (`og-image-v2.jpg`, ver index.html). Un día de caché basta para no
+# revalidar en cada rastreo y deja que una corrección del MISMO archivo llegue
+# a los intermediarios en 24 h. Nunca `immutable`: el nombre no cambia solo.
+/og-image*
+  Cache-Control: public, max-age=86400
