@@ -379,6 +379,8 @@ Detalle en `docs/reportes/AJILEI_IDX-1_Fase1b_Informe_v1.0.md` §4.
 
 *Pendiente (IDX-1 Fase 1c, D-14):* las capturas `mesav`, `mesapc` y
 `public/og-image.jpg` siguen enseñando la baraja clásica hasta que se rehagan.
+**Cerrado por CAP-1** (capturas por arnés, semilla 5; ver
+`docs/reportes/AJILEI_CAP-1_Cierre_v1.0.md`).
 
 **7 · Luz y cuerpo de la mesa (LUZ-1) — adenda del 2026-09-25, sin cambio de
 versión.** La mesa recibe luz cenital (viñeta, luz central cálida y cuatro
