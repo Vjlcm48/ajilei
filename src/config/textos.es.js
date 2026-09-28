@@ -339,10 +339,20 @@ export const TEXTOS_ES = {
   'ia.recarga.sub.voluntaria': 'Hasta {hc} HC más. Las IAS se nivelan contigo.',
   'ia.recarga.sub.automatica': 'Quedan {hc} HC. Las IAS se nivelan contigo.',
   'ia.recarga.sub.forzosa':    'Con estas fichas la mesa no puede continuar.',
+  // REC-2 · caso 3: la forzosa SIN saldo usable. La tarjeta es de sólo salida
+  // (no hay primario), y el subtítulo dice las dos razones a la vez para que
+  // «Salir con mis fichas» no parezca una elección que se podía evitar.
+  'ia.recarga.sub.sinsaldo':   'Con estas fichas la mesa no puede continuar y no te queda saldo para recargar.',
   'ia.recarga.opcion.piso':    'Mínimo {hc}',
   'ia.recarga.opcion.medio':   'Medio {hc}',
   'ia.recarga.opcion.techo':   'Al techo {hc}',
   'ia.recarga.si':             'Recargar {hc}',
+  // REC-2 · caso 2: ninguno de los tres montos cabe en el saldo, y la fila se
+  // sustituye por uno solo, todo el saldo usable (v1.3 §5.2). La nota va bajo
+  // el primario y sólo cuando el monto ES todo el saldo usable; si lo cortara
+  // el techo, el primario vuelve a `ia.recarga.si` y no hay nota.
+  'ia.recarga.si.todo':        'Recargar todo ({hc})',
+  'ia.recarga.todo.nota':      'Es todo tu saldo disponible.',
   'ia.recarga.no':             'No recargar',
   // En la forzosa, decir que no NO es «seguir sin recargar»: es levantarse. Se
   // nombra por lo que hace, y se nombra con lo que el jugador se lleva —que por

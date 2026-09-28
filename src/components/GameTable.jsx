@@ -24,7 +24,7 @@ import { siembraMesaAPU } from '../dev/siembraAPU'
 import {
   ASIENTO_HUMANO, filaAcciones, multiplicadoresDe, marcadoAllIn, ritmoDe,
   mesaClavada, pideRecarga, RECARGA,
-  opcionesRecarga, topeRecarga, recargaValida, plazoRecarga, nivelarLasIAS,
+  tarjetaRecarga, CASOS_RECARGA, topeRecarga, recargaValida, plazoRecarga, nivelarLasIAS,
   repartoPorCapas,
   recargaLista, formaRecarga, abrirRecarga, plegarRecarga, RED_REVELACION_MS,
 } from '../hooks/mesaCore'
@@ -1103,7 +1103,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // la pila, el techo de la mesa y el bolsillo. La pantalla no vuelve a decidir
   // nada: pinta lo que esa función dice y cobra por `aplicarRecarga`.
   const motivoRec  = pideRecarga(game, saldo)
-  const opcRecarga = opcionesRecarga(human.chips, unit, saldo)
+  // REC-2 · la tarjeta ENTERA sale del núcleo: qué caso es (fila, «todo» o sin
+  // saldo), qué montos se pintan y cuál nace elegido. El monto elegido es
+  // `null` en el caso 3 y nunca 0: aquí no se rellena ningún hueco.
+  const tarjRec    = tarjetaRecarga(human.chips, unit, saldo)
   const topeRec    = topeRecarga(human.chips, unit, saldo)
 
   function confirmarRecarga(monto) {
@@ -1162,12 +1165,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     if (phase === PHASES.WAITING && motivoRec !== RECARGA.FORZOSA) return
     if (recargaPedidaRef.current === game.handCount) return
     recargaPedidaRef.current = game.handCount
-    const primera = opcRecarga.find(o => !o.disabled)
     // REC-1 · nace PLEGADA: sin `abierta` y antes de que acabe la revelación
     // no se pinta nada (§5.5.1), y después, burbuja. El reloj se carga aquí a
     // 15 pero NO corre hasta `recargaLista` (el tic de abajo), así que el
     // primer segundo que se ve es el 15 y cae al terminar la revelación.
-    setRecarga({ motivo: motivoRec, monto: primera?.monto ?? 0, abierta: false })
+    setRecarga({ motivo: motivoRec, monto: tarjRec.monto, abierta: false })
     setRecargaSeg(Math.round(plazoRecarga() / 1000))
   }, [motivoRec, phase, game.handCount, recarga]) // eslint-disable-line
 
@@ -2376,8 +2378,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                       hacer nada es peor que ninguno. */}
                   {motivoRec === RECARGA.VOLUNTARIA && (
                     <SoundButton className="btn btn-recarga" data-accion="recargar" onClick={() => {
-                      const primera = opcRecarga.find(o => !o.disabled)
-                      setRecarga({ motivo: RECARGA.VOLUNTARIA, monto: primera?.monto ?? 0, abierta: true })
+                      setRecarga({ motivo: RECARGA.VOLUNTARIA, monto: tarjRec.monto, abierta: true })
                       setRecargaSeg(0)
                     }}>
                       {t('ia.recarga.pedir')}
@@ -2634,19 +2635,25 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           data-accion="recarga"
           data-motivo={recarga.motivo}
           data-plegable={recForma.plegable ? '1' : '0'}
+          data-rec-caso={tarjRec.caso}
         >
           <div className="bankrupt-modal apu-recarga">
             <p className="bankrupt-title">{t('ia.recarga.titulo')}</p>
             <p className="bankrupt-sub" data-accion="recarga-sub">
               {recarga.motivo === RECARGA.FORZOSA
-                ? t('ia.recarga.sub.forzosa')
+                ? t(tarjRec.caso === CASOS_RECARGA.SIN_SALDO ? 'ia.recarga.sub.sinsaldo' : 'ia.recarga.sub.forzosa')
                 : recarga.motivo === RECARGA.AUTOMATICA
                   ? t('ia.recarga.sub.automatica', { hc: human.chips })
                   : t('ia.recarga.sub.voluntaria', { hc: topeRec })}
             </p>
 
+            {/* REC-2 · la fila sólo existe en el caso 1. En el 2 la sustituye el
+                primario —un único monto, todo el saldo usable—, y en el 3 no hay
+                nada que ofrecer. Dentro del caso 1 sigue valiendo E-2: los tres
+                están siempre y los inalcanzables se apagan (v1.3 §5.2). */}
+            {tarjRec.caso === CASOS_RECARGA.FILA && (
             <div className="apu-montos">
-              {opcRecarga.map((o) => (
+              {tarjRec.opciones.map((o) => (
                 <SoundButton
                   key={o.id}
                   className={`btn btn-mult apu-monto${recarga.monto === o.monto ? ' btn-mult-active' : ''}`}
@@ -2658,6 +2665,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 </SoundButton>
               ))}
             </div>
+            )}
 
             {/* 1f-A4 · Aquí vivía la nota de §5.3, en su propio renglón. La
                 promesa se dice ahora en el SUBTÍTULO de las dos recargas
@@ -2666,14 +2674,33 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 (E-31). Se retira con su clave y con sus reglas de `apu.css`. */}
 
             <div className="bankrupt-actions">
-              <SoundButton
-                className="btn btn-primary"
-                data-accion="recarga-si"
-                disabled={!recargaValida(recarga.monto, human.chips, unit, saldo).ok}
-                onClick={() => confirmarRecarga(recarga.monto)}
-              >
-                {t('ia.recarga.si', { hc: recarga.monto })}
-              </SoundButton>
+              {/* REC-2 · sin monto no hay primario (caso 3): la tarjeta es de
+                  sólo salida. En el caso 2 el primario dice «todo» cuando es
+                  todo el saldo usable, y lleva la nota debajo; si lo cortara el
+                  techo —rama defensiva, ver `tarjetaRecarga`— dice la cifra. */}
+              {tarjRec.caso === CASOS_RECARGA.FILA && (
+                <SoundButton
+                  className="btn btn-primary"
+                  data-accion="recarga-si"
+                  disabled={!recargaValida(recarga.monto, human.chips, unit, saldo).ok}
+                  onClick={() => confirmarRecarga(recarga.monto)}
+                >
+                  {t('ia.recarga.si', { hc: recarga.monto })}
+                </SoundButton>
+              )}
+              {tarjRec.caso === CASOS_RECARGA.TODO && (
+                <div className="rec-todo">
+                  <SoundButton
+                    className="btn btn-primary"
+                    data-accion="recarga-si"
+                    disabled={!recargaValida(recarga.monto, human.chips, unit, saldo).ok}
+                    onClick={() => confirmarRecarga(recarga.monto)}
+                  >
+                    {t(tarjRec.todo ? 'ia.recarga.si.todo' : 'ia.recarga.si', { hc: recarga.monto })}
+                  </SoundButton>
+                  {tarjRec.todo && <p className="rec-todo-nota" data-accion="recarga-nota">{t('ia.recarga.todo.nota')}</p>}
+                </div>
+              )}
               <SoundButton className="btn btn-pass" data-accion="recarga-no" onClick={rechazarRecarga}>
                 {recarga.motivo === RECARGA.FORZOSA ? t('ia.recarga.no.forzosa') : t('ia.recarga.no')}
               </SoundButton>
