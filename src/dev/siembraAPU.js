@@ -9,6 +9,7 @@
 //   ?apu=allinIA       Una IA se sienta con la apuesta de mesa justa.
 //   ?apu=allinHumano   El humano se sienta con 1,5 apuestas.
 //   ?apu=recarga       El humano se sienta con 3 apuestas.
+//   ?apu=quiebra       El humano se sienta con media apuesta (REC-2).
 //   ?apu=capas         Dos IAS a distinta profundidad corta, el resto hondas.
 //   ?apu=sinRival      Todas las IAS con la apuesta justa.
 //   ?apu=sinRival:d12  Todas, el humano incluido.
@@ -98,6 +99,12 @@ export function siembraMesaAPU(estado) {
     // Bajo el listón de §5.1 (`pila < 5 × unit`) desde antes de la primera mano,
     // así que la pregunta automática sale al cerrarla, gane o pierda.
     recarga:      { humano: 3 },
+    // REC-2 · Media apuesta: no cubre el ante, así que la FORZOSA sale ya en
+    // `WAITING`, antes de la primera mano, sin jugar diez manos para perderlo
+    // todo. Con `saldo:` se elige el caso: `saldo:1600,quiebra` en la mesa de
+    // 100 con entrada al piso deja 600 en el bolsillo (caso 2) y
+    // `saldo:1000,quiebra` lo deja en 0 (caso 3).
+    quiebra:      { humano: 0.5 },
     // Dos niveles de all-in por debajo del resto: el ante hace la primera capa y
     // la IA de tres apuestas hace la segunda en cuanto la ronda pase de ahí.
     capas:        { ias: [1], factor: 1, iasMedias: [2], factorMedio: 3 },

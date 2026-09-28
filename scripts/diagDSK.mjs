@@ -2261,6 +2261,201 @@ async function lineaAllinEnMesa4(page, dir, tag) {
   return { hay: false, intentos: 3 }
 }
 
+// ══ REC-2 · RECARGA CON SALDO INSUFICIENTE: LOS ESTADOS PERMANENTES ════════
+//
+// Ficha AJILEI_REC-2_v1.0 §4.4 y Addendum 1. Normativo v1.3 §5.1 y §5.2.
+// Fase 0: con el saldo entre UNA apuesta y el piso de DIEZ, la tarjeta salía
+// con los tres montos apagados y un primario «Recargar 0». Estos estados
+// miran que ya no pueda pasar, en las dos vías de render del rival (mesa 2 y
+// mesa 5) y en las tres pantallas de la ficha (360×640, S25 vertical y
+// 1920×1080):
+//
+//   caso2      — forzosa con 600 en el bolsillo (`saldo:1600,quiebra`, mesa
+//                100, entrada al piso). Un solo monto: «Recargar todo (600)»,
+//                con su nota debajo. Se TOCA: la pila sube a 650, el saldo
+//                queda en 0 y no vuelve a salir pregunta.
+//   caso3      — forzosa con el bolsillo en 0 (`saldo:1000,quiebra`). Tarjeta
+//                de sólo salida. Se toca «Salir con mis fichas» y la mesa se
+//                cierra.
+//   caso2auto  — el escenario de Victor: automática con P = 300 y S = 600
+//                (`saldo:1600,recarga`). Hay que jugar una mano, y si la gana
+//                y pasa del listón no sale; se reintenta y, si no sale, se
+//                dice (no es vara).
+//
+// La vara, en las tres: ningún monto pintado vale 0, ningún primario dice
+// «Recargar 0», los botones no se pisan y la tarjeta cabe en la pantalla.
+const REC2_VIEWPORTS = [
+  { w: 360, h: 640, movil: true, nota: 'móvil portrait' },
+  { w: 412, h: 915, movil: true, nota: 'S25 vertical' },
+  { w: 1920, h: 1080, movil: false, nota: 'escritorio' },
+]
+const REC2_DIR = `${APU_OUT_DIR}/rec2`
+const REC2_TEXTO = {
+  todo: 'Recargar todo (600)',
+  nota: 'Es todo tu saldo disponible.',
+  sub3: 'Con estas fichas la mesa no puede continuar y no te queda saldo para recargar.',
+  salir: 'Salir con mis fichas',
+}
+
+// Lo que la tarjeta pinta, leído del DOM, con las cajas para la geometría.
+const REC2_LEER = () => {
+  const tarj = document.querySelector('[data-accion="recarga"]')
+  if (!tarj) return { hay: false }
+  const caja = (el) => {
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    return { x: r.x, y: r.y, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }
+  }
+  const si = tarj.querySelector('[data-accion="recarga-si"]')
+  const no = tarj.querySelector('[data-accion="recarga-no"]')
+  const nota = tarj.querySelector('[data-accion="recarga-nota"]')
+  const montos = [...tarj.querySelectorAll('[data-accion="recarga-monto"]')]
+  return {
+    hay: true,
+    motivo: tarj.dataset.motivo,
+    caso: Number(tarj.dataset.recCaso),
+    sub: tarj.querySelector('[data-accion="recarga-sub"]')?.textContent.trim(),
+    montos: montos.map((b) => b.textContent.trim()),
+    si: si ? { texto: si.textContent.trim(), disabled: si.disabled, caja: caja(si) } : null,
+    no: no ? { texto: no.textContent.trim(), caja: caja(no) } : null,
+    nota: nota ? { texto: nota.textContent.trim(), caja: caja(nota) } : null,
+    modal: caja(tarj.querySelector('.bankrupt-modal')),
+    vw: window.innerWidth, vh: window.innerHeight,
+  }
+}
+
+function rec2Vara(l, esperado) {
+  const fallos = []
+  if (!l.hay) return ['sin tarjeta']
+  if (l.motivo !== esperado.motivo) fallos.push(`motivo ${l.motivo}`)
+  if (l.caso !== esperado.caso) fallos.push(`caso ${l.caso}`)
+  // El invariante: nada pintado vale 0.
+  for (const m of l.montos) if (!(Number(m.replace(/\D/g, '')) > 0)) fallos.push(`monto «${m}»`)
+  if (l.si && /Recargar 0\b|\(0\)/.test(l.si.texto)) fallos.push(`primario «${l.si.texto}»`)
+  if (esperado.caso === 2) {
+    if (l.montos.length) fallos.push(`${l.montos.length} montos pintados`)
+    if (l.si?.texto !== REC2_TEXTO.todo) fallos.push(`primario «${l.si?.texto}»`)
+    if (l.si?.disabled) fallos.push('primario apagado')
+    if (l.nota?.texto !== REC2_TEXTO.nota) fallos.push('sin nota')
+    // La nota va DEBAJO del primario y no lo pisa.
+    else if (l.nota.caja.top < l.si.caja.bottom - 0.5) fallos.push('nota encima del primario')
+  }
+  if (esperado.caso === 3) {
+    if (l.si) fallos.push('hay primario')
+    if (l.montos.length) fallos.push('hay montos')
+    if (l.sub !== REC2_TEXTO.sub3) fallos.push(`subtítulo «${l.sub}»`)
+    if (l.no?.texto !== REC2_TEXTO.salir) fallos.push(`salida «${l.no?.texto}»`)
+  }
+  // Geometría: los botones no se pisan, miden el piso táctil y la tarjeta cabe.
+  const cajas = [l.si?.caja, l.no?.caja, l.nota?.caja].filter(Boolean)
+  for (let i = 0; i < cajas.length; i++) {
+    for (let j = i + 1; j < cajas.length; j++) {
+      const a = cajas[i], b = cajas[j]
+      const ix = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
+      const iy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
+      if (ix * iy > 0.5) fallos.push(`solape ${Math.round(ix * iy)} px²`)
+    }
+  }
+  for (const b of [l.si, l.no].filter(Boolean)) if (b.caja.h < 35.5) fallos.push(`botón de ${b.caja.h.toFixed(2)} px`)
+  const m = l.modal
+  if (m && (m.left < -0.5 || m.top < -0.5 || m.right > l.vw + 0.5 || m.bottom > l.vh + 0.5)) fallos.push('la tarjeta se sale')
+  return fallos
+}
+
+async function rec2Estado(page, vp, mesa, estado) {
+  const url = {
+    caso2: `${BASE}/?apu=saldo:1600,quiebra`,
+    caso3: `${BASE}/?apu=saldo:1000,quiebra`,
+    caso2auto: `${BASE}/?apu=saldo:1600,recarga`,
+  }[estado]
+  const esperado = {
+    caso2: { motivo: 'forzosa', caso: 2 },
+    caso3: { motivo: 'forzosa', caso: 3 },
+    caso2auto: { motivo: 'automatica', caso: 2 },
+  }[estado]
+  const tag = `${estado}_m${mesa}_${vp.w}x${vp.h}`
+  const intentos = estado === 'caso2auto' ? 4 : 1
+  for (let i = 0; i < intentos; i++) {
+    await page.goto(url)
+    await recorrerRuta(page, mesa, 'avanzado', 0, 'piso')
+    if (estado === 'caso2auto') {
+      // 5 manos y no 2: en la mesa de 5 cada mano dura el doble y con 2 el
+      // presupuesto se agotaba antes del primer pago (sonda de la Fase 1).
+      await jugarHasta(page, () => !!document.querySelector('.game-table[data-rec-motivo]')
+        || [...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano'), 5)
+      await page.waitForTimeout(400)
+      const motivo = await page.evaluate(APU_MOTIVO)
+      if (motivo !== 'automatica') continue
+    }
+    if (!await abrirRecarga(page, 15000)) return { tag, ok: false, fallos: ['la pregunta no salió'], intentos: i + 1 }
+    const l = await page.evaluate(REC2_LEER)
+    const fallos = rec2Vara(l, esperado)
+    await page.screenshot({ path: `${REC2_DIR}/rec2_${tag}.png` })
+    const r = { tag, estado, mesa, vp: `${vp.w}x${vp.h}`, intentos: i + 1, lectura: { ...l, modal: undefined }, modal: l.modal }
+
+    // El gesto, y lo que deja detrás.
+    if (estado === 'caso2' && !fallos.length) {
+      await page.click('[data-accion="recarga-si"]')
+      await page.waitForTimeout(600)
+      r.tras = await page.evaluate(() => ({
+        tarjeta: !!document.querySelector('[data-accion="recarga"]'),
+        burbuja: !!document.querySelector('[data-accion="recarga-burbuja"]'),
+        recargas: document.querySelector('.game-table')?.dataset.recargas,
+        motivo: document.querySelector('.game-table')?.dataset.recMotivo ?? null,
+        pila: document.querySelector('.pbr-chips .bd-num')?.textContent?.trim(),
+      }))
+      if (r.tras.tarjeta || r.tras.burbuja || r.tras.recargas !== '1' || r.tras.motivo) fallos.push(`tras recargar ${JSON.stringify(r.tras)}`)
+      if (r.tras.pila && Number(r.tras.pila.replace(/\D/g, '')) !== 650) fallos.push(`pila ${r.tras.pila}`)
+    }
+    if (estado === 'caso3' && !fallos.length) {
+      await page.click('[data-accion="recarga-no"]')
+      const fuera = await page.waitForSelector('.game-table', { state: 'detached', timeout: 8000 }).then(() => true, () => false)
+      r.tras = { salioDeLaMesa: fuera }
+      if (!fuera) fallos.push('la mesa no se cerró')
+    }
+    return { ...r, ok: !fallos.length, fallos }
+  }
+  // Sólo la automática llega aquí: se ganó el listón las cuatro veces.
+  return { tag, estado, mesa, vp: `${vp.w}x${vp.h}`, ok: true, noSalio: true, fallos: [], intentos }
+}
+
+async function runRec2(browser) {
+  try { mkdirSync(REC2_DIR, { recursive: true }) } catch { /* ya existe */ }
+  const filas = []
+  for (const vp of REC2_VIEWPORTS) {
+    for (const mesa of [2, 5]) {
+      for (const estado of ['caso2', 'caso3', 'caso2auto']) {
+        const page = await browser.newPage({
+          viewport: { width: vp.w, height: vp.h },
+          ...(vp.movil ? { hasTouch: true, isMobile: true } : {}),
+        })
+        const consola = []
+        page.on('pageerror', e => consola.push(`pageerror: ${e.message}`))
+        page.on('console', m => {
+          if (m.type() !== 'error' && m.type() !== 'warning') return
+          if (APU_RUIDO_CONOCIDO.some((r) => r.test(m.text()))) return
+          consola.push(`${m.type()}: ${m.text()}`)
+        })
+        let r
+        try { r = await rec2Estado(page, vp, mesa, estado) }
+        catch (e) { r = { tag: `${estado}_m${mesa}_${vp.w}x${vp.h}`, ok: false, fallos: [`excepción: ${e.message.split('\n')[0]}`] } }
+        if (consola.length) { r.ok = false; r.fallos.push(`consola: ${consola[0]}`) }
+        filas.push(r)
+        await page.close()
+      }
+    }
+  }
+  const ok = filas.every((f) => f.ok)
+  console.log(`\n── apu · REC-2 · recarga con saldo insuficiente ── ${filas.filter((f) => f.ok).length}/${filas.length}`)
+  for (const f of filas) {
+    const l = f.lectura
+    const dice = f.noSalio ? 'no salió (ganó el listón; no es vara)'
+      : l ? `${l.motivo}/caso ${l.caso} · ${l.si ? '«' + l.si.texto + '»' : 'sin primario'}${l.nota ? ' + nota' : ''} · «${l.no?.texto}»` : ''
+    console.log(`  ${f.ok ? 'OK  ' : 'FALLA'} ${String(f.tag).padEnd(26)} ${dice}${f.tras ? ' · tras: ' + JSON.stringify(f.tras) : ''}${f.fallos.length ? ' · ' + f.fallos.join('; ') : ''}`)
+  }
+  return { filas, ok }
+}
+
 async function runApu(browser) {
   const celdas = []
   try { mkdirSync(APU_OUT_DIR, { recursive: true }) } catch { /* ya existe */ }
@@ -2270,7 +2465,10 @@ async function runApu(browser) {
   // sola. El JSON se autoetiqueta con las celdas corridas, así que una corrida
   // filtrada no se puede confundir con la entera.
   const vpFilter = process.argv[3] || null
+  // REC-2 · `apu rec2` corre SÓLO los estados de REC-2; una celda filtrada
+  // (`apu 360x640`) no los corre, y el JSON lo dice (`rec2: null`).
   for (const vp of APU_VIEWPORTS) {
+    if (vpFilter === 'rec2') break
     if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
     // 1f §A.1 · `hasTouch`/`isMobile` sólo en las celdas de teléfono: es lo que
     // hace existir la media query táctil y el piso de 40 px. Las cuatro de
@@ -2783,7 +2981,8 @@ async function runApu(browser) {
     await page.close()
   }
 
-  const ok = celdas.every((c) => c.ok)
+  const rec2 = (!vpFilter || vpFilter === 'rec2') ? await runRec2(browser) : null
+  const ok = celdas.every((c) => c.ok) && (rec2 ? rec2.ok : true)
   console.log(`\n── apu · la mesa de APU-1 ── ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas`)
   for (const c of celdas) {
     const fallos = [
@@ -2819,7 +3018,7 @@ async function runApu(browser) {
       console.log(`      tarjeta ${b.modal.ancho}×${b.modal.alto} en ${b.modal.top} · tapa ${b.solapeCartas} px² de ${b.areaCartas} de la mano`)
     }
   }
-  return { celdas, ok }
+  return { celdas, ok, rec2 }
 }
 
 // ── DSK-B1 · Presupuesto vertical de la columna central (mesa 5) ──────────────
