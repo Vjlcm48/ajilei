@@ -655,9 +655,17 @@ describe('5. §5 · La recarga entre manos', () => {
       expect(pideRecarga(g, SALDO)).toBe(RECARGA.FORZOSA)
     })
 
+    // REC-2 (v1.3 §5.1) parte esta prueba en dos. Sin bolsillo sigue sin haber
+    // pregunta automática ni voluntaria; la FORZOSA sí sale, como tarjeta de
+    // sólo salida (caso 3), porque no pregunta nada: la mesa no puede seguir.
+    // Antes devolvía `NINGUNA` y ese hueco lo tapaba el modal de bancarrota.
     it('ninguna sin bolsillo: una pregunta con una sola respuesta no es pregunta', () => {
       expect(pideRecarga(enPago(UNIT * 4), 0)).toBe(RECARGA.NINGUNA)
-      expect(pideRecarga(enPago(UNIT - 1), 0)).toBe(RECARGA.NINGUNA)
+      expect(pideRecarga(enPago(UNIT * 20), 0)).toBe(RECARGA.NINGUNA)
+    })
+
+    it('REC-2 · la forzosa sin bolsillo sí sale: es de sólo salida', () => {
+      expect(pideRecarga(enPago(UNIT - 1), 0)).toBe(RECARGA.FORZOSA)
     })
 
     it('ninguna con la pila ya en el techo', () => {

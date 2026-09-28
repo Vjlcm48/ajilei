@@ -1,6 +1,6 @@
 // ── mesaCore.js · Lo que la MESA decide y el motor no ──────────────────────
 // Rector: AJILEI_APU-1_Fase1e_v1.0.md §3 (1e-ii). Normativo:
-// `docs/AJILEI_APU-1_Reglas_v1.2.md` §3.2, §4.1, §4.3, §5 y §6.9.
+// `docs/AJILEI_APU-1_Reglas_v1.3.md` §3.2, §4.1, §4.3, §5 y §6.9.
 //
 // Módulo PURO, sin React ni DOM — el molde de `cronicaCore`, `resultadoCore` y
 // `sesionCore`, y por la misma razón que aquéllos: este proyecto NO tiene jsdom
@@ -204,6 +204,65 @@ export function opcionesRecarga(pila, unit, saldo) {
   })
 }
 
+// ── REC-2 · La regla híbrida (normativo v1.3 §5.1 y §5.2) ──────────────────
+//
+// Fase 0 de REC-2: `pideRecarga` preguntaba en cuanto el bolsillo cubría UNA
+// apuesta, pero el monto más bajo de la fila es el piso de DIEZ. Con el saldo
+// entre las dos cifras salía la pregunta con los tres montos apagados, y la
+// pantalla rellenaba el hueco con un `?? 0` que se pintaba «Recargar 0». En la
+// forzosa eso echaba de la mesa a quien tenía saldo para seguir.
+//
+// Ahora las dos preguntas —¿hay pregunta? y ¿qué se ofrece?— salen de la MISMA
+// cifra, `topeRecarga`, y la tarjeta entera sale de aquí: la vista no vuelve a
+// inventar un monto.
+
+// El saldo que de verdad se puede poner en la mesa: redondeado hacia abajo a
+// la apuesta. El resto (< `unit`) se queda en el bolsillo (§5.2, múltiplos).
+export function saldoUsable(saldo, unit) {
+  if (!unit || unit <= 0) return 0
+  return Math.max(0, Math.floor((saldo ?? 0) / unit) * unit)
+}
+
+// LA puerta de «hay saldo» que comparten `pideRecarga` y `tarjetaRecarga`.
+// Bajo el techo es exactamente «saldo usable ≥ una apuesta»; con la pila en el
+// techo tampoco hay nada que ofrecer, y es lo mismo que decía `pideRecarga`.
+export const hayRecarga = (pila, unit, saldo) => topeRecarga(pila, unit, saldo) > 0
+
+export const CASOS_RECARGA = Object.freeze({
+  FILA: 1,       // al menos un monto de la fila cabe: la fila de siempre
+  TODO: 2,       // ninguno cabe, pero el saldo usable llega a una apuesta
+  SIN_SALDO: 3,  // saldo usable < una apuesta: sólo la forzosa, y de sólo salida
+})
+
+/**
+ * Lo que la tarjeta de recarga ofrece, entero. `monto` es el que nace elegido
+ * y NUNCA es 0: o es un monto que cabe o es `null` (caso 3, sin primario).
+ *
+ *   caso 1 — la fila de tres, con los inalcanzables apagados (E-2).
+ *   caso 2 — la fila se sustituye por UN monto: `topeRecarga`, que es todo el
+ *            saldo usable o lo que falte hasta el techo si es menor. `todo`
+ *            dice cuál de los dos, y de eso depende el rótulo.
+ *   caso 3 — nada que ofrecer.
+ *
+ * El caso 2 sólo existe con la fila entera apagada, y con la fila apagada el
+ * techo no puede cortar: «Al techo» vale `techo − pila`, que es ≥ el tope, y si
+ * fuera igual estaría encendida. `todo: false` es por eso una rama DEFENSIVA,
+ * que sólo se alcanza si alguien cambia la fila (informe REC-2 Fase 1, D-4).
+ */
+export function tarjetaRecarga(pila, unit, saldo) {
+  return armarTarjeta(opcionesRecarga(pila, unit, saldo), topeRecarga(pila, unit, saldo), saldoUsable(saldo, unit))
+}
+
+// La decisión, separada de las cifras para que la rama defensiva del caso 2 (el
+// techo cortando) se pueda probar con una fila fabricada: con la fila de
+// verdad no se alcanza.
+export function armarTarjeta(opciones, tope, usable) {
+  if (!(tope > 0)) return { caso: CASOS_RECARGA.SIN_SALDO, opciones: [], monto: null, todo: false }
+  const primera = opciones.find((o) => !o.disabled && o.monto > 0)
+  if (primera) return { caso: CASOS_RECARGA.FILA, opciones, monto: primera.monto, todo: false }
+  return { caso: CASOS_RECARGA.TODO, opciones: [], monto: tope, todo: tope === usable }
+}
+
 export const RECARGA = Object.freeze({
   NINGUNA: null,
   VOLUNTARIA: 'voluntaria',
@@ -215,7 +274,7 @@ export const RECARGA = Object.freeze({
  * Qué recarga toca AHORA, entre manos. Sólo entre manos: dentro de una, nunca
  * (§5.1), y por eso lo primero que se mira es la fase.
  *
- *   `forzosa`    — o el humano no cubre el ante (v1.2 §5.1), o la mano que viene no
+ *   `forzosa`    — o el humano no cubre el ante (v1.3 §5.1), o la mano que viene no
  *                  tendría una sola decisión posible porque el ante dejaría a
  *                  todos mudos (D-12). Son el mismo hecho contado dos veces:
  *                  la mesa no puede continuar como un juego de decisiones, y
@@ -227,8 +286,12 @@ export const RECARGA = Object.freeze({
  *                  defecto, y bloquea «Siguiente mano» mientras esté viva.
  *   `voluntaria` — nadie la pidió; el jugador puede pedirla él.
  *
- * Devuelve `NINGUNA` cuando no hay saldo con el que recargar: una pregunta cuya
- * única respuesta posible es «No» no es una pregunta, es un reproche.
+ * Devuelve `NINGUNA` cuando no hay saldo usable con el que recargar: una
+ * pregunta cuya única respuesta posible es «No» no es una pregunta, es un
+ * reproche. La FORZOSA es la excepción desde REC-2 (v1.3 §5.1): sin saldo sale
+ * igual, como tarjeta de sólo salida (caso 3 de `tarjetaRecarga`), porque ahí
+ * no se pregunta nada —la mesa no puede continuar— y antes ese hueco lo cubría
+ * el modal de bancarrota con sus dos «Próximamente».
  */
 export function pideRecarga(state, saldo) {
   const phase = state?.phase
@@ -236,11 +299,12 @@ export function pideRecarga(state, saldo) {
   const unit = state?.unit ?? 0
   const humano = state?.players?.[ASIENTO_HUMANO]
   if (!humano || unit <= 0) return RECARGA.NINGUNA
-  if (topeRecarga(humano.chips ?? 0, unit, saldo) <= 0) return RECARGA.NINGUNA
+  const pila = humano.chips ?? 0
 
-  const noCubreAnte = (humano.chips ?? 0) < unit
+  const noCubreAnte = pila < unit
   if (noCubreAnte || anteDejaAMudos(state)) return RECARGA.FORZOSA
-  if (pilaBaja(humano.chips ?? 0, unit)) return RECARGA.AUTOMATICA
+  if (!hayRecarga(pila, unit, saldo)) return RECARGA.NINGUNA
+  if (pilaBaja(pila, unit)) return RECARGA.AUTOMATICA
   return RECARGA.VOLUNTARIA
 }
 
@@ -302,7 +366,7 @@ export function pozoPartido(state) {
 // por el humano.
 export { accionesDe }
 
-// ── REC-1 · La pregunta que no tapa la mano (normativo v1.2 §5.5) ──────────
+// ── REC-1 · La pregunta que no tapa la mano (normativo v1.3 §5.5) ──────────
 //
 // La automática y la forzosa se decidían y se pintaban en el MISMO fotograma
 // que el resultado (Fase 0 de REC-1: t = 0 del pago), así que la tarjeta tapaba
