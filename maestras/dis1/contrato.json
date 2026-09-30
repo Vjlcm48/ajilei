@@ -1,0 +1,167 @@
+{
+  "campana": "DIS-1",
+  "fase": "Fase 2",
+  "generado": "2026-09-30T22:10:30.172Z",
+  "edge": "154.0.4258.37",
+  "origen": "lámina DIS-1 v1.3 (capturas-dis/lamina13/lamina.html), __disDiag().<aparato>.esperado",
+  "unidades": "px de página: [izquierda, arriba, derecha, abajo] de la caja de la IMAGEN",
+  "casos": {
+    "1920": {
+      "url": "?vp=1920",
+      "viewport": [
+        1920,
+        1080
+      ],
+      "aire_lema": 107.94,
+      "aire_frase": 14,
+      "silueta_px": {
+        "laptop": [
+          331.82,
+          234
+        ],
+        "telefono": [
+          79.31,
+          154.39
+        ]
+      },
+      "laptop": [
+        452.27,
+        529.75,
+        820.27,
+        783.24
+      ],
+      "telefono": [
+        779.88,
+        623.73,
+        886.01,
+        791.6
+      ]
+    },
+    "s25_tel": {
+      "url": "?vp=s25&fase=tel",
+      "viewport": [
+        360,
+        704
+      ],
+      "aire_lema": 22.1,
+      "aire_frase": 28,
+      "silueta_px": {
+        "telefono": [
+          77.06,
+          150
+        ]
+      },
+      "telefono": [
+        128.21,
+        298.14,
+        231.32,
+        461.24
+      ]
+    },
+    "s25_lap": {
+      "url": "?vp=s25&fase=lap",
+      "viewport": [
+        360,
+        704
+      ],
+      "aire_lema": 40.1,
+      "aire_frase": 28,
+      "silueta_px": {
+        "laptop": [
+          187.18,
+          132
+        ]
+      },
+      "laptop": [
+        71.24,
+        314.96,
+        278.83,
+        457.95
+      ]
+    },
+    "390_tel": {
+      "url": "?vp=390&fase=tel",
+      "viewport": [
+        390,
+        844
+      ],
+      "aire_lema": 27.7,
+      "aire_frase": 28,
+      "silueta_px": {
+        "telefono": [
+          78.08,
+          152
+        ]
+      },
+      "telefono": [
+        142.52,
+        367.79,
+        247,
+        533.06
+      ]
+    },
+    "390_lap": {
+      "url": "?vp=390&fase=lap",
+      "viewport": [
+        390,
+        844
+      ],
+      "aire_lema": 46,
+      "aire_frase": 28,
+      "silueta_px": {
+        "laptop": [
+          189.59,
+          133.7
+        ]
+      },
+      "laptop": [
+        84.84,
+        384.89,
+        295.1,
+        529.73
+      ]
+    },
+    "640_tel": {
+      "url": "?vp=640&fase=tel",
+      "viewport": [
+        360,
+        640
+      ],
+      "aire_lema": 14,
+      "aire_frase": 22,
+      "silueta_px": {
+        "telefono": [
+          67.81,
+          132
+        ]
+      },
+      "telefono": [
+        134.43,
+        260.83,
+        225.16,
+        404.36
+      ]
+    },
+    "640_lap": {
+      "url": "?vp=640&fase=lap",
+      "viewport": [
+        360,
+        640
+      ],
+      "aire_lema": 37.8,
+      "aire_frase": 22,
+      "silueta_px": {
+        "laptop": [
+          153.43,
+          108.2
+        ]
+      },
+      "laptop": [
+        90.85,
+        283.9,
+        261.01,
+        401.11
+      ]
+    }
+  }
+}

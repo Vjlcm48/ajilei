@@ -1,0 +1,110 @@
+{
+  "campana": "DIS-1",
+  "aparato": "laptop",
+  "calidad": "final",
+  "color": "grafito",
+  "blender": "4.5.10 LTS",
+  "semilla": 5,
+  "muestras": 512,
+  "imagen": [
+    3200,
+    2434
+  ],
+  "maestra": "mesapc.png",
+  "proporcion_pantalla": 1.7786458333333333,
+  "esquinas_orden": "TL,TR,BR,BL de la captura; px de imagen, origen arriba-izquierda",
+  "esquinas": [
+    [
+      423.28,
+      433.215
+    ],
+    [
+      2127.245,
+      369.802
+    ],
+    [
+      2227.089,
+      1323.856
+    ],
+    [
+      508.522,
+      1463.588
+    ]
+  ],
+  "centro_pantalla": [
+    1353.596,
+    892.564
+  ],
+  "radio_pantalla_rel": 0.008741,
+  "silueta_opaca": [
+    341,
+    302,
+    2546,
+    1796
+  ],
+  "tinta_con_sombra": [
+    189,
+    285,
+    2715,
+    1837
+  ],
+  "px_por_metro": 6228.98,
+  "pose": {
+    "guinada": 18.0,
+    "cabeceo": 0.0,
+    "altura": 0.0005
+  },
+  "camara": {
+    "picado_grados": 12.0,
+    "distancia": 1.05,
+    "margen": 0.07,
+    "huella_sombra": 0.9
+  },
+  "tiempos_s": {
+    "hueco": 158.07,
+    "captura": 4.57,
+    "web": 1.76
+  },
+  "comprobaciones": {
+    "centro_hueco_transparente": true,
+    "centro_captura_opaco": true,
+    "bisel_opaco": true,
+    "esquinas_dentro_de_imagen": true,
+    "silueta_no_toca_borde": true
+  },
+  "salidas": {
+    "hueco": "laptop_hueco.png",
+    "captura": "laptop_captura.png",
+    "web": "laptop_web.webp"
+  },
+  "web": {
+    "archivo": "laptop_web.webp",
+    "tamano": [
+      887,
+      611
+    ],
+    "bytes": 47874,
+    "calidad": 85,
+    "escala": 0.314138,
+    "recorte_en_render": [
+      134.7,
+      230.7,
+      2823.6,
+      1945.6
+    ],
+    "silueta_opaca": [
+      64.81,
+      22.39,
+      799.8,
+      564.02
+    ],
+    "tinta_con_sombra": [
+      17.06,
+      17.05,
+      852.88,
+      576.9
+    ],
+    "px_por_metro": 1956.759
+  },
+  "reencajado": "2026-09-30 16:58:21"
+}

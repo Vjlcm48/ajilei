@@ -1,0 +1,110 @@
+{
+  "campana": "DIS-1",
+  "aparato": "telefono",
+  "calidad": "final",
+  "color": "grafito",
+  "blender": "4.5.10 LTS",
+  "semilla": 5,
+  "muestras": 512,
+  "imagen": [
+    1566,
+    2400
+  ],
+  "maestra": "mesav.png",
+  "proporcion_pantalla": 0.49137931034482757,
+  "esquinas_orden": "TL,TR,BR,BL de la captura; px de imagen, origen arriba-izquierda",
+  "esquinas": [
+    [
+      348.467,
+      224.76
+    ],
+    [
+      1228.297,
+      260.936
+    ],
+    [
+      1160.369,
+      2118.71
+    ],
+    [
+      292.239,
+      2050.879
+    ]
+  ],
+  "centro_pantalla": [
+    753.325,
+    1169.184
+  ],
+  "radio_pantalla_rel": 0.107353,
+  "silueta_opaca": [
+    272,
+    190,
+    1005,
+    1956
+  ],
+  "tinta_con_sombra": [
+    140,
+    178,
+    1263,
+    2045
+  ],
+  "px_por_metro": 13373.14,
+  "pose": {
+    "guinada": -16.0,
+    "reclinado": 7.0,
+    "altura": 0.004
+  },
+  "camara": {
+    "picado_grados": 12.0,
+    "distancia": 1.05,
+    "margen": 0.07,
+    "huella_sombra": 0.9
+  },
+  "tiempos_s": {
+    "hueco": 57.78,
+    "captura": 2.38,
+    "web": 0.84
+  },
+  "comprobaciones": {
+    "centro_hueco_transparente": true,
+    "centro_captura_opaco": true,
+    "bisel_opaco": true,
+    "esquinas_dentro_de_imagen": true,
+    "silueta_no_toca_borde": true
+  },
+  "salidas": {
+    "hueco": "telefono_hueco.png",
+    "captura": "telefono_captura.png",
+    "web": "telefono_web.webp"
+  },
+  "web": {
+    "archivo": "telefono_web.webp",
+    "tamano": [
+      330,
+      522
+    ],
+    "bytes": 27752,
+    "calidad": 85,
+    "escala": 0.24539,
+    "recorte_en_render": [
+      99.1,
+      137.1,
+      1344.8,
+      2126.8
+    ],
+    "silueta_opaca": [
+      42.43,
+      12.98,
+      246.62,
+      480.08
+    ],
+    "tinta_con_sombra": [
+      10.04,
+      10.04,
+      309.93,
+      501.92
+    ],
+    "px_por_metro": 3281.63
+  },
+  "reencajado": "2026-09-30 16:58:24"
+}
