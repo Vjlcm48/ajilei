@@ -555,3 +555,26 @@ la tarjeta lleva `visibility: visible` en línea (reserva su renglón en la
 voluntaria) y sobreviviría a cualquier `visibility: hidden` heredado (Fase 0 de
 REC-1, §J-8). La regla vale para cualquier capa con un hijo que fije su propia
 visibilidad.
+
+**10 · Dispositivos realistas de la escena 5 (DIS-1) — adenda del 2026-09-30, sin cambio de versión.**
+
+- **Técnica sellada (camino B):** la laptop y el teléfono de la escena 5 son **una imagen por aparato**
+  (`src/assets/portada/dis_laptop.webp`, `dis_telefono.webp`) con la captura del juego **horneada** en la
+  pantalla. Sin `matrix3d` ni perspectiva CSS: el WebKit de Playwright para Windows no tiene transformaciones
+  3D (`-webkit-transform-3d: false`) y descarta los términos de perspectiva, así que una prueba de WebKit sobre
+  una `matrix3d` proyectiva no es fiable en esta máquina.
+- **Origen:** renders de Blender 4.5 generados por `scripts/dis1/gen_dispositivos.py` (aparatos genéricos,
+  laptop grafito y teléfono negro, sombra de contacto del propio render). Las maestras PNG de 16 bits viven
+  **fuera de git**, en la carpeta de control de Victor (`Descargas\AJILEI\DIS-1\`). En git solo van los JSON
+  (`maestras/dis1/`), el script y los dos WebP.
+- **Geometría:** el bloque `DIS-1:geometria` de `portada.css` lo escribe `scripts/dis1/geometria_dis.mjs`
+  desde los JSON. **No se edita a mano**; sin `--escribir`, el script comprueba que está al día.
+  - Escritorio: laptop de 234 px de silueta a 1920 y teléfono +30 % sobre la escala real, delante de la
+    esquina derecha de la laptop; todo escala con el alto del escenario (`cqh`).
+  - Móvil (≤ 900 px): los aparatos conservan la caja que tenían los marcos planos; relevo teléfono → laptop.
+  - Contrato: la lámina v1.3 (`maestras/dis1/contrato.json`), ±1 px, vigilado por el modo `dis` de `diagPUE`.
+- **Comportamiento:** al terminar la escena, los aparatos se desvanecen con ella (su reposo es visible).
+  Descargas con la regla de la adenda 5: no se piden donde la escena no existe ni con movimiento reducido.
+- **Si cambia la mesa del juego:** nueva maestra de CAP-1 → `gen_dispositivos.py --reencajar` (sin Blender,
+  segundos) → copiar los dos `*_web.webp` a `src/assets/portada/` y los JSON a `maestras/dis1/` →
+  `node scripts/dis1/geometria_dis.mjs` (si no está al día, `--escribir`) → `diagPUE dis`.
