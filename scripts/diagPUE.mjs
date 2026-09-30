@@ -22,8 +22,8 @@
 //       node scripts/diagPUE.mjs puerta     (la puerta: el visitante anónimo llega a la portada)
 //       node scripts/diagPUE.mjs mon        (MON-2: el render 3D con alfa de la escena 4 obedece al rotor)
 //       node scripts/diagPUE.mjs cap [--sellar]  (CAP-1: las tres maestras de la mesa; NO entra en `todo`)
-//       node scripts/diagPUE.mjs capvis          (CAP-1: cuánto de cada captura se ve en la escena 5; SÍ entra en `todo`)
-import { chromium } from 'playwright-core'
+//       node scripts/diagPUE.mjs dis             (DIS-1: los aparatos renderizados de la escena 5, Edge y WebKit; SÍ entra en `todo`)
+import { chromium, webkit } from 'playwright-core'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
   VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
@@ -105,9 +105,20 @@ const CAJA = (sel) => `(() => {
 // un padre invisible sigue declarando `opacity: 1`. Así entraba en la unión la
 // moneda héroe de la escena 4, que a los 1,4 s todavía no ha caído.
 // `checkVisibility({opacityProperty:true})` sí mira la cadena de ancestros.
+//
+// DIS-1 · En la escena 5 la tinta es la SILUETA de cada render, no su <img>:
+// la imagen lleva margen transparente y la sombra de contacto, y medir la caja
+// entera daría una holgura con la frase que no es la que se ve. La silueta sale
+// del JSON del render (`web.silueta_opaca`, px del derivado) escalada a la caja
+// REAL de la imagen. Quien movió la ruta recablea el metro (ficha Fase 2 §2.6).
+const WEB_DIS = Object.fromEntries(['laptop', 'telefono'].map((ap) => {
+  const w = JSON.parse(readFileSync(`maestras/dis1/${ap}.json`, 'utf8')).web
+  return [ap, { clase: `pue-dis-${ap}`, tamano: w.tamano, silueta: w.silueta_opaca, tinta: w.tinta_con_sombra }]
+}))
 const TINTA_ESCENA = `(() => {
   const esc = document.querySelector('.pue-esc.pue-activa');
   if (!esc) return null;
+  const DIS = ${JSON.stringify(Object.values(WEB_DIS))};
   const piezas = [...esc.querySelectorAll('img, .pregunta span, .marcador')];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, n = 0;
   const dentro = [];
@@ -118,6 +129,12 @@ const TINTA_ESCENA = `(() => {
     // MON-2 · el <img> de la escena 4 es el cuadro 16:9 exacto: su caja de
     // elemento ES el cuadro pintado, no hace falta descontar letterbox.
     if (r.width < 1 || r.height < 1) continue;
+    const d = DIS.find((x) => p.classList.contains(x.clase));
+    if (d) {
+      const fx = r.width / d.tamano[0], fy = r.height / d.tamano[1], s = d.silueta;
+      r = { left: r.left + s[0] * fx, top: r.top + s[1] * fy,
+            right: r.left + (s[0] + s[2]) * fx, bottom: r.top + (s[1] + s[3]) * fy };
+    }
     x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top);
     x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom); n++;
     dentro.push((p.parentElement && p.parentElement.className) || p.className);
@@ -1084,12 +1101,16 @@ if (hacer('1.8')) {
 
   // MON-INT · el póster del render entra en la lista de lo perezoso: viaja con
   // la política de los 2,5 s, igual que las caras y las capturas de mesa.
-  const perezosas = bitacora.filter(b => /uno_copa|tres_copa|cinco_copa|diez_copa|doce_copa|mesapc|mesav|heptacoin-poster/.test(b.url))
+  // DIS-1 · las capturas planas de la escena 5 (`mesapc`/`mesav`) dejaron paso a
+  // los dos renders con la captura horneada: son ELLOS los que tienen que viajar
+  // perezosos. Una expresión con los nombres viejos ya no casaría con nada y
+  // daría verde en falso.
+  const perezosas = bitacora.filter(b => /uno_copa|tres_copa|cinco_copa|diez_copa|doce_copa|dis_laptop|dis_telefono|heptacoin-poster/.test(b.url))
   const criticas = bitacora.filter(b => b.tPeticion <= corte)
   const despues = bitacora.filter(b => b.tPeticion > corte && !perezosas.includes(b))
 
   const todasPerezosas = perezosas.length > 0 && perezosas.every(b => b.tPeticion >= 2400)
-  anota('1.8a las caras, las capturas y el póster llegan perezosos', todasPerezosas,
+  anota('1.8a las caras, los aparatos y el póster llegan perezosos', todasPerezosas,
     perezosas.map(b => `${corto(b.url).split('/').pop()}@${b.tPeticion}ms`).join(' · ') || 'ninguna pedida')
 
   // MON-2 · ni un byte del animado antes del primer pintado: no está en ningún
@@ -1135,56 +1156,249 @@ if (hacer('1.8')) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// capvis · CAP-1 · cuánto de cada captura se VE en la escena 5
+// dis · DIS-1 · los aparatos renderizados de la escena 5
 // ════════════════════════════════════════════════════════════════════════════
-// Rector: AJILEI_CAP-1_Fase1_v1.0.md §1b.5 + Addendum 1 §3. Los dos marcos de la
-// escena 5 pintan `mesav.webp` y `mesapc.webp` con `object-fit: cover`, así que
-// lo que no cabe en el hueco se recorta en silencio: con la captura a mano de
-// antes la laptop enseñaba el 60–64 % del alto (sin cabecera ni botonera). Este
-// modo mide la fracción VISIBLE del alto de cada derivado —caja del <img> frente
-// a su tamaño natural— con los derivados reales de `src/`, en la escena 5 viva.
-// Vara: teléfono ≥ 90 % en los cuatro tamaños. Laptop ≥ 91 % —91: margen frente
-// a la variación de la escena 5; protege que la laptop enseñe cabecera y
-// botonera (ficha de commits de CAP-1, D-1; se midió 92,09 en el S25)—, salvo a
-// 360×640, donde el hueco mide 1,977 y el techo razonable es 89 % (Addendum 1,
-// D-2). Entra en `todo` porque no escribe nada; `cap` no.
-if (hacer('capvis')) {
-  console.log('\n── capvis · la mesa dentro de los marcos de la escena 5 ──')
-  const CAPVIS = [
-    { etiqueta: 'S25 360x780', width: 360, height: 780, movil: true, laptop: 0.91 },
-    { etiqueta: '390x844',     width: 390, height: 844, movil: true, laptop: 0.91 },
-    { etiqueta: '360x640',     width: 360, height: 640, movil: true, laptop: 0.89 },
-    { etiqueta: '1920x1080',   width: 1920, height: 1080, movil: false, laptop: 0.91 },
+// Rector: AJILEI_DIS-1_Fase2_Integracion_v1.0.md §2.6. Sustituye a `capvis`
+// (CAP-1), que medía la fracción visible de las capturas sueltas dentro de los
+// marcos CSS: esas capturas ya no existen como tales, van horneadas en el render.
+//
+// El contrato es la lámina DIS-1 v1.3: sus cajas de imagen están en
+// maestras/dis1/contrato.json (scripts/dis1/contrato_lamina.mjs), y la silueta y
+// la tinta de cada render, en maestras/dis1/{laptop,telefono}.json. Ningún
+// número a mano.
+//
+// Llegada: el rotor real (`esperarEscena` no basta: se necesita el INSTANTE de
+// la activación). Una sonda dentro de la página vigila la clase de la quinta
+// `.pue-esc` y, desde que se activa, muestrea por cuadro la opacidad del
+// contenedor y de cada aparato, y fotografía las cajas a +1,3 s (escritorio y
+// teléfono) y +3,3 s (laptop del relevo). En WebKit el `load` llega antes que
+// React (Fase 0 §F2): se espera a `.pue-escenario` antes de armar la sonda.
+if (hacer('dis')) {
+  console.log('\n── dis · la escena 5 con los renders de DIS-1 (Edge y WebKit) ──')
+  const CONTRATO = JSON.parse(readFileSync('maestras/dis1/contrato.json', 'utf8')).casos
+  const ES_DIS = (u) => /dis_(laptop|telefono)(-[A-Za-z0-9_-]+)?\.webp/.test(u || '')
+  const TOL_CONTRATO = 1, TOL_WEBKIT = 1
+  // `relevo` es el corte de portada.css (≤ 900 px de ancho), no el tipo de aparato.
+  const CASOS_DIS = [
+    { id: '1920x1080',    w: 1920, h: 1080, dpr: 1, contrato: '1920', perezoso: true },
+    { id: 'S25 360x704',  w: 360,  h: 704,  dpr: 3, movil: true, contrato: 's25', perezoso: true },
+    { id: '390x844',      w: 390,  h: 844,  dpr: 3, movil: true, contrato: '390' },
+    { id: '360x640',      w: 360,  h: 640,  dpr: 3, movil: true, contrato: '640' },
+    { id: '901x1000',     w: 901,  h: 1000, dpr: 1 },
+    { id: '1366x768',     w: 1366, h: 768,  dpr: 1 },
+    { id: '1440x850',     w: 1440, h: 850,  dpr: 1 },
+    { id: '768x1024',     w: 768,  h: 1024, dpr: 2, movil: true },
   ]
-  const TELEFONO_MIN = 0.90
-  const medidas = await Promise.all(CAPVIS.map(async (vp) => {
-    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: vp.movil ? 3 : 1, ...(vp.movil ? { isMobile: true, hasTouch: true } : {}) })
+  // Qué fases se comparan en WebKit (ficha §2.6): 1920, S25 en las dos y 360×640 el teléfono.
+  const CASOS_WEBKIT = { '1920x1080': [null], 'S25 360x704': ['tel', 'lap'], '360x640': ['tel'] }
+  const CASOS_OCULTOS = [
+    { id: 'S25 h 780x360',       w: 780,  h: 360,  dpr: 3, movil: true },
+    { id: '1920x1080 quietud',   w: 1920, h: 1080, dpr: 1, reducedMotion: 'reduce' },
+  ]
+
+  // La sonda. Corre en la página, así que los tiempos son los del documento y
+  // no los de Playwright: nada de latencias de ida y vuelta en la vara.
+  const SONDA_DIS = `(() => {
+    const esc = document.querySelectorAll('.pue-esc')[4];
+    const lap = esc.querySelector('.pue-dis-laptop'), tel = esc.querySelector('.pue-dis-telefono');
+    const caja = (e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; };
+    const foto = (t) => ({ t, laptop: caja(lap), telefono: caja(tel),
+      op: [+getComputedStyle(lap).opacity, +getComputedStyle(tel).opacity],
+      lema: caja(document.querySelector('.pue-lema-categoria')), frase: caja(document.querySelector('.pue-frase')),
+      listas: [lap, tel].map((i) => i.complete && i.naturalWidth > 0) });
+    const S = window.__dis = { t0: null, muestras: [], fotos: {}, fin: false };
+    const arrancar = () => {
+      S.t0 = performance.now();
+      const paso = () => {
+        const t = performance.now() - S.t0;
+        S.muestras.push([t, +getComputedStyle(esc).opacity, +getComputedStyle(lap).opacity, +getComputedStyle(tel).opacity]);
+        if (t >= 1300 && !S.fotos.t13) S.fotos.t13 = foto(t);
+        if (t >= 3300 && !S.fotos.t33) S.fotos.t33 = foto(t);
+        if (t < 4700) requestAnimationFrame(paso); else S.fin = true;
+      };
+      paso();
+    };
+    if (esc.classList.contains('pue-activa')) return 'ya activa';
+    new MutationObserver((_, o) => {
+      if (esc.classList.contains('pue-activa') && S.t0 === null) { o.disconnect(); arrancar(); }
+    }).observe(esc, { attributes: true, attributeFilter: ['class'] });
+    return 'armada';
+  })()`
+
+  async function contexto(nav, caso) {
+    const opciones = { viewport: { width: caso.w, height: caso.h }, deviceScaleFactor: caso.dpr }
+    // `isMobile` sólo existe en Chromium; en WebKit se mide el mismo viewport.
+    if (caso.movil && nav === 'edge') Object.assign(opciones, { isMobile: true, hasTouch: true })
+    if (caso.reducedMotion) opciones.reducedMotion = caso.reducedMotion
+    const ctx = await (nav === 'edge' ? browser : navWebkit).newContext(opciones)
     const page = await ctx.newPage()
+    const errores = [], peticiones = []
+    page.on('console', (m) => { if (m.type() === 'error') errores.push(m.text()) })
+    page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`))
+    const t0 = Date.now()
+    page.on('request', (r) => { if (ES_DIS(r.url())) peticiones.push({ url: r.url().split('/').pop(), t: Date.now() - t0 }) })
     await page.goto(URL_LAMINA, { waitUntil: 'load' })
-    // La escena 5 (índice 4) con sus dos imágenes ya decodificadas.
-    await esperarEscena(page, 4)
-    await page.waitForFunction(() => [...document.querySelectorAll('.pue-duo img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 10000 })
-    const m = await page.evaluate(() => ['.pue-pantalla img', '.pue-laptop-pantalla img'].map((s) => {
-      const i = document.querySelector(s)
-      const r = i.getBoundingClientRect()
-      const esc = Math.max(r.width / i.naturalWidth, r.height / i.naturalHeight)
-      return {
-        marco: s.includes('laptop') ? 'laptop' : 'teléfono', src: i.currentSrc.split('/').pop(),
-        caja: [+r.width.toFixed(2), +r.height.toFixed(2)], natural: [i.naturalWidth, i.naturalHeight],
-        alto: r.height / esc / i.naturalHeight, ancho: r.width / esc / i.naturalWidth,
-      }
-    }))
-    await ctx.close()
-    return { vp, m }
-  }))
-  for (const { vp, m } of medidas) {
-    for (const x of m) {
-      const min = x.marco === 'laptop' ? vp.laptop : TELEFONO_MIN
-      anota(`capvis ${x.marco} ${vp.etiqueta}`, x.alto >= min && x.ancho >= 0.999,
-        `${x.src} ${x.natural.join('×')} en caja ${x.caja.join('×')} (${(x.caja[0] / x.caja[1]).toFixed(3)}) · visible ${(x.alto * 100).toFixed(2)} % del alto (≥ ${min * 100} %) y ${(x.ancho * 100).toFixed(1)} % del ancho`)
-    }
+    await page.waitForSelector('.pue-escenario', { state: 'attached', timeout: 15000 })
+    return { ctx, page, errores, peticiones }
   }
-  resultados.bloques.capvis = medidas
+
+  async function medir(nav, caso) {
+    const { ctx, page, errores, peticiones } = await contexto(nav, caso)
+    const armada = await page.evaluate(SONDA_DIS)
+    await page.waitForFunction(() => window.__dis && window.__dis.fin === true, null, { timeout: 45000 })
+    const S = await page.evaluate(() => window.__dis)
+    await ctx.close()
+    return { nav, caso, armada, S, errores, peticiones, relevo: caso.w <= 900 }
+  }
+
+  async function oculto(caso) {
+    const { ctx, page, errores, peticiones } = await contexto('edge', caso)
+    await page.waitForTimeout(6000)   // la política de lo pesado se dispara a los 2,5 s
+    const escenario = await page.evaluate(() => getComputedStyle(document.querySelector('.pue-escenario')).display)
+    const indice = await page.evaluate(INDICE_ACTIVA)
+    await ctx.close()
+    return { caso, errores, peticiones, escenario, indice }
+  }
+
+  const navWebkit = await webkit.launch({ headless: true })
+  const [edge, ocultos, wk] = await Promise.all([
+    Promise.all(CASOS_DIS.map((c) => medir('edge', c))),
+    Promise.all(CASOS_OCULTOS.map(oculto)),
+    Promise.all(CASOS_DIS.filter((c) => c.id in CASOS_WEBKIT).map((c) => medir('webkit', c))),
+  ])
+  await navWebkit.close()
+
+  const r2 = (v) => Math.round(v * 100) / 100
+  const delta = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])))
+  // Qué aparato se ve en cada foto: escritorio los dos a +1,3 s; relevo el
+  // teléfono a +1,3 s y la laptop a +3,3 s.
+  const vistas = (m) => m.relevo
+    ? [{ foto: m.S.fotos.t13, aps: ['telefono'], fase: 'tel' }, { foto: m.S.fotos.t33, aps: ['laptop'], fase: 'lap' }]
+    : [{ foto: m.S.fotos.t13, aps: ['laptop', 'telefono'], fase: null }]
+  const escalar = (caja, ap, clave) => {       // caja de imagen → silueta o tinta en px de página
+    const W = WEB_DIS[ap], fx = (caja[2] - caja[0]) / W.tamano[0], fy = (caja[3] - caja[1]) / W.tamano[1], s = W[clave]
+    return [caja[0] + s[0] * fx, caja[1] + s[1] * fy, caja[0] + (s[0] + s[2]) * fx, caja[1] + (s[1] + s[3]) * fy]
+  }
+  const bloque = { edge: [], webkit: [], ocultos: [] }
+
+  for (const m of [...edge, ...wk]) {
+    const et = `${m.caso.id}${m.nav === 'webkit' ? ' · WebKit' : ''}`
+    const fila = { nav: m.nav, caso: m.caso.id, armada: m.armada, fotos: m.S.fotos, peticiones: m.peticiones, errores: m.errores }
+    if (m.armada !== 'armada' || !m.S.fotos.t13 || !m.S.fotos.t33) {
+      anota(`dis.llegada ${et}`, false, `la sonda no vio la activación de la escena 5 (${m.armada})`)
+      bloque[m.nav].push(fila); continue
+    }
+    // ── dis.contrato ──
+    if (m.caso.contrato && m.nav === 'edge') {
+      const partes = []
+      let ok = true
+      for (const v of vistas(m)) for (const ap of v.aps) {
+        const id = v.fase ? `${m.caso.contrato}_${v.fase}` : m.caso.contrato
+        const d = delta(v.foto[ap], CONTRATO[id][ap])
+        ok = ok && d <= TOL_CONTRATO
+        partes.push(`${ap} ${id} Δ ${r2(d)}`)
+      }
+      fila.contrato = partes
+      anota(`dis.contrato ${et}`, ok, `${partes.join(' · ')} px (≤ ${TOL_CONTRATO})`)
+    }
+    // ── dis.cabe y dis.holgura ──
+    {
+      const cabe = [], holg = []
+      let okCabe = true, okHolg = true
+      for (const v of vistas(m)) {
+        const tintas = v.aps.map((ap) => escalar(v.foto[ap], ap, 'tinta'))
+        const x0 = Math.min(...tintas.map((t) => t[0])), x1 = Math.max(...tintas.map((t) => t[2]))
+        const y0 = Math.min(...tintas.map((t) => t[1])), y1 = Math.max(...tintas.map((t) => t[3]))
+        const dentro = x0 >= 0 && x1 <= m.caso.w && y0 >= 0 && y1 <= m.caso.h
+        okCabe = okCabe && dentro
+        cabe.push(`${v.fase || 'duo'} x ${r2(x0)}…${r2(x1)} y ${r2(y0)}…${r2(y1)}`)
+        const sil = v.aps.map((ap) => escalar(v.foto[ap], ap, 'silueta'))
+        const arriba = Math.min(...sil.map((s) => s[1])) - v.foto.lema[3]
+        const abajo = v.foto.frase[1] - Math.max(...sil.map((s) => s[3]))
+        okHolg = okHolg && arriba >= HOLGURA_MINIMA && abajo >= HOLGURA_MINIMA
+        holg.push(`${v.fase || 'duo'} lema ${r2(arriba)} · frase ${r2(abajo)}`)
+      }
+      fila.cabe = cabe; fila.holgura = holg
+      anota(`dis.cabe ${et}`, okCabe, `tinta con sombra ${cabe.join(' | ')} en ${m.caso.w}×${m.caso.h}`)
+      anota(`dis.holgura ${et}`, okHolg, `${holg.join(' | ')} px (≥ ${HOLGURA_MINIMA})`)
+    }
+    // ── dis.relevo ── (índices de muestra: [t, contenedor, laptop, teléfono])
+    {
+      const M = m.S.muestras
+      const primero = (f, desde = 0) => { const x = M.find((s) => s[0] >= desde && f(s)); return x ? x[0] : null }
+      let ok, det
+      if (!m.relevo) {
+        const tLap = primero((s) => s[2] >= 0.999), tTel = primero((s) => s[3] >= 0.999)
+        ok = tLap !== null && tTel !== null && Math.max(tLap, tTel) < 1000
+        det = `escritorio: laptop a 1 en ${tLap === null ? '—' : Math.round(tLap)} ms · teléfono a 1 en ${tTel === null ? '—' : Math.round(tTel)} ms (los dos < 1000)`
+        fila.relevo = { tLap, tTel }
+      } else {
+        const telArriba = primero((s) => s[3] >= 0.999)
+        const telAbajo = telArriba === null ? null : primero((s) => s[3] <= 0.001, telArriba)
+        const lapArriba = primero((s) => s[2] >= 0.999)
+        let solape = 0
+        for (let k = 1; k < M.length; k++) if (M[k][2] > 0.001 && M[k][3] > 0.001) solape += M[k][0] - M[k - 1][0]
+        ok = telArriba !== null && telArriba <= 600 && telAbajo !== null && telAbajo <= 2500 &&
+             lapArriba !== null && lapArriba <= 2700 && solape < 300
+        det = `relevo: teléfono a 1 en ${telArriba === null ? '—' : Math.round(telArriba)} ms (≤ 600) y a 0 en ${telAbajo === null ? '—' : Math.round(telAbajo)} ms (≤ 2500) · ` +
+              `laptop a 1 en ${lapArriba === null ? '—' : Math.round(lapArriba)} ms (≤ 2700) · solape ${Math.round(solape)} ms (< 300)`
+        fila.relevo = { telArriba, telAbajo, lapArriba, solape }
+      }
+      anota(`dis.relevo ${et}`, ok, det)
+    }
+    // ── dis.salida ── a 4 000 + 150 ms: cada aparato que se veía conserva su opacidad
+    {
+      const M = m.S.muestras
+      const antes = M.filter((s) => s[0] <= 3950).pop(), luego = M.find((s) => s[0] >= 4150)
+      let ok = !!antes && !!luego, det = 'sin muestras en 3950/4150 ms'
+      if (ok) {
+        const partes = []
+        for (const [k, ap] of [[2, 'laptop'], [3, 'telefono']]) {
+          if (antes[k] < 0.5) { partes.push(`${ap} ya no se veía`); continue }
+          const bien = luego[k] >= 0.85
+          ok = ok && bien
+          partes.push(`${ap} ${r2(luego[k])} × contenedor ${r2(luego[1])} = ${r2(luego[k] * luego[1])} (≥ 0,85 × ${r2(luego[1])})`)
+        }
+        det = `a ${Math.round(luego[0])} ms: ${partes.join(' · ')}`
+        fila.salida = { t: luego[0], contenedor: luego[1], laptop: luego[2], telefono: luego[3] }
+      }
+      anota(`dis.salida ${et}`, ok, det)
+    }
+    // ── dis.perezoso ──
+    if (m.caso.perezoso && m.nav === 'edge') {
+      const ok = m.peticiones.length === 2 && m.peticiones.every((p) => p.t >= 2400)
+      anota(`dis.perezoso ${et}`, ok, m.peticiones.map((p) => `${p.url}@${p.t}ms`).join(' · ') || 'ninguna petición de dis_*')
+    }
+    // ── dis.errores ──
+    anota(`dis.errores ${et}`, m.errores.length === 0, m.errores.length ? m.errores.slice(0, 3).join(' | ') : '0 errores de página y de consola')
+    bloque[m.nav].push(fila)
+  }
+
+  // ── dis.webkit ── las cajas de WebKit contra las de Edge, caso por caso
+  for (const w of wk) {
+    const e = edge.find((x) => x.caso.id === w.caso.id)
+    if (!e || !e.S.fotos.t13 || !w.S.fotos.t13) { anota(`dis.webkit ${w.caso.id}`, false, 'falta la medida de un navegador'); continue }
+    const partes = []
+    let ok = true
+    for (const v of vistas(w).filter((x) => CASOS_WEBKIT[w.caso.id].includes(x.fase))) {
+      const ve = vistas(e).find((x) => x.fase === v.fase)
+      for (const ap of v.aps) {
+        const d = delta(v.foto[ap], ve.foto[ap])
+        ok = ok && d <= TOL_WEBKIT
+        partes.push(`${ap}${v.fase ? ` (${v.fase})` : ''} Δ ${r2(d)}`)
+      }
+    }
+    anota(`dis.webkit ${w.caso.id}`, ok, `${partes.join(' · ')} px (≤ ${TOL_WEBKIT})`)
+  }
+
+  // ── dis.oculto ── donde la escena no existe, ni un byte de los aparatos
+  for (const o of ocultos) {
+    anota(`dis.oculto ${o.caso.id}`, o.peticiones.length === 0,
+      `${o.peticiones.length ? o.peticiones.map((p) => `${p.url}@${p.t}ms`).join(' · ') : 'ninguna petición de dis_*'} en 6 s · escenario display=${o.escenario} · escena activa ${o.indice}`)
+    anota(`dis.errores ${o.caso.id}`, o.errores.length === 0, o.errores.length ? o.errores.slice(0, 3).join(' | ') : '0 errores de página y de consola')
+    bloque.ocultos.push({ caso: o.caso.id, peticiones: o.peticiones, escenario: o.escenario, indice: o.indice, errores: o.errores })
+  }
+  resultados.bloques.dis = bloque
 }
 
 // ════════════════════════════════════════════════════════════════════════════
