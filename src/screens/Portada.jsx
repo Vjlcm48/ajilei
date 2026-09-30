@@ -13,8 +13,11 @@ import tresUrl from '../assets/portada/tres_copa.webp'
 import cincoUrl from '../assets/portada/cinco_copa.webp'
 import diezUrl from '../assets/portada/diez_copa.webp'
 import doceUrl from '../assets/portada/doce_copa.webp'
-import mesavUrl from '../assets/portada/mesav.webp'
-import mesapcUrl from '../assets/portada/mesapc.webp'
+// DIS-1 · los dos aparatos de la escena 5 son renders con la captura HORNEADA
+// (camino B): una imagen por aparato, con alfa y su propia sombra. Salen de
+// scripts/dis1/gen_dispositivos.py y su traza está en maestras/dis1/.
+import disLaptopUrl from '../assets/portada/dis_laptop.webp'
+import disTelefonoUrl from '../assets/portada/dis_telefono.webp'
 // MON-2.1 · los dos assets de la moneda dejan `public/` y pasan por Vite, que
 // les pone hash de contenido. Sin hash no pueden entrar en la zona `immutable`
 // de `public/_headers`, y la Fase 0 midió lo que costaba: una revalidación
@@ -193,6 +196,11 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
   const suma = sumaSellada.i === escenaViva ? sumaSellada.valor : 0
   const gana = ganaSellada.i === escenaViva
   const pesadas = quieto || pesadasTardias
+  // DIS-1 · los aparatos de la escena 5 siguen la política de la moneda
+  // (MON-2.1): con lo pesado de los 2,5 s, y NUNCA donde la escena no existe
+  // (`escenaOculta`) ni con quietud, porque con quietud el rotor no llega a la
+  // escena 5. La Fase 0 midió que hoy se bajaban igual en esos dos casos.
+  const aparatos = pesadasTardias && !quieto && !escenaOculta
 
   const pausada = useRef(false)
   const relojes = useRef([])
@@ -487,20 +495,25 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
                 </div>
               </div>
 
-              {/* 5 · la mesa real · escritorio laptop + teléfono · móvil teléfono */}
+              {/* 5 · la mesa real · escritorio laptop + teléfono juntos · móvil
+                  el relevo (teléfono y luego laptop). DIS-1: dos imágenes con
+                  ancho y alto explícitos; la geometría es CSS (portada.css). */}
               <div className={esc(4)}>
                 <div className="pue-duo">
-                  <div className="pue-laptop">
-                    <div className="pue-laptop-pantalla">
-                      <img src={pesadas ? mesapcUrl : undefined} alt="" />
-                    </div>
-                    <div className="pue-laptop-base" />
-                  </div>
-                  <div className="pue-telefono">
-                    <div className="pue-pantalla">
-                      <img src={pesadas ? mesavUrl : undefined} alt="" />
-                    </div>
-                  </div>
+                  <img
+                    className="pue-dis pue-dis-laptop"
+                    src={aparatos ? disLaptopUrl : undefined}
+                    alt=""
+                    decoding="async"
+                    draggable={false}
+                  />
+                  <img
+                    className="pue-dis pue-dis-telefono"
+                    src={aparatos ? disTelefonoUrl : undefined}
+                    alt=""
+                    decoding="async"
+                    draggable={false}
+                  />
                 </div>
               </div>
 
