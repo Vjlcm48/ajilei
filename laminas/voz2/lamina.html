@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VOZ-2 · La frase del óvalo</title>
+<!-- Los tokens de la casa, por ruta relativa: la lámina se abre con doble clic. -->
+<link rel="stylesheet" href="../../src/styles/theme.css">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--green-abyss); color: var(--text-primary); font: 14px/1.45 var(--font-base); }
+  header { padding: 20px 24px 8px; }
+  h1 { margin: 0 0 4px; font-size: 20px; color: var(--gold-brand); letter-spacing: .02em; }
+  h2 { margin: 28px 0 8px; font-size: 16px; color: var(--gold-brand); }
+  .sub { color: var(--text-secondary); max-width: 1100px; }
+  .sub b { color: var(--text-primary); }
+  main { padding: 0 24px 40px; }
+  .mandos { position: sticky; top: 0; z-index: 50; background: rgba(9, 23, 14, .97); border-bottom: 1px solid rgba(var(--gold-brand-rgb), .25); padding: 10px 24px; display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: flex-start; }
+  .grupo { display: flex; flex-direction: column; gap: 4px; }
+  .grupo > span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+  .botones { display: flex; flex-wrap: wrap; gap: 4px; }
+  .botones button { font: inherit; font-size: 12.5px; color: var(--text-secondary); background: transparent; border: 1px solid var(--text-faint); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+  .botones button[aria-pressed="true"] { color: var(--green-abyss); background: var(--gold-brand); border-color: var(--gold-brand); font-weight: 700; }
+  .vistas-tabs { display: flex; gap: 6px; margin: 16px 0 10px; }
+  .vistas-tabs button { font: inherit; font-weight: 700; color: var(--text-secondary); background: var(--surface-card); border: 1px solid var(--text-faint); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+  .vistas-tabs button[aria-pressed="true"] { color: var(--gold-brand); border-color: var(--gold-brand); }
+  .celda-y-datos { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .datos { min-width: 300px; max-width: 420px; background: var(--surface-card); border: 1px solid var(--text-faint); border-radius: 10px; padding: 12px 14px; font-size: 13px; }
+  .datos dt { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-top: 8px; }
+  .datos dd { margin: 2px 0 0; }
+  .datos .frase { color: var(--text-primary); }
+  .tapa { color: var(--lose-red); }
+  .libre { color: var(--win-green); }
+  .matriz { display: grid; grid-template-columns: repeat(4, max-content); gap: 18px 18px; align-items: start; }
+  .rotulo { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .rotulo b { color: var(--text-primary); }
+  .marco { position: relative; overflow: hidden; border: 1px solid rgba(var(--gold-brand-rgb), .3); border-radius: 6px; background: #000; }
+  .lienzo { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .lienzo > img.mesa { position: absolute; left: 0; top: 0; display: block; }
+  .lienzo > img.recorte { position: absolute; display: block; }
+  .rejilla-recogidas { display: grid; gap: 10px 14px; align-items: start; }
+  .rejilla-recogidas .cab { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+  .rejilla-recogidas figure { margin: 0; }
+  .rejilla-recogidas figcaption { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+  .rejilla-recogidas img { display: block; border: 1px solid var(--text-faint); border-radius: 4px; }
+  .nota { color: var(--text-muted); font-size: 12.5px; max-width: 1100px; }
+
+  /* ── El indicio de toque: la flechita discreta en oro (un solo oro) ───── */
+  .indicio { position: absolute; width: 9px; height: 9px; color: var(--gold-brand); pointer-events: none; }
+
+  /* ── La capa desplegada: tres formas ─────────────────────────────────── */
+  .capa { position: absolute; z-index: 20; color: var(--text-primary); font-family: var(--font-base); font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+  /* A · el lenguaje de la burbuja de REC-1 (rec.css): oscura, borde de oro. */
+  .capa-A { background: rgba(9, 23, 14, .94); border: 1.5px solid rgba(var(--gold-brand-rgb), .7); border-radius: 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, .5); padding: 10px 14px; }
+  /* B · banda de fieltro: el ancho del óvalo, filete de oro arriba y abajo. */
+  .capa-B { background: rgba(12, 29, 19, .97); border-top: 1px solid rgba(var(--gold-brand-rgb), .55); border-bottom: 1px solid rgba(var(--gold-brand-rgb), .55); box-shadow: 0 6px 18px rgba(0, 0, 0, .45); padding: 10px 16px; border-radius: 3px; }
+  /* C · globo con pico hacia el óvalo. */
+  .capa-C { background: rgba(9, 23, 14, .94); border: 1.5px solid rgba(var(--gold-brand-rgb), .7); border-radius: 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .5); padding: 9px 13px; }
+  .capa-C::after { content: ''; position: absolute; left: 50%; width: 10px; height: 10px; background: rgba(9, 23, 14, .94); border: 1.5px solid rgba(var(--gold-brand-rgb), .7); transform: translateX(-50%) rotate(45deg); }
+  .capa-C.pico-abajo::after { bottom: -6.5px; border-top: none; border-left: none; }
+  .capa-C.pico-arriba::after { top: -6.5px; border-bottom: none; border-right: none; }
+  .capa-C.pico-no::after { display: none; }
+  .capa .cerrar-pista { display: block; margin-top: 4px; font-size: 10.5px; font-weight: 400; color: var(--text-muted); }
+
+  /* ── Lo que la capa tapa ─────────────────────────────────────────────── */
+  .tapado { position: absolute; z-index: 40; border: 2px dashed var(--lose-red); background: rgba(239, 83, 80, .12); pointer-events: none; }
+
+  /* ── Simulación: vuelo de monedas (z 26 > 20) y burbuja de REC-1 (z 5) ─ */
+  .moneda { position: absolute; z-index: 26; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--gold-brand-hi), var(--gold-brand) 55%, var(--gold-brand-deep)); box-shadow: 0 0 6px rgba(var(--gold-brand-rgb), .6); }
+  .burbuja { position: absolute; z-index: 5; height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 16px 0 4px; border-radius: 999px; background: rgba(9, 23, 14, .94); border: 1.5px solid rgba(var(--gold-brand-rgb), .7); box-shadow: 0 4px 14px rgba(0, 0, 0, .5); color: var(--text-primary); font: 700 15px var(--font-base); white-space: nowrap; transform: translate(-50%, -50%); }
+  .burbuja .anillo { width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--gold-brand); display: grid; place-items: center; font-size: 12px; }
+  .vela-ranura { position: absolute; z-index: 4; background: #10261a; border-radius: 8px; }
+  .falta { color: var(--lose-red); font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VOZ-2 · La frase del óvalo · lámina de la 1a</h1>
+  <p class="sub">Capturas <b>reales</b> del pago de una mano (bundle de producción, semilla 5) en <b>5 vistas × 4 mesas</b>. El óvalo de cada captura lo pinta el producto con la hoja <code>voz2.css</code> y cada variante de líneas; el indicio, la capa, el vuelo y la burbuja se dibujan encima, en sus coordenadas medidas. Elige: <b>líneas recogidas</b>, <b>indicio</b>, <b>forma</b> y <b>posición</b> de la capa.</p>
+  <p class="sub" id="faltan"></p>
+</header>
+<div class="mandos" id="mandos"></div>
+<main id="principal"></main>
+<script src="capturas/medidas.js"></script>
+<script>
+(() => {
+  const M = window.VOZ2_MEDIDAS
+  const Q = new URLSearchParams(location.search)
+  const HOJA = Q.get('hoja') === '1'
+  const VISTAS = ['1920x1080', 'S25 412x915', '390x844', '360x640', '844x390']
+  const MESAS = [5, 4, 3, 2]
+  const FORMAS = ['corta', 'corriente-IA', 'retiros-humano', 'fin-gana', 'empate-cerca-IA', 'multi-ajilei-IA', 'corriente+1capa', 'IA+tellevas', 'peor']
+  const NOMBRE_FORMA = { 'corta': 'Corta (humano)', 'corriente-IA': 'Corriente (IA)', 'retiros-humano': 'Retiros', 'fin-gana': 'Fin de partida*', 'empate-cerca-IA': 'Empate, el más cercano', 'multi-ajilei-IA': 'Varios AJILEI', 'corriente+1capa': 'Corriente + 1 capa', 'IA+tellevas': '… Te llevas … Heptacoins', 'peor': 'Peor caso' }
+  const VAR = { l1: '1 línea', l2: '2 líneas', l2a: '2 líneas, interlineado ajustado' }
+  const archivo = (celda) => celda.replace(/\W+/g, '_')
+  const forma2arch = (f) => f.replace(/\W+/g, '_')
+
+  if (!M) { document.getElementById('principal').innerHTML = '<p class="falta">Faltan las capturas: corre <code>node laminas/voz2/capturar.mjs</code> con el preview levantado.</p>'; return }
+  const faltan = VISTAS.flatMap((v) => MESAS.map((n) => `${v} m${n}`)).filter((c) => !M.celdas[c])
+  if (faltan.length) document.getElementById('faltan').innerHTML = `<span class="falta">Faltan celdas: ${faltan.join(', ')}</span>`
+
+  // ── Estado de los interruptores (la URL los recuerda) ──────────────────
+  const E = {
+    vista: Q.get('vista') || '360x640', mesa: Number(Q.get('mesa') || 5), forma: Q.get('forma') || 'IA+tellevas',
+    lineas: Q.get('lineas') || 'l2', indicio: Q.get('indicio') || 'flecha', capa: Q.get('capa') || 'A',
+    pos: Q.get('pos') || 'centro', abierta: Q.get('abierta') !== '0', vuelo: Q.get('vuelo') === '1', burbuja: Q.get('burbuja') !== '0', tapado: Q.get('tapado') !== '0',
+  }
+  const GRUPOS = [
+    ['forma', 'Forma de la frase', FORMAS.map((f) => [f, NOMBRE_FORMA[f]])],
+    ['lineas', '1 · Líneas recogidas', Object.entries(VAR)],
+    ['indicio', '2 · Indicio de toque', [['puntos', 'Solo «…»'], ['flecha', '«…» + flechita de oro']]],
+    ['capa', '3 · Forma de la capa', [['A', 'A · burbuja REC-1'], ['B', 'B · banda de fieltro'], ['C', 'C · globo con pico']]],
+    ['pos', '4 · Posición', [['centro', 'Sobre el óvalo'], ['arriba', 'Pegada arriba'], ['abajo', 'Pegada abajo']]],
+    ['abierta', 'Estado', [[true, 'Desplegada'], [false, 'Recogida']]],
+    ['vuelo', '5 · Vuelo de monedas', [[true, 'Encima (z 26)'], [false, 'No']]],
+    ['burbuja', '5 · Burbuja de recarga', [[true, 'En su ranura'], [false, 'No']]],
+    ['tapado', 'Marcar lo que tapa', [[true, 'Sí'], [false, 'No']]],
+  ]
+  function pintaMandos() {
+    const m = document.getElementById('mandos')
+    m.innerHTML = ''
+    for (const [clave, titulo, ops] of GRUPOS) {
+      const g = document.createElement('div'); g.className = 'grupo'
+      g.innerHTML = `<span>${titulo}</span>`
+      const b = document.createElement('div'); b.className = 'botones'
+      for (const [val, txt] of ops) {
+        const x = document.createElement('button'); x.textContent = txt
+        x.setAttribute('aria-pressed', String(E[clave] === val))
+        x.onclick = () => { E[clave] = val; guarda(); pinta() }
+        b.appendChild(x)
+      }
+      g.appendChild(b); m.appendChild(g)
+    }
+  }
+  function guarda() {
+    const u = new URLSearchParams()
+    for (const [k, v] of Object.entries(E)) u.set(k, typeof v === 'boolean' ? (v ? '1' : '0') : v)
+    history.replaceState(null, '', '?' + u)
+  }
+
+  // ── Geometría de la capa y de lo que tapa ───────────────────────────────
+  const inter = (a, b) => {
+    if (!a || !b) return 0
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+    return w > 0.5 && h > 0.5 ? w * h : 0
+  }
+  function colocaCapa(c, el, opts) {
+    const vp = c.vp, o = c.ovalo
+    const ancho = Math.min(Math.max(o.w, 260), vp.w - 24, opts.capa === 'B' ? o.w : 520)
+    el.style.width = ancho + 'px'
+    el.style.fontSize = (c.vista === '1920x1080' ? 15 : 14) + 'px'
+    el.style.lineHeight = '1.35'
+    const h = el.offsetHeight
+    let x = o.x + o.w / 2 - ancho / 2
+    x = Math.max(12, Math.min(vp.w - 12 - ancho, x))
+    let y = opts.pos === 'centro' ? o.y + o.h / 2 - h / 2 : opts.pos === 'arriba' ? o.y - 8 - h : o.y + o.h + 8
+    y = Math.max(6, Math.min(vp.h - 6 - h, y))
+    el.style.left = x + 'px'; el.style.top = y + 'px'
+    if (opts.capa === 'C') el.classList.add(opts.pos === 'arriba' ? 'pico-abajo' : opts.pos === 'abajo' ? 'pico-arriba' : 'pico-no')
+    return { x, y, w: ancho, h }
+  }
+  function queTapa(c, r) {
+    const L = []
+    const add = (nombre, caja) => { const a = inter(r, caja); if (a) L.push({ nombre, caja, area: a }) }
+    add('cartas del jugador', c.cartasJugador)
+    c.cartasRivales.forEach((k, i) => add(`cartas reveladas (rival ${i + 1})`, k))
+    c.nombresRivales.forEach((k) => add('nombre tocable de un rival', k))
+    add('ranura de la burbuja / «Siguiente mano»', c.ranura)
+    add('pozo', c.pozoMoneda)
+    return L
+  }
+
+  // ── Una celda: la captura, el óvalo de la variante y lo de encima ───────
+  function celda(clave, escala, opts) {
+    const c = M.celdas[clave]
+    const marco = document.createElement('div'); marco.className = 'marco'
+    // En el documento desde ya: la capa se mide maquetada (offsetHeight) antes
+    // de colocarla. Quien la pide la muda luego a su sitio.
+    document.body.appendChild(marco)
+    if (!c) { marco.textContent = 'sin captura'; return { marco, info: null } }
+    marco.style.width = c.vp.w * escala + 'px'; marco.style.height = c.vp.h * escala + 'px'
+    const L = document.createElement('div'); L.className = 'lienzo'
+    L.style.width = c.vp.w + 'px'; L.style.height = c.vp.h + 'px'; L.style.transform = `scale(${escala})`
+    marco.appendChild(L)
+    const a = archivo(clave)
+    const mesa = new Image(); mesa.className = 'mesa'; mesa.src = `capturas/${a}_mesa.jpg`; mesa.width = c.vp.w; mesa.height = c.vp.h
+    L.appendChild(mesa)
+    const f = c.formas[opts.forma], v = f?.var[opts.lineas]
+    const rec = new Image(); rec.className = 'recorte'; rec.src = `capturas/${a}_${forma2arch(opts.forma)}_${opts.lineas}.jpg`
+    Object.assign(rec.style, { left: c.ovalo.x + 'px', top: c.ovalo.y + 'px', width: c.ovalo.w + 'px', height: c.ovalo.h + 'px' })
+    L.appendChild(rec)
+    const info = { c, f, v, tapa: [] }
+    if (v && v.marca && opts.indicio === 'flecha' && v.ultimo && !opts.abierta) {
+      const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      s.setAttribute('viewBox', '0 0 10 10'); s.setAttribute('class', 'indicio')
+      s.innerHTML = '<path d="M2 3.2 L5 6.6 L8 3.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+      const em = c.fuente
+      Object.assign(s.style, { left: (v.ultimo.x + em * 0.95) + 'px', top: (v.ultimo.y + v.ultimo.h / 2 - 4.5) + 'px' })
+      L.appendChild(s)
+    }
+    if (opts.abierta && v && v.marca) {
+      const capa = document.createElement('div'); capa.className = `capa capa-${opts.capa}`
+      capa.textContent = f.texto
+      L.appendChild(capa)
+      // La capa se mide maquetada a escala 1: el lienzo escala con transform,
+      // que no cambia la maqueta.
+      const r = colocaCapa(c, capa, opts)
+      info.capa = r
+      info.tapa = queTapa(c, r)
+      if (opts.tapado) for (const t of info.tapa) {
+        const d = document.createElement('div'); d.className = 'tapado'
+        Object.assign(d.style, { left: t.caja.x + 'px', top: t.caja.y + 'px', width: t.caja.w + 'px', height: t.caja.h + 'px' })
+        L.appendChild(d)
+      }
+    }
+    if (opts.burbuja && c.ranura) {
+      // Mientras hay burbuja, «Siguiente mano» no existe (quinta condición del
+      // gate, GameTable.jsx): se tapa la ranura antes de dibujarla.
+      const vela = document.createElement('div'); vela.className = 'vela-ranura'
+      Object.assign(vela.style, { left: c.ranura.x + 'px', top: c.ranura.y + 'px', width: c.ranura.w + 'px', height: c.ranura.h + 'px' })
+      L.appendChild(vela)
+      const b = document.createElement('div'); b.className = 'burbuja'
+      b.innerHTML = '<span class="anillo">12</span>Recargar'
+      Object.assign(b.style, { left: (c.ranura.x + c.ranura.w / 2) + 'px', top: (c.ranura.y + c.ranura.h / 2) + 'px' })
+      L.appendChild(b)
+    }
+    if (opts.vuelo && c.pozoMoneda) {
+      const o = c.pozoMoneda, d = c.destino || c.cartasJugador || c.ovalo
+      const x0 = o.x + o.w / 2, y0 = o.y + o.h / 2, x1 = d.x + d.w / 2, y1 = d.y + d.h / 2
+      // Instantánea a mitad de vuelo: las siete monedas escalonadas sobre la
+      // trayectoria, por encima de la capa (26 > 20).
+      for (let i = 0; i < 7; i++) {
+        const t = 0.25 + i * 0.07, arco = -Math.sin(Math.PI * t) * 40
+        const m = document.createElement('div'); m.className = 'moneda'
+        Object.assign(m.style, { left: (x0 + (x1 - x0) * t - 8) + 'px', top: (y0 + (y1 - y0) * t + arco - 8) + 'px' })
+        L.appendChild(m)
+      }
+    }
+    return { marco, info }
+  }
+
+  function datosHTML(info, clave) {
+    if (!info || !info.c) return ''
+    const { c, f, v } = info
+    const fila = (k, val) => `<dt>${k}</dt><dd>${val}</dd>`
+    let h = fila('Celda', `${clave} · ${c.ruta}`)
+    h += fila('Caja del &lt;p&gt;', `${c.msg.w} × ${c.msg.h} px · letra ${c.fuente} px · interlineado ${c.interlinea} px${c.pFijo ? '' : ' (alto automático)'}`)
+    h += fila('Frase', `<span class="frase">«${f.texto}»</span> (${f.car} car.)`)
+    if (v) {
+      h += fila(VAR[E.lineas], `se leen <b>${v.leidos}</b> de ${v.total} caracteres · ${v.marca ? '<span class="tapa">recortada (toque activo)</span>' : '<span class="libre">entera (el óvalo no responde)</span>'}`)
+      h += fila('Óvalo / &lt;p&gt;', `Δ óvalo ${v.dOvalo} px · Δ &lt;p&gt; ${v.dMsg} px`)
+    }
+    if (E.abierta && v && !v.marca) h += fila('Capa', 'No se despliega: la frase cabe entera.')
+    else if (info.capa) h += fila('Capa', `${Math.round(info.capa.w)} × ${Math.round(info.capa.h)} px · z 20 · ` + (info.tapa.length ? `<span class="tapa">tapa: ${[...new Set(info.tapa.map((t) => t.nombre))].join(', ')}</span>` : '<span class="libre">no tapa nada medido</span>'))
+    return `<dl>${h}</dl>`
+  }
+
+  // ── Vistas de la lámina ─────────────────────────────────────────────────
+  function pintaUna(dest) {
+    const tabs = document.createElement('div'); tabs.className = 'vistas-tabs'
+    for (const vista of VISTAS) for (const n of MESAS) {
+      if (n !== MESAS[0]) continue
+      const b = document.createElement('button'); b.textContent = vista
+      b.setAttribute('aria-pressed', String(E.vista === vista)); b.onclick = () => { E.vista = vista; guarda(); pinta() }
+      tabs.appendChild(b)
+    }
+    const tm = document.createElement('div'); tm.className = 'vistas-tabs'
+    for (const n of MESAS) {
+      const b = document.createElement('button'); b.textContent = `Mesa ${n}`
+      b.setAttribute('aria-pressed', String(E.mesa === n)); b.onclick = () => { E.mesa = n; guarda(); pinta() }
+      tm.appendChild(b)
+    }
+    dest.append(tabs, tm)
+    const clave = `${E.vista} m${E.mesa}`
+    const c = M.celdas[clave]
+    const alto = Math.min(window.innerHeight - 260, 760)
+    const escala = c ? Math.min(1, alto / c.vp.h, (window.innerWidth - 520) / c.vp.w) : 1
+    const { marco, info } = celda(clave, escala, E)
+    const fila = document.createElement('div'); fila.className = 'celda-y-datos'
+    const d = document.createElement('div'); d.className = 'datos'; d.innerHTML = datosHTML(info, clave)
+    fila.append(marco, d)
+    dest.appendChild(fila)
+  }
+  function pintaMatriz(dest, opts, titulo) {
+    const h = document.createElement('h2'); h.textContent = titulo; dest.appendChild(h)
+    const g = document.createElement('div'); g.className = 'matriz'
+    for (const vista of VISTAS) for (const n of MESAS) {
+      const clave = `${vista} m${n}`, c = M.celdas[clave]
+      const caja = document.createElement('div')
+      const escala = c ? Math.min(330 / c.vp.w, 300 / c.vp.h) : 0.2
+      const { marco, info } = celda(clave, escala, opts)
+      const v = info?.v
+      const tapa = info?.tapa?.length ? ` · <span class="tapa">tapa ${[...new Set(info.tapa.map((t) => t.nombre.replace(/ \(rival \d\)/, '')))].join(', ')}</span>` : ''
+      caja.innerHTML = `<div class="rotulo"><b>${clave}</b>${v ? ` · se leen ${v.leidos}/${v.total}${v.marca ? '' : ' · <span class="libre">entera</span>'}` : ''}${tapa}</div>`
+      caja.appendChild(marco); g.appendChild(caja)
+    }
+    dest.appendChild(g)
+  }
+  function pintaRecogidas(dest, clave, titulo) {
+    const c = M.celdas[clave]
+    const h = document.createElement('h2'); h.textContent = titulo; dest.appendChild(h)
+    if (!c) return
+    const g = document.createElement('div'); g.className = 'rejilla-recogidas'
+    g.style.gridTemplateColumns = `max-content repeat(3, max-content)`
+    g.innerHTML = '<div class="cab">Forma</div>' + Object.values(VAR).map((x) => `<div class="cab">${x}</div>`).join('')
+    const esc = Math.min(1, 300 / c.ovalo.w)
+    for (const fid of FORMAS) {
+      const f = c.formas[fid]; if (!f) continue
+      const l = document.createElement('div'); l.className = 'rotulo'; l.innerHTML = `<b>${NOMBRE_FORMA[fid]}</b><br>${f.car} car.`
+      g.appendChild(l)
+      for (const vid of Object.keys(VAR)) {
+        const v = f.var[vid]
+        const fig = document.createElement('figure')
+        fig.innerHTML = `<img src="capturas/${archivo(clave)}_${forma2arch(fid)}_${vid}.jpg" width="${Math.round(c.ovalo.w * esc)}" height="${Math.round(c.ovalo.h * esc)}" alt=""><figcaption>se leen ${v.leidos}/${v.total} · ${v.marca ? 'recortada' : '<span class="libre">entera</span>'}</figcaption>`
+        g.appendChild(fig)
+      }
+    }
+    dest.appendChild(g)
+  }
+
+  function pinta() {
+    const P = document.getElementById('principal')
+    P.innerHTML = ''
+    if (HOJA) {
+      document.getElementById('mandos').style.display = 'none'
+      pintaMatriz(P, { ...E, forma: 'IA+tellevas', lineas: 'l2', indicio: 'flecha', abierta: false, vuelo: false, burbuja: false, tapado: false },
+        'Hoja · recogida provisional (2 líneas) con «…» y flechita · «… Te llevas otros 1500 Heptacoins.»')
+      pintaMatriz(P, { ...E, forma: 'IA+tellevas', lineas: 'l2', capa: 'A', pos: 'centro', abierta: true, vuelo: true, burbuja: true, tapado: true },
+        'Hoja · capa A desplegada sobre el óvalo, con el vuelo encima y la burbuja en su ranura (lo tapado, en rojo)')
+      for (const clave of ['360x640 m5', '844x390 m5', '1920x1080 m5'])
+        pintaRecogidas(P, clave, `Hoja · qué se lee recogido en ${clave}: 9 formas × 3 variantes`)
+    } else {
+      pintaMandos()
+      pintaUna(P)
+      pintaMatriz(P, E, 'Las 20 celdas con los mismos interruptores')
+      pintaRecogidas(P, `${E.vista} m${E.mesa}`, `Qué se lee recogido en ${E.vista} m${E.mesa}: 9 formas × 3 variantes`)
+      const n = document.createElement('p'); n.className = 'nota'
+      n.innerHTML = '* «Fin de partida» no llega nunca al óvalo (D16): va solo como referencia de longitud. ' +
+        'La capa, el indicio, el vuelo y la burbuja son dibujos sobre la captura en sus coordenadas medidas; el óvalo de cada variante sí lo pinta el producto. ' +
+        'En 844×390 (mesas 5/4/3) la caja del mensaje mide 16 px: «2 líneas, interlineado ajustado» son 8 px para letra de 9 y se ve como se lee.'
+      P.appendChild(n)
+    }
+    // Espera a que carguen todas las imágenes (la hoja de contacto la fotografía).
+    Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r })))).then(() => { window.__voz2Listo = true })
+  }
+  pinta()
+})()
+</script>
+</body>
+</html>
