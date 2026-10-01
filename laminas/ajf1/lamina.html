@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AJILEI · Lámina AJF-1 · botón «Jugar contra jugadores»</title>
+<!--
+  AJF-1 · Lámina de las cuatro variantes del botón de jugadores, SOBRE EL LOBBY REAL.
+
+  CÓMO SE ABRE. La sirve el servidor de desarrollo (el bypass de .env.local deja
+  el lobby a la vista sin sesión):
+      npx vite --port 5174   →   http://localhost:5174/laminas/ajf1/lamina.html
+  Por `file://` NO funciona: el lobby vive en un iframe del MISMO origen, y es
+  eso lo que deja inyectarle la hoja de las variantes.
+
+  QUÉ HACE. Carga `/` (la app de verdad, con Lobby.jsx y lobby.css de hoy) en un
+  iframe y le añade UNA hoja (`#ajf1-variantes`) cuyas reglas cuelgan de
+  `html[data-ajf1="…"]`. Ese atributo es el interruptor. No toca el árbol de
+  React —los iconos son `::before`— y no usa `!important`: gana por especificidad
+  sobre `.lobby .lob-cta-ia`. La caja de las píldoras NO cambia en ninguna variante
+  (alto `--lob-cta-h`, ancho `--lob-cta-w`): el anillo es `box-shadow: inset`,
+  nunca `border`, por la lección E-33 (un borde de 2 px movía la geometría).
+
+  PARÁMETROS.
+      ?v=hoy|A|B|C|AI     variante inicial (AI = A + icono)
+      &vp=1920x1080|390x844|360x640
+      &solo=1             sin barra: el iframe ocupa la ventana (lo usa capturar.mjs)
+  `window.__ajf1Listo` vale true cuando la variante está aplicada y medida;
+  `window.__ajf1Medida()` devuelve las cajas y las líneas de texto de los dos CTA.
+-->
+<style>
+:root {
+  --pagina: #0b1a10; --panel: #12261a; --tinta: #f5edd8; --tinta-2: #b9b29f;
+  --linea: rgba(245, 237, 216, .16); --oro: #e8b84b; --ok: #7fd18b; --mal: #ff8a7a;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--pagina); color: var(--tinta); font: 14px/1.45 system-ui, "Segoe UI", Roboto, sans-serif; }
+.barra { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--linea); background: var(--panel); }
+.barra h1 { font-size: 15px; font-weight: 600; margin: 0 8px 0 0; }
+.grupo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.grupo span { color: var(--tinta-2); margin-right: 2px; }
+.grupo button { font: inherit; color: var(--tinta); background: transparent; border: 0; box-shadow: inset 0 0 0 1px var(--linea); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.grupo button[aria-pressed="true"] { background: var(--oro); color: #1a1a0e; box-shadow: none; }
+.nota { padding: 8px 16px; color: var(--tinta-2); border-bottom: 1px solid var(--linea); min-height: 2.9em; }
+.nota b { color: var(--tinta); font-weight: 600; }
+.nota .ok { color: var(--ok); } .nota .mal { color: var(--mal); }
+.escenario { padding: 16px; display: flex; justify-content: center; }
+.marco { position: relative; overflow: hidden; border-radius: 6px; box-shadow: 0 0 0 1px var(--linea), 0 10px 30px rgba(0,0,0,.4); }
+.marco iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: #09170e; }
+body.solo .barra, body.solo .nota { display: none; }
+body.solo .escenario { padding: 0; }
+body.solo .marco { border-radius: 0; box-shadow: none; width: 100vw; height: 100vh; }
+body.solo .marco iframe { width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<div class="barra">
+  <h1>AJF-1 · «Jugar contra jugadores»</h1>
+  <div class="grupo" id="variantes"><span>Variante</span></div>
+  <div class="grupo" id="vistas"><span>Vista</span></div>
+</div>
+<div class="nota" id="nota"></div>
+<div class="escenario"><div class="marco" id="marco"><iframe id="lobby" title="Lobby real" src="/"></iframe></div></div>
+
+<script>
+// ── Las variantes ────────────────────────────────────────────────────────────
+const VARIANTES = [
+  { id: 'hoy', nombre: 'Hoy',          nota: '<b>Hoy</b> · las dos píldoras doradas, sin icono (estado de AJF-1 tras C3). Referencia.' },
+  { id: 'A',   nombre: 'A · contorno', nota: '<b>A · contorno</b> · jugadores con fondo transparente, anillo dorado de 2 px (<code>box-shadow: inset</code>) y texto oro. Sin sombra exterior.' },
+  { id: 'B',   nombre: 'B · vinotinto', nota: '<b>B · vinotinto</b> · jugadores en <code>#7c1d30</code>, texto oro, el mismo anillo de 2 px y la misma sombra exterior que la de las IAS.' },
+  { id: 'C',   nombre: 'C · iconos',   nota: '<b>C · iconos</b> · las dos doradas; moneda Heptacoin a la izquierda en IAS, dos personas en jugadores.' },
+  { id: 'AI',  nombre: 'A + icono',    nota: '<b>A + icono</b> · el contorno de A en jugadores, y los iconos de C en las dos.' },
+]
+const VISTAS = [
+  { id: '1920x1080', w: 1920, h: 1080 },
+  { id: '390x844',   w: 390,  h: 844 },
+  { id: '360x640',   w: 360,  h: 640 },
+]
+
+// Dos personas: contrato de icono de la casa (caja 24, fill none, currentColor,
+// trazo 1.75, LOB-1). Va por máscara, así que toma el color del texto del botón.
+const PERSONAS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.25"/><path d="M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="16.75" cy="9" r="2.6"/><path d="M16.2 14.05c.25-.03.5-.05.8-.05 2.75 0 4.75 2 4.75 4.9"/></svg>`
+const PERSONAS_URI = `url("data:image/svg+xml,${encodeURIComponent(PERSONAS)}")`
+
+// La hoja que se inyecta en el lobby. Especificidad (0,3,1) frente al (0,2,0) de
+// `.lobby .lob-cta-ia`: gana sin `!important`. Nada aquí toca height ni width.
+const HOJA = `
+html[data-ajf1="A"] .lobby [data-accion="jugar-pvp"],
+html[data-ajf1="AI"] .lobby [data-accion="jugar-pvp"] {
+  background: transparent;
+  color: var(--gold-brand);
+  box-shadow: inset 0 0 0 2px var(--gold-brand);
+}
+html[data-ajf1="B"] .lobby [data-accion="jugar-pvp"] {
+  background: #7c1d30;
+  color: var(--gold-brand);
+  box-shadow:
+    inset 0 0 0 2px var(--gold-brand),
+    0 calc(var(--u) * 1.5) calc(var(--u) * 4) rgba(0, 0, 0, 0.45);
+}
+html[data-ajf1="C"] .lobby .lob-accion [data-accion^="jugar-"],
+html[data-ajf1="AI"] .lobby .lob-accion [data-accion^="jugar-"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  white-space: nowrap;
+}
+html[data-ajf1="C"] .lobby .lob-accion [data-accion^="jugar-"]::before,
+html[data-ajf1="AI"] .lobby .lob-accion [data-accion^="jugar-"]::before {
+  content: "";
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+}
+html[data-ajf1="C"] .lobby [data-accion="jugar-ia"]::before,
+html[data-ajf1="AI"] .lobby [data-accion="jugar-ia"]::before {
+  /* La moneda es el maestro sellado: se pinta con sus colores, no se recolorea. */
+  background: url("/src/assets/heptacoin.svg") center / contain no-repeat;
+}
+html[data-ajf1="C"] .lobby [data-accion="jugar-pvp"]::before,
+html[data-ajf1="AI"] .lobby [data-accion="jugar-pvp"]::before {
+  background-color: currentColor;
+  -webkit-mask: ${PERSONAS_URI} center / contain no-repeat;
+          mask: ${PERSONAS_URI} center / contain no-repeat;
+}`
+
+// ── Estado y parámetros ─────────────────────────────────────────────────────
+const q = new URLSearchParams(location.search)
+const estado = {
+  v: VARIANTES.some(x => x.id === q.get('v')) ? q.get('v') : 'hoy',
+  vp: VISTAS.find(x => x.id === q.get('vp')) || VISTAS[1],
+}
+const solo = q.get('solo') === '1'
+if (solo) document.body.classList.add('solo')
+window.__ajf1Listo = false
+
+const iframe = document.getElementById('lobby')
+const marco = document.getElementById('marco')
+const nota = document.getElementById('nota')
+const doc = () => iframe.contentDocument
+
+function pintaBotones() {
+  const gv = document.getElementById('variantes'), gw = document.getElementById('vistas')
+  gv.querySelectorAll('button').forEach(b => b.remove())
+  gw.querySelectorAll('button').forEach(b => b.remove())
+  for (const x of VARIANTES) {
+    const b = document.createElement('button')
+    b.textContent = x.nombre; b.setAttribute('aria-pressed', String(x.id === estado.v))
+    b.onclick = () => { estado.v = x.id; aplica(); pintaBotones() }
+    gv.append(b)
+  }
+  for (const x of VISTAS) {
+    const b = document.createElement('button')
+    b.textContent = `${x.w}×${x.h}`; b.setAttribute('aria-pressed', String(x.id === estado.vp.id))
+    b.onclick = () => { estado.vp = x; encaja(); pintaBotones(); setTimeout(aplica, 150) }
+    gw.append(b)
+  }
+}
+
+// El iframe mide EXACTAMENTE la vista elegida, y se escala para caber en la
+// ventana: el lobby ve 390×844 aunque la lámina lo enseñe más pequeño.
+function encaja() {
+  if (solo) return
+  const { w, h } = estado.vp
+  const dispW = innerWidth - 32, dispH = innerHeight - document.querySelector('.barra').offsetHeight - nota.offsetHeight - 32
+  const k = Math.min(1, dispW / w, dispH / h)
+  iframe.style.width = w + 'px'; iframe.style.height = h + 'px'
+  iframe.style.transform = `scale(${k})`
+  marco.style.width = Math.round(w * k) + 'px'; marco.style.height = Math.round(h * k) + 'px'
+}
+addEventListener('resize', encaja)
+
+// Cajas y líneas de los dos CTA, medidas DENTRO del lobby.
+window.__ajf1Medida = () => {
+  const d = doc(); if (!d) return null
+  const lee = (sel) => {
+    const el = d.querySelector(sel); if (!el) return null
+    const r = el.getBoundingClientRect(), cs = d.defaultView.getComputedStyle(el)
+    // Líneas = tops distintos de los rectángulos de los NODOS DE TEXTO. Un rango
+    // sobre el botón entero cuenta también la caja de un `<span>` que el flex de
+    // las variantes con icono blockifica, y su top no es el del glifo: daba 2.
+    const tops = new Set(), rango = d.createRange()
+    const andar = d.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+    for (let n = andar.nextNode(); n; n = andar.nextNode()) {
+      if (!n.textContent.trim()) continue
+      rango.selectNodeContents(n)
+      for (const x of rango.getClientRects()) if (x.width > 0) tops.add(Math.round(x.top))
+    }
+    return { w: +r.width.toFixed(2), h: +r.height.toFixed(2), x: +r.x.toFixed(2), y: +r.y.toFixed(2),
+             lineas: tops.size, rebosa: el.scrollWidth > el.clientWidth + 0.5, texto: el.innerText, fondo: cs.backgroundColor, imagen: cs.backgroundImage.slice(0, 24),
+             color: cs.color, sombra: cs.boxShadow, borde: cs.borderTopWidth, fuente: cs.fontSize }
+  }
+  const de = d.documentElement
+  return { variante: de.dataset.ajf1, vista: `${de.clientWidth}×${d.defaultView.innerHeight}`,
+           desborde: de.scrollHeight > d.defaultView.innerHeight + 0.5 || de.scrollWidth > de.clientWidth + 0.5,
+           ia: lee('[data-accion="jugar-ia"]'), pvp: lee('[data-accion="jugar-pvp"]') }
+}
+
+function aplica() {
+  const d = doc(); if (!d || !d.querySelector('main.lobby [data-accion="jugar-pvp"]')) return false
+  if (!d.getElementById('ajf1-variantes')) {
+    const s = d.createElement('style'); s.id = 'ajf1-variantes'; s.textContent = HOJA; d.head.append(s)
+  }
+  d.documentElement.dataset.ajf1 = estado.v
+  const x = VARIANTES.find(v => v.id === estado.v)
+  const m = window.__ajf1Medida()
+  const fila = (k, c) => c ? `${k} ${c.w}×${c.h} · ${c.lineas === 1 ? '<span class="ok">1 línea</span>' : `<span class="mal">${c.lineas} líneas</span>`}${c.rebosa ? ' · <span class="mal">rebosa</span>' : ''}` : `${k} —`
+  nota.innerHTML = `${x.nota}<br>Medido en ${m.vista}: ${fila('IAS', m.ia)} · ${fila('jugadores', m.pvp)} · ${m.desborde ? '<span class="mal">desborda</span>' : '<span class="ok">sin desborde</span>'}`
+  return true
+}
+
+// Espera al lobby (React monta después del `load`) y a sus fuentes.
+iframe.addEventListener('load', async () => {
+  const t0 = performance.now()
+  while (!aplica()) {
+    if (performance.now() - t0 > 20000) { nota.innerHTML = '<span class="mal">El lobby no apareció en 20 s. ¿Está el servidor de desarrollo con el bypass?</span>'; return }
+    await new Promise(r => setTimeout(r, 100))
+  }
+  await doc().fonts.ready
+  await new Promise(r => setTimeout(r, 300))
+  aplica()
+  window.__ajf1Listo = true
+})
+
+pintaBotones()
+encaja()
+</script>
+</body>
+</html>
