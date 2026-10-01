@@ -9554,8 +9554,45 @@ const msgLee = (page) => page.evaluate(() => {
   const vozVieja = (bruto.match(/\(\s*\d+\s*pts\s*\)/g) || [])
 
   const el = document.querySelector('.game-message')
+  // VOZ-2 · 1b · con resultado la frase vive en `.voz2-texto` (dentro del
+  // `<p>`) y puede estar RECORTADA: `textContent` la devuelve entera aunque se
+  // lean diez caracteres (regla ARN-1: verificar lo que SE VE). Se lee el texto
+  // del span y, aparte, cuántos glifos se ven: los que tienen caja dentro del
+  // recorte del span y de cada ancestro que recorte (`Range` de uno en uno).
+  // Lo visible tiene que ser un PREFIJO contiguo del texto: si hubiera un hueco,
+  // el recorte estaría enseñando otra cosa que el principio de la frase.
+  const sp = el && el.querySelector(':scope > .voz2-texto')
+  const fuente = sp || el
+  let visto = null
+  if (sp) {
+    const tn = document.createTreeWalker(sp, NodeFilter.SHOW_TEXT).nextNode()
+    let c = { l: -1e9, t: -1e9, r: 1e9, b: 1e9 }
+    for (let n = sp; n && n !== document.documentElement; n = n.parentElement) {
+      const cs = getComputedStyle(n)
+      if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+        const b = n.getBoundingClientRect()
+        c = { l: Math.max(c.l, b.left), t: Math.max(c.t, b.top), r: Math.min(c.r, b.right), b: Math.min(c.b, b.bottom) }
+      }
+    }
+    const rg = document.createRange()
+    const ve = []
+    for (let i = 0; tn && i < tn.length; i++) {
+      rg.setStart(tn, i); rg.setEnd(tn, i + 1)
+      const q = rg.getBoundingClientRect()
+      ve.push(q.width === 0 ? null : (q.left >= c.l - 0.5 && q.right <= c.r + 0.5 && q.top >= c.t - 0.5 && q.bottom <= c.b + 0.5))
+    }
+    // Los glifos sin caja (espacios colapsados) siguen a su vecino.
+    const k = ve.findIndex((v) => v === false)
+    const n = k < 0 ? ve.length : k
+    visto = {
+      n, total: ve.length, recortada: sp.getAttribute('data-voz2-recortada') === '1',
+      contiguo: ve.slice(n).every((v) => v !== true),
+      texto: (tn ? tn.data : '').slice(0, n).trim(),
+    }
+  }
   return {
-    texto: txt(el),
+    texto: txt(fuente),
+    visto,
     tono: el ? (el.getAttribute('data-tono') || '') : null,
     clase: el ? el.className : null,
     color: el ? getComputedStyle(el).color : null,
@@ -9671,7 +9708,9 @@ const msgManoPorRotacion = (n, mano) => {
 // está revelado" y no hay que interpretar clases para saberlo.
 const msgTexto = (page) => page.evaluate(() => {
   const m = document.querySelector('.game-message')
-  return m ? m.textContent.trim() : null
+  // VOZ-2 · 1b · el texto del resultado vive en el span (ver `msgLee`).
+  const sp = m && m.querySelector(':scope > .voz2-texto')
+  return (sp || m) ? (sp || m).textContent.trim() : null
 })
 
 const msgLeeCartasDom = (page) => page.evaluate(() => {
@@ -9762,6 +9801,9 @@ async function msgRevelaYLee(page, nombres) {
 // chip de ganador al panel destapado, así que leer después falsearía `idxGana`).
 // Lo único nuevo es de dónde salen las cartas y las dos puertas que eso añade.
 async function msgAuditaMano(page, n, mano, juego, dep) {
+  // VOZ-2 · 1b · dos fotogramas: la marca de recorte la pone el producto desde
+  // sus observadores, un render después de pintarse la frase.
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
   const l = await msgLee(page)
   const conScore = l.zonas.filter(z => z.score)
   const idxGana  = conScore.findIndex(z => z.gana)
@@ -9957,8 +9999,17 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
   // ganadas por retiros no tienen cartas que leer —no hubo volteo— y ahí
   // `cartasOk` es cierto por AUSENCIA declarada, no por relleno.
   m.cartasOk = via === 'plantilla' ? true : (cartasLeidas && cartasCuadran)
+  // VOZ-2 · 1b · LO QUE SE VE es el principio de la frase compuesta. Contra la
+  // esperada cuando la hay (con capas, la esperada es sólo la cabeza: se pide
+  // que uno de los dos empiece por el otro); por retiros, contra el propio texto.
+  // Sin span (no debería pasar en el pago) la puerta cae: no hay nada que ver.
+  const v = l.visto
+  const contra = esperado ? esperado.texto : l.texto
+  m.visto = v ? { n: v.n, total: v.total, recortada: v.recortada, contiguo: v.contiguo, texto: v.texto } : null
+  m.vistoEsPrefijo = !!v && v.contiguo && v.n > 0 && (contra.startsWith(v.texto) || v.texto.startsWith(contra)) && l.texto.startsWith(v.texto) &&
+    (v.n < v.total) === v.recortada
   m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado && m.pantallaLimpia &&
-    m.manoLeida && m.manoConcuerda && m.manoCruce && m.cartasOk && m.mensajeEstable
+    m.manoLeida && m.manoConcuerda && m.manoCruce && m.cartasOk && m.mensajeEstable && m.vistoEsPrefijo
   return m
 }
 
@@ -10295,7 +10346,7 @@ async function runMSG(browser) {
     // ARN-2 · la Mano se imprime en cada mano junto con si su pastilla estaba
     // oculta y si el desempate lo ganó ella: ése es el registro con el que se
     // demuestra que la condición del hallazgo ① se ejercitó, y no un "confía".
-    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.encogio ? ` (mesa de ${m.vivos}, rotación n/a)` : (m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`)}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} ${msgCartasResumen(m)}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.encogio ? ` (mesa de ${m.vivos}, rotación n/a)` : (m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`)}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} ${msgCartasResumen(m)} visto:${m.visto ? `${m.visto.n}/${m.visto.total}${m.visto.recortada ? ' recortada' : ''}` : '—'}${m.vistoEsPrefijo ? '✓' : '✗'}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
@@ -10348,6 +10399,14 @@ async function runMSG(browser) {
   // La robustez del óvalo se midió en escritorio; en móvil NO se asume. Se
   // inyecta la frase más larga que el compositor puede producir y se comprueba
   // que ninguna ancla se mueve, en las dos plataformas y en las dos rutas.
+  //
+  // VOZ-2 · 1b · RECABLEADA. Hasta aquí se inyectaba sobre el `<p>` en plena
+  // apuesta (tras el reparto): esa frase es de RESULTADO y desde VOZ-2 el
+  // resultado vive en `.voz2-texto`, que recorta y contiene. Escribir sobre el
+  // `<p>` borraba el span y medía el camino viejo (en 360×640 veía los 3,11 px
+  // de C-2, que VOZ-2 corrige). Ahora se juega la mano hasta el PAGO y se
+  // escribe DENTRO del span, que es donde el producto la pinta. «Desborda» pasa
+  // a ser «se recorta» (la marca del producto, que es la que abre la capa).
   const anchuras = []
   for (const celda of MSG_CELDAS) {
     if (tblFilter && celda.n !== tblFilter) continue
@@ -10358,22 +10417,24 @@ async function runMSG(browser) {
     const r = { ...celda }
     try {
       await gotoMesa(page, celda.n)
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      await page.waitForTimeout(4800)   // el reparto termina en ~4,5s
+      const juego = await msgJuegaUnaMano(page, true)
+      if (!juego || !juego.jugada) throw new Error('la mano no llegó al pago')
+      await page.waitForTimeout(4500)   // la revelación (REC-1: +3,72 s)
       const d = await page.evaluate(({ anchors, hoy, manana }) => {
         const rnd = x => (x == null ? null : Math.round(x * 100) / 100)
         const R = s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { x: rnd(b.x), y: rnd(b.y), w: rnd(b.width), h: rnd(b.height) } }
         const snap = () => anchors.map(R)
-        const el = document.querySelector('.game-message')
-        if (!el) return null
+        const el = document.querySelector('.game-message > .voz2-texto')
+        if (!el) return { error: 'sin .voz2-texto en el pago' }
+        const recorta = () => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1
         const previo = el.textContent
         const corto = snap()
         el.textContent = hoy
         const conHoy = snap()
-        const desbordaHoy = el.scrollWidth > el.clientWidth + 0.5
+        const desbordaHoy = recorta()
         el.textContent = manana
         const conManana = snap()
-        const desborda = el.scrollWidth > el.clientWidth + 0.5
+        const desborda = recorta()
         el.textContent = previo
         const dmax = (a, b) => {
           let m = 0, quien = null
@@ -10391,6 +10452,7 @@ async function runMSG(browser) {
         const sensibilidad = dmax(corto, conHoy)
         return { m: contraHoy.m, quien: contraHoy.quien, sens: sensibilidad.m, sensQuien: sensibilidad.quien, desborda, desbordaHoy }
       }, { anchors: MSG_ANCHORS, hoy: motorLargaDe[celda.n], manana: largaDe[celda.n] })
+      if (d && d.error) throw new Error(d.error)
       r.delta = d ? d.m : null
       r.quien = d ? d.quien : null
       r.sens = d ? d.sens : null
@@ -10400,7 +10462,7 @@ async function runMSG(browser) {
       r.ok = !!d && d.m <= 0.02 && d.desborda === d.desbordaHoy
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
     anchuras.push(r)
-    console.log(`msg·Δ larga T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} Δ(hoy→mañana)=${r.delta} (${r.quien}) · desborde hoy/mañana=${r.desbordaHoy}/${r.desborda} · sensibilidad preexistente del óvalo=${r.sens} (${r.sensQuien})${r.error ? ' · ' + r.error : ''}`)
+    console.log(`msg·Δ larga T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} Δ(hoy→mañana)=${r.delta} (${r.quien}) · en el span · recorte hoy/mañana=${r.desbordaHoy}/${r.desborda} · sensibilidad preexistente del óvalo=${r.sens} (${r.sensQuien})${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 

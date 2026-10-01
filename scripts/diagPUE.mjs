@@ -24,6 +24,7 @@
 //       node scripts/diagPUE.mjs cap [--sellar]  (CAP-1: las tres maestras de la mesa; NO entra en `todo`)
 //       node scripts/diagPUE.mjs dis             (DIS-1: los aparatos renderizados de la escena 5, Edge y WebKit; SÍ entra en `todo`)
 //       node scripts/diagPUE.mjs bie             (BIE-1: qué suena en la puerta y el «Cargando», con la red de Supabase simulada; SÍ entra en `todo`)
+//       node scripts/diagPUE.mjs voz2 [--control=contain|nowrap|capa] [--celdas=…] [--sin-burbuja]  (VOZ-2: la frase del óvalo recortada y desplegada; NO entra en `todo`; voz2.burbuja usa además el 5173, VOZ2_DEV)
 import { chromium, webkit } from 'playwright-core'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
@@ -1774,6 +1775,443 @@ if (hacerSolo('cap')) {
   }
   resultados.bloques.cap = { semilla: SEMILLA_CAP, sellado: sellar && verde, vistas: cap }
   writeFileSync(`${DIR_CAP}/cap.json`, JSON.stringify(resultados.bloques.cap, null, 2))
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// voz2 · VOZ-2 · La frase del óvalo, recogida (1a) y desplegada (1b)
+// ════════════════════════════════════════════════════════════════════════════
+// Rector: AJILEI_VOZ-2_Fase1_v1.0.md §2 1a-ii y §3 1b-iii. Llegar y medir viven en
+// `scripts/voz2/voz2Mesa.mjs` (lo comparte la lámina); aquí sólo los veredictos.
+// Juega UNA mano por celda hasta el pago —20 celdas, ~5 min con cuatro a la
+// vez—, así que corre sólo por su nombre, nunca dentro de `todo`.
+//
+//   node scripts/diagPUE.mjs voz2                       (las cuatro puertas)
+//   node scripts/diagPUE.mjs voz2 --control=contain     (control: sin contención)
+//   node scripts/diagPUE.mjs voz2 --control=nowrap      (control: el recorte ingenuo)
+//   node scripts/diagPUE.mjs voz2 --control=capa        (control: una capa que lo tapa todo)
+//   node scripts/diagPUE.mjs voz2 --sin-burbuja         (salta la pasada del 5173)
+//   node scripts/diagPUE.mjs voz2 --celdas=360x640      (filtra por subcadena)
+//
+// · voz2.c1          el óvalo del pago es el de la tabla C1 de la Fase 0 (D1).
+// · voz2.ovalo       con las 9 formas, Δ = 0 del óvalo y de su interior (pozo,
+//                    «A igualar», comodín). El `<p>` NO puntúa aquí: C-3
+//                    (two-ovals, alto automático) y C-4 (escritorio 4/5, ahora
+//                    estirado) se imprimen aparte, ni escondidos ni tomados por
+//                    regresión.
+// · voz2.recorte     hay marca `data-voz2-recortada` ⇔ hay glifos que no se
+//                    ven (contados con `Range` contra el recorte, nunca con
+//                    `textContent`). También para la frase real del pago.
+// · voz2.contencion  centinelas 360×640 m5/m4 con «… Te llevas otros 1500
+//                    Heptacoins.» y el peor caso: además `<p>` Δ0 (C-2, D7).
+// 1b (en la misma página, tras la parte 1; el peor caso se inyecta para que
+// haya recorte en las 20 celdas):
+// · voz2.capa        tocar el texto abre la capa (fixed, z 20) con la frase
+//                    ENTERA —cada glifo dentro del viewport y sin tapar—, tocarla
+//                    la cierra, dos alternancias, y Δ0 de las anclas abierta y
+//                    después. También con la frase real, donde viene recortada.
+// · voz2.capa(a)     con la capa abierta, «Siguiente mano» recibe los nueve
+//                    toques de su rejilla y no se corta con la capa (exigencia
+//                    de Victor). Lo que tapa la capa (b) se imprime, sin veredicto.
+// · voz2.indicio     la flechita se ve recogida, no se ve desplegada ni sin
+//                    recorte, y ningún ancestro la recorta.
+// · voz2.toque       rejilla 5×3 del óvalo + el texto: cada punto del óvalo abre
+//                    con UNA alternancia y Esc cierra; tocar el óvalo con la capa
+//                    abierta la cierra; los nombres de rival en la frontera ganan;
+//                    sin recorte y fuera del resultado el óvalo no responde.
+// · voz2.a11y        con recorte, UN botón cuyo nombre es la frase entera;
+//                    Enter/Espacio alternan, Esc cierra, aria-controls = la capa;
+//                    sin recorte, ni rol ni tabindex ni aria-*.
+// · voz2.siguiente   con la capa abierta, el toque a «Siguiente mano» la quita en
+//                    ≤ 1 fotograma, no vuelve, y la mano nueva se ve (TURNO).
+// · voz2.burbuja     (5173, `?apu=`) la burbuja no cierra la capa, se ve y se
+//                    toca con ella abierta; su tarjeta la recoge y queda encima.
+// Con `--control`, la hoja de control entra por la página (no por el repo) y lo
+// que se exige es lo contrario: que la puerta VEA el movimiento donde la Fase 0
+// lo midió (o, con `capa`, el bloqueo). Sin ese rojo, el verde no vale.
+if (hacerSolo('voz2')) {
+  const V = await import('./voz2/voz2Mesa.mjs')
+  const control = (process.argv.find((a) => a.startsWith('--control=')) || '').split('=')[1] || null
+  const filtro = (process.argv.find((a) => a.startsWith('--celdas=')) || '').split('=')[1] || ''
+  if (control && !V.HOJAS_CONTROL[control]) { console.error(`--control desconocido: ${control}`); process.exit(1) }
+  const etq = control ? `voz2.control[${control}]` : 'voz2'
+  console.log(`\n── ${etq} · ${V.VISTAS_VOZ2.map((v) => v.id).join(' / ')} × mesas ${V.MESAS_VOZ2.join('/')}${filtro ? ` · filtro «${filtro}»` : ''} ──`)
+  const tareas = []
+  for (const v of V.VISTAS_VOZ2) for (const n of V.MESAS_VOZ2) if (V.etiquetaCelda(v, n).includes(filtro)) tareas.push([v, n])
+  const EPS = 0.011
+  const INTERIOR = ['ovalo', 'pozo', 'igualar', 'comodin']
+  // ── 1b · Parte 2: la capa, el toque, el teclado y la mano siguiente ───────
+  // Corre en la MISMA página que la parte 1, que deja el texto real restaurado.
+  // Orden: capa con la frase real (el camino entero del producto) → capa con el
+  // peor caso inyectado (exigencias a y b) → rejilla del toque → nombres en la
+  // frontera → sin recorte → teclado → y AL FINAL «Siguiente mano», que cambia
+  // de mano. El peor caso se inyecta en el texto Y en la capa: React no vuelve a
+  // escribir un texto que no ha cambiado, así que la capa enseña lo inyectado.
+  const ANC_D1 = ['ovalo', 'pozo', 'igualar', 'comodin', 'msg', 'texto', 'cartasJugador', 'barra']
+  const dAnclas = (a, b) => Math.max(...ANC_D1.map((k) => V.deltaCaja(a[k], b[k])))
+  const raf2 = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+  const centro = (c) => [c.x + c.w / 2, c.y + c.h / 2]
+  // (a) «visible y tocable» con la capa abierta = lo MISMO que sin capa: el
+  // centro y la misma cuenta de la rejilla 3×3, ningún toque para la capa y
+  // ningún solape con ella. Se compara contra la medida SIN capa porque la
+  // burbuja es una píldora: las esquinas de su caja caen fuera de su forma y
+  // el navegador respeta el redondeo, así que con capa o sin ella recibe 6 de 9
+  // (medido en la primera corrida: los otros tres se los lleva la ranura de
+  // detrás, nunca la capa).
+  const tocableOk = (t, sola) => !!t && t.visible && t.dentroVp && t.centro && t.solapeCapa === 0 && !t.robados.includes('capa') &&
+    !!sola && sola.visible && t.toques === sola.toques
+  const fmtToc = (t, sola) => (!t || !t.visible ? 'no está' : `${t.toques}/${t.de} toques (sin capa ${sola?.visible ? sola.toques : '—'}/${t.de}) · centro ${t.centro} · solape con la capa ${t.solapeCapa} px² · dentro del viewport ${t.dentroVp}${t.robados.length ? ` · los demás van a: ${t.robados.join(', ')}` : ''}`)
+  const fmtTapa = (tapa) => Object.entries(tapa).map(([g, t]) => `${g} ${t.pc}%${t.n > 1 ? ` (${t.n})` : ''}`).join(' · ') || 'nada'
+  const centroTexto = (page) => page.evaluate(() => { const b = document.querySelector('.voz2-texto').getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2] })
+
+  // Abre la capa tocando el texto, la mide, la cierra tocándola y vuelve a medir.
+  async function cicloCapa(page, movil, capaTexto = null) {
+    if (capaTexto) await page.evaluate((t) => { const c = document.querySelector('.voz2-capa'); if (c) c.textContent = t }, capaTexto)
+    await page.evaluate(V.ARMAR_CONTADOR)
+    const a0 = await page.evaluate(V.ANCLAS_VOZ2)
+    const sinCapa = (await page.evaluate(V.ESTADO_VOZ2)).siguiente
+    await V.tocar(page, movil, ...(await centroTexto(page)))
+    await raf2(page)
+    const e1 = await page.evaluate(V.ESTADO_VOZ2)
+    const a1 = await page.evaluate(V.ANCLAS_VOZ2)
+    if (e1.capa.visible) await V.tocar(page, movil, ...centro(e1.capa.caja))
+    const e2 = await page.evaluate(V.ESTADO_VOZ2)
+    const a2 = await page.evaluate(V.ANCLAS_VOZ2)
+    return {
+      abre: e1.expanded === 'true' && e1.capa.visible, cierra: e2.expanded === 'false' && !e2.capa.visible, alt: e2.alt,
+      textoEntero: e1.capa.texto === e1.texto, glifos: e1.glifos, z: e1.capa.z, pos: e1.capa.pos, caja: e1.capa.caja,
+      dAbierta: +dAnclas(a0, a1).toFixed(2), dDespues: +dAnclas(a0, a2).toFixed(2),
+      siguiente: e1.siguiente, siguienteSola: sinCapa, tapa: e1.tapa, indicioAbierta: e1.indicio?.visible ?? null,
+    }
+  }
+  const capaOk = (c) => c.abre && c.cierra && c.alt === 2 && c.textoEntero && c.glifos && c.glifos.ok === c.glifos.total && c.glifos.total > 0 &&
+    c.dAbierta <= EPS && c.dDespues <= EPS && c.z === '20' && c.pos === 'fixed'
+  const fmtCapa = (c) => `abre ${c.abre} · cierra ${c.cierra} · alternancias ${c.alt} · glifos ${c.glifos ? `${c.glifos.ok}/${c.glifos.total} (fuera ${c.glifos.fuera}, tapados ${c.glifos.tapados})` : '—'} · texto entero ${c.textoEntero} · Δ abierta ${c.dAbierta} · Δ después ${c.dDespues} · z ${c.z} ${c.pos}` +
+    (c.caja ? ` · capa ${c.caja.w}×${c.caja.h} en (${c.caja.x}, ${c.caja.y})` : '')
+
+  // La forma de prueba: el peor caso; donde el peor caso CABE (1920×1080 m2: 0
+  // de 9 recortadas en la 1a), el peor caso dos veces, declarado como «peor ×2».
+  // Sin recorte no hay capa que abrir, y una puerta que no abre nada no prueba nada.
+  async function formaDePrueba(page, formas) {
+    const peor = formas.find((f) => f.id === 'peor').texto
+    if (await V.ponerTexto(page, peor) === '1') return { texto: peor, nombre: 'peor caso' }
+    const doble = `${peor} ${peor}`
+    await V.ponerTexto(page, doble)
+    return { texto: doble, nombre: 'peor ×2 (el peor caso cabe)' }
+  }
+
+  async function voz2Parte2(page, v, n, formas) {
+    const movil = v.movil
+    const R = {}
+    const e0 = await page.evaluate(V.ESTADO_VOZ2)
+    R.real = { texto: e0.texto, marca: e0.marca }
+    // 1 · La frase REAL, si está recortada: abrir y cerrar sin inyectar nada.
+    if (e0.marca === '1') R.real.capa = await cicloCapa(page, movil)
+    // 2 · El peor caso (b) y las exigencias (a).
+    const fp = await formaDePrueba(page, formas)
+    const peor = fp.texto
+    R.forma = fp.nombre
+    R.marcaPeor = await V.ponerTexto(page, peor)
+    const ePeor = await page.evaluate(V.ESTADO_VOZ2)
+    R.indicio = { cerrada: ePeor.indicio }
+    R.peor = await cicloCapa(page, movil, peor)
+    R.indicio.abierta = R.peor.indicioAbierta
+    if (control === 'capa') return R
+    // 3 · La rejilla del toque, con el peor caso puesto y la capa cerrada. Sólo
+    //     se tocan los puntos que recibe el óvalo (los demás son de otros: el ⋮
+    //     del flanco en horizontal, por ejemplo, abriría su menú). Cada toque
+    //     abre UNA vez y se cierra con Esc, que así queda probado.
+    const pts = await page.evaluate(V.REJILLA_OVALO)
+    R.toque = []
+    for (const q of pts) {
+      const t = { de: q.de, el: q.el, texto: !!q.texto, x: Math.round(q.x), y: Math.round(q.y) }
+      if (q.de === 'ovalo') {
+        await page.evaluate(V.ARMAR_CONTADOR)
+        await V.tocar(page, movil, q.x, q.y)
+        const e = await page.evaluate(V.ESTADO_VOZ2)
+        t.alt = e.alt; t.abre = e.capa.visible
+        await page.keyboard.press('Escape'); await raf2(page)
+        const e2 = await page.evaluate(V.ESTADO_VOZ2)
+        t.escCierra = !e2.capa.visible && e2.expanded === 'false'
+      }
+      R.toque.push(t)
+    }
+    // Cerrar tocando el ÓVALO (no la capa), donde la capa abierta lo deje ver.
+    await page.evaluate(V.ARMAR_CONTADOR)
+    await V.tocar(page, movil, ...(await centroTexto(page)))
+    const libres = (await page.evaluate(V.REJILLA_OVALO)).filter((q) => q.de === 'ovalo')
+    if (libres.length) {
+      await V.tocar(page, movil, libres[0].x, libres[0].y)
+      const e = await page.evaluate(V.ESTADO_VOZ2)
+      R.cierraOvalo = { alt: e.alt, cerrada: !e.capa.visible }
+    } else {
+      R.cierraOvalo = null
+      await page.keyboard.press('Escape'); await raf2(page)
+    }
+    // 4 · Los nombres de rival (los de la frontera, marcados): su toque es suyo.
+    R.nombres = []
+    for (const nm of await page.evaluate(V.NOMBRES_FRONTERA)) {
+      await page.evaluate(V.ARMAR_CONTADOR)
+      await V.tocar(page, movil, nm.x, nm.y)
+      const e = await page.evaluate(V.ESTADO_VOZ2)
+      R.nombres.push({ ...nm, alt: e.alt, abre: e.capa.visible })
+      if (e.capa.visible) { await page.keyboard.press('Escape'); await raf2(page) }
+    }
+    // 5 · El teclado (D13), con locators por rol.
+    await V.ponerTexto(page, peor)
+    const k = { }
+    const boton = page.getByRole('button', { name: peor, exact: true })
+    k.botones = await boton.count()
+    const leeK = async () => { const e = await page.evaluate(V.ESTADO_VOZ2); return `${e.expanded}/${e.capa.visible ? 'capa' : '—'}` }
+    if (k.botones === 1) {
+      k.inicial = await leeK()
+      await boton.focus()
+      await page.keyboard.press('Enter'); await raf2(page); k.enter = await leeK()
+      await page.keyboard.press('Space'); await raf2(page); k.espacio = await leeK()
+      await page.keyboard.press('Enter'); await raf2(page); k.enter2 = await leeK()
+      await page.keyboard.press('Escape'); await raf2(page); k.esc = await leeK()
+      const e = await page.evaluate(V.ESTADO_VOZ2)
+      k.controls = e.controls; k.capaId = e.capa.id; k.tabindex = e.tabindex; k.apagados = e.apagados
+    }
+    // 6 · Sin recorte: ni botón, ni capa, ni flechita, y el óvalo no responde.
+    const corto = 'Ganas.'
+    k.marcaCorta = await V.ponerTexto(page, corto)
+    k.botonesCorto = await page.getByRole('button', { name: corto, exact: true }).count()
+    await page.evaluate(V.ARMAR_CONTADOR)
+    const o = (await page.evaluate(V.ANCLAS_VOZ2)).ovalo
+    await V.tocar(page, movil, o.x + o.w / 2, o.y + o.h / 2)
+    const eC = await page.evaluate(V.ESTADO_VOZ2)
+    k.corto = { role: eC.role, tabindex: eC.tabindex, expanded: eC.expanded, controls: eC.controls, capa: eC.capa.existe, indicio: eC.indicio?.visible ?? null }
+    R.a11y = k
+    await V.ponerTexto(page, R.real.texto)
+    // 7 · «Siguiente mano» con la capa abierta (peor caso, para que haya
+    //     recorte en las 20 celdas). Es también la exigencia (a) EN EL ACTO: el
+    //     toque llega al botón por su punto, con la capa encima.
+    await V.ponerTexto(page, peor)
+    await page.evaluate((t) => { const c = document.querySelector('.voz2-capa'); if (c) c.textContent = t }, peor)
+    const sigSola = (await page.evaluate(V.ESTADO_VOZ2)).siguiente
+    await V.tocar(page, movil, ...(await centroTexto(page)))
+    const eS = await page.evaluate(V.ESTADO_VOZ2)
+    R.sig = { abierta: eS.capa.visible, boton: eS.siguiente, sola: sigSola }
+    if (eS.capa.visible && eS.siguiente.visible) {
+      await page.evaluate(V.ARMAR_GRABADORA)
+      await V.tocar(page, movil, ...centro(eS.siguiente.caja))
+      const t0 = Date.now()
+      while (Date.now() - t0 < 45000) {
+        if (await page.evaluate(() => window.__voz2Rec.f.some((f) => f.turno && f.t > window.__voz2Rec.toque))) break
+        await page.waitForTimeout(250)
+      }
+      const rec = await page.evaluate(() => window.__voz2Rec)
+      const tras = rec.toque == null ? [] : rec.f.filter((f) => f.t > rec.toque)
+      const iT = tras.findIndex((f) => f.turno)
+      R.sig.fotogramas = tras.length
+      R.sig.capaTrasToque = tras.slice(0, 3).map((f) => (f.capa ? 1 : 0)).join('')
+      R.sig.cierraEn = tras.findIndex((f) => !f.capa)
+      R.sig.reaparece = tras.slice(Math.max(1, R.sig.cierraEn + 1)).some((f) => f.capa)
+      R.sig.turno = iT >= 0
+      R.sig.turnoMs = iT >= 0 ? Math.round(tras[iT].t - rec.toque) : null
+      // 8 · Fuera del resultado el óvalo no responde.
+      const o2 = (await page.evaluate(V.ANCLAS_VOZ2)).ovalo
+      if (o2) await V.tocar(page, movil, o2.x + o2.w / 2, o2.y + o2.h / 2)
+      const eF = await page.evaluate(V.ESTADO_VOZ2)
+      R.fuera = { span: eF.hay, capa: eF.capa.existe }
+    }
+    return R
+  }
+
+  // Los veredictos de la parte 2 de una celda.
+  function anotaParte2(c) {
+    const P = c.parte2
+    if (!P) { anota(`voz2.capa ${c.celda}`, false, `sin parte 2${c.error2 ? ': ' + c.error2 : ''}`); return }
+    if (control === 'capa') {
+      const vio = !capaOk(P.peor) || !tocableOk(P.peor.siguiente, P.peor.siguienteSola)
+      anota(`voz2.control[capa] ve el bloqueo ${c.celda}`, vio, `${fmtCapa(P.peor)} · «Siguiente mano»: ${fmtToc(P.peor.siguiente, P.peor.siguienteSola)}`)
+      return
+    }
+    const realTxt = P.real.capa ? `real: ${capaOk(P.real.capa) ? 'ok' : 'FALLA'} (${fmtCapa(P.real.capa)})` : `real «${P.real.texto}» cabe: sin capa`
+    anota(`voz2.capa ${c.celda}`, capaOk(P.peor) && (!P.real.capa || capaOk(P.real.capa)), `${P.forma}: ${fmtCapa(P.peor)} · ${realTxt}`)
+    anota(`voz2.capa(a) «Siguiente mano» ${c.celda}`, P.peor.abre && tocableOk(P.peor.siguiente, P.peor.siguienteSola) && (!P.real.capa || tocableOk(P.real.capa.siguiente, P.real.capa.siguienteSola)), `con la capa abierta (${P.forma}): ${fmtToc(P.peor.siguiente, P.peor.siguienteSola)}`)
+    console.log(`  ·     · voz2.capa(b) ${c.celda} · tapa (${P.forma}): ${fmtTapa(P.peor.tapa)}${P.real.capa ? ` · con la real: ${fmtTapa(P.real.capa.tapa)}` : ''}`)
+    const ind = P.indicio
+    anota(`voz2.indicio ${c.celda}`, P.marcaPeor === '1' && !!ind.cerrada && ind.cerrada.visible && !ind.cerrada.recortado && ind.cerrada.dentroVp && ind.abierta === false && P.a11y.corto.indicio === false,
+      `recogida: visible ${ind.cerrada?.visible} en (${ind.cerrada?.caja.x}, ${ind.cerrada?.caja.y}) recortada por un ancestro ${ind.cerrada?.recortado} · desplegada: visible ${ind.abierta} · sin recorte: visible ${P.a11y.corto.indicio}`)
+    const ov = P.toque.filter((t) => t.de === 'ovalo')
+    const toqueOk = ov.length > 0 && ov.every((t) => t.alt === 1 && t.abre && t.escCierra) && P.toque.some((t) => t.texto && t.de === 'ovalo') &&
+      (P.cierraOvalo === null || (P.cierraOvalo.alt === 2 && P.cierraOvalo.cerrada)) &&
+      P.nombres.every((nm) => (!nm.frontera || nm.gana) && nm.alt === 0 && !nm.abre) && P.a11y.corto.capa === false && P.a11y.corto.expanded === null &&
+      (!P.fuera || (!P.fuera.span && !P.fuera.capa))
+    const otros = P.toque.filter((t) => t.de !== 'ovalo')
+    anota(`voz2.toque ${c.celda}`, toqueOk,
+      `${ov.filter((t) => t.alt === 1 && t.abre).length}/${ov.length} puntos del óvalo abren con UNA alternancia (Esc cierra ${ov.filter((t) => t.escCierra).length})` +
+      `${otros.length ? ` · ${otros.length} puntos de otros: ${[...new Set(otros.map((t) => `${t.de}:${t.el}`))].join(', ')}` : ''}` +
+      ` · cerrar tocando el óvalo: ${P.cierraOvalo ? `alternancias ${P.cierraOvalo.alt}, cerrada ${P.cierraOvalo.cerrada}` : 'n/a (la capa lo cubre)'}` +
+      ` · nombres tocados ${P.nombres.length} (en la frontera ${P.nombres.filter((nm) => nm.frontera).length})${P.nombres.length ? ` [${P.nombres.map((nm) => `${nm.nombre} a ${nm.dist}px: gana ${nm.gana}, alternancias ${nm.alt}`).join('; ')}]` : ''}` +
+      ` · sin recorte: capa ${P.a11y.corto.capa}, aria-expanded ${P.a11y.corto.expanded} · fuera del resultado: ${P.fuera ? `span ${P.fuera.span}, capa ${P.fuera.capa}` : '—'}`)
+    const k = P.a11y
+    const a11yOk = k.botones === 1 && k.inicial === 'false/—' && k.enter === 'true/capa' && k.espacio === 'false/—' && k.enter2 === 'true/capa' && k.esc === 'false/—' &&
+      k.controls === k.capaId && k.tabindex === '0' && k.apagados.length === 0 &&
+      k.botonesCorto === 0 && k.corto.role === null && k.corto.tabindex === null && k.corto.controls === null && k.marcaCorta === null
+    anota(`voz2.a11y ${c.celda}`, a11yOk,
+      `botón con el texto ENTERO ${k.botones} · ${k.inicial} → Enter ${k.enter} → Espacio ${k.espacio} → Enter ${k.enter2} → Esc ${k.esc} · aria-controls=capa ${k.controls === k.capaId} · ancestros apagados ${k.apagados?.length ?? '—'}` +
+      ` · sin recorte: botones ${k.botonesCorto}, role ${k.corto.role}, tabindex ${k.corto.tabindex}, aria-controls ${k.corto.controls}`)
+    const s = P.sig
+    anota(`voz2.siguiente ${c.celda}`, s.abierta && tocableOk(s.boton, s.sola) && s.cierraEn >= 0 && s.cierraEn <= 1 && !s.reaparece && s.turno,
+      `capa abierta ${s.abierta} · el toque llega al botón ${fmtToc(s.boton, s.sola)} · capa en los 3 fotogramas tras el toque «${s.capaTrasToque}» (se va en el ${s.cierraEn >= 0 ? s.cierraEn + 1 : '—'}.º) · reaparece ${s.reaparece} · TURNO a los ${s.turnoMs} ms (${s.fotogramas} fotogramas grabados)`)
+  }
+  const celdas = await V.enPool(tareas, 4, async ([v, n]) => {
+    const formas = V.formasVoz2(n)
+    const celda = V.etiquetaCelda(v, n)
+    let abierta
+    try { abierta = await V.abrirCeldaEnPago(browser, v, n, URL_LAMINA, { control }) } catch (e) { return { celda, error: String(e.message || e) } }
+    const { ctx, page } = abierta
+    try {
+      const m = await page.evaluate(V.MEDIR_VOZ2, { formas })
+      if (m.error) return { celda, error: m.error }
+      const marcas = await V.leerMarcas(page, formas)
+      const c1 = V.C1_OVALO[celda]
+      const dC1 = V.deltaCaja(m.base.ovalo, { x: c1[0], y: c1[1], w: c1[2], h: c1[3] })
+      const porForma = m.formas.map((f) => {
+        const d = {}
+        for (const k of [...INTERIOR, 'msg']) d[k] = +V.deltaCaja(m.base[k], f.anclas[k]).toFixed(2)
+        const noSeVe = f.visibles < f.total
+        return { id: f.id, car: f.car, d, visibles: f.visibles, leidos: f.leidos, total: f.total, lineas: f.lineasLayout, marca: marcas?.[f.id] ?? null,
+          recorteOk: noSeVe === (marcas?.[f.id] === '1'), interiorOk: INTERIOR.every((k) => d[k] <= EPS) }
+      })
+      const realNoSeVe = m.glifosReal.visibles < m.glifosReal.total
+      const R = {
+        celda, quieta: abierta.quieta, original: m.original, glifosReal: m.glifosReal, marcaReal: marcas?.__real ?? null,
+        estilo: m.estilo, base: m.base, restaurado: m.restaurado, dC1: +dC1.toFixed(2), porForma,
+        c1Ok: dC1 <= EPS,
+        ovaloOk: porForma.every((f) => f.interiorOk),
+        recorteOk: porForma.every((f) => f.recorteOk) && realNoSeVe === (marcas?.__real === '1'),
+        centinela: V.CENTINELAS_C2.includes(celda),
+      }
+      if (R.centinela) {
+        const fs = porForma.filter((f) => V.FORMAS_C2.includes(f.id))
+        R.contencionOk = fs.length === V.FORMAS_C2.length && fs.every((f) => f.interiorOk && f.d.msg <= EPS)
+        R.contencionDetalle = fs.map((f) => `${f.id}: <p> Δ${f.d.msg} óvalo Δ${f.d.ovalo} pozo Δ${f.d.pozo} comodín Δ${f.d.comodin}`).join(' · ')
+      }
+      if (!control || control === 'capa') {
+        try { R.parte2 = await voz2Parte2(page, v, n, formas) } catch (e) { R.error2 = String(e.message || e) }
+      }
+      return R
+    } finally { await ctx.close() }
+  })
+  const orden = (c) => tareas.findIndex(([v, n]) => V.etiquetaCelda(v, n) === c.celda)
+  celdas.sort((a, b) => orden(a) - orden(b))
+  const peorD = (c, k) => Math.max(...c.porForma.map((f) => f.d[k]))
+  const MOVIL_54 = ['S25 412x915 m5', 'S25 412x915 m4', '390x844 m5', '390x844 m4', '360x640 m5', '360x640 m4']
+  for (const c of celdas) {
+    if (c.error) { anota(`${etq} ${c.celda}`, false, `ERROR ${c.error}`); continue }
+    const recortadas = c.porForma.filter((f) => f.marca === '1').map((f) => f.id)
+    const resumen = `óvalo Δmax ${peorD(c, 'ovalo')} · pozo ${peorD(c, 'pozo')} · igualar ${peorD(c, 'igualar')} · comodín ${peorD(c, 'comodin')}`
+    const info = `<p> Δmax ${peorD(c, 'msg')} (no puntúa: C-3/C-4) · ${c.estilo.fontSize}/${c.estilo.lineHeight} alto ${c.estilo.pAlto} · justify-self ${c.estilo.justifySelf}`
+    const recorte = `recortadas ${recortadas.length}/9 [${recortadas.join(', ')}] · real «${c.original}» ve ${c.glifosReal.visibles}/${c.glifosReal.total} marca ${c.marcaReal}` +
+      c.porForma.filter((f) => !f.recorteOk).map((f) => ` · ✗${f.id}: ve ${f.visibles}/${f.total}, marca ${f.marca}`).join('')
+    if (!control) {
+      anota(`voz2.c1 ${c.celda}`, c.c1Ok, `Δ contra la tabla C1 = ${c.dC1} px`)
+      anota(`voz2.ovalo ${c.celda}`, c.ovaloOk, `${resumen} · ${info}`)
+      anota(`voz2.recorte ${c.celda}`, c.recorteOk, recorte)
+      if (c.centinela) anota(`voz2.contencion ${c.celda}`, c.contencionOk, c.contencionDetalle)
+      anotaParte2(c)
+    } else if (control === 'capa') {
+      anotaParte2(c)
+    } else {
+      // Control: se exige que la puerta VEA el movimiento donde la Fase 0 lo
+      // midió (C-2 sin contención; los 906 px con el recorte ingenuo). El resto
+      // se imprime como dato, sin veredicto.
+      const espera = control === 'contain' ? c.centinela : MOVIL_54.includes(c.celda)
+      const vio = control === 'contain' ? c.contencionOk === false : c.ovaloOk === false
+      if (espera) anota(`${etq} ve el movimiento ${c.celda}`, vio, `${resumen} · ${c.contencionDetalle ?? info}`)
+      else console.log(`  ·     · ${etq} ${c.celda} (dato) · ${resumen} · ${c.ovaloOk ? 'Δ0' : 'SE MUEVE'}`)
+    }
+  }
+
+  // ── 1b · voz2.burbuja: la recarga con la capa abierta (D10, exigencia a) ──
+  // En el servidor de desarrollo (VOZ2_DEV, por defecto el 5173): `?apu=` no
+  // existe en `dist/`. Por celda: la capa se abre ANTES de que salga la burbuja
+  // y se comprueba que la burbuja no la cierra; con la capa abierta la burbuja
+  // se ve y recibe los nueve toques; tocarla abre la tarjeta, la capa se recoge
+  // y la tarjeta queda encima; «Ver la mesa» (si la tarjeta lo ofrece) la pliega
+  // y la capa NO vuelve sola. Sólo en la corrida normal (`--sin-burbuja` la salta).
+  if (!control && !process.argv.includes('--sin-burbuja')) {
+    const DEV = process.env.VOZ2_DEV || 'http://localhost:5173'
+    console.log(`\n── voz2.burbuja · ${DEV} (?apu=saldo:5000,recarga) ──`)
+    const bur = await V.enPool(tareas, 4, async ([v, n]) => {
+      const celda = V.etiquetaCelda(v, n)
+      let ab
+      try { ab = await V.abrirCeldaConBurbuja(browser, v, n, DEV) } catch (e) { return { celda, error: String(e.message || e) } }
+      const { ctx, page } = ab
+      const movil = v.movil
+      const R = { celda, intentos: ab.intentos }
+      try {
+        // La frase llega con el pago; la capa se abre en cuanto hay texto.
+        const t0 = Date.now()
+        while (Date.now() - t0 < 8000 && !(await page.evaluate(() => !!document.querySelector('.voz2-texto')))) await page.waitForTimeout(100)
+        R.burbujaAntes = await page.evaluate(() => !!document.querySelector('[data-accion="recarga-burbuja"]'))
+        const fp = await formaDePrueba(page, V.formasVoz2(n))
+        const peor = fp.texto
+        R.forma = fp.nombre
+        R.marca = await V.ponerTexto(page, peor)
+        await page.evaluate((t) => { const c = document.querySelector('.voz2-capa'); if (c) c.textContent = t }, peor)
+        await V.tocar(page, movil, ...(await centroTexto(page)))
+        R.abiertaAntes = (await page.evaluate(V.ESTADO_VOZ2)).capa.visible
+        R.salio = await V.esperarBurbuja(page)
+        const e1 = await page.evaluate(V.ESTADO_VOZ2)
+        // Si el toque cortó la celebración y la capa se abrió tarde, se vuelve a
+        // abrir ahora (lo que se mide abajo es la convivencia, no el reloj).
+        R.sigueAbierta = e1.capa.visible
+        // La burbuja SIN capa (Esc la recoge), para comparar; y se vuelve a abrir.
+        if (e1.capa.visible) { await page.keyboard.press('Escape'); await raf2(page) }
+        R.burbujaSola = (await page.evaluate(V.ESTADO_VOZ2)).burbuja
+        await V.tocar(page, movil, ...(await centroTexto(page)))
+        const e2 = await page.evaluate(V.ESTADO_VOZ2)
+        R.abierta = e2.capa.visible
+        R.burbuja = e2.burbuja
+        R.tapa = e2.tapa
+        if (e2.burbuja.visible) {
+          await V.tocar(page, movil, ...centro(e2.burbuja.caja))
+          const t1 = Date.now()
+          while (Date.now() - t1 < 3000 && !(await page.evaluate(() => !!document.querySelector('[data-accion="recarga"]')))) await page.waitForTimeout(80)
+          await page.waitForTimeout(500)
+          const e3 = await page.evaluate(() => {
+            const m = document.querySelector('.bankrupt-modal')
+            const b = m?.getBoundingClientRect()
+            const h = b ? document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2) : null
+            const c = document.querySelector('.voz2-capa')
+            return { tarjeta: !!m, encima: !!h && !!m && m.contains(h), plegable: !!document.querySelector('[data-accion="recarga-ver-mesa"]'),
+              capa: !!c && !c.hidden, expanded: document.querySelector('.voz2-texto')?.getAttribute('aria-expanded') ?? null }
+          })
+          R.tarjeta = e3
+          if (e3.plegable) {
+            await page.evaluate(() => document.querySelector('[data-accion="recarga-ver-mesa"]')?.click())
+            await page.waitForTimeout(400)
+            R.plegada = await page.evaluate(() => {
+              const c = document.querySelector('.voz2-capa')
+              return { burbuja: !!document.querySelector('[data-accion="recarga-burbuja"]'), capa: !!c && !c.hidden }
+            })
+          }
+        }
+        return R
+      } catch (e) { return { ...R, error: String(e.message || e) } } finally { await ctx.close() }
+    })
+    bur.sort((a, b) => orden(a) - orden(b))
+    for (const r of bur) {
+      if (r.error && !r.burbuja) { anota(`voz2.burbuja ${r.celda}`, false, `ERROR ${r.error}`); continue }
+      anota(`voz2.capa(a) burbuja ${r.celda}`, r.abierta && tocableOk(r.burbuja, r.burbujaSola), `capa abierta ${r.abierta} (${r.forma}) · burbuja ${fmtToc(r.burbuja, r.burbujaSola)}`)
+      const t = r.tarjeta || {}
+      const ok = r.salio && r.abierta && (r.abiertaAntes ? r.sigueAbierta : true) && t.tarjeta && t.encima && !t.capa && t.expanded === 'false' && (!r.plegada || !r.plegada.capa)
+      anota(`voz2.burbuja ${r.celda}`, ok,
+        `capa abierta antes de la burbuja ${r.abiertaAntes} → sigue abierta al salir la burbuja ${r.sigueAbierta} · tarjeta ${t.tarjeta} encima ${t.encima} · capa recogida ${t.capa === false} (aria-expanded ${t.expanded})` +
+        `${r.plegada ? ` · «Ver la mesa»: burbuja ${r.plegada.burbuja}, la capa no vuelve ${!r.plegada.capa}` : ' · sin «Ver la mesa»'} · ${r.intentos} intento(s)${r.error ? ' · ' + r.error : ''}`)
+      console.log(`  ·     · voz2.capa(b) burbuja ${r.celda} · tapa (${r.forma}): ${fmtTapa(r.tapa || {})}`)
+    }
+    resultados.bloques['voz2-burbuja'] = bur
+    writeFileSync(`${SALIDA}/voz2-burbuja.json`, JSON.stringify({ edge: browser.version(), base: DEV, celdas: bur }, null, 2))
+  }
+  const nombreJson = control ? `voz2-control-${control}.json` : 'voz2.json'
+  resultados.bloques[control ? `voz2-control-${control}` : 'voz2'] = { control, celdas }
+  writeFileSync(`${SALIDA}/${nombreJson}`, JSON.stringify({ edge: browser.version(), control, celdas }, null, 2))
+  console.log(`  JSON: ${SALIDA}/${nombreJson}`)
 }
 
 // ── Cierre ──────────────────────────────────────────────────────────────────
