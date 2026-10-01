@@ -9,11 +9,16 @@
 //   mesav.png   360×704 @3  (1080×2112) · teléfono de la escena 5
 //   mesapc.png  1366×768 @2 (2732×1536) · laptop de la escena 5 · DIS-1
 //   mesah.png   686×360 @3  (2058×1080) · sólo la og-image
+// AJF-1 · `mesav` y `mesapc` ya no salen de aquí: desde DIS-1 la escena 5 pinta
+// los dos renders (`dis_laptop`/`dis_telefono`), que las hornean a resolución
+// nativa con `scripts/dis1/gen_dispositivos.py`. Sus derivados planos
+// (`src/assets/portada/mesa{v,pc}.webp`) se quedaron sin consumidor y se
+// retiraron. Las dos maestras siguen versionadas porque las lee DIS-1.
 // Las capturas a mano de antes (`PUE_*_demo.*`, raíz) SÍ están versionadas
 // desde DOC-1b —este comentario decía lo contrario— y se quedan donde están:
 // alimentan la lámina histórica `PUE_lamina_v1.7.html`. Este script ya no las lee.
 // De las maestras salen los derivados que la portada sí publica. El día que
-// cambie una maestra, `node scripts/gen-portada-assets.mjs` reescribe los ocho
+// cambie una maestra, `node scripts/gen-portada-assets.mjs` reescribe los seis
 // y nadie tiene que acordarse de cuál faltaba. Fórmula sobre constante.
 //
 // ── SIN SHARP, Y NO POR GUSTO ───────────────────────────────────────────────
@@ -38,9 +43,9 @@
 // SELLADO, número nuevo) con el mismo núcleo que `gen-cards.mjs`, y después
 // se reducen y se pesan como siempre. Si una no pasa la comprobación de
 // holgura (B-2) o le quedan restos del número viejo, no se escribe ninguna.
-// Las tres capturas (`mesav`, `mesapc`, `og-image`) no cambian de método.
+// La captura que queda (`og-image`) no cambia de método.
 //
-// Uso:  node scripts/gen-portada-assets.mjs               los ocho
+// Uso:  node scripts/gen-portada-assets.mjs               los seis
 //       node scripts/gen-portada-assets.mjs uno_copa ...  sólo esos ids
 //       node scripts/gen-portada-assets.mjs cartas        sólo las cinco copas
 import { chromium } from 'playwright-core'
@@ -96,24 +101,6 @@ const TRABAJOS = [
     recorte: null,
     idx: true,                // pasa por el índice digital (IDX-1)
   })),
-  {
-    id: 'mesav',
-    origen: `${MAESTRAS}/mesav.png`,
-    destino: `${SALIDA_SRC}/mesav.webp`,
-    ancho: 340,
-    techo: 80 * 1024,
-    tipo: 'image/webp',
-    recorte: 'juego',
-  },
-  {
-    id: 'mesapc',
-    origen: `${MAESTRAS}/mesapc.png`,
-    destino: `${SALIDA_SRC}/mesapc.webp`,
-    ancho: 820,
-    techo: 120 * 1024,
-    tipo: 'image/webp',
-    recorte: null,
-  },
   {
     // El póster social. Va a `public/` y NO a `src/assets/`: un rastreador
     // cachea la tarjeta por URL, y la URL con hash de Vite cambia en cada build
@@ -335,5 +322,5 @@ await navegador.close()
 const total = informe.reduce((a, x) => a + (x.bytes ?? 0), 0)
 const pasados = informe.filter((x) => x.veredicto === 'PASADO' || x.error)
 console.log(`\nTOTAL :: ${informe.length} derivados · ${total} B (${(total / 1024).toFixed(1)} KiB)`)
-console.log(pasados.length ? `AVISO :: ${pasados.length} fuera de techo o sin maestro` : `TECHOS :: ${informe.length === TRABAJOS.length ? 'los ocho' : `los ${informe.length} regenerados`} DENTRO`)
+console.log(pasados.length ? `AVISO :: ${pasados.length} fuera de techo o sin maestro` : `TECHOS :: ${informe.length === TRABAJOS.length ? 'los seis' : `los ${informe.length} regenerados`} DENTRO`)
 process.exit(pasados.length ? 1 : 0)
