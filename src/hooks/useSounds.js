@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
 import { useSoundContext } from '../context/SoundContext'
 
@@ -54,7 +55,14 @@ function obtener(nombre) {
 // ── Los dos grupos que alguien precarga a propósito ─────────────────────────
 // LA PORTADA NO PRECARGA LOS DE LA MESA, y es el punto entero de esta tanda:
 // en la puerta el único sonido posible es el rasgueo del primer toque.
-export const SONIDOS_PORTADA = ['ajileiStrum']
+//
+// BIE-1 · Ya no: el rasgueo sale de la puerta (Victor, 2026-10-01: «el clic
+// tradicional que usa el resto de la app») y suenan los BOTONES, con el clic.
+// Se sigue precargando UNO, y no ninguno, a propósito: Howler arma su
+// desbloqueo de audio (`autoUnlock`) al construirse el PRIMER `Howl`. Sin
+// ninguno construido, el primero nacería dentro del primer clic y en iOS ese
+// clic podría salir mudo. 16 896 B en vez de los ~114 KB del rasgueo.
+export const SONIDOS_PORTADA = ['buttonClick']
 
 // La mesa sí precarga los suyos: el primer `cardDeal` cae a los pocos
 // fotogramas de montar y tiene que sonar en su instante. `ajileiStrum`,
@@ -172,42 +180,71 @@ function programaRecorte(nombre, sound, id, esperaMs, fadeMs) {
   recortes[nombre] = r
 }
 
+// ── BIE-1 · El reproductor, sin React ───────────────────────────────────────
+// `play` era una flecha declarada DENTRO del hook: una función nueva en cada
+// render. Cualquier efecto que dependiera de `[play]` se volvía a ejecutar en
+// cada render, y el de la Portada —un `pointerdown` de un solo uso— se rearmaba
+// cada vez: el rasgueo «del primer toque» sonaba en el primer toque DE CADA
+// repintado (medido en la Fase 0 de BIE-1: tres rasgueos en un recorrido).
+//
+// La decisión de sonar vive aquí, en una pieza pura que se prueba sin montar
+// nada (molde `creaCongelador`): recibe el ajuste de sonido EN CADA LLAMADA, no
+// lo captura, y por eso el hook puede envolverla una sola vez y no rehacerla
+// cuando el jugador apaga el sonido. `sonido` es `obtener` en la app; el test
+// le da uno falso.
+//
+// DSK-VC2 · play() DEVUELVE el id de Howler. Sin él no se puede llamar a
+// stop(id), y sin stop(id) el toque que corta una celebración cortaría el
+// dibujo pero no el sonido. Una línea, aditiva: quien no lo usa —todas las
+// llamadas anteriores— no se entera.
+export function reproducir(soundName, activo, sonido = obtener) {
+  if (!activo) return null
+  const sound = sonido(soundName)
+  if (!sound) return null
+
+  if (soundName === 'ajileiStrum') {
+    const id = sound.play()
+    programaRecorte(soundName, sound, id, STRUM_CORTE_MS, STRUM_FADE_MS)
+    return { sound, id }
+  }
+
+  if (soundName === 'cardShuffle') {
+    const id = sound.play()
+    // `duration()` es 0 mientras el archivo no ha llegado — y desde esta
+    // tanda eso puede pasar de verdad en la PRIMERA reproducción, no sólo en
+    // teoría. La guarda de `> 0` ya existía y ahora es la que trabaja: sin
+    // duración no hay recorte, y el barajado suena entero esa vez. Es la
+    // degradación correcta: nunca un silencio, como mucho un segundo de más.
+    const totalMs = sound.duration() * 1000
+    if (totalMs > 0) {
+      const fadeLen = 130
+      const triggerAt = totalMs * 0.49 - fadeLen
+      programaRecorte(soundName, sound, id, Math.max(0, triggerAt), fadeLen)
+    }
+    return { sound, id }
+  }
+
+  return { sound, id: sound.play() }
+}
+
 export function useSounds() {
   const { soundEnabled } = useSoundContext()
 
-  // DSK-VC2 · play() DEVUELVE el id de Howler. Sin él no se puede llamar a
-  // stop(id), y sin stop(id) el toque que corta una celebración cortaría el
-  // dibujo pero no el sonido. Una línea, aditiva: quien no lo usa —todas las
-  // llamadas anteriores— no se entera.
-  const play = (soundName) => {
-    if (!soundEnabled) return null
-    const sound = obtener(soundName)
-    if (!sound) return null
-
-    if (soundName === 'ajileiStrum') {
-      const id = sound.play()
-      programaRecorte(soundName, sound, id, STRUM_CORTE_MS, STRUM_FADE_MS)
-      return { sound, id }
-    }
-
-    if (soundName === 'cardShuffle') {
-      const id = sound.play()
-      // `duration()` es 0 mientras el archivo no ha llegado — y desde esta
-      // tanda eso puede pasar de verdad en la PRIMERA reproducción, no sólo en
-      // teoría. La guarda de `> 0` ya existía y ahora es la que trabaja: sin
-      // duración no hay recorte, y el barajado suena entero esa vez. Es la
-      // degradación correcta: nunca un silencio, como mucho un segundo de más.
-      const totalMs = sound.duration() * 1000
-      if (totalMs > 0) {
-        const fadeLen = 130
-        const triggerAt = totalMs * 0.49 - fadeLen
-        programaRecorte(soundName, sound, id, Math.max(0, triggerAt), fadeLen)
-      }
-      return { sound, id }
-    }
-
-    return { sound, id: sound.play() }
-  }
+  // BIE-1 · `play` con IDENTIDAD ESTABLE: `useCallback` sin dependencias. El
+  // ajuste de sonido viaja por una ref que sincroniza un efecto, y la ref se lee
+  // DENTRO de `play` —en el manejador, al sonar—, nunca durante el render: es la
+  // única forma que `react-hooks/refs` acepta (pasarle la ref a una función en
+  // el render, aunque sea dentro de un inicializador, la rechaza). El objeto
+  // `{ play }` sí es nuevo en cada render; quien lo desestructura recibe siempre
+  // la MISMA función.
+  //
+  // Entre que el jugador apaga el sonido y que corre el efecto hay, como mucho,
+  // el render del cambio; y en ese hueco `SoundContext` ya ha hecho
+  // `Howler.mute(true)`, que es la capa que de verdad silencia (SoundContext.jsx
+  // l. 26-35). Este `if` sigue siendo la segunda capa, como siempre.
+  const activo = useRef(soundEnabled)
+  useEffect(() => { activo.current = soundEnabled }, [soundEnabled])
+  const play = useCallback((soundName) => reproducir(soundName, activo.current), [])
 
   return { play }
 }
