@@ -25,8 +25,9 @@ import { SoundButton } from '../components/SoundButton'
 // `IconoAjustes` se fueron con él y por eso ya no se importan aquí.
 import BarraSuperior from '../components/BarraSuperior'
 import {
-  IconoUsuario, IconoTrofeo, IconoTienda, IconoLibro,
+  IconoUsuario, IconoTrofeo, IconoTienda, IconoLibro, IconoPersonas,
 } from '../components/IconosLobby'
+import ChipToken from '../components/ChipToken'
 import { saldoDelJugador } from '../lib/saldo'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { useIdioma } from '../hooks/useIdioma'
@@ -210,12 +211,16 @@ export default function Lobby({ cuenta, saldo, onJugarIA, onJugarPvP, onCerrarSe
               moneda grande al lado; la v1.4 la retira y la moneda del producto
               pasa a ser una sola: la de la píldora de saldo. Su ancho es
               `--cta-w`, fórmula sobre `--u` con techo de 64 u. */}
+          {/* AJF-1 · Variante «A + icono» de la lámina AJF-1: la moneda de la
+              casa a la izquierda del rótulo, decorativa (el rótulo ya lo dice).
+              La ranura mide en `em`; `ChipToken` ya sale `aria-hidden`. */}
           <button
             type="button"
             className="lob-cta-ia"
             data-accion="jugar-ia"
             onClick={jugarIA}
           >
+            <span className="lob-cta-ico" aria-hidden="true"><ChipToken size="icon" /></span>
             {t('lob.cta.ia')}
           </button>
 
@@ -225,8 +230,15 @@ export default function Lobby({ cuenta, saldo, onJugarIA, onJugarPvP, onCerrarSe
               de un botón que no hacía nada; con el botón vivo, dejarlas sería
               mentir en la otra dirección.
               `lob.cta.pronto` NO se borra del diccionario: la pastilla sigue
-              viva en las seis filas de la hoja ⚙ y en el toast. */}
-          <SoundButton className="lob-cta-pvp" data-accion="jugar-pvp" onClick={() => onJugarPvP?.()}>
+              viva en las seis filas de la hoja ⚙ y en el toast.
+              AJF-1 · Y con el botón vivo deja de vestirse de enlace: es una
+              píldora de la MISMA caja que la de las IAS —alto `--lob-cta-h` con
+              su suelo táctil de 44 px, ancho `--lob-cta-w`— en contorno de oro
+              (`.lob-cta-jugadores`, lobby.css §3.1), con las dos personas a la
+              izquierda. Sigue siendo `SoundButton` porque no abre la mesa: su
+              voz es el clic, no el golpe de mesa. */}
+          <SoundButton type="button" className="lob-cta-jugadores" data-accion="jugar-pvp" onClick={() => onJugarPvP?.()}>
+            <IconoPersonas className="lob-cta-ico" />
             <span>{t('lob.cta.pvp')}</span>
           </SoundButton>
         </div>

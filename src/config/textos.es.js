@@ -25,8 +25,8 @@
 // convertir una plomería de 18 claves en una migración de toda la app.
 export const TEXTOS_ES = {
   // Los dos accesos al juego
-  'lob.cta.ia':          'Jugar contra la IA',
-  'lob.cta.pvp':         'Jugar contra jugador',
+  'lob.cta.ia':          'Jugar contra las IAS',
+  'lob.cta.pvp':         'Jugar contra jugadores',
   'lob.cta.pronto':      'Próximamente',
 
   // Barra inferior
@@ -69,7 +69,7 @@ export const TEXTOS_ES = {
   // convivirían en el mismo espacio de nombres sin parentesco real.
 
   // ── SAL-1 · SalaOpciones ────────────────────────────────────────────────
-  'sal.opciones.titulo':          'Jugar contra jugador',
+  'sal.opciones.titulo':          'Jugar contra jugadores',
   'sal.opciones.codigo.titulo':   '¿Te invitaron? Pega tu código',
   'sal.opciones.codigo.entrar':   'Entrar',
   'sal.opciones.codigo.aria':     'Código de invitación',

@@ -391,6 +391,55 @@ body.lobby-activa #root {
 .lobby .lob-cta-ia:active { transform: translateY(1px) scale(0.995); }
 .lobby .lob-cta-ia:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
 
+/* ══ 3.1 · AJF-1 · LOS DOS ACCESOS, CON ICONO ══════════════════════════════
+   Variante «A + icono» de la lámina AJF-1 (laminas/ajf1/lamina.html), elegida
+   por Victor. Las dos píldoras tienen la MISMA CAJA —alto `--lob-cta-h` con su
+   suelo de 44 px, ancho `--lob-cta-w`, radio, fuente—; lo que las distingue es
+   el traje: oro sólido para la mesa contra las IAS, contorno de oro para la de
+   jugadores.
+   EL ANILLO ES `box-shadow: inset`, NUNCA `border` (lección E-33: un borde de
+   2 px en un botón movió 2 px el cronómetro de la mesa). La sombra interior se
+   pinta dentro de la caja y no toca la geometría de nadie.
+   La moneda de la píldora de IAS es la SEGUNDA del lobby (§4 dice «la única»):
+   la pidió la lámina y es un glifo de acción, no un saldo. */
+.lobby .lob-cta-ia,
+.lobby .lob-cta-jugadores {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  white-space: nowrap;
+}
+.lobby .lob-cta-jugadores {
+  height: var(--lob-cta-h);
+  width: var(--lob-cta-w);
+  border: 0;
+  border-radius: calc(var(--lob-cta-h) / 2);
+  background: transparent;
+  color: var(--gold-brand);
+  font: inherit;
+  font-weight: 600;
+  font-size: calc(var(--u) * 4.4);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 2px var(--gold-brand);
+  transition: transform 0.12s ease;
+}
+.lobby .lob-cta-jugadores:active { transform: translateY(1px) scale(0.995); }
+.lobby .lob-cta-jugadores:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+/* El icono mide en `em` con el rótulo: crece con la fuente del CTA, no con la
+   rejilla de controles (es glifo de línea, como el de la §5). */
+.lobby .lob-cta-ico {
+  display: block;
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+}
+.lobby .lob-cta-ico .chip-token { display: block; width: 100%; height: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  .lobby .lob-cta-jugadores { transition: none; }
+}
+
 
 /* ══ 4 · LA MONEDA DEL SALDO ═══════════════════════════════════════════════
    ES LA ÚNICA MONEDA DEL LOBBY. La v1.3 de la lámina ponía una moneda grande al
@@ -450,6 +499,10 @@ body.lobby-activa #root {
 
 
 /* ══ 5 · EL ACCESO QUE TODAVÍA NO EXISTE ═══════════════════════════════════ */
+/* AJF-1 · `.lob-cta-pvp` y sus dos descendientes se quedaron SIN CONSUMIDOR:
+   el «Jugar contra jugadores» viste ahora `.lob-cta-jugadores` (§3.1). Se dejan por la
+   regla de CSS aditivo de la tanda; retirarlos es limpieza para otra.
+   `.lob-pastilla` SÍ sigue viva (hoja ⚙ y toast). */
 .lobby .lob-cta-pvp {
   display: inline-flex;
   align-items: center;

@@ -120,3 +120,18 @@ export function IconoLibro({ className }) {
     </svg>
   )
 }
+
+// AJF-1 · Dos personas, a la izquierda de «Jugar contra jugadores». Es el
+// dibujo de la lámina AJF-1 que Victor aprobó (no un trazado Lucide): dos
+// cabezas y dos hombros abiertos —el mismo gesto que `IconoUsuario`, dos veces,
+// la segunda más pequeña y detrás—. Decorativo: el rótulo ya lo dice.
+export function IconoPersonas({ className }) {
+  return (
+    <svg {...COMUN} className={clase('personas', className)}>
+      <circle cx="9" cy="8" r="3.25" />
+      <path d="M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+      <circle cx="16.75" cy="9" r="2.6" />
+      <path d="M16.2 14.05c.25-.03.5-.05.8-.05 2.75 0 4.75 2 4.75 4.9" />
+    </svg>
+  )
+}

@@ -597,7 +597,7 @@ async function medirEstado(page, estado) {
       }))
       return {
         ...r,
-        ok: !r.stub && r.opciones && r.titulo === 'Jugar contra jugador' && r.rotos === 0,
+        ok: !r.stub && r.opciones && r.titulo === 'Jugar contra jugadores' && r.rotos === 0,
       }
     }
 
