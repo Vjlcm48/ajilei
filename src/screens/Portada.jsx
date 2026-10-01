@@ -5,7 +5,8 @@ import '../styles/portada.css'
 import { Wordmark } from '../components/Wordmark'
 import FormularioPuerta from '../components/FormularioPuerta'
 import { LEMA_PORTADA } from '../config/textosPuerta'
-import { useSounds, precargarSonidos, SONIDOS_PORTADA } from '../hooks/useSounds'
+import { precargarSonidos, SONIDOS_PORTADA } from '../hooks/useSounds'
+import { SoundButton } from '../components/SoundButton'
 
 import reversoUrl from '../assets/cards/reverso_carta.svg'
 import unoUrl from '../assets/portada/uno_copa.webp'
@@ -167,7 +168,6 @@ function useEscenaOculta() {
 export default function Portada({ onEnviarCodigo, onVerificar }) {
   const quieto = usePrefiereQuietud()
   const escenaOculta = useEscenaOculta()
-  const { play } = useSounds()
 
   // ── Todo lo que depende de la escena se DERIVA, no se resetea ─────────────
   // El molde obvio —un efecto que al cambiar de escena pone el marcador a cero,
@@ -245,21 +245,20 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
   }, [quieto])
 
   // ── El único sonido de la puerta ──────────────────────────────────────────
-  // PUE-1.2: la portada precarga ÚNICAMENTE el rasgueo (~114 KB), y diferido un
-  // segundo tras el primer pintado. Los diez sonidos de la mesa no bajan aquí:
-  // ése era el hallazgo de la Fase 0 y ésta es su cara visible.
+  // PUE-1.2: la portada precarga UN sonido, y diferido un segundo tras el
+  // primer pintado. Los diez sonidos de la mesa no bajan aquí: ése era el
+  // hallazgo de la Fase 0 y ésta es su cara visible.
+  //
+  // BIE-1 · Ese sonido es ahora el CLIC de los botones (`SONIDOS_PORTADA`,
+  // useSounds.js), y no el rasgueo. Se retiró el `pointerdown` global que
+  // tocaba la guitarra «en el primer toque»: dependía de `[play]`, `play` nacía
+  // nuevo en cada render, y el escuchador de un solo uso se rearmaba en cada
+  // repintado — tres rasgueos medidos en un recorrido (Fase 0 §A2). Tocar un
+  // hueco de la pantalla ya no suena; suenan los botones, como en todo el juego.
   useEffect(() => {
     const id = setTimeout(() => precargarSonidos(SONIDOS_PORTADA), 1000)
     return () => clearTimeout(id)
   }, [])
-
-  // El strum del primer toque usa la rama existente de `useSounds`
-  // (STRUM_CORTE_MS 1300 / fade 130): no se duplica ni una línea de audio.
-  useEffect(() => {
-    const alTocar = () => play('ajileiStrum')
-    window.addEventListener('pointerdown', alTocar, { once: true })
-    return () => window.removeEventListener('pointerdown', alTocar)
-  }, [play])
 
   // ── El rotor ──────────────────────────────────────────────────────────────
   // Un temporizador por escena y no un intervalo fijo: cada escena dura lo suyo.
@@ -385,16 +384,18 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
 
         {MOSTRAR_IDIOMA && (
           <div className={`pue-idioma${listaIdioma ? ' pue-abierta' : ''}`} ref={cajaIdioma}>
-            <button
+            {/* BIE-1 · Los botones de la puerta suenan con el clic de la casa
+                (`SoundButton`: mismo `<button>`, mismas props, mismo `type`). */}
+            <SoundButton
               className="pue-idioma-globo"
               type="button"
               aria-label="Idioma"
               aria-expanded={listaIdioma}
               onClick={(e) => { e.stopPropagation(); setListaIdioma((v) => !v) }}
-            >🌐</button>
+            >🌐</SoundButton>
             <div className="pue-idioma-lista">
               {IDIOMAS.map((l) => (
-                <button className="pue-idioma-item" type="button" key={l.id} disabled={!l.activo}>
+                <SoundButton className="pue-idioma-item" type="button" key={l.id} disabled={!l.activo}>
                   {/* Banderas PROVISIONALES en CSS. La campaña IDI trae los SVG
                       oficiales; hasta entonces son la única excepción declarada
                       —junto al cuño— a «ni un hex fuera de theme.css». */}
@@ -403,7 +404,7 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
                   {l.activo
                     ? <span className="pue-idioma-check">✓</span>
                     : <span className="pue-idioma-pronto">Pronto</span>}
-                </button>
+                </SoundButton>
               ))}
             </div>
           </div>
@@ -522,7 +523,7 @@ export default function Portada({ onEnviarCodigo, onVerificar }) {
             <p className={`pue-frase${fraseOculta ? ' pue-oculta' : ''}`} aria-hidden="true">{frase}</p>
 
             <div className="pue-cta-movil pue-sube">
-              <button className="pue-btn-jugar" type="button" onClick={abrirHoja}>JUGAR</button>
+              <SoundButton className="pue-btn-jugar" type="button" onClick={abrirHoja}>JUGAR</SoundButton>
               <p className="pue-cta-vacuna">Gratis · Sin descargas · Solo tu correo</p>
             </div>
           </section>

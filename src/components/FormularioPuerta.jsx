@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { LEMA_ENTRADA } from '../config/textosPuerta'
+// BIE-1 · Los cuatro botones del formulario suenan con el clic de la casa.
+// `SoundButton` pinta el MISMO `<button>` con las mismas props —`type`,
+// `disabled`, clase—, así que la caja no cambia. Y el envío con Enter dentro de
+// un campo suena UNA vez: el envío implícito del formulario es un clic en su
+// botón de envío, y ese clic es el único que dispara el sonido (`onSubmit` no
+// suena). Con el botón deshabilitado no hay envío implícito, ni clic.
+import { SoundButton } from './SoundButton'
 
 // ── PUE-2.2 · El formulario de la puerta, extraído ──────────────────────────
 // Documento rector: AJILEI_PUE_Fase1_v1.0 §2.2 — «el formulario no se reescribe:
@@ -121,9 +128,9 @@ export default function FormularioPuerta({ onEnviarCodigo, onVerificar, lema = L
           <p className={`puerta-aviso${aviso?.tipo === 'info' ? ' is-info' : ''}`} role="status">
             {aviso?.texto ?? ''}
           </p>
-          <button type="submit" className="puerta-btn" disabled={ocupado}>
+          <SoundButton type="submit" className="puerta-btn" disabled={ocupado}>
             {ocupado ? 'Enviando…' : 'Enviar código'}
-          </button>
+          </SoundButton>
           {/* SUP-3 · el hueco de Google. Se deja dicho y no se construye:
               un botón muerto es peor que ninguno, así que aquí sólo hay la
               nota de que llega, con el aire ya repartido. */}
@@ -158,11 +165,11 @@ export default function FormularioPuerta({ onEnviarCodigo, onVerificar, lema = L
           <p className={`puerta-aviso${aviso?.tipo === 'info' ? ' is-info' : ''}`} role="status">
             {aviso?.texto ?? ''}
           </p>
-          <button type="submit" className="puerta-btn" disabled={ocupado || codigo.length !== 6}>
+          <SoundButton type="submit" className="puerta-btn" disabled={ocupado || codigo.length !== 6}>
             {ocupado ? 'Entrando…' : 'Entrar'}
-          </button>
+          </SoundButton>
           <div className="puerta-links">
-            <button
+            <SoundButton
               type="button"
               className="puerta-link"
               onClick={pedirCodigo}
@@ -182,10 +189,10 @@ export default function FormularioPuerta({ onEnviarCodigo, onVerificar, lema = L
                   indistinguible de uno normal. */}
               {' '}
               <span className="entrada-cuenta">{restante > 0 ? `(${restante} s)` : ''}</span>
-            </button>
-            <button type="button" className="puerta-link" onClick={volverAlCorreo} disabled={ocupado}>
+            </SoundButton>
+            <SoundButton type="button" className="puerta-link" onClick={volverAlCorreo} disabled={ocupado}>
               Cambiar correo
-            </button>
+            </SoundButton>
           </div>
         </form>
       )}

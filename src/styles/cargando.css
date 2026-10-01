@@ -1,0 +1,76 @@
+/* ── BIE-1 · El indicador «Cargando» ──────────────────────────────────────
+   Documento rector: AJILEI_BIE-1_Fase1_v1.0 §3.1. Forma P con isotipo, la que
+   Victor eligió en `laminas/bie1/lamina.html`. Las medidas son las de la lámina,
+   VERBATIM: allí la pantalla era el marco de la vista; aquí es la ventana, y por
+   eso `.cargando` es el contenedor (`container-type: size`) y todo mide en
+   `cqmin`, igual que allí.
+
+   Hoja propia y nueva: no se toca ninguna existente (CSS aditivo estricto).
+   Un solo oro (`--gold-brand`) como acento; el texto, en el crema del sistema. */
+
+.cargando {
+  position: fixed;
+  inset: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  background: var(--green-abyss);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  /* El interlineado de la lámina (su `body`): sin él la fila mide 26 px de
+     alto en vez de 29 a 1920 y el conjunto deja de ser el que se eligió. */
+  line-height: 1.45;
+}
+
+.cargando-indicador {
+  display: grid;
+  justify-items: center;
+  gap: clamp(14px, 3.2cqmin, 26px);
+}
+
+/* El isotipo maestro es 2:3 (`viewBox="15 30 60 90"`): alto y ancho en esa
+   razón. EL ANCLAJE ÓPTICO LO TRAE EL PROPIO MAESTRO (AJILEI_Icono_v1.0.md §2):
+   aquí no se recorta, no se desplaza y no se recentra — sólo se escala, la misma
+   regla que `.lob-iso` en `lobby.css`. */
+.cargando-iso {
+  display: block;
+  height: clamp(48px, 9cqmin, 84px);
+  aspect-ratio: 2 / 3;
+  width: auto;
+  user-select: none;
+}
+
+.cargando-fila {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .35em;
+  font-size: clamp(15px, 2.4cqmin, 20px);
+  letter-spacing: .04em;
+}
+
+.cargando-texto { color: var(--text-primary); }
+
+/* Tres puntos que laten en secuencia */
+.cargando-puntos { display: inline-flex; gap: .32em; }
+
+.cargando-punto {
+  width: .32em;
+  height: .32em;
+  border-radius: 50%;
+  background: var(--gold-brand);
+  opacity: .25;
+  animation: cargando-late 1.2s ease-in-out infinite;
+}
+.cargando-punto:nth-child(2) { animation-delay: .2s; }
+.cargando-punto:nth-child(3) { animation-delay: .4s; }
+
+@keyframes cargando-late {
+  0%, 60%, 100% { opacity: .25; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-.18em); }
+}
+
+/* Movimiento reducido: los tres puntos quietos y encendidos a medias, como en
+   la lámina. El indicador sigue diciendo «Cargando»; sólo deja de moverse. */
+@media (prefers-reduced-motion: reduce) {
+  .cargando-punto { animation: none; opacity: .7; }
+}

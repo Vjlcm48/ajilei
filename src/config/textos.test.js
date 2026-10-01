@@ -77,7 +77,11 @@ describe('IDI-0 · diccionario es', () => {
     // escribió la frase de arriba; se nombra por CONTRA QUIÉN se juega y no por
     // dónde se pinta, porque el mismo copy sirve a la pantalla de entrada y a la
     // mesa, y `mesa.` habría dejado fuera a la primera.
-    const PREFIJOS = ['lob.', 'sal.', 'ia.']
+    //
+    // BIE-1 es la cuarta: `app.*` es lo que la app dice antes de saber en qué
+    // pantalla está —el «Cargando» de la rama CARGANDO—, que no es del lobby
+    // ni de ninguna otra superficie.
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }

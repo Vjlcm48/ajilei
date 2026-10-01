@@ -24,6 +24,12 @@
 // pantalla — ni la mesa, ni la Portada, ni el Bautizo. Meterlas aquí sería
 // convertir una plomería de 18 claves en una migración de toda la app.
 export const TEXTOS_ES = {
+  // ══ BIE-1 · La app entera, fuera de cualquier pantalla ══════════════════
+  // Rector: AJILEI_BIE-1_Fase1_v1.0 §0 D7. `app.*` es lo que la app dice antes
+  // de saber en qué pantalla está: hoy, sólo el indicador de la rama CARGANDO.
+  // «Enviando…» y «Entrando…» de la Portada NO entran: son de IDI-1.
+  'app.cargando':        'Cargando',
+
   // Los dos accesos al juego
   'lob.cta.ia':          'Jugar contra las IAS',
   'lob.cta.pvp':         'Jugar contra jugadores',

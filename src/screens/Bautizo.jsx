@@ -3,6 +3,10 @@ import '../styles/puerta.css'
 import '../styles/bautizo.css'
 import { Wordmark } from '../components/Wordmark'
 import { REGLA_USERNAME } from '../hooks/useAuth'
+// BIE-1 · Los tres botones del Bautizo suenan con el clic, como el resto de la
+// puerta (D1: suenan los botones, no los huecos). `SoundButton` trae su propio
+// `useSounds`; esta pantalla no necesita ningún otro sonido.
+import { SoundButton } from '../components/SoundButton'
 
 // ── SUP-2b · Pantalla Bautizo ───────────────────────────────────────────────
 // Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.4 (elegir nombre) y
@@ -104,15 +108,15 @@ export default function Bautizo({
 
         <p className="puerta-aviso" role="status">{error ?? ''}</p>
 
-        <button type="submit" className="puerta-btn" disabled={ocupado || !valido || sinCambio}>
+        <SoundButton type="submit" className="puerta-btn" disabled={ocupado || !valido || sinCambio}>
           {ocupado ? 'Guardando…' : 'Confirmar'}
-        </button>
+        </SoundButton>
 
         <div className="puerta-links">
           {edicion ? (
-            <button type="button" className="puerta-link" onClick={onCancelar} disabled={ocupado}>
+            <SoundButton type="button" className="puerta-link" onClick={onCancelar} disabled={ocupado}>
               Cancelar
-            </button>
+            </SoundButton>
           ) : (
             // SIN ESTO EL BAUTIZO ES UNA TRAMPA. Un jugador con sesión y sin
             // perfil no tiene ninguna otra pantalla a la que ir: si entró con el
@@ -120,9 +124,9 @@ export default function Bautizo({
             // almacenamiento del navegador. No lo pide el rector; lo pide la
             // pantalla en cuanto se mira de frente.
             onCerrarSesion && (
-              <button type="button" className="puerta-link" onClick={onCerrarSesion} disabled={ocupado}>
+              <SoundButton type="button" className="puerta-link" onClick={onCerrarSesion} disabled={ocupado}>
                 Cerrar sesión
-              </button>
+              </SoundButton>
             )
           )}
         </div>

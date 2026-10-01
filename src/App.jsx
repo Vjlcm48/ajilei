@@ -27,6 +27,9 @@ import { siembraAPU } from './dev/siembraAPU'
 import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
+// BIE-1 · El «Cargando» de la rama CARGANDO y la regla D5 que lo gobierna.
+import Cargando from './components/Cargando'
+import { useEsperaVisible } from './hooks/useEsperaVisible'
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
 // CUÁNDO: una vez por sesión, en el arranque, y ANTES de intentar nada (§4.1).
 import {
@@ -91,6 +94,11 @@ function App() {
   // por la que `useAuth` abre la función y los `useState` del lobby se declaran
   // aunque la puerta esté a punto de devolver otra pantalla.
   const auth = useAuth()
+
+  // BIE-1 · La regla D5 del indicador, con los hooks y no detrás de un retorno.
+  // `mostrar`: pintar «Cargando». `liberar`: la pantalla siguiente puede
+  // pintarse — falso mientras se carga Y mientras el indicador cumple su mínimo.
+  const espera = useEsperaVisible(auth.estado === CARGANDO)
 
   // ── SAL-B1 · La simulacion del arnes, resuelta UNA vez ────────────────────
   // Rector SAL-B1 §8.2. `simulacionSalas()` mira `?sal=` detras de la puerta
@@ -332,11 +340,19 @@ function App() {
     precargarBaraja()
   }, [screen])
 
-  // CARGANDO no pinta: pinta NADA. El fondo del documento ya es el verde abismo
-  // (welcome.css:1-6), así que el hueco de uno o dos fotogramas se ve como la
-  // app arrancando y no como una pantalla que va y viene. Un spinner aquí sería
-  // peor: parpadearía en el 99% de los arranques, que resuelven de inmediato.
-  if (auth.estado === CARGANDO) return null
+  // ── BIE-1 · CARGANDO pinta NADA… hasta los 300 ms ──────────────────────────
+  // El fondo del documento ya es el verde abismo (welcome.css:1-6), así que un
+  // hueco de uno o dos fotogramas se ve como la app arrancando. Lo que decía este
+  // comentario —un spinner parpadearía en el 99% de los arranques— sigue siendo
+  // verdad, y por eso el indicador NO aparece antes de 300 ms (D5).
+  //
+  // Lo que la Fase 0 midió es que el hueco no siempre es de dos fotogramas: tras
+  // «Entrar» dura lo que tarde la lectura de `profiles`, y con red lenta era un
+  // verde vacío de segundos sin una palabra. Pasados 300 ms aparece «Cargando»;
+  // si aparece, se queda al menos 500 ms, y mientras tanto la pantalla siguiente
+  // espera aunque `useAuth` ya haya salido de CARGANDO (coste aceptado en D5).
+  // No espera a `mi_sala()` (D6): eso pasa ya en el lobby.
+  if (!espera.liberar) return espera.mostrar ? <Cargando /> : null
 
   // ── PUE · `SIN_SESION` deja de ser la Entrada y pasa a ser la PORTADA ──────
   // El contrato NO cambia: las mismas dos funciones, el mismo estado, el mismo
