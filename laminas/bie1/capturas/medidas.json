@@ -1,0 +1,398 @@
+{
+  "edge": "154.0.4258.37",
+  "fase": 0.3,
+  "casos": [
+    {
+      "indicador": {
+        "x": 893.39,
+        "y": 470.5,
+        "w": 133.2,
+        "h": 139
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 931.98,
+        "y": 470.5,
+        "w": 56,
+        "h": 84
+      },
+      "isoCargado": true,
+      "fuente": "20px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "1920x1080",
+      "forma": "P",
+      "iso": 1,
+      "nombre": "P · con isotipo",
+      "archivo": "1920x1080_P-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 893.39,
+        "y": 525.5,
+        "w": 133.2,
+        "h": 29
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "20px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "1920x1080",
+      "forma": "P",
+      "iso": 0,
+      "nombre": "P · sin isotipo",
+      "archivo": "1920x1080_P.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 840,
+        "y": 461,
+        "w": 240,
+        "h": 158
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 932,
+        "y": 461,
+        "w": 56,
+        "h": 84
+      },
+      "isoCargado": true,
+      "fuente": "20px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "1920x1080",
+      "forma": "B",
+      "iso": 1,
+      "nombre": "B · con isotipo",
+      "archivo": "1920x1080_B-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 840,
+        "y": 516,
+        "w": 240,
+        "h": 48
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "20px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "1920x1080",
+      "forma": "B",
+      "iso": 0,
+      "nombre": "B · sin isotipo",
+      "archivo": "1920x1080_B.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 145.03,
+        "y": 380.13,
+        "w": 99.92,
+        "h": 83.75
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 178.98,
+        "y": 380.13,
+        "w": 32,
+        "h": 48
+      },
+      "isoCargado": true,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "390x844",
+      "forma": "P",
+      "iso": 1,
+      "nombre": "P · con isotipo",
+      "archivo": "390x844_P-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 145.03,
+        "y": 411.13,
+        "w": 99.92,
+        "h": 21.75
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "390x844",
+      "forma": "P",
+      "iso": 0,
+      "nombre": "P · sin isotipo",
+      "archivo": "390x844_P.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 125,
+        "y": 373.63,
+        "w": 140,
+        "h": 96.75
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 179,
+        "y": 373.63,
+        "w": 32,
+        "h": 48
+      },
+      "isoCargado": true,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "390x844",
+      "forma": "B",
+      "iso": 1,
+      "nombre": "B · con isotipo",
+      "archivo": "390x844_B-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 125,
+        "y": 404.63,
+        "w": 140,
+        "h": 34.75
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "390x844",
+      "forma": "B",
+      "iso": 0,
+      "nombre": "B · sin isotipo",
+      "archivo": "390x844_B.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 130.03,
+        "y": 278.13,
+        "w": 99.92,
+        "h": 83.75
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 163.98,
+        "y": 278.13,
+        "w": 32,
+        "h": 48
+      },
+      "isoCargado": true,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "360x640",
+      "forma": "P",
+      "iso": 1,
+      "nombre": "P · con isotipo",
+      "archivo": "360x640_P-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 130.03,
+        "y": 309.13,
+        "w": 99.92,
+        "h": 21.75
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "360x640",
+      "forma": "P",
+      "iso": 0,
+      "nombre": "P · sin isotipo",
+      "archivo": "360x640_P.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 110,
+        "y": 271.63,
+        "w": 140,
+        "h": 96.75
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 164,
+        "y": 271.63,
+        "w": 32,
+        "h": 48
+      },
+      "isoCargado": true,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "360x640",
+      "forma": "B",
+      "iso": 1,
+      "nombre": "B · con isotipo",
+      "archivo": "360x640_B-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 110,
+        "y": 302.63,
+        "w": 140,
+        "h": 34.75
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "360x640",
+      "forma": "B",
+      "iso": 0,
+      "nombre": "B · sin isotipo",
+      "archivo": "360x640_B.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 372.03,
+        "y": 153.13,
+        "w": 99.92,
+        "h": 83.75
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 405.98,
+        "y": 153.13,
+        "w": 32,
+        "h": 48
+      },
+      "isoCargado": true,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "844x390",
+      "forma": "P",
+      "iso": 1,
+      "nombre": "P · con isotipo",
+      "archivo": "844x390_P-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 372.03,
+        "y": 184.13,
+        "w": 99.92,
+        "h": 21.75
+      },
+      "dxCentro": -0.01,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "844x390",
+      "forma": "P",
+      "iso": 0,
+      "nombre": "P · sin isotipo",
+      "archivo": "844x390_P.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 352,
+        "y": 146.63,
+        "w": 140,
+        "h": 96.75
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": {
+        "x": 406,
+        "y": 146.63,
+        "w": 32,
+        "h": 48
+      },
+      "isoCargado": true,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "844x390",
+      "forma": "B",
+      "iso": 1,
+      "nombre": "B · con isotipo",
+      "archivo": "844x390_B-iso.png",
+      "errores": []
+    },
+    {
+      "indicador": {
+        "x": 352,
+        "y": 177.63,
+        "w": 140,
+        "h": 34.75
+      },
+      "dxCentro": 0,
+      "dyCentro": 0,
+      "isoCaja": null,
+      "isoCargado": null,
+      "fuente": "15px",
+      "status": "status",
+      "vivo": "polite",
+      "desborde": false,
+      "vista": "844x390",
+      "forma": "B",
+      "iso": 0,
+      "nombre": "B · sin isotipo",
+      "archivo": "844x390_B.png",
+      "errores": []
+    }
+  ]
+}

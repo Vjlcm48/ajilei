@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AJILEI · Lámina BIE-1 · indicador «Cargando»</title>
+<!--
+  BIE-1 · Lámina del indicador de espera (ficha Fase 1 §2, 1a-iii).
+
+  CÓMO SE ABRE. Doble clic (file://) o servida desde la raíz del repo: lee los
+  tokens de `src/styles/theme.css` y el isotipo maestro `src/assets/ajilei-isotipo.svg`
+  por ruta relativa, así que tiene que vivir en `laminas/bie1/`.
+
+  QUÉ ENSEÑA. La pantalla que hoy es un vacío verde (App.jsx, rama CARGANDO →
+  null) con el indicador que la sustituiría. Fondo `--green-abyss`, el mismo del
+  `body`: al aparecer el indicador NO cambia el color, solo aparece él.
+    · Forma P · «Cargando» + tres puntos que laten en secuencia.
+    · Forma B · «Cargando» + barra INDETERMINADA: un tramo que recorre la pista
+      y vuelve a empezar. Nunca una barra que se llena (D10): no hay progreso
+      que medir (Fase 0 §B4).
+    · Isotipo pequeño encima, o no. El anclaje óptico lo trae el propio maestro
+      (`viewBox`, AJILEI_Icono_v1.0 §2): se escala, no se desplaza — la misma
+      regla que `lobby.css` (.lob-iso).
+    · Movimiento reducido: puntos quietos, barra quieta (el tramo, parado en
+      el centro de la pista).
+    · Simular espera: reproduce la regla D5 con el reloj de verdad — antes de
+      300 ms no aparece nada; si aparece, se queda al menos 500 ms.
+  Un solo oro (`--gold-brand`) como acento; texto en el crema (`--text-primary`).
+
+  PARÁMETROS (los usa capturar.mjs):
+      ?forma=P|B  &iso=1|0  &quieto=1  &vista=1920x1080|390x844|360x640|844x390
+      &solo=1      sin barra de la lámina: la pantalla ocupa la ventana
+      &fase=0..1   congela las animaciones en esa fracción de su ciclo
+  `window.__bieListo` vale true cuando la pantalla está pintada (y congelada, si
+  se pidió fase).
+-->
+<link rel="stylesheet" href="../../src/styles/theme.css">
+<style>
+/* ── El chrome de la lámina (no es el producto) ─────────────────────────── */
+:root { --lam-panel: #0f2417; --lam-linea: rgba(var(--text-primary-rgb), .16); }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: #050d08; color: var(--text-primary); font: 14px/1.45 var(--font-base); }
+.lam-barra { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 10px 16px; background: var(--lam-panel); border-bottom: 1px solid var(--lam-linea); }
+.lam-barra h1 { font-size: 15px; margin: 0 6px 0 0; font-weight: 600; }
+.lam-grupo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lam-grupo > span { color: var(--text-muted); margin-right: 2px; }
+.lam-grupo button { font: inherit; color: var(--text-primary); background: transparent; border: 0; border-radius: 999px; padding: 4px 11px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--lam-linea); }
+.lam-grupo button[aria-pressed="true"] { background: var(--gold-brand); color: var(--text-dark, #1a1a0e); box-shadow: none; }
+.lam-nota { padding: 7px 16px; color: var(--text-secondary); border-bottom: 1px solid var(--lam-linea); min-height: 2.6em; }
+.lam-nota b { color: var(--text-primary); font-weight: 600; }
+.lam-escenario { padding: 16px; display: flex; justify-content: center; }
+.lam-marco { position: relative; overflow: hidden; border-radius: 6px; box-shadow: 0 0 0 1px var(--lam-linea), 0 10px 30px rgba(0, 0, 0, .5); }
+.lam-pantalla { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+body.solo .lam-barra, body.solo .lam-nota { display: none; }
+body.solo .lam-escenario { padding: 0; }
+body.solo .lam-marco { border-radius: 0; box-shadow: none; width: 100vw; height: 100vh; }
+body.solo .lam-pantalla { width: 100vw; height: 100vh; }
+
+/* ══ El producto: la pantalla de espera ═══════════════════════════════════
+   Todo mide en `cqmin` de la pantalla (container-type: size): en la app será
+   la ventana; aquí es el marco de la vista elegida, a escala. */
+.bie-pantalla {
+  container-type: size;
+  background: var(--green-abyss);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+}
+.bie-capa { position: absolute; inset: 0; display: grid; place-items: center; }
+.bie-capa[hidden], .bie-iso[hidden], .bie-fila[hidden] { display: none; }
+
+.bie-indicador {
+  display: grid;
+  justify-items: center;
+  gap: clamp(14px, 3.2cqmin, 26px);
+  --bie-texto: clamp(15px, 2.4cqmin, 20px);
+}
+/* El isotipo maestro es 2:3 (viewBox 15 30 60 90): alto y ancho en esa razón. */
+.bie-iso {
+  display: block;
+  height: clamp(48px, 9cqmin, 84px);
+  aspect-ratio: 2 / 3;
+  width: auto;
+  user-select: none;
+}
+.bie-fila { display: inline-flex; align-items: baseline; gap: .35em; font-size: var(--bie-texto); letter-spacing: .04em; }
+.bie-texto { color: var(--text-primary); }
+
+/* P · tres puntos que laten en secuencia */
+.bie-puntos { display: inline-flex; gap: .32em; }
+.bie-punto {
+  width: .32em; height: .32em; border-radius: 50%;
+  background: var(--gold-brand);
+  opacity: .25;
+  animation: bie-late 1.2s ease-in-out infinite;
+}
+.bie-punto:nth-child(2) { animation-delay: .2s; }
+.bie-punto:nth-child(3) { animation-delay: .4s; }
+@keyframes bie-late {
+  0%, 60%, 100% { opacity: .25; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-.18em); }
+}
+
+/* B · barra indeterminada: el tramo recorre la pista y vuelve a empezar */
+.bie-pista {
+  position: relative;
+  width: clamp(140px, 26cqmin, 240px);
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(var(--text-primary-rgb), .14);
+  overflow: hidden;
+}
+.bie-tramo {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 34%;
+  border-radius: 3px;
+  background: var(--gold-brand);
+  animation: bie-recorre 1.4s cubic-bezier(.45, .05, .55, .95) infinite;
+}
+@keyframes bie-recorre {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(295%); }
+}
+
+/* Movimiento reducido: todo quieto. Los puntos, los tres encendidos a medias;
+   el tramo, parado en el centro de la pista. */
+.bie-pantalla[data-quieto="1"] .bie-punto { animation: none; opacity: .7; }
+.bie-pantalla[data-quieto="1"] .bie-tramo { animation: none; transform: translateX(97%); }
+@media (prefers-reduced-motion: reduce) {
+  .bie-punto { animation: none; opacity: .7; }
+  .bie-tramo { animation: none; transform: translateX(97%); }
+}
+
+/* Lo que hay antes y después en la simulación (maqueta, no producto) */
+.bie-maqueta { display: grid; justify-items: center; gap: 10px; color: var(--text-muted); font-size: clamp(12px, 1.8cqmin, 15px); }
+.bie-maqueta b { color: var(--text-primary); font-weight: 600; }
+.bie-pildora { padding: .7em 2.2em; border-radius: 999px; background: var(--gold-brand); color: var(--text-dark, #1a1a0e); font-weight: 600; }
+.bie-reloj { position: absolute; left: 12px; bottom: 10px; font: 12px/1.3 ui-monospace, Consolas, monospace; color: var(--text-muted); }
+body.solo .bie-reloj { display: none; }
+</style>
+</head>
+<body>
+<div class="lam-barra">
+  <h1>BIE-1 · «Cargando»</h1>
+  <div class="lam-grupo" id="g-forma"><span>Forma</span></div>
+  <div class="lam-grupo" id="g-iso"><span>Isotipo</span></div>
+  <div class="lam-grupo" id="g-quieto"><span>Movimiento</span></div>
+  <div class="lam-grupo" id="g-espera"><span>Simular espera</span></div>
+  <div class="lam-grupo" id="g-vista"><span>Vista</span></div>
+</div>
+<div class="lam-nota" id="nota"></div>
+<div class="lam-escenario">
+  <div class="lam-marco" id="marco">
+    <div class="lam-pantalla bie-pantalla" id="pantalla">
+      <!-- Antes: la Portada con «Entrando…» (maqueta) -->
+      <div class="bie-capa" id="capa-antes" hidden>
+        <div class="bie-maqueta"><span>Portada</span><span class="bie-pildora">Entrando…</span></div>
+      </div>
+      <!-- El indicador. role="status" + aria-live: lo anuncia un lector de pantalla. -->
+      <div class="bie-capa" id="capa-indicador">
+        <div class="bie-indicador" role="status" aria-live="polite">
+          <img class="bie-iso" id="iso" src="../../src/assets/ajilei-isotipo.svg" alt="" aria-hidden="true" draggable="false">
+          <div class="bie-fila" id="fila-p">
+            <span class="bie-texto">Cargando</span>
+            <span class="bie-puntos" aria-hidden="true"><span class="bie-punto"></span><span class="bie-punto"></span><span class="bie-punto"></span></span>
+          </div>
+          <div id="fila-b" hidden>
+            <div class="bie-indicador" style="gap: clamp(10px, 2cqmin, 16px)">
+              <span class="bie-fila"><span class="bie-texto">Cargando</span></span>
+              <div class="bie-pista" aria-hidden="true"><div class="bie-tramo"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Después: el lobby (maqueta) -->
+      <div class="bie-capa" id="capa-despues" hidden>
+        <div class="bie-maqueta"><b>Lobby</b><span class="bie-pildora">Jugar contra las IAS</span></div>
+      </div>
+      <div class="bie-reloj" id="reloj"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FORMAS = [{ id: 'P', nombre: 'P · puntos' }, { id: 'B', nombre: 'B · barra' }]
+const VISTAS = [
+  { id: '1920x1080', w: 1920, h: 1080 }, { id: '390x844', w: 390, h: 844 },
+  { id: '360x640', w: 360, h: 640 },     { id: '844x390', w: 844, h: 390 },
+]
+const ESPERAS = [200, 1000, 2000, 4000]
+// La regla D5 de la ficha, en un solo sitio.
+const RETARDO_MS = 300, MINIMO_MS = 500
+
+const q = new URLSearchParams(location.search)
+const est = {
+  forma: q.get('forma') === 'B' ? 'B' : 'P',
+  iso: q.get('iso') !== '0',
+  quieto: q.get('quieto') === '1',
+  vista: VISTAS.find((v) => v.id === q.get('vista')) || VISTAS[1],
+}
+const solo = q.get('solo') === '1'
+if (solo) document.body.classList.add('solo')
+window.__bieListo = false
+
+const $ = (id) => document.getElementById(id)
+const pantalla = $('pantalla'), marco = $('marco')
+
+function pinta() {
+  $('fila-p').hidden = est.forma !== 'P'
+  $('fila-b').hidden = est.forma !== 'B'
+  $('iso').hidden = !est.iso
+  pantalla.dataset.quieto = est.quieto ? '1' : '0'
+  $('nota').innerHTML =
+    `<b>${est.forma === 'P' ? 'P · «Cargando» + tres puntos que laten' : 'B · «Cargando» + barra indeterminada (el tramo recorre la pista)'}</b>` +
+    ` · isotipo ${est.iso ? 'encima' : 'no'} · ${est.quieto ? 'movimiento reducido (quieto)' : 'animado'}` +
+    ` · regla D5: aparece a los ${RETARDO_MS} ms de espera; una vez visible, ≥ ${MINIMO_MS} ms`
+  botones()
+}
+
+function boton(grupo, texto, activo, fn) {
+  const b = document.createElement('button')
+  b.textContent = texto
+  if (activo !== null) b.setAttribute('aria-pressed', String(activo))
+  b.onclick = fn
+  $(grupo).append(b)
+}
+function botones() {
+  for (const g of ['g-forma', 'g-iso', 'g-quieto', 'g-espera', 'g-vista']) $(g).querySelectorAll('button').forEach((b) => b.remove())
+  for (const f of FORMAS) boton('g-forma', f.nombre, est.forma === f.id, () => { est.forma = f.id; pinta() })
+  boton('g-iso', 'con', est.iso, () => { est.iso = true; pinta() })
+  boton('g-iso', 'sin', !est.iso, () => { est.iso = false; pinta() })
+  boton('g-quieto', 'animado', !est.quieto, () => { est.quieto = false; pinta() })
+  boton('g-quieto', 'reducido', est.quieto, () => { est.quieto = true; pinta() })
+  for (const ms of ESPERAS) boton('g-espera', `${(ms / 1000).toLocaleString('es')} s`, null, () => simula(ms))
+  boton('g-espera', 'fijo', null, () => fijo())
+  for (const v of VISTAS) boton('g-vista', `${v.w}×${v.h}`, est.vista.id === v.id, () => { est.vista = v; encaja(); botones() })
+}
+
+// La pantalla mide EXACTAMENTE la vista y se escala para caber en la ventana.
+function encaja() {
+  if (solo) return
+  const { w, h } = est.vista
+  const dispW = innerWidth - 32
+  const dispH = innerHeight - document.querySelector('.lam-barra').offsetHeight - $('nota').offsetHeight - 32
+  const k = Math.min(1, dispW / w, dispH / h)
+  pantalla.style.width = w + 'px'; pantalla.style.height = h + 'px'
+  pantalla.style.transform = `scale(${k})`
+  marco.style.width = Math.round(w * k) + 'px'; marco.style.height = Math.round(h * k) + 'px'
+}
+addEventListener('resize', encaja)
+
+// ── Simular espera: la regla D5 con el reloj de verdad ──────────────────────
+// t=0 es el instante en que hoy la pantalla se queda vacía (la Portada se
+// desmonta). La espera W es lo que tarda `profiles`. Tres capas: vacío →
+// (a los 300 ms, si sigue esperando) indicador → lobby, que llega a los W ms
+// si el indicador no salió, o a max(W, aparición + 500) si salió.
+let relojes = []
+const capa = (id) => { for (const c of ['capa-antes', 'capa-indicador', 'capa-despues']) $(c).hidden = c !== id }
+const vacia = () => { for (const c of ['capa-antes', 'capa-indicador', 'capa-despues']) $(c).hidden = true }
+function limpia() { relojes.forEach(clearTimeout); relojes = [] }
+function fijo() { limpia(); capa('capa-indicador'); $('reloj').textContent = '' }
+function simula(W) {
+  limpia()
+  capa('capa-antes')
+  $('reloj').textContent = `Portada · «Entrando…» — a continuación, una espera de ${W} ms`
+  relojes.push(setTimeout(() => {
+    const t0 = performance.now()
+    vacia()
+    let visto = null
+    const linea = (txt) => { $('reloj').textContent = txt }
+    linea(`espera ${W} ms · 0 ms: vacío verde`)
+    relojes.push(setTimeout(() => {
+      if (performance.now() - t0 >= W) return
+      visto = performance.now() - t0
+      capa('capa-indicador')
+      linea(`espera ${W} ms · ${Math.round(visto)} ms: aparece «Cargando»`)
+    }, RETARDO_MS))
+    relojes.push(setTimeout(() => {
+      const fin = () => {
+        capa('capa-despues')
+        const t = Math.round(performance.now() - t0)
+        linea(visto === null
+          ? `espera ${W} ms · el lobby llega a los ${t} ms — el indicador NO llegó a salir`
+          : `espera ${W} ms · indicador de ${Math.round(visto)} a ${t} ms (${t - Math.round(visto)} ms visible) · lobby a los ${t} ms`)
+      }
+      if (visto === null) return fin()
+      const quedan = Math.max(0, visto + MINIMO_MS - (performance.now() - t0))
+      relojes.push(setTimeout(fin, quedan))
+    }, W))
+  }, 900))
+}
+
+// Congelar las animaciones en una fase (capturas deterministas).
+// El tiempo es el COMÚN de la línea, no el de cada animación: así los tres
+// puntos conservan su desfase (0 · 0,2 · 0,4 s) y la foto enseña la secuencia.
+function congela(f) {
+  for (const a of document.getAnimations()) {
+    const d = a.effect.getComputedTiming().duration
+    a.pause()
+    a.currentTime = f * d
+  }
+}
+
+pinta()
+encaja()
+fijo()
+const fase = q.get('fase')
+Promise.all([document.fonts.ready, new Promise((r) => {
+  const i = $('iso'); if (i.complete) r(); else { i.onload = r; i.onerror = r }
+})]).then(() => requestAnimationFrame(() => {
+  if (fase !== null) congela(Math.min(1, Math.max(0, Number(fase))))
+  window.__bieListo = true
+}))
+</script>
+</body>
+</html>
