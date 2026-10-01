@@ -342,8 +342,8 @@ el **dibujo**.
 | Archivo | Licencia | Medido | Volumen |
 |---|---|---|---|
 | `chips-collect.mp3` | Pixabay Content License · ID **96121** | 0,967 s · 2 ataques | 0,7 |
-| `ajilei-strum.mp3` | Pixabay Content License · ID **85867** | 3,657 s · **2 rasgueos** | 0,8 |
-| `table-knock.mp3` | Pixabay Content License · ID **504874** | 1,896 s · **2 golpes** ✓ | 0,6 |
+| `ajilei-strum.mp3` | Pixabay Content License · ID **504874** | 3,657 s · **2 rasgueos** | 0,8 |
+| `table-knock.mp3` | Pixabay Content License · ID **85867** | 1,896 s · **2 golpes** ✓ | 0,6 |
 
 Volúmenes elegidos contra el **pico medido** de cada archivo, no a ojo: el knock es el más fuerte
 (0,383) y dos golpes secos no deben sobresaltar; el strum es el más flojo (0,188) y es el momento
