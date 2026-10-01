@@ -23,12 +23,14 @@
 //       node scripts/diagPUE.mjs mon        (MON-2: el render 3D con alfa de la escena 4 obedece al rotor)
 //       node scripts/diagPUE.mjs cap [--sellar]  (CAP-1: las tres maestras de la mesa; NO entra en `todo`)
 //       node scripts/diagPUE.mjs dis             (DIS-1: los aparatos renderizados de la escena 5, Edge y WebKit; SÍ entra en `todo`)
+//       node scripts/diagPUE.mjs bie             (BIE-1: qué suena en la puerta y el «Cargando», con la red de Supabase simulada; SÍ entra en `todo`)
 import { chromium, webkit } from 'playwright-core'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
   VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
   TOLERANCIA_CAP, pasadaCap, compararPng, equivalentes, derivarComoGenerador,
 } from './cap/capMesa.mjs'
+import { contextoBie, marca, porGesto, HUECO, vidaIndicador, SONDA_INDICADOR } from './bie/bieRed.mjs'
 
 // CAP-1 Addendum 1 §2.3 · lo más que la og-image (caja dorada de mesah
 // CUBIERTA a 1200×630) puede recortar por lado, en px CSS. En 1a se midieron 4,6.
@@ -1092,7 +1094,8 @@ if (hacer('1.8')) {
   // el instante que la ficha nombra («hasta la portada pintada»). La ventana fija
   // de 2 s que usaba la auditoría metía dentro el rasgueo, que está diferido a
   // propósito UN SEGUNDO DESPUÉS de pintar — habría contado como camino crítico
-  // justamente lo que existe para no serlo.
+  // justamente lo que existe para no serlo. (BIE-1: el sonido diferido de la
+  // puerta es ahora el clic de los botones, con el mismo segundo de espera.)
   const fcp = await page.evaluate(`(() => {
     const e = performance.getEntriesByName('first-contentful-paint')[0];
     return e ? Math.round(e.startTime) : null;
@@ -1139,7 +1142,7 @@ if (hacer('1.8')) {
     `(${(criticoCrudo / 1024).toFixed(1)} KiB en crudo) · techo ${TECHO_CRITICO_KIB} KiB` +
     (dentroCritico ? '' : ' · rojo conocido desde CAP-1 (219,0 KiB, anterior a la campaña); pendiente de tanda propia'))
   anota('1.8c lo que llega DESPUÉS de pintar', true,
-    `diferido ${(suma(despues, 'cable') / 1024).toFixed(1)} KiB (rasgueo incluido) · ` +
+    `diferido ${(suma(despues, 'cable') / 1024).toFixed(1)} KiB (clic de la puerta incluido) · ` +
     `perezoso ${(suma(perezosas, 'cable') / 1024).toFixed(1)} KiB`)
 
   console.log('\n  bitácora completa · cable = gzip nivel 9, salvo lo que ya nace comprimido:')
@@ -1399,6 +1402,263 @@ if (hacer('dis')) {
     bloque.ocultos.push({ caso: o.caso.id, peticiones: o.peticiones, escenario: o.escenario, indice: o.indice, errores: o.errores })
   }
   resultados.bloques.dis = bloque
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// bie · BIE-1 · qué suena en la puerta, y el «Cargando»
+// ════════════════════════════════════════════════════════════════════════════
+// Rector: AJILEI_BIE-1_Fase1_v1.0.md §2 (1a-ii), sobre la sonda de la Fase 0.
+// La puerta entera —Portada, correo, código, lobby— con la red de Supabase
+// simulada (`scripts/bie/bieRed.mjs`): sin cuenta real y sin un byte fuera.
+//
+// EL DEFECTO QUE ESTO VIGILA NO SE VE CON PRISA. El rasgueo viejo sonaba en el
+// primer toque DESPUÉS DE CADA REPINTADO de la Portada; con los gestos pegados
+// —como los de la sonda de la Fase 0— a veces no había repintado entre dos y
+// el defecto se escondía. Por eso aquí se va a ritmo de persona: `PAUSA_BIE`
+// entre gesto y gesto, para que el rotor, la frase y la pausa de cortesía
+// repinten de sobra. Contra el árbol de `aabaeed` esta misma secuencia da
+// rasgueos (control de la Fase 1, informe §bie.s5).
+//
+// Lo que suena se clasifica por la duración del búfer de Web Audio (rasgueo
+// 3,657 s · clic 0,528 s · desbloqueo de Howler, 1 muestra) y se reparte por
+// la ventana de cada gesto. El veredicto, por gesto:
+//   · botón (JUGAR, Enviar código, Entrar)  → exactamente UN clic;
+//   · hueco o campo (tocar y teclear)       → CERO clics;
+//   · en todo el recorrido                  → CERO rasgueos.
+const PAUSA_BIE = 2200
+if (hacer('bie')) {
+  console.log('\n── bie · BIE-1 · los sonidos de la puerta (red de Supabase simulada) ──')
+  const VISTAS_BIE = [
+    { id: '1920x1080', w: 1920, h: 1080, dpr: 1, movil: false },
+    { id: '390x844', w: 390, h: 844, dpr: 2, movil: true },
+  ]
+  const toca = (page, vista, sel) => (vista.movil ? page.tap(sel) : page.click(sel))
+  const tocaPunto = (page, vista, p) => (vista.movil ? page.touchscreen.tap(p.x, p.y) : page.mouse.click(p.x, p.y))
+  const ENVIO = 'form .puerta-btn[type="submit"]'
+  const bie = { recorridos: {}, enter: null }
+
+  for (const vista of VISTAS_BIE) {
+    const { ctx, page, red, errores } = await contextoBie(browser, vista, BASE)
+    const r = { vista: vista.id, gestos: [], hueco: null, lobby: false, red, errores }
+    try {
+      await page.goto(URL_LAMINA, { waitUntil: 'load' })
+      await page.waitForSelector('.pue-escenario', { timeout: 20000 })
+      await page.waitForTimeout(PAUSA_BIE)          // la precarga del clic sale al segundo
+      r.hueco = await page.evaluate(HUECO)
+      const tipos = []
+      const gesto = async (nombre, tipo, fn) => {
+        await marca(page, nombre)
+        tipos.push(tipo)
+        await fn()
+        await page.waitForTimeout(PAUSA_BIE)
+      }
+      await gesto('toque en un hueco', 'hueco', () => tocaPunto(page, vista, r.hueco))
+      if (vista.movil) await gesto('JUGAR', 'boton', () => toca(page, vista, '.pue-btn-jugar'))
+      await gesto('toque en el correo + teclear', 'campo', async () => {
+        await toca(page, vista, '#entrada-correo')
+        await page.keyboard.type('bie@example.invalid', { delay: 40 })
+      })
+      await gesto('Enviar código', 'boton', () => toca(page, vista, ENVIO))
+      await page.waitForSelector('#entrada-codigo', { timeout: 10000 })
+      await gesto('toque en el código + teclear', 'campo', async () => {
+        await toca(page, vista, '#entrada-codigo')
+        await page.keyboard.type('123456', { delay: 60 })
+      })
+      await gesto('Entrar', 'boton', async () => {
+        await toca(page, vista, ENVIO)
+        await page.waitForSelector('main.lobby', { timeout: 10000 })
+        r.lobby = true
+      })
+      await marca(page, 'fin')
+      const ventanas = porGesto(await page.evaluate(() => window.__bie)).filter((v) => v.gesto !== 'fin')
+      r.gestos = ventanas.map((v, i) => ({ ...v, tipo: tipos[i] }))
+    } catch (e) {
+      r.error = e.message
+    }
+    bie.recorridos[vista.id] = r
+    await ctx.close()
+  }
+
+  // Enter dentro del campo del correo: el envío implícito tiene que sonar UNA vez.
+  {
+    const vista = VISTAS_BIE[0]
+    const { ctx, page, red, errores } = await contextoBie(browser, vista, BASE)
+    const r = { red, errores, codigo: false }
+    try {
+      await page.goto(URL_LAMINA, { waitUntil: 'load' })
+      await page.waitForSelector('.pue-escenario', { timeout: 20000 })
+      await page.waitForTimeout(PAUSA_BIE)
+      await page.click('#entrada-correo')
+      await page.keyboard.type('bie@example.invalid', { delay: 40 })
+      await page.waitForTimeout(PAUSA_BIE)
+      await marca(page, 'Enter en el correo')
+      await page.keyboard.press('Enter')
+      await page.waitForSelector('#entrada-codigo', { timeout: 10000 })
+      r.codigo = true
+      await page.waitForTimeout(PAUSA_BIE)
+      await marca(page, 'fin')
+      r.ventana = porGesto(await page.evaluate(() => window.__bie)).find((v) => v.gesto === 'Enter en el correo')
+    } catch (e) {
+      r.error = e.message
+    }
+    bie.enter = r
+    await ctx.close()
+  }
+
+  const recorridos = Object.values(bie.recorridos)
+  const todas = recorridos.flatMap((r) => r.gestos.map((g) => ({ ...g, vista: r.vista })))
+  const resume = (g) => `${g.vista} «${g.gesto}» clic ${g.audio.clic}${g.audio.rasgueo ? ` · RASGUEO ${g.audio.rasgueo}` : ''}`
+
+  anota('bie.s0 la puerta llega al lobby con la red simulada, sin red de fuera ni errores',
+    recorridos.every((r) => r.lobby && !r.error && r.red.fuera.length === 0 && r.errores.length === 0) && bie.enter.codigo && !bie.enter.error,
+    recorridos.map((r) => `${r.vista}: lobby=${r.lobby} · supabase ${r.red.supabase.length} · fuera ${r.red.fuera.length} · errores ${r.errores.length}${r.error ? ` · ${r.error}` : ''} · hueco en ${r.hueco ? `${r.hueco.x},${r.hueco.y} (${r.hueco.debajo})` : '—'}`).join(' │ ') +
+    ` │ Enter: código=${bie.enter.codigo}${bie.enter.error ? ` · ${bie.enter.error}` : ''}`)
+
+  const rasgueos = todas.reduce((a, g) => a + g.audio.rasgueo, 0) + (bie.enter.ventana?.audio.rasgueo ?? 0)
+  anota('bie.s1 ningún rasgueo en toda la puerta', todas.length > 0 && rasgueos === 0,
+    `${rasgueos} rasgueo(s) en ${todas.length + 1} gestos, a ${PAUSA_BIE} ms entre gesto y gesto`)
+
+  const malos = todas.filter((g) => (g.tipo === 'boton' ? g.audio.clic !== 1 : g.audio.clic !== 0))
+  anota('bie.s2 un clic por botón, ninguno al tocar un hueco o un campo', todas.length > 0 && malos.length === 0,
+    todas.map(resume).join(' · '))
+
+  const enter = bie.enter.ventana
+  anota('bie.s3 Enter en el correo suena UNA vez', !!enter && enter.audio.clic === 1,
+    enter ? `clic ${enter.audio.clic} · el paso del código ${bie.enter.codigo ? 'llegó' : 'NO llegó'}` : 'sin ventana medida')
+
+  const primeros = recorridos.map((r) => ({ vista: r.vista, g: r.gestos[0] }))
+  anota('bie.s4 el desbloqueo de Howler suena en el primer gesto', primeros.every((p) => p.g && p.g.audio.desbloqueo >= 1),
+    primeros.map((p) => `${p.vista} «${p.g?.gesto ?? '—'}»: desbloqueo ${p.g?.audio.desbloqueo ?? '—'}`).join(' · '))
+
+  // ── bie.c* · el indicador «Cargando» (Fase 1 §3.5) ──────────────────────────
+  // La regla D5 vista desde fuera: con `profiles` a distintos retardos, cuándo
+  // se vacía `#root`, cuándo llega `.cargando` y cuándo el lobby. Las horas son
+  // las del MutationObserver (commit de React), en ms de la página. Aquí no hay
+  // que ir a ritmo de persona —lo que se mide es la red, no el sonido—, así que
+  // los campos se rellenan con `fill`.
+  console.log('   · bie.c* · el indicador «Cargando»')
+  const sano = (r) => !r.error && r.red.fuera.length === 0 && r.errores.length === 0
+  const nota = (r) => `${r.vista}${r.error ? ` · ERROR ${r.error}` : ''}${r.red.fuera.length ? ` · fuera ${r.red.fuera.length}` : ''}${r.errores.length ? ` · errores ${r.errores.slice(0, 2).join(' | ')}` : ''}`
+  const vida = (r) => {
+    const v = r.vida
+    if (!v) return '—'
+    const rel = (t) => (t === null || v.vacio === null ? '—' : `${t - v.vacio}`)
+    return `vacío→cargando ${rel(v.cargando)} ms · vacío→lobby ${rel(v.lobby)} ms${v.cargando !== null && v.lobby !== null ? ` · visible ${v.lobby - v.cargando} ms` : ''}${v.tras ? ` · tras él «${v.tras}»` : ''}`
+  }
+  const esLobby = (que) => /(^|\s)lobby(\s|$)/.test(que ?? '')
+  const pasoCodigo = async (vista, opts = {}) => {
+    const { sondear = false, ...red } = opts
+    const { ctx, page, red: trafico, errores } = await contextoBie(browser, vista, BASE, red)
+    const r = { vista: vista.id, ...red, red: trafico, errores, lobby: false }
+    try {
+      await page.goto(URL_LAMINA, { waitUntil: 'load' })
+      await page.waitForSelector('.pue-escenario', { timeout: 20000 })
+      if (vista.movil) await page.tap('.pue-btn-jugar')
+      await page.fill('#entrada-correo', 'bie@example.invalid')
+      await toca(page, vista, ENVIO)
+      await page.waitForSelector('#entrada-codigo', { timeout: 10000 })
+      await page.fill('#entrada-codigo', '123456')
+      await marca(page, 'Entrar')
+      await toca(page, vista, ENVIO)
+      if (sondear) {
+        const h = await page.waitForSelector('.cargando', { timeout: 3000 }).catch(() => null)
+        if (h) {
+          r.sonda = await page.evaluate(SONDA_INDICADOR)
+          await page.waitForTimeout(250)
+          r.sonda2 = await page.evaluate(SONDA_INDICADOR)
+        }
+      }
+      await page.waitForSelector('main.lobby', { timeout: 15000 })
+      r.lobby = true
+      await page.waitForTimeout(300)
+      const serie = await page.evaluate(() => window.__bie)
+      r.vida = vidaIndicador(serie, serie.find((e) => e.marca === 'Entrar').t)
+    } catch (e) {
+      r.error = e.message
+    }
+    await ctx.close()
+    return r
+  }
+  const arranque = async (vista, opts = {}) => {
+    const { ctx, page, red: trafico, errores } = await contextoBie(browser, vista, BASE, opts)
+    const r = { vista: vista.id, ...opts, red: trafico, errores, destino: null }
+    try {
+      await page.goto(URL_LAMINA, { waitUntil: 'load' })
+      if (opts.conSesion && await page.waitForSelector('.cargando', { timeout: 3000 }).catch(() => null)) {
+        await page.waitForTimeout(150)
+        r.sonda = await page.evaluate(SONDA_INDICADOR)
+      }
+      await page.waitForSelector(opts.conSesion ? 'main.lobby' : '.pue-escenario', { timeout: 20000 })
+      r.destino = opts.conSesion ? 'lobby' : 'portada'
+      await page.waitForTimeout(3000)
+      r.vida = vidaIndicador(await page.evaluate(() => window.__bie), 0)
+    } catch (e) {
+      r.error = e.message
+    }
+    await ctx.close()
+    return r
+  }
+
+  const c = { c1: [], c2: [], c3: [], c4: [], c5: [], c7: null }
+  for (const vista of VISTAS_BIE) {
+    c.c1.push(await arranque(vista))
+    c.c2.push(await pasoCodigo(vista, { perfilMs: 0 }))
+    c.c3.push(await pasoCodigo(vista, { perfilMs: 1000, sondear: true }))
+    for (let i = 0; i < 2; i++) c.c4.push(await pasoCodigo(vista, { perfilMs: 350 }))
+    c.c5.push(await arranque(vista, { conSesion: true, perfilMs: 1000 }))
+  }
+  c.c7 = await pasoCodigo(VISTAS_BIE[0], { perfilMs: 1500, sondear: true, reducido: true })
+  bie.indicador = c
+
+  anota('bie.c1 anónimo sin sesión: el indicador nunca aparece',
+    c.c1.every((r) => sano(r) && r.destino === 'portada' && r.vida.cargando === null),
+    c.c1.map((r) => `${nota(r)}: ${r.destino ?? '—'} · «Cargando» ${r.vida?.veces ?? '—'} vez/veces en 3 s`).join(' │ '))
+
+  anota('bie.c2 código con profiles a 0 ms: no aparece, lobby directo',
+    c.c2.every((r) => sano(r) && r.lobby && r.vida.cargando === null && r.vida.lobby !== null),
+    c.c2.map((r) => `${nota(r)}: ${vida(r)}`).join(' │ '))
+
+  anota('bie.c3 código con profiles a 1 000 ms: aparece entre 300 y 400 ms tras el vacío y sigue hasta el lobby',
+    c.c3.every((r) => {
+      const v = r.vida
+      return sano(r) && r.lobby && v.cargando !== null && v.vacio !== null &&
+        v.cargando - v.vacio >= 300 && v.cargando - v.vacio <= 400 && v.veces === 1 && esLobby(v.tras)
+    }),
+    c.c3.map((r) => `${nota(r)}: ${vida(r)}`).join(' │ '))
+
+  const c4vistos = c.c4.filter((r) => r.vida?.cargando != null)
+  anota('bie.c4 código con profiles a 350 ms: si aparece, se queda ≥ 500 ms',
+    c.c4.every((r) => sano(r) && r.lobby) && c4vistos.every((r) => r.vida.lobby - r.vida.cargando >= 500),
+    `${c4vistos.length}/${c.c4.length} pasadas lo enseñaron · ` + c.c4.map((r) => `${nota(r)}: ${vida(r)}`).join(' │ '))
+
+  anota('bie.c5 arranque con la sesión de CAP-1 y profiles a 1 000 ms: aparece',
+    c.c5.every((r) => sano(r) && r.destino === 'lobby' && r.vida.cargando !== null),
+    c.c5.map((r) => `${nota(r)}: ${r.destino ?? '—'} · arranque→cargando ${r.vida?.cargando != null && r.vida.vacio != null ? r.vida.cargando - r.vida.vacio : '—'} ms · visible ${r.vida?.cargando != null && r.vida.lobby != null ? r.vida.lobby - r.vida.cargando : '—'} ms`).join(' │ '))
+
+  const s6 = c.c3.map((r) => ({ vista: r.vista, s: r.sonda }))
+  anota('bie.c6 el indicador expone role="status" con el texto «Cargando»',
+    s6.every(({ s }) => s && s.status && s.vivo === 'polite' && s.texto === 'Cargando' &&
+      s.ocultos.some((k) => /cargando-iso/.test(k)) && s.ocultos.some((k) => /cargando-puntos/.test(k))),
+    s6.map(({ vista, s }) => (s ? `${vista}: status=${s.status} · aria-live=${s.vivo} · «${s.texto}» · aria-hidden ${s.ocultos.join('+')} · ${s.animaciones} animaciones · fondo ${s.fondo}` : `${vista}: sin sonda`)).join(' │ '))
+
+  const s7 = c.c7.sonda
+  anota('bie.c7 movimiento reducido: sin animación activa',
+    sano(c.c7) && !!s7 && s7.animaciones === 0 && s7.texto === 'Cargando' && s6.every(({ s }) => s && s.animaciones > 0),
+    s7 ? `reducido: ${s7.animaciones} animaciones en marcha · «${s7.texto}» │ control sin reducir: ${s6.map(({ vista, s }) => `${vista} ${s?.animaciones ?? '—'}`).join(' · ')}` : `${nota(c.c7)}: sin sonda`)
+
+  // No es puerta: «sin mover nada al aparecer». La caja del indicador en el
+  // commit en que llega (leída por el MutationObserver, antes de pintar) contra
+  // la de la sonda, más tarde y con el isotipo ya cargado.
+  for (const r of [...c.c3, ...c.c5, c.c7]) {
+    const despues = r.sonda2 ?? r.sonda
+    if (r.vida?.caja && despues) {
+      console.log(`     caja ${r.vista}${r.reducido ? ' reducido' : ''}${r.conSesion ? ' arranque' : ''}: ${r.vida.caja} (isotipo ${r.vida.isoCargado ? 'ya cargado' : 'sin cargar'}) → ${despues.caja} a +${despues.t - r.vida.cargando} ms (isotipo ${despues.iso?.cargado ? 'cargado' : 'SIN CARGAR'}) ${r.vida.caja === despues.caja ? '· quieta' : '· SE MOVIÓ'}`)
+    } else if (r.vida?.caja) {
+      console.log(`     caja ${r.vista}${r.conSesion ? ' arranque' : ''}: ${r.vida.caja} (isotipo ${r.vida.isoCargado ? 'ya cargado' : 'sin cargar'}) · sin sonda posterior`)
+    }
+  }
+
+  resultados.bloques.bie = bie
 }
 
 // ════════════════════════════════════════════════════════════════════════════
