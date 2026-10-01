@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, createRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useId, createRef } from 'react'
 import '../styles/gameTable.css'
 import '../styles/apu.css'
 import PlayingCard from './PlayingCard'
@@ -19,6 +19,8 @@ import { conNivel } from '../hooks/nivelCore'
 import { puntosDe } from '../config/niveles'
 import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
 import { componeCronica, componeCapas } from '../hooks/cronicaCore'
+import { useVoz2Recorte } from '../hooks/useVoz2Recorte'
+import { Voz2Capa } from './Voz2Capa'
 import { siembraCEL } from '../dev/siembraCEL'
 import { siembraMesaAPU } from '../dev/siembraAPU'
 import {
@@ -68,6 +70,7 @@ import {
   // parte del arreglo — mientras la función esté a mano, el patrón vuelve.
 } from '../engine/gameEngine'
 import '../styles/luz.css'
+import '../styles/voz2.css'
 import '../styles/rev.css'
 import '../styles/rec.css'
 
@@ -477,6 +480,17 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     manoIndex: game.manoIndex,
     ruleN: game.handRules.ruleN,
   })
+  // VOZ-2 · ¿La frase de resultado se pintó recortada? Lo mide la caja, no la
+  // longitud (D4): ver `useVoz2Recorte`. Se publica en el `.voz2-texto` como
+  // `data-voz2-recortada`, y el arnés lo contrasta con los glifos visibles.
+  const [voz2Ref, voz2Recortada] = useVoz2Recorte()
+  // VOZ-2 · 1b · ¿La frase está desplegada? Se guarda la MANO en la que se
+  // abrió (`handCount`), no un booleano: en cuanto empieza otra mano deja de
+  // coincidir y la capa se cierra sola, sin un efecto que la limpie (D3, molde
+  // U1). El estado abierto de verdad se DERIVA más abajo (`voz2Abierta`), con la
+  // recarga ya calculada.
+  const [vozAbierta, setVozAbierta] = useState(null)
+  const voz2CapaId = useId()
   const unit         = game.unit
   const humanIsTurn  = game.activePlayerIndex === 0
   const pieSeat      = game.pieIndex
@@ -1217,6 +1231,40 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const recLista = !!recarga && (recarga.motivo === RECARGA.VOLUNTARIA || recListaRevelacion)
   const recForma = recLista ? formaRecarga({ seg: recargaSeg, abierta: recarga.abierta, motivo: recarga.motivo }) : null
 
+  // ── VOZ-2 · 1b · La frase desplegada (D3, D10, D12, D13) ─────────────────
+  // Abierta = hay resultado, la frase está recortada (si cabe no hay nada que
+  // desplegar), se abrió en ESTA mano y no hay tarjeta de recarga encima.
+  // D10 · al abrirse la tarjeta —voluntaria, automática o forzosa— la capa se
+  // RECOGE: no basta con esconderla mientras la tarjeta esté, porque al plegarla
+  // («Ver la mesa») volvería a salir sin que nadie la pidiera. Se anota durante
+  // el render, el mismo molde que `revelacion` arriba: converge en una vuelta.
+  // La burbuja no la toca (D10): vive en la barra del jugador, fuera del óvalo.
+  const tarjetaRecargaAbierta = !!recarga && recForma?.forma === 'tarjeta'
+  if (tarjetaRecargaAbierta && vozAbierta !== null) setVozAbierta(null)
+  const voz2Abierta = !!resultado && voz2Recortada && vozAbierta === game.handCount && !tarjetaRecargaAbierta
+  // Un toque, UNA alternancia (D12). El único manejador de toque es el del
+  // óvalo: el texto está dentro y su clic sube hasta él, así que no lleva otro
+  // (dos manejadores en la cadena alternarían dos veces y no pasaría nada).
+  const alternaVoz2 = () => {
+    if (!resultado || !voz2Recortada) return
+    setVozAbierta(voz2Abierta ? null : game.handCount)
+  }
+  const cierraVoz2 = () => setVozAbierta(null)
+  // Teclado (D13): Enter y Espacio alternan sobre el texto, que sólo con
+  // recorte es un botón. Espacio no desplaza la página.
+  const teclaVoz2 = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternaVoz2() }
+    else if (e.key === 'Escape') cierraVoz2()
+  }
+  // Esc cierra desde cualquier sitio, no sólo con el foco en el texto. El
+  // `setState` va dentro del manejador, no en el cuerpo del efecto.
+  useEffect(() => {
+    if (!voz2Abierta) return undefined
+    const alPulsar = (e) => { if (e.key === 'Escape') setVozAbierta(null) }
+    document.addEventListener('keydown', alPulsar)
+    return () => document.removeEventListener('keydown', alPulsar)
+  }, [voz2Abierta])
+
   // §5.1 · QUINCE SEGUNDOS Y «No» POR DEFECTO. El plazo corre igual en la
   // automática y en la forzosa (v1.2 §5.1: «el mismo plazo de 15 segundos
   // contado desde que termina la revelación»); lo que cambia es lo que
@@ -1898,6 +1946,44 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     )
   }
 
+  // VOZ-2 · El contenido del `<p>` del óvalo, UNO para sus dos rutas
+  // (center-zone y two-ovals), como `claseDelMensaje` (MSG-U1). Con resultado
+  // el texto va dentro de `.voz2-texto`, que es quien recorta (voz2.css): el
+  // `<p>` no cambia de caja ni de clases. Sin resultado —crónica, descarte— el
+  // marcado es exactamente el de antes de VOZ-2: el texto a pelo.
+  //
+  // 1b · Con recorte el texto es además un BOTÓN para la accesibilidad (D13):
+  // `role`, `tabIndex`, `aria-expanded` y `aria-controls` (la capa). Sin
+  // recorte no lleva ninguno de los cuatro. Lo que cambia con el recorte son
+  // ATRIBUTOS: los elementos son los mismos y la geometría también.
+  // El indicio de toque (Victor: «…» + flechita de oro) es un hermano del texto
+  // que existe siempre que hay resultado y sólo se VE con recorte y recogida
+  // (voz2.css lo decide por los atributos del texto). Va fuera de flujo: el
+  // `<p>` no cambia de caja. Lo coloca `useVoz2Recorte`, que ya mide.
+  function contenidoFrase(texto) {
+    if (!resultado) return texto
+    const boton = voz2Recortada
+      ? { role: 'button', tabIndex: 0, 'aria-expanded': voz2Abierta, 'aria-controls': voz2CapaId, onKeyDown: teclaVoz2 }
+      : null
+    return (
+      <>
+        <span ref={voz2Ref} className="voz2-texto" data-voz2-recortada={voz2Recortada ? '1' : undefined} {...boton}>
+          {texto}
+        </span>
+        <svg className="voz2-indicio" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+          <path d="M2 3.2 L5 6.6 L8 3.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </>
+    )
+  }
+
+  // VOZ-2 · 1b · El toque del óvalo (D12). La zona es el óvalo ENTERO, y sólo
+  // con resultado y con la frase recortada: sin esas dos, el manejador ni se
+  // pone. Va en el JSX y ninguna regla CSS apunta al óvalo (D1). El nombre de
+  // los rivales no es hijo del óvalo, así que su toque no llega aquí: en la
+  // frontera gana él por construcción.
+  const toqueOvaloVoz2 = resultado && voz2Recortada ? alternaVoz2 : undefined
+
   function renderCenterZone() {
     // MSG-U1/MSG-U2 · en resultado manda `resultadoCore`; fuera de él, la
     // crónica compuesta por `cronicaCore` con su estilo por tipo de acción
@@ -1910,7 +1996,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const actionKind = resultado ? null : messageActionKind(centerMsg)
     const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
-      <section className="center-zone">
+      <section className="center-zone" onClick={toqueOvaloVoz2}>
         {/* C4.5.2: mientras hay aviso de reducción, REEMPLAZA el contenido del óvalo
             (pozo/estado/comodín) por el aviso EN FLUJO, centrado y con wrap. Al
             limpiarse elimNotice (lo hace runEliminationCeremony tras ELIM_NOTICE_MS),
@@ -1941,7 +2027,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 atributo no mueve un píxel — y permite verificar que el color
                 aplicado y el tono compuesto son el mismo hecho, sin leer prosa. */}
             <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} data-capas={capasPozo.length} key={actionKind ? centerMsg : 'msg'}>
-              {centerMsg}
+              {contenidoFrase(centerMsg)}
             </p>
             {/* C4.4: el chip refleja el estado real según jugadores vivos. Solo en
                 mesas que pudieron tener comodín (arrancaron en 4+); las de 2-3 no
@@ -2003,9 +2089,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
           </div>
         </section>
-        <section className="felt-oval oval-right">
+        <section className="felt-oval oval-right" onClick={toqueOvaloVoz2}>
           <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} data-capas={capasPozo.length} key={actionKind ? centerMsg : 'msg'}>
-            {centerMsg}
+            {contenidoFrase(centerMsg)}
           </p>
         </section>
       </div>
@@ -2581,6 +2667,19 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         anchorSel=".pbr-name"
         onCerrar={reacciones.cerrarBurbuja}
       />
+
+      {/* VOZ-2 · 1b · la frase entera, desplegada. Hermana de la mesa y `fixed`,
+          molde `.vc-capa` (D2); z 20, por debajo del vuelo de la celebración, que
+          va justo detrás (D9). Montada mientras la frase esté recortada: es el destino
+          del `aria-controls` del texto (D13). */}
+      {resultado && voz2Recortada && (
+        <Voz2Capa
+          id={voz2CapaId}
+          texto={[resultado.texto, capasTexto].filter(Boolean).join(' ')}
+          abierta={voz2Abierta}
+          onCerrar={cierraVoz2}
+        />
+      )}
 
       {/* DSK-VC2 · celebración de mesa. Hermanas del área, como el panel de
           utilidades y las burbujas: overlays puros `fixed`, jamás dentro de un

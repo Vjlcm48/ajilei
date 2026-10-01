@@ -1,0 +1,174 @@
+/* ── VOZ-2 · La frase del óvalo, recogida ──────────────────────────────────────
+   Ficha VOZ-2 Fase 1 v1.0 (D1, D4, D6, D7, D8). Informe de la Fase 0:
+   docs/reportes/AJILEI_VOZ-2_Fase0_Informe_v1.0.md §B–§D.
+
+   HOJA ADITIVA ESTRICTA. Toda la frase vive hoy en gameTable.css, que es
+   protegido: aquí no se pisa ni una de sus reglas. El recorte va en un
+   elemento NUEVO, `.voz2-texto`, que GameTable.jsx sólo pinta DENTRO del
+   `<p class="game-message">` y sólo cuando hay resultado. Ninguna regla
+   existente alcanza esa clase, así que no hay especificidad que ganar ni
+   `!important` que poner. El `<p>` conserva su caja, su `key`, su `data-tono`,
+   su `data-capas` y su `msgPop`. Y NINGUNA regla de esta hoja apunta al óvalo
+   (`.center-zone` / `.felt-oval`): D1.
+
+   POR QUÉ NO SE RECORTA SOBRE EL `<p>`. Es `display: flex` y su texto vive en
+   un ítem anónimo: `text-overflow` no lo alcanza, y `-webkit-line-clamp` exige
+   cambiarle el `display`, con lo que se pierde el centrado vertical en su
+   caja de alto fijo. */
+
+
+/* ── 1 · El recorte ───────────────────────────────────────────────────────────
+   Dos propiedades propias gobiernan cuánto se lee (la lámina de la 1a las
+   enseña; la 1b fija sus valores por vista):
+     --voz2-lineas      líneas visibles antes del «…». Provisional: 2.
+     --voz2-interlinea  interlineado del recorte. SIN declarar a propósito: una
+                        `var()` sin valor deja `line-height` como `unset`, que
+                        en una propiedad heredada es heredar → el interlineado
+                        de hoy (1,3 del `<p>`), byte a byte.
+   Las dos son por elemento: cualquier bloque de medios podrá redefinirlas sobre
+   `.voz2-texto` sin tocar este bloque.
+
+   LA CONTENCIÓN NO ES OPCIONAL (Fase 0 §D2, R-1). El `<p>` es `flex: 1` con
+   `min-width: auto`: su mínimo es el `min-content` de lo que lleva dentro, y
+   ese mínimo SUBE por el `flex-wrap` del óvalo. Medido sin contención:
+     · una línea sin cortes → el óvalo se movía hasta 906 px (360×640, mesa 5);
+     · con cortes, la palabra más larga («Heptacoins.») no cabía en 73 px y el
+       `<p>` saltaba de fila: mensaje 198,81 px, comodín 161,78, pozo 3,09 (C-2).
+   `contain: inline-size` declara que el tamaño en línea del elemento NO
+   depende de su contenido: su `min-content` pasa a 0 y no sube nada. El ancho
+   lo pone `width: 100%` (el del `<p>`, que lo fija su sitio en el óvalo, no la
+   frase). Corregir C-2 es efecto de esta línea, y está sellado (D7).
+
+   `-webkit-line-clamp` recorta también a 1 línea (con «…»), así que una sola
+   mecánica sirve para las dos opciones. `text-overflow: ellipsis` se declara
+   además por si un motor resolviera el caso de 1 línea por el eje horizontal.
+   Nada de `white-space: nowrap`: es lo que convertía el `min-content` en la
+   frase entera. */
+.voz2-texto {
+  --voz2-lineas: 2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--voz2-lineas);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--voz2-interlinea);
+  contain: inline-size;
+  width: 100%;
+}
+
+
+/* ── 2 · Escritorio, mesas 4 y 5: el `<p>` se estira a su pista (D8) ──────────
+   Allí el óvalo es un grid (`gameTable.css:1140-1150`, mismo bloque de medios)
+   con `justify-items: center`: el `<p>` mide lo que mide su texto (196,86 px
+   con la frase real, 275,56 de tope medido). Con la contención su contenido ya
+   no tiene ancho propio y el `<p>` se colapsaría a 0, así que se estira a la
+   pista y su ancho pasa a ser CONSTANTE. La pista es `minmax(0, 360px)`: no
+   crece con nada de lo que hay aquí dentro, y el pozo y el óvalo no se mueven.
+
+   La regla apunta al `<p>` (sujeto `.game-message`), no al óvalo: `.center-zone`
+   aparece sólo como ancestro, igual que en el selector de gameTable.css que la
+   coloca en su celda (0,3,0). `:has(> .voz2-texto)` la limita a cuando hay
+   resultado: la crónica de apuestas queda exactamente como hoy. 0,5,0. */
+@media (min-width: 768px) and (min-height: 601px) {
+  .game-table-screen .table-four .center-zone .game-message:has(> .voz2-texto),
+  .game-table-screen .table-five .center-zone .game-message:has(> .voz2-texto) {
+    justify-self: stretch;
+  }
+}
+
+
+/* ── 3 · Valores elegidos en la lámina (1b-i) ─────────────────────────────────
+   Victor eligió, igual para todas las vistas y mesas: 2 líneas, con el
+   interlineado de hoy. Es exactamente lo que ya dice el bloque 1:
+   `--voz2-lineas: 2` y `--voz2-interlinea` sin valor. No hay bloque por vista
+   porque no hay valor por vista; las dos propiedades se quedan como mando. */
+
+
+/* ── 4 · El indicio de toque: «…» + flechita de oro ───────────────────────────
+   El «…» lo pone el recorte. La flechita es el `<svg class="voz2-indicio">`
+   hermano del texto: existe siempre que hay resultado y se VE sólo cuando el
+   texto está recortado y recogido. Lo decide el CSS leyendo los atributos del
+   texto (`data-voz2-recortada`, `aria-expanded`): el marcado no cambia (D13).
+   `useVoz2Recorte` le pone `left`/`top` (el final de lo que se lee, centro de
+   la línea); aquí, el tamaño de la lámina (9 px), dos píxeles de aire tras el
+   «…» y el oro de marca (regla de un solo oro). Fuera de flujo y sin eventos:
+   ni mueve el `<p>` ni le quita el toque a nadie.
+
+   Su bloque contenedor es el `<p>`: `position: relative` no le cambia la caja
+   (sin desplazamientos, `relative` es la misma caja), y así la flechita viaja
+   con él —también dentro de `msgPop`—. La regla apunta al `<p>` y sólo con
+   resultado (`:has`), nunca al óvalo (D1). */
+.game-table-screen .game-message:has(> .voz2-texto) {
+  position: relative;
+}
+.voz2-indicio {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 2px;
+  color: var(--gold-brand);
+  pointer-events: none;
+  visibility: hidden;
+}
+.voz2-texto[data-voz2-recortada]:not([aria-expanded="true"]) + .voz2-indicio {
+  visibility: visible;
+}
+
+/* D14 · la mano, sólo sobre el texto recortado y sólo con puntero fino. El
+   óvalo no recibe estilo (D1): su toque es un manejador del JSX. */
+@media (pointer: fine) {
+  .voz2-texto[data-voz2-recortada] {
+    cursor: pointer;
+  }
+}
+/* Con recorte el texto es un botón (D13): el foco de teclado se ve, en oro.
+   `outline` no ocupa sitio. */
+.voz2-texto[data-voz2-recortada]:focus-visible {
+  outline: 2px solid var(--gold-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+
+/* ── 5 · La capa: «C · globo», sobre el óvalo ─────────────────────────────────
+   La forma de la lámina, regla a regla (laminas/voz2/lamina.html, `.capa` y
+   `.capa-C`): oscura con borde de oro —el lenguaje de la burbuja de REC-1—,
+   14 px en móvil y 15 en escritorio, interlineado 1,35, centrada. En la
+   posición elegida («sobre el óvalo») el pico no asoma: la lámina sólo lo
+   pinta cuando la capa queda pegada por encima o por debajo, apuntando al
+   óvalo, y aquí está encima de él. Por eso no se dibuja.
+
+   `fixed` y `z-index: 20` (D2, D9). `left`/`top`/`width` los pone
+   `Voz2Capa` midiendo el óvalo. `border-box`: el ancho medido incluye el
+   relleno y el borde, como en la lámina. `[hidden]` se repite porque una regla
+   de autor con `display` le gana a la del navegador. */
+.voz2-capa {
+  position: fixed;
+  z-index: 20;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 9px 13px;
+  background: rgba(9, 23, 14, 0.94);
+  border: 1.5px solid rgba(var(--gold-brand-rgb), 0.7);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.voz2-capa[hidden] {
+  display: none;
+}
+@media (min-width: 768px) and (min-height: 601px) {
+  .voz2-capa {
+    font-size: 15px;
+  }
+}
