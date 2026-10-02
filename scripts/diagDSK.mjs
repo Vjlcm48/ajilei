@@ -1,6 +1,12 @@
 // ── diagDSK.mjs · Arnés de diagnóstico DESKTOP (campaña DSK) ──────────────────
-// Read-only: NO toca src/. Mide geometría/estilos con Edge headless (playwright-core).
-// Uso:  node scripts/diagDSK.mjs <modo>
+// Read-only: NO toca src/. Mide geometría/estilos con el Chromium fijo de playwright-core.
+// Uso:  node scripts/diagDSK.mjs <modo> [args] [--puerto=N] [--puerto-aux=N] [--servidor=externo]
+//   ARN-3a · levanta su propio servidor de desarrollo con bypass (5173; `luz` y
+//   `rev` además uno sin bypass en 5174) DENTRO de su proceso, y lo apaga al
+//   salir. Si el puerto está ocupado se niega (código 2) y dice quién lo ocupa.
+//   `--servidor=externo` usa uno levantado a mano (`AJILEI_BASE`). Navegador:
+//   Chromium de playwright-core; `ARNES_CANAL=msedge` = pasada de contraste.
+//   Sale con 0 (verde o informativo), 1 (alguna puerta en rojo) o 2 (instrumento).
 //   d1d2   → 1920×937: gates (matchMedia), estructura JSX activa, mapa DOM de los 11 frentes
 //   d3     → matriz de 4 viewports: bbox de mesa/óvalo/paneles/mazos/abanico/botones + overflow
 //   bug    → reproduce la revelación finalista y mide el reflow del panel ganador
@@ -272,7 +278,13 @@ import { register } from 'node:module'
 // El motor importa sin extensión y es archivo PROTEGIDO: el arnés se adapta
 // con un gancho de resolución propio (ver scripts/_resolveExt.mjs).
 register('./_resolveExt.mjs', import.meta.url)
-import { chromium } from 'playwright-core'
+// ARN-3a · el navegador, el servidor, el puerto y el código de salida salen del
+// terreno común (scripts/arnes/comun.mjs): Chromium fijo de Playwright, Vite
+// dentro de este proceso y 0 / 1 / 2 al salir.
+import {
+  instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
+  ErrorInstrumento, ETIQUETA_NAVEGADOR, MODOS_DSK, veredictosDSK, codigoDeSalida,
+} from './arnes/comun.mjs'
 // REC-1 · `mkdirSync` y `existsSync` para el modo `rec`. `mkdirSync` ya se usaba en
 // `retar` y `apu` sin importarse: el `try` se tragaba el ReferenceError y los
 // cajones sólo existían porque alguien los había creado antes.
@@ -334,7 +346,16 @@ const movEsperaEntrada = (page) => page.waitForTimeout(REACCION_ENTRADA_MS + 80)
 // qué ser el 5173 de siempre —durante el desarrollo de una tanda conviven el
 // servidor de Victor y el de la medición—. El valor por defecto NO cambia: sin
 // la variable, esto sigue apuntando a donde apuntaba.
-const BASE = process.env.AJILEI_BASE || 'http://localhost:5173'
+// ARN-3a · por defecto el arnés levanta SU servidor (D6) en el puerto de
+// siempre o en `--puerto=N`; `AJILEI_BASE` solo cuenta con `--servidor=externo`
+// (D9), que es el modo de antes: un servidor levantado a mano.
+instalarSalidas()
+const OPC = opcionesDelArnes()
+const EXTERNO = OPC.servidor === 'externo'
+const BASE = EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:5173') : `http://localhost:${OPC.puerto || 5173}`
+// La Portada de `luz` y `rev` se mide contra un segundo servidor SIN bypass. Con
+// servidor propio, ese también lo levanta el arnés, en 5174 o `--puerto-aux=N`.
+if (!EXTERNO) process.env.LUZ_BASE_PORTADA = process.env.REV_BASE_PORTADA = `http://localhost:${OPC.puertoAux || 5174}`
 const OUT_DIR = 'capturas-dsk'
 // LOB-1 · las capturas del lobby van a su propia carpeta y no a `capturas-dsk`,
 // que es de la mesa: mezclarlas obligaría a distinguirlas por el nombre del
@@ -342,6 +363,10 @@ const OUT_DIR = 'capturas-dsk'
 // `.gitignore` con el mismo criterio que `capturas-pue/` — son regenerables.
 const LOB_OUT_DIR = 'capturas-lob'
 const MODE = process.argv[2] || 'all'
+// ARN-3a · D5 · un modo que no existe no corre nada, y antes salía verde.
+if (!MODOS_DSK.includes(MODE)) {
+  await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: ${MODOS_DSK.join(', ')}`))
+}
 
 // ── Metadatos del instrumento (ARN-1) ────────────────────────────────────────
 // Se vuelcan en cada JSON de salida. Un número de esta tanda que no aparezca
@@ -362,7 +387,12 @@ const ARNES = {
   // que emiten veredicto, así que las baselines quedan atribuidas a la versión
   // con la que de verdad se comprobaron. La versión anterior era 151.0.4129.86
   // (Edge estable, 16-ago-2026).
-  chromiumBaselines: '151.0.4129.93',   // Edge estable, leído en vivo el 21-ago-2026
+  //
+  // ARN-3a (D1/D2) · el navegador deja de ser el Edge de la máquina: es el
+  // Chromium que trae `playwright-core` fijado. Las cifras NO se re-sellan —son
+  // las mismas que con Edge 151 y 154 (ARN-3 Fase 0 §B2)—; solo cambia la
+  // etiqueta, y desde ahora una versión distinta es error de instrumento (D3).
+  chromiumBaselines: ETIQUETA_NAVEGADOR,
 }
 
 // Ruta canónica: nivel y apuesta parametrizables, con los defaults del §0 de
@@ -13204,14 +13234,24 @@ async function runRec(browser) {
 // el único que audita el shift durante una animación — se lanza sin ella, para
 // medir lo que ve Victor. El resto de modos conserva el lanzamiento histórico
 // (sus baselines se tomaron con barras ocultas; cambiarlo movería sus números).
-const browser = await chromium.launch({
-  channel: 'msedge', headless: true,
-  ...(MODE === 'r2' ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {}),
-})
+//
+// ARN-3a · el servidor y el navegador salen del terreno común. Cualquier fallo
+// aquí es de instrumento (código 2): servidor que no levanta, puerto ajeno,
+// Chromium no instalado o de otra versión.
+let NAV
+try {
+  await servidorArnes({ tipo: 'dev', puerto: OPC.puerto || 5173, bypass: true, externo: EXTERNO, base: EXTERNO ? BASE : null })
+  if (!EXTERNO && (MODE === 'luz' || MODE === 'rev')) {
+    await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5174, bypass: false })
+  }
+  NAV = await navegadorArnes(MODE === 'r2' ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {})
+} catch (e) {
+  await fallarInstrumento(e)
+}
+const browser = NAV.browser
 // ARN-1 · el JSON se autoetiqueta. `chromium` se LEE del navegador vivo y se
-// contrasta contra la versión con la que se re-fotografiaron las baselines: si
-// el Edge de la máquina se autoactualiza, el aviso sale aquí y no dentro de un
-// Δ inexplicable seis meses después.
+// contrasta contra la versión sellada. Desde ARN-3a una versión distinta con el
+// canal por defecto ya cortó arriba (D3); aquí solo queda la nota del contraste.
 const chromiumVivo = browser.version()
 const report = {
   mode: MODE,
@@ -13219,14 +13259,13 @@ const report = {
   arnes: {
     ...ARNES,
     playwrightCore: PW_VERSION,
+    canal: NAV.canal,
     chromium: chromiumVivo,
-    chromiumDeriva: chromiumVivo !== ARNES.chromiumBaselines
-      ? `AVISO: baselines tomadas con ${ARNES.chromiumBaselines}`
-      : false,
+    chromiumDeriva: NAV.contraste ? NAV.nota : false,
+    servidor: EXTERNO ? `externo ${BASE}` : `propio ${BASE}`,
     ruta: { nivel: ARNES_NIVEL, stakeIdx: ARNES_STAKE_IDX, monto: apuestasDe(ARNES_NIVEL)[ARNES_STAKE_IDX], entrada: ARNES_ENTRADA },
   },
 }
-if (report.arnes.chromiumDeriva) console.log(`⚠ ${report.arnes.chromiumDeriva} · vivo ${chromiumVivo}`)
 try {
   if (MODE === 'd1d2' || MODE === 'all') {
     const { page, data } = await runD1D2(browser)
@@ -13272,8 +13311,17 @@ try {
 } catch (e) {
   report.error = String(e && e.stack || e)
 }
-await browser.close()
+
+// ARN-3a · D5 · el veredicto viaja en el JSON Y en el código de salida. Cada
+// modo se lee por donde escribe el suyo (scripts/arnes/nucleo.mjs). Un modo que
+// abortó a mitad de su matriz (`report.error`) es 2, nunca 0.
+const veredictos = veredictosDSK(report)
+report.veredicto = Object.fromEntries(veredictos)
+report.codigo = codigoDeSalida(veredictos.map(([, v]) => v))
 
 const json = JSON.stringify(report, (k, v) => typeof v === 'number' ? round(v) : v, 2)
 console.log(json)
 try { writeFileSync(`${OUT_DIR}/diag_${MODE}.json`, json) } catch {}
+console.log(`\n── diagDSK ${MODE} · ${veredictos.map(([k, v]) => `${k} ${v}`).join(' · ')} → código ${report.codigo}`)
+if (report.error) console.error(`✖ el modo abortó: ${String(report.error).split('\n')[0]}`)
+await terminar(report.codigo)

@@ -25,7 +25,20 @@
 //       node scripts/diagPUE.mjs dis             (DIS-1: los aparatos renderizados de la escena 5, Edge y WebKit; SÍ entra en `todo`)
 //       node scripts/diagPUE.mjs bie             (BIE-1: qué suena en la puerta y el «Cargando», con la red de Supabase simulada; SÍ entra en `todo`)
 //       node scripts/diagPUE.mjs voz2 [--control=contain|nowrap|capa] [--celdas=…] [--sin-burbuja]  (VOZ-2: la frase del óvalo recortada y desplegada; NO entra en `todo`; voz2.burbuja usa además el 5173, VOZ2_DEV)
-import { chromium, webkit } from 'playwright-core'
+//
+// ARN-3a · el arnés COMPILA (vite build) y levanta su propio `vite preview` en
+// 4173 —o `--puerto=N`— dentro de su proceso; `voz2` levanta además un
+// servidor de desarrollo con bypass en 5173 —o `--puerto-aux=N`— para la
+// burbuja. `--sin-build` mide el dist/ que haya; `--servidor=externo` usa los
+// servidores levantados a mano (`PUE_BASE`, `VOZ2_DEV`). Puerto ocupado: se
+// niega y dice quién lo ocupa. Navegador: Chromium de playwright-core
+// (`ARNES_CANAL=msedge` = contraste); la WebKit de `dis` no cambia. Sale con
+// 0 (todo verde), 1 (alguna medición en rojo) o 2 (error de instrumento).
+import { webkit } from 'playwright-core'
+import {
+  instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
+  ErrorInstrumento, codigoDeSalida,
+} from './arnes/comun.mjs'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
   VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
@@ -38,7 +51,10 @@ import { contextoBie, marca, porGesto, HUECO, vidaIndicador, SONDA_INDICADOR } f
 const OG_RECORTE_MAX_CSS = 6
 import { gzipSync, inflateSync } from 'node:zlib'
 
-const BASE = process.env.PUE_BASE || 'http://localhost:4173'
+instalarSalidas()
+const OPC = opcionesDelArnes()
+const EXTERNO = OPC.servidor === 'externo'
+const BASE = EXTERNO ? (process.env.PUE_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`
 const URL_LAMINA = `${BASE}/`
 const SALIDA = 'capturas-pue'
 
@@ -78,7 +94,9 @@ const NOMBRES_ESC = ['baraja', 'AJILEI', 'enseñanza', 'Heptacoins', 'mesa']
 
 const resultados = { generado: new Date().toISOString(), url: URL_LAMINA, bloques: {} }
 const fallos = []
+let anotadas = 0   // ARN-3a · una corrida que no anotó nada no puede salir verde
 function anota(id, ok, detalle) {
+  anotadas++
   if (!ok) fallos.push(`${id} — ${detalle}`)
   console.log(`  ${ok ? 'VERDE' : 'ROJO '} · ${id} · ${detalle}`)
   return ok
@@ -163,23 +181,31 @@ const hacer = (id) => modo === 'todo' || modo === id
 // su nombre, nunca dentro de `todo`.
 const hacerSolo = (id) => modo === id
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true })
-
-// Guarda de servidor: sin dev server no hay nada que auditar y el error de
-// Playwright no lo dice con esas palabras.
-{
-  const p = await browser.newPage()
-  try {
-    const r = await p.goto(URL_LAMINA, { waitUntil: 'domcontentloaded', timeout: 8000 })
-    if (!r || !r.ok()) throw new Error(`HTTP ${r ? r.status() : '—'}`)
-  } catch (e) {
-    console.error(`\nNo se pudo abrir ${URL_LAMINA}: ${e.message}`)
-    console.error('Levanta el terreno correcto primero:  npm run build && npx vite preview --port 4173')
-    console.error('(no npm run dev: el 5173 compila VITE_AUTH_BYPASS=1, el estado nace COMPLETO y la portada nunca se evalúa)\n')
-    await browser.close(); process.exit(1)
-  }
-  await p.close()
+// ARN-3a · D5 · un modo que no existe no medía nada y salía «TODO VERDE».
+const MODOS_PUE = ['todo', 'puerta', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '2.4', '2.5', 'mon', 'dis', 'bie', 'cap', 'voz2']
+if (!MODOS_PUE.includes(modo)) {
+  await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${modo}». Los modos son: ${MODOS_PUE.join(', ')}`))
 }
+
+// ── ARN-3a · el terreno: servidor(es) y navegador ───────────────────────────
+// Antes había aquí una guarda que pedía «npm run build && npx vite preview»:
+// ahora lo hace el arnés (D6/D7), contra el bundle de ESTE árbol, y cualquier
+// fallo del terreno es de instrumento (código 2). La guarda de «responde» la
+// hace `servidorArnes` también con `--servidor=externo`.
+// La pasada de la burbuja de voz2 necesita `?apu=`, que solo existe en DEV.
+const VOZ2_BURBUJA = modo === 'voz2' && !process.argv.some((a) => a.startsWith('--control=')) && !process.argv.includes('--sin-burbuja')
+let NAV
+try {
+  await servidorArnes({ tipo: 'preview', puerto: OPC.puerto || 4173, build: OPC.build, externo: EXTERNO, base: EXTERNO ? BASE : null })
+  if (VOZ2_BURBUJA && !EXTERNO) {
+    const dev = await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5173, bypass: true })
+    process.env.VOZ2_DEV = dev.base
+  }
+  NAV = await navegadorArnes()
+} catch (e) {
+  await fallarInstrumento(e)
+}
+const browser = NAV.browser
 
 // ════════════════════════════════════════════════════════════════════════════
 // puerta · El visitante anónimo LLEGA a la portada
@@ -1832,7 +1858,7 @@ if (hacerSolo('voz2')) {
   const V = await import('./voz2/voz2Mesa.mjs')
   const control = (process.argv.find((a) => a.startsWith('--control=')) || '').split('=')[1] || null
   const filtro = (process.argv.find((a) => a.startsWith('--celdas=')) || '').split('=')[1] || ''
-  if (control && !V.HOJAS_CONTROL[control]) { console.error(`--control desconocido: ${control}`); process.exit(1) }
+  if (control && !V.HOJAS_CONTROL[control]) await fallarInstrumento(new ErrorInstrumento(`--control desconocido: ${control}`))
   const etq = control ? `voz2.control[${control}]` : 'voz2'
   console.log(`\n── ${etq} · ${V.VISTAS_VOZ2.map((v) => v.id).join(' / ')} × mesas ${V.MESAS_VOZ2.join('/')}${filtro ? ` · filtro «${filtro}»` : ''} ──`)
   const tareas = []
@@ -2227,3 +2253,9 @@ if (fallos.length === 0) {
   for (const f of fallos) console.log(`  · ${f}`)
 }
 console.log(`\nJSON: ${SALIDA}/diagPUE.json`)
+
+// ARN-3a · D5 · 0 todo verde · 1 alguna medición en rojo (también los rojos
+// conocidos, como `1.8b`: un rojo dice rojo) · 2 si no se anotó nada.
+const codigo = codigoDeSalida(anotadas === 0 ? [] : [fallos.length ? 'rojo' : 'verde'])
+console.log(`── diagPUE ${modo} · ${anotadas} mediciones · ${fallos.length} en rojo → código ${codigo}`)
+await terminar(codigo)

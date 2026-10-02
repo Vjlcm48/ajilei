@@ -22,10 +22,12 @@
 // con `VITE_AUTH_BYPASS=1`, que es exactamente donde corre `diagDSK lob`. La
 // desviación queda anotada en el informe.
 //
-// `AJILEI_BASE` permite apuntarlo a otro puerto, misma convención que `diagDSK`:
-// durante una tanda conviven el servidor de Victor y el de la medición.
+// ARN-3a · el arnés levanta su propio servidor; con el 5173 ocupado se niega y
+// dice quién lo ocupa. Otro puerto: `--puerto=N`. Un servidor ya levantado a
+// mano: `--servidor=externo` con `AJILEI_BASE`, misma convención que `diagDSK`.
 //
-//   AJILEI_BASE=http://localhost:5174 node scripts/diagSAL.mjs sal
+//   node scripts/diagSAL.mjs sal --puerto=5180
+//   AJILEI_BASE=http://localhost:5174 node scripts/diagSAL.mjs sal --servidor=externo
 //
 // ── QUÉ MIDE Y QUÉ NO ──────────────────────────────────────────────────────
 // Mide GEOMETRÍA y silencio: que nada desborde, que la ventanilla sean tres
@@ -38,20 +40,33 @@
 // midiendo los fixtures.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { chromium } from 'playwright-core'
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
+// ARN-3a · navegador, servidor, puerto y código de salida: terreno común.
+// El arnés levanta su propio servidor de desarrollo con bypass (5173 o
+// `--puerto=N`) dentro de su proceso; `--servidor=externo` usa `AJILEI_BASE`.
+// Sale con 0 (verde; `shots` es informativo), 1 (rojo) o 2 (instrumento).
+import {
+  instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
+  ErrorInstrumento, codigoDeSalida,
+} from './arnes/comun.mjs'
 
 // ARN-1 · el instrumento se autoetiqueta. `playwright-core` va pineado exacto en
-// devDependencies porque los píxeles cambian entre versiones; el NAVEGADOR no lo
-// pina nadie —`channel: 'msedge'` es el Edge instalado en la máquina, que se
-// autoactualiza— así que su versión se relee en vivo y viaja en el JSON.
+// devDependencies porque los píxeles cambian entre versiones. Desde ARN-3a el
+// NAVEGADOR también: es el Chromium que trae esa versión (D1), y su versión se
+// relee en vivo y viaja en el JSON.
 const PW_VERSION = JSON.parse(
   readFileSync(new URL('../node_modules/playwright-core/package.json', import.meta.url), 'utf8')).version
 
-const BASE = process.env.AJILEI_BASE || 'http://localhost:5173'
+instalarSalidas()
+const OPC = opcionesDelArnes()
+const EXTERNO = OPC.servidor === 'externo'
+const BASE = EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:5173') : `http://localhost:${OPC.puerto || 5173}`
 const OUT_DIR = 'capturas-sal'
 const MODE = process.argv[2] || 'sal'
 const SOLO = process.argv[3] || null
+if (MODE !== 'sal' && MODE !== 'shots') {
+  await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: sal, shots`))
+}
 
 // Los nueve estados de §8.3, el décimo del Ajuste A1 §5 y el undécimo del A2 §3.
 // Se declaran aquí y NO se importan de
@@ -869,7 +884,14 @@ function comprobarListas() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-const browser = await chromium.launch({ channel: 'msedge', headless: true })
+let NAV
+try {
+  await servidorArnes({ tipo: 'dev', puerto: OPC.puerto || 5173, bypass: true, externo: EXTERNO, base: EXTERNO ? BASE : null })
+  NAV = await navegadorArnes()
+} catch (e) {
+  await fallarInstrumento(e)
+}
+const browser = NAV.browser
 const chromiumVivo = browser.version()
 
 const report = {
@@ -930,3 +952,8 @@ try {
   mkdirSync(OUT_DIR, { recursive: true })
   writeFileSync(`${OUT_DIR}/diag_${MODE}${SOLO ? `_${SOLO}` : ''}.json`, json)
 } catch { /* el veredicto ya salió por consola */ }
+
+// ARN-3a · D5 · el arnés que se cae (estado desconocido, excepción) es 2.
+const codigo = report.error ? 2 : codigoDeSalida([report.ok === true ? 'verde' : 'rojo'])
+console.log(`\n── diagSAL ${MODE}${SOLO ? ` ${SOLO}` : ''} · ${report.error ? 'el arnés se cayó' : report.ok ? 'verde' : 'rojo'} → código ${codigo}`)
+await terminar(codigo)

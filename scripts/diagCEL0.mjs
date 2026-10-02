@@ -21,14 +21,27 @@
 // Las capturas van a `../_cel0/`, FUERA del repositorio: son material de
 // trabajo de la lámina, no evidencia sellada, y el árbol ya carga con tres
 // carpetas de arnés.
-import { chromium } from 'playwright-core'
 import { recorrerRuta } from './rutaMesa.mjs'
 import { apuestasDe } from '../src/config/niveles.js'
 import { pisoDe } from '../src/engine/entrada.js'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
+// ARN-3a · terreno común: el arnés levanta su propio servidor de desarrollo con
+// bypass (5173 o `--puerto=N`) dentro de su proceso; `--servidor=externo` usa
+// uno levantado a mano en `AJILEI_BASE` (H-9: antes la base estaba clavada).
+// Navegador: Chromium de playwright-core. Sale con 0 / 1 / 2.
+import {
+  instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
+  ErrorInstrumento, codigoDeSalida,
+} from './arnes/comun.mjs'
 
-const BASE = 'http://localhost:5173'
+instalarSalidas()
+const OPC = opcionesDelArnes()
+const EXTERNO = OPC.servidor === 'externo'
+const BASE = EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:5173') : `http://localhost:${OPC.puerto || 5173}`
 const MODO = process.argv[2] ?? 'diagnostico'
+if (MODO !== 'diagnostico' && MODO !== 'celebracion') {
+  await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODO}». Los modos son: diagnostico, celebracion`))
+}
 // CEL-2c · el modo `celebracion` escribe en `_cel2`. Cada tanda de la campaña
 // deja su carpeta, fuera del repositorio: mezclarlas haría que una captura
 // vieja pasara por evidencia nueva.
@@ -1716,19 +1729,30 @@ async function modoCelebracion(browser) {
   console.log(`\ncontrol negativo: ${inf.control.termina === false && !inf.control.error ? 'verde' : 'ROJO'}`)
   console.log(`\nFALLOS: ${fallos.length ? '\n  - ' + fallos.join('\n  - ') : 'ninguno'}`)
   console.log(`capturas y cifras en ${OUT}/`)
+  // ARN-3a · el veredicto sale de la función: antes se imprimía y el arnés
+  // terminaba con 0 aunque hubiera seis fallos (H-2).
+  return { fallos, controlOk: inf.control.termina === false && !inf.control.error }
 }
 
 // ── Corrida ─────────────────────────────────────────────────────────────────
 if (!existsSync(OUT)) mkdirSync(OUT, { recursive: true })
-const browser = await chromium.launch({ channel: 'msedge', headless: true })
+let NAV
+try {
+  await servidorArnes({ tipo: 'dev', puerto: OPC.puerto || 5173, bypass: true, externo: EXTERNO, base: EXTERNO ? BASE : null })
+  NAV = await navegadorArnes()
+} catch (e) {
+  await fallarInstrumento(e)
+}
+const browser = NAV.browser
 
-// El despacho de modo va AQUÍ, con `process.exit`, y no envolviendo el cuerpo
+// El despacho de modo va AQUÍ, con la salida, y no envolviendo el cuerpo
 // de CEL-0 en un `if`: envolverlo obligaría a reindentar 150 líneas ya
 // verificadas y el diff escondería cualquier cambio real dentro del ruido.
 if (MODO === 'celebracion') {
-  await modoCelebracion(browser)
-  await browser.close()
-  process.exit(0)
+  const r = await modoCelebracion(browser)
+  const codigo = codigoDeSalida([r.fallos.length === 0 && r.controlOk ? 'verde' : 'rojo'])
+  console.log(`\n── diagCEL0 celebracion · ${r.fallos.length} fallos · control ${r.controlOk ? 'verde' : 'ROJO'} → código ${codigo}`)
+  await terminar(codigo)
 }
 
 const informe = { tanda: 'CEL-0', chromium: browser.version(), audio: null, celdas: {}, molde: [] }
@@ -1852,3 +1876,11 @@ console.log(`${ctrlOk ? 'VERDE' : ' MAL '} control-negativo   sin ?cel · ¿term
 
 console.log(`\ncomprobaciones verdes: ${verdes}/${informe.molde.length} · control negativo: ${ctrlOk ? 'verde' : 'ROJO'} · errores de página: ${errores.length ? errores.join(' | ') : 'ninguno'}`)
 console.log(`capturas y cifras en ${OUT}/`)
+
+// ARN-3a · D5 · rojo si un sonido no decodifica, si el molde no llega en un
+// paso, si el control negativo falla o si la página dio errores.
+const audioMal = informe.audio.filter((a) => !(a.http === 200 && a.decodifica)).length
+const verdeCEL0 = audioMal === 0 && informe.molde.length > 0 && verdes === informe.molde.length && ctrlOk && errores.length === 0
+const codigoCEL0 = codigoDeSalida([verdeCEL0 ? 'verde' : 'rojo'])
+console.log(`── diagCEL0 diagnostico · audio ${informe.audio.length - audioMal}/${informe.audio.length} · molde ${verdes}/${informe.molde.length} · control ${ctrlOk ? 'verde' : 'ROJO'} → código ${codigoCEL0}`)
+await terminar(codigoCEL0)
