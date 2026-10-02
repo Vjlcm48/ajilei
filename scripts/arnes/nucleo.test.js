@@ -7,6 +7,7 @@ import {
   NAVEGADOR_SELLADO, ETIQUETA_NAVEGADOR, ORDEN_INSTALAR, CODIGO, ErrorInstrumento,
   codigoDeSalida, canalPedido, comprobarVersion, faltaNavegador, leerOpciones, esBanderaComun,
   pidQueEscucha, veredictosDSK, VEREDICTO_DSK, MODOS_DSK,
+  esLocal, clasificarPeticion, respuestaSupabase, corteDelArnes, veredictoAislamiento, PERFIL_ARNES,
 } from './nucleo.mjs'
 import { readFileSync } from 'node:fs'
 
@@ -147,5 +148,51 @@ describe('D5 · cada modo de diagDSK se lee por donde escribe su veredicto', () 
   })
   it('una clave que nadie sabe leer es error, no verde', () => {
     expect(veredictosDSK({ nuevo: { passed: true } })).toEqual([['nuevo', 'error']])
+  })
+})
+
+// ── ARN-3c · D6 · el aislamiento de la red ───────────────────────────────────
+describe('D6 · qué sale del arnés y qué no', () => {
+  it('lo local y lo que no es de red se queda en la máquina', () => {
+    for (const u of ['http://localhost:5173/', 'http://127.0.0.1:4173/x.js', 'ws://localhost:5173/?token=1',
+      'http://[::1]:4173/', 'data:image/png;base64,AA', 'blob:http://localhost:5173/abc', 'about:blank']) {
+      expect(esLocal(u), u).toBe(true)
+    }
+    expect(esLocal('https://abc.supabase.co/rest/v1/rpc/mi_sala')).toBe(false)
+    expect(esLocal('wss://abc.supabase.co/realtime/v1/websocket')).toBe(false)
+  })
+  it('clasifica: local pasa, Supabase se contesta, lo demás se corta', () => {
+    expect(clasificarPeticion('http://localhost:4173/', 'abc.supabase.co')).toBe('local')
+    expect(clasificarPeticion('https://abc.supabase.co/rest/v1/profiles?id=eq.1', 'abc.supabase.co')).toBe('supabase')
+    expect(clasificarPeticion('https://fonts.googleapis.com/css2', 'abc.supabase.co')).toBe('fuera')
+  })
+  it('cualquier *.supabase.co es Supabase aunque el host no se conozca', () => {
+    expect(clasificarPeticion('https://otro.supabase.co/auth/v1/user', null)).toBe('supabase')
+    expect(clasificarPeticion('https://supabase.co.evil.example/x', null)).toBe('fuera')
+  })
+  it('contesta como contextoCap: RPC null (sin cuerpo de error), perfil, usuario y [] por defecto', () => {
+    expect(respuestaSupabase('/rest/v1/rpc/mi_sala')).toBe(null)
+    expect(respuestaSupabase('/rest/v1/profiles', 'application/vnd.pgrst.object+json')).toEqual(PERFIL_ARNES)
+    expect(respuestaSupabase('/rest/v1/profiles', 'application/json')).toEqual([PERFIL_ARNES])
+    expect(respuestaSupabase('/auth/v1/user').id).toBe(PERFIL_ARNES.id)
+    expect(respuestaSupabase('/rest/v1/salas')).toEqual([])
+  })
+  it('distingue un corte del arnés de un fallo de red de verdad', () => {
+    expect(corteDelArnes('net::ERR_BLOCKED_BY_CLIENT.Inspector')).toBe(true)
+    expect(corteDelArnes('net::ERR_FAILED')).toBe(true)
+    expect(corteDelArnes('net::ERR_CONNECTION_CLOSED')).toBe(false)
+    expect(corteDelArnes('net::ERR_NAME_NOT_RESOLVED')).toBe(false)
+  })
+  it('una sola escapada es error de instrumento; sin registro, también', () => {
+    expect(veredictoAislamiento({ escapadas: [] })).toBe('verde')
+    expect(veredictoAislamiento({ escapadas: ['POST https://abc.supabase.co/rest/v1/rpc/mi_sala ← 1.2.3.4:443'] })).toBe('error')
+    expect(veredictoAislamiento(null)).toBe('error')
+  })
+  it('en diagDSK el aislamiento entra como un veredicto más y una escapada sale con 2', () => {
+    const v = veredictosDSK({ mode: 'lob', lob: { ok: true }, aislamiento: { escapadas: ['x'] } })
+    expect(v).toEqual([['lob', 'verde'], ['aislamiento', 'error']])
+    expect(codigoDeSalida(v.map(([, x]) => x))).toBe(2)
+    const limpio = veredictosDSK({ mode: 'lob', lob: { ok: true }, aislamiento: { escapadas: [] } })
+    expect(codigoDeSalida(limpio.map(([, x]) => x))).toBe(0)
   })
 })

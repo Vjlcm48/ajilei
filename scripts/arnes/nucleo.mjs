@@ -180,19 +180,22 @@ export const VEREDICTO_DSK = Object.freeze({
   apu: ARRIBA('ok'), lob: ARRIBA('ok'), retar: ARRIBA('ok'),
   // `verde` arriba
   luz: ARRIBA('verde'), rev: ARRIBA('verde'), rec: ARRIBA('verde'), vuelo: ARRIBA('verde'),
+  congelado: ARRIBA('verde'),   // ARN-3c-ii · §1.1.2
   // `matrixOk`
   gate: ARRIBA('matrixOk'),
   // booleanos por celda (diagnósticos de DSK que nunca juntaron un `passed`)
   p1: BOOLEANOS(['allBadgesLetters', 'scoreHidden', 'noShift']),
   p2: BOOLEANOS(['chipOk', 'saldoHiddenResting', 'fichasAbsent', 'cycleOk', 'worst7Ok', 'noShift', 'overflowOk']),
   tactil: BOOLEANOS(['allInteractiveOk', 'multNoOverlap']),
+  // ARN-3c · D6 · no es un modo: es la puerta del aislamiento de toda la corrida.
+  aislamiento: (d) => veredictoAislamiento(d),
 })
 
 /** Modos válidos de `diagDSK` (el argumento) y la clave con que vuelven en el informe. */
 export const MODOS_DSK = Object.freeze([
   'all', 'd1d2', 'd3', 'bug', 'shots', 'gate', 'lob', 'retar', 'apu', 'b1', 'tactil', 'p1', 'p2',
   'r1', 'r2', 'o1', 'h1', 'm1', 'a1', 'f1', 'z1', 'o2', 'a2', 'u1', 'menu-movil', 'u2', 'u3',
-  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec',
+  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado',
 ])
 const CLAVES_META = new Set(['mode', 'ts', 'arnes', 'error', 'veredicto', 'codigo'])
 
@@ -211,3 +214,68 @@ export function veredictosDSK(report) {
   return out
 }
 const normaliza = (v) => (v === 'vacio' ? 'error' : v)
+
+// ── ARN-3c · D6 · el arnés no habla con el Supabase real ─────────────────────
+// Hasta 3c, cada carga de 5173 hacía un `401` contra la base de verdad y dejaba
+// `SAL-A … 42501 permission denied for function mi_sala` en la consola (H-7), y
+// un corte de red pintaba de rojo una celda de `apu` (H3b-ii-7). `contextoCap`
+// ya sabía no salir: una ruta para todo que deja pasar lo local, contesta a
+// Supabase desde aquí y corta el resto. Esa misma regla pasa al terreno común
+// (`comun.mjs` la pone en TODO contexto del navegador del arnés) y aquí queda
+// lo que decide, probado en `nucleo.test.js`.
+
+const LOCALES = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
+
+/** ¿Es una petición que se queda en esta máquina (o no es de red)? */
+export function esLocal(url) {
+  let u
+  try { u = new URL(url) } catch { return true }      // sin URL no hay red que proteger
+  if (!/^(https?|wss?):$/.test(u.protocol)) return true   // data:, blob:, about:, chrome-extension:…
+  return LOCALES.has(u.hostname)
+}
+
+/**
+ * 'local' pasa, 'supabase' se contesta desde el arnés, 'fuera' se corta.
+ * `hostSupabase` es el host del `.env.local`; además, cualquier `*.supabase.co`
+ * es Supabase aunque el host no se conozca (un `.env.local` de otro proyecto).
+ */
+export function clasificarPeticion(url, hostSupabase = null) {
+  if (esLocal(url)) return 'local'
+  const h = new URL(url).hostname
+  if ((hostSupabase && h === hostSupabase) || /\.supabase\.co$/.test(h)) return 'supabase'
+  return 'fuera'
+}
+
+// El perfil y el usuario que contesta el arnés. No se pintan (el bypass trae
+// PERFIL_DEV y la sesión simulada de `contextoCap` trae el suyo): solo cierran
+// la cascada si alguien pregunta.
+export const PERFIL_ARNES = Object.freeze({ id: '0ca90000-0000-4000-8000-0000000a7e50', username: 'Jugador_ARNES' })
+
+/**
+ * Lo que contesta el arnés a una petición a Supabase: lo mismo que `contextoCap`.
+ * Un RPC devuelve `null` con 200: así `mesaOpcional` da «no hay» sin avisar
+ * (un cuerpo de error haría que `traducir` escribiera un SAL-A en la consola).
+ */
+export function respuestaSupabase(pathname, accept = '', perfil = PERFIL_ARNES) {
+  if (pathname.startsWith('/rest/v1/profiles')) return accept.includes('vnd.pgrst.object') ? perfil : [perfil]
+  if (pathname.startsWith('/rest/v1/rpc/')) return null
+  if (pathname.startsWith('/auth/v1/user')) return { id: perfil.id, aud: 'authenticated', role: 'authenticated' }
+  return []
+}
+
+/** ¿Este fallo de petición lo provocó un corte del propio arnés? */
+export const corteDelArnes = (errorText) => /ERR_BLOCKED_BY_CLIENT|ERR_FAILED|ERR_ABORTED/.test(String(errorText || ''))
+
+/**
+ * El veredicto del aislamiento de una corrida. Lo que manda son las
+ * ESCAPADAS: respuestas que llegaron de un servidor no local (las contestadas
+ * por el arnés no tienen dirección de servidor), fallos de red que no fueron un
+ * corte del arnés y sockets no locales que nadie desvió. Una sola es un error de
+ * INSTRUMENTO (código 2): la medida dejó de hacerse en las condiciones que dice.
+ * Las peticiones cortadas («fuera») se informan; quien las juzga es su modo
+ * (`cap.red`, `bie.s0`).
+ */
+export function veredictoAislamiento(red) {
+  if (!red || !Array.isArray(red.escapadas)) return 'error'
+  return red.escapadas.length === 0 ? 'verde' : 'error'
+}

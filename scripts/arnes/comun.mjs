@@ -7,6 +7,7 @@
 //   navegadorArnes()       D1–D4 · Chromium fijo de Playwright; contraste con ARNES_CANAL=msedge
 //   servidorArnes({...})   D6–D9 · Vite DENTRO de este proceso: muere con él
 //   terminar(codigo)       D5    · cierra todo y sale con 0 / 1 / 2
+//   aislarNavegador(b)     3c D6 · ningún contexto del arnés habla con el Supabase real
 //
 // ── POR QUÉ EL SERVIDOR VIVE DENTRO DEL PROCESO (B8) ─────────────────────────
 // Con `npx vite` en otra consola la cadena era bash → node (npx) → cmd → node
@@ -18,10 +19,13 @@
 // mira cada segundo si el padre sigue vivo y, si no, cierra y sale con 2.
 import { chromium } from 'playwright-core'
 import { execFileSync } from 'node:child_process'
+import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import {
   NAVEGADOR_SELLADO, ORDEN_INSTALAR, CODIGO, ErrorInstrumento,
   canalPedido, comprobarVersion, faltaNavegador, leerOpciones, pidQueEscucha,
+  esLocal, clasificarPeticion, respuestaSupabase, corteDelArnes, veredictoAislamiento,
 } from './nucleo.mjs'
 
 export { CODIGO, ErrorInstrumento, ETIQUETA_NAVEGADOR, NAVEGADOR_SELLADO, codigoDeSalida, veredictosDSK, MODOS_DSK } from './nucleo.mjs'
@@ -44,11 +48,24 @@ async function cerrarTodo() {
   }
 }
 
-/** D5 · cierra navegador y servidores y sale con el código. */
+/**
+ * D5 · cierra navegador y servidores y sale con el código. ARN-3c · D6 · antes
+ * juzga el aislamiento de toda la corrida: si algo escapó a la red real, la
+ * salida es 2 por mucho que el modo saliera verde (la medida no se hizo en las
+ * condiciones que dice).
+ */
 export async function terminar(codigo) {
   if (saliendo) return
   saliendo = true
   await cerrarTodo()
+  if (RED.contextos > 0) {
+    const v = veredictoAislamiento(RED)
+    console.log(`· aislamiento (D6): ${resumenRed()} → ${v === 'verde' ? 'verde' : 'ERROR DE INSTRUMENTO'}`)
+    if (v !== 'verde') {
+      console.error(`✖ ${RED.escapadas.length} petición(es) salieron a la red real:\n    ${RED.escapadas.slice(0, 8).join('\n    ')}`)
+      codigo = Math.max(codigo, CODIGO.INSTRUMENTO)
+    }
+  }
   process.exit(codigo)
 }
 
@@ -128,6 +145,7 @@ export async function navegadorArnes(extra = {}) {
     throw new ErrorInstrumento(`no arrancó el navegador (canal ${canal}): ${String(e.message).split('\n')[0]}`)
   }
   alSalir(() => browser.close())
+  aislarNavegador(browser)
   const vivo = browser.version()
   const v = comprobarVersion(canal, vivo)
   if (!v.ok) throw new ErrorInstrumento(v.nota)
@@ -240,4 +258,105 @@ async function exigirQueResponda(url, mensaje) {
   } catch (e) {
     throw new ErrorInstrumento(`${mensaje} (${e.message})`)
   }
+}
+
+// ── ARN-3c · D6 · el aislamiento de la red ───────────────────────────────────
+// La regla de `contextoCap` (scripts/cap/capMesa.mjs), puesta en TODO contexto:
+// lo local pasa, Supabase se contesta desde el arnés (`respuestaSupabase`) y lo
+// demás se corta y se anota. Los sockets no locales (el tiempo real de
+// Supabase) se desvían y quedan mudos; el de Vite (local) no se toca.
+//
+// Se engancha en `browser.newContext` de la INSTANCIA: `browser.newPage()` de
+// playwright-core crea su contexto llamando a `this.newContext(...)`, así que
+// los ~70 sitios que abren página siguen como estaban y quedan cubiertos. La
+// ruta se registra al NACER el contexto: en Playwright manda la última ruta
+// registrada, así que las propias de `contextoCap` y `contextoBie` (que
+// contestan con su sesión y sus retrasos) siguen mandando, y esta queda debajo
+// como red de seguridad.
+//
+// La PUERTA no mira la ruta (eso sería creerse a sí misma): mira lo que llegó.
+// Una respuesta contestada por el arnés no trae dirección de servidor
+// (`serverAddr() === null`); una que trae dirección y no es local salió a la
+// red. Un socket desviado no dispara `page.on('websocket')`; uno que lo dispara
+// y no es local, salió.
+const RED = { contextos: 0, supabase: 0, cortadas: [], sockets: [], escapadas: [] }
+
+/** El resumen de la corrida, para el JSON y la línea final. */
+export function redDelArnes() {
+  return {
+    contextos: RED.contextos, supabaseAtendidas: RED.supabase,
+    cortadas: [...new Set(RED.cortadas)], socketsDesviados: [...new Set(RED.sockets)],
+    escapadas: [...RED.escapadas], veredicto: RED.contextos ? veredictoAislamiento(RED) : null,
+  }
+}
+const resumenRed = () =>
+  `${RED.contextos} contextos · ${RED.supabase} a Supabase contestadas aquí · ${new Set(RED.cortadas).size} destinos cortados · ` +
+  `${new Set(RED.sockets).size} sockets desviados · ${RED.escapadas.length} escapadas`
+
+let hostSupabaseCache
+function hostSupabase() {
+  if (hostSupabaseCache !== undefined) return hostSupabaseCache
+  let url = process.env.VITE_SUPABASE_URL
+  const env = join(RAIZ, '.env.local')
+  if (!url && existsSync(env)) url = (readFileSync(env, 'utf8').match(/^VITE_SUPABASE_URL=(.+)$/m) || [])[1]
+  try { hostSupabaseCache = url ? new URL(url.trim()).host : null } catch { hostSupabaseCache = null }
+  return hostSupabaseCache
+}
+
+/** Aísla un contexto. Devuelve su registro (`ctx.__aislamiento`). */
+export async function aislarContexto(ctx) {
+  RED.contextos++
+  const host = hostSupabase()
+  const propio = { sockets: [] }
+  ctx.__aislamiento = propio
+  await ctx.route('**/*', async (route) => {
+    const r = route.request()
+    const clase = clasificarPeticion(r.url(), host)
+    if (clase === 'local') return route.continue()
+    if (clase === 'supabase') {
+      RED.supabase++
+      const u = new URL(r.url())
+      return route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify(respuestaSupabase(u.pathname, r.headers()['accept'] || '')) })
+    }
+    RED.cortadas.push(new URL(r.url()).host)
+    return route.abort('blockedbyclient')
+  })
+  await ctx.routeWebSocket((u) => !esLocal(String(u)), (ws) => {
+    RED.sockets.push(ws.url()); propio.sockets.push(ws.url())
+    // Ni `connectToServer()` ni `close()`: queda abierto y mudo, como un
+    // servidor que no contesta. Cerrarlo dispararía reintentos del SDK.
+  })
+  // El vigía (la puerta): lo que de verdad llegó de fuera.
+  ctx.on('response', async (resp) => {
+    if (esLocal(resp.url())) return
+    let dir = null
+    try { dir = await resp.serverAddr() } catch { /* contexto cerrándose */ }
+    if (dir) RED.escapadas.push(`${resp.request().method()} ${resp.url()} ← ${dir.ipAddress}:${dir.port}`)
+  })
+  ctx.on('requestfailed', (r) => {
+    if (esLocal(r.url()) || corteDelArnes(r.failure()?.errorText)) return
+    RED.escapadas.push(`${r.method()} ${r.url()} ✖ ${r.failure()?.errorText}`)
+  })
+  ctx.on('page', (p) => p.on('websocket', (ws) => {
+    if (!esLocal(ws.url())) RED.escapadas.push(`WS ${ws.url()}`)
+  }))
+  return propio
+}
+
+/**
+ * Engancha el aislamiento en TODO contexto que abra este navegador. Se aplica
+ * solo en `navegadorArnes()`; un navegador lanzado aparte (el WebKit de
+ * `diagPUE dis`) se pasa por aquí a mano.
+ */
+export function aislarNavegador(browser) {
+  if (browser.__aislado) return browser
+  const nuevo = browser.newContext.bind(browser)
+  browser.newContext = async (opciones) => {
+    const ctx = await nuevo(opciones)
+    await aislarContexto(ctx)
+    return ctx
+  }
+  browser.__aislado = true
+  return browser
 }
