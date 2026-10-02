@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import process from 'node:process'
 
 const RAIZ  = join(dirname(fileURLToPath(import.meta.url)), '..')
 const BANCO = join(RAIZ, 'scripts', 'bancoNiveles.mjs')
@@ -152,16 +153,52 @@ describe('La vara viva de APU-1 dice con qué se selló, y sólo eso se le añad
     expect(viejas.every(c => c.blobs === null)).toBe(true)
   })
 
-  it('la procedencia coincide con el volcado del que salió cada celda', () => {
+  // ARN-3c · D5 · los 75 volcados de origen viven en `capturas-dsk/`, que no se
+  // rastrea, y no se pueden regenerar (salieron de un motor sin commit). Hasta
+  // aqui la prueba exigia tenerlos y en un clon limpio salia roja (Fase 0 de
+  // ARN-3, B7). Ahora la procedencia se comprueba en dos pisos: contra el
+  // INDICE comprometido (`apu1_bandas_origen.json`), siempre; y el indice
+  // contra los volcados, por sha256, solo cuando estan. Si faltan TODOS, esa
+  // segunda prueba se salta EN VOZ ALTA; si falta una parte, es roja.
+  const INDICE = 'scripts/apu1_bandas_origen.json'
+  const indice = JSON.parse(readFileSync(join(RAIZ, INDICE), 'utf8')).volcados
+  const rutas = Object.keys(indice)
+  const presentes = rutas.filter(r => existsSync(join(RAIZ, r)))
+  const sinVolcados = presentes.length === 0
+  if (sinVolcados) {
+    // `process.stderr` y no `console.warn`: vitest solo enseña la consola de una
+    // prueba que pasa con `--reporter=verbose`, y este aviso tiene que verse
+    // tambien con el `npm test` de siempre.
+    process.stderr.write(`\n⚠ testBancoBandas · SALTADA la comprobacion por sha256: no hay ninguno de los ${rutas.length} volcados de ${INDICE} en este arbol (clon limpio). La vara solo se comprueba contra el indice.\n\n`)
+  }
+
+  it('la procedencia de cada celda coincide con el índice de sus volcados', () => {
     const v = JSON.parse(readFileSync(join(RAIZ, VIVA), 'utf8'))
-    const conVolcado = v.celdas.filter(c => c.origen && existsSync(join(RAIZ, c.origen)))
-    expect(conVolcado.length).toBeGreaterThan(0)
-    for (const c of conVolcado) {
-      const j = JSON.parse(readFileSync(join(RAIZ, c.origen), 'utf8'))
-      expect(c.unit).toBe(j.configuracion.unit)
-      expect(c.siembra).toBe(j.siembra)
+    expect(rutas).toHaveLength(75)
+    for (const c of v.celdas) {
+      expect(indice[c.origen], `celda sin volcado en el indice: ${c.origen}`).toBeTruthy()
+      expect(c.unit).toBe(indice[c.origen].unit)
+      expect(c.siembra).toBe(indice[c.origen].siembra)
     }
+    // Ni entradas sobrantes: cada volcado del indice es el origen de alguna celda.
+    const usados = new Set(v.celdas.map(c => c.origen))
+    expect(rutas.filter(r => !usados.has(r))).toEqual([])
   })
+
+  it.skipIf(sinVolcados)(
+    sinVolcados
+      ? `cada volcado es el del índice, por sha256 — SALTADA: faltan los ${rutas.length} volcados (clon limpio)`
+      : 'cada volcado es el del índice, por sha256, y dice lo mismo que la celda',
+    () => {
+      expect(rutas.filter(r => !presentes.includes(r)), 'faltan volcados (presencia parcial)').toEqual([])
+      for (const r of rutas) {
+        const buf = readFileSync(join(RAIZ, r))
+        expect(createHash('sha256').update(buf).digest('hex'), `sha256 de ${r}`).toBe(indice[r].sha256)
+        const j = JSON.parse(buf.toString('utf8'))
+        expect(j.configuracion.unit).toBe(indice[r].unit)
+        expect(j.siembra).toBe(indice[r].siembra)
+      }
+    })
 
   // Una celda re-sellada NO puede pasar por vieja: trae su huella del motor y
   // dice por que cambio. Sin esto, un re-sello silencioso seria indistinguible

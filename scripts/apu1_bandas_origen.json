@@ -1,0 +1,382 @@
+{
+  "queEs": "ARN-3c · D5 · índice de los volcados de origen de scripts/apu1_bandas.json. Los volcados viven en capturas-dsk/ (ignorada) y no se pueden regenerar: salieron de un motor que ya no existe (blobs: null). Con este índice, un clon limpio comprueba que la vara y su procedencia cuadran; quien tenga los volcados comprueba además, por sha256, que cada uno es el del índice.",
+  "generado": "2026-10-02",
+  "vara": "scripts/apu1_bandas.json",
+  "volcados": {
+    "capturas-dsk/_conv1c2f/conv_m2_espejo_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "81454f01ee45597cc6bbd7901db803d44a205fce1a7a7f7370853e7e6e1114f2"
+    },
+    "capturas-dsk/_conv1c2f/conv_m2_espejo_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "cb8a65375349b6d00e97a046ef7bf3ad0259f66d41571af93a6f4ff0891b8027"
+    },
+    "capturas-dsk/_conv1c2f/conv_m2_espejo_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "1a3e0b39e3f7d839fc1e7a1d8f0ce62251cfdde8fb4c6f369ecdb849279a5ebd"
+    },
+    "capturas-dsk/_conv1c2f/conv_m2_manoso_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "b9744b0af3793fe4ebb58bf14b277aceed641060e08a167a3115348c1fdb9a52"
+    },
+    "capturas-dsk/_conv1c2f/conv_m2_manoso_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "27742f9c09fcaff143fbd8f1c26421e145858f0947b8eee372e523240f1d2b20"
+    },
+    "capturas-dsk/_conv1c2f/conv_m2_manoso_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "17ea1afa31464f614f10143b3fcdf69df6c9dc3fa3bfc0151ec7701878453ba3"
+    },
+    "capturas-dsk/_conv1c2f/conv_m3_espejo_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "2cb487c8fab3bcecf6f68064d32d5ef2c935bf87e7ca58d5afa3050befe5d526"
+    },
+    "capturas-dsk/_conv1c2f/conv_m3_espejo_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "0fea763a1547ea3723fa80a1d0f8590f3719977a81da6f1b867f8b947726905b"
+    },
+    "capturas-dsk/_conv1c2f/conv_m3_espejo_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "04c9da576e26a9dfbcb15fbaa51aa801840755a67c007aed86a018709b732c8d"
+    },
+    "capturas-dsk/_conv1c2f/conv_m3_manoso_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "8782b2165f866f872afa868e8d54b92d26ab5982f64e9691d3191a3915ef8ce4"
+    },
+    "capturas-dsk/_conv1c2f/conv_m3_manoso_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "bc99b0a861acf54fcb814a344fb37337461815edc07d69b01ae5a4658a5d15f9"
+    },
+    "capturas-dsk/_conv1c2f/conv_m3_manoso_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "39fd79fec30fbfad4b42ceca2cb695fcb732e36ad4a97c872a2b41ea3c427668"
+    },
+    "capturas-dsk/_conv1c2f/conv_m4_espejo_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "39cacb877d12a5915d2d0b5c33180779eb1c7dcc42c32ef3ea8cead6e46e6fe7"
+    },
+    "capturas-dsk/_conv1c2f/conv_m4_espejo_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "0c5b18e276a24bbdd2942ed9a1571fd90ff773f35a1f7304b6c52bf00c9a8e55"
+    },
+    "capturas-dsk/_conv1c2f/conv_m4_espejo_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "ad9628b76e1d55b24532e8f477a24e8fb8763208195fa9718c0cc8ff3e8746b6"
+    },
+    "capturas-dsk/_conv1c2f/conv_m4_manoso_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "467c2070feb1534f7adaf2b2555c2a6827b71015582c728d0769567722f2801d"
+    },
+    "capturas-dsk/_conv1c2f/conv_m4_manoso_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "3e1ed0d2c3a206aa244aba0e4ca469004f26fa83be27db369b7f60a8fbdf637f"
+    },
+    "capturas-dsk/_conv1c2f/conv_m4_manoso_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "fc42dd9eea2a81830a4d3f08d148d259eb323c29d7adef80a7c3cfe6050bf893"
+    },
+    "capturas-dsk/_conv1c2f/conv_m5_espejo_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "7aec4cf94b82a9372c37b0f0269b6ad1d77b5b87cd3c589e55706d1de77fb1fc"
+    },
+    "capturas-dsk/_conv1c2f/conv_m5_espejo_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "2ef1a8ac4d4357ba609e2e760dc556daa9d44451ad3fbe344140f94e530f13ef"
+    },
+    "capturas-dsk/_conv1c2f/conv_m5_espejo_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "e53fee880bb0f24c1f0fd6f3e8f68751f4d68d9bfef7e6fe9ed075b863339336"
+    },
+    "capturas-dsk/_conv1c2f/conv_m5_manoso_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "d17e1fc8993984bc8483d39d474ee3498d963dcb6229ae5bb2981b4e2ffdf555"
+    },
+    "capturas-dsk/_conv1c2f/conv_m5_manoso_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "a2505ee6197eafc95c990befa6060994eadbf2c54436843d1eac4e3514a2f11e"
+    },
+    "capturas-dsk/_conv1c2f/conv_m5_manoso_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "9f202690ccd86b79372ed97aa4918c970283f92e0167c1a3200c4018138c8e1e"
+    },
+    "capturas-dsk/_f1c2/e15_m5_avanzado.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "a343242917563cd7b80cf9c173aa63103642f61851f58a34f2d39001c0148b7c"
+    },
+    "capturas-dsk/_f1c2/e15_m5_basico.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "4df0b9ab747060eda53713bdd4247da110614dd2f6d5ef20629d43a26bd1899b"
+    },
+    "capturas-dsk/_f1c2/e15_m5_pro.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "45f73e9e244a7325baaa9a543064338e766bdf92146ecec5544642bf716e3870"
+    },
+    "capturas-dsk/_f1c2/e50_m2_basico.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "5f07c2beb39716b200d00117c83647505b34c898452afbf5f0629d1938e052d4"
+    },
+    "capturas-dsk/_f1c2/m2_avanzado_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "20cba567073205aa38bef294ddc23a228e92bde60d3b3aee907e91f9b5944558"
+    },
+    "capturas-dsk/_f1c2/m2_avanzado_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "3a4ae46b5200edff39b9068f1c45b7413a7cc5138f77320805aeafac4801f739"
+    },
+    "capturas-dsk/_f1c2/m2_avanzado_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "a03e5e7fa52993736678fe8c23d445b7bc4ea284b0c10d382752e1beb0887780"
+    },
+    "capturas-dsk/_f1c2/m2_pro_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "f96ed9d7bc828af12d87ab7622987117f98bb7cc39863981d0b5735137b5f67e"
+    },
+    "capturas-dsk/_f1c2/m2_pro_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "8966b1f24498faebbb3aa2ea1cdb77b23e860f18797222b6550bef5596e1f2bf"
+    },
+    "capturas-dsk/_f1c2/m2_pro_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "81ac21a8074af62b0b5993a3ba7df51f3243ede0a79a8c1b317a5cfdb1245778"
+    },
+    "capturas-dsk/_f1c2/m3_avanzado_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "e384c565f846052ded20279985db4079d65945272cf0335e42153c04c33df52c"
+    },
+    "capturas-dsk/_f1c2/m3_avanzado_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "c6b4196d8eaa094b7b4c5b74f0be2f305cd600442f39024f32dff77fb3af59bf"
+    },
+    "capturas-dsk/_f1c2/m3_avanzado_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "1dc8f4c9986060c92382af78d470c6cff60bf2c7425729a37022e1815e520527"
+    },
+    "capturas-dsk/_f1c2/m3_pro_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "97bac66f2376a34d90c0355040af04186e5ba09e96ee0124f5314bb12a47f026"
+    },
+    "capturas-dsk/_f1c2/m3_pro_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "b758687840f14021c010e594761f8c1f46a01c9f316c6afd554bf9b5f85722e2"
+    },
+    "capturas-dsk/_f1c2/m3_pro_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "84565aa963aa532a1da2da933d047ab519b58a8c0f38f69f1b14e81c5ef57b1a"
+    },
+    "capturas-dsk/_f1c2/m4_avanzado_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "90fab2a22bd77a6ac1da68f4c29b26253b79c645297b53ec0152e9a94a60c2f7"
+    },
+    "capturas-dsk/_f1c2/m4_avanzado_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "bb4bbcdc93f6cd1d7bc45a919ed607db4a709cb4d4f8e7948b5d01dcf6b6d048"
+    },
+    "capturas-dsk/_f1c2/m4_pro_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "48ab078dcc6229cc8abf6335f4b024ca12864ba9f11c08089c09efc3eb9814a8"
+    },
+    "capturas-dsk/_f1c2/m4_pro_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "723fea57d5567988117f1f2454a3c72f319c6c48276832d06d73c444b1b77c54"
+    },
+    "capturas-dsk/_f1c2/m5_avanzado_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "ecbd53f5f7d01407e4651e6ff4fab147fa5c601ec9df38bcfddab4a56cb27a90"
+    },
+    "capturas-dsk/_f1c2/m5_avanzado_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "7c2b325edf0708752a9fd1fc5e044f916434a210469fe28cad338d09756ca9b2"
+    },
+    "capturas-dsk/_f1c2/m5_pro_espejo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "874c8adb4427f2b6425ef423668c149e556ce76a7e60f9cf4cde2d7168a1aa6c"
+    },
+    "capturas-dsk/_f1c2/m5_pro_pasivo.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "9252888ce0b81b3b3d1e23dce51ad5089f0dc5583d479d5b28c49ed9977a8920"
+    },
+    "capturas-dsk/_res_conv_m2_aleatorio_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "8deb7eea222f5e3e25c298740bd716939750949c48881016459aaed627bbb3c2"
+    },
+    "capturas-dsk/_res_conv_m2_aleatorio_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "dbdb67917f62f550a375a519a964b88a41d93dec28e673377a79fa2e7163dfbd"
+    },
+    "capturas-dsk/_res_conv_m2_aleatorio_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "7b5aff606ced43eac3f9db43d7f3a28abcc3334e2eca5af5217271cefbe4ea83"
+    },
+    "capturas-dsk/_res_conv_m3_aleatorio_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "057f3b5df43cf0d3694363b23c0f41b4fac9ee839ed9713f8b3961fd3ac04901"
+    },
+    "capturas-dsk/_res_conv_m3_aleatorio_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "a748229d1c3dba786ae7abb3a4725fbb079d89980b073494c491207407fdf32b"
+    },
+    "capturas-dsk/_res_conv_m3_aleatorio_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "363a896ac6bc4a343aa9fcd8a09fd6d0065fb4927c12e9cc851bdfcdfea771d6"
+    },
+    "capturas-dsk/_res_conv_m4_aleatorio_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "71d6fa72e8ffde152f1b57e2f392bb0055dd941deb7657cb3f6240e1823c4361"
+    },
+    "capturas-dsk/_res_conv_m4_aleatorio_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "e62bb5b3ca2a65abcadee7449533feddc5f9304f193de47b6da0d8aa1e7d2230"
+    },
+    "capturas-dsk/_res_conv_m4_aleatorio_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "1124d23eab8a3f68c0c5b59bb7f22cfed4dba617a7a7b51e9449316668faf736"
+    },
+    "capturas-dsk/_res_conv_m5_aleatorio_avanzado.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "1208ae747753c995913102ed737026659bec60a11e20694149fb41ce6a49d8f7"
+    },
+    "capturas-dsk/_res_conv_m5_aleatorio_basico.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "61e821e2c384ae6f227ad0b3fe4b2f524fb25c53723534d7ccc42afca2ba8ae8"
+    },
+    "capturas-dsk/_res_conv_m5_aleatorio_pro.json": {
+      "unit": 100,
+      "siembra": 11,
+      "sha256": "6bba901bd43f5f9b560ab0fd9c6e28ea04086f65e1005490e63223336e78f99c"
+    },
+    "capturas-dsk/_res_e20_m5_avanzado.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "56ad277a0d16dfec65087cea46ffde86af72d3391f7353d9b674cd9a20d25e4c"
+    },
+    "capturas-dsk/_res_e20_m5_basico.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "3ad35713103077bf93c19294d2134d39a8c96287b179a2a4b89fdbf32e020485"
+    },
+    "capturas-dsk/_res_e20_m5_pro.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "f7491b12e39e4791e08f187c743e9e471e443886f7ff2adf115f997e899b9836"
+    },
+    "capturas-dsk/_res_m2_avanzado_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "ff841eb3d3aa1ea906679df05684d46dc011fb6036a59c9278dbe5d1451c363e"
+    },
+    "capturas-dsk/_res_m2_pro_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "8783c3203c1ae12e0230af25c0de08431f9aeaad7846fbb39a8278ac55009043"
+    },
+    "capturas-dsk/_res_m3_avanzado_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "c55325b0d4d1d6d0d88342e8627848a609490158e3b3c1a32dc4532f1484eeea"
+    },
+    "capturas-dsk/_res_m3_pro_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "fc2f650f503639475ef6b2e4278cbe0f1850ec46c442e04ba39127097c28001a"
+    },
+    "capturas-dsk/_res_m4_avanzado_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "364643411db05b798bf30a564fcd3243f1335eb80fdc4a0eed96aa1de345274b"
+    },
+    "capturas-dsk/_res_m4_avanzado_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "4c58bfacb8cf2a74d5cfd3a47621d0c64207b9baf6c9dbf04857c293128dbf1a"
+    },
+    "capturas-dsk/_res_m4_pro_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "62be461734620fbb9636c569bedecaa80d0f8c9d78a195b3a0ae776c139d0e6b"
+    },
+    "capturas-dsk/_res_m4_pro_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "a6a823fb8513234523b1e5c7509f797eace7c261c29c9611e402590bbf77eeb1"
+    },
+    "capturas-dsk/_res_m5_avanzado_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "3c32c6db663bf0d304d4a7009c82c5d20caa046ebd0455e4d36dd6b22938be8d"
+    },
+    "capturas-dsk/_res_m5_avanzado_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "a5e97caa5b914c37ce3a38a46148437602bfd7c2a87e1fdf2759059185dc0287"
+    },
+    "capturas-dsk/_res_m5_pro_aleatorio.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "6c14dc0df512ca7146b97f03688216c792451d88bbe42e7f8e29774cd102ece7"
+    },
+    "capturas-dsk/_res_m5_pro_manoso.json": {
+      "unit": 100,
+      "siembra": 23,
+      "sha256": "618c92b820c147a27c6914f54ad8213a39a1ca10e5befe9dc8afdb45b0435eee"
+    }
+  }
+}
