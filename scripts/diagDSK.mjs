@@ -313,6 +313,11 @@ import { NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
 // para que deje de ser un secreto de `diagDSK` y la compartan los demás arneses
 // (la avería de NIV-UI, contada en la cabecera de aquel módulo).
 import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa } from './rutaMesa.mjs'
+// ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
+import {
+  jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
+  estadoCelda, reintentar, INTENTOS_COBERTURA, contestarRecargaComun,
+} from './arnes/autojuego.mjs'
 // MOV-1b-a · las entradas del menú y qué está vivo en cada rama salen de la
 // MISMA fuente única que la app (mismo criterio que consultas.js, niveles.js y
 // tapetes.js). El modo `menu-movil` DERIVA de aquí lo que espera, así que
@@ -1681,6 +1686,23 @@ const APU_EN_PAGO = () => !!document.querySelector('[data-accion="recargar"]')
   || !!document.querySelector('.game-table[data-rec-motivo]')
   || [...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano')
 
+// ARN-3b-ii · D3 (H3b-2) · EL PAGO, POR UNA SEÑAL QUE SOLO EXISTE EN EL PAGO.
+// `APU_EN_PAGO` incluye `data-rec-motivo`, y eso es la pregunta PENDIENTE, no
+// el pago: un All-in que deja la pila bajo el listón la pone en el acto. Medido
+// (ARN-3b-ii §3): las cuatro vías falsas antes del clic y `recMotivo`
+// «automatica»/«forzosa» a los 2 ms, con la mano aún en juego. Para los bucles
+// que deben PARARSE ante la pregunta, `APU_EN_PAGO` sigue igual; para decir «la
+// mano llegó al pago» vale esto: «Siguiente mano», la recarga voluntaria, o la
+// pregunta ya PINTADA (burbuja o tarjeta), que REC-1 solo pinta al terminar la
+// revelación. Devuelve qué señal fue, o null.
+const APU_PAGO_VISIBLE = () => {
+  if ([...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano')) return 'siguiente'
+  if (document.querySelector('[data-accion="recargar"]')) return 'recargar'
+  if (document.querySelector('[data-accion="recarga-burbuja"]')) return 'burbuja'
+  if (document.querySelector('[data-accion="recarga"]')) return 'tarjeta'
+  return null
+}
+
 // REC-1 · el motivo de la pregunta, esté pintada o no.
 const APU_MOTIVO = () => document.querySelector('[data-accion="recarga"]')?.dataset.motivo
   ?? document.querySelector('.game-table')?.dataset.recMotivo ?? null
@@ -2646,8 +2668,12 @@ async function runApu(browser) {
     // ningún instante del camino, y que la mano LLEGA AL PAGO —o sea que el
     // rival contestó y el reparto ocurrió—. Quién gana cada capa lo sella
     // Vitest, que es donde el reparto se puede fijar a mano.
-    let alPago = false, allinTrasPulsar = 0, clavadaTrasPulsar = false
+    let alPago = false, allinTrasPulsar = 0, clavadaTrasPulsar = false, msHastaPago = null
+    let pagoAntes = null, senalPago = null
     if (c['apu.2'].ok) {
+      // D3 · TRANSICIÓN: la señal del pago tiene que ser falsa ANTES del clic.
+      // Si ya era cierta, `apu.7` no puede medir nada y no se da por llegado.
+      pagoAntes = await page.evaluate(APU_PAGO_VISIBLE)
       await page.click('[data-accion="allin"]')
       await esperarMesa(page, () => {
         const t = document.querySelector('.game-table')
@@ -2660,7 +2686,25 @@ async function runApu(browser) {
       allinTrasPulsar = foto.allin
       clavadaTrasPulsar = foto.clavada === '1'
       await page.screenshot({ path: `${dir}/apu_respondido_${tag}.png` })
-      alPago = await esperarMesa(page, APU_EN_PAGO, 30000)
+      // ARN-3b · P8 · la espera JUEGA el descarte del humano. En all-in el
+      // humano sigue descartando, y la mesa le da sus 20 s para hacerlo
+      // (GameTable.jsx:767, `isDiscardTimerActive` no mira el all-in). Una
+      // espera de brazos cruzados gastaba esos 20 s del tope de 30: si las IAS
+      // tardaban más de ~10 s en sus apuestas, la mano llegaba al pago DESPUÉS
+      // del tope y `apu.7` salía rojo sin que la mesa se hubiera clavado (el
+      // rojo de 360×640 en la Fase 0, con `clavada: 0`). Se contesta
+      // «Sin descartar», que es lo que el reloj haría a los 20 s.
+      const t7 = Date.now()
+      while (Date.now() - t7 < 30000) {
+        const senal = pagoAntes ? null : await page.evaluate(APU_PAGO_VISIBLE)
+        if (senal) { alPago = true; senalPago = senal; break }
+        await page.evaluate(() => {
+          const b = [...document.querySelectorAll('.discard-area .btn')].find((x) => x.textContent.trim() === 'Sin descartar' && !x.disabled)
+          if (b) b.click()
+        })
+        await page.waitForTimeout(200)
+      }
+      msHastaPago = alPago ? Date.now() - t7 : null
       if (!clavadaTrasPulsar) {
         const d = await page.evaluate(() => document.querySelector('.game-table')?.dataset.clavada)
         clavadaTrasPulsar = d === '1'
@@ -2670,8 +2714,17 @@ async function runApu(browser) {
       pulsado: !!c['apu.2'].ok,
       allinTrasPulsar,
       clavada: clavadaTrasPulsar ? '1' : '0',
-      alPago,
-      ok: !!c['apu.2'].ok && allinTrasPulsar >= 1 && !clavadaTrasPulsar && alPago,
+      alPago, msHastaPago, pagoAntes, senalPago,
+      ok: !!c['apu.2'].ok && allinTrasPulsar >= 1 && !clavadaTrasPulsar && alPago && !pagoAntes,
+    }
+    // ARN-3b · D4 · si en cuatro mesas el humano no llegó a tener la fila de
+    // All-in (nadie abrió por encima de su media apuesta), el caso no se dio:
+    // `apu.2` y `apu.7` —que es el mismo estado un clic más tarde— quedan «sin
+    // cobertura», no rojos (el `logrado: false` de la Fase 0).
+    c.sinCobertura = []
+    if (c['apu.2'].logrado === false) {
+      for (const k of ['apu.2', 'apu.7']) { c[k].estado = 'sinCobertura'; c[k].ok = null }
+      c.sinCobertura.push(`apu.2/apu.7 (la fila de All-in no se dio en ${c['apu.2'].intentos} mesas)`)
     }
 
     // ── apu.3 · La recarga: panel, gate y nivelado (§5) ───────────────────
@@ -2914,9 +2967,13 @@ async function runApu(browser) {
       // seis puntos de teléfono entran en el `ok` de la celda como los siete.
       c.telPuntos = [
         { id: 'tel.marca',   ok: c.marcaPorMesa.every((f) => f.ok) },
-        { id: 'tel.boton4',  ok: c['apu.2'].okCuatroCifras === true },
+        // D4 · sin la fila de All-in no hay botón que medir: sin cobertura.
+        { id: 'tel.boton4',  ok: c['apu.2'].logrado === false ? null : c['apu.2'].okCuatroCifras === true },
         { id: 'tel.recarga', ok: c.recargaTel?.ok === true },
-        { id: 'tel.linea',   ok: c.lineaAllinHumano.ok === true },
+        // D4 · la línea del humano en all-in solo vive mientras dura la ronda
+        // de apuestas: si su All-in la cierra en el acto, no llega a pintarse.
+        // Tres mesas sin verla es un hueco de cobertura, no un rojo.
+        { id: 'tel.linea',   ok: c.lineaAllinHumano.hay === false ? null : c.lineaAllinHumano.ok === true },
         { id: 'tel.blanda',  ok: c.botonesBlanda?.ok === true },
         { id: 'tel.forzosa', ok: c.botonesForzosa?.ok === true },
       ]
@@ -3005,21 +3062,26 @@ async function runApu(browser) {
 
     c.consola = consola
     c.consolaConocida = conocido.length
-    c.ok = APU_PUNTOS.every((k) => c[k].ok) && consola.length === 0
-      && (c.telPuntos ? c.telPuntos.every((p) => p.ok) : true)
+    // ARN-3b · D4 · un punto sin cobertura (`ok: null`) no es verde ni rojo:
+    // se declara en `sinCobertura` y el modo sale `cobertura`.
+    for (const p of c.telPuntos ?? []) if (p.ok === null) c.sinCobertura.push(`${p.id} (${p.id === 'tel.linea' ? 'la línea all-in del humano no llegó a verse en 3 mesas' : 'sin la fila de All-in'})`)
+    const vale = (v) => v === true || v === null
+    c.ok = APU_PUNTOS.every((k) => vale(c[k].ok)) && consola.length === 0
+      && (c.telPuntos ? c.telPuntos.every((p) => vale(p.ok)) : true)
     celdas.push(c)
     await page.close()
   }
 
   const rec2 = (!vpFilter || vpFilter === 'rec2') ? await runRec2(browser) : null
   const ok = celdas.every((c) => c.ok) && (rec2 ? rec2.ok : true)
-  console.log(`\n── apu · la mesa de APU-1 ── ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas`)
+  const sinCobertura = celdas.flatMap((c) => (c.sinCobertura ?? []).map((s) => `${c.vp} ${s}`))
+  console.log(`\n── apu · la mesa de APU-1 ── ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas${sinCobertura.length ? ` · ${sinCobertura.length} punto(s) sin cobertura` : ''}`)
   for (const c of celdas) {
     const fallos = [
-      ...APU_PUNTOS.filter((k) => !c[k].ok),
-      ...(c.telPuntos ?? []).filter((p) => !p.ok).map((p) => p.id),
+      ...APU_PUNTOS.filter((k) => c[k].ok === false),
+      ...(c.telPuntos ?? []).filter((p) => p.ok === false).map((p) => p.id),
     ]
-    console.log(`  ${c.ok ? 'OK  ' : 'FALLA'} ${c.vp.padEnd(9)} ${String(c.nota).padEnd(16)}${fallos.length ? ' · ' + fallos.join(', ') : ''}${c.consola.length ? ' · consola: ' + c.consola[0] : ''}`)
+    console.log(`  ${c.ok ? 'OK  ' : 'FALLA'} ${c.vp.padEnd(9)} ${String(c.nota).padEnd(16)}${fallos.length ? ' · ' + fallos.join(', ') : ''}${c.sinCobertura?.length ? ' · sin cobertura: ' + c.sinCobertura.join('; ') : ''}${c['apu.7'].msHastaPago != null ? ` · apu.7 al pago en ${c['apu.7'].msHastaPago} ms (${c['apu.7'].senalPago})` : ''}${c['apu.7'].pagoAntes ? ` · apu.7: el pago ya se veía ANTES del clic (${c['apu.7'].pagoAntes})` : ''}${c.consola.length ? ' · consola: ' + c.consola[0] : ''}`)
     // 1f §A.5 · la tabla de la marca ALL-IN por mesa, que es la que va al
     // informe. Se imprime aquí y no se deja sólo en el JSON: es la medida por la
     // que la ficha pone un STOP, y un STOP tiene que verse sin abrir un archivo.
@@ -3048,7 +3110,7 @@ async function runApu(browser) {
       console.log(`      tarjeta ${b.modal.ancho}×${b.modal.alto} en ${b.modal.top} · tapa ${b.solapeCartas} px² de ${b.areaCartas} de la mano`)
     }
   }
-  return { celdas, ok, rec2 }
+  return { celdas, ok, rec2, sinCobertura }
 }
 
 // ── DSK-B1 · Presupuesto vertical de la columna central (mesa 5) ──────────────
@@ -4156,7 +4218,7 @@ async function runO1(browser) {
     // el ancho de las columnas `auto` del grid .table-mid y con él el 1fr donde
     // vive el óvalo — la elasticidad real del escritorio no la trae el mensaje.
     // Se anota también el ancho de cada side-col para ATRIBUIR la causa.
-    const real = []
+    const todos = []
     const snap = async (tag) => {
       await page.mouse.move(5, 5)
       const m = await o1Measure(page, null)
@@ -4165,25 +4227,23 @@ async function runO1(browser) {
         const w = s => { const e = document.querySelector(s); return e ? rnd(e.getBoundingClientRect().width) : null }
         return { L: w('.side-col-left'), R: w('.side-col-right'), mid: w('.mid-center'), riv: w('.rivals-zone') }
       })
-      real.push({ tag, oval: m.oval, text: m.text, lines: m.lines, cols })
+      const r = { tag, oval: m.oval, text: m.text, lines: m.lines, cols }
+      todos.push(r)
+      return r
     }
     await snap('waiting')
+    // ARN-3b · con el bucle común (D2). El óvalo es la columna elástica del
+    // grid: si la mesa pierde vivos cambia de ancho A PROPÓSITO, así que esos
+    // frames se cuentan aparte (D3) y no entran en el Δ ni en el rango.
+    const juego = nuevoJuego()
     for (let hand = 0; hand < 3; hand++) {
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      for (let i = 0; i < 60; i++) {
-        await page.waitForTimeout(280)
-        await snap(`h${hand}t${i}`)
-        if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) break
-        await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Apostar")')
-        await clickIf(page, 'button:has-text("Sin descartar")')
-      }
-      await snap(`h${hand}-showdown`)
-      if (!await clickIf(page, 'button:has-text("Siguiente mano")')) break
-      await page.waitForTimeout(1500)
-      await snap(`h${hand}-reset`)
+      const r = await jugarMano(page, juego, { mano: hand, tick: 280, max: 60, cada: 1, muestrear: snap, muestraFinal: false })
+      if (juego.ausente) break
+      marcarReducida(juego, await snap(`h${hand}-showdown`))
+      if (!r.cerrada || !await siguienteMano(page, juego)) break
+      marcarReducida(juego, await snap(`h${hand}-reset`))
     }
+    const real = separarReducida(todos).medidos
 
     // Δ del óvalo contra el reposo — inyectados y reales por separado
     const dOf = o => bboxDelta(o, base.oval)
@@ -4214,6 +4274,7 @@ async function runO1(browser) {
       overflow: anyOverflow.map(s => ({ fam: s.fam, outL: s.outLeft, outR: s.outRight, outT: s.outTop, outB: s.outBottom, clipped: s.clipped })),
       states: states.map(s => ({ fam: s.fam, chars: s.chars, lines: s.lines, textW: s.textW, ovalW: s.oval?.w, ovalH: s.oval?.h, ovalX: s.oval?.x, ovalY: s.oval?.y, clipped: s.clipped })),
       realSeq: real.map(r => ({ tag: r.tag, w: r.oval?.w, h: r.oval?.h, x: r.oval?.x, y: r.oval?.y, lines: r.lines, text: r.text, cols: r.cols })),
+      juego: resumenJuego(juego), sinFantasma: juego.fantasmas.length === 0,
       // Alcance: cuando O1 corrió, sólo mesa 5 estaba congelada y 4/3/2 eran
       // INSUMO (passed = null, elasticidad registrada en `range` para el reporte).
       // DSK-O2 selló las tres restantes → las cuatro puntúan. Un dato que se
@@ -4224,7 +4285,8 @@ async function runO1(browser) {
       // garantiza el `overflow:hidden` + `minmax(0,360px)` del bloque :948, y en
       // 3/2 la guardia de contención de O2 (overflow + min-width:0 del mensaje).
       stressOk: !wrap.err && Math.abs(wrap.stress?.ovalGrew ?? 0) < 0.6,
-      passed: ovalStable && longestFits && !wrap.err && Math.abs(wrap.stress?.ovalGrew ?? 0) < 0.6,
+      // D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+      passed: ovalStable && longestFits && !wrap.err && Math.abs(wrap.stress?.ovalGrew ?? 0) < 0.6 && juego.fantasmas.length === 0,
     })
     await page.close()
   }
@@ -4308,10 +4370,22 @@ const h1Restore = (page, prev) => page.evaluate((p) => {
   if (num && p.num != null) num.textContent = p.num
   if (nm && p.nm != null) nm.textContent = p.nm
 }, prev)
-const h1Delta = (a, b, keys = H1_ANCHORS) => {
+// ARN-3b · D6 (H-14) · los números alineados a la DERECHA. La cifra de la pila
+// crece y decrece hacia la izquierda por diseño —es lo que `numRightFixed` y
+// `growsLeft` comprueban aparte—, así que en el ciclo su borde IZQUIERDO y su
+// ancho no son anclas: desde APU-1 la pila pasa de «1000» a «950» al cobrar el
+// ante y el borde izquierdo se mueve un dígito (10,19 px) sin que nada esté mal.
+// Para ellas se exige lo que sí es ancla: el borde DERECHO, la y y el alto. Las
+// demás anclas conservan la caja entera. No se afloja nada más.
+const H1_DERECHA = ['num', 'chips']
+const bboxDeltaDerecha = (a, b) => {
+  if (!a || !b) return 0
+  return Math.max(Math.abs(a.right - b.right), Math.abs(a.y - b.y), Math.abs(a.h - b.h))
+}
+const h1Delta = (a, b, keys = H1_ANCHORS, derecha = []) => {
   let max = 0, who = null
   for (const k of keys) {
-    const d = bboxDelta(a[k], b[k])
+    const d = derecha.includes(k) ? bboxDeltaDerecha(a[k], b[k]) : bboxDelta(a[k], b[k])
     if (d > max) { max = d; who = k }
   }
   return { max: Math.round(max * 100) / 100, who }
@@ -4375,34 +4449,27 @@ async function runH1(browser) {
     // llegaba a agotar: las 16 celdas veían sólo el rol MANO (rolesSeen=["Mano"])
     // y el Δ de 2px de la pastilla PIE quedaba fuera del muestreo. Ahora son 3
     // manos con techo holgado y la cobertura de roles es PUERTA, no informe.
-    const states = []
+    // Techo por mano: una mano de mesa 5 (4 IAs + descarte + payout) tarda
+    // ~40s reales; con 160 iteraciones el ciclo moría a medias y tres celdas
+    // de mesa 5 no llegaban a rotar el rol. 340 da holgura de 2× sin encarecer
+    // el muestreo: se CLICA cada iteración pero se MUESTREA una de cada dos.
+    // ARN-3b · con el bucle común (D2); la mesa reducida se cuenta aparte (D3).
+    const todos = []
+    const juego = nuevoJuego()
+    const muestrear = async (tag) => { const s = { tag, ...(await h1Snap(page)) }; todos.push(s); return s }
     for (let hand = 0; hand < 3; hand++) {
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      let closed = false
-      // Techo por mano: una mano de mesa 5 (4 IAs + descarte + payout) tarda
-      // ~40s reales; con 160 iteraciones el ciclo moría a medias y tres celdas
-      // de mesa 5 no llegaban a rotar el rol. 340 da holgura de 2× sin encarecer
-      // el muestreo: se CLICA cada iteración pero se MUESTREA una de cada dos.
-      for (let i = 0; i < 340; i++) {
-        await page.waitForTimeout(230); await page.mouse.move(5, 5)
-        if (i % 2 === 0) states.push({ tag: `h${hand}t${i}`, ...(await h1Snap(page)) })
-        if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
-          states.push({ tag: `h${hand}t${i}f`, ...(await h1Snap(page)) }); closed = true; break
-        }
-        await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Apostar")')
-        await clickIf(page, 'button:has-text("Sin descartar")')
-      }
-      states.push({ tag: `h${hand}-sd`, ...(await h1Snap(page)) })
-      if (!closed || !await clickIf(page, 'button:has-text("Siguiente mano")')) break
-      await page.waitForTimeout(1500); await page.mouse.move(5, 5)
-      states.push({ tag: `h${hand}-post`, ...(await h1Snap(page)) })
+      const r = await jugarMano(page, juego, { mano: hand, muestrear })
+      if (juego.ausente) break
+      marcarReducida(juego, await muestrear(`h${hand}-sd`))
+      if (!r.cerrada || !await siguienteMano(page, juego)) break
+      marcarReducida(juego, await muestrear(`h${hand}-post`))
     }
-    // La baseline del ciclo es el reposo inicial; se exige Δ=0 en todos los frames.
+    const states = separarReducida(todos).medidos
+    // La baseline del ciclo es el reposo inicial; se exige Δ=0 en todos los
+    // frames (D6: en `num`/`chips`, por su borde derecho).
     let worst = { max: 0, who: null, tag: null }
     for (const s of states) {
-      const d = h1Delta(s, base)
+      const d = h1Delta(s, base, H1_ANCHORS, H1_DERECHA)
       if (d.max > worst.max) worst = { ...d, tag: s.tag }
     }
     // Rango de la franja de acción (fuera de las anclas, sólo informativo).
@@ -4465,12 +4532,15 @@ async function runH1(browser) {
     }
     headWidthRange = Math.round(headWidthRange * 100) / 100
 
+    // D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+    const sinFantasma = juego.fantasmas.length === 0
     const passed = nameReserved && numRightFixed && growsLeft && mesaAligned && !!mesaBelow &&
       sepGone && fichasGone && saldoBlockFixed && cycleStable && sawTurnOn && sawTurnOff && overflowOk &&
       roleCycleOk && headsStable && headSawPie &&
-      (!ovalGated || ovalStable)
+      (!ovalGated || ovalStable) && sinFantasma
 
     out.push({
+      juego: resumenJuego(juego), sinFantasma,
       table: n, vp, route,
       routeCommon: route.playerZone && route.playerBar &&
         JSON.stringify(route.left) === JSON.stringify(['pbr-name', 'pbr-badges']),
@@ -4623,27 +4693,32 @@ async function runM1(browser) {
     const fanGapLeft = Number.isFinite(live.gapLeft) && live.gapLeft ? live.gapLeft : 8
     const deckDx = live.deckDx ?? 0
 
+    // (6) abanico de barajado atado al mazo (se inyecta uno de medición y se
+    // retira). ARN-3b (H-1) · se mide ANTES del ciclo: después la mesa puede no
+    // estar (bancarrota, forzosa) y el `getBoundingClientRect` de null abortaba
+    // el modo entero en la 2.ª de 16 celdas. Es la misma caja: el ciclo exige
+    // Δ=0 del mazo contra el reposo (cycleStable), y D9 lo comprueba.
+    const fan = await page.evaluate(() => {
+      const w = document.querySelector('.player-zone .deck-shuffle-wrapper')
+      const d = document.querySelector('.player-zone .deck-pile').getBoundingClientRect()
+      const s = document.createElement('div'); s.className = 'shuffle-fan-card'; s.style.animation = 'none'
+      w.appendChild(s); const r = s.getBoundingClientRect(); s.remove()
+      const rn = x => Math.round(x * 100) / 100
+      return { fanW: rn(r.width), fanH: rn(r.height), fanX: rn(r.x), fanY: rn(r.y), deckW: rn(d.width), deckH: rn(d.height), deckX: rn(d.x), deckY: rn(d.y) }
+    })
+
     // Ciclo de 3 manos: el humano es MANO (1ª), PIE (2ª) y sin rol (3ª) → cubre
     // el mazo visible y el oculto sin desmontar (reserva viva de .deck-hidden).
-    const states = [{ tag: 'reposo', ...(await m1Snap(page)) }]
+    // ARN-3b · con el bucle común (D2); la mesa reducida se cuenta aparte (D3).
+    const todos = [{ tag: 'reposo', ...(await m1Snap(page)) }]
+    const juego = nuevoJuego()
+    const muestrear = async (tag) => { const s = { tag, ...(await m1Snap(page)) }; todos.push(s); return s }
     for (let hand = 0; hand < 3; hand++) {
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      let closed = false
-      for (let i = 0; i < 340; i++) {
-        await page.waitForTimeout(230); await page.mouse.move(5, 5)
-        if (i % 2 === 0) states.push({ tag: `h${hand}t${i}`, ...(await m1Snap(page)) })
-        if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
-          states.push({ tag: `h${hand}t${i}f`, ...(await m1Snap(page)) }); closed = true; break
-        }
-        await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Apostar")')
-        await clickIf(page, 'button:has-text("Sin descartar")')
-      }
-      if (!closed || !await clickIf(page, 'button:has-text("Siguiente mano")')) break
-      await page.waitForTimeout(1500); await page.mouse.move(5, 5)
-      states.push({ tag: `h${hand}-post`, ...(await m1Snap(page)) })
+      const r = await jugarMano(page, juego, { mano: hand, muestrear })
+      if (!r.cerrada || !await siguienteMano(page, juego)) break
+      marcarReducida(juego, await muestrear(`h${hand}-post`))
     }
+    const states = separarReducida(todos).medidos
 
     // Estado de referencia: el primero en el que el humano ES Pie (mazo visible).
     const pieState = states.find(s => s.isPie) || states[0]
@@ -4674,15 +4749,7 @@ async function runM1(browser) {
     const gapOk = Math.abs(gapNow - gapExpected) <= 0.5
     // (5) sombras del rival (1/2/3 + 4) en vez de las del humano (2/4/6 + 8)
     const shadowOk = /(^|\s)1px 1px 0px 0px/.test(pieState.shadow || '') && !/8px 8px/.test(pieState.shadow || '')
-    // (6) abanico de barajado atado al mazo (se inyecta uno de medición y se retira)
-    const fan = await page.evaluate(() => {
-      const w = document.querySelector('.player-zone .deck-shuffle-wrapper')
-      const d = document.querySelector('.player-zone .deck-pile').getBoundingClientRect()
-      const s = document.createElement('div'); s.className = 'shuffle-fan-card'; s.style.animation = 'none'
-      w.appendChild(s); const r = s.getBoundingClientRect(); s.remove()
-      const rn = x => Math.round(x * 100) / 100
-      return { fanW: rn(r.width), fanH: rn(r.height), fanX: rn(r.x), fanY: rn(r.y), deckW: rn(d.width), deckH: rn(d.height), deckX: rn(d.x), deckY: rn(d.y) }
-    })
+    // (6) abanico de barajado: medido antes del ciclo (arriba)
     const fanOk = Math.abs(fan.fanW - fan.deckW) <= 0.5 && Math.abs(fan.fanH - fan.deckH) <= 0.5 &&
       Math.abs(fan.fanX - fan.deckX) <= 0.5 && Math.abs(fan.fanY - fan.deckY) <= 0.5
     // (7) reserva viva: sin Pie el mazo conserva caja y posición (visibility)
@@ -4715,10 +4782,13 @@ async function runM1(browser) {
     const aiSizeOk = !hasAi || (Math.abs(pieState.aiDeck.w - target.w) <= 0.5 && Math.abs(pieState.aiDeck.h - target.h) <= 0.5)
     const aiAnchorOk = !hasAi || (Math.abs(pieState.aiDeck.x - pre.ai.x) <= 0.5 && Math.abs(pieState.aiDeck.y - pre.ai.y) <= 0.5)
 
+    // D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+    const sinFantasma = juego.fantasmas.length === 0
     const passed = sizeOk && anchorOk && wrapOk && gapOk && shadowOk && fanOk && hiddenReserveOk &&
-      cycleStable && flowConstant && flowWrapOk && flowDeckOk && sawPie && sawNoPie && aiSizeOk && aiAnchorOk
+      cycleStable && flowConstant && flowWrapOk && flowDeckOk && sawPie && sawNoPie && aiSizeOk && aiAnchorOk && sinFantasma
 
     out.push({
+      juego: resumenJuego(juego), sinFantasma,
       table: n, vp, target, pre, deckDx, anchorExpX,
       deck: pieState.deck, wrap: pieState.wrap, aiDeck: pieState.aiDeck, shadow: pieState.shadow,
       sizeOk, anchorOk, wrapOk, gapNow, gapExpected, fanGapLeft, gapOk, shadowOk, fan, fanOk,
@@ -4726,32 +4796,38 @@ async function runM1(browser) {
       flowConstant, flowWrapOk, flowDeckOk, flow: flowSeq[0] ?? null,
       hasAi, aiSizeOk, aiAnchorOk, passed,
     })
-    console.log(`T${n} ${vp.w}x${vp.h} mazo ${pieState.deck.w}x${pieState.deck.h} (obj ${target.w}x${target.h}) ancla (${pieState.deck.x},${pieState.deck.y}) esp x=${anchorExpX} (dx ${deckDx}) · hueco ${gapNow}/${gapExpected} · Δciclo=${worst.max} ${passed ? 'OK' : 'FAIL'}`)
+    console.log(`T${n} ${vp.w}x${vp.h} mazo ${pieState.deck.w}x${pieState.deck.h} (obj ${target.w}x${target.h}) ancla (${pieState.deck.x},${pieState.deck.y}) esp x=${anchorExpX} (dx ${deckDx}) · hueco ${gapNow}/${gapExpected} · Δciclo=${worst.max}${notaJuego(juego)} ${passed ? 'OK' : 'FAIL'}`)
     await page.close()
   }
   return out
 }
 
 // ── APU-1 C-0.5 · CONTESTAR LA PREGUNTA DE RECARGA ──────────────────────────
-// Los modos de linea base de pixel (`a1`, `a2`, `f1`) se escribieron cuando el
-// pago solo tenia «Siguiente mano». APU-1 metio en medio la pregunta de recarga,
-// que BLOQUEA esa accion a proposito (§5.1), asi que un bucle que no la contesta
-// se queda esperando: la mano no cierra (`SINCERRAR` en a2) y los frames se
-// muestrean con el panel abierto, que es otra pantalla.
-//
-// Se contesta que SI mientras haya saldo —estos modos quieren la mesa VIVA tres
-// manos enteras, no pilas cortas— y que no cuando ya no lo haya. Es la misma
-// disciplina del modo `apu`, que la declina por la razon contraria y por eso lo
-// dice en su propio bucle.
-async function contestarRecarga(page) {
-  return page.evaluate(() => {
-    if (!document.querySelector('[data-accion="recarga"]')) return false
-    const si = document.querySelector('[data-accion="recarga-si"]')
-    if (si && !si.disabled) { si.click(); return true }
-    const no = document.querySelector('[data-accion="recarga-no"]')
-    if (no) { no.click(); return true }
-    return false
-  })
+// Los modos de linea base de pixel se escribieron cuando el pago solo tenia
+// «Siguiente mano». APU-1 metio en medio la pregunta de recarga, que BLOQUEA
+// esa accion a proposito (§5.1). C-0.5 la contesto en `a1` y `a2`; ARN-3b
+// (H-10) la lleva al bucle comun, `contestarRecargaComun` en
+// scripts/arnes/autojuego.mjs, y desde ahi la contestan todos los modos que
+// juegan manos: SI mientras haya saldo, no cuando ya no lo haya.
+
+// ── ARN-3b · D4 · una celda que no vio su caso se repite con otra mano ───────
+// `medir(intento)` devuelve la celda con su `estado` (medida, sinCobertura o
+// error) y, si no se cubrió, `motivoCobertura`. Hasta tres intentos; si aun así
+// el caso no se dio, la celda sale «sin cobertura» y el modo, con `cobertura`.
+/** La línea de log de lo que el bucle vio: reducida, sin cerrar y fantasmas. */
+function notaJuego(juego) {
+  return (juego.reducida ? ` · mesa reducida ${juego.vivos0}→${juego.vivos} desde ${juego.reducidaDesde} (${juego.framesReducida} frames aparte)` : '') +
+    (juego.sinCerrar.length ? ` · sin cerrar: ${juego.sinCerrar.map(x => `h${x.mano} ${x.causa}`).join(', ')}` : '') +
+    (juego.fantasmas.length ? ` · TURNO FANTASMA ×${juego.fantasmas.length}` : '')
+}
+
+async function conCobertura(medir, etiqueta) {
+  for (let intento = 1; ; intento++) {
+    const celda = await medir(intento)
+    celda.intentos = intento
+    if (!reintentar(celda.estado, intento)) return celda
+    console.log(`  ↻ ${etiqueta}: sin cobertura (${celda.motivoCobertura}) · intento ${intento} de ${INTENTOS_COBERTURA}, otra mano`)
+  }
 }
 
 // ── A1 · Anclaje arriba-izquierda del abanico humano ─────────────────────────
@@ -4898,154 +4974,161 @@ async function runA1(browser) {
   for (const n of A1_TABLES) for (const vp of VIEWPORTS) {
     if (tblFilter && n !== tblFilter) continue
     if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
-    const key = `${vp.w}x${vp.h}`
-    const pre = A1_PRE[key]
-    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
-    await gotoMesa(page, n); await installProbes(page)
-    await page.waitForTimeout(300); await page.mouse.move(5, 5)
+    out.push(await conCobertura(async () => {
+      const key = `${vp.w}x${vp.h}`
+      const pre = A1_PRE[key]
+      const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+      await gotoMesa(page, n); await installProbes(page)
+      await page.waitForTimeout(300); await page.mouse.move(5, 5)
 
-    const tok = await a1Tokens(page)
-    const live = await a2Live(page)      // dx de A2, leídos por valor usado
-    // Rotación completa de PIE: 3 manos (mismo ciclo que M1) → el humano es
-    // MANO, PIE y sin rol, y se recorren todas las fases con y sin cartas.
-    const states = [{ tag: 'reposo', ...(await a1Snap(page)) }]
-    // Se cuenta y se dice: una celda que midió menos frames porque la mesa se
-    // acabó no es lo mismo que una celda entera, y callarlo sería fabricar un
-    // verde con menos evidencia de la que la vara cree tener.
-    let mesaSeAcabo = false
-    for (let hand = 0; hand < 3 && !mesaSeAcabo; hand++) {
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      let closed = false
-      for (let i = 0; i < 340; i++) {
-        await page.waitForTimeout(230); await page.mouse.move(5, 5)
-        if (await contestarRecarga(page)) { await page.waitForTimeout(260); continue }
-        if (i % 2 === 0) states.push({ tag: `h${hand}t${i}`, ...(await a1Snap(page)) })
-        if (states[states.length - 1].ausente) { mesaSeAcabo = true; break }
-        if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
-          states.push({ tag: `h${hand}t${i}f`, ...(await a1Snap(page)) }); closed = true; break
+      const tok = await a1Tokens(page)
+      const live = await a2Live(page)      // dx de A2, leídos por valor usado
+      // Rotación completa de PIE: 3 manos (mismo ciclo que M1) → el humano es
+      // MANO, PIE y sin rol, y se recorren todas las fases con y sin cartas.
+      const todos = [{ tag: 'reposo', ...(await a1Snap(page)) }]
+      // ARN-3b · el bucle es el común (D2): contesta la recarga, pulsa
+      // Retirarse/All-in cuando la pila no llega, sabe cuándo la mesa se acaba y
+      // cuándo se reduce, y dice por qué una mano no cerró. Se cuenta y se dice:
+      // una celda que midió menos frames porque la mesa se acabó no es lo mismo
+      // que una celda entera, y callarlo sería fabricar un verde con menos
+      // evidencia de la que la vara cree tener.
+      const juego = nuevoJuego()
+      const muestrear = async (tag) => { const s = { tag, ...(await a1Snap(page)) }; todos.push(s); return s }
+      for (let hand = 0; hand < 3; hand++) {
+        const r = await jugarMano(page, juego, { mano: hand, muestrear })
+        if (!r.cerrada || !await siguienteMano(page, juego)) break
+        marcarReducida(juego, await muestrear(`h${hand}-post`))
+      }
+      const mesaSeAcabo = juego.ausente
+      // D3 (B4) · desde que la mesa pierde vivos, el grupo del humano se recoloca
+      // A PROPÓSITO (5 → 3 vivos corre el abanico centrado 36,83 px en T5
+      // 1920×937). Esos fotogramas son de otra mesa: se cuentan aparte, nunca
+      // como desplazamiento y nunca escondidos (`juego.mesaReducida`).
+      const states = separarReducida(todos).medidos
+
+      const worstOf = (get) => {
+        let max = 0, who = null
+        for (const s of states) { const v = get(s); if (v == null) continue; if (Math.abs(v) > max) { max = Math.abs(v); who = s.tag } }
+        return { max: round(max), tag: who }
+      }
+      const every = (fn) => states.every(s => fn(s) !== false)
+
+      // (1) origen del abanico CONSTANTE en todos los frames (Δ=0)
+      const base = states[0]
+      const dOriginX = worstOf(s => s.card1 ? s.card1.x - base.card1.x : null)
+      const dOriginY = worstOf(s => s.card1 ? s.card1.y - base.card1.y : null)
+      const originConst = dOriginX.max < 0.5 && dOriginY.max < 0.5
+      // (2) huecos = tokens. DSK-A2 re-expresa el horizontal contra la PILA VISIBLE:
+      //     con el abanico centrado, el hueco contra el borde de la reserva del
+      //     wrapper deja de ser --dsk-fan-gap-left (se le suman los dos dx), pero el
+      //     que se ve —pila → carta 1— vale el token exacto por construcción de C6.
+      const dGapLeft = worstOf(s => (s.card1 && s.deck) ? (s.card1.left - s.deck.right) - tok.gapLeft : null)
+      const dGapTop = worstOf(s => (s.card1 && s.zone) ? (s.card1.top - s.zone.top) - tok.gapTop : null)
+      const gapsOk = dGapLeft.max <= 0.5 && dGapTop.max <= 0.5
+      // (3) slot y carta comparten anclaje
+      const dSlotCardX = worstOf(s => s.card1Inner ? s.card1Inner.x - s.card1.x : null)
+      const dSlotCardY = worstOf(s => s.card1Inner ? s.card1Inner.y - s.card1.y : null)
+      const slotCardShared = dSlotCardX.max <= 0.5 && dSlotCardY.max <= 0.5
+      // (4) mazo en coordenadas M1 exactas + el dx de A2 (leído vivo), con y sin PIE
+      const deckExpX = round(pre.deck.x + (live.deckDx ?? 0))
+      const dDeckX = worstOf(s => s.deck ? s.deck.x - deckExpX : null)
+      const dDeckY = worstOf(s => s.deck ? s.deck.y - pre.deck.y : null)
+      const deckOk = dDeckX.max <= 0.5 && dDeckY.max <= 0.5
+      const sawPie = states.some(s => s.isPie), sawNoPie = states.some(s => s.isPie === false)
+      const flowWrapOk = every(s => !s.flowWrap || (Math.abs(s.flowWrap.w - pre.wrapW) <= 0.5 && s.flowWrap.h === states[0].flowWrap.h))
+      // (5) la línea: aquí quedan sólo su CICLO y su ENCAJE. DSK-A2 la mudó de la
+      //     banda superior izquierda a debajo de las cartas, así que los checks de
+      //     SITIO (tagNoCollision contra la carta 1, dTagDx/dTagDy contra el rincón
+      //     de A1, y el apilamiento del peor caso) ya no describen nada: viven ahora
+      //     en el modo a2, contra su casa nueva. Lo que no cambió —y por eso sigue
+      //     aquí— es que sólo aparece en la fase de pago y que su reserva la aloja.
+      const tagFrames = states.filter(s => s.tagVis === 'visible' && s.tagText)
+      const tagCycleOk = tagFrames.length > 0 && states.some(s => s.tagVis === 'hidden')
+      const tagFits = tagFrames.every(s => !s.tagClipped)
+      // (6) nada más movido (baseline PRE-tanda)
+      // Null-safe como las demás: un frame `ausente` (la mesa se acabó, C-0.5) no
+      // trae zona, y `worstOf` ya sabe saltarse lo que venga en null.
+      const dZoneTop = worstOf(s => s.zone ? s.zone.top - pre.zoneTop : null)
+      const dZoneH = worstOf(s => s.zone ? s.zone.h - pre.zoneH : null)
+      const dBar = worstOf(s => s.relBar ? s.relBar.dy - pre.barDy : null)
+      const dLeftX = worstOf(s => s.relLeft ? s.relLeft.dx - pre.leftDx : null)
+      const dLeftY = worstOf(s => s.relLeft ? s.relLeft.dy - pre.leftDy : null)
+      const dCenterY = worstOf(s => s.relCenter ? s.relCenter.dy - pre.centerDy : null)
+      // los botones van centrados por el grid: se exige simetría, no una x fija
+      const dCenterSym = worstOf(s => s.relCenter ? s.relCenter.dx + s.relCenter.dr : null)
+      const dRightR = worstOf(s => s.relRight ? s.relRight.dr - pre.rightDr : null)
+      const dRightY = worstOf(s => s.relRight ? s.relRight.dy - pre.rightDy : null)
+      // Timer · el criterio es de pertenencia al juego de renglones medido en HEAD
+      // (ver A1_PRE.timerDys): cada frame con timer debe caer en uno de ellos. Así
+      // queda auditado en TODAS las fases —apuesta y descarte— en vez de en el
+      // frame que toque muestrear. Se exige además que nunca salga de su columna,
+      // cuya caja A1 prueba inmóvil por separado (dCenterY / dCenterSym).
+      const timerDys = [...new Set(states.filter(s => s.relTimer).map(s => s.relTimer.dy))].sort((a, b) => a - b)
+      const dTimerY = { max: round(Math.max(0, ...timerDys.map(y => Math.min(...pre.timerDys.map(p => Math.abs(y - p)))))), tag: 'set' }
+      const timerInsideCenter = states.every(s => !s.relTimer || !s.relCenter ||
+        (s.relTimer.dy >= s.relCenter.dy - 0.5 && s.relTimer.dx >= s.relCenter.dx - 0.5))
+      const sawTimer = states.some(s => s.relTimer)
+      const untouched = [dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY].every(d => d.max <= 0.5) && timerInsideCenter && sawTimer
+      const overflowOk = every(s => s.overflow === 0)
+
+      // (5b) peor caso de contenido: la reserva debe alojarlo SIN recorte. Se inyecta
+      // con innerHTML porque el marcado real lleva <strong> (ver A1_WORST_TAG); con
+      // textContent se medían 2,67px de menos y la reserva parecía sobrada.
+      const worstCase = await page.evaluate((html) => {
+        const t = document.querySelector('.player-zone .score-tag-player')
+        if (!t) return null
+        const prev = t.innerHTML, prevVis = t.style.visibility
+        t.innerHTML = html; t.style.visibility = 'visible'
+        const b = t.getBoundingClientRect()
+        const rnd = x => Math.round(x * 100) / 100
+        const el = document.elementFromPoint(Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2))
+        const r = {
+          html, boxW: rnd(b.width), contentW: t.scrollWidth, clipped: t.scrollWidth > t.clientWidth + 0.5,
+          onTop: !!el && (el === t || t.contains(el)),
         }
-        await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Apostar")')
-        await clickIf(page, 'button:has-text("Sin descartar")')
+        t.innerHTML = prev; t.style.visibility = prevVis
+        return r
+      }, A1_WORST_TAG)
+      const worstOk = !!worstCase && !worstCase.clipped && worstCase.onTop
+
+      // (7) guardia de deriva de los tokens primitivos
+      const tokensOk = Math.abs(tok.zonePadTop - tok.livePadTop) <= 0.01 &&
+        Math.abs(tok.zonePadLeft - tok.livePadLeft) <= 0.01 &&
+        Math.abs(tok.rowPadTop - tok.liveRowPadTop) <= 0.01 &&
+        Math.abs(tok.liveRowGap - 8) <= 0.01 &&
+        tok.justify === 'flex-start' && tok.zonePosition === 'relative' &&
+        Math.abs(tok.rowWResolved - (tok.cardW * 6 + 76)) <= 0.5
+
+      // ARN-3b · D4 (A-7) · la línea «Tu mejor palo» solo vive si el humano LLEGA
+      // al pago con puntaje. Si en tres manos no llegó, el caso no se dio: es un
+      // hueco de cobertura, no un rojo de la línea. Su ciclo se sigue exigiendo
+      // cuando sí se dio.
+      const cubierta = tagFrames.length > 0
+      // D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+      const sinFantasma = juego.fantasmas.length === 0
+      const passed = originConst && gapsOk && slotCardShared && deckOk && sawPie && sawNoPie &&
+        flowWrapOk && (tagCycleOk || !cubierta) && tagFits && worstOk &&
+        untouched && overflowOk && tokensOk && sinFantasma
+
+      const celda = {
+        estado: estadoCelda({ cubierta }),
+        motivoCobertura: cubierta ? null : 'la línea «Tu mejor palo» no llegó a verse (el humano no llegó al pago con puntaje)',
+        juego: resumenJuego(juego), sinFantasma,
+        table: n, vp, pre, tokens: tok, a2: live, frames: states.length,
+        // Frames que no se pudieron medir porque la mesa ya no estaba (C-0.5).
+        framesAusentes: states.filter(s => s.ausente).length, mesaSeAcabo,
+        origin: { x: base.card1.x, y: base.card1.y, dX: dOriginX, dY: dOriginY, originConst },
+        gaps: { left: round(base.card1.left - base.deck.right), top: round(base.card1.top - base.zone.top), dGapLeft, dGapTop, gapsOk },
+        slotCard: { dSlotCardX, dSlotCardY, slotCardShared },
+        deck: { x: base.deck.x, y: base.deck.y, deckExpX, dDeckX, dDeckY, deckOk, sawPie, sawNoPie, flowWrapOk },
+        tag: { frames: tagFrames.length, sample: tagFrames[0]?.tagText ?? null, tagCycleOk, tagFits, worstCase, worstOk },
+        untouchedDeltas: { dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY, timerDys, timerInsideCenter, sawTimer, untouched },
+        overflowOk, tokensOk, passed,
       }
-      if (mesaSeAcabo || !closed || !await clickIf(page, 'button:has-text("Siguiente mano")')) break
-      await page.waitForTimeout(1500); await page.mouse.move(5, 5)
-      states.push({ tag: `h${hand}-post`, ...(await a1Snap(page)) })
-      if (states[states.length - 1].ausente) mesaSeAcabo = true
-    }
-
-    const worstOf = (get) => {
-      let max = 0, who = null
-      for (const s of states) { const v = get(s); if (v == null) continue; if (Math.abs(v) > max) { max = Math.abs(v); who = s.tag } }
-      return { max: round(max), tag: who }
-    }
-    const every = (fn) => states.every(s => fn(s) !== false)
-
-    // (1) origen del abanico CONSTANTE en todos los frames (Δ=0)
-    const base = states[0]
-    const dOriginX = worstOf(s => s.card1 ? s.card1.x - base.card1.x : null)
-    const dOriginY = worstOf(s => s.card1 ? s.card1.y - base.card1.y : null)
-    const originConst = dOriginX.max < 0.5 && dOriginY.max < 0.5
-    // (2) huecos = tokens. DSK-A2 re-expresa el horizontal contra la PILA VISIBLE:
-    //     con el abanico centrado, el hueco contra el borde de la reserva del
-    //     wrapper deja de ser --dsk-fan-gap-left (se le suman los dos dx), pero el
-    //     que se ve —pila → carta 1— vale el token exacto por construcción de C6.
-    const dGapLeft = worstOf(s => (s.card1 && s.deck) ? (s.card1.left - s.deck.right) - tok.gapLeft : null)
-    const dGapTop = worstOf(s => (s.card1 && s.zone) ? (s.card1.top - s.zone.top) - tok.gapTop : null)
-    const gapsOk = dGapLeft.max <= 0.5 && dGapTop.max <= 0.5
-    // (3) slot y carta comparten anclaje
-    const dSlotCardX = worstOf(s => s.card1Inner ? s.card1Inner.x - s.card1.x : null)
-    const dSlotCardY = worstOf(s => s.card1Inner ? s.card1Inner.y - s.card1.y : null)
-    const slotCardShared = dSlotCardX.max <= 0.5 && dSlotCardY.max <= 0.5
-    // (4) mazo en coordenadas M1 exactas + el dx de A2 (leído vivo), con y sin PIE
-    const deckExpX = round(pre.deck.x + (live.deckDx ?? 0))
-    const dDeckX = worstOf(s => s.deck ? s.deck.x - deckExpX : null)
-    const dDeckY = worstOf(s => s.deck ? s.deck.y - pre.deck.y : null)
-    const deckOk = dDeckX.max <= 0.5 && dDeckY.max <= 0.5
-    const sawPie = states.some(s => s.isPie), sawNoPie = states.some(s => s.isPie === false)
-    const flowWrapOk = every(s => !s.flowWrap || (Math.abs(s.flowWrap.w - pre.wrapW) <= 0.5 && s.flowWrap.h === states[0].flowWrap.h))
-    // (5) la línea: aquí quedan sólo su CICLO y su ENCAJE. DSK-A2 la mudó de la
-    //     banda superior izquierda a debajo de las cartas, así que los checks de
-    //     SITIO (tagNoCollision contra la carta 1, dTagDx/dTagDy contra el rincón
-    //     de A1, y el apilamiento del peor caso) ya no describen nada: viven ahora
-    //     en el modo a2, contra su casa nueva. Lo que no cambió —y por eso sigue
-    //     aquí— es que sólo aparece en la fase de pago y que su reserva la aloja.
-    const tagFrames = states.filter(s => s.tagVis === 'visible' && s.tagText)
-    const tagCycleOk = tagFrames.length > 0 && states.some(s => s.tagVis === 'hidden')
-    const tagFits = tagFrames.every(s => !s.tagClipped)
-    // (6) nada más movido (baseline PRE-tanda)
-    // Null-safe como las demás: un frame `ausente` (la mesa se acabó, C-0.5) no
-    // trae zona, y `worstOf` ya sabe saltarse lo que venga en null.
-    const dZoneTop = worstOf(s => s.zone ? s.zone.top - pre.zoneTop : null)
-    const dZoneH = worstOf(s => s.zone ? s.zone.h - pre.zoneH : null)
-    const dBar = worstOf(s => s.relBar ? s.relBar.dy - pre.barDy : null)
-    const dLeftX = worstOf(s => s.relLeft ? s.relLeft.dx - pre.leftDx : null)
-    const dLeftY = worstOf(s => s.relLeft ? s.relLeft.dy - pre.leftDy : null)
-    const dCenterY = worstOf(s => s.relCenter ? s.relCenter.dy - pre.centerDy : null)
-    // los botones van centrados por el grid: se exige simetría, no una x fija
-    const dCenterSym = worstOf(s => s.relCenter ? s.relCenter.dx + s.relCenter.dr : null)
-    const dRightR = worstOf(s => s.relRight ? s.relRight.dr - pre.rightDr : null)
-    const dRightY = worstOf(s => s.relRight ? s.relRight.dy - pre.rightDy : null)
-    // Timer · el criterio es de pertenencia al juego de renglones medido en HEAD
-    // (ver A1_PRE.timerDys): cada frame con timer debe caer en uno de ellos. Así
-    // queda auditado en TODAS las fases —apuesta y descarte— en vez de en el
-    // frame que toque muestrear. Se exige además que nunca salga de su columna,
-    // cuya caja A1 prueba inmóvil por separado (dCenterY / dCenterSym).
-    const timerDys = [...new Set(states.filter(s => s.relTimer).map(s => s.relTimer.dy))].sort((a, b) => a - b)
-    const dTimerY = { max: round(Math.max(0, ...timerDys.map(y => Math.min(...pre.timerDys.map(p => Math.abs(y - p)))))), tag: 'set' }
-    const timerInsideCenter = states.every(s => !s.relTimer || !s.relCenter ||
-      (s.relTimer.dy >= s.relCenter.dy - 0.5 && s.relTimer.dx >= s.relCenter.dx - 0.5))
-    const sawTimer = states.some(s => s.relTimer)
-    const untouched = [dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY].every(d => d.max <= 0.5) && timerInsideCenter && sawTimer
-    const overflowOk = every(s => s.overflow === 0)
-
-    // (5b) peor caso de contenido: la reserva debe alojarlo SIN recorte. Se inyecta
-    // con innerHTML porque el marcado real lleva <strong> (ver A1_WORST_TAG); con
-    // textContent se medían 2,67px de menos y la reserva parecía sobrada.
-    const worstCase = await page.evaluate((html) => {
-      const t = document.querySelector('.player-zone .score-tag-player')
-      if (!t) return null
-      const prev = t.innerHTML, prevVis = t.style.visibility
-      t.innerHTML = html; t.style.visibility = 'visible'
-      const b = t.getBoundingClientRect()
-      const rnd = x => Math.round(x * 100) / 100
-      const el = document.elementFromPoint(Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2))
-      const r = {
-        html, boxW: rnd(b.width), contentW: t.scrollWidth, clipped: t.scrollWidth > t.clientWidth + 0.5,
-        onTop: !!el && (el === t || t.contains(el)),
-      }
-      t.innerHTML = prev; t.style.visibility = prevVis
-      return r
-    }, A1_WORST_TAG)
-    const worstOk = !!worstCase && !worstCase.clipped && worstCase.onTop
-
-    // (7) guardia de deriva de los tokens primitivos
-    const tokensOk = Math.abs(tok.zonePadTop - tok.livePadTop) <= 0.01 &&
-      Math.abs(tok.zonePadLeft - tok.livePadLeft) <= 0.01 &&
-      Math.abs(tok.rowPadTop - tok.liveRowPadTop) <= 0.01 &&
-      Math.abs(tok.liveRowGap - 8) <= 0.01 &&
-      tok.justify === 'flex-start' && tok.zonePosition === 'relative' &&
-      Math.abs(tok.rowWResolved - (tok.cardW * 6 + 76)) <= 0.5
-
-    const passed = originConst && gapsOk && slotCardShared && deckOk && sawPie && sawNoPie &&
-      flowWrapOk && tagCycleOk && tagFits && worstOk &&
-      untouched && overflowOk && tokensOk
-
-    out.push({
-      table: n, vp, pre, tokens: tok, a2: live, frames: states.length,
-      // Frames que no se pudieron medir porque la mesa ya no estaba (C-0.5).
-      framesAusentes: states.filter(s => s.ausente).length, mesaSeAcabo,
-      origin: { x: base.card1.x, y: base.card1.y, dX: dOriginX, dY: dOriginY, originConst },
-      gaps: { left: round(base.card1.left - base.deck.right), top: round(base.card1.top - base.zone.top), dGapLeft, dGapTop, gapsOk },
-      slotCard: { dSlotCardX, dSlotCardY, slotCardShared },
-      deck: { x: base.deck.x, y: base.deck.y, deckExpX, dDeckX, dDeckY, deckOk, sawPie, sawNoPie, flowWrapOk },
-      tag: { frames: tagFrames.length, sample: tagFrames[0]?.tagText ?? null, tagCycleOk, tagFits, worstCase, worstOk },
-      untouchedDeltas: { dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY, timerDys, timerInsideCenter, sawTimer, untouched },
-      overflowOk, tokensOk, passed,
-    })
-    console.log(`T${n} ${vp.w}x${vp.h} origen (${base.card1.x},${base.card1.y}) Δ=${Math.max(dOriginX.max, dOriginY.max)} · gaps pila→c1=${round(base.card1.left - base.deck.right)}/${tok.gapLeft} T=${round(base.card1.top - base.zone.top)}/${tok.gapTop} · mazo (${base.deck.x},${base.deck.y}) esp ${deckExpX} Δ=${Math.max(dDeckX.max, dDeckY.max)} · línea ${tagFrames.length}f fit=${tagFits} peor=${worstCase?.contentW}/${live.bandW} · resto Δ=${Math.max(...[dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY].map(d => d.max))}${mesaSeAcabo ? ` · mesa acabada (${states.filter(s => s.ausente).length} frame(s) sin medir)` : ''} · ${passed ? 'OK' : 'FAIL'}`)
-    await page.close()
+      console.log(`T${n} ${vp.w}x${vp.h} origen (${base.card1.x},${base.card1.y}) Δ=${Math.max(dOriginX.max, dOriginY.max)} · gaps pila→c1=${round(base.card1.left - base.deck.right)}/${tok.gapLeft} T=${round(base.card1.top - base.zone.top)}/${tok.gapTop} · mazo (${base.deck.x},${base.deck.y}) esp ${deckExpX} Δ=${Math.max(dDeckX.max, dDeckY.max)} · línea ${tagFrames.length}f fit=${tagFits} peor=${worstCase?.contentW}/${live.bandW} · resto Δ=${Math.max(...[dZoneTop, dZoneH, dBar, dLeftX, dLeftY, dCenterY, dCenterSym, dRightR, dRightY, dTimerY].map(d => d.max))}${mesaSeAcabo ? ' · mesa acabada' : ''}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'FAIL'}`)
+      await page.close()
+      return celda
+    }, `a1 T${n} ${vp.w}x${vp.h}`))
   }
   return out
 }
@@ -5166,16 +5249,19 @@ async function runF1(browser) {
 
     // Ciclo: hasta 4 manos, muestreando y parando a SELECCIONAR en cuanto se
     // abre la fase de descarte (el peor caso vertical de la tanda).
-    const states = [{ tag: 'reposo', ...(await f1Snap(page)) }]
+    const todos = [{ tag: 'reposo', ...(await f1Snap(page)) }]
     let selFrame = null
+    // ARN-3b · con el bucle común (D2): ahora contesta la recarga (el punto
+    // ciego gemelo de B5: el botón «Siguiente mano» no se monta mientras la
+    // pregunta está pendiente) y pulsa Retirarse/All-in cuando la pila no llega.
+    const juego = nuevoJuego()
+    const muestrear = async (tag) => { const s = { tag, ...(await f1Snap(page)) }; todos.push(s); return s }
     // DSK-W1 · bitácora del ciclo. Un modo que no alcanza su estado exigido tiene
     // que poder decir POR QUÉ: cuántas manos jugó, si llegó a ver la fase, y si se
     // quedó sin mesa (bancarrota / fin de partida) antes que sin iteraciones.
     const ciclo = { manos: 0, vioDescarte: 0, cerradas: 0, gameOver: false, bancarrota: false, sinCerrar: false }
     for (let hand = 0; hand < F1_MANOS && !selFrame; hand++) {
       ciclo.manos++
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      let closed = false
       // DSK-W1 · captura de la fase de descarte, invocable DOS veces por
       // iteración. Es la corrección de fondo de esta tanda: el clic de apuesta
       // cierra BET_2 y el motor abre DISCARD EN EL ACTO, así que el
@@ -5191,30 +5277,24 @@ async function runF1(browser) {
         // selecciona TODAS las clicables: el peor caso es cualquiera de ellas
         await page.evaluate(() => [...document.querySelectorAll('.player-zone .playing-card.card-clickable')].forEach(el => el.click()))
         await page.waitForTimeout(350); await page.mouse.move(5, 5)
-        selFrame = { tag, ...(await f1Snap(page)) }
-        states.push(selFrame)
+        selFrame = marcarReducida(juego, { tag, ...(await f1Snap(page)) })
+        todos.push(selFrame)
       }
-      for (let i = 0; i < 340; i++) {
-        await page.waitForTimeout(230); await page.mouse.move(5, 5)
-        if (i % 2 === 0) states.push({ tag: `h${hand}t${i}`, ...(await f1Snap(page)) })
-        await capturarDescarte(`h${hand}-sel`)
-        if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
-          states.push({ tag: `h${hand}t${i}f`, ...(await f1Snap(page)) }); closed = true; break
-        }
-        const aposto = await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Apostar")')
+      const r = await jugarMano(page, juego, {
+        mano: hand, muestrear,
+        trasMuestra: () => capturarDescarte(`h${hand}-sel`),
         // RECHEQUEO · mirar aquí, no en el siguiente tick, es lo que hace
         // determinista el selReached.
-        if (aposto) { await page.waitForTimeout(120); await capturarDescarte(`h${hand}-selr`) }
-        await clickIf(page, 'button:has-text("Sin descartar")')
-      }
+        trasAccion: async (i, accion) => { if (accion) { await page.waitForTimeout(120); await capturarDescarte(`h${hand}-selr`) } },
+      })
+      const closed = r.cerrada
       if (closed) ciclo.cerradas++; else ciclo.sinCerrar = true
       ciclo.gameOver = ciclo.gameOver || await page.locator('.game-over-screen').isVisible().catch(() => false)
       ciclo.bancarrota = ciclo.bancarrota || await page.locator('.bankrupt-overlay').isVisible().catch(() => false)
-      if (!closed || !await clickIf(page, 'button:has-text("Siguiente mano")')) break
-      await page.waitForTimeout(1500); await page.mouse.move(5, 5)
+      if (!closed || !await siguienteMano(page, juego)) break
     }
+    // D3 · lo medido en una mesa reducida se cuenta aparte
+    const states = separarReducida(todos).medidos
 
     const base = states[0]
     const worstOf = (get) => {
@@ -5281,11 +5361,14 @@ async function runF1(browser) {
     const overflowOk = states.every(s => s.overflow === 0)
     const untouched = [dDeckX, dDeckY, dOriginX, dOriginY, dZoneTop, dZoneH, dBar].every(d => d.max <= 0.5)
 
+    // D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+    const sinFantasma = juego.fantasmas.length === 0
     const passed = sizeOk && ratioOk && artOk && cardIsSlot && sizeConst && floorOk && airOk &&
       selReached && selInsideArea && selClearsOval && untouched && overflowOk &&
-      tok.cardBox === 'border-box' && tok.slotAlign === 'flex-start'
+      tok.cardBox === 'border-box' && tok.slotAlign === 'flex-start' && sinFantasma
 
     out.push({
+      juego: resumenJuego(juego), sinFantasma,
       table: n, vp, tokens: tok, a2: live, frames: states.length,
       size: { w: base.slot1.w, h: base.slot1.h, expectedW, horizBound, vertBound, floorW, bound, rise, reserveH: base.reserveH, sizeOk, ratioOk, floorOk, floor, preW, preOk },
       art: { sample: base.art ?? artFrames[0]?.art ?? null, artWasteW, artWasteH, artOk },
@@ -5295,7 +5378,7 @@ async function runF1(browser) {
       intacto: { deckExpX, dDeckX, dDeckY, dOriginX, dOriginY, dZoneTop, dZoneH, dBar, overflowOk, untouched },
       passed,
     })
-    console.log(`T${n} ${vp.w}x${vp.h} carta ${base.slot1.w}x${base.slot1.h} (esp ${expectedW}, pre-A2 ${preW}, manda ${bound}) · arte waste ${artWasteW}/${artWasteH} · aire x=${airXMin}/${airXExp} y=${airYMin}/${tok.airY} · SEL tope vs área=${selTopVsZone} vs óvalo=${selTopVsOval} (${ciclo.manos}m/${ciclo.cerradas}c/desc ${ciclo.vioDescarte}${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) · mazo Δ=${Math.max(dDeckX.max, dDeckY.max)} origen Δ=${Math.max(dOriginX.max, dOriginY.max)} área Δ=${Math.max(dZoneTop.max, dZoneH.max, dBar.max)} · ${passed ? 'OK' : 'FAIL'}`)
+    console.log(`T${n} ${vp.w}x${vp.h} carta ${base.slot1.w}x${base.slot1.h} (esp ${expectedW}, pre-A2 ${preW}, manda ${bound}) · arte waste ${artWasteW}/${artWasteH} · aire x=${airXMin}/${airXExp} y=${airYMin}/${tok.airY} · SEL tope vs área=${selTopVsZone} vs óvalo=${selTopVsOval} (${ciclo.manos}m/${ciclo.cerradas}c/desc ${ciclo.vioDescarte}${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) · mazo Δ=${Math.max(dDeckX.max, dDeckY.max)} origen Δ=${Math.max(dOriginX.max, dOriginY.max)} área Δ=${Math.max(dZoneTop.max, dZoneH.max, dBar.max)}${notaJuego(juego)} · ${passed ? 'OK' : 'FAIL'}`)
     await page.close()
   }
   return out
@@ -5413,20 +5496,19 @@ async function runZ1(browser) {
     const tok = await page.evaluate(() => window.__z1tokens())
 
     // showdown con cartas de cara (reintenta manos)
+    // ARN-3b · H-4 · con el bucle común (D2). El bucle viejo daba por llegado el
+    // pago sin contestar la recarga, y la tarjeta se abre SOLA a los 5 s: caía
+    // encima de la mesa a mitad del sondeo de cartas y el sobrevuelo no escalaba
+    // (escala=1 en T5 1280×720, Fase 0 §A2). Ahora la mano solo cierra con
+    // «Siguiente mano» montado, que es lo mismo que la pregunta ya contestada.
+    const juego = nuevoJuego()
     let hasFace = false
     for (let att = 0; att < 6 && !hasFace; att++) {
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      for (let i = 0; i < 200; i++) {
-        await page.waitForTimeout(240); await page.mouse.move(5, 5)
-        if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) break
-        await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Apostar")')
-        await clickIf(page, 'button:has-text("Sin descartar")')
-      }
+      const r = await jugarMano(page, juego, { mano: att, tick: 240, max: 200, cada: 0 })
+      if (juego.ausente) break
       await page.mouse.move(5, 5); await page.waitForTimeout(500)
       hasFace = (await page.evaluate(() => window.__z1cards())).length > 0
-      if (!hasFace) { await clickIf(page, 'button:has-text("Siguiente mano")'); await page.waitForTimeout(1200) }
+      if (!hasFace && (!r.cerrada || !await siguienteMano(page, juego, { espera: 1200 }))) break
     }
 
     const cards = await page.evaluate(() => window.__z1cards())
@@ -5436,6 +5518,16 @@ async function runZ1(browser) {
       const rest = await page.evaluate(([s, i]) => window.__z1measure(s, i), [c.seat, c.idx])
       const anchorsRest = await page.evaluate(() => window.__z1anchors())
       if (!rest) continue
+      // ARN-3b · H-4 · qué hay ENCIMA del centro de la carta antes del
+      // sobrevuelo. Si no es la propia carta (un velo, una tarjeta), una escala
+      // 1 no es un rojo del sobrevuelo: el ratón nunca llegó a ella. Se dice.
+      const encima = await page.evaluate(([s, i, x, y]) => {
+        const sl = window.__z1slot(s, i)
+        const el = document.elementFromPoint(x, y)
+        if (!el) return 'nada'
+        if (sl && (el === sl || sl.contains(el))) return null
+        return (el.closest('[data-accion]')?.dataset.accion) || el.className?.toString().split(' ')[0] || el.tagName
+      }, [c.seat, c.idx, Math.round((rest.box.left + rest.box.right) / 2), Math.round((rest.box.top + rest.box.bottom) / 2)])
       // hover REAL sobre el centro de la carta
       await page.mouse.move(Math.round((rest.box.left + rest.box.right) / 2), Math.round((rest.box.top + rest.box.bottom) / 2))
       await page.waitForTimeout(260)   // 130ms de transición + margen
@@ -5464,6 +5556,7 @@ async function runZ1(browser) {
       const nameOk = hov.hitName !== false
       const zOk = Number(hov.zIndex) === tok.slotZ
       checks.push({
+        ...(encima ? { encima } : {}),
         seat: c.seat, idx: c.idx, rest: rest.box, hover: hov.box, scaleW, scaleH, scaleOk,
         anchors: anch, anchorDrift, anchorOk, insidePerim, noHuman, nameHit: hov.hitName, nameOk,
         zIndex: hov.zIndex, panelZ: hov.panelZ, zOk, delta,
@@ -5501,10 +5594,18 @@ async function runZ1(browser) {
     }
     await page.close()
 
-    const passed = cards.length > 0 && checks.every(c => c.ok) && (!choreo || (choreo.completed && choreo.hoverSuppressed))
-    out.push({ table: n, vp, tokens: tok, cards: cards.length, checks, choreo, passed })
+    // ARN-3b · D4 · si en seis manos ninguna llegó al pago con cartas de cara,
+    // el caso no se dio: «sin cobertura», no rojo. D8: el fantasma sí es rojo.
+    const cubierta = cards.length > 0
+    const sinFantasma = juego.fantasmas.length === 0
+    const passed = checks.every(c => c.ok) && (!choreo || (choreo.completed && choreo.hoverSuppressed)) && sinFantasma
+    out.push({
+      estado: estadoCelda({ cubierta }), motivoCobertura: cubierta ? null : 'ninguna mano llegó al pago con cartas de cara',
+      juego: resumenJuego(juego), sinFantasma,
+      table: n, vp, tokens: tok, cards: cards.length, checks, choreo, passed,
+    })
     const bad = checks.filter(c => !c.ok)
-    console.log(`T${n} ${vp.w}x${vp.h} · cartas=${cards.length} · escala=${[...new Set(checks.map(c => c.scaleW))].join('/')} (tok ${tok.scale}) · ancla Δmáx=${round(Math.max(0, ...checks.map(c => c.anchorDrift)))} · resto Δmáx=${round(Math.max(0, ...checks.map(c => c.delta.max)))} · nombre ok=${checks.every(c => c.nameOk)} · coreo=${choreo ? (choreo.completed ? 'completa' : 'ROTA') + '/' + (choreo.hoverSuppressed ? 'suprimido' : 'NO-SUPR') : 'n/a'} · ${passed ? 'OK' : 'FAIL' + (bad.length ? ' [' + bad.slice(0, 2).map(b => `${b.seat}#${b.idx}`).join(',') + ']' : '')}`)
+    console.log(`T${n} ${vp.w}x${vp.h} · cartas=${cards.length} · escala=${[...new Set(checks.map(c => c.scaleW))].join('/')} (tok ${tok.scale}) · ancla Δmáx=${round(Math.max(0, ...checks.map(c => c.anchorDrift)))} · resto Δmáx=${round(Math.max(0, ...checks.map(c => c.delta.max)))} · nombre ok=${checks.every(c => c.nameOk)} · coreo=${choreo ? (choreo.completed ? 'completa' : 'ROTA') + '/' + (choreo.hoverSuppressed ? 'suprimido' : 'NO-SUPR') : 'n/a'}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'FAIL' + (bad.length ? ' [' + bad.slice(0, 2).map(b => `${b.seat}#${b.idx}${b.encima ? ' bajo ' + b.encima : ''}`).join(',') + ']' : '')}`)
   }
   return out
 }
@@ -5832,6 +5933,21 @@ const A2_VIEWPORTS = [...VIEWPORTS, { w: 1440, h: 850 }]
 const A2_WORST_TAG = A1_WORST_TAG          // misma línea, mismo marcado real
 
 // Muestreador de vuelos por rAF: duran 595/750ms y el polling de 230ms los pierde.
+//
+// ARN-3b-ii · D2 (H3b-1) · LA REGLA DE LOS VUELOS TIENE ALCANCE. La puerta (11)
+// existía para proteger la banda «Tu mejor palo», y la banda solo vive en el
+// pago. La reposición del descarte nace en el mazo del Pie con el tamaño de la
+// ranura de destino (GameTable.jsx:1321-1335) y cuelga 23 px (1024/1280/1366) o
+// 29 px (1440/1920) por debajo de la fila; con la banda oculta eso cae sobre
+// tapete liso (ARN-3b-ii §1: 16 vistas, rejilla 5×3 y capturas, nada pintado).
+// Así que la regla se parte en dos, y se lee POR FOTOGRAMA:
+//   · banda — en los fotogramas con la banda VISIBLE, ninguna carta en vuelo
+//     dentro de la zona baja del tope de la banda;
+//   · zona  — en TODOS los fotogramas, ninguna carta en vuelo que toque la zona
+//     del humano sale de ella por abajo ni por los lados. El borde de arriba no
+//     cuenta: el reparto y los descartes de los rivales entran por ahí.
+// Cuando una de las dos cae, `peorBanda`/`peorZona` dicen qué carta (clase,
+// estilo, caja, origen y destino) y en qué fotograma (D6 de ARN-3b-ii).
 async function a2InstallFlights(page) {
   await page.evaluate(() => {
     window.__paint = (el) => {
@@ -5846,17 +5962,52 @@ async function a2InstallFlights(page) {
       const b = rg.getBoundingClientRect()
       return b.height ? { top: rnd(b.top), left: rnd(b.left), right: rnd(b.right), src: 'text' } : null
     }
-    window.__flights = { samples: 0, inZone: 0, maxBottomInZone: -1e9 }
+    window.__flights = {
+      samples: 0, inZone: 0, maxBottomInZone: -1e9,
+      banda: { frames: 0, peorExceso: null, peor: null },
+      zona: { peorFuera: 0, peor: null },
+    }
+    const rnd = x => Math.round(x * 100) / 100
+    const ficha = (f, b, extra) => {
+      const st = f.getAttribute('style') || ''
+      const m = st.match(/translate\(\s*(-?[\d.]+)px,\s*(-?[\d.]+)px\)/)
+      const left = parseFloat(f.style.left), top = parseFloat(f.style.top)
+      return {
+        ...extra, frame: window.__flights.samples, t: Math.round(performance.now()),
+        cls: f.className, style: st,
+        caja: { left: rnd(b.left), top: rnd(b.top), right: rnd(b.right), bottom: rnd(b.bottom) },
+        origen: { left: rnd(left), top: rnd(top) },
+        destino: m ? { left: rnd(left + Number(m[1])), top: rnd(top + Number(m[2])) } : null,
+      }
+    }
     const tick = () => {
       const fs = document.querySelectorAll('.flying-card')
       const zone = document.querySelector('.player-zone')
       if (fs.length && zone) {
         const z = zone.getBoundingClientRect(); window.__flights.samples++
+        const tag = document.querySelector('.player-zone .score-tag-player')
+        const bandaViva = !!tag && getComputedStyle(tag).visibility === 'visible'
+        const bandaTop = tag ? tag.getBoundingClientRect().top : null
+        if (bandaViva) window.__flights.banda.frames++
         for (const f of fs) {
           const b = f.getBoundingClientRect()
           if (b.bottom > z.top && b.top < z.bottom && b.right > z.left && b.left < z.right) {
             window.__flights.inZone++
             window.__flights.maxBottomInZone = Math.max(window.__flights.maxBottomInZone, b.bottom)
+            // banda · solo con la banda VISIBLE en este fotograma
+            if (bandaViva) {
+              const exceso = b.bottom - bandaTop
+              if (window.__flights.banda.peorExceso == null || exceso > window.__flights.banda.peorExceso) {
+                window.__flights.banda.peorExceso = rnd(exceso)
+                window.__flights.banda.peor = ficha(f, b, { bandaTop: rnd(bandaTop) })
+              }
+            }
+            // zona · en todos los fotogramas: abajo y a los lados
+            const fuera = Math.max(b.bottom - z.bottom, z.left - b.left, b.right - z.right)
+            if (fuera > window.__flights.zona.peorFuera) {
+              window.__flights.zona.peorFuera = rnd(fuera)
+              window.__flights.zona.peor = ficha(f, b, { zona: { left: rnd(z.left), right: rnd(z.right), bottom: rnd(z.bottom) } })
+            }
           }
         }
       }
@@ -5961,178 +6112,191 @@ async function runA2(browser) {
   for (const n of A2_TABLES) for (const vp of A2_VIEWPORTS) {
     if (tblFilter && n !== tblFilter) continue
     if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
-    const key = `${vp.w}x${vp.h}`
-    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
-    await gotoMesa(page, n); await installProbes(page); await a2InstallFlights(page)
-    await page.waitForTimeout(300); await page.mouse.move(5, 5)
-    const live = await a2Live(page)
-    const preW = F1_A2[key]?.[n] ?? null
+    out.push(await conCobertura(async () => {
+      const key = `${vp.w}x${vp.h}`
+      const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+      await gotoMesa(page, n); await installProbes(page); await a2InstallFlights(page)
+      await page.waitForTimeout(300); await page.mouse.move(5, 5)
+      const live = await a2Live(page)
+      const preW = F1_A2[key]?.[n] ?? null
 
-    // Manos completas: cubren reposo, barajado, reparto, apuesta (con la fila de
-    // multiplicadores, que es el techo del carril), descarte con selección, y pago
-    // —el único estado donde la banda está viva—. El ciclo NO se corta en la 1ª:
-    // el respiro pila→carta 1 se exige CON y SIN Pie, y el Pie rota +1 por mano
-    // (en mesa 5 el humano puede no serlo hasta la 3ª). Se para en cuanto la
-    // cobertura está completa, para no pagar manos de más.
-    // DSK-W1 · el techo sube de 3 a A2_MANOS por la receta H2: la banda sólo vive
-    // si el humano LLEGA AL SHOWDOWN con puntaje (`human.score`), y eso no pasa
-    // todas las manos. Con 3 manos la cobertura quedaba al azar de cómo cayera el
-    // juego; el ciclo sigue parando en cuanto está cubierta, así que el caso
-    // normal no paga ni una mano más.
-    const states = [{ tag: 'reposo', ...(await a2Snap(page)) }]
-    const covered = () => states.some(s => s.isPie) && states.some(s => s.isPie === false) &&
-      states.some(s => s.tagVis === 'visible')
-    const ciclo = { manos: 0, cerradas: 0, gameOver: false, bancarrota: false, sinCerrar: false }
-    for (let hand = 0; hand < A2_MANOS && !covered(); hand++) {
-      ciclo.manos++
-      await clickIf(page, 'button:has-text("Iniciar mano")')
-      let closed = false
-      for (let i = 0; i < 240; i++) {
-        await page.waitForTimeout(230); await page.mouse.move(5, 5)
-        if (await contestarRecarga(page)) { await page.waitForTimeout(260); continue }
-        states.push({ tag: `h${hand}t${i}`, ...(await a2Snap(page)) })
-        if (await page.locator('button:has-text("Siguiente mano")').isVisible().catch(() => false)) {
-          states.push({ tag: `h${hand}-pago`, ...(await a2Snap(page)) }); closed = true; break
-        }
-        const aposto = await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-          await clickIf(page, '.action-buttons button:has-text("Apostar")')
-        // DSK-W1 · RECHEQUEO, hermano del de f1: el clic de apuesta cierra BET_2
-        // y DISCARD se abre en el acto, así que el `kind` muestreado ANTES de
-        // apostar ya no describe la fase viva. Se vuelve a mirar aquí en vez de
-        // esperar al siguiente tick, que es donde el ciclo perdía la fase.
-        let ult = states[states.length - 1]
-        if (aposto) {
-          await page.waitForTimeout(120)
-          ult = { tag: `h${hand}t${i}r`, ...(await a2Snap(page)) }
-          states.push(ult)
-        }
-        if (ult.kind.includes('discard')) {
-          await page.evaluate(() => { const c = document.querySelector('.player-zone .playing-card.card-clickable'); if (c) c.click() })
-          await page.waitForTimeout(250)
-          states.push({ tag: `h${hand}-sel`, ...(await a2Snap(page)) })
-          await clickIf(page, 'button:has-text("Sin descartar")') || await clickIf(page, '.discard-area .btn')
-        }
+      // Manos completas: cubren reposo, barajado, reparto, apuesta (con la fila de
+      // multiplicadores, que es el techo del carril), descarte con selección, y pago
+      // —el único estado donde la banda está viva—. El ciclo NO se corta en la 1ª:
+      // el respiro pila→carta 1 se exige CON y SIN Pie, y el Pie rota +1 por mano
+      // (en mesa 5 el humano puede no serlo hasta la 3ª). Se para en cuanto la
+      // cobertura está completa, para no pagar manos de más.
+      // DSK-W1 · el techo sube de 3 a A2_MANOS por la receta H2: la banda sólo vive
+      // si el humano LLEGA AL SHOWDOWN con puntaje (`human.score`), y eso no pasa
+      // todas las manos. Con 3 manos la cobertura quedaba al azar de cómo cayera el
+      // juego; el ciclo sigue parando en cuanto está cubierta, así que el caso
+      // normal no paga ni una mano más.
+      const todos = [{ tag: 'reposo', ...(await a2Snap(page)) }]
+      // ARN-3b · con el bucle común (D2): contesta la recarga, pulsa
+      // Retirarse/All-in cuando la pila no llega y, si una mano no cierra, dice
+      // por qué (D5: el `SINCERRAR` de T4 ya no sale mudo). La mesa reducida se
+      // cuenta aparte (D3).
+      const juego = nuevoJuego()
+      const muestrear = async (tag) => { const s = marcarReducida(juego, { tag, ...(await a2Snap(page)) }); todos.push(s); return s }
+      const medidos = () => separarReducida(todos).medidos
+      const covered = () => medidos().some(s => s.isPie) && medidos().some(s => s.isPie === false) &&
+        medidos().some(s => s.tagVis === 'visible')
+      const ciclo = { manos: 0, cerradas: 0, gameOver: false, bancarrota: false, sinCerrar: false }
+      for (let hand = 0; hand < A2_MANOS && !covered(); hand++) {
+        ciclo.manos++
+        const r = await jugarMano(page, juego, {
+          mano: hand, max: 240, cada: 1, muestrear, finTag: () => `h${hand}-pago`,
+          // DSK-W1 · RECHEQUEO, hermano del de f1: el clic de apuesta cierra BET_2
+          // y DISCARD se abre en el acto, así que el `kind` muestreado ANTES de
+          // apostar ya no describe la fase viva. Se vuelve a mirar aquí en vez de
+          // esperar al siguiente tick, que es donde el ciclo perdía la fase.
+          trasAccion: async (i, accion) => {
+            let ult = todos[todos.length - 1]
+            if (accion) {
+              await page.waitForTimeout(120)
+              ult = await muestrear(`h${hand}t${i}r`)
+            }
+            if (ult.kind.includes('discard')) {
+              await page.evaluate(() => { const c = document.querySelector('.player-zone .playing-card.card-clickable'); if (c) c.click() })
+              await page.waitForTimeout(250)
+              await muestrear(`h${hand}-sel`)
+              await clickIf(page, 'button:has-text("Sin descartar")') || await clickIf(page, '.discard-area .btn')
+            }
+          },
+        })
+        const closed = r.cerrada
+        if (closed) ciclo.cerradas++; else ciclo.sinCerrar = true
+        ciclo.gameOver = ciclo.gameOver || await page.locator('.game-over-screen').isVisible().catch(() => false)
+        ciclo.bancarrota = ciclo.bancarrota || await page.locator('.bankrupt-overlay').isVisible().catch(() => false)
+        if (!closed || covered()) break
+        if (!await siguienteMano(page, juego)) break
+        await muestrear(`h${hand}-post`)
       }
-      if (closed) ciclo.cerradas++; else ciclo.sinCerrar = true
-      ciclo.gameOver = ciclo.gameOver || await page.locator('.game-over-screen').isVisible().catch(() => false)
-      ciclo.bancarrota = ciclo.bancarrota || await page.locator('.bankrupt-overlay').isVisible().catch(() => false)
-      if (!closed || covered()) break
-      if (!await clickIf(page, 'button:has-text("Siguiente mano")')) break
-      await page.waitForTimeout(1500); await page.mouse.move(5, 5)
-      states.push({ tag: `h${hand}-post`, ...(await a2Snap(page)) })
-    }
-    const flights = await page.evaluate(() => window.__flights)
-    const oof = await a2OutOfFlow(page, A2_WORST_TAG)
+      const states = medidos()
+      const flights = await page.evaluate(() => window.__flights)
+      const oof = await a2OutOfFlow(page, A2_WORST_TAG)
 
-    const F = states.filter(s => s.card1)
-    // Por PERTENENCIA, no por igualdad: el pago de APU-1 lleva dos botones.
-    const pago = F.filter(s => s.btn.split('|').includes('Siguiente mano'))
-    const apuesta = F.filter(s => s.kind.includes('action-col'))
-    const worstOf = (get) => {
-      let max = 0, who = null
-      for (const s of F) { const v = get(s); if (v == null) continue; if (Math.abs(v) > max) { max = Math.abs(v); who = s.tag } }
-      return { max: round(max), tag: who }
-    }
-    const base = F[0]
-    // (1) simetría
-    const dSim = worstOf(s => (s.simIzq != null && s.simDer != null) ? s.simIzq - s.simDer : null)
-    // (2) origen constante
-    const dOrigX = worstOf(s => s.card1.x - base.card1.x)
-    const dOrigY = worstOf(s => s.card1.y - base.card1.y)
-    // (3) piso: doble puerta
-    const dSizeW = worstOf(s => s.slotW - base.slotW)
-    // (4) respiro, con y sin PIE
-    const dResp = worstOf(s => s.respiro != null ? s.respiro - live.gapLeft : null)
-    const sawPie = F.some(s => s.isPie), sawNoPie = F.some(s => s.isPie === false)
-    // (5) aterrizaje
-    const pilaMin = round(Math.min(...F.filter(s => s.pilaFilo != null).map(s => s.pilaFilo)))
-    // (6) banda en su casa nueva (medida sobre los frames de PAGO, donde vive)
-    const bandFrames = F.filter(s => s.tagVis === 'visible')
-    const bandDyExp = round(live.airY + live.liveRowPadBottom + live.liveBarMarginTop)
-    const bandDy = bandFrames.length ? round(bandFrames[0].tagBox.top - bandFrames[0].cardsBottom) : null
-    // Sobrante de la reserva del mazo por debajo de las cartas más allá del propio
-    // --dsk-hand-air-y. Medido en el WRAPPER, no en la banda: 0 en las 16 celdas
-    // donde manda el techo de F1 y 5,33 / 20,84 en las 4 donde manda la pista
-    // (mesas 3/2 a 1440 y 1920), donde las cartas acaban más arriba y la línea se
-    // apoya en el filo de la barra. El eje vertical no admite --dsk-hand-w (lleva
-    // un 100% y en `top` los porcentajes resuelven contra el ALTO), así que el
-    // ancla del CSS es la reserva y la expectativa se deriva de ella.
-    const reserveVsCards = bandFrames.length
-      ? round(bandFrames[0].wrapBottom - bandFrames[0].cardsBottom - live.airY) : null
-    const bandClearPaint = bandFrames.length ? round(Math.min(...bandFrames.filter(s => s.paint).map(s => s.paint.top - s.tagBox.bottom))) : null
-    const bandNoClip = bandFrames.every(s => !s.tagClipped)
-    const bandCentered = bandFrames.every(s => Math.abs(s.tagCx) <= 0.5)
-    const bandNoBtn = bandFrames.every(s => s.olapBtns.length === 0)
-    const bandNoPaint = bandFrames.every(s => !s.olapPaint)
-    // (9) ciclo de visibility: viva SÓLO en pago
-    //
-    // APU-1 C-0.5 · EL PAGO YA NO TIENE UN SOLO BOTON. `s.btn` es la lista de
-    // rotulos del area de accion unidos por `|`, y esta comparacion pedia que
-    // fuera EXACTAMENTE «Siguiente mano». En el pago de APU-1 hay dos: el de
-    // seguir y el de la recarga voluntaria (`btn-recarga`, 1e-ii §5.2), asi que
-    // las veinte celdas daban FAIL sin que la banda se hubiera movido un pixel
-    // —todas sus demas medidas salen a 0,07 px o menos—. Lo que A2 quiere decir
-    // es que la banda vive SOLO en el pago, y eso se pregunta por PERTENENCIA:
-    // que «Siguiente mano» este entre los botones, no que sea el unico.
-    const enPago = (s) => s.btn.split('|').includes('Siguiente mano')
-    const visOnlyPayout = bandFrames.length > 0 && bandFrames.every(enPago) &&
-      F.some(s => s.tagVis === 'hidden')
-    // (10) guardia de la fase de apuesta: nunca visible sobre la fila de mults
-    const betGuardOk = apuesta.length > 0 && apuesta.every(s => s.tagVis === 'hidden')
-    // (11) vuelos por debajo de la banda
-    const flightOk = !flights.inZone || bandDy == null ||
-      flights.maxBottomInZone <= (bandFrames[0].tagBox.top + 0.5)
-    // (12) gemelo IA de mesa 2 intacto. NO se mide comparando frames entre sí: el
-    // showdown escala las cartas ganadoras de la IA y, al ser su fila centrada,
-    // recoloca a sus vecinos —incluido su mazo— con un efecto que es PREVIO a esta
-    // tanda (documentado en m1Snap). Lo que A2 tiene que demostrar es que no lo
-    // TOCA, así que se contrasta el frame en reposo contra la baseline de HEAD
-    // (M1_PRE.ai) y contra su propia simetría de bloque, que es el criterio que el
-    // rival ya implementaba: abanico y mazo centrados como un todo.
-    const aiBase = F[0].ai, aiPre = M1_PRE[key]?.ai
-    const aiSim = aiBase ? {
-      izq: round(aiBase.s0.left - aiBase.row.left),
-      der: round(aiBase.row.right - aiBase.wrap.right),
-      dPileX: round(aiBase.pile.x - (aiPre?.x ?? aiBase.pile.x)),
-      dPileY: round(aiBase.pile.y - (aiPre?.y ?? aiBase.pile.y)),
-    } : null
-    const dAi = aiSim ? { max: round(Math.max(Math.abs(aiSim.izq - aiSim.der), Math.abs(aiSim.dPileX), Math.abs(aiSim.dPileY))), tag: 'reposo' } : { max: 0, tag: null }
+      const F = states.filter(s => s.card1)
+      // Por PERTENENCIA, no por igualdad: el pago de APU-1 lleva dos botones.
+      const pago = F.filter(s => s.btn.split('|').includes('Siguiente mano'))
+      const apuesta = F.filter(s => s.kind.includes('action-col'))
+      const worstOf = (get) => {
+        let max = 0, who = null
+        for (const s of F) { const v = get(s); if (v == null) continue; if (Math.abs(v) > max) { max = Math.abs(v); who = s.tag } }
+        return { max: round(max), tag: who }
+      }
+      const base = F[0]
+      // (1) simetría
+      const dSim = worstOf(s => (s.simIzq != null && s.simDer != null) ? s.simIzq - s.simDer : null)
+      // (2) origen constante
+      const dOrigX = worstOf(s => s.card1.x - base.card1.x)
+      const dOrigY = worstOf(s => s.card1.y - base.card1.y)
+      // (3) piso: doble puerta
+      const dSizeW = worstOf(s => s.slotW - base.slotW)
+      // (4) respiro, con y sin PIE
+      const dResp = worstOf(s => s.respiro != null ? s.respiro - live.gapLeft : null)
+      const sawPie = F.some(s => s.isPie), sawNoPie = F.some(s => s.isPie === false)
+      // (5) aterrizaje
+      const pilaMin = round(Math.min(...F.filter(s => s.pilaFilo != null).map(s => s.pilaFilo)))
+      // (6) banda en su casa nueva (medida sobre los frames de PAGO, donde vive)
+      const bandFrames = F.filter(s => s.tagVis === 'visible')
+      const bandDyExp = round(live.airY + live.liveRowPadBottom + live.liveBarMarginTop)
+      const bandDy = bandFrames.length ? round(bandFrames[0].tagBox.top - bandFrames[0].cardsBottom) : null
+      // Sobrante de la reserva del mazo por debajo de las cartas más allá del propio
+      // --dsk-hand-air-y. Medido en el WRAPPER, no en la banda: 0 en las 16 celdas
+      // donde manda el techo de F1 y 5,33 / 20,84 en las 4 donde manda la pista
+      // (mesas 3/2 a 1440 y 1920), donde las cartas acaban más arriba y la línea se
+      // apoya en el filo de la barra. El eje vertical no admite --dsk-hand-w (lleva
+      // un 100% y en `top` los porcentajes resuelven contra el ALTO), así que el
+      // ancla del CSS es la reserva y la expectativa se deriva de ella.
+      const reserveVsCards = bandFrames.length
+        ? round(bandFrames[0].wrapBottom - bandFrames[0].cardsBottom - live.airY) : null
+      const bandClearPaint = bandFrames.length ? round(Math.min(...bandFrames.filter(s => s.paint).map(s => s.paint.top - s.tagBox.bottom))) : null
+      const bandNoClip = bandFrames.every(s => !s.tagClipped)
+      const bandCentered = bandFrames.every(s => Math.abs(s.tagCx) <= 0.5)
+      const bandNoBtn = bandFrames.every(s => s.olapBtns.length === 0)
+      const bandNoPaint = bandFrames.every(s => !s.olapPaint)
+      // (9) ciclo de visibility: viva SÓLO en pago
+      //
+      // APU-1 C-0.5 · EL PAGO YA NO TIENE UN SOLO BOTON. `s.btn` es la lista de
+      // rotulos del area de accion unidos por `|`, y esta comparacion pedia que
+      // fuera EXACTAMENTE «Siguiente mano». En el pago de APU-1 hay dos: el de
+      // seguir y el de la recarga voluntaria (`btn-recarga`, 1e-ii §5.2), asi que
+      // las veinte celdas daban FAIL sin que la banda se hubiera movido un pixel
+      // —todas sus demas medidas salen a 0,07 px o menos—. Lo que A2 quiere decir
+      // es que la banda vive SOLO en el pago, y eso se pregunta por PERTENENCIA:
+      // que «Siguiente mano» este entre los botones, no que sea el unico.
+      const enPago = (s) => s.btn.split('|').includes('Siguiente mano')
+      const visOnlyPayout = bandFrames.length > 0 && bandFrames.every(enPago) &&
+        F.some(s => s.tagVis === 'hidden')
+      // (10) guardia de la fase de apuesta: nunca visible sobre la fila de mults
+      const betGuardOk = apuesta.length > 0 && apuesta.every(s => s.tagVis === 'hidden')
+      // (11) vuelos · ARN-3b-ii D2: con alcance (ver a2InstallFlights). `banda`
+      // se lee solo en los fotogramas con la banda visible; `zona`, en todos.
+      const vuelosBanda = flights.banda.peorExceso == null || flights.banda.peorExceso <= 0.5
+      const vuelosZona = flights.zona.peorFuera <= 0.5
+      // (12) gemelo IA de mesa 2 intacto. NO se mide comparando frames entre sí: el
+      // showdown escala las cartas ganadoras de la IA y, al ser su fila centrada,
+      // recoloca a sus vecinos —incluido su mazo— con un efecto que es PREVIO a esta
+      // tanda (documentado en m1Snap). Lo que A2 tiene que demostrar es que no lo
+      // TOCA, así que se contrasta el frame en reposo contra la baseline de HEAD
+      // (M1_PRE.ai) y contra su propia simetría de bloque, que es el criterio que el
+      // rival ya implementaba: abanico y mazo centrados como un todo.
+      const aiBase = F[0].ai, aiPre = M1_PRE[key]?.ai
+      const aiSim = aiBase ? {
+        izq: round(aiBase.s0.left - aiBase.row.left),
+        der: round(aiBase.row.right - aiBase.wrap.right),
+        dPileX: round(aiBase.pile.x - (aiPre?.x ?? aiBase.pile.x)),
+        dPileY: round(aiBase.pile.y - (aiPre?.y ?? aiBase.pile.y)),
+      } : null
+      const dAi = aiSim ? { max: round(Math.max(Math.abs(aiSim.izq - aiSim.der), Math.abs(aiSim.dPileX), Math.abs(aiSim.dPileY))), tag: 'reposo' } : { max: 0, tag: null }
 
-    const checks = {
-      simetria: dSim.max <= 0.5,
-      origenConst: dOrigX.max < 0.5 && dOrigY.max < 0.5,
-      pisoF1: dSizeW.max < 0.5 && (preW == null || Math.abs(base.slotW - preW) <= 0.01),
-      respiro: dResp.max <= 0.5 && sawPie && sawNoPie,
-      aterrizaje: pilaMin >= 0,
-      bandaSitio: null,          // se calcula justo debajo (necesita el sobrante de la reserva)
-      bandaEncaje: bandNoClip && bandCentered,
-      bandaLibre: bandNoBtn && bandNoPaint && (bandClearPaint == null || bandClearPaint >= 0),
-      fueraDeFlujo: oof.dAnchors === 0 && oof.dSlots === 0 && oof.dScrollH === 0 && oof.dClientH === 0 && !oof.worstClipped,
-      overflow: F.every(s => s.ovX === 0 && s.ovY === 0),
-      cicloVisibility: visOnlyPayout,
-      guardiaApuesta: betGuardOk,
-      vuelos: flightOk,
-      gemeloIA: n !== 2 ? null : dAi.max <= 0.5,
-      primitivas: Math.abs(live.tokRowPadBottom - live.liveRowPadBottom) <= 0.01 &&
-        Math.abs(live.tokBarMarginTop - live.liveBarMarginTop) <= 0.01 && live.wrapPosition === 'relative',
-    }
-    checks.bandaSitio = bandFrames.length > 0 && Math.abs(bandDy - (bandDyExp + reserveVsCards)) <= 0.05
+      const checks = {
+        simetria: dSim.max <= 0.5,
+        origenConst: dOrigX.max < 0.5 && dOrigY.max < 0.5,
+        pisoF1: dSizeW.max < 0.5 && (preW == null || Math.abs(base.slotW - preW) <= 0.01),
+        respiro: dResp.max <= 0.5 && sawPie && sawNoPie,
+        aterrizaje: pilaMin >= 0,
+        bandaSitio: null,          // se calcula justo debajo (necesita el sobrante de la reserva)
+        bandaEncaje: bandNoClip && bandCentered,
+        bandaLibre: bandNoBtn && bandNoPaint && (bandClearPaint == null || bandClearPaint >= 0),
+        fueraDeFlujo: oof.dAnchors === 0 && oof.dSlots === 0 && oof.dScrollH === 0 && oof.dClientH === 0 && !oof.worstClipped,
+        overflow: F.every(s => s.ovX === 0 && s.ovY === 0),
+        cicloVisibility: visOnlyPayout,
+        guardiaApuesta: betGuardOk,
+        vuelosBanda, vuelosZona,
+        gemeloIA: n !== 2 ? null : dAi.max <= 0.5,
+        primitivas: Math.abs(live.tokRowPadBottom - live.liveRowPadBottom) <= 0.01 &&
+          Math.abs(live.tokBarMarginTop - live.liveBarMarginTop) <= 0.01 && live.wrapPosition === 'relative',
+      }
+      checks.bandaSitio = bandFrames.length > 0 && Math.abs(bandDy - (bandDyExp + reserveVsCards)) <= 0.05
+      // ARN-3b · D4 · la banda solo vive si el humano llega al pago con puntaje.
+      // Si no llegó en ninguna mano, su sitio y su ciclo no se pudieron medir: es
+      // un hueco de cobertura (se reintenta con otra mano), no un rojo de la banda.
+      const cubierta = bandFrames.length > 0
+      if (!cubierta) { checks.bandaSitio = null; checks.cicloVisibility = null }
+      // D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+      checks.turnoFantasma = juego.fantasmas.length === 0
 
-    const passed = Object.values(checks).every(v => v === true || v === null)
-    out.push({
-      table: n, vp, live, preW, frames: F.length,
-      simetria: { izq: base.simIzq, der: base.simDer, dSim },
-      origen: { x: base.card1.x, y: base.card1.y, dOrigX, dOrigY },
-      piso: { w: base.slotW, preW, dSizeW },
-      mazo: { respiro: base.respiro, dResp, pilaMin, sawPie, sawNoPie },
-      banda: { frames: bandFrames.length, dy: bandDy, dyExp: bandDyExp, reserveVsCards, clearPaint: bandClearPaint,
-        w: bandFrames[0]?.tagBox?.w ?? null, cx: bandFrames[0]?.tagCx ?? null, bandNoClip, bandCentered, bandNoBtn, bandNoPaint },
-      fueraDeFlujo: oof, vuelos: { ...flights, bandTop: bandFrames[0]?.tagBox?.top ?? null },
-      gemeloIA: { ...dAi, ...aiSim, pre: aiPre }, ciclo, checks, passed,
-    })
-    console.log(`T${n} ${vp.w}x${vp.h} · sim ${base.simIzq}/${base.simDer} Δ=${dSim.max} · carta ${base.slotW}/${preW} · respiro ${base.respiro}/${live.gapLeft} pila@${pilaMin} · banda ${bandFrames.length}f (${ciclo.manos}m/${ciclo.cerradas}c${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) dy=${bandDy} (exp ${bandDyExp}${reserveVsCards ? ` +${reserveVsCards} de reserva` : ''}) w=${bandFrames[0]?.tagBox?.w}/${live.bandW} aire↓=${bandClearPaint} · flujo Δ=${oof.dAnchors}/${oof.dSlots}/${oof.dScrollH} · vuelo ${round(flights.maxBottomInZone)}≤${bandFrames[0]?.tagBox?.top} · IA Δ=${dAi.max} · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
-    await page.close()
+      const passed = Object.values(checks).every(v => v === true || v === null)
+      const celda = {
+        estado: estadoCelda({ cubierta }),
+        motivoCobertura: cubierta ? null : 'la banda «Tu mejor palo» no llegó a verse (el humano no llegó al pago con puntaje)',
+        juego: resumenJuego(juego),
+        table: n, vp, live, preW, frames: F.length,
+        simetria: { izq: base.simIzq, der: base.simDer, dSim },
+        origen: { x: base.card1.x, y: base.card1.y, dOrigX, dOrigY },
+        piso: { w: base.slotW, preW, dSizeW },
+        mazo: { respiro: base.respiro, dResp, pilaMin, sawPie, sawNoPie },
+        banda: { frames: bandFrames.length, dy: bandDy, dyExp: bandDyExp, reserveVsCards, clearPaint: bandClearPaint,
+          w: bandFrames[0]?.tagBox?.w ?? null, cx: bandFrames[0]?.tagCx ?? null, bandNoClip, bandCentered, bandNoBtn, bandNoPaint },
+        fueraDeFlujo: oof, vuelos: { ...flights, bandTop: bandFrames[0]?.tagBox?.top ?? null },
+        gemeloIA: { ...dAi, ...aiSim, pre: aiPre }, ciclo, checks, passed,
+      }
+      console.log(`T${n} ${vp.w}x${vp.h} · sim ${base.simIzq}/${base.simDer} Δ=${dSim.max} · carta ${base.slotW}/${preW} · respiro ${base.respiro}/${live.gapLeft} pila@${pilaMin} · banda ${bandFrames.length}f (${ciclo.manos}m/${ciclo.cerradas}c${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) dy=${bandDy} (exp ${bandDyExp}${reserveVsCards ? ` +${reserveVsCards} de reserva` : ''}) w=${bandFrames[0]?.tagBox?.w}/${live.bandW} aire↓=${bandClearPaint} · flujo Δ=${oof.dAnchors}/${oof.dSlots}/${oof.dScrollH} · vuelo banda ${flights.banda.peorExceso ?? '—'} (${flights.banda.frames}f) zona ${flights.zona.peorFuera} · máx ${round(flights.maxBottomInZone)} · IA Δ=${dAi.max}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
+      await page.close()
+      return celda
+    }, `a2 T${n} ${vp.w}x${vp.h}`))
   }
   return out
 }
@@ -6469,28 +6633,29 @@ async function runU1(browser) {
 
     // (6) Estados calientes de la mano: apuesta (con fila de mults), descarte con
     //     selección y pago. En cada uno se abre el menú y se mide todo otra vez.
+    // ARN-3b · con el bucle común (D2): la mano ya está arrancada (la arrancó
+    // el clic que atravesó el menú), y las sondas de cada estado caliente son
+    // su gancho. Ahora contesta la recarga y pulsa Retirarse/All-in.
     const vistos = new Set()
-    for (let i = 0; i < 240; i++) {
-      await page.waitForTimeout(230); await page.mouse.move(5, 5)
-      const st = await page.evaluate(() => ({
-        bet: !!document.querySelector('.action-buttons .btn'),
-        discard: !!document.querySelector('.discard-area .btn'),
-        pago: !!document.querySelector('.action-area .btn-primary') &&
-          /Siguiente mano/.test(document.querySelector('.action-area .btn-primary').textContent || ''),
-      }))
-      if (st.bet && !vistos.has('apuesta')) { vistos.add('apuesta'); probes.push(await u1Probe(page, 'apuesta')) }
-      if (st.discard && !vistos.has('descarte')) {
-        vistos.add('descarte')
-        await page.evaluate(() => { const c = document.querySelector('.player-zone .playing-card.card-clickable'); if (c) c.click() })
-        await page.waitForTimeout(200)
-        probes.push(await u1Probe(page, 'descarte-sel'))
-      }
-      if (st.pago) { vistos.add('pago'); probes.push(await u1Probe(page, 'pago')); break }
-      await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-        await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-        await clickIf(page, '.action-buttons button:has-text("Apostar")')
-      await clickIf(page, 'button:has-text("Sin descartar")') || await clickIf(page, '.discard-area .btn')
-    }
+    const juego = nuevoJuego()
+    const rU1 = await jugarMano(page, juego, {
+      mano: 0, max: 240, cada: 0, iniciar: false,
+      trasMuestra: async () => {
+        const st = await page.evaluate(() => ({
+          bet: !!document.querySelector('.action-buttons .btn'),
+          discard: !!document.querySelector('.discard-area .btn'),
+        }))
+        if (st.bet && !vistos.has('apuesta')) { vistos.add('apuesta'); probes.push(await u1Probe(page, 'apuesta')) }
+        if (st.discard && !vistos.has('descarte')) {
+          vistos.add('descarte')
+          await page.evaluate(() => { const c = document.querySelector('.player-zone .playing-card.card-clickable'); if (c) c.click() })
+          await page.waitForTimeout(200)
+          probes.push(await u1Probe(page, 'descarte-sel'))
+        }
+      },
+      descarte: async () => { await clickIf(page, 'button:has-text("Sin descartar")') || await clickIf(page, '.discard-area .btn') },
+    })
+    if (rU1.cerrada) { vistos.add('pago'); probes.push(await u1Probe(page, 'pago')) }
 
     // (7) z REAL contra los dos techos vivos: panel revelado (7) y sobrevuelo Z1
     //     (9). Mesa 2 no revela → queda null, no falso verde.
@@ -6613,6 +6778,8 @@ async function runU1(browser) {
       popupClicFuera: trasClicDentro.popup === true && trasClicFuera.popup === true &&
         trasClicFuera.menu === false,
     }
+    // ARN-3b · D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+    checks.turnoFantasma = juego.fantasmas.length === 0
     const passed = Object.values(checks).every(v => v === true || v === null)
     cells.push({
       table: n, vp, caja: { got: caja, exp: { t: expT, hr: expHR, x: expX }, d: dCaja, dMax: dCajaMax },
@@ -6621,7 +6788,7 @@ async function runU1(browser) {
       dims, titles,
       badge: { press, vivo14, muerto26, menuTrasAuto, trasClicDentro, trasClicFuera },
       cierre: { esc: checks.cierreEsc, clicFuera: cerradoClicFuera, ejecutar: trasEjecutar.open === false, ...clicPasaAlBoton },
-      guardHits, checks, passed,
+      guardHits, checks, passed, juego: resumenJuego(juego),
     })
     console.log(`T${n} ${key} · caja Δ=${dCajaMax} (${caja.glyph}) · flujo Δ=${dFlujo.max}/${dVuelta.max} · panel ${probes[0].panel.w}×${probes[0].panel.h} (esp ${dims?.expW}×${dims?.expH}) filas ${dims?.itemW[0]}×${dims?.itemH[0]} sep ${dims?.sep}+${dims?.hairline} · badge "${press.badgeTxt}"/ls ${press.ls} popup ${press.popup?.rect.w}×${press.popup?.rect.h} z${press.popup?.z} auto ${vivo14}→${muerto26} menú ${press.menuOpen}/${trasClicDentro.menu}/${trasClicFuera.menu} · z ${panelZ}>${zTecho} (${probes.find(p => p.maxZ.max === zTecho)?.maxZ.who})${zReal?.z1Vivo ? ` · Z1 vivo slot ${zReal.z1Vivo.slotZ}/panel ${zReal.z1Vivo.panelZ1} techo ${zReal.z1Vivo.maxZ.max} wins=${zReal.z1Vivo.wins}` : ''} wins=${probes.every(p => p.wins)} · cierre esc/fuera/exec/pasa ${checks.cierreEsc}/${cerradoClicFuera}/${trasEjecutar.open === false}/${clicPasaAlBoton.cerrado && clicPasaAlBoton.arrancada} · guardia ${guardHits.length} · ${probes.length}f · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
     await page.close()
@@ -10934,6 +11101,11 @@ function tapLinea(id, banda, disco, ok) {
 }
 
 async function runTapetes(browser) {
+  // ARN-3b · D7 · nombre y precio del diálogo de compra, por la misma función
+  // que usa el panel para pintarlo. Dinámico: `tapetesCore` importa sin
+  // extensión y el gancho de `_resolveExt` solo alcanza a lo que se carga
+  // después de registrarlo.
+  const { textoCompra } = await import('../src/hooks/tapetesCore.js')
   const celdas = []
   const capturas = []
 
@@ -11067,6 +11239,8 @@ async function runTapetes(browser) {
       attr: document.body.dataset.tapete ?? null,
       dialogo: !!document.querySelector('.tap-dialogo'),
       txt: document.querySelector('.tap-dialogo-txt') ? document.querySelector('.tap-dialogo-txt').textContent.trim() : null,
+      // ARN-3b · D7 · el nombre va en su <strong>: se lee por estructura.
+      nombre: document.querySelector('.tap-dialogo-txt strong')?.textContent.trim() ?? null,
       activoPanel: document.querySelector('.tapetes-panel').dataset.activo,
       ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
     }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
@@ -11141,13 +11315,21 @@ async function runTapetes(browser) {
       estadosFrio: frio.estados[0] === 'activo' && frio.estados.slice(1).every(e => e === 'no-comprado'),
       // Copy y montos SALEN de la fuente única: si alguien los escribiera a
       // mano en el JSX, esta puerta es la que discrepa.
+      // ARN-3b · D7 (H-3) · y el ARNÉS también los lee de ahí, sin literales:
+      // comparaba contra «N fichas» escrito a mano y el producto dice solo el
+      // número desde REN-1b (e4f8f6f). La baldosa es `montoTexto(precio)`.
       preciosDeLaFuente: frio.precios.length === TAP_VARIANTES.length &&
-        TAP_VARIANTES.every(id => frio.precios.includes(
-          montoTexto(TAPETES.find(t => t.id === id).precio) + ' fichas')),
+        TAP_VARIANTES.every(id => frio.precios.includes(montoTexto(textoCompra(id).precio))),
       previaAplica: previa.attr === 'tricolor' && previa.dialogo === true &&
         previa.activoPanel === TAPETE_POR_DEFECTO,
       previaNoPersiste: previa.ls === null && previa.lsc === null,
-      dialogoDiceLoQueDebe: previa.txt === '¿Comprar Tricolor por ' + montoTexto(50000) + ' fichas?',
+      // D7 · nombre y monto, de `textoCompra` (la misma función que pinta el
+      // diálogo): el nombre en su <strong> y el monto formateado en la frase.
+      // El marco de la frase («¿Comprar … por … Heptacoins?») no tiene fuente
+      // única —vive escrito en TapetesPanel.jsx:115— y por eso no se compara
+      // aquí contra ningún literal (hallazgo de ARN-3b, no se arregla).
+      dialogoDiceLoQueDebe: previa.nombre === textoCompra('tricolor').nombre &&
+        (previa.txt ?? '').includes(montoTexto(textoCompra('tricolor').precio)),
       noRevierte: trasNo.attr === TAPETE_POR_DEFECTO && trasNo.dialogo === false &&
         trasNo.ls === null && trasNo.lsc === null,
       cerrarPanelRevierte: previaAzul === 'azul' && trasEsc.attr === TAPETE_POR_DEFECTO &&
@@ -11349,58 +11531,62 @@ async function runVuelo(browser) {
       // Descarta de verdad (hasta 3 cartas). Sin eso el humano no gana una mano
       // en mesa 5 auto-jugando — es el mismo hallazgo que acotó la sub-pasada
       // jugada del modo `vc` a la mesa de 2.
+      // ARN-3b · H-13 · con el bucle común (D2). El humano abortaba en la 7.ª u
+      // 8.ª mano con «3 manos sin cerrar»: el bucle no contestaba la recarga
+      // (que desmonta «Siguiente mano» mientras está pendiente) ni la fila de
+      // All-in/Retirarse. Ahora las contesta y, si una mano no cierra, dice por
+      // qué (D5).
+      const juego = nuevoJuego()
+      // Descarta de verdad (hasta 3 cartas): sin eso el humano no gana una mano
+      // en mesa 5 auto-jugando.
+      const descartarHasta3 = async () => {
+        const hayDescarte = await page.locator('.action-area button:has-text("Sin descartar")').first().isVisible().catch(() => false)
+        if (!hayDescarte) return
+        const cartas = page.locator('.card-clickable')
+        const n = Math.min(3, await cartas.count())
+        for (let k = 0; k < n; k++) await cartas.nth(k).click({ timeout: 1200 }).catch(() => {})
+        await vcEspera(page, 80)
+        if (!await clickIf(page, '.action-area button:has-text("Descartar")')) {
+          await clickIf(page, '.action-area button:has-text("Sin descartar")')
+        }
+      }
       let fin = null, manos = 0, fallos = 0
       for (let mano = 1; mano <= esc.maxManos && fin !== esc.quien; mano++) {
         manos = mano
         await page.evaluate(() => window.__vuReset && window.__vuReset())
-        await clickIf(page, 'button:has-text("Iniciar mano")')
         fin = null
         // MEDIDO: una mano de mesa 5 con cuatro IAs dura ~55 s de reloj. Con un
         // presupuesto de 300 vueltas (~42 s de esperas) el bucle se rendía justo
         // ANTES del final, y entonces el reintento buscaba el botón de una mano
         // todavía en curso y daba la mesa por abortada en la primera mano.
-        for (let i = 0; i < 700 && !fin; i++) {
-          await vcEspera(page, 140)
-          const acabo = await page.locator('button:has-text("Siguiente mano")').first().isVisible().catch(() => false)
-          if (acabo) {
-            fin = await page.evaluate(() => {
-              const m = document.querySelector('.game-message')
-              if (!m) return 'fin'
-              return m.classList.contains('msg-win') ? 'win' : (m.classList.contains('msg-lose') ? 'lose' : 'fin')
-            })
-            break
-          }
-          await page.mouse.move(2, 2)
-          const hayDescarte = await page.locator('.action-area button:has-text("Sin descartar")').first().isVisible().catch(() => false)
-          if (hayDescarte) {
-            const cartas = page.locator('.card-clickable')
-            const n = Math.min(3, await cartas.count())
-            for (let k = 0; k < n; k++) await cartas.nth(k).click({ timeout: 1200 }).catch(() => {})
-            await vcEspera(page, 80)
-            if (!await clickIf(page, '.action-area button:has-text("Descartar")')) {
-              await clickIf(page, '.action-area button:has-text("Sin descartar")')
-            }
-            continue
-          }
-          await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
-            await clickIf(page, '.action-buttons button:has-text("Igualar")') ||
-            await clickIf(page, '.action-buttons button:has-text("Apostar")')
+        const r = await jugarMano(page, juego, {
+          mano, tick: 140, max: 700, cada: 0, esperar: (ms) => vcEspera(page, ms), descarte: descartarHasta3,
+        })
+        if (r.cerrada) {
+          fin = await page.evaluate(() => {
+            const m = document.querySelector('.game-message')
+            if (!m) return 'fin'
+            return m.classList.contains('msg-win') ? 'win' : (m.classList.contains('msg-lose') ? 'lose' : 'fin')
+          })
         }
         if (fin === esc.quien) break
+        if (juego.ausente) { c.abortadaEn = `mano ${mano}: la mesa se acabó`; break }
         // "Siguiente mano" con reintento: el botón puede tardar en montarse
         // (limpieza, ceremonia de eliminación), y rendirse al primer intento
-        // abortaba la búsqueda entera tras 3 manos — medido.
+        // abortaba la búsqueda entera tras 3 manos — medido. La recarga se
+        // contesta también aquí: es lo que desmonta el botón.
         let siguio = false
         for (let k = 0; k < 40 && !siguio; k++) {
           siguio = await clickIf(page, 'button:has-text("Siguiente mano")')
-          if (!siguio) await vcEspera(page, 500)
+          if (!siguio) { await contestarRecargaComun(page); await vcEspera(page, 500) }
         }
         // No se aborta al primer tropiezo: se cuentan. Una mano que no cierra es
         // ruido del muestreador; tres seguidas ya son una mesa que no avanza.
         fallos = siguio ? 0 : fallos + 1
-        if (fallos >= 3) { c.abortadaEn = `mano ${mano}: 3 manos sin cerrar`; break }
+        if (fallos >= 3) { c.abortadaEn = `mano ${mano}: 3 manos sin cerrar (${juego.sinCerrar.slice(-3).map(x => x.causa).join(', ') || 'cerraron, pero «Siguiente mano» no se pudo pulsar'})`; break }
         await vcEspera(page, 400)
       }
+      c.juego = resumenJuego(juego)
       c.manos = manos
       c.alcanzado = fin === esc.quien
       // Esperar AL HECHO, no al reloj: que la capa haya nacido y vuelto a morir.
@@ -11489,6 +11675,8 @@ async function runVuelo(browser) {
         pozoSeVaciaAlSalirLaPrimera: potAntes !== null && potAntes !== '0' && potDurante === '0',
         sinCelebracionEnIA: esc.id === 'humano' ? true : (!v.overlay && !v.pulso),
         saldoSubeAlFinal: esc.id === 'humano' ? subeAlFinal === true : true,
+        // ARN-3b · D8 · el turno fantasma es una invariante: si se rompe, es rojo.
+        turnoFantasma: juego.fantasmas.length === 0,
       }
       c.checks = checks
       c.detalle = { iMax, ladoVuelo, destino, dx: dx === null ? null : round(dx), dy: dy === null ? null : round(dy),
@@ -13005,90 +13193,104 @@ async function recReloj(browser, solo) {
   ].filter((c) => !solo || c.id === solo)
   const out = {}
   for (const c of casos) {
-    const vp = REC_VPS[c.vp]
-    const { ctx, page, consola } = await recPagina(browser, vp)
-    const r = { id: c.id, vp: { w: vp.w, h: vp.h }, mesa: 5 }
-    const tira = []
-    let grabar = false, parar = false
-    const tirador = c.tira ? (async () => {
-      while (!parar) {
-        if (!grabar) { await recDuerme(40); continue }
-        const t = Date.now()
-        try {
-          const n = String(tira.length).padStart(3, '0')
-          await page.screenshot({ path: `${REC_OUT}/tira/${c.id}_${n}.jpg`, type: 'jpeg', quality: 55 })
-          tira.push({ t, archivo: `tira/${c.id}_${n}.jpg` })
-        } catch { /* cambio de página */ }
-        const resto = 250 - (Date.now() - t)
-        if (resto > 0) await recDuerme(resto)
+    // ARN-3b · D4 (H-4) · la puerta 7 necesita una IA NO ganadora con sus
+    // cartas tapadas en el pago. Si en esa mano todas se retiraron, el caso no
+    // se dio: se repite la celda con otra mano, hasta tres veces, y si aun así
+    // no se da sale «sin cobertura», no rojo. Ningún molde de `src/dev/` lo
+    // fuerza sin cambiar el escenario que miden las puertas 3–6.
+    for (let intento = 1; ; intento++) {
+      const vp = REC_VPS[c.vp]
+      const { ctx, page, consola } = await recPagina(browser, vp)
+      const r = { id: c.id, vp: { w: vp.w, h: vp.h }, mesa: 5 }
+      const tira = []
+      let grabar = false, parar = false
+      const tirador = c.tira ? (async () => {
+        while (!parar) {
+          if (!grabar) { await recDuerme(40); continue }
+          const t = Date.now()
+          try {
+            const n = String(tira.length).padStart(3, '0')
+            await page.screenshot({ path: `${REC_OUT}/tira/${c.id}_${n}.jpg`, type: 'jpeg', quality: 55 })
+            tira.push({ t, archivo: `tira/${c.id}_${n}.jpg` })
+          } catch { /* cambio de página */ }
+          const resto = 250 - (Date.now() - t)
+          if (resto > 0) await recDuerme(resto)
+        }
+      })() : null
+      try {
+        r.caza = await recCazar(page, 5, c.molde, c.busca)
+        if (!r.caza) throw new Error(`sin ${c.busca}`)
+        grabar = true
+        await page.waitForSelector('[data-accion="recarga-burbuja"]', { timeout: 9000 })
+        // Puerta 7 · con la burbuja: sin overlay en el DOM y un nombre que se destapa.
+        await recDuerme(350)
+        r.veloConBurbuja = await page.evaluate(() => document.querySelectorAll('.bankrupt-overlay').length)
+        r.redAlAparecer = await page.evaluate(() => document.querySelector('.game-table')?.dataset.recRed === '1')
+        if (c.busca === 'forzosa') r.destapa = await recDestapa(page)
+        await recDuerme(1200)
+        grabar = false
+        // Puerta 4 · abrir con N en la burbuja.
+        await recEsperaSeg(page, () => { const b = document.querySelector('[data-accion="recarga-burbuja"]'); return b && Number(b.dataset.seg) <= 12 ? true : null })
+        const antes = await page.evaluate(REC_SEG)
+        await page.click('[data-accion="recarga-burbuja"]')
+        await page.waitForSelector('[data-accion="recarga-plazo"]', { timeout: 3000 })
+        const abierta = await page.evaluate(REC_SEG)
+        await recDuerme(700)
+        r.fotoAbierta = await recFoto(page, `reloj_abierta_${c.id}`)
+        const antesPlegar = await page.evaluate(REC_SEG)
+        await page.click('[data-accion="recarga-ver-mesa"]')
+        await page.waitForSelector('[data-accion="recarga-burbuja"]', { timeout: 3000 })
+        const plegada = await page.evaluate(REC_SEG)
+        r.continuidad = { antes, abierta, antesPlegar, plegada }
+        r.p4 = antes.forma === 'burbuja' && abierta.forma === 'tarjeta' && Math.abs(abierta.seg - antes.seg) <= 1
+          && abierta.verMesa === true && plegada.forma === 'burbuja' && Math.abs(plegada.seg - antesPlegar.seg) <= 1
+        // Puerta 5 · a 5 s, sin tocar nada.
+        const a5 = await recEsperaSeg(page, () => {
+          const p = document.querySelector('[data-accion="recarga-plazo"]')
+          const m = p?.textContent.match(/(\d+)\s*s/)
+          return m && Number(m[1]) <= 5 ? { seg: Number(m[1]), verMesa: !!document.querySelector('[data-accion="recarga-ver-mesa"]'), burbuja: !!document.querySelector('[data-accion="recarga-burbuja"]') } : null
+        }, 15000)
+        await recDuerme(500)
+        r.fotoUltimos5 = await recFoto(page, `ultimos5_${c.id}`)
+        r.apertura = a5
+        r.p5 = !!a5 && a5.seg === 5 && !a5.verMesa && !a5.burbuja
+        // Puerta 6 · vence.
+        const fin = await recEsperaSeg(page, (busca) => {
+          const g = document.querySelector('.game-table')
+          if (busca === 'forzosa') return !g ? 'fuera' : null
+          return [...document.querySelectorAll('.btn')].some((b) => b.textContent.trim() === 'Siguiente mano') ? 'siguiente' : null
+        }, 9000, c.busca)
+        r.vence = fin
+        r.p6 = c.busca === 'forzosa' ? fin === 'fuera' : fin === 'siguiente'
+        await recDuerme(300)
+        r.fotoVence = await recFoto(page, `vence_${c.id}`)
+      } catch (e) {
+        r.error = String(e.message).split('\n')[0]
       }
-    })() : null
-    try {
-      r.caza = await recCazar(page, 5, c.molde, c.busca)
-      if (!r.caza) throw new Error(`sin ${c.busca}`)
-      grabar = true
-      await page.waitForSelector('[data-accion="recarga-burbuja"]', { timeout: 9000 })
-      // Puerta 7 · con la burbuja: sin overlay en el DOM y un nombre que se destapa.
-      await recDuerme(350)
-      r.veloConBurbuja = await page.evaluate(() => document.querySelectorAll('.bankrupt-overlay').length)
-      r.redAlAparecer = await page.evaluate(() => document.querySelector('.game-table')?.dataset.recRed === '1')
-      if (c.busca === 'forzosa') r.destapa = await recDestapa(page)
-      await recDuerme(1200)
-      grabar = false
-      // Puerta 4 · abrir con N en la burbuja.
-      await recEsperaSeg(page, () => { const b = document.querySelector('[data-accion="recarga-burbuja"]'); return b && Number(b.dataset.seg) <= 12 ? true : null })
-      const antes = await page.evaluate(REC_SEG)
-      await page.click('[data-accion="recarga-burbuja"]')
-      await page.waitForSelector('[data-accion="recarga-plazo"]', { timeout: 3000 })
-      const abierta = await page.evaluate(REC_SEG)
-      await recDuerme(700)
-      r.fotoAbierta = await recFoto(page, `reloj_abierta_${c.id}`)
-      const antesPlegar = await page.evaluate(REC_SEG)
-      await page.click('[data-accion="recarga-ver-mesa"]')
-      await page.waitForSelector('[data-accion="recarga-burbuja"]', { timeout: 3000 })
-      const plegada = await page.evaluate(REC_SEG)
-      r.continuidad = { antes, abierta, antesPlegar, plegada }
-      r.p4 = antes.forma === 'burbuja' && abierta.forma === 'tarjeta' && Math.abs(abierta.seg - antes.seg) <= 1
-        && abierta.verMesa === true && plegada.forma === 'burbuja' && Math.abs(plegada.seg - antesPlegar.seg) <= 1
-      // Puerta 5 · a 5 s, sin tocar nada.
-      const a5 = await recEsperaSeg(page, () => {
-        const p = document.querySelector('[data-accion="recarga-plazo"]')
-        const m = p?.textContent.match(/(\d+)\s*s/)
-        return m && Number(m[1]) <= 5 ? { seg: Number(m[1]), verMesa: !!document.querySelector('[data-accion="recarga-ver-mesa"]'), burbuja: !!document.querySelector('[data-accion="recarga-burbuja"]') } : null
-      }, 15000)
-      await recDuerme(500)
-      r.fotoUltimos5 = await recFoto(page, `ultimos5_${c.id}`)
-      r.apertura = a5
-      r.p5 = !!a5 && a5.seg === 5 && !a5.verMesa && !a5.burbuja
-      // Puerta 6 · vence.
-      const fin = await recEsperaSeg(page, (busca) => {
-        const g = document.querySelector('.game-table')
-        if (busca === 'forzosa') return !g ? 'fuera' : null
-        return [...document.querySelectorAll('.btn')].some((b) => b.textContent.trim() === 'Siguiente mano') ? 'siguiente' : null
-      }, 9000, c.busca)
-      r.vence = fin
-      r.p6 = c.busca === 'forzosa' ? fin === 'fuera' : fin === 'siguiente'
-      await recDuerme(300)
-      r.fotoVence = await recFoto(page, `vence_${c.id}`)
-    } catch (e) {
-      r.error = String(e.message).split('\n')[0]
+      parar = true
+      if (tirador) await tirador
+      const ev = await recEventos(page).catch(() => [])
+      const L = recLinea(ev)
+      r.linea = L
+      r.tira = tira.map((f) => ({ ms: Math.round(f.t - L.t0), archivo: f.archivo }))
+      // Puerta 3 · el primer 15 visible, contra el aterrizaje del vuelo y t0 + 3 s.
+      r.p3 = L.primer15 !== null && (L.aterriza === null
+        ? L.vueloSale === null
+        : L.primer15 >= L.aterriza && L.primer15 >= 3000)
+      // D4 · sin caso no es rojo ni verde: la mitad de la puerta que sí se midió
+      // (sin overlay con la burbuja) se sigue exigiendo.
+      r.sinCaso = c.busca === 'forzosa' && r.destapa?.caso === false
+      r.estado = estadoCelda({ cubierta: !r.sinCaso })
+      r.intentos = intento
+      r.p7 = r.veloConBurbuja === 0 && (c.busca !== 'forzosa' || r.sinCaso || r.destapa?.ok === true)
+      r.consola = consola
+      r.ok = !r.error && r.p3 && r.p4 && r.p5 && r.p6 && r.p7 && consola.length === 0
+      out[c.id] = r
+      console.log(`  rec · ${c.id.padEnd(16)} ${r.ok ? 'OK  ' : 'FALLA'} · p3 ${r.p3 ? '✓' : '✗'} (15 a +${L.primer15} ms, vuelo aterriza +${L.aterriza}${r.redAlAparecer ? ', RED' : ''}) · p4 ${r.p4 ? '✓' : '✗'} · p5 ${r.p5 ? '✓' : '✗'} · p6 ${r.p6 ? '✓' : '✗'} · p7 ${r.p7 ? '✓' : '✗'}${r.sinCaso ? ' (sin caso: ninguna IA no ganadora con cartas tapadas)' : ''}${r.error ? ' · ' + r.error : ''}`)
+      await ctx.close()
+      if (!reintentar(r.estado, intento)) break
+      console.log(`  ↻ rec · ${c.id}: sin cobertura en p7 · intento ${intento} de ${INTENTOS_COBERTURA}, otra mano`)
     }
-    parar = true
-    if (tirador) await tirador
-    const ev = await recEventos(page).catch(() => [])
-    const L = recLinea(ev)
-    r.linea = L
-    r.tira = tira.map((f) => ({ ms: Math.round(f.t - L.t0), archivo: f.archivo }))
-    // Puerta 3 · el primer 15 visible, contra el aterrizaje del vuelo y t0 + 3 s.
-    r.p3 = L.primer15 !== null && (L.aterriza === null
-      ? L.vueloSale === null
-      : L.primer15 >= L.aterriza && L.primer15 >= 3000)
-    r.p7 = r.veloConBurbuja === 0 && (c.busca !== 'forzosa' || r.destapa?.ok === true)
-    r.consola = consola
-    r.ok = !r.error && r.p3 && r.p4 && r.p5 && r.p6 && r.p7 && consola.length === 0
-    out[c.id] = r
-    console.log(`  rec · ${c.id.padEnd(16)} ${r.ok ? 'OK  ' : 'FALLA'} · p3 ${r.p3 ? '✓' : '✗'} (15 a +${L.primer15} ms, vuelo aterriza +${L.aterriza}${r.redAlAparecer ? ', RED' : ''}) · p4 ${r.p4 ? '✓' : '✗'} · p5 ${r.p5 ? '✓' : '✗'} · p6 ${r.p6 ? '✓' : '✗'} · p7 ${r.p7 ? '✓' : '✗'}${r.error ? ' · ' + r.error : ''}`)
-    await ctx.close()
   }
   return out
 }
@@ -13223,9 +13425,13 @@ async function runRec(browser) {
     anillo: c.some((x) => x.anillo) ? c.filter((x) => x.anillo).every((x) => x.anillo.ok) : null,
   }
   const verde = Object.values(puertas).every((v) => v !== false) && c.every((x) => x.ok) && r.every((x) => x.ok)
-  const resumen = `${verde ? 'VERDE' : 'ROJO'} · ` + Object.entries(puertas).map(([k, v]) => `${k} ${v == null ? '—' : v ? '✓' : '✗'}`).join(' · ')
+  // ARN-3b · D4 · los huecos de cobertura se declaran: el veredicto sale
+  // `cobertura` (código 1), no verde.
+  const sinCobertura = r.filter((x) => x.estado === 'sinCobertura').map((x) => `p7 ${x.id} (${x.intentos} intentos)`)
+  const resumen = `${verde ? (sinCobertura.length ? 'SIN COBERTURA' : 'VERDE') : 'ROJO'} · ` + Object.entries(puertas).map(([k, v]) => `${k} ${v == null ? '—' : v ? '✓' : '✗'}`).join(' · ') +
+    (sinCobertura.length ? ` · sin cobertura: ${sinCobertura.join(', ')}` : '')
   console.log(`── REC · ${resumen}`)
-  return { verde, puertas, resumen }
+  return { verde, puertas, resumen, sinCobertura }
 }
 
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
