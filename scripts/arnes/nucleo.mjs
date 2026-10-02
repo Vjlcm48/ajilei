@@ -37,14 +37,21 @@ export class ErrorInstrumento extends Error {
 
 /**
  * Junta los veredictos de los modos corridos. Cada uno es 'verde', 'rojo',
- * 'informativo' o 'error'. Un solo error manda (2); si no, un solo rojo (1);
- * si no, 0. Una lista VACÍA es un error: un arnés que no midió nada no puede
- * salir verde (D4 de la Fase 0: un skip silencioso no es un verde).
+ * 'cobertura', 'informativo' o 'error'. Un solo error manda (2); si no, un
+ * rojo o una cobertura (1); si no, 0. Una lista VACÍA es un error: un arnés que
+ * no midió nada no puede salir verde (D4 de la Fase 0: un skip silencioso no es
+ * un verde).
+ *
+ * ARN-3b · D4 · 'cobertura' es un modo con alguna celda «sin cobertura»: el
+ * caso que la celda mide no se dio en tres intentos. No es un rojo de puerta
+ * —la etiqueta lo distingue en la salida y en el JSON—, pero tampoco puede
+ * salir 0: un hueco de medida no es un verde.
  */
+export const VEREDICTOS = Object.freeze(['verde', 'rojo', 'cobertura', 'informativo', 'error'])
 export function codigoDeSalida(veredictos) {
   if (!Array.isArray(veredictos) || veredictos.length === 0) return CODIGO.INSTRUMENTO
-  if (veredictos.some((v) => v !== 'verde' && v !== 'rojo' && v !== 'informativo')) return CODIGO.INSTRUMENTO
-  if (veredictos.includes('rojo')) return CODIGO.ROJO
+  if (veredictos.some((v) => v === 'error' || !VEREDICTOS.includes(v))) return CODIGO.INSTRUMENTO
+  if (veredictos.includes('rojo') || veredictos.includes('cobertura')) return CODIGO.ROJO
   return CODIGO.VERDE
 }
 
@@ -137,8 +144,23 @@ export function pidQueEscucha(netstat, puerto) {
 // escribe — sin cambiar una sola puerta —; lo que no tiene veredicto es
 // 'informativo'. Una matriz VACÍA no es verde: es 'vacio' (error, código 2).
 const TODAS = (lista, pred) => lista.every(pred) ? 'verde' : 'rojo'
-const PORCELDA = (d) => Array.isArray(d) ? (d.length ? TODAS(d, (c) => c.passed === true) : 'vacio') : 'rojo'
-const ARRIBA = (campo) => (d) => (d && typeof d === 'object' && campo in d) ? (d[campo] === true ? 'verde' : 'rojo') : 'rojo'
+// ARN-3b · D4 · una celda dice su `estado`: 'medida' (o sin campo, como antes),
+// 'sinCobertura' o 'error'. Su `passed` se calcula SIN la puerta de cobertura,
+// así que una celda sin cobertura con un rojo de geometría sigue siendo roja.
+// Orden: error > rojo > cobertura > verde.
+const PORCELDA = (d) => {
+  if (!Array.isArray(d)) return 'rojo'
+  if (!d.length) return 'vacio'
+  if (d.some((c) => c?.estado === 'error')) return 'error'
+  if (d.some((c) => c?.passed !== true)) return 'rojo'
+  return d.some((c) => c?.estado === 'sinCobertura') ? 'cobertura' : 'verde'
+}
+// Los modos con veredicto arriba declaran sus huecos en `sinCobertura` (lista).
+const ARRIBA = (campo) => (d) => {
+  if (!(d && typeof d === 'object' && campo in d)) return 'rojo'
+  if (d[campo] !== true) return 'rojo'
+  return Array.isArray(d.sinCobertura) && d.sinCobertura.length ? 'cobertura' : 'verde'
+}
 const BOOLEANOS = (campos) => (d) => Array.isArray(d)
   ? (d.length ? TODAS(d, (c) => campos.every((k) => c[k] === true)) : 'vacio')
   : 'rojo'
