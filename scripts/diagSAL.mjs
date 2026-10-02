@@ -5,7 +5,10 @@
 //
 //   node scripts/diagSAL.mjs sal            → los 11 estados × 6 viewports
 //   node scripts/diagSAL.mjs sal <estado>   → un solo estado, para depurar
-//   node scripts/diagSAL.mjs shots          → sólo capturas, sin veredicto
+//
+// ARN-3c (A-3 de ARN-3a) · `shots` se retiró: la cabecera prometía «solo
+// capturas, sin veredicto», pero el código no ramificaba por modo y `shots`
+// corría y juzgaba igual que `sal`. `sal` ya deja las capturas.
 //
 // ── CONTRA QUÉ SERVIDOR CORRE, Y POR QUÉ NO ES EL QUE PEDÍA §8.1 ───────────
 // §8.1 dice «corre contra `vite preview` (4173), como `diagDSK`». No puede, y la
@@ -44,7 +47,7 @@ import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 // ARN-3a · navegador, servidor, puerto y código de salida: terreno común.
 // El arnés levanta su propio servidor de desarrollo con bypass (5173 o
 // `--puerto=N`) dentro de su proceso; `--servidor=externo` usa `AJILEI_BASE`.
-// Sale con 0 (verde; `shots` es informativo), 1 (rojo) o 2 (instrumento).
+// Sale con 0 (verde), 1 (rojo) o 2 (instrumento).
 import {
   instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
   ErrorInstrumento, codigoDeSalida,
@@ -64,8 +67,8 @@ const BASE = EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:5173') : `h
 const OUT_DIR = 'capturas-sal'
 const MODE = process.argv[2] || 'sal'
 const SOLO = process.argv[3] || null
-if (MODE !== 'sal' && MODE !== 'shots') {
-  await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: sal, shots`))
+if (MODE !== 'sal') {
+  await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». El modo es: sal${MODE === 'shots' ? ' («shots» se retiró en ARN-3c: no era un modo distinto; `sal` deja las capturas)' : ''}`))
 }
 
 // Los nueve estados de §8.3, el décimo del Ajuste A1 §5 y el undécimo del A2 §3.

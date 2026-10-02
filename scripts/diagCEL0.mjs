@@ -22,6 +22,8 @@
 // trabajo de la lámina, no evidencia sellada, y el árbol ya carga con tres
 // carpetas de arnés.
 import { recorrerRuta } from './rutaMesa.mjs'
+// ARN-3c-ii · la mediana de 3 de las varas de tiempo y el encadenado honesto (lo puro).
+import { mayoriaDeFallos, separarConocidos, encadenadoHonesto } from './arnes/varas.mjs'
 import { apuestasDe } from '../src/config/niveles.js'
 import { pisoDe } from '../src/engine/entrada.js'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
@@ -494,6 +496,25 @@ const MELODIAS_CEL = [
 ]
 const GOTAS_TECHO = 18      // lámina CEL-2
 const TOC_MS = 1896         // duración medida de table-knock.mp3 (mapa de audio, CEL-0)
+// ARN-3c-ii · el reloj nominal del PRODUCTO (`TOC_NOMINAL_MS`), leído de su
+// fuente y no copiado: `coreografiaCore.js` importa sin extensión y no se carga
+// en Node, así que se lee como texto. Si la constante cambia de forma, falla
+// ruidoso aquí y no en falso en el encadenado.
+const TOC_NOMINAL = (() => {
+  const m = readFileSync(new URL('../src/hooks/coreografiaCore.js', import.meta.url), 'utf8').match(/export const TOC_NOMINAL_MS = (\d+)/)
+  if (!m) throw new Error('diagCEL0: no encuentro TOC_NOMINAL_MS en src/hooks/coreografiaCore.js')
+  return Number(m[1])
+})()
+// ARN-3c-ii · D9 · los rojos conocidos, cada uno con su dueño. Un rojo conocido
+// sigue siendo rojo (código 1); lo que cambia es que se dice de quién es, y que
+// un rojo NUEVO se distingue a simple vista.
+const CEL_CONOCIDOS = [
+  { patron: /el saldo pide 2800 ms y el doble de CEL-2c son 2933/, dueno: 'CEL-2c' },
+  { patron: /la fiesta NO se encadenó al toc-toc/, dueno: 'ARN-3d (precargar tableKnock)' },
+]
+// D9 · las celdas del arco (las varas de tiempo) se miden tres veces y cada
+// fallo cuenta si sale en al menos dos: la mediana de 3 (scripts/arnes/varas.mjs).
+const REPS_ARCO = 3
 // CEL-2c · las cifras que Victor selló en vivo. Van escritas aquí y no
 // importadas del núcleo: si alguien recalibra el factor, el arnés tiene que
 // DISCREPAR y decirlo, no seguirle.
@@ -848,6 +869,25 @@ async function arcoDeUnaCelda(browser, celda, fallos, opciones = {}) {
 
 // Las puertas sobre una celda ya corrida. Se separan de la corrida para poder
 // aplicarles matices por modo (mudo, movimiento reducido) sin duplicar nada.
+// ARN-3c-ii · D9 · una celda del arco, medida REPS_ARCO veces. Cada repetición
+// se juzga con su propia lista; al total pasan los fallos que salen en al menos
+// dos (la mediana de 3: ver scripts/arnes/varas.mjs), con la cifra de cada una.
+// El informe de la celda es el de la primera repetición, más las tres listas.
+async function arcoPorMayoria(browser, celda, fallos, opcionesArco = {}, opcionesJuicio = {}) {
+  const reps = [], medidas = []
+  for (let i = 0; i < REPS_ARCO; i++) {
+    const f = []
+    const a = await arcoDeUnaCelda(browser, celda, f, opcionesArco)
+    juzgaArco(a, f, opcionesJuicio)
+    reps.push(f); medidas.push(a)
+  }
+  const mayoria = mayoriaDeFallos(reps)
+  for (const e of mayoria.mantenidos) {
+    fallos.push(`${e.textos[0].texto} [${e.veces}/${REPS_ARCO}: ${e.textos.map(t => `r${t.rep + 1}`).join(',')}]`)
+  }
+  return { ...medidas[0], mayoria, fallosPorRepeticion: reps, esperasMedidas: medidas.map(m => m.esperaMedida ?? null) }
+}
+
 function juzgaArco(a, fallos, opciones = {}) {
   const { id, fotos = {}, fases = [], marcas = [] } = a
   const orden = fases.map(f => f.fase)
@@ -873,9 +913,21 @@ function juzgaArco(a, fallos, opciones = {}) {
       if (ancla.encadenado !== false) fallos.push(`${id}: con el sonido apagado no debe haber encadenado`)
       if (Math.abs(espera - TOC_MS) > 250) fallos.push(`${id}: sin sonido el arco esperó ${espera} ms y el reloj nominal es ${TOC_MS}`)
     } else {
-      if (ancla.encadenado !== true) fallos.push(`${id}: la fiesta NO se encadenó al toc-toc (encadenado=${ancla.encadenado})`)
+      // ARN-3c-ii · §1.1.1 · el encadenado HONESTO. `encadenado` (lo publica
+      // `useCoreografia`) es `!!audio`: verdadero con que el toc-toc se pidiera,
+      // suene o no. Encadena de verdad si `esperaPrecedente(audio) > 0`, y eso se
+      // lee de `espera`: vale exactamente el nominal cuando dio 0. Sale ROJO
+      // mientras `tableKnock` no esté cargado al llegar a GAME_OVER: conocido con
+      // dueño (ARN-3d, la precarga), y es la puerta que validará la 3d.
+      ancla.encadenadoHonesto = encadenadoHonesto(ancla, TOC_NOMINAL)
+      if (!ancla.encadenadoHonesto) {
+        fallos.push(`${id}: la fiesta NO se encadenó al toc-toc (encadenado=${ancla.encadenado}, espera ${ancla.espera} ms ${ancla.espera === TOC_NOMINAL ? '= el reloj nominal: esperaPrecedente dio 0, el toc-toc no sonaba' : ''})`)
+      }
       if (espera < TOC_MS - 250) fallos.push(`${id}: la fiesta reventó a los ${espera} ms, ANTES de que acabara el toc-toc (${TOC_MS} ms)`)
-      if (espera >= ancla.espera - 60) fallos.push(`${id}: mandó el temporizador-red (${espera} ms de ${ancla.espera}), no el 'end' de Howler`)
+      // Sin encadenado de verdad no hay `end` que esperar: la fiesta la manda
+      // el reloj nominal por diseño, y esta puerta solo repetiría el fallo de
+      // arriba con otras palabras (era el «1905 ms de 1896» de H-5).
+      if (ancla.encadenadoHonesto && espera >= ancla.espera - 60) fallos.push(`${id}: mandó el temporizador-red (${espera} ms de ${ancla.espera}), no el 'end' de Howler`)
       // 3 · Y la melodía, después. Jamás encima del toc-toc.
       if (!suena) fallos.push(`${id}: la melodía no llegó a sonar`)
       else if (suena.t < revienta.t) fallos.push(`${id}: la melodía sonó ${revienta.t - suena.t} ms ANTES del estallido`)
@@ -1651,18 +1703,12 @@ async function modoCelebracion(browser) {
     // nodos-contra-canvas se juega de verdad.
     { id: 'cuadros-360x640',      w: 360,  h: 640 },
   ]) {
-    const a = await arcoDeUnaCelda(browser, c, fallos)
-    juzgaArco(a, fallos)
-    inf.arco[c.id] = a
+    inf.arco[c.id] = await arcoPorMayoria(browser, c, fallos)
   }
   // Con el sonido apagado: el arco visual completo, con los mismos tiempos.
-  const mudo = await arcoDeUnaCelda(browser, { id: 'mudo-1280x800', w: 1280, h: 800 }, fallos, { mudo: true })
-  juzgaArco(mudo, fallos, { mudo: true })
-  inf.arco.mudo = mudo
+  inf.arco.mudo = await arcoPorMayoria(browser, { id: 'mudo-1280x800', w: 1280, h: 800 }, fallos, { mudo: true }, { mudo: true })
   // Con movimiento reducido: sin lluvia y con las cifras puestas.
-  const reducido = await arcoDeUnaCelda(browser, { id: 'reducido-1280x800', w: 1280, h: 800 }, fallos, { reducido: true, rapido: true })
-  juzgaArco(reducido, fallos, { reducido: true })
-  inf.arco.reducido = reducido
+  inf.arco.reducido = await arcoPorMayoria(browser, { id: 'reducido-1280x800', w: 1280, h: 800 }, fallos, { reducido: true, rapido: true }, { reducido: true })
   // Y las dos puertas que necesitan su propia pestaña.
   inf.melodias = await puertaMelodias(browser, fallos)
   inf.frases2c = await puertaFrases(browser, fallos)
@@ -1727,11 +1773,16 @@ async function modoCelebracion(browser) {
   const sl = inf.salto || {}
   console.log(`\n-- el salto por toque --\n  al tocar: tramo ${sl.medio?.tramo?.cascada}, rubros dentro ${(sl.medio?.rubros || []).filter(x => x.opacidad > 0.5).length} -> tras el toque: tramo ${sl.tras?.tramo?.cascada}, rubros ${(sl.tras?.rubros || []).filter(x => x.opacidad > 0.5).length}, saldo ${sl.tras?.saldo} (fase ${sl.tras?.fase}) - boton de salir ${sl.salida ? 'responde' : 'NO responde'}`)
   console.log(`\ncontrol negativo: ${inf.control.termina === false && !inf.control.error ? 'verde' : 'ROJO'}`)
-  console.log(`\nFALLOS: ${fallos.length ? '\n  - ' + fallos.join('\n  - ') : 'ninguno'}`)
+  // ARN-3c-ii · D9 · los conocidos, con su dueño, y los nuevos, aparte.
+  const sep = separarConocidos(fallos, CEL_CONOCIDOS)
+  const sueltos = Object.entries(inf.arco).flatMap(([id, a]) => (a.mayoria?.sueltos || []).map(s => `${s.textos[0].texto.startsWith(id) ? '' : `${id}: `}${s.textos[0].texto} [1/${REPS_ARCO}]`))
+  console.log(`\n-- D9 · mediana de ${REPS_ARCO} en las celdas del arco: fallos que salieron en UNA sola repetición (no cuentan) --\n  ${sueltos.length ? sueltos.join('\n  ') : 'ninguno'}`)
+  console.log(`\nFALLOS CONOCIDOS (${sep.conocidos.length}): ${sep.conocidos.length ? '\n  - ' + sep.conocidos.map(k => `[${k.dueno}] ${k.fallo}`).join('\n  - ') : 'ninguno'}`)
+  console.log(`FALLOS NUEVOS (${sep.nuevos.length}): ${sep.nuevos.length ? '\n  - ' + sep.nuevos.join('\n  - ') : 'ninguno'}`)
   console.log(`capturas y cifras en ${OUT}/`)
   // ARN-3a · el veredicto sale de la función: antes se imprimía y el arnés
   // terminaba con 0 aunque hubiera seis fallos (H-2).
-  return { fallos, controlOk: inf.control.termina === false && !inf.control.error }
+  return { fallos, conocidos: sep.conocidos, nuevos: sep.nuevos, sueltos, controlOk: inf.control.termina === false && !inf.control.error }
 }
 
 // ── Corrida ─────────────────────────────────────────────────────────────────
@@ -1751,7 +1802,7 @@ const browser = NAV.browser
 if (MODO === 'celebracion') {
   const r = await modoCelebracion(browser)
   const codigo = codigoDeSalida([r.fallos.length === 0 && r.controlOk ? 'verde' : 'rojo'])
-  console.log(`\n── diagCEL0 celebracion · ${r.fallos.length} fallos · control ${r.controlOk ? 'verde' : 'ROJO'} → código ${codigo}`)
+  console.log(`\n── diagCEL0 celebracion · ${r.fallos.length} fallos (${r.conocidos.length} conocidos con dueño · ${r.nuevos.length} NUEVOS) · control ${r.controlOk ? 'verde' : 'ROJO'} → código ${codigo}`)
   await terminar(codigo)
 }
 

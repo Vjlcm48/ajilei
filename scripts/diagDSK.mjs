@@ -283,7 +283,7 @@ register('./_resolveExt.mjs', import.meta.url)
 // dentro de este proceso y 0 / 1 / 2 al salir.
 import {
   instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
-  ErrorInstrumento, ETIQUETA_NAVEGADOR, MODOS_DSK, veredictosDSK, codigoDeSalida,
+  ErrorInstrumento, ETIQUETA_NAVEGADOR, MODOS_DSK, veredictosDSK, codigoDeSalida, redDelArnes,
 } from './arnes/comun.mjs'
 // REC-1 · `mkdirSync` y `existsSync` para el modo `rec`. `mkdirSync` ya se usaba en
 // `retar` y `apu` sin importarse: el `try` se tragaba el ReferenceError y los
@@ -318,6 +318,10 @@ import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
   estadoCelda, reintentar, INTENTOS_COBERTURA, contestarRecargaComun,
 } from './arnes/autojuego.mjs'
+// ARN-3c · D4 · el juicio de «¿cabe el texto en su caja?» (lo puro, probado).
+import { juzgaCajaTexto, juzgaSobrante } from './arnes/cajas.mjs'
+// ARN-3c · D7 · `lob` y `msg` entran al bundle real con la sesión simulada de CAP.
+import { contextoCap } from './cap/capMesa.mjs'
 // MOV-1b-a · las entradas del menú y qué está vivo en cada rama salen de la
 // MISMA fuente única que la app (mismo criterio que consultas.js, niveles.js y
 // tapetes.js). El modo `menu-movil` DERIVA de aquí lo que espera, así que
@@ -361,6 +365,28 @@ const BASE = EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:5173') : `h
 // La Portada de `luz` y `rev` se mide contra un segundo servidor SIN bypass. Con
 // servidor propio, ese también lo levanta el arnés, en 5174 o `--puerto-aux=N`.
 if (!EXTERNO) process.env.LUZ_BASE_PORTADA = process.env.REV_BASE_PORTADA = `http://localhost:${OPC.puertoAux || 5174}`
+// ARN-3c · D7 · `lob` y `msg` miden el bundle REAL (`vite preview`, 4173 por
+// defecto o `--puerto=N`), con la sesión simulada de `contextoCap`: no usan
+// nada que solo exista en DEV, y así dejan de depender del bypass y del
+// `.env.local` de la máquina (Fase 0 de ARN-3, B3). `all` corre `lob`, así que
+// también levanta el preview, en `--puerto-aux=N` o 4173. `rec` y
+// `voz2.burbuja` se quedan en 5173 a propósito: `?apu=` solo existe en DEV.
+// `msg --semilla=azar` (o `--semilla=N`) es EXPLORACIÓN: juega otra población
+// de manos y anota la semilla en el JSON. No es la vara: la vara son las
+// semillas fijas de `MSG_SEMILLAS`. Se quita de la línea de órdenes aquí, antes
+// de que nadie lea los modos por posición.
+const MSG_SEMILLA_ARG = (() => {
+  const i = process.argv.findIndex(a => a.startsWith('--semilla='))
+  if (i < 0) return null
+  const v = process.argv.splice(i, 1)[0].slice('--semilla='.length)
+  if (v === 'azar') return { modo: 'azar', base: 1 + Math.floor(Math.random() * 2 ** 30) }
+  if (/^\d+$/.test(v)) return { modo: 'explicita', base: Number(v) }
+  return { modo: 'invalida', valor: v }
+})()
+const MODOS_PREVIEW = ['lob', 'msg']
+const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
+  ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
+  : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
 const OUT_DIR = 'capturas-dsk'
 // LOB-1 · las capturas del lobby van a su propia carpeta y no a `capturas-dsk`,
 // que es de la mesa: mezclarlas obligaría a distinguirlas por el nombre del
@@ -371,6 +397,10 @@ const MODE = process.argv[2] || 'all'
 // ARN-3a · D5 · un modo que no existe no corre nada, y antes salía verde.
 if (!MODOS_DSK.includes(MODE)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: ${MODOS_DSK.join(', ')}`))
+}
+// ARN-3c · D7 · `--semilla` se valida ANTES de levantar nada (un preview compila).
+if (MSG_SEMILLA_ARG && (MODE !== 'msg' || MSG_SEMILLA_ARG.modo === 'invalida')) {
+  await fallarInstrumento(new ErrorInstrumento(`--semilla solo vale en «msg», y como «azar» o un entero (recibido: ${JSON.stringify(MSG_SEMILLA_ARG)})`))
 }
 
 // ── Metadatos del instrumento (ARN-1) ────────────────────────────────────────
@@ -879,10 +909,13 @@ async function runLob(browser) {
   const celdas = []
 
   for (const vp of LOB_VIEWPORTS) {
-    const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    // ARN-3c · D7 · al bundle real (4173) con la sesión simulada de CAP: la
+    // vista entra tal cual (`{ w, h, dpr, movil }`), como midió AJF-1. La puerta
+    // de consola sigue siendo la de siempre: solo `pageerror`.
+    const { ctx, page } = await contextoCap(browser, { w: vp.w, h: vp.h, dpr: 1, movil: false }, BASE_PROD)
     const consola = []
     page.on('pageerror', e => consola.push(`pageerror: ${e.message}`))
-    await page.goto(BASE)
+    await page.goto(BASE_PROD)
     await page.waitForSelector('main.lobby')
     // Que asiente el primer fotograma: la marca entra con `respira` y el CTA
     // tiene transición. Medir antes daría cajas de mitad de animación.
@@ -1149,7 +1182,7 @@ async function runLob(browser) {
     // Captura del lobby en cada viewport, para que Victor valide contra la
     // lámina sin tener que abrir seis ventanas. Se toma antes de navegar, así
     // que se rehace la carga: cuesta un segundo y evita fotografiar RetarIAS.
-    await page.goto(BASE)
+    await page.goto(BASE_PROD)
     await page.waitForSelector('main.lobby')
     await page.waitForTimeout(500)
     await page.mouse.move(5, 5)
@@ -1157,7 +1190,7 @@ async function runLob(browser) {
     await page.screenshot({ path: c.shot })
 
     celdas.push(c)
-    await page.close()
+    await ctx.close()
   }
 
   const ok = celdas.every(c => c.ok)
@@ -1211,16 +1244,16 @@ const RETAR_SALDO_AVISO = 1500
 //      en una carga pelada de `/`, ANTES de tocar nada, y el nodo culpable ya no
 //      está en el DOM cuando el lobby asienta. No es de esta campaña; queda
 //      consignado en §E para quien sea dueño de la cáscara.
-//   2. `mi_sala` — 401 y `permission denied`. Es la consecuencia DOCUMENTADA de
-//      correr con `VITE_AUTH_BYPASS`: el uuid de `PERFIL_DEV` no existe en la
-//      base y cualquier clave foránea lo rechaza (cabecera de `diagSAL`).
+//   2. `mi_sala` — 401 y `permission denied`: el uuid de `PERFIL_DEV` no existe
+//      en la base real. ARN-3c (D12) lo SACÓ del filtro: desde D6 ningún
+//      contexto del arnés habla con el Supabase real (`aislarNavegador`, en
+//      scripts/arnes/comun.mjs) y `mi_sala` lo contesta el arnés con `null`, así
+//      que ese ruido ya no puede darse. Dejar el patrón solo podía esconder OTRO
+//      `401` real. Un `401` o un `SAL-A` que aparezca desde hoy es un hallazgo.
+//
+// Queda solo el aviso `inert` (1), conocido con dueño: ARN-3d.
 const RETAR_RUIDO_CONOCIDO = [
   /boolean attribute/,
-  // El aviso de `salasApi` lleva el nombre de la función; la línea de red que
-  // lo precede no —su URL vive en `location`, no en el texto—, así que hacen
-  // falta los dos patrones para tapar UNA sola causa.
-  /mi_sala/,
-  /status of 401/,
 ]
 
 // La geometría de la pantalla, medible en cualquier estado. Se toma DOS veces
@@ -1600,9 +1633,10 @@ const APU_VIEWPORTS = [
 // base de 1e y no se pisan.
 const APU_TEL_DIR = `${APU_OUT_DIR}/tel`
 
-// El mismo ruido de fondo que `retar` nombró uno a uno: el aviso `inert` de
-// React en el primer render y el 401 de `mi_sala` bajo `VITE_AUTH_BYPASS`.
-// Ninguno es de APU-1. Se filtran por NOMBRE y se cuentan aparte.
+// El mismo ruido de fondo que `retar` nombró uno a uno: desde ARN-3c (D12),
+// solo el aviso `inert` de React en el primer render (dueño: ARN-3d). El 401 de
+// `mi_sala` salió del filtro con el aislamiento de D6. Se filtra por NOMBRE y
+// se cuenta aparte.
 const APU_RUIDO_CONOCIDO = RETAR_RUIDO_CONOCIDO
 
 // Espera activa a que la mesa llegue a un estado. Las manos duran segundos —hay
@@ -5980,6 +6014,57 @@ async function a2InstallFlights(page) {
         destino: m ? { left: rnd(left + Number(m[1])), top: rnd(top + Number(m[2])) } : null,
       }
     }
+    // ARN-3c-ii · D8 · `vuelos.sobrante` (la sonda de ARN-3b-ii §1, ya puerta).
+    // Cuando una carta en vuelo dentro de la zona baja de la fila de cartas, se
+    // ocultan las voladoras UN INSTANTE —síncrono, dentro de este mismo tick de
+    // rAF: no llega a pintarse— y se describe qué hay debajo en una rejilla de
+    // 5×3 sobre la franja que cuelga. Lo juzga `juzgaSobrante` (cajas.mjs).
+    window.__sob = { casos: [], vistos: [] }
+    const SOB_TOPE = 8
+    const describir = (el, zone) => {
+      if (!el) return { el: null }
+      const cad = []
+      for (let e = el, k = 0; e && k < 3; e = e.parentElement, k++) cad.push(`${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''}`)
+      const cs = getComputedStyle(el)
+      let op = 1
+      for (let e = el; e; e = e.parentElement) op *= Number(getComputedStyle(e).opacity)
+      const zbg = getComputedStyle(zone).backgroundColor
+      const transparente = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'transparent'
+      const borde = ['top', 'right', 'bottom', 'left'].some((l) => parseFloat(cs.getPropertyValue(`border-${l}-width`)) > 0 &&
+        cs.getPropertyValue(`border-${l}-style`) !== 'none' && !transparente(cs.getPropertyValue(`border-${l}-color`)))
+      return {
+        el: cad.join(' < '), esZona: el === zone, visibility: cs.visibility, opacity: rnd(op),
+        pinta: {
+          texto: [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()),
+          imagen: /^(IMG|SVG|CANVAS|VIDEO|svg)$/.test(el.tagName) || cs.backgroundImage !== 'none',
+          fondo: !transparente(cs.backgroundColor) && cs.backgroundColor !== zbg ? cs.backgroundColor : null,
+          borde,
+          sombra: cs.boxShadow !== 'none',
+          contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0,
+        },
+      }
+    }
+    const sondearSobrante = (f, b, z, zone, fs) => {
+      const slots = [...document.querySelectorAll('.player-zone .cards-row .card-slot-wrapper')]
+      if (!slots.length) return
+      const cb = Math.max(...slots.map((x) => x.getBoundingClientRect().bottom))
+      if (!(b.bottom > cb + 0.5)) return
+      const clave = `${Math.round(b.left)}|${Math.round(b.bottom)}`
+      if (window.__sob.vistos.includes(clave) || window.__sob.casos.length >= SOB_TOPE) return
+      window.__sob.vistos.push(clave)
+      const prev = [...fs].map((x) => x.style.visibility)
+      fs.forEach((x) => { x.style.visibility = 'hidden' })
+      const top = Math.max(cb, z.top), bot = Math.min(b.bottom, z.bottom)
+      const L = Math.max(b.left, z.left), R = Math.min(b.right, z.right)
+      const pts = []
+      for (let j = 0; j < 3; j++) for (let i = 0; i < 5; i++) {
+        const x = L + (i + 0.5) * (R - L) / 5, y = top + (j + 0.5) * (bot - top) / 3
+        pts.push({ x: rnd(x), y: rnd(y), ...describir(document.elementFromPoint(x, y), zone) })
+      }
+      fs.forEach((x, k) => { x.style.visibility = prev[k] })
+      window.__sob.casos.push({ frame: window.__flights.samples, sobrante: rnd(b.bottom - cb), filaBottom: rnd(cb),
+        carta: { left: rnd(b.left), bottom: rnd(b.bottom) }, franja: { x: rnd(L), y: rnd(top), w: rnd(R - L), h: rnd(bot - top) }, pts })
+    }
     const tick = () => {
       const fs = document.querySelectorAll('.flying-card')
       const zone = document.querySelector('.player-zone')
@@ -5994,6 +6079,7 @@ async function a2InstallFlights(page) {
           if (b.bottom > z.top && b.top < z.bottom && b.right > z.left && b.left < z.right) {
             window.__flights.inZone++
             window.__flights.maxBottomInZone = Math.max(window.__flights.maxBottomInZone, b.bottom)
+            sondearSobrante(f, b, z, zone, fs)
             // banda · solo con la banda VISIBLE en este fotograma
             if (bandaViva) {
               const exceso = b.bottom - bandaTop
@@ -6104,6 +6190,17 @@ async function a2OutOfFlow(page, html) {
 
 // DSK-W1 · techo de MANOS del ciclo de a2 (hermano del F1_MANOS de arriba).
 const A2_MANOS = 12
+// ARN-3c-ii · §1.3 · la señal del pago de `a2`: el resultado pintado en el
+// óvalo (`data-tono`, solo con `resultado`), o cualquiera de las de
+// `APU_PAGO_VISIBLE`. Devuelve cuál, o null.
+const A2_EN_PAGO = () => {
+  if (document.querySelector('.game-message')?.dataset.tono) return 'resultado'
+  if ([...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano')) return 'siguiente'
+  if (document.querySelector('[data-accion="recargar"]')) return 'recargar'
+  if (document.querySelector('[data-accion="recarga-burbuja"]')) return 'burbuja'
+  if (document.querySelector('[data-accion="recarga"]')) return 'tarjeta'
+  return null
+}
 
 async function runA2(browser) {
   const out = []
@@ -6137,7 +6234,14 @@ async function runA2(browser) {
       // por qué (D5: el `SINCERRAR` de T4 ya no sale mudo). La mesa reducida se
       // cuenta aparte (D3).
       const juego = nuevoJuego()
-      const muestrear = async (tag) => { const s = marcarReducida(juego, { tag, ...(await a2Snap(page)) }); todos.push(s); return s }
+      // ARN-3c-ii · §1.3 · cada muestra lleva la señal PROPIA del pago.
+      // `APU_PAGO_VISIBLE` («Siguiente mano», recargar, burbuja o tarjeta) NO
+      // basta: con la recarga pendiente, durante la revelación (+3,72 s) la
+      // banda ya se ve, «Siguiente mano» no se monta y la burbuja aún no se pinta
+      // (medido: el control «después» salió rojo con esa señal sola). Lo que
+      // marca el pago entero es el RESULTADO: `.game-message[data-tono]` solo
+      // lleva valor cuando hay `resultado` (PAYOUT o GAME_OVER).
+      const muestrear = async (tag) => { const s = marcarReducida(juego, { tag, ...(await a2Snap(page)), pago: await page.evaluate(A2_EN_PAGO) }); todos.push(s); return s }
       const medidos = () => separarReducida(todos).medidos
       const covered = () => medidos().some(s => s.isPie) && medidos().some(s => s.isPie === false) &&
         medidos().some(s => s.tagVis === 'visible')
@@ -6174,6 +6278,8 @@ async function runA2(browser) {
       }
       const states = medidos()
       const flights = await page.evaluate(() => window.__flights)
+      const sobrante = juzgaSobrante(await page.evaluate(() => window.__sob?.casos ?? []))
+      sobrante.casos = await page.evaluate(() => window.__sob?.casos.length ?? 0)
       const oof = await a2OutOfFlow(page, A2_WORST_TAG)
 
       const F = states.filter(s => s.card1)
@@ -6225,8 +6331,11 @@ async function runA2(browser) {
       // las veinte celdas daban FAIL sin que la banda se hubiera movido un pixel
       // —todas sus demas medidas salen a 0,07 px o menos—. Lo que A2 quiere decir
       // es que la banda vive SOLO en el pago, y eso se pregunta por PERTENENCIA:
-      // que «Siguiente mano» este entre los botones, no que sea el unico.
-      const enPago = (s) => s.btn.split('|').includes('Siguiente mano')
+      // ARN-3c-ii · §1.3 (H3b-ii-2) · el pago, por su señal propia y no por el
+      // botón: con la recarga pendiente (`?apu=allinHumano`) «Siguiente mano» no
+      // se monta, la banda sí se ve en el pago, y preguntar por el botón pintaba
+      // de rojo un ciclo sano. Misma familia que el `apu.7` de 3b-ii.
+      const enPago = (s) => s.pago != null
       const visOnlyPayout = bandFrames.length > 0 && bandFrames.every(enPago) &&
         F.some(s => s.tagVis === 'hidden')
       // (10) guardia de la fase de apuesta: nunca visible sobre la fila de mults
@@ -6235,6 +6344,10 @@ async function runA2(browser) {
       // se lee solo en los fotogramas con la banda visible; `zona`, en todos.
       const vuelosBanda = flights.banda.peorExceso == null || flights.banda.peorExceso <= 0.5
       const vuelosZona = flights.zona.peorFuera <= 0.5
+      // (11c) ARN-3c-ii · D8 · el sobrante del descarte cae sobre tapete. Sin
+      // caso en la celda (ninguna reposición colgó bajo la fila) no hay veredicto:
+      // no es un hueco del azar que se reintente, es una mano sin reposición.
+      const vuelosSobrante = sobrante.ok
       // (12) gemelo IA de mesa 2 intacto. NO se mide comparando frames entre sí: el
       // showdown escala las cartas ganadoras de la IA y, al ser su fila centrada,
       // recoloca a sus vecinos —incluido su mazo— con un efecto que es PREVIO a esta
@@ -6264,7 +6377,7 @@ async function runA2(browser) {
         overflow: F.every(s => s.ovX === 0 && s.ovY === 0),
         cicloVisibility: visOnlyPayout,
         guardiaApuesta: betGuardOk,
-        vuelosBanda, vuelosZona,
+        vuelosBanda, vuelosZona, vuelosSobrante,
         gemeloIA: n !== 2 ? null : dAi.max <= 0.5,
         primitivas: Math.abs(live.tokRowPadBottom - live.liveRowPadBottom) <= 0.01 &&
           Math.abs(live.tokBarMarginTop - live.liveBarMarginTop) <= 0.01 && live.wrapPosition === 'relative',
@@ -6290,10 +6403,10 @@ async function runA2(browser) {
         mazo: { respiro: base.respiro, dResp, pilaMin, sawPie, sawNoPie },
         banda: { frames: bandFrames.length, dy: bandDy, dyExp: bandDyExp, reserveVsCards, clearPaint: bandClearPaint,
           w: bandFrames[0]?.tagBox?.w ?? null, cx: bandFrames[0]?.tagCx ?? null, bandNoClip, bandCentered, bandNoBtn, bandNoPaint },
-        fueraDeFlujo: oof, vuelos: { ...flights, bandTop: bandFrames[0]?.tagBox?.top ?? null },
+        fueraDeFlujo: oof, vuelos: { ...flights, bandTop: bandFrames[0]?.tagBox?.top ?? null, sobrante },
         gemeloIA: { ...dAi, ...aiSim, pre: aiPre }, ciclo, checks, passed,
       }
-      console.log(`T${n} ${vp.w}x${vp.h} · sim ${base.simIzq}/${base.simDer} Δ=${dSim.max} · carta ${base.slotW}/${preW} · respiro ${base.respiro}/${live.gapLeft} pila@${pilaMin} · banda ${bandFrames.length}f (${ciclo.manos}m/${ciclo.cerradas}c${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) dy=${bandDy} (exp ${bandDyExp}${reserveVsCards ? ` +${reserveVsCards} de reserva` : ''}) w=${bandFrames[0]?.tagBox?.w}/${live.bandW} aire↓=${bandClearPaint} · flujo Δ=${oof.dAnchors}/${oof.dSlots}/${oof.dScrollH} · vuelo banda ${flights.banda.peorExceso ?? '—'} (${flights.banda.frames}f) zona ${flights.zona.peorFuera} · máx ${round(flights.maxBottomInZone)} · IA Δ=${dAi.max}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
+      console.log(`T${n} ${vp.w}x${vp.h} · sim ${base.simIzq}/${base.simDer} Δ=${dSim.max} · carta ${base.slotW}/${preW} · respiro ${base.respiro}/${live.gapLeft} pila@${pilaMin} · banda ${bandFrames.length}f (${ciclo.manos}m/${ciclo.cerradas}c${ciclo.gameOver ? '/GAMEOVER' : ''}${ciclo.bancarrota ? '/BANCARROTA' : ''}${ciclo.sinCerrar ? '/SINCERRAR' : ''}) dy=${bandDy} (exp ${bandDyExp}${reserveVsCards ? ` +${reserveVsCards} de reserva` : ''}) w=${bandFrames[0]?.tagBox?.w}/${live.bandW} aire↓=${bandClearPaint} · flujo Δ=${oof.dAnchors}/${oof.dSlots}/${oof.dScrollH} · vuelo banda ${flights.banda.peorExceso ?? '—'} (${flights.banda.frames}f) zona ${flights.zona.peorFuera} sobrante ${sobrante.ok === null ? '— (sin caso)' : sobrante.ok ? `tapete (${sobrante.casos})` : `PINTA ${sobrante.culpables.slice(0, 2).map(x => x.el).join(' | ')}`} · máx ${round(flights.maxBottomInZone)} · IA Δ=${dAi.max}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'}`)
       await page.close()
       return celda
     }, `a2 T${n} ${vp.w}x${vp.h}`))
@@ -9091,6 +9204,10 @@ async function runU3(browser) {
 // ── DSK-VC2 · Victory Celebration ────────────────────────────────────────────
 const VC_VIEWPORTS = [...VIEWPORTS, { w: 1440, h: 850 }]
 const VC_TABLES = [5, 4, 3, 2]
+// ARN-3c-ii · §1.1.3 · lo ÚNICO que puede sonar mientras dura la celebración
+// de mano: el roce de las fichas (VC2). La fanfarria de antes (`win.mp3`) salió
+// del repo en CEL-A-b; esta lista es la que la puerta pide ahora, entera.
+const VC_SONIDOS_CELEBRACION_MANO = ['chips-collect.mp3']
 
 // Anclas del Δ=0. Las mismas de U2/U3: si un overlay fuera de flujo moviera
 // algo, se vería aquí.
@@ -9256,7 +9373,16 @@ async function vcHastaVictoria(page, maxManos = 18) {
       await clickIf(page, 'button:has-text("Sin descartar")')
     }
     if (fin === 'win') return mano
-    if (!await clickIf(page, 'button:has-text("Siguiente mano")')) return null
+    // ARN-3c-ii · desde REC-1 «Siguiente mano» no se monta hasta que acaba la
+    // revelación (+3,72 s). Pulsarlo EN EL ACTO fallaba y el bucle se rendía
+    // tras la primera mano perdida: «sin victoria humana en el tope de manos»
+    // en 2 de 2 corridas, sin haber jugado el tope. Se le da la revelación.
+    let siguio = false
+    for (let k = 0; k < 40 && !siguio; k++) {
+      siguio = await clickIf(page, 'button:has-text("Siguiente mano")')
+      if (!siguio) await vcEspera(page, 200)
+    }
+    if (!siguio) return null
     await vcEspera(page, 450)
   }
   return null
@@ -9456,8 +9582,14 @@ async function runVC(browser) {
         esperaMs !== null && !(audio?.sonando ?? []).includes('showdown.mp3')
 
       // P1 · el roce suena y la fanfarria vieja NO — win.mp3 quedó sin uso.
+      // ARN-3c-ii · §1.1.3 · la compuerta estaba A MEDIAS: `win.mp3` salió del
+      // repo y del registro en CEL-A-b, así que `!sonando.includes('win.mp3')`
+      // ya no podía fallar nunca. Lo que la regla quiere decir es «durante la
+      // celebración de mano suena el roce y NADA MÁS»: se pide la lista exacta.
+      // Una fanfarria que vuelva, con el nombre que sea, es rojo.
       r.sonando = audio?.sonando ?? []
-      const p1_sonido = r.sonando.includes('chips-collect.mp3') && !r.sonando.includes('win.mp3')
+      r.sonandoAjeno = r.sonando.filter(s => !VC_SONIDOS_CELEBRACION_MANO.includes(s))
+      const p1_sonido = r.sonando.includes('chips-collect.mp3') && r.sonandoAjeno.length === 0
 
       // P4 · el toque corta VISUAL y AUDIO de un golpe.
       await page.mouse.click(4, 384)
@@ -9497,7 +9629,7 @@ async function runVC(browser) {
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
     r.ok = !!(r.p1 && r.p2 && r.p4 && r.p11)
     jugado.push(r)
-    console.log(`vc·jugado m${n} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} viva=${JSON.stringify(r.viva)} sonando=${JSON.stringify(r.sonando)} Δ=${r.dOverlay} (${r.dQuien}) toque=${r.p4} · secuencia=${r.p11} antes=${JSON.stringify(r.antes)} espera=${r.esperaMs}ms${r.error ? ' · ' + r.error : ''}`)
+    console.log(`vc·jugado m${n} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} viva=${JSON.stringify(r.viva)} sonando=${JSON.stringify(r.sonando)}${r.sonandoAjeno?.length ? ` AJENO=${JSON.stringify(r.sonandoAjeno)}` : ''} Δ=${r.dOverlay} (${r.dQuien}) toque=${r.p4} · secuencia=${r.p11} antes=${JSON.stringify(r.antes)} espera=${r.esperaMs}ms${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
@@ -10296,7 +10428,7 @@ const msgCuentaAzar = (page) => page.evaluate(() => window.__arn3N ?? null)
 // en pantalla. Un clic por iteración con rechequeo (lección W1).
 // ARN-2 · devuelve además la Mano muestreada en vuelo. `false` sigue
 // significando "no hubo mano que jugar".
-async function msgJuegaUnaMano(page, primera) {
+async function msgJuegaUnaMano(page, primera, barrido = null) {
   if (primera) await clickIf(page, 'button:has-text("Iniciar mano")')
   else if (!await clickIf(page, 'button:has-text("Siguiente mano")')) return false
   // ARN-2 · una sola lectura limpia basta y no se repite: `manoIndex` se fija en
@@ -10309,6 +10441,7 @@ async function msgJuegaUnaMano(page, primera) {
   // sin que nada estuviera roto.
   for (let i = 0; i < 320; i++) {
     await page.waitForTimeout(250)
+    if (barrido) await msgBarre(page, barrido, 'mano')
     if (manoVista === null) {
       const v = await msgLeeMano(page)
       if (v.turno && !v.showdown) { manoVista = v.mano; manoCuantas = v.cuantas }
@@ -10359,6 +10492,33 @@ const MSG_CAZAS = [
 const MSG_CAZA_INTENTOS = 4
 const MSG_CAZA_TOPE_SEMILLA = 2000000
 
+// ── ARN-3c · D7 · `msg` en 4173, con semillas ───────────────────────────────
+// `msg` juega en el bundle real con la sesión simulada de `contextoCap`, que
+// SIEMBRA `Math.random` (Fase 0 de ARN-3, B3). Con una semilla fija `msg`
+// jugaría siempre la misma mano, así que cada página que abre lleva la suya, de
+// una LISTA FIJA: la vara. `k` numera las páginas en el orden en que `msg` las
+// abre (0–6 las siete celdas de P2 y P4, 7–8 las cazas, 9 el fin de partida,
+// 10–14 el barrido de P5), y la semilla es `base + k`. La base de la vara es
+// `MSG_SEMILLA_BASE`; `--semilla=azar` (o `=N`) la cambia, y entonces la
+// corrida es EXPLORACIÓN: lo dice el JSON y no cuenta como vara.
+// La caza siembra ADEMÁS el barajado de la mano 1 con su propia semilla
+// (`msgSiembraAzar`), que al gastarse devuelve el azar a esta.
+const MSG_SEMILLA_BASE = 1
+const MSG_PAGINAS = 15
+const msgSemilla = (k) => (MSG_SEMILLA_ARG ? MSG_SEMILLA_ARG.base : MSG_SEMILLA_BASE) + k
+const msgSemillas = () => Array.from({ length: MSG_PAGINAS }, (_, k) => msgSemilla(k))
+async function msgAbre(browser, vp, movil, k) {
+  const { page } = await contextoCap(browser, { w: vp.w, h: vp.h, dpr: 1, movil: !!movil }, BASE_PROD, { semilla: msgSemilla(k) })
+  return page
+}
+// La ruta de siempre (`rutaMesa.mjs`), contra el bundle real; `alPaso` deja
+// barrer las pantallas del camino (P5).
+async function msgAMesa(page, n, alPaso = null) {
+  await page.goto(BASE_PROD, { waitUntil: 'networkidle' })
+  await recorrerRutaComun(page, n, ARNES_NIVEL, ARNES_STAKE_IDX, ARNES_ENTRADA, { alPaso })
+  await page.mouse.move(5, 5)
+}
+
 async function msgCaza(browser, caza, dep) {
   // Las tiradas del barajado no se clavan: son las del mazo real menos una
   // (deck.js, Fisher-Yates de i=n-1 a 1). Si el mazo cambiara de tamaño, la
@@ -10371,18 +10531,18 @@ async function msgCaza(browser, caza, dep) {
     if (!buscada) { r.residuo = `sin semilla que reparta la mano pedida por debajo de ${MSG_CAZA_TOPE_SEMILLA}`; break }
     desde = buscada.semilla + 1
     const t = { intento, semilla: buscada.semilla, pedida: msgClaveMano(buscada.mano) }
-    const page = await browser.newPage({ viewport: { width: caza.vp.w, height: caza.vp.h } })
+    const page = await msgAbre(browser, caza.vp, false, 7 + MSG_CAZAS.indexOf(caza))
     try {
-      await gotoMesa(page, caza.n)
+      await msgAMesa(page, caza.n)
       t.mismoAzar = await msgSiembraAzar(page, buscada.semilla, tiradas)
       if (!t.mismoAzar) {
         t.motivo = 'el generador de Node y el del navegador no dieron la misma tirada'
         r.residuo = t.motivo
-        r.intentos.push(t); await page.close(); break
+        r.intentos.push(t); await page.context().close(); break
       }
       const juego = await msgJuegaUnaMano(page, true)
       t.tiradasServidas = await msgCuentaAzar(page)
-      if (!juego || !juego.jugada) { t.motivo = 'la mano no llegó a resultado'; r.intentos.push(t); await page.close(); continue }
+      if (!juego || !juego.jugada) { t.motivo = 'la mano no llegó a resultado'; r.intentos.push(t); await page.context().close(); continue }
       // ¿Salió el reparto pedido? Se LEE de la zona humana, que está boca arriba
       // desde el reparto, y se compara con lo predicho. Un desfase de tiradas se
       // delata aquí en vez de colarse.
@@ -10392,7 +10552,7 @@ async function msgCaza(browser, caza, dep) {
       t.forzada = t.repartida !== null && t.repartida === t.pedida
       if (!t.forzada) {
         t.motivo = 'el reparto no coincidió con el predicho (¿tirada gastada antes del barajado?)'
-        r.intentos.push(t); await page.close(); continue
+        r.intentos.push(t); await page.context().close(); continue
       }
       const m = await msgAuditaMano(page, caza.n, 1, juego, dep)
       t.rama = caza.cumple(m) ? 'la pedida' : 'otra'
@@ -10402,15 +10562,15 @@ async function msgCaza(browser, caza, dep) {
       t.cartas = msgCartasResumen(m)
       t.mano = m
       r.intentos.push(t)
-      if (t.rama !== 'la pedida') { t.motivo = 'la mano forzada salió, pero el resultado no cayó en la rama buscada'; await page.close(); continue }
+      if (t.rama !== 'la pedida') { t.motivo = 'la mano forzada salió, pero el resultado no cayó en la rama buscada'; await page.context().close(); continue }
       r.ok = m.ok
       r.ejercitada = m.ok && m.via === 're-derivado'
-      await page.close()
+      await page.context().close()
       break
     } catch (e) {
       t.error = String(e && e.message || e).slice(0, 200)
       r.intentos.push(t)
-      await page.close().catch(() => {})
+      await page.context().close().catch(() => {})
     }
   }
   if (r.ok === null && !r.residuo) r.residuo = `no se logró forzar la condición en ${MSG_CAZA_INTENTOS} intentos`
@@ -10423,6 +10583,84 @@ async function msgCaza(browser, caza, dep) {
         `${r.ok ? '' : ` ✗esperado="${ult.mano.esperado}"`}`))
   return r
 }
+
+// ── ARN-3c · D4 · P5 · Barrido «Heptacoins» (fusiona `verifyREN1`) ────────────
+// `verifyREN1` preguntó una vez, contra la palabra vieja, si «Heptacoins» se
+// salía de alguna caja. La pregunta pasa a ser permanente y deja de declarar
+// las cajas a mano: se recorre TODO nodo de texto visible que diga
+// «Heptacoins», se mide contra su caja y contra los antepasados que recortan, y
+// juzga `juzgaCajaTexto` (scripts/arnes/cajas.mjs). Barre en cada sondeo de las
+// manos de P2 y, en P5, en las pantallas que `msg` no pisa: la ruta (lobby y
+// las cuatro filas), la mesa en la zona hueco 800×1200 —el único sitio donde
+// montan `.opp-chips` y `.ai-chips`— y el panel de tapetes. Lo que no monta
+// (rango 0×0, `visibility:hidden`, opacidad 0, recortado a propósito con
+// `clip`/`clip-path`) no se mide: es el rojo fantasma que `verifyREN1` ya pagó.
+function msgSondaHepta() {
+  const out = []
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  let n
+  while ((n = w.nextNode())) {
+    if (!n.nodeValue.includes('Heptacoins')) continue
+    const el = n.parentElement
+    if (!el) continue
+    const rg = document.createRange(); rg.selectNodeContents(n)
+    const t = rg.getBoundingClientRect()
+    if (t.width * t.height <= 1) continue
+    let oculto = getComputedStyle(el).visibility !== 'visible'
+    for (let e = el; e && !oculto; e = e.parentElement) {
+      const cs = getComputedStyle(e)
+      if (Number(cs.opacity) === 0 || cs.clipPath !== 'none' || (cs.clip && cs.clip !== 'auto')) oculto = true
+    }
+    if (oculto) continue
+    let caja = el
+    while (caja.parentElement && /^(inline|contents)$/.test(getComputedStyle(caja).display)) caja = caja.parentElement
+    const cs = getComputedStyle(caja), px = (p) => parseFloat(cs.getPropertyValue(p)) || 0
+    const b = caja.getBoundingClientRect()
+    const recortes = []
+    let elipsis = cs.textOverflow === 'ellipsis'
+    for (let e = caja; e && e !== document.documentElement; e = e.parentElement) {
+      const c = getComputedStyle(e)
+      if (!/hidden|clip/.test(c.overflowX + ' ' + c.overflowY)) continue
+      const r = e.getBoundingClientRect(), bp = (p) => parseFloat(c.getPropertyValue(p)) || 0
+      recortes.push({ x: r.x + bp('border-left-width'), right: r.right - bp('border-right-width'),
+        y: r.y + bp('border-top-width'), bottom: r.bottom - bp('border-bottom-width') })
+      if (c.textOverflow === 'ellipsis') elipsis = true
+    }
+    const clase = typeof caja.className === 'string' && caja.className ? '.' + caja.className.trim().split(/\s+/).join('.') : ''
+    out.push({
+      caja: caja.tagName.toLowerCase() + clase,
+      texto: (caja.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+      rango: { x: t.x, y: t.y, right: t.right, bottom: t.bottom },
+      contenido: { x: b.x + px('border-left-width') + px('padding-left'), right: b.right - px('border-right-width') - px('padding-right') },
+      relleno: { y: b.y + px('border-top-width'), bottom: b.bottom - px('border-bottom-width') },
+      scroll: { w: caja.scrollWidth, cw: caja.clientWidth, h: caja.scrollHeight, ch: caja.clientHeight },
+      recortes, elipsis,
+    })
+  }
+  return out
+}
+const msgNuevoBarrido = () => ({ medidas: 0, cajas: new Map(), desbordes: [], recortes: [] })
+// Una caja se cuenta una vez por (celda, caja, texto); un desborde se guarda con
+// su celda, su momento y su exceso, para poder ir a mirarlo.
+async function msgBarre(page, b, momento) {
+  let m
+  try { m = await page.evaluate(msgSondaHepta) } catch { return }   // navegación a mitad: el siguiente sondeo vuelve
+  for (const x of m) {
+    b.medidas++
+    const j = juzgaCajaTexto(x)
+    const clave = `${b.celda} · ${x.caja} · «${x.texto}»`
+    if (!b.cajas.has(clave)) b.cajas.set(clave, j.estado)
+    if (j.estado === 'desborda' && !b.desbordes.some(d => d.clave === clave)) b.desbordes.push({ clave, momento, exceso: j.exceso })
+    if (j.estado === 'recorta' && !b.recortes.some(d => d.clave === clave)) b.recortes.push({ clave, momento, exceso: j.exceso })
+  }
+}
+const MSG_BARRIDO_VISTAS = [
+  { id: 'ruta-360x640',    vp: { w: 360,  h: 640 },  n: 5, movil: true,  tapetes: true },
+  { id: 'ruta-740x360',    vp: { w: 740,  h: 360 },  n: 5, movil: true },
+  { id: 'hueco5-800x1200', vp: { w: 800,  h: 1200 }, n: 5, movil: false },
+  { id: 'hueco2-800x1200', vp: { w: 800,  h: 1200 }, n: 2, movil: false },
+  { id: 'tapetes-1920x937', vp: { w: 1920, h: 937 }, n: 5, movil: false, tapetes: true },
+]
 
 async function runMSG(browser) {
   const { composeResultado, claseTono } = await import('../src/hooks/resultadoCore.js')
@@ -10523,17 +10761,19 @@ async function runMSG(browser) {
   // puntuaciones de cada zona, quién lleva el chip de ganador y quién es la
   // Mano, se recompone con el MISMO compositor y se compara la cadena entera.
   const jugado = []
+  // ARN-3c · D4 · el barrido «Heptacoins» viaja con las manos de P2: barre la
+  // mesa al llegar y en cada sondeo del juego (ver P5).
+  const barrido = msgNuevoBarrido()
   for (const celda of MSG_CELDAS) {
     if (tblFilter && celda.n !== tblFilter) continue
-    const page = await browser.newPage({
-      viewport: { width: celda.vp.w, height: celda.vp.h },
-      ...(celda.movil ? { hasTouch: true, isMobile: true } : {}),
-    })
-    const r = { ...celda, manos: [] }
+    const page = await msgAbre(browser, celda.vp, celda.movil, MSG_CELDAS.indexOf(celda))
+    const r = { ...celda, manos: [], semilla: msgSemilla(MSG_CELDAS.indexOf(celda)) }
     try {
-      await gotoMesa(page, celda.n)
+      await msgAMesa(page, celda.n)
+      barrido.celda = `T${celda.n} ${celda.vp.w}x${celda.vp.h}`
+      await msgBarre(page, barrido, 'mesa')
       for (let mano = 1; mano <= 3; mano++) {
-        const juego = await msgJuegaUnaMano(page, mano === 1)
+        const juego = await msgJuegaUnaMano(page, mano === 1, barrido)
         if (!juego || !juego.jugada) break
         r.manos.push(await msgAuditaMano(page, celda.n, mano, juego, dep))
       }
@@ -10544,7 +10784,7 @@ async function runMSG(browser) {
     // oculta y si el desempate lo ganó ella: ése es el registro con el que se
     // demuestra que la condición del hallazgo ① se ejercitó, y no un "confía".
     console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.encogio ? ` (mesa de ${m.vivos}, rotación n/a)` : (m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`)}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} ${msgCartasResumen(m)} visto:${m.visto ? `${m.visto.n}/${m.visto.total}${m.visto.recortada ? ' recortada' : ''}` : '—'}${m.vistoEsPrefijo ? '✓' : '✗'}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
-    await page.close()
+    await page.context().close()
   }
 
   // ── P2b · ARN-3 · Caza dirigida de la condición AJILEI ────────────────────
@@ -10554,15 +10794,53 @@ async function runMSG(browser) {
     cazas.push(await msgCaza(browser, caza, dep))
   }
 
+  // ── P5 · ARN-3c · D4 · Barrido «Heptacoins» en lo que P2 no pisa ─────────
+  // La ruta (lobby y las cuatro filas), la mesa en la zona hueco 800×1200 con
+  // una mano jugada, y el diálogo de compra de tapetes («¿Comprar Tricolor por
+  // 50.000 Heptacoins?»), que es donde hoy vive la palabra en ese panel.
+  for (const [i, v] of MSG_BARRIDO_VISTAS.entries()) {
+    if (tblFilter && v.n !== tblFilter) continue
+    const page = await msgAbre(browser, v.vp, v.movil, 10 + i)
+    barrido.celda = v.id
+    try {
+      await msgAMesa(page, v.n, (pg, paso) => msgBarre(pg, barrido, `ruta:${paso}`))
+      await msgBarre(page, barrido, 'mesa')
+      if (v.tapetes) {
+        await page.click('.utilities-trigger')
+        await page.waitForSelector('.util-item-tapetes', { timeout: 4000 })
+        await page.click('.util-item-tapetes')
+        await page.waitForSelector('.tap-swatch[data-tap="tricolor"]', { timeout: 4000 })
+        await page.click('.tap-swatch[data-tap="tricolor"]')
+        await page.waitForSelector('.tap-dialogo', { timeout: 4000 })
+        await page.waitForTimeout(250)
+        await msgBarre(page, barrido, 'tapetes:dialogo')
+        await page.click('.tap-btn-no').catch(() => {})
+      } else {
+        await msgJuegaUnaMano(page, true, barrido)
+      }
+    } catch (e) { barrido.errores = [...(barrido.errores || []), `${v.id}: ${String(e && e.message || e).slice(0, 160)}`] }
+    await page.context().close()
+  }
+  const vistasBarridas = new Set([...barrido.cajas.keys()].map(k => k.split(' · ')[0]))
+  const barridoRes = {
+    ok: barrido.desbordes.length === 0 && !(barrido.errores || []).length && barrido.medidas > 0,
+    medidas: barrido.medidas, cajas: barrido.cajas.size, vistas: vistasBarridas.size,
+    desbordes: barrido.desbordes, recortes: barrido.recortes, errores: barrido.errores || [],
+    porCaja: Object.fromEntries(barrido.cajas),
+  }
+  console.log(`msg·barrido «Heptacoins» · ${barridoRes.ok ? 'OK' : 'FALLA'} · ${barridoRes.medidas} medidas · ${barridoRes.cajas} cajas distintas en ${barridoRes.vistas} vistas · desbordes=${barridoRes.desbordes.length} · recortes del producto (elipsis)=${barridoRes.recortes.length}` +
+    (barridoRes.desbordes.length ? '\n   ✗ ' + barridoRes.desbordes.map(d => `${d.clave} (${d.momento}, exceso ${d.exceso}px)`).join('\n   ✗ ') : '') +
+    (barridoRes.errores.length ? '\n   ! ' + barridoRes.errores.join('\n   ! ') : ''))
+
   // ── P3 · Fin de partida: el oro es de la victoria ─────────────────────────
   // CONSTRUIDO: llegar a GAME_OVER jugando exige arruinar a todas las IAs. Lo
   // que se audita aquí es el contrato de CSS —qué color pinta cada clase y que
   // nada más cambie—; que el tono correcto le llegue a cada caso lo sella P1.
   const finales = []
   {
-    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
+    const page = await msgAbre(browser, { w: 1366, h: 768 }, false, 9)
     try {
-      await gotoMesa(page, 2)
+      await msgAMesa(page, 2)
       const medido = await page.evaluate(() => {
         const caja = document.createElement('div')
         caja.className = 'game-over-screen'
@@ -10589,7 +10867,7 @@ async function runMSG(browser) {
     } catch (e) { finales.push({ error: String(e && e.message || e).slice(0, 200), p3: false }) }
     const f = finales[0]
     console.log(`msg·fin de partida · ${f.p3 ? 'OK' : 'FALLA'} victoria=${f.victoria?.color} derrota=${f.derrota?.color} (mismo cuerpo ${f.victoria?.fontSize}/${f.victoria?.fontWeight})${f.error ? ' · ' + f.error : ''}`)
-    await page.close()
+    await page.context().close()
   }
 
   // ── P4 · Δ=0 con la frase MÁS LARGA ───────────────────────────────────────
@@ -10607,13 +10885,10 @@ async function runMSG(browser) {
   const anchuras = []
   for (const celda of MSG_CELDAS) {
     if (tblFilter && celda.n !== tblFilter) continue
-    const page = await browser.newPage({
-      viewport: { width: celda.vp.w, height: celda.vp.h },
-      ...(celda.movil ? { hasTouch: true, isMobile: true } : {}),
-    })
+    const page = await msgAbre(browser, celda.vp, celda.movil, MSG_CELDAS.indexOf(celda))
     const r = { ...celda }
     try {
-      await gotoMesa(page, celda.n)
+      await msgAMesa(page, celda.n)
       const juego = await msgJuegaUnaMano(page, true)
       if (!juego || !juego.jugada) throw new Error('la mano no llegó al pago')
       await page.waitForTimeout(4500)   // la revelación (REC-1: +3,72 s)
@@ -10660,7 +10935,7 @@ async function runMSG(browser) {
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
     anchuras.push(r)
     console.log(`msg·Δ larga T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} Δ(hoy→mañana)=${r.delta} (${r.quien}) · en el span · recorte hoy/mañana=${r.desbordaHoy}/${r.desborda} · sensibilidad preexistente del óvalo=${r.sens} (${r.sensQuien})${r.error ? ' · ' + r.error : ''}`)
-    await page.close()
+    await page.context().close()
   }
 
   // ── ARN-2 · Censo de la condición del hallazgo ① ──────────────────────────
@@ -10722,10 +10997,13 @@ async function runMSG(browser) {
   // sentencia es de Victor. Una caza que SÍ forzó la condición y luego no cuadra
   // sí es roja: ahí el instrumento tiene delante lo que buscaba.
   const passed = p1 && jugado.every(r => r.ok) && finales.every(f => f.p3) && anchuras.every(r => r.ok) &&
-    cazas.every(c => c.ok !== false)
+    cazas.every(c => c.ok !== false) && barridoRes.ok
   const residuos = cazas.filter(c => c.ok === null)
-  console.log(`\n── MSG: compositor ${p1 ? 'OK' : 'FALLA'} (${matriz.length} casos) · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · fin ${finales.filter(f => f.p3).length}/${finales.length} · Δ larga ${anchuras.filter(r => r.ok).length}/${anchuras.length} · caza ${cazas.filter(c => c.ok === true).length}/${cazas.length}${residuos.length ? ` (+${residuos.length} residuo)` : ''} · ${passed ? 'VERDE' : 'ROJO'}`)
-  return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, cazas, finales, anchuras, condicionARN2: condicion, insumoARN3: insumo, passed }
+  // ARN-3c · D7 · la población de manos: la vara (semillas fijas) o exploración.
+  const semillas = { modo: MSG_SEMILLA_ARG ? MSG_SEMILLA_ARG.modo : 'vara', base: msgSemilla(0), lista: msgSemillas(), exploracion: !!MSG_SEMILLA_ARG }
+  console.log(`\n── MSG: compositor ${p1 ? 'OK' : 'FALLA'} (${matriz.length} casos) · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · fin ${finales.filter(f => f.p3).length}/${finales.length} · Δ larga ${anchuras.filter(r => r.ok).length}/${anchuras.length} · caza ${cazas.filter(c => c.ok === true).length}/${cazas.length}${residuos.length ? ` (+${residuos.length} residuo)` : ''} · barrido ${barridoRes.ok ? 'OK' : 'FALLA'} (${barridoRes.cajas} cajas) · ${passed ? 'VERDE' : 'ROJO'}` +
+    ` · semillas ${semillas.exploracion ? `EXPLORACIÓN (no es la vara) base=${semillas.base}` : `vara ${semillas.lista[0]}–${semillas.lista[semillas.lista.length - 1]}`}`)
+  return { compositor: { p1, casos: matriz.length, sinPierdes, sinVozVieja, coherente, oroSoloGana, dobleOk, larga, largaDe, motorLargaDe }, jugado, cazas, finales, anchuras, barrido: barridoRes, semillas, condicionARN2: condicion, insumoARN3: insumo, passed }
 }
 
 
@@ -12172,11 +12450,10 @@ const REV_CARTAS = ['ia_opp', 'ia_aizone', 'humano']
 // 42–1378. En la copia de mesa el dibujo va desplazado (vbW − 910) / 2 = 47,5.
 const REV_MARCO = { x0: 53, y0: 67, x1: 857, y1: 1353 }
 const REV_BROCHES = { x0: 42, y0: 42, x1: 868, y1: 1378 }
-// Lugares con causa (b) en la Fase 0 (json/_causas.json): su Δ contra el
-// canónico tiene que bajar a la franja del control (3,0–13,2).
-const REV_CAUSA_B = ['m2_pc_vuelo', 'm2_pc_humano', 'm2_s25h_vuelo', 'm2_s25h_ia_opp', 'm2_s25h_humano',
-  'm5_pc_vuelo', 'm5_pc_humano', 'm5_s25h_vuelo', 'm5_s25h_humano']
-const REV_FASE0 = 'capturas-rev'
+// ARN-3c (D11) · aquí vivían `REV_CAUSA_B` y `REV_FASE0`: la comparación de cada
+// recorte contra el canónico de la Fase 0 de REV-1 (`capturas-rev/json/
+// _comparacion.json` y `capturas-rev/lab/_canon__cont.png`). Sus datos no
+// existen en ninguna máquina y nunca fue puerta: se retiró entera.
 
 // El congelador de la Fase 0, literal (capturaRev.mjs `instalarCongelador`),
 // más el interruptor de rev.css.
@@ -12491,8 +12768,6 @@ async function revDibujo(browser, celdas) {
   const lab = await (await browser.newContext({ viewport: { width: 800, height: 800 }, deviceScaleFactor: REV_DPR })).newPage()
   const cmp = await (await browser.newContext()).newPage()
   const svgs = new Map()
-  const canon = existsSync(`${REV_FASE0}/lab/_canon__cont.png`) ? readFileSync(`${REV_FASE0}/lab/_canon__cont.png`) : null
-  const fase0 = existsSync(`${REV_FASE0}/json/_comparacion.json`) ? JSON.parse(readFileSync(`${REV_FASE0}/json/_comparacion.json`, 'utf8')).filas : []
   const filas = []
   for (const c of celdas) {
     const porLugar = {}
@@ -12532,13 +12807,8 @@ async function revDibujo(browser, celdas) {
       const cont = await revSinBorde(cmp, readFileSync(`${REV_OUT}/${x.archivo}`), x.borde[0], REV_DPR)
       writeFileSync(`${REV_OUT}/recortes/${c.id}_${lugar}__cont.png`, cont)
       const labVsReal = await revComparar(cmp, pngLab, cont)
-      const idF0 = `${c.id.replace(REV_SUF, '')}_${lugar}`
-      const f0 = fase0.find(f => f.id === idF0)
-      const canonDespues = canon ? await revComparar(cmp, canon, cont) : null
       filas.push({ id: `${c.id}_${lugar}`, celda: c.id, lugar, estado: x.estado, archivo: x.archivo, asset: url.split('/').pop().split('?')[0],
-        pintura: x.pintura, opacidadRecorte: x.opacidadRecorte, animada: !!x.animada, labVsReal, p4: labVsReal <= 12,
-        canonAntes: f0 ? f0.contenidoDelta : null, canonDespues, causaB: REV_CAUSA_B.includes(idF0),
-        archivoAntes: f0 ? f0.archivo : null })
+        pintura: x.pintura, opacidadRecorte: x.opacidadRecorte, animada: !!x.animada, labVsReal, p4: labVsReal <= 12 })
     }
   }
   return filas
@@ -12712,7 +12982,7 @@ async function runRev(browser) {
     celdas.push(c)
   }
   const dibujo = await revDibujo(browser, celdas)
-  for (const f of dibujo) console.log(`rev dibujo ${f.id.padEnd(20)} ${f.estado.padEnd(8)} lab↔real ${String(f.labVsReal).padStart(5)} · canónico ${f.canonAntes} → ${f.canonDespues}${f.causaB ? ' (b)' : ''}`)
+  for (const f of dibujo) console.log(`rev dibujo ${f.id.padEnd(20)} ${f.estado.padEnd(8)} lab↔real ${String(f.labVsReal).padStart(5)}`)
   // Prueba de la puerta de oclusión (§J-6): el mazo en «reparto», con la
   // voladora recién nacida encima, tiene que salir TAPADO.
   const oclusion = celdas.map(c => {
@@ -12749,6 +13019,220 @@ async function runRev(browser) {
     celdas: celdas.map(c => ({ id: c.id, error: c.error, ms: c.ms, log: c.log, puertas: c.puertas })), semilla: LUZ_SEMILLA, dpr: REV_DPR }
   writeFileSync(`${REV_OUT}/_rev${REV_SUF}.json`, JSON.stringify(out, null, 1))
   return { verde, puertas, resumen, oclusion, oclusionProbada, fuera, vueloReal: vueloReal && { ...vueloReal, sinPintar: vueloReal.sinPintar?.length } }
+}
+
+// ══ ARN-3c-ii · §1.1.2 · MODO `congelado` · LAS GUARDAS DE FRZ-1, SIMULADAS ══
+// FRZ-1b selló «la mesa se congela con la visibilidad» (2a77c87): turno del
+// humano, IA, retirados y arranque de mano, más el audio a 0. Hasta hoy nadie lo
+// vigilaba en vivo: AJF-1 §B lo verificó LEYENDO el código, la prueba de vitest
+// (`useCongelado.test.js`) sella el núcleo pero no las guardas de `GameTable`, y
+// la Fase 1 de FRZ-1 usó una sonda de CDP crudo en el scratchpad porque
+// Playwright no puede ocultar una pestaña de verdad.
+//
+// Aquí se SIMULA la visibilidad, que es lo único que `useCongelado` escucha:
+// `document.hidden` y `visibilityState` se redefinen antes de que cargue la app
+// y `visibilitychange` se dispara a mano. Es la misma entrada que da el
+// navegador; lo que no se simula es el estrangulamiento de timers de una
+// pestaña oculta de verdad, que no es lo que estas guardas vigilan.
+//
+// Cada celda mide la guarda en sus DOS lados: a oscuras no pasa nada, y al
+// volver pasa en un tiempo que demuestra que a la vista SÍ habría pasado dentro
+// de la ventana medida (si no, un «no pasó nada» no probaría nada).
+//   turno    · GameTable `if (congelado) return` del reloj del humano
+//   audio    · `Howler.volume()` a 0 a oscuras y el de antes al volver
+//   ia       · la cadena de decisiones de la IA no avanza
+//   sigue    · «Siguiente mano» a oscuras: la mano nueva no arranca
+//   reparte  · el barajado a oscuras no reparte al vencer sus 1950 ms
+//   retirado · humano retirado y Mano: si BET_2 abre con el turno en él, no
+//              salta a oscuras (ver la premisa en `congRetirado`)
+// La séptima guarda viva —el descarte con el humano retirado (`arranca`)— solo
+// se dispara si el retiro del humano CIERRA la ronda, y eso depende del azar del
+// reparto: no se fuerza aquí (ver el informe de ARN-3c-ii).
+const CONG_VP = { w: 1366, h: 768 }
+const CONG_INIT = () => {
+  let oculto = false
+  Object.defineProperty(Document.prototype, 'hidden', { configurable: true, get: () => oculto })
+  Object.defineProperty(Document.prototype, 'visibilityState', { configurable: true, get: () => (oculto ? 'hidden' : 'visible') })
+  window.__arnesOcultar = (v) => { oculto = !!v; document.dispatchEvent(new Event('visibilitychange')) }
+}
+const congOcultar = (page, v) => page.evaluate((x) => window.__arnesOcultar(x), v)
+const congTurno = (page) => page.evaluate(() => {
+  if (document.querySelector('.player-zone.turn-active')) return 'humano'
+  const i = [...document.querySelectorAll('.opp-panel, .ai-zone')].findIndex(e => e.classList.contains('turn-active'))
+  return i >= 0 ? `ia${i + 1}` : null
+})
+const congCrono = (page) => page.evaluate(() => {
+  const t = [...document.querySelectorAll('.timer-display')].find(e => e.getClientRects().length)
+  const n = t ? parseInt(t.textContent, 10) : NaN
+  return Number.isFinite(n) ? n : null
+})
+const congBaraja = (page) => page.evaluate(() => document.querySelectorAll('.shuffle-fan-card').length)
+const congVolumen = (page) => page.evaluate(() => (window.Howler ? window.Howler.volume() : null))
+async function congHasta(page, pred, tope, paso = 80) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < tope) {
+    if (await pred()) return Date.now() - t0
+    await page.waitForTimeout(paso)
+  }
+  return null
+}
+async function congPagina(browser, n) {
+  const page = await browser.newPage({ viewport: { width: CONG_VP.w, height: CONG_VP.h } })
+  await page.addInitScript(CONG_INIT)
+  await gotoMesa(page, n)
+  return page
+}
+
+// turno + audio · la mano 1 abre con el turno del humano (es la Mano).
+async function congTurnoYAudio(browser) {
+  const r = { celda: 'turno', guarda: 'GameTable · reloj del humano (`if (congelado) return`)' }
+  const a = { celda: 'audio', guarda: 'useCongelado · Howler.volume(0) y vuelta' }
+  const page = await congPagina(browser, 5)
+  try {
+    await clickIf(page, 'button:has-text("Iniciar mano")')
+    if (await congHasta(page, async () => (await congTurno(page)) === 'humano' && (await congCrono(page)) !== null, 25000) === null) throw new Error('no llegó el turno del humano')
+    const v0 = await congCrono(page); await page.waitForTimeout(1600); const v1 = await congCrono(page)
+    a.antes = await congVolumen(page)
+    await congOcultar(page, true)
+    a.oculto = await congVolumen(page)
+    const o0 = await congCrono(page); await page.waitForTimeout(3000); const o1 = await congCrono(page)
+    r.turnoOculto = await congTurno(page)
+    await congOcultar(page, false)
+    a.despues = await congVolumen(page)
+    await page.waitForTimeout(2200); const d1 = await congCrono(page)
+    Object.assign(r, { visible: [v0, v1], oculto: [o0, o1], alVolver: [o1, d1] })
+    r.ok = v1 < v0 && o1 === o0 && r.turnoOculto === 'humano' && d1 < o1
+    a.ok = a.antes > 0 && a.oculto === 0 && a.despues === a.antes
+  } catch (e) { r.error = a.error = String(e && e.message || e).slice(0, 200); r.ok = a.ok = false }
+  await page.close()
+  return [r, a]
+}
+
+// ia · el humano pasa y se oculta en el acto: la IA no decide a oscuras.
+async function congIA(browser) {
+  const r = { celda: 'ia', guarda: 'GameTable · cadena de decisiones de la IA (`if (congelado) return`)' }
+  const page = await congPagina(browser, 5)
+  try {
+    await clickIf(page, 'button:has-text("Iniciar mano")')
+    if (await congHasta(page, async () => (await congTurno(page)) === 'humano', 25000) === null) throw new Error('no llegó el turno del humano')
+    await page.waitForTimeout(300)
+    const boton = await clickIf(page, '[data-accion="pasar"]') || await clickIf(page, '[data-accion="igualar"]') || await clickIf(page, '[data-accion="apostar"]')
+    if (!boton) throw new Error('el humano no tenía acción que pulsar')
+    await congOcultar(page, true)
+    await page.waitForTimeout(150)
+    r.turnoAlOcultar = await congTurno(page)
+    const msg0 = await page.evaluate(() => document.querySelector('.game-message')?.textContent ?? '')
+    await page.waitForTimeout(4000)
+    r.turnoTras4s = await congTurno(page)
+    r.mensajeQuieto = msg0 === await page.evaluate(() => document.querySelector('.game-message')?.textContent ?? '')
+    await congOcultar(page, false)
+    r.alVolverMs = await congHasta(page, async () => (await congTurno(page)) !== r.turnoTras4s, 8000)
+    r.ok = /^ia/.test(r.turnoAlOcultar || '') && r.turnoTras4s === r.turnoAlOcultar && r.mensajeQuieto &&
+      r.alVolverMs !== null && r.alVolverMs < 4000
+  } catch (e) { r.error = String(e && e.message || e).slice(0, 200); r.ok = false }
+  await page.close()
+  return r
+}
+
+// sigue + reparte · una mano entera a la vista; luego «Siguiente mano» a
+// oscuras (no arranca), al volver arranca el barajado y, en cuanto se ve, a
+// oscuras otra vez: el barajado no reparte al vencer sus 1950 ms.
+async function congArranque(browser) {
+  const s = { celda: 'sigue', guarda: 'GameTable · «Siguiente mano» (`diferir(sigue)`)' }
+  const p = { celda: 'reparte', guarda: 'GameTable · fin del barajado (`diferir(reparte)`)' }
+  const page = await congPagina(browser, 5)
+  try {
+    if (!await playToShowdown(page, 260)) throw new Error('la mano 1 no llegó al pago')
+    await page.waitForTimeout(4500)          // la revelación (REC-1: +3,72 s)
+    await page.click('button:has-text("Siguiente mano")')
+    await congOcultar(page, true)
+    s.barajaOculto = await congHasta(page, async () => (await congBaraja(page)) > 0, 3000)
+    await congOcultar(page, false)
+    s.alVolverMs = await congHasta(page, async () => (await congBaraja(page)) > 0, 4000, 40)
+    s.ok = s.barajaOculto === null && s.alVolverMs !== null && s.alVolverMs < 1500
+    // reparte: el barajado ya se ve; a oscuras, más allá de sus 1950 ms.
+    await congOcultar(page, true)
+    await page.waitForTimeout(3500)
+    p.barajaTras3500 = await congBaraja(page)
+    await congOcultar(page, false)
+    p.alVolverMs = await congHasta(page, async () => (await congBaraja(page)) === 0, 3000, 40)
+    p.ok = s.alVolverMs !== null && p.barajaTras3500 > 0 && p.alVolverMs !== null && p.alVolverMs < 1500
+  } catch (e) { s.error = p.error = String(e && e.message || e).slice(0, 200); s.ok = s.ok ?? false; p.ok = false }
+  await page.close()
+  return [s, p]
+}
+
+// retirado · mesa 3, mano 1: el humano es la Mano y se retira en BET_1. El
+// comentario de `salta` (GameTable) dice que al abrir BET_2 el turno vuelve a la
+// Mano —retirada— y que ese efecto la pasa. A oscuras durante el reparto de las
+// tres cartas, BET_2 tendría que abrir con el turno QUIETO en el humano.
+// PREMISA, medida a la vista en ARN-3c-ii (sonda con MutationObserver, 3 de 3):
+// hoy BET_2 abre DIRECTAMENTE en la siguiente silla viva y el humano retirado
+// no recibe el turno ni un instante. El motor (protegido) ya no la pone ahí,
+// así que `salta` no se dispara por esta vía. La celda lo comprueba en cada
+// corrida: si BET_2 abre en otra silla, queda `noAlcanzable` (informativa, no
+// cuenta), y si algún día vuelve a abrir en la Mano retirada, mide la guarda.
+// Si la mano se decide en BET_1 no hay caso: se reintenta (hasta 3).
+async function congRetirado(browser) {
+  const r = { celda: 'retirado', guarda: 'GameTable · salto del retirado (`diferir(salta)`)', intentos: 0 }
+  for (let k = 1; k <= INTENTOS_COBERTURA; k++) {
+    r.intentos = k
+    const page = await congPagina(browser, 3)
+    try {
+      await clickIf(page, 'button:has-text("Iniciar mano")')
+      if (await congHasta(page, async () => (await congTurno(page)) === 'humano', 25000) === null) throw new Error('no llegó el turno del humano')
+      await page.waitForTimeout(300)
+      if (!await clickIf(page, '[data-accion="retirarse"]')) throw new Error('no había «Retirarse»')
+      // BET_1 sigue con las IAS; el reparto de las tres cartas se ve porque nadie tiene el turno.
+      const vioIA = await congHasta(page, async () => /^ia/.test(await congTurno(page) || ''), 8000)
+      const enDescarte = vioIA === null ? null : await congHasta(page, async () => (await congTurno(page)) === null, 20000, 40)
+      if (enDescarte === null) { await page.close(); continue }
+      await congOcultar(page, true)
+      const abre = await congHasta(page, async () => (await congTurno(page)) !== null, 15000)
+      if (abre === null) { await congOcultar(page, false); await page.close(); continue }   // la mano acabó sin BET_2
+      r.turnoAlAbrir = await congTurno(page)
+      if (r.turnoAlAbrir !== 'humano') {
+        await congOcultar(page, false)
+        r.estado = 'noAlcanzable'
+        r.nota = `BET_2 abrió en ${r.turnoAlAbrir}, no en la Mano retirada: \`salta\` no se dispara por esta vía`
+        r.ok = true
+        await page.close()
+        return r
+      }
+      await page.waitForTimeout(2000)
+      r.turnoTras2s = await congTurno(page)
+      await congOcultar(page, false)
+      r.alVolverMs = await congHasta(page, async () => (await congTurno(page)) !== 'humano', 3000, 40)
+      r.ok = r.turnoAlAbrir === 'humano' && r.turnoTras2s === 'humano' && r.alVolverMs !== null && r.alVolverMs < 1500
+      r.estado = 'medida'
+      await page.close()
+      return r
+    } catch (e) { r.error = String(e && e.message || e).slice(0, 200); await page.close().catch(() => {}) }
+  }
+  r.estado = 'sinCobertura'
+  r.ok = true            // el `passed` va sin la puerta de cobertura (D4 de 3b)
+  return r
+}
+
+async function runCongelado(browser) {
+  const celdas = [
+    ...await congTurnoYAudio(browser),
+    await congIA(browser),
+    ...await congArranque(browser),
+    await congRetirado(browser),
+  ]
+  for (const c of celdas) {
+    const { celda, guarda, ok, error, ...resto } = c
+    console.log(`congelado·${celda.padEnd(8)} ${ok ? 'OK   ' : 'FALLA'} ${c.estado === 'sinCobertura' ? '(SIN COBERTURA) ' : c.estado === 'noAlcanzable' ? '(NO ALCANZABLE, informativa) ' : ''}· ${guarda} · ${JSON.stringify(resto)}${error ? ' · ' + error : ''}`)
+  }
+  const verde = celdas.every(c => c.ok)
+  const sinCobertura = celdas.filter(c => c.estado === 'sinCobertura').map(c => `${c.celda} (${c.intentos} intentos)`)
+  const medidas = celdas.filter(c => c.estado !== 'noAlcanzable')
+  const noAlcanzables = celdas.filter(c => c.estado === 'noAlcanzable').map(c => `${c.celda}: ${c.nota}`)
+  console.log(`── CONGELADO · ${verde ? (sinCobertura.length ? 'SIN COBERTURA' : 'VERDE') : 'ROJO'} · ${medidas.filter(c => c.ok).length}/${medidas.length} guardas medidas` +
+    `${noAlcanzables.length ? ` · no alcanzable: ${noAlcanzables.join('; ')}` : ''}` +
+    ' · no sellada aquí: el descarte con el humano retirado (`arranca`), que depende del reparto')
+  return { verde, celdas, sinCobertura, noAlcanzables, noSellada: ['GameTable · descarte con el humano retirado (`diferir(arranca)`)'] }
 }
 
 // ══ REC-1 Fase 1 · MODO `rec` · LA RECARGA QUE NO TAPA LA MESA ════════════════
@@ -13446,7 +13930,14 @@ async function runRec(browser) {
 // Chromium no instalado o de otra versión.
 let NAV
 try {
-  await servidorArnes({ tipo: 'dev', puerto: OPC.puerto || 5173, bypass: true, externo: EXTERNO, base: EXTERNO ? BASE : null })
+  if (MODOS_PREVIEW.includes(MODE)) {
+    await servidorArnes({ tipo: 'preview', puerto: OPC.puerto || 4173, build: OPC.build, externo: EXTERNO, base: EXTERNO ? BASE_PROD : null })
+  } else {
+    await servidorArnes({ tipo: 'dev', puerto: OPC.puerto || 5173, bypass: true, externo: EXTERNO, base: EXTERNO ? BASE : null })
+  }
+  if (MODE === 'all') {
+    await servidorArnes({ tipo: 'preview', puerto: OPC.puertoAux || 4173, build: OPC.build, externo: EXTERNO, base: EXTERNO ? BASE_PROD : null })
+  }
   if (!EXTERNO && (MODE === 'luz' || MODE === 'rev')) {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5174, bypass: false })
   }
@@ -13468,7 +13959,8 @@ const report = {
     canal: NAV.canal,
     chromium: chromiumVivo,
     chromiumDeriva: NAV.contraste ? NAV.nota : false,
-    servidor: EXTERNO ? `externo ${BASE}` : `propio ${BASE}`,
+    servidor: MODOS_PREVIEW.includes(MODE) ? `${EXTERNO ? 'externo' : 'propio'} ${BASE_PROD} (preview, sesión simulada)`
+      : `${EXTERNO ? 'externo' : 'propio'} ${BASE}${MODE === 'all' ? ` + preview ${BASE_PROD} para lob` : ''}`,
     ruta: { nivel: ARNES_NIVEL, stakeIdx: ARNES_STAKE_IDX, monto: apuestasDe(ARNES_NIVEL)[ARNES_STAKE_IDX], entrada: ARNES_ENTRADA },
   },
 }
@@ -13514,10 +14006,14 @@ try {
   if (MODE === 'luz') report.luz = await runLuz(browser)
   if (MODE === 'rev') report.rev = await runRev(browser)
   if (MODE === 'rec') report.rec = await runRec(browser)
+  if (MODE === 'congelado') report.congelado = await runCongelado(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }
 
+// ARN-3c · D6 · la corrida entera se midió aislada del Supabase real, o no: el
+// aislamiento entra como un veredicto más (una escapada es 2).
+report.aislamiento = redDelArnes()
 // ARN-3a · D5 · el veredicto viaja en el JSON Y en el código de salida. Cada
 // modo se lee por donde escribe el suyo (scripts/arnes/nucleo.mjs). Un modo que
 // abortó a mitad de su matriz (`report.error`) es 2, nunca 0.

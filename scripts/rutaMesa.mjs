@@ -39,8 +39,12 @@ export const ENTRADA_ARNES = 'medio'
  * @param {string} nivel    id de reto (`basico` | `avanzado` | `pro`)
  * @param {number} stakeIdx índice dentro de `apuestasDe(nivel)` (0–3)
  * @param {string} entrada  `piso` | `medio` | `techo`
+ * @param {object} [op]
+ * @param {(page, paso: string) => Promise<void>} [op.alPaso] ARN-3c · se llama
+ *   en cada pantalla de la ruta (lobby, cada fila elegida y antes del CTA), para
+ *   que un arnés mida por el camino sin copiar la ruta (el barrido de `msg`).
  */
-export async function recorrerRuta(page, n, nivel, stakeIdx, entrada = ENTRADA_ARNES) {
+export async function recorrerRuta(page, n, nivel, stakeIdx, entrada = ENTRADA_ARNES, { alPaso = null } = {}) {
   const iNivel = NIVELES.findIndex((x) => x.id === nivel)
   if (iNivel < 0) throw new Error(`rutaMesa: reto desconocido "${nivel}"`)
   const montos = apuestasDe(nivel)
@@ -48,6 +52,7 @@ export async function recorrerRuta(page, n, nivel, stakeIdx, entrada = ENTRADA_A
 
   // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo.
   await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+  if (alPaso) await alPaso(page, 'lobby')
   await page.click('[data-accion="jugar-ia"]')
 
   // Las cuatro filas, EN CASCADA: cada una habilita la siguiente, así que no se
@@ -55,9 +60,13 @@ export async function recorrerRuta(page, n, nivel, stakeIdx, entrada = ENTRADA_A
   // a que el chip esté vivo —`:not([disabled])`— y no sólo a que esté en el DOM:
   // la fila entera se pinta desde el primer render, apagada.
   await pulsarChip(page, 'reto', iNivel + 1)
+  if (alPaso) await alPaso(page, 'reto')
   await pulsarChip(page, 'jugadores', n - 1)          // 2·3·4·5 → 1º·2º·3º·4º
+  if (alPaso) await alPaso(page, 'jugadores')
   await pulsarChip(page, 'apuesta', stakeIdx + 1)
+  if (alPaso) await alPaso(page, 'apuesta')
   await pulsarChip(page, 'entrada', ORDEN_ENTRADA.indexOf(entrada) + 1)
+  if (alPaso) await alPaso(page, 'entrada')
 
   await page.click('[data-accion="cta"]')
   await page.waitForSelector('.game-table')

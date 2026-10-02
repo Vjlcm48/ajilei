@@ -114,9 +114,11 @@ const INICIO = ({ semilla, clave, sesion }) => {
  * `red.fuera` = peticiones que NO son del origen local ni del host de Supabase
  * (la puerta cap.red las quiere en cero). `red.supabase` = las interceptadas.
  */
-export async function contextoCap(browser, vista, base) {
+export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP } = {}) {
   // `vista` es una clave de VISTAS_CAP o, para sondas fuera de lo sellado
   // (la variante C de la og-image), un objeto con la misma forma.
+  // ARN-3c · D7 · `semilla`: `msg` juega en 4173 por aquí y no puede jugar
+  // siempre la misma mano (Fase 0 de ARN-3, B3). Por defecto, la sellada de CAP.
   const v = typeof vista === 'string' ? VISTAS_CAP[vista] : vista
   const { host, ref } = hostSupabase()
   const ctx = await browser.newContext({
@@ -134,9 +136,13 @@ export async function contextoCap(browser, vista, base) {
     access_token: 'cap.' + Buffer.from(JSON.stringify({ sub: user.id, exp: ahora + dura })).toString('base64url') + '.cap',
     token_type: 'bearer', expires_in: dura, expires_at: ahora + dura, refresh_token: 'cap-refresh', user,
   }
-  await ctx.addInitScript(INICIO, { semilla: SEMILLA_CAP, clave: `sb-${ref}-auth-token`, sesion })
+  await ctx.addInitScript(INICIO, { semilla, clave: `sb-${ref}-auth-token`, sesion })
 
-  const red = { supabase: [], fuera: [], sockets: [] }
+  // ARN-3c · D6 · el terreno común (`aislarNavegador`) ya desvía los sockets no
+  // locales al nacer el contexto, y un socket desviado NO dispara
+  // `page.on('websocket')`: sin esto, `cap.red` dejaría de verlos. Se leen de
+  // su registro (`ctx.__aislamiento`), además de los que sí disparen el evento.
+  const red = { supabase: [], fuera: [], sockets: ctx.__aislamiento ? ctx.__aislamiento.sockets : [] }
   const origen = new URL(base).host
   // UNA ruta para todo: lo local pasa, Supabase se contesta aquí, lo demás se
   // corta y se anota (es la puerta cap.red, no un error silencioso).

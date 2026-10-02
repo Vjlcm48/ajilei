@@ -37,8 +37,10 @@
 import { webkit } from 'playwright-core'
 import {
   instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
-  ErrorInstrumento, codigoDeSalida,
+  ErrorInstrumento, codigoDeSalida, aislarNavegador,
 } from './arnes/comun.mjs'
+// ARN-3c-ii · D9 · la mediana de 3 de `dis` (lo puro).
+import { mayoriaDePuertas } from './arnes/varas.mjs'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
   VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
@@ -1290,7 +1292,25 @@ if (hacer('dis')) {
     return { caso, errores, peticiones, escenario, indice }
   }
 
-  const navWebkit = await webkit.launch({ headless: true })
+  // ARN-3c-ii · D9 · `dis` es vara de tiempo (reloj de pared, topes de 600,
+  // 2 500 y 2 700 ms con ~3 % de margen: H-6). Sus topes NO se aflojan: se mide
+  // TRES veces en la misma corrida y cada puerta vale lo que su mediana, que en
+  // una puerta de umbral es «verde en al menos dos de tres»
+  // (`mayoriaDePuertas`, scripts/arnes/varas.mjs). Dentro del bucle, `anota`
+  // es local y solo apunta; la de verdad se llama al final, una vez por puerta,
+  // con las tres cifras en el detalle. (El cuerpo no se reindentó a propósito:
+  // el diff enseña que las puertas no cambiaron.)
+  const anotaUna = anota
+  const REPS_DIS = 3
+  const repsDis = [], bloquesDis = []
+  // `contexto()` (arriba, fuera del bucle) abre las páginas de WebKit con él:
+  // vive fuera del bucle y se reasigna en cada repetición.
+  let navWebkit = null
+  for (let repDis = 0; repDis < REPS_DIS; repDis++) {
+  const puertasRep = []
+  const anota = (id, ok, detalle) => { puertasRep.push({ clave: id, ok: !!ok, det: detalle }); return ok }
+  // ARN-3c · D6 · el WebKit no sale de `navegadorArnes()`: se aísla a mano.
+  navWebkit = aislarNavegador(await webkit.launch({ headless: true }))
   const [edge, ocultos, wk] = await Promise.all([
     Promise.all(CASOS_DIS.map((c) => medir('edge', c))),
     Promise.all(CASOS_OCULTOS.map(oculto)),
@@ -1428,7 +1448,12 @@ if (hacer('dis')) {
     anota(`dis.errores ${o.caso.id}`, o.errores.length === 0, o.errores.length ? o.errores.slice(0, 3).join(' | ') : '0 errores de página y de consola')
     bloque.ocultos.push({ caso: o.caso.id, peticiones: o.peticiones, escenario: o.escenario, indice: o.indice, errores: o.errores })
   }
-  resultados.bloques.dis = bloque
+  repsDis.push(puertasRep); bloquesDis.push(bloque)
+  }
+  for (const p of mayoriaDePuertas(repsDis)) {
+    anotaUna(p.clave, p.ok, `[${p.verdes}/${p.de} verdes, mediana de ${REPS_DIS}] ${p.dets.map((d, i) => `r${i + 1}: ${d}`).join(' ‖ ')}`)
+  }
+  resultados.bloques.dis = { ...bloquesDis[0], repeticiones: bloquesDis }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
