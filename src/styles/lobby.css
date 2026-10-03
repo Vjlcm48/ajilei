@@ -498,32 +498,12 @@ body.lobby-activa #root {
 }
 
 
-/* ══ 5 · EL ACCESO QUE TODAVÍA NO EXISTE ═══════════════════════════════════ */
-/* AJF-1 · `.lob-cta-pvp` y sus dos descendientes se quedaron SIN CONSUMIDOR:
-   el «Jugar contra jugadores» viste ahora `.lob-cta-jugadores` (§3.1). Se dejan por la
-   regla de CSS aditivo de la tanda; retirarlos es limpieza para otra.
-   `.lob-pastilla` SÍ sigue viva (hoja ⚙ y toast). */
-.lobby .lob-cta-pvp {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--u) * 1.6);
-  background: none;
-  border: 0;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: calc(var(--u) * 3.5);
-  cursor: pointer;
-  padding: var(--u) calc(var(--u) * 2);
-  border-radius: 999px;
-}
-/* Glifo de LÍNEA, no icono de acción (§1.9): se mide en `em` con la frase que
-   acompaña, así que crece con ella y no con la rejilla de controles. */
-.lobby .lob-cta-pvp .lob-ico {
-  width: 1em;
-  height: 1em;
-  flex: none;
-}
-/* La pastilla «Próximamente» / «Pronto». Un solo estilo para las cinco. */
+/* ══ 5 · LA PASTILLA ═══════════════════════════════════════════════════════ */
+/* ARN-3d §2.2 (B10) · aquí vivían las tres reglas del acceso «Jugar contra
+   jugadores» de antes de AJF-1: sin consumidor desde que ese botón viste
+   `.lob-cta-jugadores` (§3.1), y retiradas en esta tanda. */
+/* La pastilla «Próximamente» / «Pronto». Un solo estilo para las cinco. Viva en
+   la hoja ⚙ y en el toast. */
 .lobby .lob-pastilla {
   font-size: 0.78em;
   color: var(--text-muted);
@@ -532,7 +512,6 @@ body.lobby-activa #root {
   padding: 0.12em 0.7em;
   white-space: nowrap;
 }
-.lobby .lob-cta-pvp .lob-pastilla { color: var(--text-secondary); }
 
 
 /* ══ 6 · BARRA INFERIOR ════════════════════════════════════════════════════ */

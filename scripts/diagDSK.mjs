@@ -1260,10 +1260,11 @@ const RETAR_SALDO_AVISO = 1500
 //      que ese ruido ya no puede darse. Dejar el patrón solo podía esconder OTRO
 //      `401` real. Un `401` o un `SAL-A` que aparezca desde hoy es un hallazgo.
 //
-// Queda solo el aviso `inert` (1), conocido con dueño: ARN-3d.
-const RETAR_RUIDO_CONOCIDO = [
-  /boolean attribute/,
-]
+// ARN-3d §2.1 (B9) · el aviso `inert` (1) lo ARREGLÓ su dueño: la hoja ⚙ pasa
+// `inert: true` (`atributosHoja`, lobbyCore). El filtro queda VACÍO: desde hoy
+// cualquier voz en la consola de `retar`, `apu` o `rec2` es un hallazgo. Se deja
+// la lista (y no se borra) para que el próximo ruido conocido se nombre aquí.
+const RETAR_RUIDO_CONOCIDO = []
 
 // La geometría de la pantalla, medible en cualquier estado. Se toma DOS veces
 // —con el contador abierto y con la pantalla en reposo— porque §E-8 salió de
@@ -1642,10 +1643,10 @@ const APU_VIEWPORTS = [
 // base de 1e y no se pisan.
 const APU_TEL_DIR = `${APU_OUT_DIR}/tel`
 
-// El mismo ruido de fondo que `retar` nombró uno a uno: desde ARN-3c (D12),
-// solo el aviso `inert` de React en el primer render (dueño: ARN-3d). El 401 de
-// `mi_sala` salió del filtro con el aislamiento de D6. Se filtra por NOMBRE y
-// se cuenta aparte.
+// El mismo ruido de fondo que `retar` nombró uno a uno. Desde ARN-3d-ii la
+// lista está VACÍA: el aviso `inert` lo arregló su dueño (la hoja ⚙, `inert:
+// true`) y el 401 de `mi_sala` salió del filtro con el aislamiento de D6
+// (ARN-3c). Se deja el alias para que el próximo ruido se nombre en un sitio.
 const APU_RUIDO_CONOCIDO = RETAR_RUIDO_CONOCIDO
 
 // Espera activa a que la mesa llegue a un estado. Las manos duran segundos —hay
@@ -9224,12 +9225,12 @@ const VC_SONIDOS_CELEBRACION_MANO = ['chips-collect.mp3']
 // si el Howl aún cargaba, `playing()` era falso aunque fuera a sonar 40 ms
 // después (instrumento, Fase 0 §C4). Ahora se espera a que suene, con techo.
 const VC_ROCE_TECHO_MS = 300
-// …y se anota en qué estado estaba ese Howl EN EL INSTANTE DEL `play`. En la
-// PRIMERA celebración de la página nace en ese `play` (`loading`): en el camino
-// de IA nadie precarga `chipsCollect` (producto, Fase 0 §C4). Es un conocido con
-// dueño, ARN-3d-ii; la puerta que exige `loaded` se enciende allí, cuando el
-// producto lo arregle. Mientras, `loading` se informa y no tiñe `jugado`.
-const VC_EXIGE_ROCE_CARGADO = false
+// …y se anota en qué estado estaba ese Howl EN EL INSTANTE DEL `play`. Hasta
+// ARN-3d-ii, en la PRIMERA celebración de la página nacía en ese `play`
+// (`loading`): en el camino de IA nadie precargaba `chipsCollect` (Fase 0 §C4).
+// ARN-3d-ii lo mete en `SONIDOS_MESA` y la puerta se ENCIENDE: el primer roce
+// de la partida tiene que encontrar su Howl cargado (`p12`).
+const VC_EXIGE_ROCE_CARGADO = true
 
 // ARN-3d · LA VICTORIA, SEMBRADA (D14, revisión del STOP-1). Las cuatro
 // sub-pasadas que necesitan una mano ganada (`jugado`, `reloj`, `mute`,

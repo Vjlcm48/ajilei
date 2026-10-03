@@ -65,12 +65,19 @@ function obtener(nombre) {
 export const SONIDOS_PORTADA = ['buttonClick']
 
 // La mesa sí precarga los suyos: el primer `cardDeal` cae a los pocos
-// fotogramas de montar y tiene que sonar en su instante. `ajileiStrum`,
-// `chipsCollect` y `tableKnock` NO entran aquí — son de la celebración, que
-// llega minutos después y tiene su propio momento para pedirlos.
+// fotogramas de montar y tiene que sonar en su instante. `ajileiStrum` y
+// `tableKnock` NO entran aquí: el rasgueo es del AJILEI (raro) y el golpe de
+// mesa ya lo precarga el lobby (`SONIDOS_LOBBY`).
+//
+// ARN-3d §2.5 (D14) · `chipsCollect` SÍ entra. Es el roce de fichas de CADA
+// mano que se cobra —la gane el humano o una IA—, no un sonido de fiesta rara:
+// el primero cae en la primera mano. Fuera de esta lista nacía en su primer
+// `play` (`loading`) y, con red real, el primer roce de la partida llegaba
+// tarde respecto a las monedas (~0,73 s con 4G lento; Fase 0 §C4). 30 929 B.
 export const SONIDOS_MESA = [
   'cardDeal', 'coinBet', 'cardFold', 'cardShuffle',
   'timerWarning', 'showdown', 'comodin', 'buttonClick',
+  'chipsCollect',
 ]
 
 // LOB-1 · El lobby precarga UNO, y es el que él mismo dispara: el golpe de mesa
@@ -98,10 +105,10 @@ export const SONIDOS_LOBBY = ['tableKnock']
 //
 // LOS TRES, Y POR QUÉ CADA UNO:
 //   · `chipsCollect` — el anfitrión pulsa «Jugar ya»: las fichas suenan cuando
-//     la apuesta entra en juego. Es el único de los tres que hoy NO está en
-//     ninguna lista de precarga (la Fase 0 §3.4 lo midió): lo trajo la
-//     celebración y se pide en su propio momento. Aquí estrena segundo
-//     consumidor sin cambiar una cifra suya.
+//     la apuesta entra en juego. Cuando nació esta lista era el único de los
+//     tres que no estaba en ninguna otra (la Fase 0 §3.4 lo midió); desde
+//     ARN-3d viaja también en `SONIDOS_MESA`, y pedirlo dos veces no cuesta
+//     nada. Aquí estrena segundo consumidor sin cambiar una cifra suya.
 //   · `cardShuffle` — el barajado de fondo del mazo en el fieltro, a 0,15. Ya
 //     viaja en `SONIDOS_MESA`, así que en el camino sala → mesa se pide dos
 //     veces y no pasa nada: `precargarSonidos` es idempotente.

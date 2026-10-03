@@ -367,7 +367,6 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const [elimNotice,   setElimNotice]   = useState(null)   // {id,text} — aviso central no bloqueante
   const [reflowing,    setReflowing]    = useState(false)  // asentado suave del nuevo layout
   const [noteFlash,    setNoteFlash]    = useState(0)      // destello del chip de comodín
-  const [bankruptModal, setBankruptModal] = useState(false)// Caso B: humano sin fichas (≥2 vivos)
   // ── APU-1 §5 · LA RECARGA ENTRE MANOS ────────────────────────────
   // `recarga` es la pregunta ABIERTA: `{ motivo, monto, abierta }`, o `null` si no hay
   // ninguna. El motivo lo decide `pideRecarga` y manda en todo lo demás —si hay
@@ -1010,9 +1009,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   }, [phase, game.activePlayerIndex, congelado]) // eslint-disable-line
 
   // ── Saltar en silencio a un jugador activo RETIRADO (C4.4.1) ──────────────
-  // Puede ocurrir al iniciar BET_2/BET_3 si la Mano se retiró en una ronda
-  // previa (el motor reinicia activePlayerIndex = manoIndex). Sin "pensando" ni
-  // retardo: se avanza el turno de inmediato vía la API del motor (sin tocarlo).
+  // Nació para cuando BET_2/BET_3 abrían en la Mano retirada en una ronda
+  // previa. HOY NO SE ALCANZA: el motor abre la ronda en la siguiente silla
+  // viva, nunca en la retirada (medido a la vista, 3 de 3, en ARN-3c §11.1.2;
+  // por eso la celda `retirado` del modo `congelado` sale «no alcanzable»).
+  // La guarda se MANTIENE como defensa: si el motor volviera a dar el turno a
+  // un retirado, se avanza de inmediato vía su API (sin tocarlo), sin
+  // "pensando" ni retardo, en vez de dejar la mesa esperando a quien no juega.
   //
   // FRZ-1 §2.3 · Transición de UN paso, así que va al slot en vez de a las
   // dependencias: si estamos a oscuras se DIFIERE y la vuelta la ejecuta. Se
@@ -1152,7 +1155,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     setRecarga(null)
     // v1.2 §5.1 · «Rechazarla o dejar vencer el plazo […] termina la mesa y
     // devuelve las fichas al saldo.» Se termina por la MISMA puerta
-    // que la ✕ de la cabecera y que el modal de bancarrota, así que las fichas
+    // que la ✕ de la cabecera (y que el modal de bancarrota, que salía por ella
+    // hasta que ARN-3d lo retiró por inalcanzable), así que las fichas
     // que queden vuelven al bolsillo (§2.5). No se pierde nada por decir que no:
     // se pierde la mano que no se llegó a jugar.
     if (eraForzosa) salir()
@@ -1620,15 +1624,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // terminar, el efecto de reparto reparte las cartas.
   // C4.5: si una IA cae en bancarrota, primero corre la salida digna del panel
   // (ceremonia) y LUEGO se compromete la mano nueva con aviso + asentado suave.
-  // Si el humano cae en bancarrota con ≥2 vivos, en vez del GAME_OVER básico se
-  // congela la mesa (no se compromete next) y se abre el modal bloqueante.
   function beginHand() {
     setLastActions({})
     const prev = gameRef.current
     const next = startHand(prev)
     if (next.phase === PHASES.GAME_OVER) {
-      if (next.players[0].eliminated && next.aliveCount >= 2) setBankruptModal(true)
-      else setGame(next)
+      setGame(next)
       return
     }
     const elimSeats = next.players
@@ -2427,13 +2428,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 <div className="action-area thinking">Reponiendo…</div>
               )}
 
-              {/* C4.5: durante la salida digna (ceremony) o el modal de bancarrota
-                  no se ofrece "Siguiente mano" — la mesa no continúa. */}
+              {/* C4.5: durante la salida digna (ceremony) no se ofrece
+                  "Siguiente mano" — la mesa no continúa. */}
               {/* §5.1 · LA QUINTA CONDICIÓN DEL GATE. «Bloquea Siguiente mano», dice
                   el normativo, y no es un detalle de cortesía: la recarga sólo
                   existe ENTRE manos, así que dejar el botón vivo mientras la
                   pregunta está abierta es ofrecer la única acción que la anula. */}
-              {isPayoutPhase && !isClearing && !isShuffling && !ceremony && !bankruptModal && !recarga && (
+              {isPayoutPhase && !isClearing && !isShuffling && !ceremony && !recarga && (
                 <div className="action-area">
                   {/* FRZ-1 §2.4 · El otro extremo del arranque de mano. Handle
                       para poder cancelarlo, y si al vencer estamos a oscuras la
@@ -2833,30 +2834,6 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   {t('ia.recarga.vermesa')}
                 </SoundButton>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* C4.5 · Caso B — humano sin fichas (≥2 vivos): modal bloqueante y educado.
-          La mesa permanece congelada detrás (no se compromete la mano nueva). */}
-      {bankruptModal && (
-        <div className="bankrupt-overlay">
-          <div className="bankrupt-modal">
-            <p className="bankrupt-title">Te quedaste sin Heptacoins</p>
-            <p className="bankrupt-sub">Necesitas más Heptacoins para seguir jugando.</p>
-            <div className="bankrupt-actions">
-              <SoundButton className="btn btn-primary" onClick={salir}>
-                Volver al lobby
-              </SoundButton>
-              <button className="btn btn-soon" disabled>
-                Ver video por Heptacoins
-                <span className="soon-tag">Próximamente</span>
-              </button>
-              <button className="btn btn-soon" disabled>
-                Comprar Heptacoins
-                <span className="soon-tag">Próximamente</span>
-              </button>
             </div>
           </div>
         </div>

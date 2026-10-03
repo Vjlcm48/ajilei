@@ -133,15 +133,6 @@ body {
   margin: 0;
 }
 
-/* Kept for ModeSelect (globally referenced) */
-.soon-tag {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
 /* ── Decorative cards ───────────────────────────────────────────────────────
    position: absolute within .welcome-screen (position: relative).
    z-index: 0 keeps them behind .welcome-card (z-index: 1).

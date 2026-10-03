@@ -31,8 +31,9 @@ import ChipToken from '../components/ChipToken'
 import { saldoDelJugador } from '../lib/saldo'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { useIdioma } from '../hooks/useIdioma'
-import { enmascararCorreo } from '../hooks/lobbyCore'
+import { enmascararCorreo, atributosHoja } from '../hooks/lobbyCore'
 import { useSounds, precargarSonidos, SONIDOS_LOBBY } from '../hooks/useSounds'
+import { precargarMesa } from '../lib/cargarMesa'
 
 // ── El isotipo del lobby ────────────────────────────────────────────────────
 // `?no-inline` por el mismo motivo que `ChipToken` y `Wordmark`: el nombre del
@@ -92,6 +93,12 @@ export default function Lobby({ cuenta, saldo, onJugarIA, onJugarPvP, onCerrarSe
   // segundos de que el lobby exista; pedirlo en el manejador llegaría tarde y
   // Howler lo encolaría para después del clic. `precargarSonidos` es idempotente.
   useEffect(() => { precargarSonidos(SONIDOS_LOBBY) }, [])
+  // ARN-3d §2.4 (B11) · y el chunk de la mesa, en un momento ocioso. Aquí, en el
+  // MONTAJE del lobby, porque el lobby sólo existe con sesión: la Portada no lo
+  // monta y no paga la mesa antes de su primera pintura (`1.8b`). Un humano
+  // tarda segundos en elegir las cuatro filas de Retar; el chunk, con 4G lento,
+  // menos de uno.
+  useEffect(() => { precargarMesa() }, [])
 
   // ── La jaula de 1126px se EXCEPCIONA, no se demuele ───────────────────────
   // Molde EXACTO de `Portada.jsx:217-223`: `index.css` es andamiaje de Vite y
@@ -277,7 +284,8 @@ export default function Lobby({ cuenta, saldo, onJugarIA, onJugarPvP, onCerrarSe
         // que le da su transición— así que fuera de su estado abierto se retira
         // del árbol de accesibilidad y del orden de tabulación. Sin esto, un
         // jugador de teclado tabularía a través de siete controles invisibles.
-        {...(hojaAbierta ? {} : { inert: '', 'aria-hidden': 'true' })}
+        // `atributosHoja` (lobbyCore) dice cuáles, y por qué `inert` es `true`.
+        {...atributosHoja(hojaAbierta)}
       >
         <h2 id="lob-hoja-t" className="lob-hoja-t" tabIndex={-1} ref={tituloHojaRef}>
           {t('lob.cfg.titulo')}

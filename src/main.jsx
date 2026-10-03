@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/theme.css'
 import './index.css'
@@ -20,11 +20,44 @@ import './styles/tapetes.css'
 import './styles/menuMovil.css'
 import App from './App.jsx'
 import { SoundProvider } from './context/SoundContext.jsx'
+import EsperaDiferida from './components/EsperaDiferida'
+import { decidirFalloChunk, origenFalloMesa } from './lib/cargarMesa'
 
+// ── ARN-3d §2.4 (D11) · un chunk que ya no está: recargar UNA vez ───────────
+// La mesa viaja en su propio chunk con nombre de hash. Si se despliega una
+// versión nueva mientras una pestaña sigue abierta con la vieja, esa pestaña
+// pide un `GameTable-<hash viejo>.js` que ya no existe, y el servidor contesta
+// `index.html` (H3d-3: `wrangler.jsonc` no se toca en esta tanda). El `import()`
+// falla y Vite lo anuncia con `vite:preloadError`.
+//
+// Recargar trae el `index.html` nuevo, que apunta al chunk nuevo. No hay estado
+// que perder: el saldo de la sesión se lee de la base al volver. UNA vez por
+// sesión de la pestaña (la guarda vive en `sessionStorage`): si tras recargar
+// vuelve a fallar, no se entra en bucle y el error sigue su curso.
+//
+// Y SÓLO al entrar (STOP-2): si el fallo es de la precarga del lobby, se calla
+// y el lobby sigue. La decisión es `decidirFalloChunk` (`lib/cargarMesa`).
+const GUARDA_RECARGA = 'ajilei.recargaPorChunk'
+window.addEventListener('vite:preloadError', (evento) => {
+  let guarda
+  try { guarda = sessionStorage.getItem(GUARDA_RECARGA) === null ? 'libre' : 'usada' } catch { guarda = 'rota' }
+  const decision = decidirFalloChunk(origenFalloMesa(), guarda)
+  if (decision === 'silencio') { evento.preventDefault(); return }
+  if (decision !== 'recargar') return
+  try { sessionStorage.setItem(GUARDA_RECARGA, String(Date.now())) } catch { return }
+  evento.preventDefault()
+  window.location.reload()
+})
+
+// ARN-3d §2.4 · el ÚNICO `Suspense`, en la raíz, con el «Cargando» de BIE-1
+// como `fallback` (`EsperaDiferida`). La mesa entra en una transición: no
+// debería verse nunca.
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <SoundProvider>
-      <App />
+      <Suspense fallback={<EsperaDiferida />}>
+        <App />
+      </Suspense>
     </SoundProvider>
   </StrictMode>,
 )

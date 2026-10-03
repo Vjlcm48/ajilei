@@ -9,6 +9,7 @@ import {
   TRASPASO_MS, ASIENTO_MS,
   avanceDe, duracionCascada, duracionConteo, esperaRevienta, esperaFinMelodia,
 } from './coreografiaCore'
+import { esperaPrecedente } from './celebracionCore'
 import { MELODIA_MS } from '../config/melodiasCelebracion'
 
 // ── CEL-2 · El arco de la pantalla de victoria ──────────────────────────────
@@ -238,7 +239,11 @@ export function useCoreografia({ precedente, netas, saldo }) {
       const toc = typeof precedente === 'function' ? precedente() : null
       const audio = toc && toc.sound ? toc : null
       const espera = esperaRevienta(audio)
-      marcaCEL('ancla', { encadenado: !!audio, espera })
+      // ARN-3d §2.5 (D13) · `honesto`: el toc-toc SONABA al lanzar (la espera
+      // sale de su duración real) y no se cayó al nominal. Antes el arnés lo
+      // deducía de `espera !== TOC_NOMINAL_MS`; ahora la marca lo dice. Sólo en
+      // desarrollo: `marcaCEL` no hace nada en producción.
+      marcaCEL('ancla', { encadenado: !!audio, honesto: esperaPrecedente(audio) > 0, espera })
       if (!audio) { esperaRef.current = { timer: setTimeout(revienta, espera) }; return }
       const fin = () => revienta()
       // El reloj es el evento; el temporizador es la red, con el margen que

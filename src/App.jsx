@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, startTransition } from 'react'
 // ── LOB-1 · `Lobby` releva a `WelcomeScreen` en la casilla de `COMPLETO` ─────
 // `components/WelcomeScreen.jsx` sigue en el árbol —borrar es otra tanda, igual
 // que con `TableSelect` y `Entrada`— pero deja de importarse desde aquí, así que
@@ -14,7 +14,11 @@ import PartidaPvP from './screens/PartidaPvP'
 // APU-1 1e · «Retar a las IAS» releva a `NivelSelect` + `ModeSelect`, que se
 // RETIRAN del árbol en esta tanda (rector 1e §2.3) junto con `TableSelect`.
 import RetarIAS from './screens/RetarIAS'
-import GameTable from './components/GameTable'
+// ARN-3d §2.4 (B11) · la mesa viaja en su propio chunk y entra por `lazy`. El
+// especificador vive en `lib/cargarMesa`, el mismo que precarga el lobby; aquí
+// NO puede quedar un import estático de `GameTable` (lo vigila
+// `scripts/testMesaDiferida.test.js`), o la mesa volvería al paquete principal.
+import { cargarMesa, fabricaMesa, marcarEntradaMesa } from './lib/cargarMesa'
 import Portada from './screens/Portada'
 import Bautizo from './screens/Bautizo'
 import { saldoDelJugador } from './lib/saldo'
@@ -30,6 +34,11 @@ import { precargarBaraja } from './lib/precargaBaraja'
 // BIE-1 · El «Cargando» de la rama CARGANDO y la regla D5 que lo gobierna.
 import Cargando from './components/Cargando'
 import { useEsperaVisible } from './hooks/useEsperaVisible'
+
+// Fuera del componente: un `lazy` creado en cada render sería una mesa nueva
+// cada vez. `fabricaMesa` da un thenable SÍNCRONO cuando el chunk ya llegó, así
+// que con la precarga hecha `lazy` no suspende (Fase 0 §B4, H3d-2).
+const GameTable = lazy(fabricaMesa)
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
 // CUÁNDO: una vez por sesión, en el arranque, y ANTES de intentar nada (§4.1).
 import {
@@ -335,6 +344,12 @@ function App() {
   useEffect(() => {
     if (SIN_PRECARGA.includes(screen)) return
     precargarSonidos(SONIDOS_MESA)
+    // ARN-3d §2.4 · y el chunk de la mesa, por si el lobby no llegó a pedirlo
+    // (su montaje es el primer sitio, `Lobby.jsx`). `import()` es idempotente:
+    // si ya está pedido o llegado, esto no baja nada. AQUÍ y no antes: este
+    // efecto deja fuera 'lobby' (`SIN_PRECARGA`) porque `screen` vale 'lobby'
+    // también en la Portada (H3d-1), y la Portada no paga la mesa.
+    cargarMesa().catch(() => {})
     // CAR-1 §3.2 · y la baraja con ellos, por la misma razón y en el mismo
     // momento: 0,57 MB de WebP contra los 24,28 MB de PNG que ya no viajan.
     precargarBaraja()
@@ -526,9 +541,20 @@ function App() {
           // La entrada sale del bolsillo AQUÍ, al sentarse, y no cuando la mesa
           // termina: es lo que el jugador arriesga, y la barra superior de la
           // mesa tiene que enseñarlo desde la primera mano.
-          setSaldoSesion((previo) => previo - elegida.entrada)
-          setMesa(elegida)
-          setScreen('table')
+          //
+          // ARN-3d §2.4 · en una TRANSICIÓN: si el chunk de la mesa aún no
+          // llegó, React deja Retar puesta hasta que la mesa está lista, en vez
+          // de pintar el `fallback` del `Suspense` de la raíz (`main.jsx`). Con
+          // la precarga hecha no hay nada que esperar (D12).
+          //
+          // La marca va ANTES: desde aquí, un fallo del chunk es de la entrada
+          // y recarga; hasta aquí era de la precarga y se callaba (STOP-2).
+          marcarEntradaMesa()
+          startTransition(() => {
+            setSaldoSesion((previo) => previo - elegida.entrada)
+            setMesa(elegida)
+            setScreen('table')
+          })
         }}
         onVolver={() => setScreen('lobby')}
         onLobby={() => setScreen('lobby')}
