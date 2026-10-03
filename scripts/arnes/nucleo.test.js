@@ -7,7 +7,7 @@ import {
   NAVEGADOR_SELLADO, ETIQUETA_NAVEGADOR, ORDEN_INSTALAR, CODIGO, ErrorInstrumento,
   codigoDeSalida, canalPedido, comprobarVersion, faltaNavegador, leerOpciones, esBanderaComun,
   pidQueEscucha, veredictosDSK, VEREDICTO_DSK, MODOS_DSK,
-  esLocal, clasificarPeticion, respuestaSupabase, corteDelArnes, veredictoAislamiento, PERFIL_ARNES,
+  esLocal, clasificarPeticion, respuestaSupabase, corteDelArnes, veredictoAislamiento, PERFIL_ARNES, decidirBuild,
 } from './nucleo.mjs'
 import { readFileSync } from 'node:fs'
 
@@ -116,9 +116,13 @@ describe('D8 · quién escucha en el puerto', () => {
 
 describe('D5 · cada modo de diagDSK se lee por donde escribe su veredicto', () => {
   const celdas = (...p) => p.map((passed) => ({ passed }))
-  it('todos los modos válidos (menos `all`) tienen lector', () => {
+  it('todos los modos válidos (menos `humo`, que es un paquete) tienen lector', () => {
     const clave = (m) => (m === 'menu-movil' ? 'menuMovil' : m)
-    for (const m of MODOS_DSK.filter((x) => x !== 'all')) expect(VEREDICTO_DSK[clave(m)], m).toBeTypeOf('function')
+    for (const m of MODOS_DSK.filter((x) => x !== 'humo')) expect(VEREDICTO_DSK[clave(m)], m).toBeTypeOf('function')
+  })
+  it('ARN-3e · D12 · `humo` es un modo y `all` ya no', () => {
+    expect(MODOS_DSK).toContain('humo')
+    expect(MODOS_DSK).not.toContain('all')
   })
   it('`passed` por celda (a1, h1, z1…): una celda roja tiñe el modo', () => {
     expect(veredictosDSK({ mode: 'a1', a1: celdas(true, true) })).toEqual([['a1', 'verde']])
@@ -194,5 +198,30 @@ describe('D6 · qué sale del arnés y qué no', () => {
     expect(codigoDeSalida(v.map(([, x]) => x))).toBe(2)
     const limpio = veredictosDSK({ mode: 'lob', lob: { ok: true }, aislamiento: { escapadas: [] } })
     expect(codigoDeSalida(limpio.map(([, x]) => x))).toBe(0)
+  })
+})
+
+describe('ARN-3e-ii · D17 · nunca compilar con un dev vivo en el mismo proceso (H3e-i-1)', () => {
+  it('sin servidores de desarrollo, se puede compilar', () => {
+    expect(decidirBuild([])).toEqual({ ok: true, motivo: null })
+    expect(decidirBuild()).toEqual({ ok: true, motivo: null })
+  })
+  it('con un dev vivo, no: el motivo nombra el puerto, la causa y el orden sano', () => {
+    const d = decidirBuild([5173])
+    expect(d.ok).toBe(false)
+    expect(d.motivo).toContain(':5173')
+    expect(d.motivo).toContain('H3e-i-1')
+    expect(d.motivo).toMatch(/preview .*ANTES que el dev/)
+    expect(d.motivo).toContain('--sin-build')
+  })
+  it('con dos, los nombra a los dos', () => {
+    expect(decidirBuild([5173, 5174]).motivo).toContain(':5173, :5174')
+  })
+  it('servidorArnes lo consulta antes de compilar y lo convierte en código 2', () => {
+    const t = readFileSync(new URL('./comun.mjs', import.meta.url), 'utf8')
+    const preview = t.slice(t.indexOf("tipo === 'preview'"), t.indexOf('vite.build('))
+    expect(preview).toMatch(/decidirBuild\(DEVS_VIVOS\)[\s\S]*throw new ErrorInstrumento\(puede\.motivo\)/)
+    const dev = t.slice(t.indexOf("if (tipo === 'dev')"), t.indexOf("tipo === 'preview'"))
+    expect(dev).toContain('DEVS_VIVOS.push(puerto)')
   })
 })

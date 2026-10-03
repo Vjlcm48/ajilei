@@ -11,7 +11,9 @@
 //   d3     → matriz de 4 viewports: bbox de mesa/óvalo/paneles/mazos/abanico/botones + overflow
 //   bug    → reproduce la revelación finalista y mide el reflow del panel ganador
 //   shots  → capturas de los 4 viewports (+ la del bug si 'bug' corre antes)
-//   all    → d1d2 + d3 + bug + shots + lob
+//   humo   → d1d2 + d3 + bug + shots + gate + lob + retar (~4 min). Es el modo
+//            por defecto. ARN-3e retiró `all`: tardaba ~43 min, 40 de `apu`, y
+//            no era «todo»; `apu` se corre por su nombre.
 //   gate [tag] → DSK-G1: matriz matchMedia del gate + capturas WAITING (diff)
 //   lob    → LOB-1: el lobby post-login, en los 6 viewports de `gate`. OCHO
 //            puntos por celda: (1) `main.lobby` está y `main.welcome-screen` no;
@@ -368,7 +370,7 @@ if (!EXTERNO) process.env.LUZ_BASE_PORTADA = process.env.REV_BASE_PORTADA = `htt
 // ARN-3c · D7 · `lob` y `msg` miden el bundle REAL (`vite preview`, 4173 por
 // defecto o `--puerto=N`), con la sesión simulada de `contextoCap`: no usan
 // nada que solo exista en DEV, y así dejan de depender del bypass y del
-// `.env.local` de la máquina (Fase 0 de ARN-3, B3). `all` corre `lob`, así que
+// `.env.local` de la máquina (Fase 0 de ARN-3, B3). `humo` corre `lob`, así que
 // también levanta el preview, en `--puerto-aux=N` o 4173. `rec` y
 // `voz2.burbuja` se quedan en 5173 a propósito: `?apu=` solo existe en DEV.
 // `msg --semilla=azar` (o `--semilla=N`) es EXPLORACIÓN: juega otra población
@@ -402,7 +404,11 @@ const OUT_DIR = 'capturas-dsk'
 // archivo en una carpeta que ya guarda cientos. `capturas-lob/` está ignorada en
 // `.gitignore` con el mismo criterio que `capturas-pue/` — son regenerables.
 const LOB_OUT_DIR = 'capturas-lob'
-const MODE = process.argv[2] || 'all'
+const MODE = process.argv[2] || 'humo'
+// ARN-3e · D12 · `all` se retiró: no corre nada y dice por qué (código 2).
+if (MODE === 'all') {
+  await fallarInstrumento(new ErrorInstrumento('`all` se retiró en ARN-3e: usa `humo`, y `apu` por su nombre'))
+}
 // ARN-3a · D5 · un modo que no existe no corre nada, y antes salía verde.
 if (!MODOS_DSK.includes(MODE)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: ${MODOS_DSK.join(', ')}`))
@@ -1673,9 +1679,16 @@ async function esperarMesa(page, cond, limite = 25000) {
 // las cuatro celdas de una corrida y falló en una de la siguiente, sin que nada
 // cambiara. Con el humano apostando, la segunda capa es SEGURA en cuanto pone
 // una ficha de más, y el punto deja de ser una moneda al aire.
+//
+// ARN-3e · devuelve EL VALOR de `cond` (no `true`), para que quien lo necesite
+// tome su foto DENTRO de la misma evaluación que cumple la condición. `apu.5`
+// leía la frase en una evaluación posterior y, si entre medias el bucle había
+// pulsado «Siguiente mano», leía un mensaje ya vaciado (H3c-ii-3). Los demás
+// llamadores devuelven booleanos y no notan el cambio.
 async function jugarHasta(page, cond, manos = 6, agresivo = false) {
+  let v
   for (let i = 0; i < manos * 40; i++) {
-    if (await page.evaluate(cond)) return true
+    if ((v = await page.evaluate(cond))) return v
     const hecho = await page.evaluate((agresivo) => {
       const pulsa = (sel) => {
         const b = document.querySelector(sel)
@@ -1701,7 +1714,7 @@ async function jugarHasta(page, cond, manos = 6, agresivo = false) {
     // este modo caza —el pozo partido, por ejemplo— viven en el PAGO, y el pago
     // dura lo que tarde el bucle en pulsar «Siguiente mano»: mirando una sola vez
     // por vuelta se pasaba de largo la mitad de las veces.
-    if (await page.evaluate(cond)) return true
+    if ((v = await page.evaluate(cond))) return v
   }
   return page.evaluate(cond)
 }
@@ -2883,23 +2896,39 @@ async function runApu(browser) {
     // ── apu.5 · Las capas del pozo, contadas (§4.2) ───────────────────────
     // Una IA corta y otra a media profundidad: el ante hace la primera capa y la
     // segunda aparece en cuanto la ronda pase de ahí.
-    await page.goto(`${BASE}/?apu=capas`)
-    await recorrerRuta(page, 4, 'basico', 0, 'medio')
     // El pozo se parte cuando alguien pone por encima del nivel de la IA corta, y
     // eso pide que la ronda pase del ante. Depende de que las IAS apuesten, así
     // que se le da cuerda: doce manos es un minuto largo y sobra para verlo.
-    const huboCapas = await jugarHasta(page, () => Number(document.querySelector('.game-message')?.dataset.capas ?? 0) > 1, 12, true)
-    const capas = await page.evaluate(() => {
-      const m = document.querySelector('.game-message')
-      return {
-        capas: Number(m?.dataset.capas ?? 0),
-        texto: m?.textContent?.trim() ?? '',
-        tono: m?.dataset.tono ?? '',
-      }
-    })
+    //
+    // ARN-3e · la foto se toma DENTRO de la condición, en una sola evaluación, y
+    // solo en el PAGO: con `data-tono` puesto o con «Siguiente mano» a la vista.
+    // Leer `capas > 1` sola no basta: al pulsar «Siguiente mano» la mesa vacía
+    // frase y tono y deja `data-capas` en 3 hasta ~1,3 s después (H3c-ii-3,
+    // H3e-i-2). El botón se desmonta en ese mismo render (`isClearing`), así
+    // que el hueco no cumple ninguna de las dos señales. Y un pago con capas,
+    // pero con el tono o la frase vacíos, SÍ se lee: el juicio lo da rojo.
+    //
+    // ARN-3e-ii · D16 · si el molde no parte el pozo en 3 mesas, el caso no se
+    // dio: `apu.5` queda «sin cobertura» (ARN-3b D4), como `apu.2`.
+    let leido = false
+    let intentosCapas = 0
+    while (!leido && intentosCapas < 3) {
+      intentosCapas++
+      await page.goto(`${BASE}/?apu=capas`)
+      await recorrerRuta(page, 4, 'basico', 0, 'medio')
+      leido = await jugarHasta(page, () => {
+        const m = document.querySelector('.game-message')
+        const capas = Number(m?.dataset.capas ?? 0)
+        const tono = m?.dataset.tono ?? ''
+        const siguiente = [...document.querySelectorAll('.btn')].some(b => b.textContent.trim() === 'Siguiente mano')
+        return capas > 1 && (tono || siguiente) ? { capas, texto: m.textContent.trim(), tono } : false
+      }, 12, true)
+    }
+    const huboCapas = !!leido
+    const capas = leido || { capas: 0, texto: '', tono: '' }
     if (huboCapas) await page.screenshot({ path: `${dir}/apu_capas_${tag}.png` })
     c['apu.5'] = {
-      huboCapas, ...capas,
+      huboCapas, intentos: intentosCapas, ...capas,
       // QUÉ SE EXIGE, Y QUÉ NO. Que el pozo se parta en capas NO obliga a decir
       // nada: si las dos se las lleva el mismo, el resultado ya lo cuenta entero
       // y añadir una frase sería ruido. La primera corrida cayó justo ahí —dos
@@ -2908,8 +2937,13 @@ async function runApu(browser) {
       // parte el pozo de verdad y que, cuando la frase sale, sale bien formada.
       // Quién gana cada capa y cuándo toca nombrarlo es puro y lo sella Vitest
       // (`testMesaAPU1` §6), que es donde se puede fijar el reparto a mano.
-      ok: huboCapas && capas.capas > 1 && capas.texto.length > 0
+      ok: huboCapas && capas.capas > 1 && capas.texto.length > 0 && capas.tono.length > 0
         && (!capas.texto.includes('El pozo se partió') || /se lleva|vuelven|Te llevas/.test(capas.texto)),
+    }
+    if (!huboCapas) {
+      c['apu.5'].estado = 'sinCobertura'
+      c['apu.5'].ok = null
+      c.sinCobertura.push(`apu.5 (el pozo no se partió en ${intentosCapas} mesas)`)
     }
 
     // ── apu.6 · Geometría: nada se sale, nada queda bajo el dedo ──────────
@@ -14055,13 +14089,19 @@ async function runRec(browser) {
 // Chromium no instalado o de otra versión.
 let NAV
 try {
+  // ARN-3e · `humo` levanta su preview (y compila) ANTES que el servidor de
+  // desarrollo. Al revés, el build corre en el mismo proceso mientras el dev
+  // recién creado prepara sus dependencias en segundo plano, y el dev queda
+  // inservible: la app no llega al lobby (medido en ARN-3e-i; `--sin-build`
+  // salía verde y el control en copia lo reproduce). Es el orden de `diagPUE
+  // voz2` (preview y luego dev), el que ARN-3a dejó sano con `conNodeEnvPropio`.
+  if (MODE === 'humo') {
+    await servidorArnes({ tipo: 'preview', puerto: OPC.puertoAux || 4173, build: OPC.build, externo: EXTERNO, base: EXTERNO ? BASE_PROD : null })
+  }
   if (MODOS_PREVIEW.includes(MODE)) {
     await servidorArnes({ tipo: 'preview', puerto: OPC.puerto || 4173, build: OPC.build, externo: EXTERNO, base: EXTERNO ? BASE_PROD : null })
   } else {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puerto || 5173, bypass: true, externo: EXTERNO, base: EXTERNO ? BASE : null })
-  }
-  if (MODE === 'all') {
-    await servidorArnes({ tipo: 'preview', puerto: OPC.puertoAux || 4173, build: OPC.build, externo: EXTERNO, base: EXTERNO ? BASE_PROD : null })
   }
   if (!EXTERNO && (MODE === 'luz' || MODE === 'rev')) {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5174, bypass: false })
@@ -14085,27 +14125,28 @@ const report = {
     chromium: chromiumVivo,
     chromiumDeriva: NAV.contraste ? NAV.nota : false,
     servidor: MODOS_PREVIEW.includes(MODE) ? `${EXTERNO ? 'externo' : 'propio'} ${BASE_PROD} (preview, sesión simulada)`
-      : `${EXTERNO ? 'externo' : 'propio'} ${BASE}${MODE === 'all' ? ` + preview ${BASE_PROD} para lob` : ''}`,
+      : `${EXTERNO ? 'externo' : 'propio'} ${BASE}${MODE === 'humo' ? ` + preview ${BASE_PROD} para lob` : ''}`,
     ruta: { nivel: ARNES_NIVEL, stakeIdx: ARNES_STAKE_IDX, monto: apuestasDe(ARNES_NIVEL)[ARNES_STAKE_IDX], entrada: ARNES_ENTRADA },
   },
 }
 try {
-  if (MODE === 'd1d2' || MODE === 'all') {
+  if (MODE === 'd1d2' || MODE === 'humo') {
     const { page, data } = await runD1D2(browser)
     report.d1d2 = data
     await page.close()
   }
-  if (MODE === 'd3' || MODE === 'all') report.d3 = await runD3(browser)
-  if (MODE === 'bug' || MODE === 'all') report.bug = await runBug(browser)
-  if (MODE === 'shots' || MODE === 'all') report.shots = await runShots(browser)
-  if (MODE === 'gate') report.gate = await runGate(browser, process.argv[3] || 'after')
-  // LOB-1 · entra en `all` porque es la pantalla por la que pasan TODOS los
+  if (MODE === 'd3' || MODE === 'humo') report.d3 = await runD3(browser)
+  if (MODE === 'bug' || MODE === 'humo') report.bug = await runBug(browser)
+  if (MODE === 'shots' || MODE === 'humo') report.shots = await runShots(browser)
+  // ARN-3e · D12 · `gate` entra en `humo`: es la pantalla de entrada y cuesta 7 s.
+  if (MODE === 'gate' || MODE === 'humo') report.gate = await runGate(browser, (MODE === 'gate' && process.argv[3]) || 'after')
+  // LOB-1 · entra en `humo` (antes `all`) porque es la pantalla por la que pasan TODOS los
   // demás modos: si el lobby se rompe, los otros 27 salen rojos sin decir por
   // qué. Que este punto caiga primero es lo que convierte esa cascada en un
   // diagnóstico. Es barato: seis viewports sin llegar a la mesa.
-  if (MODE === 'lob' || MODE === 'all') report.lob = await runLob(browser)
-  if (MODE === 'retar' || MODE === 'all') report.retar = await runRetar(browser)
-  if (MODE === 'apu' || MODE === 'all') report.apu = await runApu(browser)
+  if (MODE === 'lob' || MODE === 'humo') report.lob = await runLob(browser)
+  if (MODE === 'retar' || MODE === 'humo') report.retar = await runRetar(browser)
+  if (MODE === 'apu') report.apu = await runApu(browser)
   if (MODE === 'b1') report.b1 = await runB1(browser)
   if (MODE === 'tactil') report.tactil = await runTactil(browser)
   if (MODE === 'p1') report.p1 = await runP1(browser)

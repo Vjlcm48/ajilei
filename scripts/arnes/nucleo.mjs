@@ -124,6 +124,26 @@ function puertoValido(texto, bandera) {
 
 export const esBanderaComun = (a) => BANDERAS.some((b) => (b.endsWith('=') ? a.startsWith(b) : a === b))
 
+// ── ARN-3e-ii · D17 · ¿se puede compilar ahora? ─────────────────────────────
+// H3e-i-1: un `vite build` en el MISMO proceso que un servidor de desarrollo ya
+// creado deja a ese dev inservible: la app no llega al lobby y el modo muere
+// por un timeout de 30 s que no dice por qué. El orden sano es el de `diagPUE
+// voz2` y `humo`: el preview (con su build) primero, el dev después.
+/**
+ * `devsVivos`: los puertos de los servidores de desarrollo que este proceso ya
+ * creó. Con alguno, compilar es un error de INSTRUMENTO (código 2), con el
+ * motivo escrito. Devuelve `{ ok, motivo }`.
+ */
+export function decidirBuild(devsVivos = []) {
+  if (!devsVivos.length) return { ok: true, motivo: null }
+  return {
+    ok: false,
+    motivo: `H3e-i-1 · se pidió un build con un servidor de desarrollo ya vivo en este proceso `
+      + `(${devsVivos.map((p) => `:${p}`).join(', ')}). Compilar después de crear el dev lo deja inservible: `
+      + `la app no llega al lobby. Levanta el preview (y su build) ANTES que el dev, o usa --sin-build.`,
+  }
+}
+
 // ── D8 · el puerto ocupado ───────────────────────────────────────────────────
 /**
  * Del texto de `netstat -ano` saca el PID que ESCUCHA en el puerto, en
@@ -193,7 +213,7 @@ export const VEREDICTO_DSK = Object.freeze({
 
 /** Modos válidos de `diagDSK` (el argumento) y la clave con que vuelven en el informe. */
 export const MODOS_DSK = Object.freeze([
-  'all', 'd1d2', 'd3', 'bug', 'shots', 'gate', 'lob', 'retar', 'apu', 'b1', 'tactil', 'p1', 'p2',
+  'humo', 'd1d2', 'd3', 'bug', 'shots', 'gate', 'lob', 'retar', 'apu', 'b1', 'tactil', 'p1', 'p2',
   'r1', 'r2', 'o1', 'h1', 'm1', 'a1', 'f1', 'z1', 'o2', 'a2', 'u1', 'menu-movil', 'u2', 'u3',
   'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado',
 ])

@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import {
   NAVEGADOR_SELLADO, ORDEN_INSTALAR, CODIGO, ErrorInstrumento,
-  canalPedido, comprobarVersion, faltaNavegador, leerOpciones, pidQueEscucha,
+  canalPedido, comprobarVersion, faltaNavegador, leerOpciones, pidQueEscucha, decidirBuild,
   esLocal, clasificarPeticion, respuestaSupabase, corteDelArnes, veredictoAislamiento,
 } from './nucleo.mjs'
 
@@ -180,6 +180,10 @@ function exigirPuertoLibre(puerto) {
 }
 
 // ── D6–D9 · el servidor ──────────────────────────────────────────────────────
+// ARN-3e-ii · D17 · los servidores de desarrollo que este proceso ya creó. Un
+// build pedido después es un error de instrumento (`decidirBuild`, H3e-i-1).
+const DEVS_VIVOS = []
+
 /**
  * Levanta (o, con `externo`, solo comprueba) el servidor del arnés.
  *   tipo   'dev' (createServer) o 'preview' (build + preview)
@@ -214,11 +218,14 @@ export async function servidorArnes({ tipo, puerto, bypass = true, build = true,
       if (antes === undefined) delete process.env.VITE_AUTH_BYPASS
       else process.env.VITE_AUTH_BYPASS = antes
     }
+    DEVS_VIVOS.push(puerto)
     alSalir(() => servidor.close())
     await servidor.listen()
   } else if (tipo === 'preview') {
     // D7 · nunca un dist/ viejo: se compila antes, salvo --sin-build.
     if (build) {
+      const puede = decidirBuild(DEVS_VIVOS)
+      if (!puede.ok) throw new ErrorInstrumento(puede.motivo)
       console.log('· arnés: compilando (vite build) para medir el bundle de este árbol…')
       await conNodeEnvPropio(() => vite.build({ root: RAIZ, logLevel: 'warn', clearScreen: false }))
     }
