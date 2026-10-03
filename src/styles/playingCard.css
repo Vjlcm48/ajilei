@@ -20,6 +20,12 @@
   box-shadow: 2px 10px 18px rgba(0, 0, 0, 0.35);
 }
 
+/* Los tres `!important` de la carta seleccionada son las ÚNICAS excepciones del
+   CSS aditivo del proyecto (`AJILEI_Sistema_Diseno_v1.2.md:432-433`). La
+   seleccionada tiene que ganar a TODO estado de la carta —el hover de arriba, la
+   luz de LUZ-1 (`luz.css:195`), las hojas de campaña—: sube, se ribetea de oro y
+   lleva su halo, sin sombra de contacto. Los vigila la lista blanca de
+   `scripts/testImportant.test.js`; un cuarto `!important` sale rojo. */
 .card-selected {
   transform: translateY(-18px) !important;
   border-color: var(--gold-brand) !important;
