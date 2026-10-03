@@ -12,7 +12,7 @@
 
 - Enhancement responsivo vía `@media (orientation: landscape)`. **No** se fuerza la orientación por código.
 - Todo el CSS nuevo va estrictamente dentro del media query de landscape. No se toca el layout de escritorio (ya aprobado) ni el de móvil vertical (`≤767px`, ya aprobado).
-- Archivos protegidos (`gameEngine.js`, `aiPlayer.js`, `seatLayouts.js`) **no** se modifican sin autorización explícita.
+- Archivos protegidos: **la lista canónica de `AJILEI_Protegidos_v1.0.md` §2** (hoy seis). No se modifican sin autorización explícita de Victor. *(ARN-3e (2026-10-03): antes copiaba una lista de tres; la lista no se copia, se apunta.)*
 - Reglas heredadas que se mantienen: ruteo por `aliveCount` (nunca `numPlayers`); `visibility` en vez de remoción del DOM; franjas de altura fija para evitar saltos; `box-sizing: border-box` verificado antes de diagnosticar problemas de ancho.
 
 ---
@@ -199,7 +199,7 @@ Todos los elementos de escritorio/vertical deben estar presentes en landscape:
 ## 12. Guardarraíles (resumen)
 
 - CSS nuevo estrictamente dentro de `@media (orientation: landscape)`.
-- No tocar `gameEngine.js` / `aiPlayer.js` / `seatLayouts.js` sin autorización.
+- No tocar ningún protegido (`AJILEI_Protegidos_v1.0.md` §2) sin autorización. *(ARN-3e (2026-10-03): antes copiaba una lista de tres; la lista no se copia, se apunta.)*
 - `aliveCount` para ruteo de layout; `visibility` (no remoción del DOM); franjas de altura fija; `box-sizing: border-box`.
 - Validación visual (capturas / DevTools) antes de cada commit. Testing manual obligatorio por Tanda.
 

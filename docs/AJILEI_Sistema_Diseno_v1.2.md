@@ -10,7 +10,7 @@
 
 ## ⚠️ RESTRICCIÓN GENERAL
 
-**NO modificar `gameEngine.js` ni `aiPlayer.js` bajo ninguna circunstancia.** Este sistema es 100% capa visual.
+**Los archivos protegidos** (lista canónica en `AJILEI_Protegidos_v1.0.md` §2; entre ellos `gameEngine.js` y `aiPlayer.js`) **no se modifican sin autorización explícita de Victor.** Este sistema es 100 % capa visual: ninguna campaña de diseño tiene motivo para abrirlos. La excepción pre-autorizada y las aperturas autorizadas viven en Protegidos §6 y §7, y en ningún otro sitio. *(ARN-3e (2026-10-03): decía «NO modificar `gameEngine.js` ni `aiPlayer.js` bajo ninguna circunstancia», que chocaba con Protegidos §6 y §7.)*
 
 ---
 
@@ -430,7 +430,7 @@ contacto en los paneles aparecería y desaparecería con el turno. Quedan fuera
 de LUZ-1 hasta que `turnBreath` deje de usar `box-shadow`.
 
 **La carta seleccionada no lleva sombra de contacto.** Conserva su halo dorado
-`!important` (`playingCard.css:23-27`). Tampoco hay `drop-shadow` en las cartas.
+`!important` (`playingCard.css:29-33`; eran `:23-27` antes del comentario que los justifica, ARN-3e (2026-10-03)). Tampoco hay `drop-shadow` en las cartas.
 La sombra de contacto va con `:where()` en 0,1,0 y excluye `.card-winner` y
 `.card-empty`, que tienen esa misma especificidad y cargan antes: sin la
 exclusión, el orden de carga les quitaría el halo y el `none`.
@@ -578,3 +578,25 @@ visibilidad.
 - **Si cambia la mesa del juego:** nueva maestra de CAP-1 → `gen_dispositivos.py --reencajar` (sin Blender,
   segundos) → copiar los dos `*_web.webp` a `src/assets/portada/` y los JSON a `maestras/dis1/` →
   `node scripts/dis1/geometria_dis.mjs` (si no está al día, `--escribir`) → `diagPUE dis`.
+
+---
+
+## 13. LOS ÓVALOS DE LA MESA SON INTOCABLES (ARN-3e, 2026-10-03)
+
+**Alcance:** «los óvalos» son **el óvalo central de la mesa** (mensajes, pozo y comodín) **en sus versiones para las mesas de 2, 3, 4 y 5**. Texto aprobado por Victor el 2026-10-03 (ARN-3e D19).
+
+> **Los óvalos de la mesa son intocables.** Su caja —posición, tamaño y forma— la fijan las constantes de O1 y DSK-O2, selladas por medición, y no cambia por ninguna vía:
+>
+> 1. **Ni geometría.** Ninguna campaña mueve, redimensiona ni recoloca un óvalo, en ninguna mesa (2, 3, 4 o 5) ni en ninguna vista.
+> 2. **Ni CSS.** Ninguna hoja nueva escribe reglas sobre el óvalo ni sobre su caja. Lo nuevo que deba verse dentro entra como elemento propio, con su clase, y se estiliza ahí (molde `.voz2-texto`, VOZ-2).
+> 3. **Ni contenido que lo haga crecer.** Lo que se pinte dentro cabe en la caja sellada o se recorta por dentro (elipsis con `contain: inline-size`, VOZ-2 D7). Ningún texto, cifra, icono ni animación puede empujar la caja, tampoco desde su `min-content`.
+>
+> Cambiar un óvalo es una decisión de Victor, con la misma ceremonia que abrir un protegido (`AJILEI_Protegidos_v1.0.md` §1): detenerse, reportar y esperar. Lo vigilan `o1`, `o2`, `h1`, `r1`/`r2`, `msg`, `apu` (`solapeOvalo`), `luz`/`rev` (Δ 0) y `diagPUE voz2`; el registro lleva la lista al día (INV-04).
+
+**Dónde lo dice el código** (no cambia; esta sección es su regla escrita):
+- O1, `gameTable.css:1194-1196`: «Geometría FIJA del óvalo central … no se mueve ni redimensiona jamás».
+- `gameTable.css:4985` y `:5016`: ningún contenido, presente ni futuro, lo mueve ni lo infla desde dentro.
+- DSK-O2, `gameTable.css:5473-5475`: el óvalo congelado en las mesas de 4, 3 y 2.
+- VOZ-2 D7, `voz2.css:30-39`: «la contención no es opcional»; la regla apunta al `<p>`, nunca al óvalo (`:100`).
+
+`o1` y `o2` solo miden escritorio. En móvil lo vigilan `diagPUE voz2`, `msg` y `apu`: es un hueco aceptado (ARN-3e D8), anotado en INV-04.

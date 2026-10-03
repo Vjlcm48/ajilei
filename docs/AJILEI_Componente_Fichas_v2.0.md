@@ -166,7 +166,7 @@ Mismo componente, misma identidad visual; solo cambia el tamaño.
 - Componente / clase **compartido único** (sin duplicación por layout).
 - Colores y tokens según `AJILEI_Sistema_Diseno_v1.2.md`; fichas en `--gold-brand`, aro en `--green-deep`; `--gold-dim` prohibido.
 - Componente **presentacional**: lee saldo / pozo del estado existente, no cambia lógica de juego.
-- No tocar `gameEngine.js` / `aiPlayer.js` / `seatLayouts.js` sin autorización.
+- No tocar ningún protegido (`AJILEI_Protegidos_v1.0.md` §2) sin autorización. *(ARN-3e (2026-10-03): antes copiaba una lista de tres; la lista no se copia, se apunta.)*
 - Animaciones solo con `transform` / `opacity`; respetar `prefers-reduced-motion`.
 - Validación visual y testing manual por Tanda; commit como cierre.
 

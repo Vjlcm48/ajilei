@@ -1,7 +1,7 @@
-# AJILEI — Archivos protegidos · Lista canónica v1.5
+# AJILEI — Archivos protegidos · Lista canónica v1.6
 
 - **Archivo:** `docs/AJILEI_Protegidos_v1.0.md`
-- **Versión:** 1.5
+- **Versión:** 1.6
 - **Estado:** **LISTA CANÓNICA ÚNICA.** Sellado 2026-08-20 por Victor
   (HEPTACREATION LLC), al cierre de la campaña IDN-1.
 - **Actualización v1.1 (2026-08-26):** se cierra el hueco de reconstrucción
@@ -32,6 +32,12 @@
   protegido— y nace la **§7, «Rangos abiertos en APU-1»**: por archivo y por
   fase, qué rango se abrió, por qué y con qué autoridad. De paso corrige **dos
   atribuciones equivocadas de la §3** que salieron al reconstruir esa historia.
+- **Actualización v1.6 (2026-10-03):** cierre de ARN-3 (ARN-3e). **La lista sigue
+  siendo las mismas seis y la §3 no cambia:** ningún protegido cambió, y desde
+  ARN-3e lo comprueba `scripts/testProtegidos.test.js`, que lee la §2 y la §3
+  de este documento y compara cada fila con los bytes del árbol. Entra en la §5
+  la regla que la acompaña, **«la huella se re-mide en el mismo commit»**, y la
+  §4 aclara que su «cinco archivos» es la constancia de la v1.1.
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -183,7 +189,7 @@ Los dos párrafos que abren esta sección se conservan tal como se escribieron
 en la v1.0: la constancia de la búsqueda es parte del valor del documento, y
 quien lea esta sección debe poder ver qué se buscó antes de aceptar el cierre.
 
-**Rige, como hasta ahora, la tabla de §2: cinco archivos.**
+**Rige, como hasta ahora, la tabla de §2: cinco archivos.** *(v1.1; desde la v1.4 son seis: ver la nota siguiente. Nota de la v1.6, ARN-3e (2026-10-03).)*
 
 > **REABIERTO Y VUELTO A CERRAR — v1.4 (2026-09-17).** Esta sección exigía
 > «autorización explícita de Victor en este documento» para reabrirse, y aquí
@@ -205,6 +211,14 @@ quien lea esta sección debe poder ver qué se buscó antes de aceptar el cierre
   manda este documento y se reporta la discrepancia.
 - El informe de cierre de cada campaña incluye la verificación de §3 sobre los
   archivos de esta lista.
+- **La huella se re-mide en el mismo commit** *(v1.6, ARN-3e (2026-10-03))*.
+  Una campaña autorizada a abrir un protegido actualiza su fila de §3 (blob,
+  `sha256` y líneas) **en el mismo commit** que cambia el archivo, y nombra la
+  tanda en la columna «abierto en». `scripts/testProtegidos.test.js` compara
+  cada fila con los bytes del árbol: un protegido cambiado sin su fila es rojo,
+  y una fila cambiada sin el archivo también. Así el diff de cada commit enseña
+  la apertura junto al código, y una apertura sin permiso no llega verde a
+  `main`.
 - **Una excepción pre-autorizada se declara en la §6 de este documento y en
   ningún otro sitio.** La de la siembra vivió dos campañas dentro de un documento
   de fase (`AJILEI_Modos_y_Asistencia_v1.0.md §7.1`), que es justo el patrón que

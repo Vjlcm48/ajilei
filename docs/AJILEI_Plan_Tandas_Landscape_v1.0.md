@@ -22,7 +22,7 @@
 - **Un frente a la vez.** No se abren Tandas en paralelo; se completa y valida antes de seguir.
 - **Validación visual primero.** Capturas / DevTools a 812×375 (landscape) y prueba en dispositivo antes de cualquier commit.
 - **Testing manual obligatorio** como cierre de cada Tanda, seguido de Git commit.
-- **Archivos protegidos** (`gameEngine.js`, `aiPlayer.js`, `seatLayouts.js`) no se tocan sin autorización explícita. Claude Code **se detiene y reporta** al acercarse a un límite de alcance, no improvisa.
+- **Archivos protegidos:** la lista canónica de `AJILEI_Protegidos_v1.0.md` §2 (hoy seis). No se tocan sin autorización explícita de Victor. *(ARN-3e (2026-10-03): antes copiaba una lista de tres; la lista no se copia, se apunta.)* Claude Code **se detiene y reporta** al acercarse a un límite de alcance, no improvisa.
 - **CSS nuevo** estrictamente dentro de `@media (orientation: landscape)` (Bloques 1–3). El Bloque 4 (fichas) toca las tres orientaciones por diseño.
 
 ---
@@ -93,7 +93,7 @@ Instrucciones **targeted** (1–2 asuntos por vez) para no obligar a Claude Code
 - Bloques 1–3: CSS estrictamente dentro de `@media (orientation: landscape)`. No tocar el layout de escritorio ni el de vertical aprobados.
 - Bloque 4: el componente de fichas es **presentacional** (lee saldo/pozo del estado existente, no cambia lógica de juego).
 - `aliveCount` para ruteo; `visibility` (no remoción del DOM); franjas de altura fija; `box-sizing: border-box`.
-- No tocar `gameEngine.js` / `aiPlayer.js` / `seatLayouts.js` sin autorización.
+- No tocar ningún protegido (`AJILEI_Protegidos_v1.0.md` §2) sin autorización. *(ARN-3e (2026-10-03): antes copiaba una lista de tres; la lista no se copia, se apunta.)*
 
 ---
 
