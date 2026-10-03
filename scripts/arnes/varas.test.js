@@ -1,6 +1,6 @@
 // ── ARN-3c-ii · D9 y §1.1.1 · la mediana de 3 y el encadenado honesto ────────
 import { describe, it, expect } from 'vitest'
-import { claveFallo, mayoriaDeFallos, mayoriaDePuertas, separarConocidos, encadenadoHonesto } from './varas.mjs'
+import { claveFallo, mayoriaDeFallos, mayoriaDePuertas, separarConocidos, encadenadoHonesto, leeHonesto } from './varas.mjs'
 
 describe('D9 · la mediana de 3 como mayoría por puerta', () => {
   it('la clave de un fallo no lleva sus cifras', () => {
@@ -54,5 +54,23 @@ describe('§1.1.1 · el encadenado honesto', () => {
   it('sin audio no hay encadenado', () => {
     expect(encadenadoHonesto({ encadenado: false, espera: TOC }, TOC)).toBe(false)
     expect(encadenadoHonesto(null, TOC)).toBe(false)
+  })
+  // ARN-3d §1.4 · las dos ramas: la marca `honesto` manda cuando existe; sin
+  // ella, la deducción por igualdad de ARN-3c.
+  it('con la marca `honesto`, se LEE y no se deduce', () => {
+    expect(leeHonesto({ encadenado: true, honesto: true, espera: TOC })).toBe(true)
+    // La marca dice la verdad aunque la espera, por azar, valga el nominal…
+    expect(encadenadoHonesto({ encadenado: true, honesto: true, espera: TOC }, TOC)).toBe(true)
+    // …y aunque la espera parezca de archivo, si la marca dice que no, es que no.
+    expect(encadenadoHonesto({ encadenado: true, honesto: false, espera: 2146 }, TOC)).toBe(false)
+    // Sin audio pedido no hay encadenado, diga lo que diga la marca.
+    expect(encadenadoHonesto({ encadenado: false, honesto: true, espera: 2146 }, TOC)).toBe(false)
+  })
+  it('sin la marca (o con un valor que no es booleano), cae a la deducción', () => {
+    expect(leeHonesto({ encadenado: true, espera: 2146 })).toBe(false)
+    expect(leeHonesto({ encadenado: true, honesto: 'sí', espera: TOC })).toBe(false)
+    expect(leeHonesto(null)).toBe(false)
+    expect(encadenadoHonesto({ encadenado: true, honesto: 'sí', espera: TOC }, TOC)).toBe(false)
+    expect(encadenadoHonesto({ encadenado: true, honesto: undefined, espera: 2146 }, TOC)).toBe(true)
   })
 })

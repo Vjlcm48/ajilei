@@ -312,7 +312,7 @@ import { NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
 // APU-1 1e · la ruta a la mesa sale de este archivo y pasa a `rutaMesa.mjs`,
 // para que deje de ser un secreto de `diagDSK` y la compartan los demás arneses
 // (la avería de NIV-UI, contada en la cabecera de aquel módulo).
-import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa } from './rutaMesa.mjs'
+import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa, esperarMesa as esperarMesaComun } from './rutaMesa.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -382,6 +382,15 @@ const MSG_SEMILLA_ARG = (() => {
   if (v === 'azar') return { modo: 'azar', base: 1 + Math.floor(Math.random() * 2 ** 30) }
   if (/^\d+$/.test(v)) return { modo: 'explicita', base: Number(v) }
   return { modo: 'invalida', valor: v }
+})()
+// ARN-3d §2.5 · `vc --retrasa-roce=<ms>` retrasa SOLO `chips-collect.mp3` en
+// la página de `vc·jugado`: es la vara de su precarga (antes `loading` en el
+// `play` de la primera celebración, después `loaded`). Sin la bandera, nada.
+const VC_RETRASO_ROCE_MS = (() => {
+  const i = process.argv.findIndex(a => a.startsWith('--retrasa-roce='))
+  if (i < 0) return 0
+  const v = Number(process.argv.splice(i, 1)[0].slice('--retrasa-roce='.length))
+  return Number.isFinite(v) && v > 0 ? v : 0
 })()
 const MODOS_PREVIEW = ['lob', 'msg']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
@@ -6963,7 +6972,8 @@ async function runU1(browser) {
     // NivelSelect lo premarca. No salta la pantalla (regla dura de v1.0 §4.2),
     // así que la ruta es idéntica; el chip sólo añade un <span> dentro del
     // botón y `nth-of-type` sigue apuntando al mismo sitio.
-    await volverALaMesa(page, n); await page.waitForSelector('.game-table')
+    // ARN-3d · la espera común (`rutaMesa.esperarMesa`), no una copia suya.
+    await volverALaMesa(page, n); await esperarMesaComun(page)
     await u1Install(page); await u1OpenMenu(page)
     const entry = await page.evaluate(() => window.__u1SoundEntry())
     const ok = lsAntes === 'off' && lsTras === 'off' && entry && entry.off === true && entry.glyph === '🔇'
@@ -9209,6 +9219,51 @@ const VC_TABLES = [5, 4, 3, 2]
 // del repo en CEL-A-b; esta lista es la que la puerta pide ahora, entera.
 const VC_SONIDOS_CELEBRACION_MANO = ['chips-collect.mp3']
 
+// ARN-3d §1.3 · EL ROCE, LEÍDO A TIEMPO. `vc·jugado` leía `sonando` en el mismo
+// tick en que aparece la capa, que es el instante del `play('chipsCollect')`:
+// si el Howl aún cargaba, `playing()` era falso aunque fuera a sonar 40 ms
+// después (instrumento, Fase 0 §C4). Ahora se espera a que suene, con techo.
+const VC_ROCE_TECHO_MS = 300
+// …y se anota en qué estado estaba ese Howl EN EL INSTANTE DEL `play`. En la
+// PRIMERA celebración de la página nace en ese `play` (`loading`): en el camino
+// de IA nadie precarga `chipsCollect` (producto, Fase 0 §C4). Es un conocido con
+// dueño, ARN-3d-ii; la puerta que exige `loaded` se enciende allí, cuando el
+// producto lo arregle. Mientras, `loading` se informa y no tiñe `jugado`.
+const VC_EXIGE_ROCE_CARGADO = false
+
+// ARN-3d · LA VICTORIA, SEMBRADA (D14, revisión del STOP-1). Las cuatro
+// sub-pasadas que necesitan una mano ganada (`jugado`, `reloj`, `mute`,
+// `corte`) entran con `?apu=gana`: el molde prepara el REPARTO de la primera
+// mano para que la gane el humano, y la mano se juega por el camino normal
+// (`repartoGanador.js`). Antes cada una buscaba su victoria a ciegas en 18
+// manos y alguna se quedaba sin ella (H3d-i-2). Si el molde no la da (el único
+// caso es mesa 5 con dos retiradas exactas a las 2), `vcHastaVictoria` sigue
+// jugando a ciegas, y si tampoco llega, la sub-pasada sale «sin cobertura»: es
+// la red, no un rojo de producto.
+const VC_MOLDE = '?apu=gana'
+async function gotoMesaVC(page, n) {
+  await page.goto(`${BASE}/${VC_MOLDE}`)
+  RUTA_USADA = await recorrerRuta(page, n, ARNES_NIVEL, ARNES_STAKE_IDX, ARNES_ENTRADA)
+  await page.mouse.move(5, 5)
+  return RUTA_USADA
+}
+const vcMolde = (manos) => (manos === 1 ? 'el molde dio la victoria en la 1.ª mano' : `el molde NO la dio: victoria en la mano ${manos}`)
+const VC_SONDA_ROCE = () => {
+  window.__vcRoce = []
+  const t0 = performance.now()
+  const arma = () => {
+    if (!window.Howl) { if (performance.now() - t0 < 30000) setTimeout(arma, 5); return }
+    const orig = window.Howl.prototype.play
+    window.Howl.prototype.play = function (...a) {
+      const estado = this.state()
+      const id = orig.apply(this, a)
+      if (/chips-collect/.test(String(this._src))) window.__vcRoce.push({ t: Math.round(performance.now()), estado, id })
+      return id
+    }
+  }
+  arma()
+}
+
 // Anclas del Δ=0. Las mismas de U2/U3: si un overlay fuera de flujo moviera
 // algo, se vería aquí.
 const VC_ANCHORS = [
@@ -9225,6 +9280,32 @@ async function vcInstall(page) {
     const R = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: rnd(b.x), y: rnd(b.y), w: rnd(b.width), h: rnd(b.height), cx: rnd(b.left + b.width / 2), cy: rnd(b.top + b.height / 2) } }
     window.__vcR = s => R(document.querySelector(s))
     window.__vcSnap = () => A.map(s => R(document.querySelector(s)))
+    // ARN-3d §1.3 · EL Δ DE `.pbr-chips` (Fase 0 §C5). Mientras vuela la
+    // celebración, `saldoMostrado` RETIENE la cifra del ganador; el toque la
+    // suelta y la cifra salta al saldo real (si gana un dígito, 10,19 px). Eso
+    // no es el overlay moviendo nada. Para que la segunda toma compare la MISMA
+    // cifra, se escriben en los nodos de texto los valores de la primera, se
+    // mide (getBoundingClientRect fuerza el reflujo) y se devuelven, todo en el
+    // mismo tick: React no llega a ver nada. Se tocan los nodos de texto, no
+    // `textContent`, para no romper el árbol que React lleva por dentro.
+    const textos = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return []
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      const out = []
+      while (w.nextNode()) out.push(w.currentNode)
+      return out
+    }
+    window.__vcTextos = (sel) => textos(sel).map(n => n.nodeValue)
+    window.__vcSnapIgualado = (sel, antes) => {
+      const nodos = textos(sel)
+      const ahora = nodos.map(n => n.nodeValue)
+      const iguala = Array.isArray(antes) && antes.length === nodos.length
+      if (iguala) nodos.forEach((n, i) => { n.nodeValue = antes[i] })
+      const snap = A.map(s => R(document.querySelector(s)))
+      if (iguala) nodos.forEach((n, i) => { n.nodeValue = ahora[i] })
+      return { snap, ahora, iguala, nodos: nodos.length }
+    }
     window.__vcCss = (sel, props) => {
       const el = document.querySelector(sel)
       if (!el) return null
@@ -9536,15 +9617,24 @@ async function runVC(browser) {
     const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
     const r = { mesa: n }
     try {
-      await gotoMesa(page, n)
+      await page.addInitScript(VC_SONDA_ROCE)   // ARN-3d §1.3 · el estado del Howl en su `play`
+      if (VC_RETRASO_ROCE_MS) {
+        r.retrasoRoceMs = VC_RETRASO_ROCE_MS
+        await page.route('**/chips-collect.mp3', async (route) => {
+          await new Promise((ok) => setTimeout(ok, VC_RETRASO_ROCE_MS))
+          await route.fallback()
+        })
+      }
+      await gotoMesaVC(page, n)
       await vcInstall(page)
       const manos = await vcHastaVictoria(page)
       r.manos = manos
       if (manos == null) {
-        r.error = 'sin victoria humana en el tope de manos'
-        r.ok = false
+        r.error = 'sin victoria humana: ni el molde ni el tope de manos'
+        r.ok = null
+        r.estado = 'sinCobertura'
         jugado.push(r)
-        console.log(`vc·jugado m${n} · FALLA · ${r.error}`)
+        console.log(`vc·jugado m${n} · SIN COBERTURA · ${r.error}`)
         await page.close(); continue
       }
 
@@ -9574,8 +9664,15 @@ async function runVC(browser) {
         pulso: !!document.querySelector('.vc-pulso'),
         ajilei: !!document.querySelector('.vc-ajilei'),
       }))
+      // ARN-3d §1.3 · el roce se espera hasta VC_ROCE_TECHO_MS desde que se ve
+      // la capa, en vez de leerlo en el tick de su `play`.
+      const tRoce = Date.now()
+      r.roceSonoTrasMs = await page.waitForFunction(
+        () => (window.__vcAudio()?.sonando ?? []).includes('chips-collect.mp3'), null,
+        { timeout: VC_ROCE_TECHO_MS }).then(() => Date.now() - tRoce, () => null)
       const audio = await page.evaluate(() => window.__vcAudio())
       const durante = await page.evaluate(() => window.__vcSnap())
+      const textosDurante = await page.evaluate(() => window.__vcTextos('.pbr-chips'))
       // El roce entra cuando el volteo ya se calló: nunca solapados.
       r.p11 = antes.capa === false && antes.sonando.includes('showdown.mp3') &&
         !antes.sonando.includes('chips-collect.mp3') &&
@@ -9606,7 +9703,13 @@ async function runVC(browser) {
       // MISMO estado de juego: ambas tomas en fase de pago, una con el overlay
       // vivo y otra tras cortarlo. Contra el estado de espera se mediría el
       // reparto de la mano —165px de diferencia legítima— y no el overlay.
-      const despues = await page.evaluate(() => window.__vcSnap())
+      // ARN-3d §1.3 · la segunda toma, con el texto de `.pbr-chips` de la primera.
+      const igualada = await page.evaluate((t) => window.__vcSnapIgualado('.pbr-chips', t), textosDurante)
+      const despues = igualada.snap
+      r.pbrIgualado = {
+        iguala: igualada.iguala, durante: textosDurante.join('').trim(), despues: igualada.ahora.join('').trim(),
+        nodos: `${textosDurante.length}/${igualada.nodos}`,
+      }
       const dmax = (a, b) => {
         let m = 0, quien = null
         a.forEach((p, i) => {
@@ -9623,13 +9726,21 @@ async function runVC(browser) {
       r.viva = viva
       r.p1 = viva.capa === true && viva.pulso === true && viva.ajilei === false && p1_sonido
       r.p4 = p4
-      r.p2 = r.dOverlay <= 0.02
+      // Sin igualar no hay comparación honesta: la puerta no se da por buena.
+      r.p2 = r.pbrIgualado.iguala && r.dOverlay <= 0.02
       // P3 · la celebración muere sola dentro del techo.
       r.p3 = true   // se mide en la sub-pasada de reloj
+      // ARN-3d §1.3 · el estado del Howl del roce en su primer `play` de la página.
+      r.roce = await page.evaluate(() => window.__vcRoce ?? [])
+      r.roceEstado = r.roce[0]?.estado ?? null
+      r.p12 = r.roceEstado === 'loaded'
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
-    r.ok = !!(r.p1 && r.p2 && r.p4 && r.p11)
+    r.ok = !!(r.p1 && r.p2 && r.p4 && r.p11 && (!VC_EXIGE_ROCE_CARGADO || r.p12))
     jugado.push(r)
     console.log(`vc·jugado m${n} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} viva=${JSON.stringify(r.viva)} sonando=${JSON.stringify(r.sonando)}${r.sonandoAjeno?.length ? ` AJENO=${JSON.stringify(r.sonandoAjeno)}` : ''} Δ=${r.dOverlay} (${r.dQuien}) toque=${r.p4} · secuencia=${r.p11} antes=${JSON.stringify(r.antes)} espera=${r.esperaMs}ms${r.error ? ' · ' + r.error : ''}`)
+    if (r.pbrIgualado) console.log(`  vc·jugado · .pbr-chips medido con el texto de «durante» (${r.pbrIgualado.durante} → ${r.pbrIgualado.despues}${r.pbrIgualado.iguala ? '' : ` · NO SE PUDO IGUALAR: nodos ${r.pbrIgualado.nodos}`}) · 13 anclas a 0,02 px`)
+    if (r.manos != null) console.log(`  vc·jugado · ${vcMolde(r.manos)}${r.retrasoRoceMs ? ` · chips-collect.mp3 retrasado ${r.retrasoRoceMs} ms` : ''}`)
+    if (r.roce) console.log(`  vc·jugado · roce: ${r.roce.length} play(s) ${r.roce.map(x => `${x.estado}@${x.t}`).join(' · ') || '(ninguno)'} · sonando a los ${r.roceSonoTrasMs ?? `>${VC_ROCE_TECHO_MS}`} ms de ver la capa (techo ${VC_ROCE_TECHO_MS}) · puerta «loaded» ${VC_EXIGE_ROCE_CARGADO ? (r.p12 ? 'VERDE' : 'ROJA') : 'apagada'}${r.conocidos ? ` · ${r.conocidos.join(' · ')}` : ''}`)
     await page.close()
   }
 
@@ -9640,17 +9751,19 @@ async function runVC(browser) {
     const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
     const r = { mesa: n }
     try {
-      await gotoMesa(page, n)
+      await gotoMesaVC(page, n)
       await vcInstall(page)
       const manos = await vcHastaVictoria(page)
       r.manos = manos
       if (manos == null) {
-        r.error = 'sin victoria humana en el tope de manos'
-        r.ok = false
+        r.error = 'sin victoria humana: ni el molde ni el tope de manos'
+        r.ok = null
+        r.estado = 'sinCobertura'
         relojes.push(r)
-        console.log(`vc·reloj m${n} · FALLA · ${r.error}`)
+        console.log(`vc·reloj m${n} · SIN COBERTURA · ${r.error}`)
         await page.close(); continue
       }
+      console.log(`  vc·reloj m${n} · ${vcMolde(manos)}`)
       // VC2b · el techo mide el DIBUJO, y el dibujo ya no arranca en el pago:
       // entre uno y otro está la espera al final de showdown. Medir desde el
       // pago daría un falso rojo (a mitad del techo la celebración aún no ha
@@ -9721,7 +9834,7 @@ async function runVC(browser) {
     const page = await browser.newPage({ viewport: { width: 1366, height: 768 } })
     const r = { esc }
     try {
-      await gotoMesa(page, 2)
+      await gotoMesaVC(page, 2)
       await vcInstall(page)
       if (esc === 'mute') {
         // Por la ENTRADA DEL MENÚ, el camino del usuario, y ANTES de jugar:
@@ -9734,12 +9847,14 @@ async function runVC(browser) {
       const manos = await vcHastaVictoria(page)
       r.manos = manos
       if (manos == null) {
-        r.error = 'sin victoria humana en el tope de manos'
-        r.ok = false
+        r.error = 'sin victoria humana: ni el molde ni el tope de manos'
+        r.ok = null
+        r.estado = 'sinCobertura'
         guardias.push(r)
-        console.log(`vc·guardia ${esc} · FALLA · ${r.error}`)
+        console.log(`vc·guardia ${esc} · SIN COBERTURA · ${r.error}`)
         await page.close(); continue
       }
+      console.log(`  vc·guardia ${esc} · ${vcMolde(manos)}`)
 
       if (esc === 'mute') {
         const yaMismo = await page.evaluate(() => ({
@@ -9783,10 +9898,19 @@ async function runVC(browser) {
     await page.close()
   }
 
-  const passed = p6 && cells.every(c => c.passed) && jugado.every(r => r.ok) &&
-    relojes.every(r => r.ok) && guardias.every(r => r.ok)
-  console.log(`\n── VC: ${cells.filter(c => c.passed).length}/${cells.length} celdas · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · reloj+mute ${relojes.filter(r => r.ok).length}/${relojes.length} · guardias ${guardias.filter(r => r.ok).length}/${guardias.length} · decisor ${p6 ? 'OK' : 'FALLA'} · ${passed ? 'VERDE' : 'ROJO'}`)
-  return { decisor, cells, jugado, relojes, guardias, passed, topeMs: CELEBRACION_TOPE_MS, viajeMs: VIAJE_MS, escalonMs: VIAJE_ESCALON_MS, ajileiMs: AJILEI_MS }
+  // ARN-3d · una sub-pasada sin victoria (`ok: null`) no es verde ni roja: se
+  // declara en `sinCobertura` y el modo sale `cobertura` (D4 de ARN-3b). Un
+  // `false` sigue siendo rojo.
+  const sinCobertura = [
+    ...jugado.filter(r => r.estado === 'sinCobertura').map(r => `jugado m${r.mesa}`),
+    ...relojes.filter(r => r.estado === 'sinCobertura').map(r => `reloj m${r.mesa}`),
+    ...guardias.filter(r => r.estado === 'sinCobertura').map(r => `guardia ${r.esc}`),
+  ].map(q => `${q} (sin victoria humana: ni el molde ni el tope de manos)`)
+  const noRojo = (r) => r.ok === true || r.estado === 'sinCobertura'
+  const passed = p6 && cells.every(c => c.passed) && jugado.every(noRojo) &&
+    relojes.every(noRojo) && guardias.every(noRojo)
+  console.log(`\n── VC: ${cells.filter(c => c.passed).length}/${cells.length} celdas · jugado ${jugado.filter(r => r.ok).length}/${jugado.length} · reloj+mute ${relojes.filter(r => r.ok).length}/${relojes.length} · guardias ${guardias.filter(r => r.ok).length}/${guardias.length} · decisor ${p6 ? 'OK' : 'FALLA'} · ${passed ? (sinCobertura.length ? `SIN COBERTURA: ${sinCobertura.join('; ')}` : 'VERDE') : 'ROJO'}`)
+  return { decisor, cells, jugado, relojes, guardias, passed, sinCobertura, topeMs: CELEBRACION_TOPE_MS, viajeMs: VIAJE_MS, escalonMs: VIAJE_ESCALON_MS, ajileiMs: AJILEI_MS }
 }
 
 // ── MSG-U1 · Mensajes de resultado compuestos desde el estado ────────────────

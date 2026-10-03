@@ -69,9 +69,26 @@ export async function recorrerRuta(page, n, nivel, stakeIdx, entrada = ENTRADA_A
   if (alPaso) await alPaso(page, 'entrada')
 
   await page.click('[data-accion="cta"]')
-  await page.waitForSelector('.game-table')
+  await esperarMesa(page)
 
   return { nivel, stakeIdx, monto: montos[stakeIdx], jugadores: n, entrada }
+}
+
+// ── ARN-3d · LA ESPERA DE LA MESA, EN UN SOLO SITIO ────────────────────────
+// Rector: AJILEI_ARN-3d_v1.0.md §1.1 (Fase 0 §B7). Cuando la mesa viaja en su
+// propio chunk, entre el toque de «Jugar» y la mesa pintada puede haber una
+// descarga. Nadie lee la mesa antes de esta espera: la ruta la llama al final y
+// los que entran por otro camino (la segunda entrada de `u1`, el control
+// negativo de CEL) la llaman también, en vez de repetirla a su manera.
+//
+// Basta `.game-table` VISIBLE: con `startTransition` el DOM de la mesa sólo se
+// confirma cuando el módulo ya está evaluado, y Vite inserta la hoja del chunk
+// ANTES de resolver el `import()` (Fase 0 §B7–B8). Si un día la espera pintara
+// un `fallback` (`.cargando`, BIE-1), la mesa no está lista mientras se vea.
+// Sin `sleep`: se espera a una condición, nunca a un reloj.
+export async function esperarMesa(page, { timeout = 30000 } = {}) {
+  await page.waitForSelector('.game-table', { timeout })
+  await page.waitForFunction(() => !document.querySelector('.cargando'), null, { timeout })
 }
 
 // El orden de los chips de la cuarta fila, tal como los devuelve

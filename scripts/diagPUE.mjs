@@ -25,6 +25,7 @@
 //       node scripts/diagPUE.mjs dis             (DIS-1: los aparatos renderizados de la escena 5, Edge y WebKit; SÍ entra en `todo`)
 //       node scripts/diagPUE.mjs bie             (BIE-1: qué suena en la puerta y el «Cargando», con la red de Supabase simulada; SÍ entra en `todo`)
 //       node scripts/diagPUE.mjs voz2 [--control=contain|nowrap|capa] [--celdas=…] [--sin-burbuja]  (VOZ-2: la frase del óvalo recortada y desplegada; NO entra en `todo`; voz2.burbuja usa además el 5173, VOZ2_DEV)
+//       node scripts/diagPUE.mjs mesa            (ARN-3d: del toque de «Jugar» a la mesa pintada, con 4G lento; vara de tiempo: corre SOLA; NO entra en `todo`)
 //
 // ARN-3a · el arnés COMPILA (vite build) y levanta su propio `vite preview` en
 // 4173 —o `--puerto=N`— dentro de su proceso; `voz2` levanta además un
@@ -44,8 +45,9 @@ import { mayoriaDePuertas } from './arnes/varas.mjs'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
   VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
-  TOLERANCIA_CAP, pasadaCap, compararPng, equivalentes, derivarComoGenerador,
+  TOLERANCIA_CAP, pasadaCap, compararPng, equivalentes, derivarComoGenerador, contextoCap,
 } from './cap/capMesa.mjs'
+import { recorrerRuta } from './rutaMesa.mjs'
 import { contextoBie, marca, porGesto, HUECO, vidaIndicador, SONDA_INDICADOR } from './bie/bieRed.mjs'
 
 // CAP-1 Addendum 1 §2.3 · lo más que la og-image (caja dorada de mesah
@@ -184,7 +186,7 @@ const hacer = (id) => modo === 'todo' || modo === id
 const hacerSolo = (id) => modo === id
 
 // ARN-3a · D5 · un modo que no existe no medía nada y salía «TODO VERDE».
-const MODOS_PUE = ['todo', 'puerta', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '2.4', '2.5', 'mon', 'dis', 'bie', 'cap', 'voz2']
+const MODOS_PUE = ['todo', 'puerta', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '2.4', '2.5', 'mon', 'dis', 'bie', 'cap', 'voz2', 'mesa']
 if (!MODOS_PUE.includes(modo)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${modo}». Los modos son: ${MODOS_PUE.join(', ')}`))
 }
@@ -1163,13 +1165,15 @@ if (hacer('1.8')) {
   const suma = (lista, campo) => lista.reduce((acc, b) => acc + (b[campo] > 0 ? b[campo] : 0), 0)
   const criticoCable = suma(criticas, 'cable')
   const criticoCrudo = suma(criticas, 'bytes')
-  // CAP-1 · ROJO CONOCIDO. El techo NO se re-sella (decisión del rector): el
-  // rojo tiene que seguir viéndose hasta que una tanda propia adelgace el bundle.
+  // El techo NO se re-selló nunca (decisión del rector en CAP-1): el rojo se vio
+  // desde CAP-1 hasta que ARN-3d sacó la mesa a su propio chunk (B11) y el
+  // camino crítico bajó de 222,0 a ~168,8 KiB. Ya no hay rojo conocido: un rojo
+  // aquí desde hoy es un hallazgo (¿alguien volvió a importar `GameTable` de
+  // forma estática? Lo vigila `scripts/testMesaDiferida.test.js`).
   const dentroCritico = criticoCable <= TECHO_CRITICO_KIB * 1024
   anota('1.8b camino crítico hasta el primer pintado', dentroCritico,
     `FCP=${fcp}ms · ${criticas.length} recursos · ${(criticoCable / 1024).toFixed(1)} KiB en el cable ` +
-    `(${(criticoCrudo / 1024).toFixed(1)} KiB en crudo) · techo ${TECHO_CRITICO_KIB} KiB` +
-    (dentroCritico ? '' : ' · rojo conocido desde CAP-1 (219,0 KiB, anterior a la campaña); pendiente de tanda propia'))
+    `(${(criticoCrudo / 1024).toFixed(1)} KiB en crudo) · techo ${TECHO_CRITICO_KIB} KiB`)
   anota('1.8c lo que llega DESPUÉS de pintar', true,
     `diferido ${(suma(despues, 'cable') / 1024).toFixed(1)} KiB (clic de la puerta incluido) · ` +
     `perezoso ${(suma(perezosas, 'cable') / 1024).toFixed(1)} KiB`)
@@ -1185,6 +1189,187 @@ if (hacer('1.8')) {
 
   resultados.bloques['1.8'] = { fcp, bitacora, perezosas, criticoCable, criticoCrudo, todasPerezosas }
   await ctx.close()
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// mesa · ARN-3d · del toque de «Jugar» a la mesa pintada
+// ════════════════════════════════════════════════════════════════════════════
+// Rector: AJILEI_ARN-3d_v1.0.md §1.2 (Fase 0 §B4, la sonda `_sondaEntrada`).
+// Cuando la mesa viaja en su propio chunk, la entrada a la mesa puede costar
+// una descarga y, mal hecha, un parpadeo: con un `Suspense` local React deja
+// ~330 ms la raíz VACÍA aunque el chunk ya esté en memoria (H3d-2). Este modo
+// lo mide como lo vería el jugador, con red de móvil.
+//
+// LA RED, ANOTADA (Fase 0 §B4): «4G lento» de DevTools por CDP,
+// `Network.emulateNetworkConditions` con latencia 562,5 ms, bajada 180 000 B/s
+// y subida 84 375 B/s, en cada página. Sesión simulada (`contextoCap`) a
+// 1366×768, un contexto nuevo por repetición (caché vacía). Mesa 5, básico.
+//
+// QUÉ SE MIDE, DENTRO DE LA PÁGINA (un MutationObserver desde antes del HTML):
+//   · del `pointerdown` en el CTA de Retar a dos rAF después de que
+//     `.game-table` entra en el DOM («mesa pintada»);
+//   · los intervalos con `#root` VACÍO tras el toque;
+//   · los intervalos de HUECO tras el toque: ni Retar (`main.sal`) ni la mesa.
+//     Es lo que el jugador llamaría «pantalla vacía» aunque la raíz tuviera un
+//     `fallback` dentro.
+// Escenario A: la precarga ya terminó (red en reposo y 500 ms más). Escenario
+// B: entrada inmediata, la ruta del arnés (~150 ms del lobby al CTA).
+//
+// LAS PUERTAS (D16: no se aflojan; vara de tiempo: corre SOLA, y un rojo con
+// otros arneses vivos no cuenta):
+//   mesa.a       A: toque → mesa pintada ≤ 60 ms y 0 ms en blanco (ni vacío ni hueco)
+//   mesa.b       B: 0 ms en blanco; el tiempo se informa, sin techo
+//   mesa.portada el chunk de la mesa no se pide antes del FCP de la Portada
+// Cada escenario son 3 repeticiones y el veredicto es la mayoría (D9).
+//
+// «SIN CHUNK» SE DICE, NO SE SUPONE. El chunk de la mesa es el que Vite nombra
+// por su módulo (`GameTable-*.js|css`). Si en toda la corrida no se pide
+// ninguno y aun así la mesa se pinta, la mesa vino en el paquete principal: las
+// puertas lo dicen con la lista de scripts que se cargaron, y salen verdes por
+// eso y no por no haber medido nada.
+const MESA_RED = Object.freeze({ offline: false, latency: 562.5, downloadThroughput: 180000, uploadThroughput: 84375 })
+const MESA_REPS = 3
+const MESA_TECHO_A_MS = 60
+const ES_CHUNK_MESA = (u) => /\/GameTable-[A-Za-z0-9_-]+\.(js|css)(\?|$)/.test(u || '')
+const VIGIA_MESA = () => {
+  window.__mesaT = { vacios: [], huecos: [] }
+  const T = window.__mesaT
+  document.addEventListener('pointerdown', (e) => {
+    if (T.toque == null && e.target.closest?.('main.sal [data-accion="cta"]')) T.toque = performance.now()
+  }, true)
+  const mira = () => {
+    const root = document.getElementById('root')
+    if (!root || T.toque == null) return
+    const t = performance.now()
+    const vacio = root.children.length === 0
+    const hueco = !document.querySelector('main.sal') && !document.querySelector('.game-table')
+    if (vacio && T.vacioDesde == null) T.vacioDesde = t
+    if (!vacio && T.vacioDesde != null) { T.vacios.push(t - T.vacioDesde); T.vacioDesde = null }
+    if (hueco && T.huecoDesde == null) T.huecoDesde = t
+    if (!hueco && T.huecoDesde != null) { T.huecos.push(t - T.huecoDesde); T.huecoDesde = null }
+    if (T.mesa == null && document.querySelector('.game-table')) {
+      T.mesa = t
+      requestAnimationFrame(() => requestAnimationFrame(() => { T.pintada = performance.now() }))
+    }
+  }
+  new MutationObserver(mira).observe(document, { subtree: true, childList: true })
+}
+
+async function redLenta(ctx, page) {
+  const cdp = await ctx.newCDPSession(page)
+  await cdp.send('Network.enable')
+  await cdp.send('Network.emulateNetworkConditions', MESA_RED)
+}
+
+// Una entrada a la mesa, en un contexto nuevo. No juzga: devuelve la medida.
+async function entradaMesa(esc) {
+  const { ctx, page, errores } = await contextoCap(browser, { w: 1366, h: 768, dpr: 1 }, BASE)
+  try {
+    await ctx.addInitScript(VIGIA_MESA)
+    await redLenta(ctx, page)
+    const t0 = Date.now()
+    await page.goto(URL_LAMINA, { waitUntil: 'load', timeout: 120000 })
+    await page.waitForSelector('main.lobby [data-accion="jugar-ia"]', { timeout: 120000 })
+    const lobbyMs = Date.now() - t0
+    if (esc === 'A') {
+      // La precarga terminada: la red en reposo (con 4G lento, nada puede seguir
+      // bajando) y medio segundo para que el módulo se evalúe.
+      await page.waitForLoadState('networkidle', { timeout: 120000 })
+      await page.waitForTimeout(500)
+    }
+    await recorrerRuta(page, 5, 'basico', 0)
+    await page.waitForFunction(() => window.__mesaT.pintada != null, null, { timeout: 60000 })
+    const T = await page.evaluate(() => window.__mesaT)
+    const res = await page.evaluate(() => performance.getEntriesByType('resource')
+      .filter((e) => /\.(js|css)(\?|$)/.test(e.name))
+      .map((e) => ({ n: e.name.replace(location.origin, ''), ini: Math.round(e.startTime), fin: Math.round(e.responseEnd) })))
+    const chunk = res.filter((r) => ES_CHUNK_MESA(r.n))
+    const vacio = T.vacios.reduce((a, x) => a + x, 0) + (T.vacioDesde != null ? Infinity : 0)
+    const hueco = T.huecos.reduce((a, x) => a + x, 0) + (T.huecoDesde != null ? Infinity : 0)
+    return {
+      esc, lobbyMs,
+      toqueAPintada: Math.round(T.pintada - T.toque),
+      vacioMs: Math.round(vacio), huecoMs: Math.round(hueco),
+      chunk, chunkListoAlToque: chunk.length ? chunk.every((c) => c.fin > 0 && c.fin < T.toque) : null,
+      scripts: res.filter((r) => /\.js(\?|$)/.test(r.n)).map((r) => r.n.split('/').pop()),
+      errores: errores.slice(0, 3),
+    }
+  } finally {
+    await ctx.close()
+  }
+}
+
+// La Portada, como la ve un visitante anónimo: ¿se pide la mesa antes del FCP?
+async function portadaMesa() {
+  const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } })
+  try {
+    const page = await ctx.newPage()
+    await redLenta(ctx, page)
+    await page.goto(URL_LAMINA, { waitUntil: 'load', timeout: 120000 })
+    await page.waitForSelector('main.portada-lienzo', { timeout: 120000 })
+    // Tres segundos más de Portada: una precarga mal colgada (en `App`, que tiene
+    // `screen` en 'lobby' también aquí, H3d-1) tiene tiempo de delatarse.
+    await page.waitForTimeout(3000)
+    return await page.evaluate(() => {
+      const fcp = performance.getEntriesByName('first-contentful-paint')[0]
+      const res = performance.getEntriesByType('resource').map((e) => ({ n: e.name.replace(location.origin, ''), ini: Math.round(e.startTime) }))
+      return { fcp: fcp ? Math.round(fcp.startTime) : null, res, portada: !!document.querySelector('main.portada-lienzo') }
+    })
+  } finally {
+    await ctx.close()
+  }
+}
+
+if (hacerSolo('mesa')) {
+  console.log(`\n── mesa · ARN-3d · toque → mesa pintada · 4G lento (latencia ${MESA_RED.latency} ms, ${MESA_RED.downloadThroughput} B/s ↓, ${MESA_RED.uploadThroughput} B/s ↑) · ${MESA_REPS} repeticiones por escenario ──`)
+  const filas = { A: [], B: [] }
+  for (const esc of ['A', 'B']) {
+    for (let r = 0; r < MESA_REPS; r++) {
+      const f = await entradaMesa(esc)
+      filas[esc].push(f)
+      console.log(`  ${esc}${r + 1} · toque→pintada ${f.toqueAPintada} ms · vacío ${f.vacioMs} ms · hueco ${f.huecoMs} ms · lobby ${f.lobbyMs} ms · ` +
+        (f.chunk.length ? `chunk ${f.chunk.map((c) => `${c.n.split('/').pop()}@${c.ini}–${c.fin}`).join(' + ')} · listo al toque: ${f.chunkListoAlToque ? 'sí' : 'NO'}` : `sin chunk · scripts: ${f.scripts.join(', ')}`) +
+        (f.errores.length ? ` · errores: ${f.errores.join(' | ')}` : ''))
+    }
+  }
+  const portadas = []
+  for (let r = 0; r < MESA_REPS; r++) {
+    const p = await portadaMesa()
+    portadas.push(p)
+    const pedidas = p.res.filter((x) => ES_CHUNK_MESA(x.n))
+    console.log(`  portada${r + 1} · FCP ${p.fcp} ms · chunk de la mesa: ${pedidas.length ? pedidas.map((x) => `${x.n.split('/').pop()}@${x.ini}`).join(' + ') : 'no se pide'}`)
+  }
+
+  // ¿Hay chunk? Lo dice la corrida: si alguna entrada lo pidió, existe.
+  const hayChunk = [...filas.A, ...filas.B].some((f) => f.chunk.length > 0)
+  const sinChunk = (f) => `sin chunk: mesa en el paquete principal (${f.scripts.join(', ')})`
+  const blanco = (f) => f.vacioMs === 0 && f.huecoMs === 0
+  const repsA = filas.A.map((f) => [{
+    clave: 'mesa.a', ok: f.toqueAPintada <= MESA_TECHO_A_MS && blanco(f),
+    det: `${f.toqueAPintada} ms (≤ ${MESA_TECHO_A_MS}) · vacío ${f.vacioMs} · hueco ${f.huecoMs} · ` +
+      (f.chunk.length ? `chunk listo al toque: ${f.chunkListoAlToque ? 'sí' : 'NO'}` : sinChunk(f)),
+  }])
+  const repsB = filas.B.map((f) => [{
+    clave: 'mesa.b', ok: blanco(f),
+    det: `vacío ${f.vacioMs} · hueco ${f.huecoMs} · ${f.toqueAPintada} ms (se informa) · ` +
+      (f.chunk.length ? `chunk listo al toque: ${f.chunkListoAlToque ? 'sí' : 'no'}` : sinChunk(f)),
+  }])
+  const repsP = portadas.map((p) => {
+    const antes = p.res.filter((x) => ES_CHUNK_MESA(x.n) && p.fcp != null && x.ini <= p.fcp)
+    const luego = p.res.filter((x) => ES_CHUNK_MESA(x.n) && !(p.fcp != null && x.ini <= p.fcp))
+    return [{
+      clave: 'mesa.portada', ok: p.portada && p.fcp != null && antes.length === 0,
+      det: `FCP ${p.fcp} ms · ` + (antes.length ? `chunk pedido ANTES del FCP: ${antes.map((x) => `${x.n.split('/').pop()}@${x.ini}`).join(' + ')}`
+        : luego.length ? `chunk pedido después del FCP: ${luego.map((x) => `${x.n.split('/').pop()}@${x.ini}`).join(' + ')}`
+        : hayChunk ? 'el chunk no se pide en la Portada' : 'sin chunk: mesa en el paquete principal'),
+    }]
+  })
+  for (const reps of [repsA, repsB, repsP]) {
+    for (const p of mayoriaDePuertas(reps)) {
+      anota(`${p.clave} (${p.verdes}/${p.de})`, p.ok, p.dets.join(' ‖ '))
+    }
+  }
+  resultados.bloques.mesa = { red: MESA_RED, reps: MESA_REPS, hayChunk, filas, portadas: portadas.map((p) => ({ fcp: p.fcp, chunk: p.res.filter((x) => ES_CHUNK_MESA(x.n)) })) }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

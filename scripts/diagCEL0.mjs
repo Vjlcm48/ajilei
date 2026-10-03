@@ -1,5 +1,6 @@
 // ── diagCEL0.mjs · Arnés de la campaña CEL ──────────────────────────────────
-// Read-only sobre src/. Uso: `npm run dev` en otra consola, luego
+// Read-only sobre src/. Uso (desde ARN-3a el arnés levanta su propio servidor
+// de desarrollo con bypass en 5173, o `--puerto=N`; no hace falta otra consola):
 //   node scripts/diagCEL0.mjs                → modo `diagnostico` (CEL-0)
 //   node scripts/diagCEL0.mjs celebracion    → modo `celebracion` (CEL-1)
 //
@@ -21,9 +22,9 @@
 // Las capturas van a `../_cel0/`, FUERA del repositorio: son material de
 // trabajo de la lámina, no evidencia sellada, y el árbol ya carga con tres
 // carpetas de arnés.
-import { recorrerRuta } from './rutaMesa.mjs'
+import { recorrerRuta, esperarMesa } from './rutaMesa.mjs'
 // ARN-3c-ii · la mediana de 3 de las varas de tiempo y el encadenado honesto (lo puro).
-import { mayoriaDeFallos, separarConocidos, encadenadoHonesto } from './arnes/varas.mjs'
+import { mayoriaDeFallos, separarConocidos, encadenadoHonesto, leeHonesto } from './arnes/varas.mjs'
 import { apuestasDe } from '../src/config/niveles.js'
 import { pisoDe } from '../src/engine/entrada.js'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
@@ -508,9 +509,13 @@ const TOC_NOMINAL = (() => {
 // ARN-3c-ii · D9 · los rojos conocidos, cada uno con su dueño. Un rojo conocido
 // sigue siendo rojo (código 1); lo que cambia es que se dice de quién es, y que
 // un rojo NUEVO se distingue a simple vista.
+//
+// ARN-3d-ii · D9 · el encadenado al toc-toc YA NO es conocido: el pendiente
+// «precargar `tableKnock`» se cerró como hecho por LOB-1 (H3d-4), y la marca
+// `honesto` dice la verdad desde `useCoreografia`. Una fiesta que no se
+// encadena es, desde hoy, un rojo NUEVO.
 const CEL_CONOCIDOS = [
   { patron: /el saldo pide 2800 ms y el doble de CEL-2c son 2933/, dueno: 'CEL-2c' },
-  { patron: /la fiesta NO se encadenó al toc-toc/, dueno: 'ARN-3d (precargar tableKnock)' },
 ]
 // D9 · las celdas del arco (las varas de tiempo) se miden tres veces y cada
 // fallo cuenta si sale en al menos dos: la mediana de 3 (scripts/arnes/varas.mjs).
@@ -919,9 +924,11 @@ function juzgaArco(a, fallos, opciones = {}) {
       // lee de `espera`: vale exactamente el nominal cuando dio 0. Sale ROJO
       // mientras `tableKnock` no esté cargado al llegar a GAME_OVER: conocido con
       // dueño (ARN-3d, la precarga), y es la puerta que validará la 3d.
+      // ARN-3d §1.4 · si la marca trae `honesto` (D13), se LEE; si no, se deduce.
       ancla.encadenadoHonesto = encadenadoHonesto(ancla, TOC_NOMINAL)
+      ancla.encadenadoLeido = leeHonesto(ancla) ? 'marca honesto' : 'deducido por igualdad con el nominal'
       if (!ancla.encadenadoHonesto) {
-        fallos.push(`${id}: la fiesta NO se encadenó al toc-toc (encadenado=${ancla.encadenado}, espera ${ancla.espera} ms ${ancla.espera === TOC_NOMINAL ? '= el reloj nominal: esperaPrecedente dio 0, el toc-toc no sonaba' : ''})`)
+        fallos.push(`${id}: la fiesta NO se encadenó al toc-toc (encadenado=${ancla.encadenado}, ${leeHonesto(ancla) ? `honesto=${ancla.honesto}, ` : ''}espera ${ancla.espera} ms ${ancla.espera === TOC_NOMINAL ? '= el reloj nominal: esperaPrecedente dio 0, el toc-toc no sonaba' : ''})`)
       }
       if (espera < TOC_MS - 250) fallos.push(`${id}: la fiesta reventó a los ${espera} ms, ANTES de que acabara el toc-toc (${TOC_MS} ms)`)
       // Sin encadenado de verdad no hay `end` que esperar: la fiesta la manda
@@ -1742,6 +1749,11 @@ async function modoCelebracion(browser) {
     const t = Object.fromEntries((a.fases || []).map(f => [f.fase, f.t]))
     console.log(`  ${id.padEnd(22)} sobria 0 -> fiesta ${t.fiesta ?? '?'} -> calma ${t.calma ?? '?'} -> reposo ${t.reposo ?? '?'}`
       + ` | espera al toc ${a.esperaMedida ?? '?'} | melodia ${a.fotos?.reposo?.melodia || '(ninguna)'}`)
+    // ARN-3d §1.4 · cómo se juzgó el encadenado: por la marca o por la deducción.
+    const anc = marcaDe(a.marcas || [], 'ancla')
+    if (anc && 'encadenadoHonesto' in anc) {
+      console.log(`  ${''.padEnd(22)} encadenado honesto ${anc.encadenadoHonesto} (${anc.encadenadoLeido}; espera ${anc.espera} ms)`)
+    }
     console.log(`  ${''.padEnd(22)} lluvia: ${a.nacidas?.length ?? 0} monedas en ${a.ventanaLluvia ?? '?'} ms, ${a.vivasMax ?? 0} vivas como mucho,`
       + ` ${a.nacidasTrasSeisSegundos ?? 0} nacidas tras los 6 s, ${a.nacidasTrasCalma ?? 0} tras la calma`)
     console.log(`  ${''.padEnd(22)} caida ${a.caida?.min ?? '?'}-${a.caida?.max ?? '?'} s | opacidad max ${a.opacidad?.crucero ?? '?'} (pintada ${a.opacidad?.pintada ?? '?'})`
@@ -1841,6 +1853,9 @@ async function controlNegativo(browser) {
     // LOB-1 · el CTA del lobby, por contrato de marcado y no por rótulo: el
     // texto sale ahora de un diccionario (IDI-0) y cambiará con el idioma.
     await recorrerRuta(page, 5, 'basico', 0, 'piso')
+    // ARN-3d · la mesa, por la espera común. Los 3,5 s de abajo NO esperan a la
+    // mesa: son la mano (ante, barajado y reparto), y se quedan.
+    await esperarMesa(page)
     await page.click('button:has-text("Iniciar mano")')
     await page.waitForTimeout(3500)   // ante + barajado + reparto
     r.termina = await page.locator('.game-over-screen').count() > 0

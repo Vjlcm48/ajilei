@@ -77,7 +77,16 @@ export function separarConocidos(fallos, conocidos) {
 // producto no se toca (D1): el arnés lo deduce de lo que ya publica, porque
 // `espera` vale EXACTAMENTE `TOC_NOMINAL_MS` cuando `esperaPrecedente` dio 0, y
 // en otro caso vale `min(ESPERA_TOPE_MS, duración + ESPERA_MARGEN_MS)`.
+//
+// ARN-3d §1.4 · LA MARCA QUE DICE LA VERDAD. Desde ARN-3d-ii `useCoreografia`
+// publica además `honesto: esperaPrecedente(audio) > 0` (D13; solo en DEV). Si
+// la marca lo trae, se LEE; la deducción por igualdad queda de respaldo para un
+// árbol sin el campo (hoy: 250 ms de separación entre `espera` y el nominal,
+// Fase 0 §C3, que dejaría de valer si alguien recorta el toc-toc a ~1,65 s).
+export const leeHonesto = (ancla) => !!ancla && typeof ancla.honesto === 'boolean'
+
 export function encadenadoHonesto(ancla, tocNominalMs) {
   if (!ancla || ancla.encadenado !== true) return false
+  if (leeHonesto(ancla)) return ancla.honesto
   return ancla.espera !== tocNominalMs
 }
