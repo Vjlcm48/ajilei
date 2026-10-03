@@ -39,3 +39,18 @@ export function enmascararCorreo(correo) {
   if (at === correo.length - 1) return ''
   return `${correo[0]}•••${correo.slice(at)}`
 }
+
+// ── ARN-3d §2.1 (B9) · Los atributos de la hoja ⚙ ────────────────────────────
+// La hoja existe SIEMPRE en el DOM —se mueve con `transform`, que es lo que le
+// da su transición—, así que cerrada se retira del árbol de accesibilidad y del
+// orden de tabulación.
+//
+// `inert: true`, NO `inert: ''`. Desde React 19 `inert` es un atributo booleano
+// de verdad: la cadena vacía se trata como FALSO y React avisa en consola
+// («Received an empty string for a boolean attribute `inert`»). Con `''` la
+// hoja cerrada no era inerte, y el aviso salía cuatro veces por celda en el
+// arnés, que lo tenía filtrado como ruido conocido (`RETAR_RUIDO_CONOCIDO`).
+// `aria-hidden` sí es un atributo de texto y se queda en `'true'`.
+export function atributosHoja(abierta) {
+  return abierta ? {} : { inert: true, 'aria-hidden': 'true' }
+}

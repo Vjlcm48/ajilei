@@ -13,6 +13,8 @@
 //   ?apu=capas         Dos IAS a distinta profundidad corta, el resto hondas.
 //   ?apu=sinRival      Todas las IAS con la apuesta justa.
 //   ?apu=sinRival:d12  Todas, el humano incluido.
+//   ?apu=gana          ARN-3d · el humano gana la PRIMERA mano: prepara el
+//                      reparto, no las pilas (`repartoGanador.js`).
 // Se pueden encadenar con comas: `?apu=saldo:900,allinIA`.
 //
 // ── EL MOLDE NO INVENTA ESTADOS, SIEMBRA PILAS ─────────────────────────────
@@ -39,6 +41,8 @@
 // parámetro tiene que estar presente. Ni un despiste de configuración puede
 // sembrar una sesión real: en producción estas funciones devuelven `null` (o la
 // identidad) en su primera línea y el minificador se lleva el archivo entero.
+
+import { armarRepartoGanador } from './repartoGanador'
 
 export const APU_PARAM = 'apu'
 
@@ -124,6 +128,14 @@ export function siembraMesaAPU(estado) {
   let players = estado.players
   for (const parte of partes) {
     const [nombre, arg] = parte.split(':')
+    // ARN-3d §2.5 (D14) · el único molde que NO siembra pilas: arma el orden
+    // de la baraja de la primera mano (el motor baraja en el primer «Iniciar
+    // mano»). Cuenta los vivos con que nace la mesa, que son los que fijan las
+    // reglas de esa mano (HR-1). El estado sale tal cual.
+    if (nombre === 'gana') {
+      armarRepartoGanador(players.filter((p) => !p.eliminated).length)
+      continue
+    }
     const molde = MOLDES[nombre]
     if (!molde) continue
 

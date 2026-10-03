@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { enmascararCorreo } from './lobbyCore.js'
+import { enmascararCorreo, atributosHoja } from './lobbyCore.js'
 
 // Corre en Node pelado: `lobbyCore.js` no toca React ni DOM, que es el punto
 // entero de que exista.
@@ -43,5 +43,19 @@ describe('LOB-1 · enmascararCorreo', () => {
     const salida = enmascararCorreo('nombresecreto@gmail.com')
     expect(salida).not.toContain('ombresecreto')
     expect(salida.startsWith('n•••@')).toBe(true)
+  })
+})
+
+// ARN-3d §2.1 (B9) · la hoja ⚙ cerrada es inerte DE VERDAD: con React 19,
+// `inert: ''` es falso y además avisa en consola.
+describe('ARN-3d · atributosHoja', () => {
+  it('cerrada: inert true (booleano, no cadena) y aria-hidden', () => {
+    const a = atributosHoja(false)
+    expect(a).toEqual({ inert: true, 'aria-hidden': 'true' })
+    expect(a.inert).toBe(true)
+  })
+
+  it('abierta: ningún atributo', () => {
+    expect(atributosHoja(true)).toEqual({})
   })
 })
