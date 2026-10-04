@@ -73,6 +73,7 @@ import '../styles/luz.css'
 import '../styles/voz2.css'
 import '../styles/rev.css'
 import '../styles/rec.css'
+import '../styles/tactil.css'
 
 const TURN_TIME  = 20
 const WARNING_AT = 5

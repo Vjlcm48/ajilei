@@ -1,0 +1,113 @@
+/* ── PAN-1 · El piso táctil de la mesa (camino Z) ────────────────────────────
+   Ficha PAN-1 1b v1.0. INV-07 (docs/AJILEI_Invariantes_v1.0.md): zona táctil
+   ≥ 40 px por eje en todo lo tocable de la mesa, sin que cambie nada de lo que
+   se ve. El CSS de abajo es el «CSS final» de Z del anexo de la Fase 0
+   (docs/reportes/AJILEI_PAN-1_Fase0_Informe_v1.0.md), LITERAL, elegido por
+   Victor en la lámina de la 1a, salvo lo marcado «NO ES Z LITERAL»: las ✕ de
+   mesas 3 y 4 en apaisado y la tarjeta de recarga (respuestas del rector a §6
+   del informe de la 1b).
+
+   HOJA ADITIVA, como luz.css, voz2.css, rev.css y rec.css: sin `!important`.
+   Se importa en GameTable.jsx detrás de rec.css, pero NO cuenta con ello: cada
+   regla gana a la que corrige por ESPECIFICIDAD, nunca por orden de carga (D8
+   de la 1a; la lámina la probó como PRIMERA hoja del <head>). Quien añada una
+   regla aquí escribe al lado la especificidad que vence. */
+
+/* ═══ PAN-1 · Z · camino 2: sólo zona táctil (embaldosado B2) ═══════════════════
+   Cada regla gana por ESPECIFICIDAD (D8): la lámina la inyecta como PRIMERA hoja
+   del <head>, detrás de la cual carga todo el CSS del proyecto. */
+
+/* D5 · el :hover pegado de los .btn de la mesa (gameTable.css:497) no levanta en táctil */
+@media (hover: none) {
+  .game-table-screen .btn:hover { transform: none; }                                    /* (0,3,0) > (0,2,0) */
+}
+
+/* ── Vertical (teléfono) ── */
+@media (max-width: 767px) and (orientation: portrait) and (pointer: coarse) {
+  /* Multiplicadores: ancho visible 31,7 → 35,5; zona −13,5 arriba (aire con las cartas,
+     inertes en la apuesta) y +0,5 abajo (hasta el pseudo de BT-1). Ancla: padding-box (borde 1). */
+  .game-table-screen .player-bar .mult-row .btn-mult { position: relative; min-width: 35.5px; }
+  .game-table-screen .player-bar .mult-row .btn-mult::after {
+    content: ''; position: absolute; top: -14.5px; bottom: -1.5px; left: -3.5px; right: -3.5px;
+  }
+  /* ✕: a la izquierda, la mitad del aire que deja el pseudo del ⋮; a la derecha, el borde. */
+  .game-table-screen .header-right .btn-leave { position: relative; z-index: 3; }
+  .game-table-screen .header-right .btn-leave::after {
+    content: ''; position: absolute; top: -6.5px; bottom: -6.5px; left: -3.6px; right: -10px;
+  }
+}
+
+/* ── Horizontal (teléfono) · D4: multiplicadores de MT-1 (gameTable.css:3270-3272) ── */
+@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
+  /* Arriba los toca el pseudo de «Retirarse» (½ hueco, BT-L): sólo crecen HACIA ABAJO,
+     sobre el fondo de la mesa (24 px libres en 640×360, 35 en 915×412). */
+  .game-table-screen .player-bar .mult-row .btn-mult::after { bottom: -18px; }        /* (0,4,1) > (0,3,1) */
+  /* el ×10 anclaba su pseudo al borde (right: −1, :3301-3303) y se quedaba en 35 de ancho: el
+     carril acaba a 5 px del borde de la mesa, sin nada tocable */
+  .game-table-screen .player-bar .mult-row .btn-mult:last-child::after { right: -6px; }
+  /* ✕ de mesa 2 (32×28): ½ del aire con el ⋮ a la izquierda; resto a la derecha y en vertical. */
+  /* NO ES Z LITERAL (rector, §6.2): la ✕ de mesa 3 (31×30) entra en el mismo patrón. */
+  .game-table-screen .table-two .header-right .btn-leave,
+  .game-table-screen .table-three .header-right .btn-leave { position: relative; z-index: 3; }
+  .game-table-screen .table-two .header-right .btn-leave::after,
+  .game-table-screen .table-three .header-right .btn-leave::after {
+    content: ''; position: absolute; top: -7px; bottom: -7px; left: -4px; right: -7px;
+  }
+  /* ✕ de mesa 5 (absoluta, 15×19 → hoy 24×45): sólo puede crecer A LA IZQUIERDA, sobre la
+     esquina del panel de IA 1. Cruza el «NUNCA a la izquierda» de gameTable.css:3363 → lámina. */
+  .game-table-screen .table-five .header-right .btn-leave::after { left: -17px; }
+  /* NO ES Z LITERAL (rector, §6.2): la ✕ de mesa 4 NO es la absoluta de mesa 5, es la natural
+     con su pseudo (gameTable.css:3575-3592): ya mide 40 de ancho y le falta 1 de alto. Fuera
+     el `left: -17px` de Z (respeta el «NUNCA a la izquierda» de :3583); 2 px más arriba. */
+  .game-table-screen .table-four .header-right .btn-leave::after { top: -10px; }       /* (0,4,1) > (0,2,1) */
+}
+
+/* ── Teléfono, las dos orientaciones: fichas y nombres ── */
+@media (max-width: 767px) and (orientation: portrait) and (pointer: coarse),
+       (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
+  /* Ficha de la IA (28×28, opponentPanel.css:505-517): crece más hacia ARRIBA, porque el panel
+     siguiente (contexto de apilamiento propio) le pinta encima por abajo. */
+  .game-table-screen .opp-panel .opp-corner-chip::after,
+  .game-table-screen .ai-zone .opp-corner-chip::after {
+    content: ''; position: absolute; top: -15px; bottom: -6px; left: -6px; right: -6px;
+  }
+  /* D7 · Nombre tocable: SIN tocar su overflow (la elipsis manda). Se agranda el MISMO
+     mecanismo que ya usa (opponentPanel.css:79-84): padding transparente con margen negativo
+     igual → caja externa intacta. 0.6em/0.45em (7,8/5,85 a 13 px) → 8.5px/9px: 23,2 + 17 = 40,2. */
+  .game-table-screen .opp-panel .opp-name.opp-name-tappable {
+    padding: 8.5px 9px; margin: -8.5px -9px; position: relative; z-index: 6;
+  }
+}
+
+/* ── Escritorio táctil · D3: la ✕ ── */
+@media (orientation: landscape) and (min-height: 601px) and (pointer: coarse) {
+  .game-table-screen .header-right .btn-leave { position: relative; }
+  .game-table-screen .header-right .btn-leave::after {
+    content: ''; position: absolute; top: -7px; bottom: -7px; left: -4px; right: -8px;
+  }
+}
+
+/* ── El ⋮ abierto · D6: «Mano actual» tiene el rol en el icono (19×26). El pseudo del icono
+   cubre la fila entera (.util-item es position: relative): el toque en cualquier punto de la
+   fila es del icono. El contador, hermano posterior, sigue encima. ── */
+@media (pointer: coarse) {
+  .game-table-screen .utilities-panel .util-item-mano button.util-ico-slot::after {
+    content: ''; position: absolute; inset: 0;
+  }
+}
+
+/* ── D2 · La tarjeta de recarga: zona de 40, caja de hoy ──────────────────────────
+   NO ES Z LITERAL. Z decía `min-height: 40px`, y en 360×640 la blanda crecía 12 px
+   hacia arriba y tapaba el pie de la mano (A2 rojo; informe de la 1b, §5) y la forzosa bajaba de
+   42 a 40. Respuesta del rector a §6.1, opción (b): cada botón de la tarjeta conserva
+   su caja visible y gana una zona de 40 por eje con un ::after transparente,
+   centrado. `min(0px, 50% − 20px)` sólo crece lo que le falte: la forzosa (42) y
+   cualquier botón de ≥ 40 se quedan sin pseudo efectivo. Los porcentajes son del
+   padding-box del botón, así que la zona mide 40 contando su borde. Sin
+   (pointer: coarse), como la regla de Z que sustituye: el ratón no pierde nada. */
+.game-table-screen .bankrupt-overlay .bankrupt-modal .btn[data-accion^="recarga-"] { position: relative; }   /* (0,5,0) */
+.game-table-screen .bankrupt-overlay .bankrupt-modal .btn[data-accion^="recarga-"]::after {
+  content: ''; position: absolute;
+  top: min(0px, calc(50% - 20px)); bottom: min(0px, calc(50% - 20px));
+  left: min(0px, calc(50% - 20px)); right: min(0px, calc(50% - 20px));
+}

@@ -1983,9 +1983,20 @@ async function medirBotonesRecarga(page) {
     const red = (x) => Math.round(x * 100) / 100
     const modal = document.querySelector('[data-accion="recarga"] .bankrupt-modal')
     if (!modal) return { hay: false }
+    // PAN-1 1b · la ZONA TÁCTIL de cada botón (respuesta del rector a §6.1): el
+    // barrido en cruz de `__hitBox` desde el centro, con `elementFromPoint`. La
+    // caja visible sigue midiéndose aparte, con su vara de siempre.
+    const zona = (e) => {
+      const r = e.getBoundingClientRect()
+      const cx = Math.round((r.left + r.right) / 2), cy = Math.round((r.top + r.bottom) / 2)
+      const da = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === e || e.contains(t)) }
+      if (!da(cx, cy)) return { zonaAncho: 0, zonaAlto: 0 }
+      const paso = (dx, dy) => { let n = 0; while (n < 120 && da(cx + dx * (n + 1), cy + dy * (n + 1))) n++; return n }
+      return { zonaAncho: paso(-1, 0) + paso(1, 0) + 1, zonaAlto: paso(0, -1) + paso(0, 1) + 1 }
+    }
     const caja = (e) => {
       const r = e.getBoundingClientRect()
-      return { top: red(r.top), bottom: red(r.bottom), left: red(r.left), right: red(r.right), alto: red(r.height), ancho: red(r.width) }
+      return { top: red(r.top), bottom: red(r.bottom), left: red(r.left), right: red(r.right), alto: red(r.height), ancho: red(r.width), ...zona(e) }
     }
     const montos = [...modal.querySelectorAll('[data-accion="recarga-monto"]')]
     const acciones = [...modal.querySelectorAll('.bankrupt-actions .btn')]
@@ -2064,7 +2075,7 @@ async function medirBotonesRecarga(page) {
     const ver = modal.querySelector('[data-accion="recarga-ver-mesa"]')
     const verMesa = ver ? (() => {
       const r = ver.getBoundingClientRect(); const f = filaPlazo.getBoundingClientRect(); const p = plazo.getBoundingClientRect()
-      return { hay: true, alto: red(r.height), ancho: red(r.width), mismaFila: r.top >= f.top - 0.5 && r.bottom <= f.bottom + 0.5, aLaDerecha: r.left >= p.left, sepAcciones: red(r.top - Math.max(...ca.map((x) => x.bottom))) }
+      return { hay: true, alto: red(r.height), ancho: red(r.width), ...zona(ver), mismaFila: r.top >= f.top - 0.5 && r.bottom <= f.bottom + 0.5, aLaDerecha: r.left >= p.left, sepAcciones: red(r.top - Math.max(...ca.map((x) => x.bottom))) }
     })() : { hay: false }
     const mejorPalo = document.querySelector('.score-tag-player')
     // Lo que la tarjeta le quita a la mano del jugador. Victor aceptó que en
@@ -2083,6 +2094,8 @@ async function medirBotonesRecarga(page) {
       botones: cajas,
       altoMin: red(Math.min(...cajas.map((c) => c.alto))),
       altoMax: red(Math.max(...cajas.map((c) => c.alto))),
+      zonaMin: Math.min(...cajas.map((c) => Math.min(c.zonaAncho, c.zonaAlto))),
+      bajoZona: cajas.filter((c) => c.zonaAncho < 40 || c.zonaAlto < 40).map((c) => `${c.rotulo} ${c.zonaAncho}×${c.zonaAlto}`),
       sepMontos, sepAcciones, sepEntreFilas,
       sepMontosV, sepAccionesV, sepAccionesPlazo,
       // Dentro de una fila y entre los renglones de una misma fila: todo lo que
@@ -2280,10 +2293,15 @@ async function fotoS25(page, ruta, vuelta) {
 // fila de ≥ 40 con ≥ 12 entre ellas, montos de ≥ 36 con ≥ 10, ≥ 12 de los
 // montos a las acciones y ≥ 8 hasta el cronómetro, entera en la ventana con ≥ 8
 // de aire arriba y abajo.
+// PAN-1 1b · D6 · LA ZONA, 40; LA CAJA, LA DE HOY (INV-07; respuesta del rector a
+// §6.1 del informe de la 1b, opción b). Subir la caja a 40 tapaba la mano en
+// 360×640. Las cajas visibles conservan su vara y, aparte, cada botón de la
+// tarjeta y «Ver la mesa» miden ≥ 40 por eje de ZONA TÁCTIL (`zona`), la que les
+// da el ::after de tactil.css, en el mismo commit.
 const VARA_BOTONES = {
-  blanda:  { altoMin: 36, altoMax: 40, sepBotones: 10, entreFilas: 12, hastaPlazo: 8,  align: 'left' },
-  forzosa: { altoMin: 40, altoMax: 44, sepBotones: 12, entreFilas: 16, hastaPlazo: 14, align: 'left' },
-  compacta: { altoMin: 36, altoMax: 44, altoAcciones: 40, sepMontos: 10, sepAcciones: 12, sepBotones: 10, entreFilas: 12, hastaPlazo: 8, align: 'left', accionesEnFila: true, aire: 8 },
+  blanda:  { altoMin: 36, altoMax: 40, zona: 40, sepBotones: 10, entreFilas: 12, hastaPlazo: 8,  align: 'left' },
+  forzosa: { altoMin: 40, altoMax: 44, zona: 40, sepBotones: 12, entreFilas: 16, hastaPlazo: 14, align: 'left' },
+  compacta: { altoMin: 36, altoMax: 44, zona: 40, altoAcciones: 40, sepMontos: 10, sepAcciones: 12, sepBotones: 10, entreFilas: 12, hastaPlazo: 8, align: 'left', accionesEnFila: true, aire: 8 },
 }
 
 function varaBotones(b, esPortrait, lamina = null) {
@@ -2292,14 +2310,17 @@ function varaBotones(b, esPortrait, lamina = null) {
   const v = VARA_BOTONES[nombre]
   const fallos = []
   if (!(b.altoMin >= v.altoMin && b.altoMax <= v.altoMax)) fallos.push(`alto ${b.altoMin}–${b.altoMax} fuera de ${v.altoMin}–${v.altoMax}`)
+  if (!(b.zonaMin >= v.zona)) fallos.push(`zona táctil bajo ${v.zona}: ${(b.bajoZona ?? []).join(', ')}`)
   if (v.altoAcciones && !(b.altoAccionesMin >= v.altoAcciones)) fallos.push(`acciones a ${b.altoAccionesMin} < ${v.altoAcciones}`)
   if (v.sepMontos && !(Math.min(...b.sepMontos) >= v.sepMontos)) fallos.push(`entre montos ${Math.min(...b.sepMontos)} < ${v.sepMontos}`)
   if (v.sepAcciones && !(Math.min(...b.sepAcciones, ...b.sepAccionesV) >= v.sepAcciones)) fallos.push(`entre acciones ${Math.min(...b.sepAcciones, ...b.sepAccionesV)} < ${v.sepAcciones}`)
   if (v.accionesEnFila && b.filasAcciones !== 1) fallos.push(`acciones en ${b.filasAcciones} filas`)
   if (v.aire && !(b.modal.top >= v.aire && b.aireAbajo >= v.aire)) fallos.push(`aire ${b.modal.top}/${b.aireAbajo} < ${v.aire}`)
   // REC-1 · «Ver la mesa», cuando está, también es botón de la tarjeta: piso
-  // táctil de 36 (v1.2 §5.4), en la fila del cronómetro y a su derecha.
-  if (b.verMesa?.hay && !(b.verMesa.alto >= 36 && b.verMesa.mismaFila && b.verMesa.aLaDerecha)) fallos.push(`«Ver la mesa» ${b.verMesa.alto} px${b.verMesa.mismaFila ? '' : ', fuera de la fila'}${b.verMesa.aLaDerecha ? '' : ', no a la derecha'}`)
+  // táctil de 36 (v1.2 §5.4) —caja de 36 y ZONA de 40 desde PAN-1 (D6)—, en la
+  // fila del cronómetro y a su derecha.
+  const verZona = Math.min(b.verMesa?.zonaAncho ?? 0, b.verMesa?.zonaAlto ?? 0)
+  if (b.verMesa?.hay && !(b.verMesa.alto >= 36 && verZona >= v.zona && b.verMesa.mismaFila && b.verMesa.aLaDerecha)) fallos.push(`«Ver la mesa» ${b.verMesa.alto} px (zona ${b.verMesa.zonaAncho}×${b.verMesa.zonaAlto})${b.verMesa.mismaFila ? '' : ', fuera de la fila'}${b.verMesa.aLaDerecha ? '' : ', no a la derecha'}`)
   if (!(b.sepBotones >= v.sepBotones)) fallos.push(`entre botones ${b.sepBotones} < ${v.sepBotones}`)
   if (!(b.sepEntreFilas >= v.entreFilas)) fallos.push(`entre filas ${b.sepEntreFilas} < ${v.entreFilas}`)
   if (!(b.sepAccionesPlazo >= v.hastaPlazo)) fallos.push(`hasta el cronómetro ${b.sepAccionesPlazo} < ${v.hastaPlazo}`)
@@ -2946,23 +2967,43 @@ async function runApu(browser) {
       c.sinCobertura.push(`apu.5 (el pozo no se partió en ${intentosCapas} mesas)`)
     }
 
-    // ── apu.6 · Geometría: nada se sale, nada queda bajo el dedo ──────────
-    const geo = await page.evaluate(() => {
-      const red = (x) => Math.round(x * 100) / 100
-      const doc = document.documentElement
-      const botones = [...document.querySelectorAll('.action-buttons .btn, [data-accion="recarga-monto"]')]
-      return {
-        desbordaDoc: doc.scrollWidth > doc.clientWidth + 1,
-        botonMin: botones.length ? red(Math.min(...botones.map(b => b.getBoundingClientRect().height))) : null,
-        fuera: botones.filter(b => {
-          const x = b.getBoundingClientRect()
-          return x.right > innerWidth + 1 || x.bottom > innerHeight + 1
-        }).length,
-      }
-    })
+    // ── apu.6 · PAN-1 · la fila A PROPÓSITO, en el turno del humano ──────
+    // Antes medía donde la dejara apu.5 —casi siempre el pago, sin fila— y su piso
+    // de 36 px, contra la caja VISIBLE, no midió un botón en ninguna corrida
+    // (H3e-ii-1). Ahora: mesa nueva, mano 1 (la Mano es el asiento 0, el humano:
+    // abre él), y la fila de apuestas con sus multiplicadores medida por su ZONA
+    // TÁCTIL (el `__hitBox` de `tactil`/`u1`) contra INV-07: 40 por eje. Mesas 2 y
+    // 5: los dos caminos de render del rival (D6), aunque el área del humano sea la
+    // misma. No reutiliza la fila de apu.2: aquélla es la de All-in, sin
+    // multiplicadores. El piso de la TARJETA de recarga va aparte (VARA_BOTONES).
+    // El piso rige con PUNTERO GRUESO: las celdas de escritorio de `apu` se abren
+    // con ratón, donde la fila se queda en su caja visible (33) a propósito —el
+    // embaldosado B2 sólo vive bajo `pointer: coarse`—. Ahí se miden igual, pero
+    // sólo cuentan el desborde y lo que quede fuera de la ventana.
+    const apu6Mesas = []
+    for (const nMesa of [2, 5]) {
+      await page.goto(`${BASE}/`)
+      await recorrerRuta(page, nMesa, 'basico', 0, 'medio')
+      await installHitProbe(page)
+      await page.evaluate(() => [...document.querySelectorAll('.btn')].find(x => x.textContent.trim() === 'Iniciar mano')?.click())
+      await esperarMesa(page, () => !!document.querySelector('.action-buttons .btn'), 20000)
+      await page.waitForTimeout(400)
+      apu6Mesas.push({ mesa: nMesa, ...await page.evaluate((MIN) => {
+        const red = (x) => Math.round(x * 100) / 100
+        const doc = document.documentElement
+        const grueso = matchMedia('(pointer: coarse)').matches
+        const els = [...document.querySelectorAll('.action-buttons .btn, .mult-row .btn-mult')]
+        const t = els.map(el => { const hb = window.__hitBox(el); return { t: el.textContent.trim().slice(0, 14), visual: `${red(hb.visualW)}×${red(hb.visualH)}`, w: hb.w ?? 0, h: hb.h ?? 0, ocluido: !!hb.occluded } })
+        return {
+          desbordaDoc: doc.scrollWidth > doc.clientWidth + 1,
+          fuera: els.filter(b => { const x = b.getBoundingClientRect(); return x.right > innerWidth + 1 || x.bottom > innerHeight + 1 }).length,
+          grueso, tocables: t, bajoPiso: t.filter(x => x.ocluido || (grueso && (x.w < MIN || x.h < MIN))).map(x => `${x.t} ${x.w}×${x.h}`),
+        }
+      }, TACTIL_MIN) })
+    }
     c['apu.6'] = {
-      ...geo,
-      ok: !geo.desbordaDoc && geo.fuera === 0 && (geo.botonMin === null || geo.botonMin >= 36),
+      mesas: apu6Mesas,
+      ok: apu6Mesas.length > 0 && apu6Mesas.every(m => !m.desbordaDoc && m.fuera === 0 && m.tocables.length > 0 && m.bajoPiso.length === 0),
     }
 
     // ── 1f §A.2 · las medidas de portrait que faltan ──────────────────────
@@ -3067,7 +3108,7 @@ async function runApu(browser) {
         const b = await medirBotonesRecarga(page)
         c.botonesRecarga = {
           ...suave, ...b,
-          ok: !!b.hay && b.altoMin >= 36 && b.altoMax <= 40
+          ok: !!b.hay && b.altoMin >= 36 && b.altoMax <= 40 && b.zonaMin >= 40   // PAN-1 D6: zona ≥ 40
             && b.sepMin >= 8 && b.solapeBotones === 0
             && b.subVisible && b.plazoVisible && b.dentro,
         }
@@ -3184,7 +3225,7 @@ async function runApu(browser) {
     }
     if (c.botonesRecarga?.hay) {
       const b = c.botonesRecarga
-      console.log(`      botones recarga (${b.motivo}) · alto ${b.altoMin}–${b.altoMax} px · separación mín ${b.sepMin} px (montos ${b.sepMontos.join('/')}, entre filas ${b.sepEntreFilas}) · solape ${b.solapeBotones} px² · ${b.ok ? 'tocables' : 'NO'}`)
+      console.log(`      botones recarga (${b.motivo}) · alto ${b.altoMin}–${b.altoMax} px · zona mín ${b.zonaMin}${b.bajoZona?.length ? ' (' + b.bajoZona.join(', ') + ')' : ''} · separación mín ${b.sepMin} px (montos ${b.sepMontos.join('/')}, entre filas ${b.sepEntreFilas}) · solape ${b.solapeBotones} px² · ${b.ok ? 'tocables' : 'NO'}`)
       console.log(`      tarjeta ${b.modal.ancho}×${b.modal.alto} en ${b.modal.top} · tapa ${b.solapeCartas} px² de ${b.areaCartas} de la mano`)
     }
   }
@@ -3288,16 +3329,40 @@ const TACTIL_MIN = 40
 // Sonda de hit-box real: desde el centro del control, avanza 1px por eje hasta
 // que elementFromPoint deja de resolver al control (su ::after cuenta como el
 // propio control en hit-testing). Devuelve la caja táctil efectiva.
+//
+// PAN-1 1b · D4 · «DURANTE LA REVELACIÓN DEL PAGO, EL GANADOR MANDA». En el pago
+// el panel `opp-winner` (z 7, sus cartas en z 6) se pinta encima de la ficha y
+// el nombre de su vecino: es preexistente, aceptado, y ALEATORIO (depende de
+// quién gane). Con `{ revelacion: true }` un punto del barrido de un tocable de
+// OTRO panel que caiga dentro del `opp-winner` cuenta como «tapado por la
+// revelación» y no como fallo: se mira la pila entera (`elementsFromPoint`), se
+// saltan los elementos del ganador y, si lo siguiente es el tocable, el punto es
+// suyo. Esos puntos se cuentan aparte (`porRevelacion`) para que se vean. Sin la
+// opción, la sonda es la de siempre.
 async function installHitProbe(page) {
   await page.evaluate(() => {
-    window.__hitBox = (el) => {
+    window.__hitBox = (el, { revelacion = false } = {}) => {
       const r = el.getBoundingClientRect()
       const cx = Math.round((r.left + r.right) / 2), cy = Math.round((r.top + r.bottom) / 2)
-      const hits = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === el || el.contains(t)) }
+      const suyo = (t) => t === el || el.contains(t)
+      const ganadorAjeno = (t) => { const g = t.closest('.opp-panel.opp-winner'); return !!g && !g.contains(el) }
+      let porRevelacion = 0
+      const hits = (x, y) => {
+        const t = document.elementFromPoint(x, y)
+        if (!t) return false
+        if (suyo(t)) return true
+        if (!revelacion || !ganadorAjeno(t)) return false
+        for (const u of document.elementsFromPoint(x, y)) {
+          if (ganadorAjeno(u)) continue
+          if (suyo(u)) { porRevelacion++; return true }
+          return false
+        }
+        return false
+      }
       if (!hits(cx, cy)) return { occluded: true, visualW: r.width, visualH: r.height }
       const scan = (dx, dy) => { let x = cx, y = cy, n = 0; while (n < 120 && hits(x + dx, y + dy)) { x += dx; y += dy; n++ } return { x, y } }
       const L = scan(-1, 0).x, R = scan(1, 0).x, T = scan(0, -1).y, B = scan(0, 1).y
-      return { left: L, right: R, top: T, bottom: B, w: R - L + 1, h: B - T + 1, visualW: Math.round(r.width * 10) / 10, visualH: Math.round(r.height * 10) / 10, cx, cy }
+      return { left: L, right: R, top: T, bottom: B, w: R - L + 1, h: B - T + 1, visualW: Math.round(r.width * 10) / 10, visualH: Math.round(r.height * 10) / 10, cx, cy, ...(revelacion ? { porRevelacion } : {}) }
     }
   })
 }
@@ -3310,10 +3375,18 @@ async function runTactil(browser) {
   // no era que el defecto no ocurriera, es que nadie miraba. Un modo táctil que
   // no cubre las pantallas grandes no está declarando un alcance: está dejando
   // un hueco que se lee como verde.
-  const TOUCH_VPS = [{ w: 1024, h: 768 }, { w: 1280, h: 720 }, { w: 1366, h: 768 }, { w: 1920, h: 1080 }]
+  //
+  // PAN-1 1b · LAS CELDAS DE TELÉFONO. El aplazado 21 vivía en 360×640 y el modo
+  // no la visitaba nunca: medía sólo escritorio táctil. Y `tactil [celda] [mesa]`
+  // corre un trozo de la matriz (`tactil 360x640`, `tactil 640x360 4`).
+  const TOUCH_VPS = [{ w: 1024, h: 768 }, { w: 1280, h: 720 }, { w: 1366, h: 768 }, { w: 1920, h: 1080 },
+    { w: 360, h: 640 }, { w: 390, h: 844 }, { w: 412, h: 915 }, { w: 915, h: 412 }, { w: 640, h: 360 }]
   const TABLES = [5, 4, 3, 2]   // táctil coarse en CADA mesa (mesa 2 = sin nombre-tap)
+  const fCelda = process.argv[3] || null, fMesa = process.argv[4] ? Number(process.argv[4]) : null
   const out = []
   for (const n of TABLES) for (const vp of TOUCH_VPS) {
+    if (fCelda && `${vp.w}x${vp.h}` !== fCelda) continue
+    if (fMesa && n !== fMesa) continue
     // pointer:coarse: hasTouch + isMobile fuerza a Chromium a reportar coarse.
     const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, hasTouch: true, isMobile: true })
     await gotoMesa(page, n)
@@ -3322,23 +3395,25 @@ async function runTactil(browser) {
     const coarse = await page.evaluate(() => window.matchMedia('(pointer: coarse)').matches)
     const targets = {}
 
-    const probe = async (label, sels) => page.evaluate(({ sels, vpH, vpW, MIN }) => {
+    // `revelacion` (D4): sólo en el pago, donde el ganador manda sobre sus vecinos.
+    const probe = async (label, sels, revelacion = false) => page.evaluate(({ sels, vpH, vpW, MIN, revelacion }) => {
       const acc = []
       for (const { sel, name, interactive } of sels) {
         document.querySelectorAll(sel).forEach((el, i) => {
-          const hb = window.__hitBox(el)
+          const hb = window.__hitBox(el, { revelacion })
           const inView = hb.top != null && hb.top >= 0 && hb.bottom <= vpH && hb.left >= 0 && hb.right <= vpW
           const ok = interactive === false ? true : (hb.w >= MIN && hb.h >= MIN && inView && !hb.occluded)
-          acc.push({ name: name + (i ? `#${i}` : ''), text: el.textContent.trim().slice(0, 14), interactive: interactive !== false, visual: `${hb.visualW}×${hb.visualH}`, hitW: hb.w, hitH: hb.h, left: hb.left, right: hb.right, top: hb.top, bottom: hb.bottom, inView, ok })
+          acc.push({ name: name + (i ? `#${i}` : ''), text: el.textContent.trim().slice(0, 14), interactive: interactive !== false, visual: `${hb.visualW}×${hb.visualH}`, hitW: hb.w, hitH: hb.h, left: hb.left, right: hb.right, top: hb.top, bottom: hb.bottom, inView, ok, ...(hb.porRevelacion ? { porRevelacion: hb.porRevelacion } : {}) })
         })
       }
       return acc
-    }, { sels, vpH: vp.h, vpW: vp.w, MIN: TACTIL_MIN })
+    }, { sels, vpH: vp.h, vpW: vp.w, MIN: TACTIL_MIN, revelacion })
 
     targets.waiting = await probe('waiting', [
       { sel: '.action-area .btn-primary', name: 'Iniciar' },
       { sel: '.opp-corner-chip', name: 'ficha-IA' },   // DSK-P2: hit ≥40 en coarse
       { sel: '.utilities-trigger', name: 'utilidades' }, // DSK-U1: el ⋮ hereda el estándar
+      { sel: '.btn-leave', name: 'salir' },            // PAN-1 · la ✕ no estaba en el censo
     ])
     await clickIf(page, 'button:has-text("Iniciar mano")')
 
@@ -3368,9 +3443,12 @@ async function runTactil(browser) {
     }
 
     targets.showdown = await probe('showdown', [
-      { sel: '.opp-name-tappable', name: 'nombre-tap' },
+      // PAN-1 1b · junto a D4 (respuesta del rector a §6.3): en el pago NO se mide
+      // el nombre del panel REVELADO. Lo cortan sus propias cartas, y tocarlo no
+      // hace nada (R1.c, GameTable.jsx:1453): no es un tocable mientras revela.
+      { sel: '.opp-panel:not(.opp-winner) .opp-name-tappable', name: 'nombre-tap' },
       { sel: '.action-area .btn-primary', name: 'Siguiente' },
-    ])
+    ], true)
     // Ejercer un tap de revelado sobre el nombre (funcional)
     const revealTap = await page.evaluate(() => {
       const cand = [...document.querySelectorAll('.opp-name-tappable')].find(el => !el.closest('.opp-panel').className.includes('opp-winner'))
@@ -3403,7 +3481,11 @@ async function runTactil(browser) {
       multNoOverlap: overlaps.length === 0, overlaps,
       allInteractiveOk: flat.filter(t => t.interactive).every(t => t.ok),
       failing: flat.filter(t => t.interactive && !t.ok).map(t => `${t.phase}/${t.name} ${t.hitW}×${t.hitH}`),
+      // D4 · los puntos que la revelación del ganador tapó y se contaron del vecino.
+      tapadoPorRevelacion: flat.filter(t => t.porRevelacion).map(t => `${t.name} ${t.porRevelacion} px`),
     })
+    const u = out[out.length - 1]
+    console.log(`tactil T${n} ${vp.w}x${vp.h} · coarse=${coarse} · pago=${reached} · ${u.allInteractiveOk && u.multNoOverlap ? 'OK' : 'FAIL'}${u.failing.length ? ' · ' + u.failing.join(', ') : ''}${overlaps.length ? ' · solapes ' + overlaps.map(o => o.pair).join(', ') : ''}${u.tapadoPorRevelacion.length ? ' · D4 ' + u.tapadoPorRevelacion.join(', ') : ''}`)
     await page.close()
   }
   return out
@@ -13687,15 +13769,20 @@ function recVaraAnillo(a) {
   return { ok: fallos.length === 0, fallos, diametro: round(Math.min(a.ancho, a.alto)), fs: a.fs, fw: a.fw, contrasteNumero: round(cN), contrasteTrazo: round(cT), burbuja: a.burbuja }
 }
 
-// «Ver la mesa»: su caja y el piso táctil de 36 (v1.2 §5.4).
+// «Ver la mesa»: su caja y el piso táctil de 36 (v1.2 §5.4) —y su ZONA, desde
+// PAN-1 (D6): la vara la pide ≥ 40 por eje—.
 const REC_VER_MESA = () => {
   const b = document.querySelector('[data-accion="recarga-ver-mesa"]')
   if (!b) return { hay: false }
   const r = b.getBoundingClientRect()
+  const cx = Math.round((r.left + r.right) / 2), cy = Math.round((r.top + r.bottom) / 2)
+  const da = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === b || b.contains(t)) }
+  const paso = (dx, dy) => { let n = 0; while (n < 120 && da(cx + dx * (n + 1), cy + dy * (n + 1))) n++; return n }
+  const z = da(cx, cy) ? { zonaAncho: paso(-1, 0) + paso(1, 0) + 1, zonaAlto: paso(0, -1) + paso(0, 1) + 1 } : { zonaAncho: 0, zonaAlto: 0 }
   const fila = b.closest('.apu-plazo-fila')?.getBoundingClientRect()
   const plazo = document.querySelector('[data-accion="recarga-plazo"]')?.getBoundingClientRect()
   return {
-    hay: true, alto: Math.round(r.height * 100) / 100, ancho: Math.round(r.width * 100) / 100,
+    hay: true, alto: Math.round(r.height * 100) / 100, ancho: Math.round(r.width * 100) / 100, ...z,
     mismaFila: !!fila && r.top >= fila.top - 0.5 && r.bottom <= fila.bottom + 0.5,
     aLaDerecha: !!plazo && r.left >= plazo.left,
   }
