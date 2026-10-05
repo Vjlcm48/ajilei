@@ -214,7 +214,7 @@ A la IA que va por encima no se le quita nada; las eliminadas **no vuelven**. `a
   - el **cronómetro va a la izquierda**;
   - a su derecha, en la misma fila, **«Ver la mesa»** cuando la tarjeta se puede plegar (§5.5).
 - **Separaciones:** las de A5 rigen en **todas las pantallas**, es decir, teléfono vertical, teléfono apaisado y escritorio. En el teléfono apaisado la forzosa es compacta, con las dos acciones en fila.
-- **Ningún botón de la tarjeta baja del piso táctil de 36 px.** En la forzosa, las acciones miden ≥ 40 px.
+- **El piso táctil de la tarjeta (PAN-1, INV-07): zona táctil de 40 px por eje en cada botón.** La caja visible de la blanda y de «Ver la mesa» sigue en **36 px**; en la forzosa, las acciones miden **42**. La zona la da un `::after` transparente que solo crece lo que falta (`src/styles/tactil.css`) y se mide por barrido, no por la caja (`diagDSK apu`, `diagDSK rec`).
 
 ### 5.5 La burbuja — SELLADO (REC-1)
 
@@ -412,3 +412,7 @@ Ganarle a la IA acuña Heptacoins. Aceptado por ahora; la válvula pertenece a E
   - la cifra «≤ 142,78 px» de A2, que A5 ya había dejado atrás, pasa a «≤ 163 px y 0 px² sobre las cartas» en 360×640;
   - la automática va sin título en el teléfono vertical;
   - en escritorio y en el apaisado, la tarjeta blanda abierta puede cubrir la mano, que se recupera con «Ver la mesa».
+
+### Adenda PAN-1 (2026-10-05, sin cambio de versión)
+
+- **§5.4, el piso táctil de la tarjeta:** la regla pasa de «ningún botón baja de 36 px» a **zona táctil de 40 px por eje** en cada botón (INV-07). La caja visible no cambia: 36 en la blanda y en «Ver la mesa», 42 en las acciones de la forzosa. Subir la caja a 40 tapaba la mano en 360×640 (A2), y por eso la zona la da un `::after` transparente con `min(0px, calc(50% - 20px))` por lado, que solo crece lo que falta. La línea se cambió en su sitio para que las citas de `:217` sigan valiendo. Decisión del rector en la 1b de PAN-1 (opción b); lo vigilan `diagDSK apu` (`zonaMin`, `bajoZona`) y `diagDSK rec` («Ver la mesa»).

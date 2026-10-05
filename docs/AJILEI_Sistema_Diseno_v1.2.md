@@ -600,3 +600,19 @@ visibilidad.
 - VOZ-2 D7, `voz2.css:30-39`: «la contención no es opcional»; la regla apunta al `<p>`, nunca al óvalo (`:100`).
 
 `o1` y `o2` solo miden escritorio. En móvil lo vigilan `diagPUE voz2`, `msg` y `apu`: es un hueco aceptado (ARN-3e D8), anotado en INV-04.
+
+**Precisión (Victor, 2026-10-03, PAN-1).** El óvalo **no se toca por diseño ni por contenido**: lo que dicen los tres puntos de arriba. Lo que sí hace es **adaptarse al tamaño de la pantalla**, como al girar el teléfono y como al entrar o salir de la pantalla completa (INV-45). El «Ni geometría» del punto 1 se lee así: ninguna campaña cambia la geometría que el CSS sellado da a cada tamaño de pantalla. El óvalo vertical sigue siendo el vertical, y su CSS no se toca.
+
+---
+
+## 14. PISO TÁCTIL: SE MIDE LA ZONA, NO LA CAJA (PAN-1, 2026-10-05)
+
+**La regla (INV-07):** todo lo tocable de la mesa tiene una **zona táctil de 40 px por eje** (44 en el lobby y en el menú). La zona es lo que responde al dedo, y se mide por **barrido en cruz con `elementFromPoint`** desde el centro, no por la caja visible. Una caja de 28 con una zona transparente de 40 cumple; una caja de 40 tapada por un vecino, no. La dan pseudo-elementos `::after` transparentes en hojas aditivas (`src/styles/tactil.css`, sin `!important`, ganando por especificidad), que solo crecen sobre espacio sin nada tocable. La tarjeta de recarga tiene caja de 36 y zona de 40; la forzosa, 42 (`AJILEI_APU-1_Reglas_v1.3.md:217`).
+
+**Tres comentarios del protegido `gameTable.css` quedaron atrás.** Los comentarios del protegido no se editan (`AJILEI_Protegidos_v1.0.md` §1). Esta nota dice cómo se leen hoy:
+
+1. **«aquí no hay presupuesto para 40 reales»** (`gameTable.css:2042-2053`, BT-1, la fila de acciones comprimida). Sigue siendo cierto de la **caja**, que es de 28. Pero no es un incumplimiento: el `::after` de BT-1 lleva la **zona** a 40, y desde PAN-1 INV-07 se mide por zona. El «incumplimiento conocido» de los 28 px (H3e-ii-1) era una medida de la caja visible.
+2. **«NUNCA a la izquierda (left:0)»** (`gameTable.css:3364-3366`, la ✕ de mesa 5 en apaisado, y `:3581-3584`, la de mesa 4). Rige para el **botón visible**, que no debe pisar el panel de la IA. Una **zona transparente** sobre una esquina sin nada tocable sí puede crecer a la izquierda: la ✕ de mesa 5 en apaisado lo hace (`left: -17px`, `tactil.css`). La de mesa 4 lo respeta: crece solo hacia arriba (`top: -10px`).
+3. **«su táctil es deuda aparte»** (`gameTable.css:1936-1937`, los multiplicadores). La deuda está pagada: `tactil.css` les da la zona de 40 en el teléfono, en vertical y en apaisado.
+
+Si un día se abre `gameTable.css` por otra causa, estos tres comentarios viajan con `.btn-soon` y `.soon-tag` (aplazado 6).
