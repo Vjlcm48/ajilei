@@ -31,6 +31,7 @@ import { siembraAPU } from './dev/siembraAPU'
 import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
+import { creaPantallaCompleta } from './lib/pantallaCompletaCore'
 // BIE-1 · El «Cargando» de la rama CARGANDO y la regla D5 que lo gobierna.
 import Cargando from './components/Cargando'
 import { useEsperaVisible } from './hooks/useEsperaVisible'
@@ -353,6 +354,22 @@ function App() {
     // CAR-1 §3.2 · y la baraja con ellos, por la misma razón y en el mismo
     // momento: 0,57 MB de WebP contra los 24,28 MB de PNG que ya no viajan.
     precargarBaraja()
+  }, [screen])
+
+  // ── PAN-1 1c · LA PANTALLA COMPLETA EN LOS TELÉFONOS (INV-45, R1–R9) ──────
+  // Un oyente en el documento, montado una vez: el primer toque en la app, sea
+  // donde sea, la pide, para que la mesa nazca con el alto completo (R2). Si
+  // algo la saca, fuera de la mesa vuelve con el siguiente toque; dentro, solo
+  // con «Iniciar mano» o «Siguiente mano», que llaman a `reentrar` en
+  // `GameTable` (R4). La política vive en `lib/pantallaCompletaCore.js`.
+  const pantallaCompleta = useRef(null)
+  useEffect(() => {
+    const pc = creaPantallaCompleta(document, window)
+    pantallaCompleta.current = pc
+    return pc.engancha()
+  }, [])
+  useEffect(() => {
+    pantallaCompleta.current?.fijaDentroMesa(screen === 'table')
   }, [screen])
 
   // ── BIE-1 · CARGANDO pinta NADA… hasta los 300 ms ──────────────────────────

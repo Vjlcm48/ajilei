@@ -518,10 +518,13 @@ export default function SalaEspera({
               ) : (
                 <>
                   <span>{sala?.codigo ?? ' '}</span>
+                  {/* PAN-1 1c · copiar y compartir no piden la pantalla completa:
+                      pedirla gasta la activación del toque que ellos necesitan. */}
                   <button
                     type="button"
                     className={`sal-copiar${copiado ? ' is-hecho' : ''}`}
                     data-accion="copiar"
+                    data-sin-pantalla-completa=""
                     aria-label={t(copiado ? 'sal.espera.codigo.copiado' : 'sal.espera.codigo.copiar')}
                     onClick={copiar}
                   >
@@ -531,7 +534,7 @@ export default function SalaEspera({
               )}
             </div>
           </div>
-          <button type="button" className="sal-esp-compartir" data-accion="compartir" onClick={compartir}>
+          <button type="button" className="sal-esp-compartir" data-accion="compartir" data-sin-pantalla-completa="" onClick={compartir}>
             <IconoCompartir />
             <span>{t('sal.espera.compartir')}</span>
           </button>

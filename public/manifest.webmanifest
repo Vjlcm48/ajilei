@@ -3,7 +3,7 @@
   "short_name": "AJILEI",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "any",
   "background_color": "#0a1e10",
   "theme_color": "#0a1e10",

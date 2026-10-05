@@ -40,6 +40,7 @@ import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
 import { useTapetes } from '../hooks/useTapetes'
 import { useCongelado } from '../hooks/useCongelado'
+import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
 import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
 import { VIVAS_ESCRITORIO, VIVAS_MOVIL, PRESENTES_MOVIL_HORIZONTAL } from '../config/menuEntradas'
 import { getBestSuitScore } from '../engine/handEvaluator'
@@ -2298,7 +2299,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   que no cubre el ante. Mismo gate que «Siguiente mano». */}
               {phase === PHASES.WAITING && !isShuffling && !recarga && (
                 <div className="action-area">
-                  <SoundButton className="btn btn-primary" onClick={beginHand}>
+                  {/* PAN-1 1c · R4: dentro de la mesa, la pantalla completa solo
+                      vuelve aquí y en «Siguiente mano», síncrona y lo primero. */}
+                  <SoundButton className="btn btn-primary" onClick={() => {
+                    reentrarPantallaCompleta(document, window)
+                    beginHand()
+                  }}>
                     Iniciar mano
                   </SoundButton>
                 </div>
@@ -2445,6 +2451,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                       siguientes al clic; se guarda igual porque la ventana
                       existe. */}
                   <SoundButton className="btn btn-primary" onClick={() => {
+                    reentrarPantallaCompleta(document, window)  // PAN-1 1c · R4
                     setIsClearing(true)
                     setGame(prev => ({ ...prev, message: '', winner: null }))
                     clearTimeout(siguienteManoTimerRef.current)
