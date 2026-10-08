@@ -135,8 +135,9 @@ function pantallaDe(estado) {
 // informe. Dentro de una función que el `return null` de arriba deja inalcanzable,
 // se van con ella por construcción.
 //
-// El saldo contra el que se juzgan es el que devuelve `saldoDelJugador()`,
-// 5.000 mientras ECO-1 no exista. De ahí salen las cifras de
+// El saldo contra el que se juzgan es el de la billetera falsa del bypass
+// (`dev/billeteraFalsa.js`, ECO-1b): 5.000 si `?apu=saldo:<n>` no dice otra
+// cosa, la misma cifra que daba la constante de antes. De ahí salen las cifras de
 // §8.3: alcanzan 100/200/500/1000; no alcanzan 2000 ni 5000; y una mesa de 5000
 // pide 25.000, así que faltan exactamente 20.000.
 
@@ -206,9 +207,11 @@ function abiertasDe(estado) {
 }
 
 function configDe(estado) {
-  // 500 HC: 5×500 = 2.500 > 1.200 de bono, así que el aviso al anfitrión se
-  // enciende. Es la frontera exacta que §4.2 describe.
-  if (estado === 'armar-aviso') return { jugadores: 4, apuesta: 500, tipo: 'privada' }
+  // 1.000 HC: 5×1.000 = 5.000 > 2.500 de bono, así que el aviso al anfitrión se
+  // enciende. Es la frontera exacta que §4.2 describe. ECO-1b (B4) la movió de
+  // 500 a 1.000: con el bono en 2.500, la mesa de 500 ya está al alcance de un
+  // invitado nuevo (5×500 = 2.500) y el aviso no saldría.
+  if (estado === 'armar-aviso') return { jugadores: 4, apuesta: 1000, tipo: 'privada' }
   // Abierta y con la combinación que sí existe en el listado.
   if (estado === 'armar-unirme') return { jugadores: 4, apuesta: 200, tipo: 'abierta' }
   if (estado.startsWith('armar')) return { jugadores: 4, apuesta: 100, tipo: 'privada' }

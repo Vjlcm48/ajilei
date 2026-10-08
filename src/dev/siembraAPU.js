@@ -5,7 +5,9 @@
 // visual imposible de repetir dos veces igual.
 //
 // ── QUÉ SIEMBRA ────────────────────────────────────────────────────────────
-//   ?apu=saldo:<n>     El saldo de la SESIÓN arranca en n (1e-i).
+//   ?apu=saldo:<n>     El saldo arranca en n (1e-i). Desde ECO-1b lo que se
+//                      siembra es la billetera FALSA del bypass
+//                      (`dev/billeteraFalsa.js`); sin bypass no siembra nada.
 //   ?apu=allinIA       Una IA se sienta con la apuesta de mesa justa.
 //   ?apu=allinHumano   El humano se sienta con 1,5 apuestas.
 //   ?apu=recarga       El humano se sienta con 3 apuestas.
@@ -57,7 +59,7 @@ function pedido() {
 }
 
 /**
- * Lo que `?apu=` pide para la SESIÓN (el saldo del bolsillo), o `null`.
+ * Lo que `?apu=` pide para el saldo (la billetera falsa, ECO-1b), o `null`.
  * @returns {{saldo:number|null}|null}
  */
 export function siembraAPU() {

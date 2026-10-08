@@ -27,6 +27,7 @@
 // Las dos series llevan la hora de la página (`performance.now`), y el arnés
 // mete sus propias marcas (`window.__bieMarca`) para repartirlas por gesto.
 import { hostSupabase, PERFIL_CAP } from '../cap/capMesa.mjs'
+import { respuestaRpc } from '../arnes/nucleo.mjs'
 
 // Duraciones decodificadas en Edge (Fase 0 §A1): rasgueo 3,657 s, clic 0,528 s.
 // El desbloqueo de Howler es un búfer de 1 muestra a 22 050 Hz (≈ 0,000045 s).
@@ -135,7 +136,8 @@ export async function contextoBie(browser, vista, base, { perfilMs = 0, verifyMs
     if (u.pathname.startsWith('/rest/v1/profiles')) {
       return json((r.headers()['accept'] || '').includes('vnd.pgrst.object') ? PERFIL_CAP : [PERFIL_CAP], perfilMs)
     }
-    if (u.pathname.startsWith('/rest/v1/rpc/')) return json(null)
+    // ECO-1b · mi_billetera contesta el saldo del arnés (5.000); el resto, null.
+    if (u.pathname.startsWith('/rest/v1/rpc/')) return json(respuestaRpc(u.pathname))
     return json([])
   })
   const page = await ctx.newPage()

@@ -27,6 +27,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { recorrerRuta } from '../rutaMesa.mjs'
+import { respuestaRpc } from '../arnes/nucleo.mjs'
 
 // ── Constantes selladas ─────────────────────────────────────────────────────
 
@@ -113,8 +114,17 @@ const INICIO = ({ semilla, clave, sesion }) => {
  * Un contexto nuevo con la vista, la siembra, la sesión falsa y la red vigilada.
  * `red.fuera` = peticiones que NO son del origen local ni del host de Supabase
  * (la puerta cap.red las quiere en cero). `red.supabase` = las interceptadas.
+ *
+ * ECO-1b · `billetera` (opcional) es un objeto VIVO que la ruta lee en cada
+ * petición, así que el modo que lo pasa puede cambiarlo a mitad de recorrido:
+ *   saldo       lo que contesta `mi_billetera` (sin él, `SALDO_ARNES` = 5.000)
+ *   retrasoMs   cuánto tarda en contestar `mi_billetera`
+ *   falla       `mi_billetera` contesta 503 (la red o la base caídas)
+ *   errores     { nombreRpc: 'clave' } → esa RPC contesta el `raise` P0001
+ *   lecturas    lo cuenta la ruta: cuántas veces se pidió `mi_billetera`
+ * Sin `billetera`, la ruta contesta lo de siempre más la billetera de 5.000.
  */
-export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP } = {}) {
+export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP, billetera = null } = {}) {
   // `vista` es una clave de VISTAS_CAP o, para sondas fuera de lo sellado
   // (la variante C de la og-image), un objeto con la misma forma.
   // ARN-3c · D7 · `semilla`: `msg` juega en 4173 por aquí y no puede jugar
@@ -156,7 +166,26 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP 
       if (u.pathname.startsWith('/rest/v1/profiles')) {
         return json((r.headers()['accept'] || '').includes('vnd.pgrst.object') ? PERFIL_CAP : [PERFIL_CAP])
       }
-      if (u.pathname.startsWith('/rest/v1/rpc/')) return json(null)       // mi_sala y compañía: «no hay»
+      if (u.pathname.startsWith('/rest/v1/rpc/')) {
+        // mi_sala y compañía: «no hay»; mi_billetera: el saldo (ECO-1b).
+        if (billetera) {
+          const nombre = u.pathname.slice('/rest/v1/rpc/'.length)
+          if (nombre === 'mi_billetera') {
+            billetera.lecturas = (billetera.lecturas ?? 0) + 1
+            if (billetera.retrasoMs) await new Promise((ok) => setTimeout(ok, billetera.retrasoMs))
+            if (billetera.falla) {
+              return route.fulfill({ status: 503, contentType: 'application/json',
+                body: JSON.stringify({ code: 'PGRST000', message: 'arnés: billetera caída', details: null, hint: null }) })
+            }
+          }
+          const clave = billetera.errores?.[nombre]
+          if (clave) {
+            return route.fulfill({ status: 400, contentType: 'application/json',
+              body: JSON.stringify({ code: 'P0001', message: clave, details: null, hint: null }) })
+          }
+        }
+        return json(respuestaRpc(u.pathname, { saldo: billetera?.saldo }))
+      }
       if (u.pathname.startsWith('/auth/v1/user')) return json(user)
       if (u.pathname.startsWith('/auth/v1/token')) return json(sesion)
       return json([])

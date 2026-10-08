@@ -151,3 +151,7 @@ capturas-rec/
 # REGENERABLES con semilla sellada, mismo criterio que capturas-rec.
 capturas-cap/
 capturas-dis/
+
+# ECO-1b · capturas del modo `saldo` de scripts/diagDSK.mjs. REGENERABLES, mismo
+# criterio que capturas-rec y capturas-cap.
+capturas-saldo/

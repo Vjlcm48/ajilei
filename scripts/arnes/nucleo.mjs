@@ -201,6 +201,7 @@ export const VEREDICTO_DSK = Object.freeze({
   // `verde` arriba
   luz: ARRIBA('verde'), rev: ARRIBA('verde'), rec: ARRIBA('verde'), vuelo: ARRIBA('verde'),
   congelado: ARRIBA('verde'),   // ARN-3c-ii · §1.1.2
+  saldo: ARRIBA('verde'),       // ECO-1b · una sola cifra (INV-46)
   // `matrixOk`
   gate: ARRIBA('matrixOk'),
   // booleanos por celda (diagnósticos de DSK que nunca juntaron un `passed`)
@@ -215,7 +216,7 @@ export const VEREDICTO_DSK = Object.freeze({
 export const MODOS_DSK = Object.freeze([
   'humo', 'd1d2', 'd3', 'bug', 'shots', 'gate', 'lob', 'retar', 'apu', 'b1', 'tactil', 'p1', 'p2',
   'r1', 'r2', 'o1', 'h1', 'm1', 'a1', 'f1', 'z1', 'o2', 'a2', 'u1', 'menu-movil', 'u2', 'u3',
-  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado',
+  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo',
 ])
 const CLAVES_META = new Set(['mode', 'ts', 'arnes', 'error', 'veredicto', 'codigo'])
 
@@ -271,14 +272,31 @@ export function clasificarPeticion(url, hostSupabase = null) {
 // la cascada si alguien pregunta.
 export const PERFIL_ARNES = Object.freeze({ id: '0ca90000-0000-4000-8000-0000000a7e50', username: 'Jugador_ARNES' })
 
+// ── ECO-1b · la billetera que sirve el arnés ────────────────────────────────
+// Desde la 1b la app lee su saldo de `mi_billetera()`. Contra `vite preview`
+// (sesión simulada) la app usa la API real y quien contesta es el arnés: 5.000,
+// la cifra con la que nacieron las varas, para que ninguna se mueva. El modo
+// `saldo` de diagDSK sirve otra (3.700) para que una constante no pueda pasar.
+export const SALDO_ARNES = 5000
+
+/**
+ * Lo que contesta el arnés a una RPC. `mi_billetera` → el saldo; el resto →
+ * `null` con 200: así `mesaOpcional` da «no hay» sin avisar (un cuerpo de
+ * error haría que `traducir` escribiera un SAL-A en la consola).
+ * Es la respuesta común de las TRES rutas que imitan a Supabase: la de
+ * `comun.mjs`, `contextoCap` y `contextoBie`.
+ */
+export function respuestaRpc(pathname, { saldo = SALDO_ARNES } = {}) {
+  if (pathname === '/rest/v1/rpc/mi_billetera') return saldo
+  return null
+}
+
 /**
  * Lo que contesta el arnés a una petición a Supabase: lo mismo que `contextoCap`.
- * Un RPC devuelve `null` con 200: así `mesaOpcional` da «no hay» sin avisar
- * (un cuerpo de error haría que `traducir` escribiera un SAL-A en la consola).
  */
-export function respuestaSupabase(pathname, accept = '', perfil = PERFIL_ARNES) {
+export function respuestaSupabase(pathname, accept = '', perfil = PERFIL_ARNES, opciones = {}) {
   if (pathname.startsWith('/rest/v1/profiles')) return accept.includes('vnd.pgrst.object') ? perfil : [perfil]
-  if (pathname.startsWith('/rest/v1/rpc/')) return null
+  if (pathname.startsWith('/rest/v1/rpc/')) return respuestaRpc(pathname, opciones)
   if (pathname.startsWith('/auth/v1/user')) return { id: perfil.id, aud: 'authenticated', role: 'authenticated' }
   return []
 }

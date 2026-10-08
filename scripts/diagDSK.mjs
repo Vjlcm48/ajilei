@@ -311,6 +311,8 @@ import { getBestSuitScore, isAjilei } from '../src/engine/handEvaluator.js'
 // para no clavar ni el orden de la rejilla ni los montos: los `id` son el
 // CONTRATO del producto y los rótulos son copy declarado provisional.
 import { NIVEL_POR_DEFECTO, apuestasDe } from '../src/config/niveles.js'
+// ECO-1b · el modo `saldo` calcula la entrada con la MISMA regla que la app.
+import { pisoDe } from '../src/engine/entrada.js'
 // APU-1 1e · la ruta a la mesa sale de este archivo y pasa a `rutaMesa.mjs`,
 // para que deje de ser un secreto de `diagDSK` y la compartan los demás arneses
 // (la avería de NIV-UI, contada en la cabecera de aquel módulo).
@@ -394,7 +396,8 @@ const VC_RETRASO_ROCE_MS = (() => {
   const v = Number(process.argv.splice(i, 1)[0].slice('--retrasa-roce='.length))
   return Number.isFinite(v) && v > 0 ? v : 0
 })()
-const MODOS_PREVIEW = ['lob', 'msg']
+// ECO-1b · `saldo` también: mide la billetera que la API REAL lee del arnés.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -14164,6 +14167,300 @@ async function runRec(browser) {
   return { verde, puertas, resumen, sinCobertura }
 }
 
+// ── ECO-1b · `saldo` · UNA SOLA CIFRA (INV-46) ──────────────────────────────
+// Rector: AJILEI_ECO-1_Fase1b_v1.0.md §2.6 y §3.6, con el ajuste 1 del rector
+// al plan (la vara d cubre también Retar, no sólo la píldora).
+//
+// Contra el bundle REAL (`vite preview`) con la sesión simulada de CAP: la app
+// usa la API de verdad (`lib/billeteraApi`) y el arnés hace de servidor,
+// contestando `mi_billetera` con 3.700 — una cifra que ni la constante de antes
+// (5.000) ni el bono (2.500) pueden igualar por azar. La billetera del arnés es
+// un objeto VIVO (`contextoCap({ billetera })`): el modo la cambia a mitad de
+// recorrido para provocar la lentitud, el fallo y el `saldo_insuficiente`.
+// Un tramo corre en el servidor de desarrollo con bypass, porque a la sala de
+// espera sólo se llega con `?sal=`.
+//
+//   saldo.1  la misma cifra en Lobby, Retar, SalaOpciones y ArmarMesa, igual a
+//            la servida, con UNA sola lectura por arranque
+//   saldo.2  sentarse contra las IAS y abandonar tras el ante: la cifra nueva
+//            es la misma en las cuatro y cumple final = 3.700 − entrada + fichas
+//   saldo.3  lectura lenta: hueco «—» sin cifra; la caja no salta al llegar el
+//            saldo; Retar sin gris ni aviso y con el CTA apagado mientras tanto
+//   saldo.4  lectura fallida: nunca «0», «5.000» ni otra cifra inventada; Retar
+//            dice «No pudimos leer tu saldo» con «Reintentar», que la recupera;
+//            y volver a primer plano también la recupera sola
+//   saldo.5  `saldo_insuficiente` al crear una mesa PvP: se relee la billetera
+//            y la píldora y los chips se ponen al día
+//   saldo.6  dev con bypass: la sala de espera y Armar una mesa dicen la cifra
+//            de `?apu=saldo:3700`, listas desde el primer fotograma
+const SALDO_OUT_DIR = 'capturas-saldo'
+const SALDO_SERVIDO = 3700
+const SALDO_VP = { w: 412, h: 915, dpr: 1, movil: true }
+const BASE_SALDO_DEV = `http://localhost:${OPC.puertoAux || 5173}`
+// O1 · lo que puede moverse la píldora al llegar la cifra: menos de media
+// cifra. El alto no se mueve nada.
+const SALDO_TOL_W = 4
+
+const saldoTexto = (n) => montoTexto(n)
+const numeroDe = (t) => Number(String(t ?? '').replace(/\D/g, '')) || 0
+
+async function leerPildora(page) {
+  return page.evaluate(() => {
+    const p = document.querySelector('.lob-pildora')
+    if (!p) return null
+    const r = p.getBoundingClientRect()
+    return {
+      texto: p.querySelector('.bd-num')?.textContent?.trim() ?? '',
+      estado: p.dataset.saldo ?? null,
+      vacio: p.hasAttribute('data-saldo-vacio'),
+      w: +r.width.toFixed(2), h: +r.height.toFixed(2),
+    }
+  })
+}
+
+async function leerRetar(page) {
+  return page.evaluate(() => ({
+    grises: [...document.querySelectorAll('[data-accion="apuesta"]')].filter((b) => b.disabled).length,
+    avisoSaldo: !!document.querySelector('[data-accion="aviso-saldo"]'),
+    avisoLectura: document.querySelector('[data-accion="aviso-lectura"]')?.textContent?.trim() ?? null,
+    reintentar: !!document.querySelector('[data-accion="saldo-reintentar"]'),
+    ctaApagado: document.querySelector('[data-accion="cta"]')?.disabled ?? null,
+    nota: document.querySelector('[data-accion="cta-nota"]')?.textContent?.trim() ?? '',
+  }))
+}
+
+// La navegación, por contrato de marcado (`data-accion`), nunca por rótulo.
+const saldoIr = {
+  lobby: async (page) => { await page.click('[data-accion="casa"]'); await page.waitForSelector('main.lobby [data-accion="jugar-ia"]') },
+  retar: async (page) => { await page.click('[data-accion="jugar-ia"]'); await page.waitForSelector('[data-accion="reto"]') },
+  opciones: async (page) => { await page.click('[data-accion="jugar-pvp"]'); await page.waitForSelector('[data-accion="armar"]') },
+  armar: async (page) => { await page.click('[data-accion="armar"]'); await page.waitForSelector('[data-accion="apuesta"]') },
+}
+
+// Las cuatro pantallas con píldora del recorrido normal, desde el lobby y de
+// vuelta al lobby. Devuelve lo que la píldora dijo en cada una.
+async function saldoEnLasCuatro(page) {
+  const out = {}
+  out.lobby = await leerPildora(page)
+  await saldoIr.retar(page); out.retar = await leerPildora(page)
+  await saldoIr.lobby(page)
+  await saldoIr.opciones(page); out.opciones = await leerPildora(page)
+  await saldoIr.armar(page); out.armar = await leerPildora(page)
+  await saldoIr.lobby(page)
+  return out
+}
+const todasDicen = (pantallas, texto) => Object.values(pantallas).every((p) => p && p.texto === texto && p.estado === 'listo' && !p.vacio)
+
+async function saldoContexto(browser, billetera) {
+  const { ctx, page } = await contextoCap(browser, SALDO_VP, BASE_PROD, { billetera })
+  const errores = []
+  page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`))
+  return { ctx, page, errores }
+}
+
+async function runSaldo(browser) {
+  try { mkdirSync(SALDO_OUT_DIR, { recursive: true }) } catch { /* ya existe */ }
+  const puntos = {}
+  const sinCobertura = []
+  const errores = []
+  const servida = saldoTexto(SALDO_SERVIDO)
+
+  // ── saldo.1 y saldo.2 · el recorrido, en UNA carga de página ───────────────
+  {
+    const billetera = { saldo: SALDO_SERVIDO }
+    const { ctx, page, errores: e } = await saldoContexto(browser, billetera)
+    await page.goto(BASE_PROD)
+    await page.waitForSelector('main.lobby .lob-pildora[data-saldo="listo"]')
+    const pantallas = await saldoEnLasCuatro(page)
+    puntos['saldo.1'] = {
+      servida, pantallas, lecturas: billetera.lecturas ?? 0,
+      ok: todasDicen(pantallas, servida) && billetera.lecturas === 1,
+    }
+
+    // saldo.2 · sentarse, jugar el ante y abandonar. La entrada es el piso de
+    // Básico · 50 (500): con 3.700 en el bolsillo alcanza de sobra.
+    const ruta = await recorrerRutaComun(page, 2, 'basico', 0, 'piso')
+    const entrada = pisoDe(ruta.monto)
+    await page.click('button:has-text("Iniciar mano")')
+    await page.waitForTimeout(2500)
+    const fichas = numeroDe(await page.evaluate(() => document.querySelector('.pbr-chips .bd-num')?.textContent ?? ''))
+    await page.screenshot({ path: `${SALDO_OUT_DIR}/saldo2_mesa.png` })
+    await page.click('.btn-leave'); await page.waitForTimeout(200)
+    await page.click('.leave-modal button:has-text("Abandonar mesa")')
+    await page.waitForSelector('[data-accion="reto"]')
+    const esperado = SALDO_SERVIDO - entrada + fichas
+    const trasRetar = await leerPildora(page)
+    await saldoIr.lobby(page)
+    const trasSalir = { retar: trasRetar, ...(await saldoEnLasCuatro(page)) }
+    await page.screenshot({ path: `${SALDO_OUT_DIR}/saldo2_lobby.png` })
+    puntos['saldo.2'] = {
+      entrada, fichas, esperado: saldoTexto(esperado), pantallas: trasSalir, lecturas: billetera.lecturas ?? 0,
+      // `fichas < entrada`: el ante se jugó, así que la cifra TIENE que haber
+      // cambiado. Sin eso, una píldora clavada en 3.700 pasaría.
+      ok: fichas > 0 && fichas < entrada && esperado !== SALDO_SERVIDO
+        && todasDicen(trasSalir, saldoTexto(esperado)) && billetera.lecturas === 1,
+    }
+    errores.push(...e)
+    await ctx.close()
+  }
+
+  // ── saldo.3 · la lectura lenta ─────────────────────────────────────────────
+  {
+    // (a) en el lobby: hueco, y la caja no salta al llegar la cifra.
+    const b1 = { saldo: SALDO_SERVIDO, retrasoMs: 2500 }
+    const c1 = await saldoContexto(browser, b1)
+    await c1.page.goto(BASE_PROD)
+    await c1.page.waitForSelector('main.lobby .lob-pildora')
+    const antes = await leerPildora(c1.page)
+    await c1.page.screenshot({ path: `${SALDO_OUT_DIR}/saldo3_cargando.png` })
+    await c1.page.waitForSelector('.lob-pildora[data-saldo="listo"]', { timeout: 10000 })
+    const despues = await leerPildora(c1.page)
+    errores.push(...c1.errores)
+    await c1.ctx.close()
+
+    // (b) en Retar: con el reto Pro y una mesa de 2 elegida, ninguna apuesta
+    // en gris mientras carga; al llegar 3.700, las de piso > 3.700 se apagan.
+    const b2 = { saldo: SALDO_SERVIDO, retrasoMs: 3000 }
+    const c2 = await saldoContexto(browser, b2)
+    await c2.page.goto(BASE_PROD)
+    await c2.page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+    await saldoIr.retar(c2.page)
+    await c2.page.click('[data-accion="reto"]:nth-of-type(3)')
+    await c2.page.click('[data-accion="jugadores"]:nth-of-type(1)')
+    await c2.page.waitForTimeout(120)
+    const retarCargando = { ...(await leerRetar(c2.page)), pildora: await leerPildora(c2.page) }
+    await c2.page.waitForSelector('.lob-pildora[data-saldo="listo"]', { timeout: 10000 })
+    await c2.page.waitForTimeout(120)
+    const retarListo = { ...(await leerRetar(c2.page)), pildora: await leerPildora(c2.page) }
+    const grisesEsperados = apuestasDe('pro').filter((hc) => pisoDe(hc) > SALDO_SERVIDO).length
+    errores.push(...c2.errores)
+    await c2.ctx.close()
+
+    puntos['saldo.3'] = {
+      antes, despues, retarCargando, retarListo, grisesEsperados,
+      ok: antes?.estado === 'cargando' && antes.vacio && antes.texto === '—'
+        && despues?.estado === 'listo' && despues.texto === servida
+        && antes.h === despues.h && Math.abs(antes.w - despues.w) <= SALDO_TOL_W
+        && retarCargando.pildora?.texto === '—' && retarCargando.grises === 0
+        && !retarCargando.avisoSaldo && retarCargando.avisoLectura === null
+        && retarCargando.ctaApagado === true && retarCargando.nota.includes('Cargando')
+        && retarListo.pildora?.texto === servida && retarListo.grises === grisesEsperados && grisesEsperados > 0,
+    }
+  }
+
+  // ── saldo.4 · la lectura fallida ───────────────────────────────────────────
+  {
+    // (a) Retar dice lo que pasa y «Reintentar» lo arregla.
+    const b1 = { saldo: SALDO_SERVIDO, falla: true }
+    const c1 = await saldoContexto(browser, b1)
+    await c1.page.goto(BASE_PROD)
+    await c1.page.waitForSelector('main.lobby .lob-pildora[data-saldo="error"]', { timeout: 10000 })
+    const lobby = await leerPildora(c1.page)
+    await saldoIr.retar(c1.page)
+    await c1.page.click('[data-accion="reto"]:nth-of-type(3)')
+    await c1.page.click('[data-accion="jugadores"]:nth-of-type(1)')
+    await c1.page.waitForTimeout(120)
+    const retarError = { ...(await leerRetar(c1.page)), pildora: await leerPildora(c1.page) }
+    await c1.page.screenshot({ path: `${SALDO_OUT_DIR}/saldo4_retar_error.png` })
+    b1.falla = false
+    await c1.page.click('[data-accion="saldo-reintentar"]')
+    await c1.page.waitForSelector('.lob-pildora[data-saldo="listo"]', { timeout: 10000 })
+    await c1.page.waitForTimeout(120)
+    const retarRecuperado = { ...(await leerRetar(c1.page)), pildora: await leerPildora(c1.page) }
+    errores.push(...c1.errores)
+    await c1.ctx.close()
+
+    // (b) volver a primer plano también la recupera, sin esperar los 15 s
+    // (la última lectura falló). Playwright no puede ocultar una pestaña de
+    // verdad (FRZ-1): se emite el evento con la pestaña visible, que es lo que
+    // el oyente comprueba.
+    const b2 = { saldo: SALDO_SERVIDO, falla: true }
+    const c2 = await saldoContexto(browser, b2)
+    await c2.page.goto(BASE_PROD)
+    await c2.page.waitForSelector('main.lobby .lob-pildora[data-saldo="error"]', { timeout: 10000 })
+    const lobbyError = await leerPildora(c2.page)
+    b2.falla = false
+    await c2.page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+    await c2.page.waitForSelector('.lob-pildora[data-saldo="listo"]', { timeout: 10000 })
+    const lobbyRecuperado = await leerPildora(c2.page)
+    errores.push(...c2.errores)
+    await c2.ctx.close()
+
+    const sinCifra = (p) => p && p.texto === '—' && p.vacio && p.estado === 'error'
+    puntos['saldo.4'] = {
+      lobby, retarError, retarRecuperado, lobbyError, lobbyRecuperado,
+      ok: sinCifra(lobby) && sinCifra(retarError.pildora) && sinCifra(lobbyError)
+        && (retarError.avisoLectura ?? '').includes('No pudimos leer tu saldo') && retarError.reintentar
+        && retarError.ctaApagado === true && retarError.grises === 0 && !retarError.avisoSaldo
+        && retarRecuperado.pildora?.texto === servida && retarRecuperado.avisoLectura === null
+        && lobbyRecuperado?.texto === servida && lobbyRecuperado.estado === 'listo',
+    }
+  }
+
+  // ── saldo.5 · `saldo_insuficiente` en Armar una mesa ───────────────────────
+  {
+    const b = { saldo: SALDO_SERVIDO, errores: { crear_sala: 'saldo_insuficiente' } }
+    const c = await saldoContexto(browser, b)
+    await c.page.goto(BASE_PROD)
+    await c.page.waitForSelector('main.lobby .lob-pildora[data-saldo="listo"]')
+    await saldoIr.opciones(c.page)
+    await saldoIr.armar(c.page)
+    await c.page.click('[data-accion="apuesta"]:nth-of-type(3)')        // 500
+    await c.page.waitForTimeout(120)
+    const antes = { pildora: await leerPildora(c.page), lecturas: b.lecturas ?? 0 }
+    // El servidor sabe otra cosa: entre la lectura y el toque, el saldo bajó.
+    b.saldo = 900
+    await c.page.click('[data-accion="cta"]')
+    await c.page.waitForFunction(() => document.querySelector('.lob-pildora .bd-num')?.textContent?.trim() === '900', null, { timeout: 10000 })
+    await c.page.waitForTimeout(120)
+    const despues = await c.page.evaluate(() => ({
+      nota: document.querySelector('[data-accion="cta-nota"]')?.textContent?.trim() ?? '',
+      chip500Apagado: document.querySelector('[data-accion="apuesta"]:nth-of-type(3)')?.disabled ?? null,
+    }))
+    const pildora = await leerPildora(c.page)
+    await c.page.screenshot({ path: `${SALDO_OUT_DIR}/saldo5_insuficiente.png` })
+    errores.push(...c.errores)
+    await c.ctx.close()
+    puntos['saldo.5'] = {
+      antes, despues, pildora, lecturas: b.lecturas,
+      ok: antes.pildora?.texto === servida && antes.lecturas === 1
+        && b.lecturas === 2 && pildora?.texto === '900' && pildora.estado === 'listo'
+        && despues.nota.includes('2.500') && despues.chip500Apagado === true,
+    }
+  }
+
+  // ── saldo.6 · dev con bypass: la sala de espera y Armar ─────────────────────
+  if (EXTERNO) {
+    sinCobertura.push('saldo.6 (con --servidor=externo no hay servidor de desarrollo propio)')
+    puntos['saldo.6'] = { ok: true, sinCobertura: true }
+  } else {
+    const leerAlNacer = async (url) => {
+      const page = await browser.newPage({ viewport: { width: SALDO_VP.w, height: SALDO_VP.h } })
+      const e = []
+      page.on('pageerror', (x) => e.push(`pageerror: ${x.message}`))
+      await page.goto(url)
+      await page.waitForSelector('.lob-pildora')
+      const p = await leerPildora(page)
+      errores.push(...e)
+      await page.close()
+      return p
+    }
+    const espera = await leerAlNacer(`${BASE_SALDO_DEV}/?sal=espera-anfitrion&apu=saldo:${SALDO_SERVIDO}`)
+    const armar = await leerAlNacer(`${BASE_SALDO_DEV}/?sal=armar&apu=saldo:${SALDO_SERVIDO}`)
+    puntos['saldo.6'] = {
+      espera, armar,
+      ok: [espera, armar].every((p) => p && p.texto === servida && p.estado === 'listo' && !p.vacio),
+    }
+  }
+
+  puntos.consola = { errores, ok: errores.length === 0 }
+  const verde = Object.values(puntos).every((p) => p.ok === true)
+  const resumen = `${verde ? (sinCobertura.length ? 'SIN COBERTURA' : 'VERDE') : 'ROJO'} · ` +
+    Object.entries(puntos).map(([k, v]) => `${k} ${v.ok ? '✓' : '✗'}`).join(' · ')
+  console.log(`── SALDO · ${resumen}`)
+  return { verde, puntos, sinCobertura, resumen }
+}
+
 // R2c · Playwright headless pasa --hide-scrollbars POR DEFECTO. Con esa bandera
 // una barra que nace por overflow desplazable no encoge el cliente y el saltito
 // de 15px del área es invisible al arnés (falso verde comprobado). El modo r2 —
@@ -14189,6 +14486,12 @@ try {
     await servidorArnes({ tipo: 'preview', puerto: OPC.puerto || 4173, build: OPC.build, externo: EXTERNO, base: EXTERNO ? BASE_PROD : null })
   } else {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puerto || 5173, bypass: true, externo: EXTERNO, base: EXTERNO ? BASE : null })
+  }
+  // ECO-1b · `saldo` mide además la sala de espera, a la que sólo se llega con
+  // `?sal=` (DEV y bypass): su servidor de desarrollo va DESPUÉS del preview y
+  // su build (INV-43), en `--puerto-aux=N` o 5173.
+  if (!EXTERNO && MODE === 'saldo') {
+    await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5173, bypass: true })
   }
   if (!EXTERNO && (MODE === 'luz' || MODE === 'rev')) {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5174, bypass: false })
@@ -14260,6 +14563,7 @@ try {
   if (MODE === 'rev') report.rev = await runRev(browser)
   if (MODE === 'rec') report.rec = await runRec(browser)
   if (MODE === 'congelado') report.congelado = await runCongelado(browser)
+  if (MODE === 'saldo') report.saldo = await runSaldo(browser)
 } catch (e) {
   report.error = String(e && e.stack || e)
 }

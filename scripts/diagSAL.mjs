@@ -85,7 +85,7 @@ const ESTADOS = [
   { id: 'opciones-error',         pantalla: 'opciones', nota: 'código rechazado' },
   { id: 'opciones-codigo-lleno',  pantalla: 'opciones', nota: 'campo lleno LHQH + error · la primera letra visible' },
   { id: 'armar',                  pantalla: 'armar',    nota: 'estado base' },
-  { id: 'armar-aviso',            pantalla: 'armar',    nota: 'apuesta 500 · aviso al anfitrión' },
+  { id: 'armar-aviso',            pantalla: 'armar',    nota: 'apuesta 1000 · aviso al anfitrión' },
   { id: 'armar-unirme',           pantalla: 'armar',    nota: 'combinación existente · CTA cambiado' },
   // ── SAL-B2 F1b · la sala de espera real, un estado por vista de la lámina ──
   { id: 'espera-anfitrion',       pantalla: 'espera',   nota: 'anfitrión · 2/4 · «Jugar ya» · llegada, salida y cancelación por Realtime' },
@@ -543,9 +543,10 @@ async function medirEstado(page, estado) {
     }
 
     case 'armar-aviso': {
-      // 500 HC: 5 × 500 = 2.500 > 1.200 de bono, así que el aviso se enciende y
-      // nombra las apuestas que un invitado nuevo SÍ alcanza. Las dos cifras
-      // salen de `salas.js`, no del texto.
+      // 1.000 HC: 5 × 1.000 = 5.000 > 2.500 de bono, así que el aviso se
+      // enciende y nombra las apuestas que un invitado nuevo SÍ alcanza. Las
+      // cifras salen de `salas.js`, no del texto. ECO-1b (B4) re-sella: era la
+      // mesa de 500 con un bono de 1.200 y alcance «100 o 200».
       const r = await page.evaluate(() => {
         const aviso = document.querySelector('[data-accion="aviso-nuevos"]')
         return {
@@ -557,8 +558,8 @@ async function medirEstado(page, estado) {
       })
       return {
         ...r,
-        ok: r.on && r.texto.includes('1.200') && r.texto.includes('500')
-          && r.texto.includes('100') && r.texto.includes('200') && !r.texto.includes('⟦'),
+        ok: r.on && r.texto.includes('2.500') && r.texto.includes('Con 1.000 HC')
+          && r.texto.includes('100, 200 o 500') && !r.texto.includes('⟦'),
       }
     }
 

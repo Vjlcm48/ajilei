@@ -8,6 +8,7 @@ import {
   codigoDeSalida, canalPedido, comprobarVersion, faltaNavegador, leerOpciones, esBanderaComun,
   pidQueEscucha, veredictosDSK, VEREDICTO_DSK, MODOS_DSK,
   esLocal, clasificarPeticion, respuestaSupabase, corteDelArnes, veredictoAislamiento, PERFIL_ARNES, decidirBuild,
+  respuestaRpc, SALDO_ARNES,
 } from './nucleo.mjs'
 import { readFileSync } from 'node:fs'
 
@@ -180,6 +181,12 @@ describe('D6 · qué sale del arnés y qué no', () => {
     expect(respuestaSupabase('/rest/v1/profiles', 'application/json')).toEqual([PERFIL_ARNES])
     expect(respuestaSupabase('/auth/v1/user').id).toBe(PERFIL_ARNES.id)
     expect(respuestaSupabase('/rest/v1/salas')).toEqual([])
+    // ECO-1b · la billetera: 5.000 por defecto (las varas de hoy), o la pedida.
+    expect(SALDO_ARNES).toBe(5000)
+    expect(respuestaSupabase('/rest/v1/rpc/mi_billetera')).toBe(5000)
+    expect(respuestaSupabase('/rest/v1/rpc/mi_billetera', '', PERFIL_ARNES, { saldo: 3700 })).toBe(3700)
+    expect(respuestaRpc('/rest/v1/rpc/mi_billetera', { saldo: 0 })).toBe(0)
+    expect(respuestaRpc('/rest/v1/rpc/mi_sala', { saldo: 3700 })).toBe(null)
   })
   it('distingue un corte del arnés de un fallo de red de verdad', () => {
     expect(corteDelArnes('net::ERR_BLOCKED_BY_CLIENT.Inspector')).toBe(true)
