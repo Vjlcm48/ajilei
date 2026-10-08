@@ -28,7 +28,6 @@ import {
   IconoUsuario, IconoTrofeo, IconoTienda, IconoLibro, IconoPersonas,
 } from '../components/IconosLobby'
 import ChipToken from '../components/ChipToken'
-import { saldoDelJugador } from '../lib/saldo'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { useIdioma } from '../hooks/useIdioma'
 import { enmascararCorreo, atributosHoja } from '../hooks/lobbyCore'
@@ -73,7 +72,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
 
-export default function Lobby({ cuenta, saldo, onJugarIA, onJugarPvP, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, onJugarIA, onJugarPvP, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -180,11 +179,15 @@ export default function Lobby({ cuenta, saldo, onJugarIA, onJugarPvP, onCerrarSe
           dentro de la sesión SE MUEVE: baja al sentarse a una mesa y sube con
           lo que el jugador se levanta. Un lobby que siguiera pintando la
           constante diría 5.000 justo después de que el jugador perdiera 2.500,
-          que es peor que no enseñar nada. El defecto conserva la conducta vieja
-          para cualquier montaje que todavía no pase la prop. */}
+          que es peor que no enseñar nada.
+
+          ECO-1b · la prop es la `billetera` entera de `useBilletera` (App) y ya
+          no hay defecto: el respaldo `saldoDelJugador()` era la constante 5.000,
+          y una píldora sin cifra enseña su hueco, no un número de mentira. */}
       <BarraSuperior
         usuario={usuario}
-        saldo={saldo ?? saldoDelJugador()}
+        saldo={billetera?.saldo ?? null}
+        estadoSaldo={billetera?.estado}
         onPerfil={pronto}
         onTienda={pronto}
         onAjustes={() => setHojaAbierta(true)}

@@ -14,7 +14,7 @@ import {
   saldoMinimo,
 } from '../config/salas'
 import { MEMORIA_PVP } from '../config/salaRecordada'
-import { saldoDelJugador } from '../lib/saldo'
+import { saldoParaJuzgar } from '../hooks/billeteraCore'
 import { claveDeError } from '../lib/salasApi'
 import {
   alcanza,
@@ -62,6 +62,13 @@ import {
 // quién va a invitar. Por eso es naranja y no rojo, y por eso el chip de 2.000
 // sigue vivo.
 
+// ECO-1b · «100 o 200» con dos; «100, 200 o 500» con tres. El bono subió y la
+// lista creció: unirla siempre con « o » habría dado «100 o 200 o 500».
+function listaConO(partes) {
+  if (partes.length <= 1) return partes.join('')
+  return `${partes.slice(0, -1).join(', ')} o ${partes[partes.length - 1]}`
+}
+
 export default function ArmarMesa({
   api,
   cuenta,
@@ -69,25 +76,45 @@ export default function ArmarMesa({
   // `armar-aviso` y `armar-unirme` sin tocar el almacenamiento del navegador.
   // En producción es `null` y manda la memoria.
   configInicial = null,
+  // ECO-1b · la cifra única de `useBilletera` (App).
+  billetera = null,
   onEntrarSala,
   onVolver,
   onLobby,
 }) {
   const { t } = useIdioma()
-  const saldo = saldoDelJugador()
+  // ECO-1b · `saldo` es lo que se pinta (o `null` mientras no se sabe);
+  // `juicio` es contra qué se apagan los chips: sin cifra, contra nada
+  // (`SIN_JUICIO`), y decide el servidor.
+  const saldo = billetera?.saldo ?? null
+  const juicio = saldoParaJuzgar(saldo)
 
   // ── §4.4 · La configuración recordada, ya pasada por sus guardas ──────────
   // El inicializador perezoso de `useState` corre UNA vez, que es exactamente
   // lo que se quiere: leer el almacenamiento en cada render sería trabajo
   // repetido, y peor, dejaría que un cambio de saldo a mitad de pantalla
   // reescribiera bajo el dedo lo que el jugador acaba de elegir.
-  const [config, setConfig] = useState(
-    () => (configInicial ? normalizarConfig(configInicial, saldo) : MEMORIA_PVP.leer(saldo))
+  //
+  // ECO-1b · si la pantalla se monta antes de que llegue el saldo, la memoria
+  // se lee SIN la guarda de saldo y la guarda se aplica al pintar, en cuanto la
+  // cifra llega: `normalizarConfig` es idempotente, así que con el saldo ya
+  // conocido al montar no cambia nada respecto a antes. Sin efecto que escriba
+  // estado (`react-hooks/set-state-in-effect`).
+  const [configCruda, setConfig] = useState(
+    () => (configInicial ? normalizarConfig(configInicial, juicio) : MEMORIA_PVP.leer(juicio))
   )
+  const config = normalizarConfig(configCruda, juicio)
   const { jugadores, apuesta, tipo } = config
 
-  const [mesas, setMesas] = useState([])
+  // ECO-1b · filas crudas; el orden se calcula al pintar (ver `SalaOpciones`).
+  const [filas, setFilas] = useState([])
+  const mesas = ordenarMesas(filas, juicio)
   const [error, setError] = useState(null)
+  // ECO-1b · la apuesta con la que se INTENTÓ. Tras un `saldo_insuficiente` la
+  // billetera se relee, y si la cifra nueva ya no alcanza esa mesa la guarda de
+  // saldo la cae al defecto: la nota tiene que seguir hablando de la mesa que
+  // el servidor rechazó, no de la que quedó marcada después.
+  const [apuestaIntentada, setApuestaIntentada] = useState(null)
   const [ocupado, setOcupado] = useState(false)
 
   // ── Qué mesas abiertas hay ───────────────────────────────────────────────
@@ -102,10 +129,10 @@ export default function ArmarMesa({
   const releerMesas = useCallback(() => {
     let vivo = true
     api.salasAbiertas().then(({ data }) => {
-      if (vivo) setMesas(ordenarMesas(data ?? [], saldo))
+      if (vivo) setFilas(data ?? [])
     })
     return () => { vivo = false }
-  }, [api, saldo])
+  }, [api])
 
   useEffect(() => releerMesas(), [releerMesas])
 
@@ -136,7 +163,7 @@ export default function ArmarMesa({
   // decir dos veces lo mismo en dos tonos distintos.
   const recuerdo = tipo === 'privada'
     ? existeMisma
-    : (existeMisma ? null : otraMesaAlAlcance(mesas, saldo, jugadores, apuesta))
+    : (existeMisma ? null : otraMesaAlAlcance(mesas, juicio, jugadores, apuesta))
 
   const rotuloCta = tipo === 'privada'
     ? 'sal.armar.cta.privada'
@@ -158,6 +185,11 @@ export default function ArmarMesa({
     }
 
     setError(respuesta.error)
+    setApuestaIntentada(apuesta)
+
+    // ECO-1b · el servidor sabe un saldo más bajo que el que enseñamos: se
+    // vuelve a leer la billetera y la píldora y los chips se ponen al día.
+    if (respuesta.error === 'saldo_insuficiente') billetera?.alSaldoInsuficiente?.()
 
     // ── §4.3 · La carrera del índice parcial ────────────────────────────────
     // Si entre la lectura de arriba y este toque otro anfitrión abrió la misma
@@ -184,7 +216,8 @@ export default function ArmarMesa({
   // la lámina.
   let notaCta = null
   if (error === 'saldo_insuficiente') {
-    notaCta = t('sal.armar.nota.5x', { min: montoTexto(saldoMinimo(apuesta)), hc: montoTexto(apuesta) })
+    const rechazada = apuestaIntentada ?? apuesta
+    notaCta = t('sal.armar.nota.5x', { min: montoTexto(saldoMinimo(rechazada)), hc: montoTexto(rechazada) })
   } else if (error) {
     notaCta = t(claveDeError(error))
   } else if (esUnirme) {
@@ -201,6 +234,7 @@ export default function ArmarMesa({
       clase="es-armar"
       cuenta={cuenta}
       saldo={saldo}
+      estadoSaldo={billetera?.estado}
       // Aquí la flecha y la casa DEJAN de coincidir: la flecha deshace un paso
       // —vuelve a `SalaOpciones`, §4.5— y la casa salta al lobby de un tirón
       // (§5.1). Tener las dos es lo que hace que el jugador que entró a mirar
@@ -237,7 +271,7 @@ export default function ArmarMesa({
           // La regla 5× apaga el chip. Es CORTESÍA (§3.5), no validación: el
           // servidor la comprueba otra vez y su `saldo_insuficiente` se pinta
           // como cualquier otro error.
-          disabled: !alcanza(hc, saldo),
+          disabled: !alcanza(hc, juicio),
         }))}
         valor={apuesta}
         onChange={(hc) => elegir({ apuesta: hc })}
@@ -248,9 +282,10 @@ export default function ArmarMesa({
               hc: montoTexto(apuesta),
               bono: montoTexto(BONO_BIENVENIDA),
               // Se DERIVA de `ALCANCE_NUEVOS`, que a su vez se deriva del bono y
-              // de la regla. Escribir «100 o 200» a mano aquí sería dejar una
-              // frase que mentiría el día que suba el bono.
-              alcance: ALCANCE_NUEVOS.map(montoTexto).join(' o '),
+              // de la regla. Escribir «100 o 200» a mano aquí habría dejado una
+              // frase que mentía en cuanto subió el bono (ECO-1b: ahora son
+              // tres, «100, 200 o 500»).
+              alcance: listaConO(ALCANCE_NUEVOS.map(montoTexto)),
             })
           : null}
       />

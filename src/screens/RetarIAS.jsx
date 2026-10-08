@@ -12,8 +12,9 @@ import {
   elegir, filaHabilitada, listo,
   opcionesReto, opcionesJugadores, opcionesApuesta, opcionesEntrada,
   idEntrada, pasoEntrada, topeEntrada, entradaDeLaSesion, pilaDeCadaIA,
-  avisoDeSaldo, CASO_ALCANZA, CASO_RETO_MENOR,
+  avisoDeSaldo, CASO_ALCANZA, CASO_RETO_MENOR, guardaDeSaldo,
 } from './retarCore'
+import { saldoParaJuzgar, ERROR as SALDO_ERROR } from '../hooks/billeteraCore'
 
 // ── APU-1 1e · «Retar a las IAS» ────────────────────────────────────────────
 // Rector: AJILEI_APU-1_Fase1e_v1.0.md §2.2. Boceto aprobado por Victor en
@@ -73,9 +74,33 @@ function AvisoSaldo({ texto }) {
   )
 }
 
+// ── ECO-1b · Sin cifra y con la lectura fallida: decirlo y dejar reintentar ──
+// Ajuste 1 del rector al plan de la 1b. Si la billetera falló y no hay ninguna
+// cifra conocida, «Cargando tu saldo…» sería mentir para siempre. Este bloque
+// dice lo que pasa y ofrece la única salida que depende del jugador: volver a
+// leer. Mismo traje que `AvisoSaldo` (las clases `sal-saldo*`), otro
+// `data-accion` para que el arnés lo distinga.
+function AvisoLectura({ onReintentar }) {
+  const { t } = useIdioma()
+  return (
+    <section className="sal-saldo" data-accion="aviso-lectura" role="alert">
+      <p className="sal-saldo-txt">{t('ia.retar.saldo.error')}</p>
+      <button
+        type="button"
+        className="sal-saldo-cta"
+        data-accion="saldo-reintentar"
+        onClick={onReintentar}
+      >
+        {t('ia.retar.saldo.reintentar')}
+      </button>
+    </section>
+  )
+}
+
 export default function RetarIAS({
   cuenta,
-  saldoSesion,
+  // ECO-1b · la cifra única de `useBilletera` (App). Releva a `saldoSesion`.
+  billetera = null,
   configInicial = null,
   onRetar,
   onVolver,
@@ -83,16 +108,31 @@ export default function RetarIAS({
 }) {
   const { t } = useIdioma()
 
+  // ── ECO-1b · la cifra y el juicio ─────────────────────────────────────────
+  // `saldo` es lo que se enseña (o `null` mientras no se sabe). `juicio` es
+  // contra qué se apagan mesas y entradas: sin cifra, contra nada
+  // (`SIN_JUICIO`) — ni mesas en gris, ni «No te alcanza», ni aviso de saldo.
+  // Lo único que se apaga sin cifra es el CTA: sentarse SÍ gasta, y no se gasta
+  // a ciegas.
+  const saldo = billetera?.saldo ?? null
+  const juicio = saldoParaJuzgar(saldo)
+  const sinCifra = saldo === null
+  const lecturaFallida = sinCifra && billetera?.estado === SALDO_ERROR
+
   // El inicializador perezoso corre UNA vez: leer el almacenamiento en cada
   // render sería trabajo repetido y dejaría que un cambio de saldo reescribiera
   // bajo el dedo lo que el jugador acaba de elegir. `entrada` nace en `null`
   // porque no se recuerda — no es un olvido, es la política.
-  const [config, setConfig] = useState(() => ({
+  //
+  // ECO-1b · sin cifra se lee sin la guarda de saldo, y `guardaDeSaldo` la
+  // aplica al pintar en cuanto la cifra llega (sin efecto que escriba estado).
+  const [configCruda, setConfig] = useState(() => ({
     ...(configInicial
-      ? normalizarReto(configInicial, saldoSesion)
-      : MEMORIA_RETO.leer(saldoSesion)),
+      ? normalizarReto(configInicial, juicio)
+      : MEMORIA_RETO.leer(juicio)),
     entrada: null,
   }))
+  const config = guardaDeSaldo(configCruda, juicio)
 
   // Si el contador de «Otra…» está abierto. Es estado de PINTURA y no de
   // decisión: el monto elegido vive en `config.entrada`, y por eso el contador
@@ -114,8 +154,8 @@ export default function RetarIAS({
   // ni montos que ofrecer. `unit` es la apuesta de mesa; el 0 de relleno nunca
   // se usa porque la fila va deshabilitada.
   const unit = apuesta ?? 0
-  const filaEntrada = opcionesEntrada(unit, saldoSesion)
-  const tope = apuesta !== null ? topeEntrada(unit, saldoSesion) : 0
+  const filaEntrada = opcionesEntrada(unit, juicio)
+  const tope = apuesta !== null ? topeEntrada(unit, juicio) : 0
 
   const tocarEntrada = (id) => {
     if (id === 'otra') {
@@ -130,18 +170,18 @@ export default function RetarIAS({
   }
 
   const mover = (direccion) => {
-    cambiar('entrada', pasoEntrada(entrada, unit, saldoSesion, direccion))
+    cambiar('entrada', pasoEntrada(entrada, unit, juicio, direccion))
   }
 
   // ── RET-A · El aviso de saldo ─────────────────────────────────────────────
   // La regla entera está en `retarCore.avisoDeSaldo` y aquí sólo se pinta. Mira
   // el SALDO y el RETO, nada más: ni la apuesta ni la entrada, que son las dos
   // filas que el jugador recorre con el dedo.
-  const aviso = avisoDeSaldo(saldoSesion, reto)
+  const aviso = avisoDeSaldo(juicio, reto)
 
   // ── El CTA y su nota ──────────────────────────────────────────────────────
   const completo = listo(config)
-  const veredicto = completo ? entradaDeLaSesion(entrada, unit, saldoSesion) : { ok: false, motivo: null }
+  const veredicto = completo ? entradaDeLaSesion(entrada, unit, juicio) : { ok: false, motivo: null }
 
   const MOTIVOS_TEXTO = {
     [MOTIVOS_ENTRADA.MONTO_INVALIDO]: 'ia.entrada.monto_invalido',
@@ -151,13 +191,17 @@ export default function RetarIAS({
   }
 
   let notaCta = null
-  if (!completo) {
+  if (sinCifra) {
+    // ECO-1b · mientras carga, la nota lo dice; si la lectura falló, lo dice
+    // `AvisoLectura` con su botón y la nota calla para no repetirlo.
+    notaCta = lecturaFallida ? null : t('ia.retar.saldo.cargando')
+  } else if (!completo) {
     notaCta = t('ia.retar.cta.falta')
   } else if (!veredicto.ok) {
     notaCta = t(MOTIVOS_TEXTO[veredicto.motivo] ?? 'ia.entrada.monto_invalido', {
       hc: montoTexto(unit * 5),
       techo: montoTexto(tope),
-      saldo: montoTexto(saldoSesion),
+      saldo: montoTexto(saldo),
     })
   }
 
@@ -179,13 +223,14 @@ export default function RetarIAS({
       titulo={t('ia.retar.titulo')}
       clase="es-retar"
       cuenta={cuenta}
-      saldo={saldoSesion}
+      saldo={saldo}
+      estadoSaldo={billetera?.estado}
       onVolver={onVolver}
       onLobby={onLobby}
       cta={{
         clase: 'es-retar',
         etiqueta: rotuloCta,
-        disabled: !completo || !veredicto.ok,
+        disabled: sinCifra || !completo || !veredicto.ok,
         onClick: () => {
           // Se recuerda lo que el jugador llegó a USAR, no por dónde paseó el
           // dedo — y de eso, sólo los tres campos de la política.
@@ -242,7 +287,7 @@ export default function RetarIAS({
       <FilaChips
         titulo={t('ia.retar.apuesta')}
         accion="apuesta"
-        opciones={opcionesApuesta(reto, saldoSesion).map((o) => ({
+        opciones={opcionesApuesta(reto, juicio).map((o) => ({
           ...o,
           etiqueta: montoTexto(o.etiqueta),
         }))}
@@ -336,6 +381,7 @@ export default function RetarIAS({
 
         El botón es el ÚNICO nuevo de la pantalla y entra por el `pronto` de
         la carcasa — el mismo «Pronto» del `+` dorado de la cabecera. */}
+      {lecturaFallida && <AvisoLectura onReintentar={billetera?.refrescar} />}
       {aviso.caso !== CASO_ALCANZA && (
         <AvisoSaldo
           texto={aviso.caso === CASO_RETO_MENOR

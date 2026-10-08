@@ -46,6 +46,8 @@ export default function PantallaChips({
   clase = '',
   cuenta,
   saldo,
+  // ECO-1b · cargando, listo o error: viaja a `data-saldo` de la píldora.
+  estadoSaldo,
   onVolver,
   onLobby,
   cta,
@@ -85,6 +87,7 @@ export default function PantallaChips({
       <BarraSuperior
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
+        estadoSaldo={estadoSaldo}
         onPerfil={pronto}
         onTienda={pronto}
         onAjustes={pronto}

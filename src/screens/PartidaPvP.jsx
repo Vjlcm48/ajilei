@@ -5,7 +5,6 @@ import BarraSuperior from '../components/BarraSuperior'
 import { IconoCasa } from '../components/IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
 import { montoTexto } from '../config/tapetes'
-import { saldoDelJugador } from '../lib/saldo'
 
 // ── SAL-B2 F1b · PartidaPvP · STUB ──────────────────────────────────────────
 // Rector: AJILEI_SAL-B2_Fase1b_v1.0.md §5. Decisión de Victor (11-sep-2026):
@@ -20,9 +19,10 @@ import { saldoDelJugador } from '../lib/saldo'
 // es, hasta MES-PvP, una mesa muerta que el barrido cancela a los diez minutos
 // (`ACTIVA_SIN_PARTIDA_MIN`), y este stub no finge lo contrario.
 
-export default function PartidaPvP({ cuenta, sala = null, onLobby }) {
+export default function PartidaPvP({ cuenta, billetera = null, sala = null, onLobby }) {
   const { t } = useIdioma()
-  const saldo = saldoDelJugador()
+  // ECO-1b · la cifra única de `useBilletera` (App); sólo la pinta la píldora.
+  const saldo = billetera?.saldo ?? null
 
   const [toast, setToast] = useState(null)
   const relojToast = useRef(null)
@@ -47,6 +47,7 @@ export default function PartidaPvP({ cuenta, sala = null, onLobby }) {
       <BarraSuperior
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
+        estadoSaldo={billetera?.estado}
         onPerfil={() => avisar('lob.toast.pronto')}
         onTienda={() => avisar('lob.toast.pronto')}
         onAjustes={() => avisar('lob.toast.pronto')}

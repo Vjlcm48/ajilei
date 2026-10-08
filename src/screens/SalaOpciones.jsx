@@ -6,7 +6,7 @@ import { IconoVolver, IconoCasa } from '../components/IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
 import { montoTexto } from '../config/tapetes'
 import { normalizarCodigo } from '../config/salas'
-import { saldoDelJugador } from '../lib/saldo'
+import { saldoParaJuzgar } from '../hooks/billeteraCore'
 import { claveDeError } from '../lib/salasApi'
 import {
   LARGO_CODIGO,
@@ -52,18 +52,30 @@ export default function SalaOpciones({
   // enciende, se prueba UNA vez.
   codigoInicial = null,
   intentar = false,
+  // ECO-1b · la cifra única de `useBilletera` (App).
+  billetera = null,
   onArmarMesa,
   onEntrarSala,
   onLobby,
 }) {
   const { t } = useIdioma()
-  const saldo = saldoDelJugador()
+  // ECO-1b · `saldo` es lo que se pinta (o `null` mientras no se sabe);
+  // `juicio` es contra qué se atenúan las mesas: sin cifra, contra nada
+  // (`SIN_JUICIO`), y decide el servidor.
+  const saldo = billetera?.saldo ?? null
+  const juicio = saldoParaJuzgar(saldo)
+  // Estable (un `useCallback` de `useBilletera`): puede ir en las dependencias
+  // del intento automático sin rearmarlo en cada render de `App`.
+  const alSaldoInsuficiente = billetera?.alSaldoInsuficiente
 
   // El cuerpo del código: SÓLO los cuatro caracteres. El `AJ-` se dibuja fuera
   // del campo porque es constante y no algo que el jugador teclee.
   const [cuerpo, setCuerpo] = useState(() => cuerpoDe(codigoInicial))
   const [errorCodigo, setErrorCodigo] = useState(null)
-  const [mesas, setMesas] = useState([])
+  // ECO-1b · se guardan las filas CRUDAS y el orden se calcula al pintar: así
+  // la llegada del saldo reordena sin volver a pedir `salas_abiertas()`.
+  const [filas, setFilas] = useState([])
+  const mesas = ordenarMesas(filas, juicio)
   const [ocupado, setOcupado] = useState(false)
   const [toast, setToast] = useState(null)
 
@@ -105,10 +117,10 @@ export default function SalaOpciones({
   const releerMesas = useCallback(() => {
     let vivo = true
     api.salasAbiertas().then(({ data }) => {
-      if (vivo) setMesas(ordenarMesas(data ?? [], saldo))
+      if (vivo) setFilas(data ?? [])
     })
     return () => { vivo = false }
-  }, [api, saldo])
+  }, [api])
 
   useEffect(() => releerMesas(), [releerMesas])
 
@@ -134,6 +146,9 @@ export default function SalaOpciones({
       // de castigo que hace que la gente deje de intentarlo.
       setErrorCodigo(error)
       campoRef.current?.focus()
+      // ECO-1b · el servidor sabe un saldo más bajo que el que enseñamos: se
+      // vuelve a leer la billetera para que la píldora diga lo mismo que él.
+      if (error === 'saldo_insuficiente') alSaldoInsuficiente?.()
       return
     }
     onEntrarSala?.(data)
@@ -188,11 +203,12 @@ export default function SalaOpciones({
       if (error) {
         setErrorCodigo(error)
         campoRef.current?.focus()
+        if (error === 'saldo_insuficiente') alSaldoInsuficiente?.()
         return
       }
       onEntrarSala?.(data)
     })
-  }, [intentar, codigoInicial, api, onEntrarSala])
+  }, [intentar, codigoInicial, api, onEntrarSala, alSaldoInsuficiente])
 
   const alTeclear = (e) => {
     setCuerpo(filtrarCodigo(e.target.value))
@@ -203,7 +219,12 @@ export default function SalaOpciones({
     setOcupado(true)
     const { data, error } = await api.unirseSala({ salaId: mesa.id })
     setOcupado(false)
-    if (error) { avisar(claveDeError(error)); releerMesas(); return }
+    if (error) {
+      avisar(claveDeError(error))
+      releerMesas()
+      if (error === 'saldo_insuficiente') alSaldoInsuficiente?.()
+      return
+    }
     onEntrarSala?.(data)
   }
 
@@ -214,6 +235,7 @@ export default function SalaOpciones({
       <BarraSuperior
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
+        estadoSaldo={billetera?.estado}
         onPerfil={() => avisar('lob.toast.pronto')}
         onTienda={() => avisar('lob.toast.pronto')}
         onAjustes={() => avisar('lob.toast.pronto')}
@@ -293,7 +315,7 @@ export default function SalaOpciones({
               </div>
             ) : (
               mesas.map((mesa) => {
-                const aMiAlcance = alcanza(mesa.apuesta, saldo)
+                const aMiAlcance = alcanza(mesa.apuesta, juicio)
                 return (
                   <div
                     key={mesa.id}
@@ -322,7 +344,7 @@ export default function SalaOpciones({
                       <div className="sal-mesa-l2">
                         {aMiAlcance
                           ? t('sal.opciones.mesa.estado', { x: mesa.sentados, n: mesa.jugadores })
-                          : t('sal.opciones.mesa.faltan', { hc: montoTexto(faltanPara(mesa.apuesta, saldo)) })}
+                          : t('sal.opciones.mesa.faltan', { hc: montoTexto(faltanPara(mesa.apuesta, juicio)) })}
                       </div>
                     </div>
                     <button

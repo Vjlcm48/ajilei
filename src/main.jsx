@@ -30,8 +30,10 @@ import { decidirFalloChunk, origenFalloMesa } from './lib/cargarMesa'
 // `index.html` (H3d-3: `wrangler.jsonc` no se toca en esta tanda). El `import()`
 // falla y Vite lo anuncia con `vite:preloadError`.
 //
-// Recargar trae el `index.html` nuevo, que apunta al chunk nuevo. No hay estado
-// que perder: el saldo de la sesión se lee de la base al volver. UNA vez por
+// Recargar trae el `index.html` nuevo, que apunta al chunk nuevo. El saldo no
+// se pierde: desde ECO-1b es la billetera del servidor y se vuelve a leer al
+// volver (`useBilletera`). Lo único que se pierde es el ajuste local de las
+// partidas contra las IAS, TRANSITORIO hasta ECO-1c. UNA vez por
 // sesión de la pestaña (la guarda vive en `sessionStorage`): si tras recargar
 // vuelve a fallar, no se entra en bucle y el error sigue su curso.
 //

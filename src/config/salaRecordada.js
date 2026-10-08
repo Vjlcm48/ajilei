@@ -40,8 +40,8 @@ import { crearMemoria } from './memoriaChips'
  * el defecto de la lámina. Quien llame no tiene que comprobar nada, que es justo
  * lo que evita que la pantalla nazca con `undefined` en un chip.
  *
- * El saldo entra por parámetro y no se lee aquí: `saldoDelJugador()` es hoy
- * síncrono y mañana será una promesa (lo declara `lib/saldo.js`), y este módulo
+ * El saldo entra por parámetro y no se lee aquí: desde ECO-1b es la billetera
+ * del servidor (`useBilletera`), que llega cuando llega, y este módulo
  * no puede ser uno de los que ese cambio arrastre.
  */
 export const MEMORIA_PVP = crearMemoria({

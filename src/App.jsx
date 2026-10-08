@@ -21,14 +21,16 @@ import RetarIAS from './screens/RetarIAS'
 import { cargarMesa, fabricaMesa, marcarEntradaMesa } from './lib/cargarMesa'
 import Portada from './screens/Portada'
 import Bautizo from './screens/Bautizo'
-import { saldoDelJugador } from './lib/saldo'
-// El molde de APU-1, hermano de `siembraCEL`: en producción devuelve `null` en
-// su primera línea y el minificador se lleva el archivo entero.
-import { siembraAPU } from './dev/siembraAPU'
+// ECO-1b · la fuente única del saldo. `billeteraApi` lee `mi_billetera()`; la
+// falsa sólo existe en desarrollo con bypass y, como `simulacionSalas`, en
+// producción devuelve `null` en su primera línea y desaparece del bundle.
+import { useBilletera } from './hooks/useBilletera'
+import { billeteraApi } from './lib/billeteraApi'
+import { simulacionBilletera } from './dev/billeteraFalsa'
 // `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
 // `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
 // sigue viva y exportada en el hook, que es donde trabaja.
-import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL } from './hooks/useAuth'
+import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL, COMPLETO } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
 import { creaPantallaCompleta } from './lib/pantallaCompletaCore'
@@ -189,21 +191,24 @@ function App() {
   // recuerda en ninguna parte, a propósito.
   const [mesa, setMesa] = useState(null)
 
-  // ── El saldo de la SESIÓN (ECO-1 sigue pendiente) ────────────────────────
-  // Rector 1e §0 y §2.3. No hay billetera: `saldoDelJugador()` devuelve una
-  // constante y nada se persiste. Lo que esta cifra sí hace es MOVERSE dentro de
-  // la sesión —baja al sentarse, sube con lo que se levante de la mesa— y eso es
-  // lo que permite validar de verdad las dos reglas que dependen de ella: la
-  // mesa en gris por saldo (§2.2) y la recarga (§3.5).
+  // ── ECO-1b · EL SALDO: UNA SOLA FUENTE ───────────────────────────────────
+  // Rector ECO-1 1b §1 (B1–B3). Hasta aquí vivía en este sitio `saldoSesion`,
+  // que nacía de una constante (5.000) y sólo veían vs-IA y el lobby; las
+  // pantallas PvP leían la constante por su cuenta. Ahora la cifra sale de la
+  // billetera del servidor (`mi_billetera()`) más el ajuste local de las
+  // partidas contra las IAS, y baja por props a las seis pantallas.
   //
-  // Vive en `App` y no en la pantalla porque tiene que SOBREVIVIR a que la
-  // pantalla se desmonte: el viaje es lobby → retar → mesa → resultado → lobby,
-  // y el saldo es lo único que cruza las cuatro. Al recargar la página vuelve a
-  // la constante, que es exactamente lo honesto hasta que exista el ledger.
+  // El ajuste sigue haciendo lo que hacía `saldoSesion` —bajar al sentarse,
+  // bajar con cada recarga, subir con lo que se levanta de la mesa— y por eso
+  // sigue viviendo aquí: tiene que sobrevivir a que las pantallas se desmonten.
+  // TRANSITORIO hasta ECO-1c: al recargar la página se pierde y la cifra vuelve
+  // a la del servidor.
   //
-  // `?apu=saldo:<n>` (solo en desarrollo) lo arranca en otra cifra: es lo que
-  // permite fotografiar una mesa EN GRIS por saldo sin perder antes una partida.
-  const [saldoSesion, setSaldoSesion] = useState(() => siembraAPU()?.saldo ?? saldoDelJugador())
+  // La API se resuelve UNA vez, como la de salas: la falsa (desarrollo con
+  // bypass, `?apu=saldo:<n>` o 5.000) o la real. Las dos pasan por el mismo
+  // núcleo; la falsa sólo cambia de dónde se lee la cifra.
+  const [apiBilletera] = useState(() => simulacionBilletera() ?? billeteraApi)
+  const billetera = useBilletera(apiBilletera, auth.estado === COMPLETO ? (auth.perfil?.id ?? null) : null)
 
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
   // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
@@ -457,6 +462,7 @@ function App() {
       <SalaOpciones
         api={api}
         cuenta={cuenta}
+        billetera={billetera}
         codigoInicial={invitacion}
         // El intento automatico ocurre solo cuando el codigo vino de un enlace
         // Y el arranque ya comprobo que no hay mesa en espera (A1 §2.5). Un
@@ -474,6 +480,7 @@ function App() {
       <ArmarMesa
         api={api}
         cuenta={cuenta}
+        billetera={billetera}
         configInicial={simulacion?.config ?? null}
         onEntrarSala={entrarSala}
         onVolver={() => setScreen('sala-opciones')}
@@ -487,6 +494,7 @@ function App() {
       <SalaEspera
         api={api}
         cuenta={cuenta}
+        billetera={billetera}
         salaInicial={sala}
         // Salir devuelve a `SalaOpciones` y no al lobby (§7): quien acaba de
         // dejar una mesa casi siempre quiere otra, y el listado esta ahi.
@@ -511,6 +519,7 @@ function App() {
     return (
       <PartidaPvP
         cuenta={cuenta}
+        billetera={billetera}
         sala={sala}
         onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); setScreen('lobby') }}
       />
@@ -524,24 +533,28 @@ function App() {
   // la pila proporcional de §2.3 (factor 1,5, sellado en 1c-2).
   //
   // `onLeave` recibe las FICHAS con las que el humano se levanta y las devuelve
-  // al saldo de la sesión. Es la otra mitad de la resta de abajo, y sin ella el
-  // saldo bajaría en cada mesa y no subiría nunca.
+  // al saldo (ECO-1b: al ajuste local, TRANSITORIO hasta ECO-1c). Es la otra
+  // mitad de la resta de abajo, y sin ella el saldo bajaría en cada mesa y no
+  // subiría nunca.
   if (screen === 'table' && mesa !== null) {
     return (
       /* APU-1 §5 · `saldo` y `onRecargar`: la recarga gasta BOLSILLO, y el
          bolsillo vive aquí. La mesa no lo guarda ni lo recuerda —lo LEE para
          saber qué puede ofrecer, y avisa cuando el jugador gasta—. Es la misma
-         dirección que la entrada, que también sale del bolsillo al sentarse. */
+         dirección que la entrada, que también sale del bolsillo al sentarse.
+         ECO-1b · el `?? 0` es sólo de forma: «Retar» no deja sentarse
+         mientras la cifra no ha llegado, y un fallo posterior conserva la
+         última, así que en la mesa el saldo siempre es un número. */
       <GameTable
         stake={mesa.apuesta}
         numPlayers={mesa.jugadores}
         nivel={mesa.reto}
         entrada={mesa.entrada}
         cuenta={cuenta}
-        saldo={saldoSesion}
-        onRecargar={(monto) => setSaldoSesion((previo) => Math.max(0, previo - monto))}
+        saldo={billetera.saldo ?? 0}
+        onRecargar={(monto) => billetera.recargar(monto)}
         onLeave={(fichas) => {
-          setSaldoSesion((previo) => previo + (Number.isFinite(fichas) ? fichas : mesa.entrada))
+          billetera.salir(fichas, mesa.entrada)
           setMesa(null)
           setScreen('retar-ias')
         }}
@@ -553,7 +566,7 @@ function App() {
     return (
       <RetarIAS
         cuenta={cuenta}
-        saldoSesion={saldoSesion}
+        billetera={billetera}
         onRetar={(elegida) => {
           // La entrada sale del bolsillo AQUÍ, al sentarse, y no cuando la mesa
           // termina: es lo que el jugador arriesga, y la barra superior de la
@@ -568,7 +581,7 @@ function App() {
           // y recarga; hasta aquí era de la precarga y se callaba (STOP-2).
           marcarEntradaMesa()
           startTransition(() => {
-            setSaldoSesion((previo) => previo - elegida.entrada)
+            billetera.entrar(elegida.entrada)
             setMesa(elegida)
             setScreen('table')
           })
@@ -580,13 +593,14 @@ function App() {
   }
 
   // La caída de la cascada sigue siendo el destino de `COMPLETO`. CUATRO props
-  // desde SAL-B1 —entra `onJugarPvP`— y ninguna más: el lobby sigue sin conocer
+  // desde SAL-B1 —entra `onJugarPvP`; ECO-1b cambia `saldo` por `billetera`— y
+  // ninguna más: el lobby sigue sin conocer
   // `screen`, ni Supabase, ni la mesa. Lo unico que sabe es que su segundo CTA
   // ahora lleva a alguna parte.
   return (
     <Lobby
       cuenta={cuenta}
-      saldo={saldoSesion}
+      billetera={billetera}
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
       onCerrarSesion={auth.cerrarSesion}

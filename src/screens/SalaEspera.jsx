@@ -10,7 +10,6 @@ import { useIdioma } from '../hooks/useIdioma'
 import { useSounds, precargarSonidos, SONIDOS_SALAS } from '../hooks/useSounds'
 import { useCronometroSala } from '../hooks/useCronometroSala'
 import { montoTexto } from '../config/tapetes'
-import { saldoDelJugador } from '../lib/saldo'
 import { claveDeError, esMesa } from '../lib/salasApi'
 import {
   enlaceDeSala,
@@ -84,6 +83,9 @@ const MAZO_FUNDIDO_MS = 250
 export default function SalaEspera({
   api,
   cuenta,
+  // ECO-1b · la cifra única de `useBilletera` (App). Aquí sólo la pinta la
+  // píldora.
+  billetera = null,
   salaInicial = null,
   onSalir,
   onLobby,
@@ -91,7 +93,7 @@ export default function SalaEspera({
 }) {
   const { t } = useIdioma()
   const { play } = useSounds()
-  const saldo = saldoDelJugador()
+  const saldo = billetera?.saldo ?? null
   const uid = cuenta?.id ?? null
 
   // ── El estado ─────────────────────────────────────────────────────────────
@@ -479,6 +481,7 @@ export default function SalaEspera({
       <BarraSuperior
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
+        estadoSaldo={billetera?.estado}
         onPerfil={() => avisar('lob.toast.pronto')}
         onTienda={() => avisar('lob.toast.pronto')}
         onAjustes={() => avisar('lob.toast.pronto')}

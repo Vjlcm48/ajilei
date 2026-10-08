@@ -231,6 +231,15 @@ body.sal-activa #root {
 }
 .sal .lob-pildora .bd { font-size: inherit; gap: calc(var(--u) * 1.2); }
 .sal .lob-pildora .bd-num { font: inherit; color: var(--text-primary); }
+/* ECO-1b · O1 · mientras el saldo no se sabe, la píldora enseña «—» y no una
+   cifra inventada. El hueco mide lo que medirá una cifra de cuatro dígitos con
+   su punto («2.500», cifras tabulares), para que la llegada del saldo no empuje
+   el `+` ni cambie el alto. Aditivo: sólo actúa con `data-saldo-vacio`. */
+.sal .lob-pildora[data-saldo-vacio] .bd-num {
+  display: inline-block;
+  min-inline-size: 4.6ch;
+  text-align: center;
+}
 
 /* El `+` es GLIFO DE LÍNEA, no icono de acción: se mide en `em` con el número
    que tiene al lado. Las dos líneas de `font: inherit; padding: 0` no son

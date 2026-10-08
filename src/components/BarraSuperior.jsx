@@ -40,14 +40,19 @@ import { useSounds } from '../hooks/useSounds'
 // marcado, que es la que se pudre.
 //
 // ── EL SALDO ENTRA POR PARÁMETRO ───────────────────────────────────────────
-// El lobby le pasa la constante de config que ya pintaba; las salas le pasan
-// `saldoDelJugador()`, que es el ÚNICO lector que SAL puede importar (SAL-A
-// §4.2). Los dos resuelven hoy al mismo número, y el día que ECO-1 conecte la
-// billetera esta barra no se entera: recibe un número y lo pinta.
+// ECO-1b · las seis pantallas le pasan la MISMA cifra, la de `useBilletera`
+// (billetera del servidor + ajuste local de vs-IA). Esta barra no sabe de dónde
+// sale: recibe un número, o `null` mientras no se sabe, y lo pinta.
+//
+// `null` NO se pinta como 0 (`montoTexto(null)` daría «0»): la píldora enseña
+// la moneda y un hueco «—» con caja reservada (O1), nunca una cifra inventada.
+// `estadoSaldo` —cargando, listo o error— viaja al atributo `data-saldo` para
+// que el arnés lo lea (modo `saldo` de diagDSK, INV-46).
 
 export default function BarraSuperior({
   usuario = '',
-  saldo,
+  saldo = null,
+  estadoSaldo,
   onPerfil,
   onTienda,
   onAjustes,
@@ -62,6 +67,7 @@ export default function BarraSuperior({
   const { play } = useSounds()
 
   const hayHoja = typeof ajustesExpandido === 'boolean'
+  const sinCifra = !Number.isFinite(saldo)
 
   return (
     <header className="lob-top">
@@ -77,10 +83,17 @@ export default function BarraSuperior({
 
       {/* La píldora NO es un botón: es un dato con un atajo dentro. El `+` sí
           lo es, y por eso es el único elemento pulsable de la caja. */}
-      <div className="lob-pildora" aria-label={t('lob.saldo.aria')}>
-        {/* PROVISIONAL: sin billetera; ECO-x lo conecta a Supabase. No hay saldo
-            vivo en el producto: no existe ledger, y una cifra que no se mueve
-            nunca es lo único honesto que se puede enseñar hasta que exista.
+      <div
+        className="lob-pildora"
+        aria-label={t('lob.saldo.aria')}
+        data-saldo={estadoSaldo}
+        data-saldo-vacio={sinCifra ? '' : undefined}
+        aria-busy={sinCifra && estadoSaldo !== 'error' ? 'true' : undefined}
+      >
+        {/* ECO-1b · la cifra es la de la billetera (ver la cabecera). Sin cifra,
+            un hueco con la caja reservada: `lobby.css` y `salas.css` le dan el
+            ancho de una cifra de cuatro dígitos para que la llegada del saldo
+            no empuje el `+`.
 
             ── La moneda de la casa, y UNA sola ──────────────────────────────
             `BalanceDisplay` YA monta su `ChipToken`, que es `heptacoin.svg` —el
@@ -89,7 +102,7 @@ export default function BarraSuperior({
             hay. El lado lo fija `--ico` desde la hoja, no el atributo del
             componente — contrato de iconos. */}
         <span className="lob-moneda">
-          <BalanceDisplay chips={montoTexto(saldo)} size="icon" />
+          <BalanceDisplay chips={sinCifra ? '—' : montoTexto(saldo)} size="icon" />
         </span>
         <SoundButton className="lob-mas" data-accion="tienda" aria-label={t('lob.nav.tienda')} onClick={onTienda}>
           <IconoMas />
