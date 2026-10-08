@@ -13,8 +13,9 @@
 // `saldoInicial` se leía en SEIS sitios, uno de ellos dentro de un archivo
 // protegido, y por eso ECO-1 no podía cambiarlo sin tocar seis manos. APU-1
 // 1e-iii lo partió en dos: `economy.pilaPruebas` para el banco y las pruebas, y
-// el bolsillo con nombre propio dentro de `lib/saldo.js`, que es el único que
-// ECO-1 tendrá que tocar.
+// el bolsillo con nombre propio dentro de `lib/saldo.js`, que era el único que
+// ECO-1 tendría que tocar. ECO-1b lo relevó por la billetera del servidor
+// (`hooks/useBilletera.js`) y ya nadie importa aquel archivo.
 //
 // ── EL ESPEJO DEL SERVIDOR ──────────────────────────────────────────────────
 // Estas mismas cifras están del otro lado, en `check` de columna y en las
@@ -40,8 +41,13 @@ import { AJILEI_CONFIG } from './ajileiConfig'
 export const APUESTAS_PVP = [100, 200, 500, 1000, 2000, 5000]
 
 // El bono con el que nace una cuenta. La Fase 0 §5.3 buscó un `1200` en todo el
-// árbol y no había ninguno: esta línea es la primera vez que la cifra existe.
-export const BONO_BIENVENIDA = 1200
+// árbol y no había ninguno: esta línea fue la primera vez que la cifra existió.
+//
+// ECO-1b (B4) · 2.500, la cifra sellada (S1) y la que da de verdad el servidor
+// desde la 1a (`bono_bienvenida_hc()` en la migración `eco1a_libro`). El 1.200
+// contradecía al normativo (Fase 0 de ECO-1, §M-1). Si una cambia, la otra se
+// cambia a mano: Vitest no puede leer una función SQL.
+export const BONO_BIENVENIDA = 2500
 
 // ── La regla del 5× ─────────────────────────────────────────────────────────
 // Para sentarse a una mesa hay que tener CINCO veces la apuesta, no una. No es
@@ -65,7 +71,8 @@ export function apuestasAlAlcance(saldo) {
   return APUESTAS_PVP.filter((apuesta) => saldoMinimo(apuesta) <= saldo)
 }
 
-// Lo que alcanza una cuenta recién nacida: [100, 200]. Se DERIVA en vez de
+// Lo que alcanza una cuenta recién nacida: [100, 200, 500] desde ECO-1b (con
+// 1.200 eran [100, 200]: 5 × 500 = 2.500 cabe justo en el bono). Se DERIVA en vez de
 // escribirse, para que el día que el bono o la regla cambien esta lista cambie
 // sola en vez de quedarse mintiendo.
 export const ALCANCE_NUEVOS = apuestasAlAlcance(BONO_BIENVENIDA)

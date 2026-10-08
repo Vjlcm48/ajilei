@@ -72,14 +72,16 @@ describe('SAL-A · la regla del 5×', () => {
 })
 
 describe('SAL-A · el bono de bienvenida', () => {
-  it('son 1200 Heptacoins', () => {
-    expect(BONO_BIENVENIDA).toBe(1200)
+  it('son 2.500 Heptacoins (ECO-1b, B4)', () => {
+    // Re-sello de ECO-1b: era 1.200 (rector SAL-A §4.1) y contradecía S1 y el
+    // servidor de la 1a, que da 2.500 (`bono_bienvenida_hc()`).
+    expect(BONO_BIENVENIDA).toBe(2500)
   })
 
-  it('una cuenta nueva alcanza exactamente las dos primeras mesas', () => {
-    // La cifra sellada del rector §4.1. Con 1200 se llega a la de 200 (1000) y
-    // no a la de 500 (2500), y ésa es la razón de que el bono sea 1200 y no otro.
-    expect(ALCANCE_NUEVOS).toEqual([100, 200])
+  it('una cuenta nueva alcanza exactamente las tres primeras mesas', () => {
+    // Con 2.500 se llega a la de 500 (5 × 500 = 2.500, el borde exacto entra) y
+    // no a la de 1.000 (5.000). Con el 1.200 de SAL-A eran [100, 200].
+    expect(ALCANCE_NUEVOS).toEqual([100, 200, 500])
   })
 
   it('el alcance de nuevos se DERIVA y no está escrito a mano', () => {

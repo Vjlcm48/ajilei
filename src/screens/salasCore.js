@@ -58,7 +58,16 @@ export function codigoListo(cuerpo) {
 // dos funciones deciden es qué botón enseñar apagado para no gastar un viaje de
 // red en algo que el cliente ya sabe.
 
+//
+// ── ECO-1b · `Infinity` = «todavía no se sabe, no se juzga» ─────────────────
+// Mientras la billetera no ha contestado, las pantallas pasan `Infinity`
+// (`billeteraCore.SIN_JUICIO`): todo alcanza, nada se atenúa y no hay «Te
+// faltan». Es la misma convención que `retarCore.normalizarReto` ya usaba. Lo
+// que NO es un número —`null`, `undefined`, `NaN`— sigue sin alcanzar nada:
+// eso es un fallo de quien llama, no un saldo por llegar.
+
 export function alcanza(apuesta, saldo) {
+  if (saldo === Infinity) return true
   return Number.isFinite(saldo) && saldo >= saldoMinimo(apuesta)
 }
 
@@ -69,6 +78,7 @@ export function alcanza(apuesta, saldo) {
  * el día que ECO-1 mueva el saldo, el número cambia solo.
  */
 export function faltanPara(apuesta, saldo) {
+  if (saldo === Infinity) return 0
   const falta = saldoMinimo(apuesta) - (Number.isFinite(saldo) ? saldo : 0)
   return falta > 0 ? falta : 0
 }
@@ -185,14 +195,13 @@ export function normalizarConfig(crudo, saldo) {
 }
 
 // ── El aviso al anfitrión · §4.2 ────────────────────────────────────────────
-// «Con 500 HC, un invitado nuevo (1.200 HC de bienvenida) no podrá sentarse.»
+// «Con 1.000 HC, un invitado nuevo (2.500 HC de bienvenida) no podrá sentarse.»
 //
-// La ficha lo enuncia como «cuando apuesta > 200» y la lámina como
-// `apuesta * REGLA > BONO`. Son la misma frontera dicha de dos maneras —5×240 =
-// 1200— y se implementa la SEGUNDA, que es la fórmula: escrita como «> 200», el
-// día que el bono suba a 2.000 el aviso seguiría saliendo en la mesa de 500 y
-// mintiendo. Escrita como fórmula, se corrige sola. Regla de la casa: fórmula
-// sobre constante.
+// La ficha lo enunciaba como «cuando apuesta > 200» y la lámina como
+// `apuesta * REGLA > BONO`. Eran la misma frontera dicha de dos maneras con el
+// bono de entonces (1.200) y se implementó la SEGUNDA, que es la fórmula: con
+// ECO-1b el bono subió a 2.500 y el aviso pasó solo de la mesa de 500 a la de
+// 1.000, sin tocar esta función. Regla de la casa: fórmula sobre constante.
 export function fueraDelAlcanceDeNuevos(apuesta, bono) {
   return saldoMinimo(apuesta) > bono
 }

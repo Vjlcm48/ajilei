@@ -26,8 +26,8 @@ import { ALFABETO_CODIGO, APUESTAS_PVP, BONO_BIENVENIDA, JUGADORES_PVP } from '.
 // Por eso todo lo que estas pruebas cubren vive fuera del JSX — que es la razón
 // de que `salasCore.js` exista.
 //
-// El saldo entra por parámetro en todas: ninguna llama a `saldoDelJugador()`, de
-// modo que el día que ECO-1 mueva el saldo estas pruebas siguen valiendo.
+// El saldo entra por parámetro en todas: ninguna lee la billetera, de modo que
+// el saldo real de ECO-1 (1b) no cambió ninguna de estas pruebas.
 
 describe('SAL-B1 · la máscara del código', () => {
   it('deja pasar el alfabeto sellado entero', () => {
@@ -86,12 +86,25 @@ describe('SAL-B1 · la regla 5× y el «Te faltan»', () => {
   })
 
   it('un saldo que no es número no alcanza nada', () => {
-    // `saldoDelJugador()` es hoy síncrono y mañana será una promesa: el día que
-    // alguien pinte la pantalla antes de que el saldo llegue, esto decide que
+    // Un `null` o un `NaN` es un fallo de quien llama, no un saldo por llegar:
     // los botones nacen apagados en vez de encendidos por accidente.
     expect(alcanza(100, undefined)).toBe(false)
     expect(alcanza(100, NaN)).toBe(false)
     expect(alcanza(100, null)).toBe(false)
+  })
+
+  it('ECO-1b · Infinity es «todavía no se sabe»: no se juzga', () => {
+    // Mientras la billetera no contesta, las pantallas pasan `Infinity`
+    // (`billeteraCore.SIN_JUICIO`): nada se apaga, nada se atenúa y no hay
+    // «Te faltan». Decide el servidor.
+    expect(alcanza(5000, Infinity)).toBe(true)
+    expect(faltanPara(5000, Infinity)).toBe(0)
+    const orden = ordenarMesas([
+      { id: 'a', jugadores: 2, apuesta: 5000, sentados: 1 },
+      { id: 'b', jugadores: 2, apuesta: 100, sentados: 1 },
+    ], Infinity)
+    expect(orden.map((m) => m.id)).toEqual(['b', 'a'])
+    expect(normalizarConfig({ jugadores: 5, apuesta: 5000, tipo: 'abierta' }, Infinity).apuesta).toBe(5000)
   })
 
   it('la cifra de la lámina: 5.000 de saldo, mesa de 5.000 → faltan 20.000', () => {
@@ -195,13 +208,14 @@ describe('SAL-B1 · lo que ArmarMesa le pregunta al listado', () => {
 
 describe('SAL-B1 · el aviso al anfitrión', () => {
   it('se enciende justo donde el bono deja de alcanzar', () => {
-    // La ficha lo enuncia como «apuesta > 200» y la lámina como
-    // `apuesta × 5 > bono`. Son la misma frontera —5 × 240 = 1.200— y se
-    // implementa la fórmula: escrito como «> 200», el día que el bono suba el
-    // aviso seguiría saliendo donde ya no toca.
+    // La ficha lo enunciaba como «apuesta > 200» y la lámina como
+    // `apuesta × 5 > bono`, y se implementó la fórmula. ECO-1b (B4) re-sella:
+    // con el bono en 2.500 la frontera pasó sola de la mesa de 500 a la de
+    // 1.000, que es justo lo que la fórmula prometía.
     expect(fueraDelAlcanceDeNuevos(100, BONO_BIENVENIDA)).toBe(false)
     expect(fueraDelAlcanceDeNuevos(200, BONO_BIENVENIDA)).toBe(false)
-    expect(fueraDelAlcanceDeNuevos(500, BONO_BIENVENIDA)).toBe(true)
+    expect(fueraDelAlcanceDeNuevos(500, BONO_BIENVENIDA)).toBe(false)
+    expect(fueraDelAlcanceDeNuevos(1000, BONO_BIENVENIDA)).toBe(true)
     expect(fueraDelAlcanceDeNuevos(5000, BONO_BIENVENIDA)).toBe(true)
   })
 

@@ -92,6 +92,18 @@ export function alcanzaMesa(apuesta, saldo) {
   return saldo >= pisoDe(apuesta)
 }
 
+// ── ECO-1b · la guarda de saldo, aplicada al pintar ───────────────────────
+// Si «Retar» se monta antes de que llegue el saldo, la memoria se lee sin
+// juzgar (`Infinity`) y esta guarda la juzga en cuanto la cifra llega: una
+// apuesta recordada que ya no alcanza cae, y con ella la entrada (la cascada).
+// Con el saldo ya conocido al montar no cambia nada: `MEMORIA_RETO.leer` ya la
+// había tirado. Devuelve el mismo objeto cuando no hay nada que cambiar.
+export function guardaDeSaldo(config, saldo) {
+  const apuesta = config?.apuesta
+  if (apuesta === null || apuesta === undefined || alcanzaMesa(apuesta, saldo)) return config
+  return elegir(config, 'apuesta', null)
+}
+
 // Un reto es alcanzable cuando ALGUNA de sus cuatro mesas lo es. Por la forma
 // de las tablas eso es siempre la más barata, pero se pregunta por las cuatro y
 // no por el mínimo: el día que una tabla deje de estar ordenada —o que un reto

@@ -194,14 +194,20 @@ export const AJILEI_CONFIG = {
     // `saldoInicial` mientras era las dos cosas a la vez —las fichas con que
     // nacía todo asiento Y el saldo del jugador—, y esa confusión es justo la
     // que APU-1 vino a deshacer: desde 1e las fichas de mesa salen de la
-    // ENTRADA que el jugador elige (§2.2) y el saldo de la sesión vive en
-    // `App.jsx`. Lo único que queda aquí es la pila con la que el banco de
-    // niveles y las pruebas del motor sientan a todo el mundo por igual, que es
-    // lo que hace honesta esa comparación. El saldo real provisional se mudó a
-    // `lib/saldo.js` con nombre propio, a la espera de ECO-1.
+    // ENTRADA que el jugador elige (§2.2) y el saldo del jugador es, desde
+    // ECO-1b, la billetera del servidor (`hooks/useBilletera.js`). Lo único que
+    // queda aquí es la pila con la que el banco de niveles y las pruebas del
+    // motor sientan a todo el mundo por igual, que es lo que hace honesta esa
+    // comparación.
     pilaPruebas: 5000,
-    bonoDiario: 50,
-    videoReward: 25,
-    maxVideosPerDay: 5,
+    // ECO-1b (B5) · al día con lo sellado (Reglas de ECO-1 §7): el video vale
+    // 500 HC con un tope de 8 al día, y la constancia da 500 HC cada 3 días
+    // seguidos de ingreso. `bonoDiario` (50) se retira: no existe en las reglas.
+    // SIGUEN SIN LECTORES, a propósito: la verdad de estas cifras está en el
+    // servidor (sub-tandas de video y constancia de ECO-1); aquí sólo dejan de
+    // contradecirla.
+    videoReward: 500,
+    maxVideosPerDay: 8,
+    constancia: { monto: 500, dias: 3 },
   },
 }

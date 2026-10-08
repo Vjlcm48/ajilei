@@ -285,6 +285,14 @@ export const TEXTOS_ES = {
   'ia.retar.saldo.ninguno':   'Te faltan fichas para sentarte en una mesa.',
   'ia.retar.saldo.cta':       'Conseguir más monedas',
 
+  // ECO-1b · la cifra viene del servidor y puede tardar o fallar. Mientras
+  // tarda, el CTA de Retar se apaga y su nota lo dice; si la lectura falla sin
+  // ninguna cifra conocida, un aviso lo dice y ofrece reintentar (ajuste 1 del
+  // rector). Ninguna enseña un número: no se inventa un saldo.
+  'ia.retar.saldo.cargando':   'Cargando tu saldo…',
+  'ia.retar.saldo.error':      'No pudimos leer tu saldo. Revisa tu conexión.',
+  'ia.retar.saldo.reintentar': 'Reintentar',
+
   // Los tres motivos de `entrada.entradaValida` más el cuarto que añade la
   // pantalla (§2.2). El motor no puede juzgar el bolsillo —no lo conoce— y por
   // eso `sin_saldo` nace en `retarCore` y no en `entrada.js`.

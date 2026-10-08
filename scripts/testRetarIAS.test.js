@@ -17,6 +17,7 @@ import {
   opcionesReto, opcionesJugadores, opcionesApuesta, opcionesEntrada,
   topeEntrada, idEntrada, pasoEntrada, entradaDeLaSesion, pilaDeCadaIA,
 } from '../src/screens/retarCore.js'
+import { guardaDeSaldo } from '../src/screens/retarCore.js'
 import { CLAVE_CONFIG_SALA } from '../src/config/salas.js'
 import { normalizarConfig } from '../src/screens/salasCore.js'
 import { pisoDe, medioDe, techoDe, pilaIA, MOTIVOS_ENTRADA } from '../src/engine/entrada.js'
@@ -418,5 +419,34 @@ describe('7. RET-A · El aviso de saldo (§ tanda corta, decisiones de Victor)',
     // lo que no se hace — un aviso sobre un reto que nadie eligió.
     expect(avisoDeSaldo(0, null)).toEqual({ caso: CASO_ALCANZA, retoSugerido: null })
     expect(avisoDeSaldo(0, 'inventado')).toEqual({ caso: CASO_ALCANZA, retoSugerido: null })
+  })
+})
+
+// ── ECO-1b · Retar con el saldo todavía por llegar ───────────────────────────
+// Mientras la billetera no contesta, la pantalla juzga contra `Infinity`
+// (`billeteraCore.SIN_JUICIO`): nada en gris, ningún aviso, y la entrada sólo
+// la limita el techo de la mesa. Cuando la cifra llega, `guardaDeSaldo` tira la
+// apuesta recordada que ya no alcanza, con la entrada detrás (la cascada).
+describe('ECO-1b · Retar sin cifra y con la cifra recién llegada', () => {
+  it('sin cifra no hay gris, ni aviso, ni «No te alcanza»', () => {
+    for (const nivel of NIVELES) {
+      expect(opcionesApuesta(nivel.id, Infinity).every((o) => !o.disabled)).toBe(true)
+      expect(avisoDeSaldo(Infinity, nivel.id)).toEqual({ caso: CASO_ALCANZA, retoSugerido: null })
+    }
+    const unit = apuestasDe('pro')[3]
+    expect(entradaDeLaSesion(techoDe(unit), unit, Infinity)).toEqual({ ok: true, motivo: null })
+  })
+
+  it('guardaDeSaldo tira la apuesta que ya no alcanza, y la entrada con ella', () => {
+    const unit = apuestasDe('pro')[3]
+    const config = { reto: 'pro', jugadores: 4, apuesta: unit, entrada: pisoDe(unit) }
+    expect(guardaDeSaldo(config, Infinity)).toBe(config)
+    expect(guardaDeSaldo(config, pisoDe(unit))).toBe(config)
+    expect(guardaDeSaldo(config, pisoDe(unit) - 1)).toEqual({ reto: 'pro', jugadores: 4, apuesta: null, entrada: null })
+  })
+
+  it('sin apuesta elegida no hay nada que guardar', () => {
+    const config = { reto: 'basico', jugadores: null, apuesta: null, entrada: null }
+    expect(guardaDeSaldo(config, 0)).toBe(config)
   })
 })
