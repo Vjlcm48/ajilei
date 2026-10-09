@@ -323,13 +323,24 @@ export function pideRecarga(state, saldo) {
  * §5.3 («pila_humano_tras_recarga»). Al sentarse coincide con su entrada; a
  * mitad de mesa no, y es la pila la que manda: nivelar contra una entrada que
  * el jugador ya perdió sentaría a las IAS por encima de la mesa que hay.
+ *
+ * ── ECO-1c · D-1: LA QUEBRADA NO VUELVE (C9, P-2) ─────────────────────────
+ * `eliminated` sólo lo escribe `startHand` (`gameEngine.js:507-515`), así que
+ * una IA que se queda sin fichas EN ESTA MANO sigue sin marcar durante PAYOUT,
+ * que es justo cuando se ofrece la recarga. Con el filtro de `eliminated` a
+ * secas, recargar entonces la completaba hasta la pila de §2.3 y la mesa que
+ * el jugador acababa de ganar no se cerraba (Fase 0 §D.1; reproducido en
+ * `mesaIACore.test.js` y en el modo `revive`). Se nivela sólo a las IAS con
+ * fichas ≥ la apuesta: el MISMO criterio con el que `startHand` elimina
+ * (`p.chips < unit`), porque una IA por debajo del ante que se completara
+ * revivía igual.
  */
 export function nivelarLasIAS(state) {
   const unit = state?.unit ?? 0
   const pilaHumano = state?.players?.[ASIENTO_HUMANO]?.chips ?? 0
   return (state?.players ?? [])
     .map((p, seat) => ({ p, seat }))
-    .filter(({ p, seat }) => seat !== ASIENTO_HUMANO && !p.eliminated)
+    .filter(({ p, seat }) => seat !== ASIENTO_HUMANO && !p.eliminated && (p.chips ?? 0) >= unit)
     .map(({ p, seat }) => ({ seat, monto: nivelarIA(p.chips ?? 0, pilaHumano, unit) - (p.chips ?? 0) }))
     .filter((x) => x.monto > 0)
 }

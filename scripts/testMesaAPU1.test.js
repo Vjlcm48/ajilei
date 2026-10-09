@@ -681,15 +681,25 @@ describe('5. §5 · La recarga entre manos', () => {
       expect(subidas).toEqual([{ seat: 1, monto: 1300 }])
     })
 
-    it('las eliminadas no vuelven', () => {
-      const g = mesa([1000, 0, 0])
+    // ECO-1c · D-1 (P-2). Antes la IA 2, a 0 y sin `eliminated`, SÍ se
+    // nivelaba: era justo el defecto. Ahora ninguna de las dos vuelve —la
+    // eliminada por su marca, la quebrada por no cubrir el ante—, y la que
+    // sigue viva con fichas se nivela como siempre.
+    it('las eliminadas no vuelven, ni las quebradas sin marca (D-1)', () => {
+      const g = mesa([1000, 0, 0, 200])
       g.players[1] = { ...g.players[1], eliminated: true }
-      expect(nivelarLasIAS(g).map(x => x.seat)).toEqual([2])
+      expect(nivelarLasIAS(g).map(x => x.seat)).toEqual([3])
     })
 
+    // ECO-1c · D-1. Antes esta prueba sentaba a la IA en 0 y comprobaba que el
+    // nivelado la subía HASTA EL TECHO: afirmaba dos cosas a la vez —que el
+    // techo topa la fórmula (min(1,5 × 2.500, 2.500) = 2.500) y que una IA a 0
+    // se nivela—, y la segunda es D-1. Ahora la IA se sienta con UNA apuesta,
+    // viva, y la prueba afirma sólo lo que dice su nombre: la pila de la IA
+    // tras nivelar no pasa del techo aunque 1,5 × la del humano sí lo haría.
     it('el techo de la mesa topa también a las IAS', () => {
-      const g = mesa([techoDe(UNIT), 0])
-      expect(nivelarLasIAS(g)).toEqual([{ seat: 1, monto: techoDe(UNIT) }])
+      const g = mesa([techoDe(UNIT), UNIT])
+      expect(nivelarLasIAS(g)).toEqual([{ seat: 1, monto: techoDe(UNIT) - UNIT }])
     })
 
     // La recarga sube la PILA y la ENTRADA a la vez, y eso es lo que hace que
