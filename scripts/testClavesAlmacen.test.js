@@ -29,6 +29,7 @@ const CLAVES = [
   { clave: 'ajilei.salaPendiente', almacen: 'local', fuente: 'SALA Fase 1 · SAL-B1 A3 · salaPendiente.js' },
   { clave: 'ajilei.salaConfig', almacen: 'local', fuente: 'SAL (APU-1_Fase0) · salas.js' },
   { clave: 'ajilei.recargaPorChunk', almacen: 'session', fuente: 'ARN-3d (D11) · main.jsx' },
+  { clave: 'ajilei.dispositivo', almacen: 'local', fuente: 'ECO-1 Fase 1c (P-4) · dispositivo.js' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -41,6 +42,7 @@ const ACCESORES = [
   'src/hooks/useTapetes.js',       // ajilei.tapete, ajilei.tapetes.comprados
   'src/hooks/useUtilitiesMenu.js', // ajilei.consultas
   'src/main.jsx',                  // ajilei.recargaPorChunk (sessionStorage)
+  'src/lib/dispositivo.js',        // ajilei.dispositivo (ECO-1c, P-4)
 ]
 
 const fuentes = archivos('src', (n) => /\.(jsx?)$/.test(n) && !/\.test\.jsx?$/.test(n))
