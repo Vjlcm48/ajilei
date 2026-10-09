@@ -317,6 +317,7 @@ import { pisoDe } from '../src/engine/entrada.js'
 // para que deje de ser un secreto de `diagDSK` y la compartan los demás arneses
 // (la avería de NIV-UI, contada en la cabecera de aquel módulo).
 import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa, esperarMesa as esperarMesaComun } from './rutaMesa.mjs'
+import { runMesaIA, runRevive } from './eco/mesaia.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -397,7 +398,8 @@ const VC_RETRASO_ROCE_MS = (() => {
   return Number.isFinite(v) && v > 0 ? v : 0
 })()
 // ECO-1b · `saldo` también: mide la billetera que la API REAL lee del arnés.
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo']
+// ECO-1c · y `mesaia`: la mesa contra las IAS contra el servidor imitado.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -2496,10 +2498,15 @@ function rec2Vara(l, esperado) {
 }
 
 async function rec2Estado(page, vp, mesa, estado) {
+  // ECO-1c · P-6 · sentarse cobra lo que el molde SIENTA (media apuesta en
+  // `quiebra`), no la entrada elegida, así que el bolsillo ya no sale de
+  // `saldo − 1.000`: Retar no dejaría sentarse con 650. Se siembra aparte con
+  // `bolsillo:<n>` (la billetera queda en n tras sentarse). Mismos bolsillos de
+  // la ficha: 600, 0 y 600.
   const url = {
-    caso2: `${BASE}/?apu=saldo:1600,quiebra`,
-    caso3: `${BASE}/?apu=saldo:1000,quiebra`,
-    caso2auto: `${BASE}/?apu=saldo:1600,recarga`,
+    caso2: `${BASE}/?apu=saldo:5000,bolsillo:600,quiebra`,
+    caso3: `${BASE}/?apu=saldo:5000,bolsillo:0,quiebra`,
+    caso2auto: `${BASE}/?apu=saldo:5000,bolsillo:600,recarga`,
   }[estado]
   const esperado = {
     caso2: { motivo: 'forzosa', caso: 2 },
@@ -14183,7 +14190,10 @@ async function runRec(browser) {
 //   saldo.1  la misma cifra en Lobby, Retar, SalaOpciones y ArmarMesa, igual a
 //            la servida, con UNA sola lectura por arranque
 //   saldo.2  sentarse contra las IAS y abandonar tras el ante: la cifra nueva
-//            es la misma en las cuatro y cumple final = 3.700 − entrada + fichas
+//            es la misma en las cuatro y cumple final = 3.700 − entrada + fichas.
+//            ECO-1c · y es la del SERVIDOR: el banco imitado del contexto
+//            anotó la entrada y la salida, y su saldo es esa cifra (sin el
+//            ajuste local de la 1b, que ya no existe)
 //   saldo.3  lectura lenta: hueco «—» sin cifra; la caja no salta al llegar el
 //            saldo; Retar sin gris ni aviso y con el CTA apagado mientras tanto
 //   saldo.4  lectura fallida: nunca «0», «5.000» ni otra cifra inventada; Retar
@@ -14297,8 +14307,12 @@ async function runSaldo(browser) {
       entrada, fichas, esperado: saldoTexto(esperado), pantallas: trasSalir, lecturas: billetera.lecturas ?? 0,
       // `fichas < entrada`: el ante se jugó, así que la cifra TIENE que haber
       // cambiado. Sin eso, una píldora clavada en 3.700 pasaría.
+      libro: (billetera.banco?.libro ?? []).map((l) => `${l.tipo} ${l.monto}`),
       ok: fichas > 0 && fichas < entrada && esperado !== SALDO_SERVIDO
-        && todasDicen(trasSalir, saldoTexto(esperado)) && billetera.lecturas === 1,
+        && todasDicen(trasSalir, saldoTexto(esperado)) && billetera.lecturas === 1
+        && billetera.banco?.saldo === esperado
+        && (billetera.banco?.libro ?? []).filter((l) => l.tipo === 'entrada_ia').length === 1
+        && (billetera.banco?.libro ?? []).filter((l) => l.tipo === 'salida_ia').length === 1,
     }
     errores.push(...e)
     await ctx.close()
@@ -14490,7 +14504,7 @@ try {
   // ECO-1b · `saldo` mide además la sala de espera, a la que sólo se llega con
   // `?sal=` (DEV y bypass): su servidor de desarrollo va DESPUÉS del preview y
   // su build (INV-43), en `--puerto-aux=N` o 5173.
-  if (!EXTERNO && MODE === 'saldo') {
+  if (!EXTERNO && (MODE === 'saldo' || MODE === 'mesaia')) {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5173, bypass: true })
   }
   if (!EXTERNO && (MODE === 'luz' || MODE === 'rev')) {
@@ -14564,6 +14578,15 @@ try {
   if (MODE === 'rec') report.rec = await runRec(browser)
   if (MODE === 'congelado') report.congelado = await runCongelado(browser)
   if (MODE === 'saldo') report.saldo = await runSaldo(browser)
+  // ECO-1c · `mesaia` (C3–C8 contra el servidor imitado) y `revive` (D-1).
+  if (MODE === 'mesaia') {
+    try { mkdirSync('capturas-mesaia', { recursive: true }) } catch { /* ya existe */ }
+    report.mesaia = await runMesaIA(browser, { base: BASE_PROD, baseDev: BASE_SALDO_DEV, externo: EXTERNO })
+  }
+  if (MODE === 'revive') {
+    try { mkdirSync('capturas-mesaia', { recursive: true }) } catch { /* ya existe */ }
+    report.revive = await runRevive(browser, { base: BASE })
+  }
 } catch (e) {
   report.error = String(e && e.stack || e)
 }

@@ -202,6 +202,8 @@ export const VEREDICTO_DSK = Object.freeze({
   luz: ARRIBA('verde'), rev: ARRIBA('verde'), rec: ARRIBA('verde'), vuelo: ARRIBA('verde'),
   congelado: ARRIBA('verde'),   // ARN-3c-ii · §1.1.2
   saldo: ARRIBA('verde'),       // ECO-1b · una sola cifra (INV-46)
+  mesaia: ARRIBA('verde'),      // ECO-1c · la mesa contra las IAS en el servidor (INV-47–49)
+  revive: ARRIBA('verde'),      // ECO-1c · D-1: la IA quebrada no vuelve
   // `matrixOk`
   gate: ARRIBA('matrixOk'),
   // booleanos por celda (diagnósticos de DSK que nunca juntaron un `passed`)
@@ -216,7 +218,7 @@ export const VEREDICTO_DSK = Object.freeze({
 export const MODOS_DSK = Object.freeze([
   'humo', 'd1d2', 'd3', 'bug', 'shots', 'gate', 'lob', 'retar', 'apu', 'b1', 'tactil', 'p1', 'p2',
   'r1', 'r2', 'o1', 'h1', 'm1', 'a1', 'f1', 'z1', 'o2', 'a2', 'u1', 'menu-movil', 'u2', 'u3',
-  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo',
+  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo', 'mesaia', 'revive',
 ])
 const CLAVES_META = new Set(['mode', 'ts', 'arnes', 'error', 'veredicto', 'codigo'])
 
@@ -267,6 +269,12 @@ export function clasificarPeticion(url, hostSupabase = null) {
   return 'fuera'
 }
 
+// ECO-1c · el servidor imitado de las mesas contra las IAS: el MISMO modelo
+// que usan el bypass y las pruebas de contrato (`src/dev/bancoImitado.js`, la
+// migración eco1c leída en JS). Es puro: sin `import.meta` ni DOM.
+import { crearBanco } from '../../src/dev/bancoImitado.js'
+export { crearBanco }
+
 // El perfil y el usuario que contesta el arnés. No se pintan (el bypass trae
 // PERFIL_DEV y la sesión simulada de `contextoCap` trae el suyo): solo cierran
 // la cascada si alguien pregunta.
@@ -285,9 +293,19 @@ export const SALDO_ARNES = 5000
  * error haría que `traducir` escribiera un SAL-A en la consola).
  * Es la respuesta común de las TRES rutas que imitan a Supabase: la de
  * `comun.mjs`, `contextoCap` y `contextoBie`.
+ *
+ * ECO-1c · con `banco` (uno por contexto de navegador), el saldo es el del
+ * banco y las seis funciones de mesa (`sentarse_ia`…`recoger_mesa_ia`) las
+ * contesta él con `params` (el cuerpo JSON de la petición): una partida en
+ * `vite preview` mueve dinero de verdad contra el contrato de la 1c.
  */
-export function respuestaRpc(pathname, { saldo = SALDO_ARNES } = {}) {
-  if (pathname === '/rest/v1/rpc/mi_billetera') return saldo
+export function respuestaRpc(pathname, { saldo = SALDO_ARNES, banco = null, params = null } = {}) {
+  const nombre = pathname.slice('/rest/v1/rpc/'.length)
+  if (banco) {
+    if (nombre === 'mi_billetera') return banco.saldo
+    return banco.llamar(nombre, params ?? {})
+  }
+  if (nombre === 'mi_billetera') return saldo
   return null
 }
 

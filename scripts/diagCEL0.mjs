@@ -22,6 +22,7 @@
 // Las capturas van a `../_cel0/`, FUERA del repositorio: son material de
 // trabajo de la lámina, no evidencia sellada, y el árbol ya carga con tres
 // carpetas de arnés.
+import { SALDO_ARNES } from './arnes/nucleo.mjs'
 import { recorrerRuta, esperarMesa } from './rutaMesa.mjs'
 // ARN-3c-ii · la mediana de 3 de las varas de tiempo y el encadenado honesto (lo puro).
 import { mayoriaDeFallos, separarConocidos, encadenadoHonesto, leeHonesto } from './arnes/varas.mjs'
@@ -231,7 +232,15 @@ const TOL = 0.6
 // contra una entrada que la app ya no cobra: la promesa de derivar estaba en el
 // comentario, no en el código.
 const ENTRADA_ARNES_CEL = pisoDe(apuestasDe('basico')[0])
-const SALDO_INICIAL = ENTRADA_ARNES_CEL
+// ── ECO-1c · C8 · «SALDO ACTUAL» ES EL SALDO REAL ───────────────────────────
+// Hasta la 1c la tarjeta pintaba la PILA (`GameTable`: `saldo={human.chips}`) y
+// esta cifra era la entrada. Desde la 1c pinta lo que devuelve `salir_ia`: la
+// billetera de verdad tras cobrar la mesa. El arnés corre en desarrollo con
+// bypass, donde el servidor es el banco imitado, que nace con la billetera del
+// arnés (5.000, la falsa sin `?apu=saldo`): 5.000 − 500 de entrada + las
+// fichas con que se levanta. Con `?cel` (netas 0) vuelven las 500 y la
+// billetera es otra vez 5.000; con `?cel=<n>`, 5.000 + netas.
+const SALDO_INICIAL = SALDO_ARNES
 // CEL-1b · el hueco fijo entre la moneda de aterrizaje y la cifra del saldo.
 // Constante LOCAL declarada en celebracion.css §CEL-1b: el Sistema de Diseno
 // v1.2 no define escala de espaciado, asi que no hay token que citar. Vive aqui
@@ -514,9 +523,11 @@ const TOC_NOMINAL = (() => {
 // «precargar `tableKnock`» se cerró como hecho por LOB-1 (H3d-4), y la marca
 // `honesto` dice la verdad desde `useCoreografia`. Una fiesta que no se
 // encadena es, desde hoy, un rojo NUEVO.
-const CEL_CONOCIDOS = [
-  { patron: /el saldo pide 2800 ms y el doble de CEL-2c son 2933/, dueno: 'CEL-2c' },
-]
+// ECO-1c · el único conocido, el de CEL-2c, SE RETIRA: era el saldo contando la
+// pila (500 → 2.800 ms) y no la billetera. Con C8 la app vuelve a pedir 2.933,
+// la cifra sellada (Victory_Celebration v1.1 §4.2). Re-sello del arnés aprobado
+// por el rector en el STOP-1 de la 1c.
+const CEL_CONOCIDOS = []
 // D9 · las celdas del arco (las varas de tiempo) se miden tres veces y cada
 // fallo cuenta si sale en al menos dos: la mediana de 3 (scripts/arnes/varas.mjs).
 const REPS_ARCO = 3
@@ -529,6 +540,9 @@ const OPACIDAD_TECHO = 0.7
 const MELODIA_S = 12        // duración sellada por CEL-A
 // CEL-2g · el doble de lo que medían en CEL-2c, con la mesa del molde: el premio
 // no mueve nada (netas 0 -> mínimo) y el saldo va de 5000 a 5000 (magnitud 5000).
+// ECO-1c · 2.933 ES LA CURVA EN 5.000 (`duracionConteo`, ×2 de CEL-2g): la
+// billetera real del arnés. Entre ARN-3c y ECO-1b salía 2.800 porque el saldo
+// era la pila de 500; no era una cifra nueva, era la cifra equivocada.
 const CONTEO_PREMIO_MS = 2800   // era 1400
 const CONTEO_SALDO_MS = 2933    // era 1467
 const CASCADA_ORDEN = ['Puntos obtenidos', 'Manos jugadas', 'Manos ganadas', 'Tu mejor mano']

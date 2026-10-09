@@ -27,7 +27,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { recorrerRuta } from '../rutaMesa.mjs'
-import { respuestaRpc } from '../arnes/nucleo.mjs'
+import { respuestaRpc, crearBanco, SALDO_ARNES } from '../arnes/nucleo.mjs'
 
 // ── Constantes selladas ─────────────────────────────────────────────────────
 
@@ -123,6 +123,18 @@ const INICIO = ({ semilla, clave, sesion }) => {
  *   errores     { nombreRpc: 'clave' } → esa RPC contesta el `raise` P0001
  *   lecturas    lo cuenta la ruta: cuántas veces se pidió `mi_billetera`
  * Sin `billetera`, la ruta contesta lo de siempre más la billetera de 5.000.
+ *
+ * ECO-1c · el servidor es un BANCO IMITADO por contexto (`billetera.banco`,
+ * que la ruta crea si no viene): el contrato de la 1c en JS, el mismo del
+ * bypass y de las pruebas. `mi_billetera` contesta su saldo, y las seis
+ * funciones de mesa, lo que diga él. Cambiar `billetera.saldo` a mitad de
+ * recorrido es un `ajuste_admin` en el banco (el servidor «sabe otra cosa»).
+ * Y dos mandos más:
+ *   cortes      { nombreRpc: { veces, modo } } → las próximas `veces` llamadas
+ *               a esa RPC no contestan: 'antes' = no llegan al banco (503);
+ *               'despues' = el banco las aplica y la respuesta se pierde (503)
+ *   retrasos    { nombreRpc: ms } → esa RPC tarda en contestar
+ *   llamadas    lo anota la ruta: [{ nombre, params, codigo, t }] de las RPC de mesa
  */
 export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP, billetera = null } = {}) {
   // `vista` es una clave de VISTAS_CAP o, para sondas fuera de lo sellado
@@ -153,6 +165,9 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
   // `page.on('websocket')`: sin esto, `cap.red` dejaría de verlos. Se leen de
   // su registro (`ctx.__aislamiento`), además de los que sí disparen el evento.
   const red = { supabase: [], fuera: [], sockets: ctx.__aislamiento ? ctx.__aislamiento.sockets : [] }
+  // ECO-1c · el servidor imitado de ESTE contexto, con el saldo que se pida.
+  const banco = billetera?.banco ?? crearBanco({ saldo: billetera?.saldo ?? SALDO_ARNES })
+  if (billetera) { billetera.banco = banco; billetera.__saldoVisto = billetera.saldo }
   const origen = new URL(base).host
   // UNA ruta para todo: lo local pasa, Supabase se contesta aquí, lo demás se
   // corta y se anota (es la puerta cap.red, no un error silencioso).
@@ -167,9 +182,26 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
         return json((r.headers()['accept'] || '').includes('vnd.pgrst.object') ? PERFIL_CAP : [PERFIL_CAP])
       }
       if (u.pathname.startsWith('/rest/v1/rpc/')) {
-        // mi_sala y compañía: «no hay»; mi_billetera: el saldo (ECO-1b).
+        // mi_sala y compañía: «no hay»; mi_billetera: el saldo (ECO-1b); las
+        // mesas contra las IAS: el banco imitado (ECO-1c).
+        const nombre = u.pathname.slice('/rest/v1/rpc/'.length)
+        let params = null
+        try { params = r.postDataJSON() } catch { params = null }
         if (billetera) {
-          const nombre = u.pathname.slice('/rest/v1/rpc/'.length)
+          if (billetera.saldo !== undefined && billetera.saldo !== billetera.__saldoVisto) {
+            if (billetera.__saldoVisto !== undefined) banco.ajusteAdmin(billetera.saldo - banco.saldo)
+            billetera.__saldoVisto = billetera.saldo
+          }
+          const retraso = billetera.retrasos?.[nombre]
+          if (retraso) await new Promise((ok) => setTimeout(ok, retraso))
+          const corte = billetera.cortes?.[nombre]
+          if (corte && corte.veces > 0) {
+            corte.veces -= 1
+            if (corte.modo === 'despues') respuestaRpc(u.pathname, { banco, params })
+            ;(billetera.llamadas ??= []).push({ nombre, params, codigo: `corte-${corte.modo}`, t: Date.now() })
+            return route.fulfill({ status: 503, contentType: 'application/json',
+              body: JSON.stringify({ code: 'PGRST000', message: 'arnés: corte', details: null, hint: null }) })
+          }
           if (nombre === 'mi_billetera') {
             billetera.lecturas = (billetera.lecturas ?? 0) + 1
             if (billetera.retrasoMs) await new Promise((ok) => setTimeout(ok, billetera.retrasoMs))
@@ -184,7 +216,11 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
               body: JSON.stringify({ code: 'P0001', message: clave, details: null, hint: null }) })
           }
         }
-        return json(respuestaRpc(u.pathname, { saldo: billetera?.saldo }))
+        const respuesta = respuestaRpc(u.pathname, { banco, params })
+        if (billetera && respuesta && typeof respuesta === 'object' && 'codigo' in respuesta) {
+          ;(billetera.llamadas ??= []).push({ nombre, params, codigo: respuesta.codigo, t: Date.now() })
+        }
+        return json(respuesta)
       }
       if (u.pathname.startsWith('/auth/v1/user')) return json(user)
       if (u.pathname.startsWith('/auth/v1/token')) return json(sesion)

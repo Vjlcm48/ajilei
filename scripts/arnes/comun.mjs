@@ -26,6 +26,7 @@ import {
   NAVEGADOR_SELLADO, ORDEN_INSTALAR, CODIGO, ErrorInstrumento,
   canalPedido, comprobarVersion, faltaNavegador, leerOpciones, pidQueEscucha, decidirBuild,
   esLocal, clasificarPeticion, respuestaSupabase, corteDelArnes, veredictoAislamiento,
+  crearBanco, SALDO_ARNES,
 } from './nucleo.mjs'
 
 export { CODIGO, ErrorInstrumento, ETIQUETA_NAVEGADOR, NAVEGADOR_SELLADO, codigoDeSalida, veredictosDSK, MODOS_DSK } from './nucleo.mjs'
@@ -323,8 +324,12 @@ export async function aislarContexto(ctx) {
     if (clase === 'supabase') {
       RED.supabase++
       const u = new URL(r.url())
+      // ECO-1c · un banco imitado por contexto, por si una mesa se sienta aquí.
+      ctx.__banco ??= crearBanco({ saldo: SALDO_ARNES })
+      let params = null
+      try { params = r.postDataJSON() } catch { params = null }
       return route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify(respuestaSupabase(u.pathname, r.headers()['accept'] || '')) })
+        body: JSON.stringify(respuestaSupabase(u.pathname, r.headers()['accept'] || '', undefined, { banco: ctx.__banco, params })) })
     }
     RED.cortadas.push(new URL(r.url()).host)
     return route.abort('blockedbyclient')
