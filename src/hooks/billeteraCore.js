@@ -6,23 +6,32 @@
 //
 // ── UNA SOLA CIFRA ──────────────────────────────────────────────────────────
 // Hasta la 1b el teléfono tenía dos saldos que no se hablaban: `saldoSesion`
-// (vs-IA) y la constante 5.000 (PvP). Ahora hay uno:
+// (vs-IA) y la constante 5.000 (PvP). La 1b los juntó en «billetera del
+// servidor + ajuste local», y la 1c (AJILEI_ECO-1_Fase1c_v1.0.md §2.2) retira
+// el ajuste: la entrada, las recargas y la salida contra las IAS son ya
+// movimientos del libro, así que
 //
-//     saldo = billetera del servidor + ajuste local de sesión
+//     saldo = billetera del servidor
 //
-// La billetera la lee `mi_billetera()` (migración de la 1a). El ajuste es lo
-// que las partidas contra las IAS mueven mientras el servidor no las conoce.
+// y llega por dos caminos: la lectura de `mi_billetera()` y el saldo que
+// devuelve cada función de dinero (`tomarSaldo`), sin relectura extra.
 //
-// TRANSITORIO hasta ECO-1c: el ajuste vive en memoria, no se persiste en ningún
-// almacenamiento y se pierde al recargar la página (B2, camino A aprobado por
-// Victor). En la 1c la entrada, las recargas y la salida pasan a ser
-// movimientos del libro y el ajuste desaparece entero.
+// ── PENDIENTE ───────────────────────────────────────────────────────────────
+// Mientras se cobra una salida, la cifra vieja ya no es verdad (le faltan las
+// fichas de la mesa) y la nueva aún no llegó: la píldora enseña «—», como en
+// la carga, y nadie juzga contra ella (`saldoParaJuzgar` → sin juicio).
+//
+// ── LA GENERACIÓN ───────────────────────────────────────────────────────────
+// Una lectura de `mi_billetera()` que salió ANTES de un `tomarSaldo` puede
+// llegar DESPUÉS con la cifra vieja (al arrancar, la recogida de la mesa
+// abandonada y la lectura corren a la vez). Cada `tomarSaldo` sube la
+// generación del control del hook, y una lectura de una generación anterior se
+// tira (`lecturaVigente`).
 //
 // ── LA BILLETERA ES DE UNA CUENTA ───────────────────────────────────────────
 // El estado guarda el `uid` al que pertenece, igual que `useAuth` guarda el
 // perfil con su dueño. Si se cierra sesión y entra otra cuenta en la misma carga
-// de página, `paraCuenta` empieza de cero: ni la cifra ni el ajuste de la
-// anterior se cuelan.
+// de página, `paraCuenta` empieza de cero: la cifra de la anterior no se cuela.
 
 /** Los tres estados de la lectura. */
 export const CARGANDO = 'cargando'
@@ -32,9 +41,10 @@ export const ERROR = 'error'
 // ── Por qué se vuelve a leer ────────────────────────────────────────────────
 //   ARRANQUE      la cuenta acaba de llegar a `COMPLETO` (o cambió)
 //   PRIMER_PLANO  la app vuelve a verse (`visibilitychange`)
-//   INSUFICIENTE  el servidor rechazó una mesa PvP con `saldo_insuficiente`:
-//                 la cifra que enseñamos era más alta que la suya
-//   REINTENTO     el jugador lo pide (el botón de Retar tras un fallo)
+//   INSUFICIENTE  el servidor rechazó una mesa con `saldo_insuficiente`: la
+//                 cifra que enseñamos era más alta que la suya
+//   REINTENTO     el jugador lo pide (el botón de Retar tras un fallo), o una
+//                 salida no contestó y hay que enseñar lo que diga el servidor
 export const MOTIVOS = Object.freeze({
   ARRANQUE: 'arranque',
   PRIMER_PLANO: 'primer-plano',
@@ -57,8 +67,7 @@ export function billeteraNueva(uid, servidor = null) {
     uid: uid ?? null,
     servidor: conocido ? servidor : null,
     estado: conocido ? LISTO : CARGANDO,
-    // TRANSITORIO hasta ECO-1c
-    ajuste: 0,
+    pendiente: false,
   }
 }
 
@@ -120,6 +129,9 @@ export function debeLeer(control, motivo, ahora) {
  *
  * Con fallo, la cifra que ya se conocía SE CONSERVA: tras un corte de red la
  * píldora sigue diciendo lo último que sabía en vez de quedarse vacía o en 0.
+ *
+ * Una lectura no quita el «pendiente» de una salida: la cifra que trae puede
+ * ser de antes del cobro.
  */
 export function alResponder(billetera, uid, respuesta) {
   const propia = paraCuenta(billetera, uid)
@@ -129,46 +141,36 @@ export function alResponder(billetera, uid, respuesta) {
   return { ...propia, estado: ERROR }
 }
 
-/**
- * La cifra que se enseña, o `null` si todavía no se sabe.
- * Nunca negativa: si el ajuste local dejara la suma bajo cero (un ajuste del
- * administrador a la baja mientras se juega), se enseña 0.
- */
+/** La cifra que se enseña, o `null` si todavía no se sabe o se está cobrando. */
 export function saldoMostrado(billetera) {
-  if (!billetera || billetera.servidor === null) return null
-  return Math.max(0, billetera.servidor + billetera.ajuste)
+  if (!billetera || billetera.servidor === null || billetera.pendiente) return null
+  return billetera.servidor
 }
 
-// ── Las tres operaciones del ajuste local · TRANSITORIO hasta ECO-1c ────────
-// Son las mismas cuentas que hacía `saldoSesion` en `App.jsx` hasta la 1b, en
-// los mismos sitios (B2): la entrada resta al sentarse, la recarga resta al
-// confirmarse y la salida suma lo que el jugador se lleva.
+// ── ECO-1c · El saldo que devuelven las funciones de dinero ─────────────────
+// `sentarse_ia`, `recargar_ia`, `salir_ia` y `recoger_mesa_ia` devuelven el
+// saldo de la billetera tras moverla: se toma tal cual, sin releer.
 
-/** Al sentarse: la entrada sale del bolsillo (era `App.jsx:571`). */
-export function entrar(billetera, entrada) {
-  const monto = Number.isFinite(entrada) ? entrada : 0
-  return { ...billetera, ajuste: billetera.ajuste - monto }
+/** El saldo que acaba de devolver el servidor. Lo que no es un saldo no toca nada. */
+export function tomarSaldo(billetera, uid, saldo) {
+  const propia = paraCuenta(billetera, uid)
+  if (!esSaldoValido(saldo)) return propia
+  return { ...propia, servidor: saldo, estado: LISTO, pendiente: false }
 }
 
-/**
- * Al confirmar una recarga (era `App.jsx:542`): `max(0, saldo − monto)`. Se
- * resta como mucho lo que hay, para que la suma no baje de cero y la salida
- * posterior sume sobre 0, igual que antes.
- */
-export function recargar(billetera, monto) {
-  const m = Number.isFinite(monto) ? monto : 0
-  const actual = saldoMostrado(billetera)
-  const quitar = actual === null ? m : Math.min(m, actual)
-  return { ...billetera, ajuste: billetera.ajuste - quitar }
+/** Se está cobrando una salida: la píldora enseña «—» hasta que llegue la cifra. */
+export function esperarSaldo(billetera, uid) {
+  return { ...paraCuenta(billetera, uid), pendiente: true }
 }
 
-/**
- * Al levantarse de la mesa (era `App.jsx:543-547`): vuelven las fichas con las
- * que se sale, o la entrada si la mesa no supo decirlas.
- */
-export function salir(billetera, fichas, entrada) {
-  const vuelven = Number.isFinite(fichas) ? fichas : (Number.isFinite(entrada) ? entrada : 0)
-  return { ...billetera, ajuste: billetera.ajuste + vuelven }
+/** La salida no contestó: se deja de esperar y se enseña lo que diga la lectura. */
+export function soltarEspera(billetera, uid) {
+  return { ...paraCuenta(billetera, uid), pendiente: false }
+}
+
+/** ¿Sigue valiendo una lectura pedida en la generación `deLaLectura`? */
+export function lecturaVigente(control, deLaLectura) {
+  return (control?.generacion ?? 0) === deLaLectura
 }
 
 // ── El saldo con el que se JUZGA ────────────────────────────────────────────

@@ -31,9 +31,10 @@ import { decidirFalloChunk, origenFalloMesa } from './lib/cargarMesa'
 // falla y Vite lo anuncia con `vite:preloadError`.
 //
 // Recargar trae el `index.html` nuevo, que apunta al chunk nuevo. El saldo no
-// se pierde: desde ECO-1b es la billetera del servidor y se vuelve a leer al
-// volver (`useBilletera`). Lo único que se pierde es el ajuste local de las
-// partidas contra las IAS, TRANSITORIO hasta ECO-1c. UNA vez por
+// se pierde: es la billetera del servidor y se vuelve a leer al volver
+// (`useBilletera`). Y desde ECO-1c tampoco la mesa: si `sentarse_ia` ya la
+// abrió, queda abierta en el servidor y la recoge el arranque, porque es de
+// este dispositivo (`recoger_mesa_ia`, P-4), con su aviso de saldo. UNA vez por
 // sesión de la pestaña (la guarda vive en `sessionStorage`): si tras recargar
 // vuelve a fallar, no se entra en bucle y el error sigue su curso.
 //

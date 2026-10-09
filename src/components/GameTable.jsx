@@ -31,6 +31,8 @@ import {
   recargaLista, formaRecarga, abrirRecarga, plegarRecarga, RED_REVELACION_MS,
 } from '../hooks/mesaCore'
 import { t } from '../config/textos'
+// ECO-1c · el fin de mano para el récord (C7): la capa 0, no `winner`.
+import { finDeMano, TOPE_RECARGA_MS } from '../hooks/mesaIACore'
 import { jugadoresVsIA } from '../engine/entrada'
 import {
   useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
@@ -303,7 +305,11 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) 
 }
 
 // ── GameTable ─────────────────────────────────────────────────────────────────
-export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, onRecargar }) {
+// ECO-1c · `control` es el canal de ESTA mesa con el servidor (`lib/controlMesaIA`),
+// que crea `App` al sentarse: los avisos de pila (C3), las recargas y el cobro
+// de la victoria (C8) pasan por él. Releva a `onRecargar`, que restaba del ajuste
+// local de la 1b. Sin `control` la mesa juega como antes, sin servidor.
+export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -470,6 +476,25 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // entregaban el EVENTO DE CLIC como primer argumento. Mientras nadie leyera
   // ese argumento daba igual; desde esta tanda se lee.
   const salir = useCallback(() => { onLeave?.(human.chips) }, [onLeave, human.chips])
+
+  // ── ECO-1c · C3 · CADA CAMBIO DE LA PILA, AL SERVIDOR ─────────────────────
+  // Plan del STOP-1 §1. Todo lo que mueve la pila del humano —el ante, sus
+  // apuestas, el pozo que cobra, la recarga— pasa por `setGame`, y por eso
+  // basta UN efecto que mire la pila: la apuesta se avisa en el commit en que
+  // sale al pozo, antes de que nadie vea cartas. Al entrar en PAYOUT, una vez
+  // por mano, el aviso lleva el fin de mano (C7), aunque la pila no cambie
+  // (quien pierde ya la bajó al apostar). La cola de `control` ordena, salta lo
+  // que sobra y reintenta; aquí sólo se dice qué pasó.
+  const finAvisadoRef = useRef(-1)
+  useEffect(() => {
+    if (!control) return
+    let fin = null
+    if (phase === PHASES.PAYOUT && finAvisadoRef.current !== game.handCount) {
+      fin = finDeMano(game)
+      finAvisadoRef.current = game.handCount
+    }
+    control.pila(human.chips, fin)
+  }, [control, human.chips, phase, game.handCount]) // eslint-disable-line react-hooks/exhaustive-deps
   // MSG-U1 · El resultado se COMPONE desde el estado, no se hereda del motor.
   // Vale null fuera de PAYOUT/GAME_OVER, y ahí toma el relevo `cronica`
   // (MSG-U2/REN-2): el interruptor sigue siendo la fase, jamás el texto.
@@ -849,6 +874,23 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN,
   }) === 'partida'
 
+  // ── ECO-1c · C8 · «SALDO ACTUAL» ES EL SALDO REAL ─────────────────────────
+  // La mesa ganada no tiene más manos: se cobra AL ENTRAR en la celebración, no
+  // al pulsar «Salir», y la cifra que cuenta «Saldo actual» es la que devuelve
+  // `salir_ia`. La cuenta del saldo empieza unos 5 s después de montar la
+  // pantalla (Victory_Celebration v1.1 §4.2), así que casi siempre llega antes;
+  // si no, `useCoreografia` la espera. El «Salir» de la celebración vuelve a
+  // llamar a `control.salir`, que devuelve la MISMA promesa: un cobro.
+  const [saldoFinal, setSaldoFinal] = useState(null)
+  const cobroVictoriaRef = useRef(false)
+  useEffect(() => {
+    if (!esVictoriaDeMesa || !control || cobroVictoriaRef.current) return
+    cobroVictoriaRef.current = true
+    control.salir(human.chips).then((r) => {
+      if (Number.isFinite(r?.saldo)) setSaldoFinal(r.saldo)
+    })
+  }, [esVictoriaDeMesa, control, human.chips])
+
   const celebracion = useCelebracion({
     enabled: true,
     phase,
@@ -1128,8 +1170,25 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const tarjRec    = tarjetaRecarga(human.chips, unit, saldo)
   const topeRec    = topeRecarga(human.chips, unit, saldo)
 
-  function confirmarRecarga(monto) {
-    if (!recargaValida(monto, human.chips, unit, saldo).ok) return
+  // ── ECO-1c · LA RECARGA SE COBRA EN EL SERVIDOR ──────────────────────────
+  // Las fichas aparecen CUANDO EL SERVIDOR CONFIRMA (ficha §2.2). Mientras,
+  // `recargaVuelo` apaga los botones de la tarjeta y para su plazo; si la red no
+  // contesta, se dice y se ofrece reintentar la MISMA recarga (mismo `seq`: no
+  // se cobra dos veces), sin tocar las fichas. Un «no» del servidor (sin saldo,
+  // sobre el techo) se dice en el subtítulo y la tarjeta sigue abierta.
+  //
+  // P-2b · TOPE DE 10 S. Pasado `TOPE_RECARGA_MS` sin respuesta —falle la red
+  // o se quede colgada—, la tarjeta lo dice, «Reintentar» vuelve a mandar la
+  // misma recarga aunque siga en vuelo (`forzar`), y el segundo botón pasa a
+  // «Salir con mis fichas». Salir no pierde nada: la salida espera en la cola a
+  // la recarga y, si entra, la lleva (P-2a). `tope` no vuelve atrás hasta que
+  // el servidor conteste: quien ya vio la salida no la pierde por reintentar.
+  // La ✕ no se apaga nunca; en la forzosa la tapa el velo, como antes.
+  const [recargaVuelo, setRecargaVuelo] = useState(null)   // { seq, monto, estado: 'enviando'|'red', tope }
+  const [recargaFallo, setRecargaFallo] = useState(null)   // el código del último «no»
+  const recargaVueloRef = useRef(null)
+
+  function aplicarRecargaEnMesa(monto) {
     // §1 de la ficha: la recarga REUTILIZA `chipsCollect`. Es el sonido de
     // fichas que llegan, y eso es exactamente lo que pasa.
     play('chipsCollect')
@@ -1147,10 +1206,51 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       for (const { seat, monto: cuanto } of nivelarLasIAS(g)) g = aplicarRecarga(g, seat, cuanto)
       return g
     })
-    onRecargar?.(monto)
     setRecargaHecha(n => n + 1)
     setRecarga(null)
   }
+
+  function confirmarRecarga(monto) {
+    if (!recargaValida(monto, human.chips, unit, saldo).ok) return
+    if (recargaVueloRef.current) return
+    if (!control) { aplicarRecargaEnMesa(monto); return }
+    const seq = control.recargar(monto)
+    if (seq === null) return
+    recargaVueloRef.current = { seq, monto }
+    setRecargaFallo(null)
+    setRecargaVuelo({ seq, monto, estado: 'enviando', tope: false })
+  }
+
+  function reintentarRecarga() {
+    control?.reintentarAhora({ forzar: true })
+    setRecargaVuelo(v => (v ? { ...v, estado: 'enviando' } : v))
+  }
+
+  const vueloSeq = recargaVuelo?.seq ?? null
+  useEffect(() => {
+    if (vueloSeq === null) return undefined
+    const t = setTimeout(() => {
+      setRecargaVuelo(v => (v && v.seq === vueloSeq ? { ...v, tope: true } : v))
+    }, TOPE_RECARGA_MS)
+    return () => clearTimeout(t)
+  }, [vueloSeq])
+
+  useEffect(() => {
+    if (!control) return undefined
+    return control.suscribir((ev) => {
+      const vuelo = recargaVueloRef.current
+      if (!vuelo) return
+      if (ev.tipo === 'red' && ev.item?.seq === vuelo.seq) {
+        setRecargaVuelo(v => (v ? { ...v, estado: 'red' } : v))
+        return
+      }
+      if (ev.tipo !== 'recarga' || ev.seq !== vuelo.seq) return
+      recargaVueloRef.current = null
+      setRecargaVuelo(null)
+      if (ev.ok) aplicarRecargaEnMesa(ev.monto)
+      else setRecargaFallo(ev.respuesta?.codigo ?? 'otro')
+    })
+  }, [control]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function rechazarRecarga() {
     const eraForzosa = recarga?.motivo === RECARGA.FORZOSA
@@ -1285,7 +1385,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // cambio del tic: abrir o plegar la tarjeta no lo tocan, así que burbuja y
   // tarjeta leen un solo reloj (§5.5.4).
   useEffect(() => {
-    if (!recarga || congelado || !recLista) return
+    // ECO-1c · y NO corre mientras el servidor contesta una recarga: una
+    // forzosa que venciera a mitad de la llamada echaría al jugador de la mesa
+    // con su recarga quizá ya cobrada.
+    if (!recarga || congelado || !recLista || recargaVuelo) return
     // La voluntaria no tiene plazo: la abrió él y se cierra cuando él quiera.
     if (recarga.motivo === RECARGA.VOLUNTARIA) return
     if (recargaSeg <= 0) return
@@ -1298,7 +1401,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       if (quedan <= 0) rechazarRecarga()
     }, 1000)
     return () => clearTimeout(t)
-  }, [recarga, recargaSeg, congelado, recLista]) // eslint-disable-line
+  }, [recarga, recargaSeg, congelado, recLista, recargaVuelo]) // eslint-disable-line
 
   // ── Discard (secuencial, jugador por jugador en orden Mano→Pie) ───────────
   // Por jugador: cartas vuelan boca abajo hacia el mazo → slots vacíos un
@@ -2173,7 +2276,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             <PantallaVictoria
               sesion={sesion}
               netas={fichasNetas(human.chips, human.entrada)}
-              saldo={human.chips}
+              saldo={control ? saldoFinal : human.chips}
               puntos={sesion.manosGanadas * puntosDe(game.nivelIA)}
               precedente={precedenteToc}
               onLeave={salir}
@@ -2747,8 +2850,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         >
           <div className="bankrupt-modal apu-recarga">
             <p className="bankrupt-title">{t('ia.recarga.titulo')}</p>
-            <p className="bankrupt-sub" data-accion="recarga-sub">
-              {recarga.motivo === RECARGA.FORZOSA
+            <p className="bankrupt-sub" data-accion="recarga-sub" data-rec-servidor={recargaVuelo?.tope ? 'tope' : recargaVuelo?.estado ?? (recargaFallo ? 'no' : '')}>
+              {recargaVuelo?.tope
+                ? t('ia.recarga.error.tope')
+                : recargaVuelo?.estado === 'red'
+                ? t('ia.recarga.error.red')
+                : recargaFallo
+                  ? t(recargaFallo === 'saldo_insuficiente' ? 'ia.recarga.error.saldo' : 'ia.recarga.error.otro')
+                  : recarga.motivo === RECARGA.FORZOSA
                 ? t(tarjRec.caso === CASOS_RECARGA.SIN_SALDO ? 'ia.recarga.sub.sinsaldo' : 'ia.recarga.sub.forzosa')
                 : recarga.motivo === RECARGA.AUTOMATICA
                   ? t('ia.recarga.sub.automatica', { hc: human.chips })
@@ -2766,7 +2875,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   key={o.id}
                   className={`btn btn-mult apu-monto${recarga.monto === o.monto ? ' btn-mult-active' : ''}`}
                   data-accion="recarga-monto"
-                  disabled={o.disabled}
+                  disabled={o.disabled || !!recargaVuelo}
                   onClick={() => setRecarga(r => ({ ...r, monto: o.monto }))}
                 >
                   {t(`ia.recarga.opcion.${o.id}`, { hc: o.monto })}
@@ -2790,10 +2899,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 <SoundButton
                   className="btn btn-primary"
                   data-accion="recarga-si"
-                  disabled={!recargaValida(recarga.monto, human.chips, unit, saldo).ok}
-                  onClick={() => confirmarRecarga(recarga.monto)}
+                  disabled={(recargaVuelo?.estado === 'enviando' && !recargaVuelo.tope) || (!recargaVuelo && !recargaValida(recarga.monto, human.chips, unit, saldo).ok)}
+                  onClick={() => (recargaVuelo ? reintentarRecarga() : confirmarRecarga(recarga.monto))}
                 >
-                  {t('ia.recarga.si', { hc: recarga.monto })}
+                  {recargaVuelo
+                    ? t(recargaVuelo.estado === 'red' || recargaVuelo.tope ? 'ia.recarga.reintentar' : 'ia.recarga.enviando')
+                    : t('ia.recarga.si', { hc: recarga.monto })}
                 </SoundButton>
               )}
               {tarjRec.caso === CASOS_RECARGA.TODO && (
@@ -2801,17 +2912,25 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   <SoundButton
                     className="btn btn-primary"
                     data-accion="recarga-si"
-                    disabled={!recargaValida(recarga.monto, human.chips, unit, saldo).ok}
-                    onClick={() => confirmarRecarga(recarga.monto)}
+                    disabled={(recargaVuelo?.estado === 'enviando' && !recargaVuelo.tope) || (!recargaVuelo && !recargaValida(recarga.monto, human.chips, unit, saldo).ok)}
+                    onClick={() => (recargaVuelo ? reintentarRecarga() : confirmarRecarga(recarga.monto))}
                   >
-                    {t(tarjRec.todo ? 'ia.recarga.si.todo' : 'ia.recarga.si', { hc: recarga.monto })}
+                    {recargaVuelo
+                      ? t(recargaVuelo.estado === 'red' || recargaVuelo.tope ? 'ia.recarga.reintentar' : 'ia.recarga.enviando')
+                      : t(tarjRec.todo ? 'ia.recarga.si.todo' : 'ia.recarga.si', { hc: recarga.monto })}
                   </SoundButton>
                   {tarjRec.todo && <p className="rec-todo-nota" data-accion="recarga-nota">{t('ia.recarga.todo.nota')}</p>}
                 </div>
               )}
-              <SoundButton className="btn btn-pass" data-accion="recarga-no" onClick={rechazarRecarga}>
-                {recarga.motivo === RECARGA.FORZOSA ? t('ia.recarga.no.forzosa') : t('ia.recarga.no')}
-              </SoundButton>
+              {recargaVuelo?.tope ? (
+                <SoundButton className="btn btn-pass" data-accion="recarga-salir" onClick={salir}>
+                  {t('ia.recarga.no.forzosa')}
+                </SoundButton>
+              ) : (
+                <SoundButton className="btn btn-pass" data-accion="recarga-no" disabled={!!recargaVuelo} onClick={rechazarRecarga}>
+                  {recarga.motivo === RECARGA.FORZOSA ? t('ia.recarga.no.forzosa') : t('ia.recarga.no')}
+                </SoundButton>
+              )}
             </div>
 
             {/* O1 · el plazo RESERVA su renglón aunque la voluntaria no lo use: sin

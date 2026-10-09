@@ -183,8 +183,11 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
   // se importa de ninguna configuración — se DERIVA de las dos que la tarjeta ya
   // recibe: `netas` es `chips - entrada`, luego `entrada` es `saldo - netas`.
   // Una fuente menos que pueda desincronizarse.
-  const entrada = saldo - netas
-  const saldoVivo = valorEntre(entrada, saldo, numeros.saldo)
+  // ECO-1c · C8 · el saldo es el REAL (`salir_ia`) y puede no haber llegado:
+  // entonces «—», con la misma caja, y nada cuenta (`useCoreografia` espera).
+  const sinSaldo = !Number.isFinite(saldo)
+  const entrada = sinSaldo ? 0 : saldo - netas
+  const saldoVivo = sinSaldo ? '—' : valorEntre(entrada, saldo, numeros.saldo)
 
   // El vuelo se MIDE en vivo, como el del pozo: dónde está la moneda del premio
   // y dónde la MONEDA DE ATERRIZAJE del saldo, en coordenadas de la tarjeta.

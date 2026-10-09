@@ -293,6 +293,14 @@ export const TEXTOS_ES = {
   'ia.retar.saldo.error':      'No pudimos leer tu saldo. Revisa tu conexión.',
   'ia.retar.saldo.reintentar': 'Reintentar',
 
+  // ECO-1c · sentarse es una llamada al servidor (`sentarse_ia`). Mientras
+  // contesta, el CTA lo dice; si no contesta, la nota lo dice y el mismo CTA
+  // reintenta con el mismo token (no cobra dos veces).
+  'ia.retar.sentando':         'Sentando…',
+  'ia.retar.sentarse.red':     'No pudimos abrir la mesa. Revisa tu conexión y vuelve a intentarlo.',
+  'ia.retar.sentarse.saldo':   'Tu saldo no alcanza para esta entrada.',
+  'ia.retar.sentarse.otro':    'No pudimos abrir la mesa. Vuelve a intentarlo.',
+
   // Los tres motivos de `entrada.entradaValida` más el cuarto que añade la
   // pantalla (§2.2). El motor no puede juzgar el bolsillo —no lo conoce— y por
   // eso `sin_saldo` nace en `retarCore` y no en `entrada.js`.
@@ -380,12 +388,34 @@ export const TEXTOS_ES = {
   'ia.recarga.vermesa':        'Ver la mesa',
   'ia.recarga.aria.forzosa':   'Recargar fichas, quedan {s} segundos',
   'ia.recarga.aria.automatica': 'Recargar fichas (opcional), quedan {s} segundos',
+  // ECO-1c · la recarga se cobra en el servidor: las fichas llegan cuando
+  // contesta. Mientras, el botón lo dice; si no contesta, se dice y se ofrece
+  // reintentar (la misma recarga, que no se cobra dos veces).
+  'ia.recarga.enviando':       'Recargando…',
+  'ia.recarga.error.red':      'No pudimos confirmar la recarga.',
+  'ia.recarga.reintentar':     'Reintentar',
+  'ia.recarga.error.saldo':    'Tu saldo ya no alcanza para esa recarga.',
+  'ia.recarga.error.otro':     'La recarga no se pudo hacer.',
+  // P-2b · a los 10 s sin respuesta. El segundo botón pasa a ser
+  // `ia.recarga.no.forzosa` («Salir con mis fichas»): salir es posible y no
+  // pierde nada, porque si la recarga entra la salida la lleva (P-2a).
+  'ia.recarga.error.tope':     'El servidor no responde. Si la recarga entra, sus fichas van contigo.',
   // 1f-A4 · `ia.recarga.nivelado` SE RETIRA. Era la promesa de §5.3 en un
   // renglón aparte, y desde A3 la dicen los dos subtítulos blandos. En el
   // teléfono no se pintaba (no cabía) y en escritorio se pintaba justo debajo
   // del subtítulo que ya lo decía: la misma frase dos veces seguidas (E-31).
   // Una sola voz en todas las pantallas. Con la clave se van el `<p>` de
   // `GameTable.jsx` y las reglas `.apu-nota` de `apu.css`.
+
+  // ── ECO-1c · El aviso de saldo (lámina `laminas/eco1c`, aprobada) ────────
+  // El dinero que vuelve FUERA de la mesa: la partida recogida al arrancar
+  // (a), la que cerró otro dispositivo (b, C6) y la vieja que cierra el
+  // sentarse (c, C5). `{hc}` lo pinta el componente en oro. La 1d lo reusará
+  // para la constancia; el video de recompensa no.
+  'aviso.saldo.recogida':      'Volvieron {hc} HC de tu partida anterior.',
+  'aviso.saldo.recogida.cero': 'Tu partida anterior quedó cerrada. No quedaban fichas en la mesa.',
+  'aviso.saldo.otro':          'Abriste otra partida en otro dispositivo. Volvieron {hc} HC.',
+  'aviso.saldo.otro.cero':     'Abriste otra partida en otro dispositivo. No quedaban fichas en la mesa.',
 }
 
 export default TEXTOS_ES

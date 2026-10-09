@@ -72,7 +72,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
 
-export default function Lobby({ cuenta, billetera = null, onJugarIA, onJugarPvP, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, onJugarIA, onJugarPvP, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -188,6 +188,8 @@ export default function Lobby({ cuenta, billetera = null, onJugarIA, onJugarPvP,
         usuario={usuario}
         saldo={billetera?.saldo ?? null}
         estadoSaldo={billetera?.estado}
+        aviso={aviso}
+        onAvisoFin={onAvisoFin}
         onPerfil={pronto}
         onTienda={pronto}
         onAjustes={() => setHojaAbierta(true)}

@@ -56,6 +56,9 @@ function usePrefiereQuietud() {
   return quieto
 }
 
+// ECO-1c · lo más que el tramo del saldo espera a la cifra del servidor.
+export const ESPERA_SALDO_MS = 4000
+
 export function useCoreografia({ precedente, netas, saldo }) {
   const { soundEnabled } = useSoundContext()
   const quietud = usePrefiereQuietud()
@@ -295,8 +298,22 @@ export function useCoreografia({ precedente, netas, saldo }) {
   }, [tramo, aterrizaTraspaso])
 
   // ── El saldo ──────────────────────────────────────────────────────────────
+  // ECO-1c · C8 · «Saldo actual» es el saldo REAL, el que devuelve `salir_ia`
+  // al cobrar la mesa ganada (Reglas §9). Casi siempre llega antes de este
+  // tramo; si no, el tramo LO ESPERA —el effect se vuelve a correr cuando la
+  // cifra llega— con una red de `ESPERA_SALDO_MS`: sin cifra, la tarjeta
+  // enseña «—» y el relato sigue sin contar. No se cuenta hacia una cifra que
+  // no se sabe.
   useEffect(() => {
     if (tramo !== 'saldo') return undefined
+    if (!Number.isFinite(saldo)) {
+      marcaCEL('saldo-espera')
+      const t = setTimeout(() => {
+        marcaCEL('saldo-red')
+        vaAlTramo('asiento')
+      }, ESPERA_SALDO_MS)
+      return () => clearTimeout(t)
+    }
     const dur = duracionConteo(Math.abs(saldo))
     marcaCEL('saldo-ini', { dur })
     return cuenta(dur, setSaldoVivo, () => {

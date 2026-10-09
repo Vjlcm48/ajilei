@@ -27,15 +27,22 @@ import { RAIZ } from './arnes/fuente.mjs'
 const PROHIBIDAS = [
   // la billetera falsa (`MARCA_BILLETERA_FALSA`)
   'ajilei:billetera-falsa',
+  // ECO-1c · el banco imitado del bypass (`MARCA_BANCO_IMITADO`): el contrato
+  // SQL de la 1c en JS, que sirve las mesas sin servidor en desarrollo
+  'ajilei:banco-imitado',
   // la tabla de moldes de `siembraAPU`
   'allinHumano',
+  // ECO-1c · el mando `?apu=bolsillo:<n>` (el literal de su expresión regular;
+  // fuera de `src/dev/` «bolsillo» sólo vive en comentarios, que no llegan)
+  'bolsillo:',
   // los estados de `?sal=`
   'opciones-fuera-alcance',
   'espera-fantasma',
 ]
 
-// Y la que SÍ tiene que estar: la lectura de verdad.
-const OBLIGATORIAS = ['mi_billetera']
+// Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las
+// funciones de mesa de verdad (la falsa no puede ser la única que llega).
+const OBLIGATORIAS = ['mi_billetera', 'sentarse_ia', 'informar_pila', 'recoger_mesa_ia']
 
 let carpeta = null
 let textos = []

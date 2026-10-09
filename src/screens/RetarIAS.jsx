@@ -102,6 +102,13 @@ export default function RetarIAS({
   // ECO-1b · la cifra única de `useBilletera` (App). Releva a `saldoSesion`.
   billetera = null,
   configInicial = null,
+  // ECO-1c · sentarse es una llamada al servidor. `sentando`: null, o
+  // `{ fase: 'enviando' }` mientras contesta, o `{ fase: 'error', codigo }`.
+  // Mientras se envía —y mientras corre el aviso de una mesa vieja que se
+  // cerró (escena c de la lámina)— el CTA no se puede volver a pulsar.
+  sentando = null,
+  avisoSaldo = null,
+  onAvisoFin,
   onRetar,
   onVolver,
   onLobby,
@@ -190,8 +197,13 @@ export default function RetarIAS({
     [MOTIVO_SIN_SALDO]:               'ia.entrada.sin_saldo',
   }
 
+  const enviando = sentando?.fase === 'enviando'
   let notaCta = null
-  if (sinCifra) {
+  if (sentando?.fase === 'error') {
+    notaCta = t(sentando.codigo === 'red' ? 'ia.retar.sentarse.red'
+      : sentando.codigo === 'saldo_insuficiente' ? 'ia.retar.sentarse.saldo'
+        : 'ia.retar.sentarse.otro')
+  } else if (sinCifra) {
     // ECO-1b · mientras carga, la nota lo dice; si la lectura falló, lo dice
     // `AvisoLectura` con su botón y la nota calla para no repetirlo.
     notaCta = lecturaFallida ? null : t('ia.retar.saldo.cargando')
@@ -210,7 +222,7 @@ export default function RetarIAS({
   // de pluralización en `t()` para un solo caso sería traer i18next por la
   // puerta de atrás (doctrina de `config/textos.js`).
   const rivales = jugadores !== null ? jugadores - 1 : 0
-  const rotuloCta = completo
+  const rotuloCta = enviando ? t('ia.retar.sentando') : completo
     ? t(rivales === 1 ? 'ia.retar.cta.una' : 'ia.retar.cta', {
         n: rivales,
         hc: montoTexto(apuesta),
@@ -225,12 +237,14 @@ export default function RetarIAS({
       cuenta={cuenta}
       saldo={saldo}
       estadoSaldo={billetera?.estado}
+      aviso={avisoSaldo}
+      onAvisoFin={onAvisoFin}
       onVolver={onVolver}
       onLobby={onLobby}
       cta={{
         clase: 'es-retar',
         etiqueta: rotuloCta,
-        disabled: sinCifra || !completo || !veredicto.ok,
+        disabled: enviando || sinCifra || !completo || !veredicto.ok,
         onClick: () => {
           // Se recuerda lo que el jugador llegó a USAR, no por dónde paseó el
           // dedo — y de eso, sólo los tres campos de la política.

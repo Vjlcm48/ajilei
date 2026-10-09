@@ -48,6 +48,9 @@ export default function PantallaChips({
   saldo,
   // ECO-1b · cargando, listo o error: viaja a `data-saldo` de la píldora.
   estadoSaldo,
+  // ECO-1c · el aviso de saldo (lámina `laminas/eco1c`), para la píldora.
+  aviso = null,
+  onAvisoFin,
   onVolver,
   onLobby,
   cta,
@@ -88,6 +91,8 @@ export default function PantallaChips({
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
         estadoSaldo={estadoSaldo}
+        aviso={aviso}
+        onAvisoFin={onAvisoFin}
         onPerfil={pronto}
         onTienda={pronto}
         onAjustes={pronto}

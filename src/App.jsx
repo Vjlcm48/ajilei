@@ -26,7 +26,15 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA } from './dev/billeteraFalsa'
+// ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
+// mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
+// que siembran los moldes de humano en desarrollo (P-6).
+import { mesaIAApi } from './lib/mesaIAApi'
+import { crearControlMesa } from './lib/controlMesaIA'
+import { idDispositivo } from './lib/dispositivo'
+import { entradaSembradaAPU } from './dev/siembraAPU'
+import { avisoDeVuelta, TIEMPOS_AVISO } from './hooks/avisoSaldoCore'
 // `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
 // `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
 // sigue viva y exportada en el hook, que es donde trabaja.
@@ -99,6 +107,18 @@ import { arranqueDeSesion } from './screens/salasCore'
 // tres del PvP, que llevan a una partida que todavia no existe.
 // SAL-B2 F1b · y el stub de partida PvP, que todavia no reparte nada.
 const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sala-espera', 'partida-pvp']
+
+// ECO-1c · un token por intento de sentarse (la idempotencia de `sentarse_ia`).
+function nuevoToken() {
+  try { return crypto.randomUUID() } catch {
+    // Sin `randomUUID` (contexto no seguro): un v4 hecho a mano, que es lo que
+    // el servidor espera (`uuid`).
+    const h = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16))
+    h[12] = '4'; h[16] = ((parseInt(h[16], 16) & 3) | 8).toString(16)
+    const x = h.join('')
+    return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`
+  }
+}
 
 function App() {
   // Los hooks van todos ARRIBA y ninguno detrás de un retorno: el orden de
@@ -195,20 +215,45 @@ function App() {
   // Rector ECO-1 1b §1 (B1–B3). Hasta aquí vivía en este sitio `saldoSesion`,
   // que nacía de una constante (5.000) y sólo veían vs-IA y el lobby; las
   // pantallas PvP leían la constante por su cuenta. Ahora la cifra sale de la
-  // billetera del servidor (`mi_billetera()`) más el ajuste local de las
-  // partidas contra las IAS, y baja por props a las seis pantallas.
+  // billetera del servidor (`mi_billetera()`) y baja por props a las seis
+  // pantallas.
   //
-  // El ajuste sigue haciendo lo que hacía `saldoSesion` —bajar al sentarse,
-  // bajar con cada recarga, subir con lo que se levanta de la mesa— y por eso
-  // sigue viviendo aquí: tiene que sobrevivir a que las pantallas se desmonten.
-  // TRANSITORIO hasta ECO-1c: al recargar la página se pierde y la cifra vuelve
-  // a la del servidor.
+  // ECO-1c · el ajuste local de la 1b se RETIRA: la entrada, las recargas y la
+  // salida contra las IAS son movimientos del libro, y la billetera toma el
+  // saldo que devuelve cada función de dinero (`billetera.tomar`).
   //
   // La API se resuelve UNA vez, como la de salas: la falsa (desarrollo con
   // bypass, `?apu=saldo:<n>` o 5.000) o la real. Las dos pasan por el mismo
   // núcleo; la falsa sólo cambia de dónde se lee la cifra.
   const [apiBilletera] = useState(() => simulacionBilletera() ?? billeteraApi)
-  const billetera = useBilletera(apiBilletera, auth.estado === COMPLETO ? (auth.perfil?.id ?? null) : null)
+  const uidCompleto = auth.estado === COMPLETO ? (auth.perfil?.id ?? null) : null
+  const billetera = useBilletera(apiBilletera, uidCompleto)
+  const { tomar: tomarSaldo, esperar: esperarSaldo, soltar: soltarSaldo, refrescar: releerSaldo, alSaldoInsuficiente } = billetera
+
+  // ── ECO-1c · LA MESA CONTRA LAS IAS, EN EL SERVIDOR ──────────────────────
+  // Rector ECO-1 1c §2.2. `apiMesa` se resuelve UNA vez, como las otras dos:
+  // la del banco imitado del bypass o la real.
+  //
+  // `controlMesa` es el canal de la mesa en curso (`lib/controlMesaIA`): lo
+  // crea `sentarse_ia` y lo usa `GameTable` para avisar de la pila y recargar.
+  // Vive AQUÍ y no en la mesa porque la salida no espera a la red: el jugador se
+  // levanta en el acto y el cobro sigue mandándose con la mesa ya desmontada.
+  // El `ref` es para los manejadores (saber si un evento es de la mesa actual);
+  // el estado, para pasárselo a la mesa.
+  const [apiMesa] = useState(() => simulacionMesaIA() ?? mesaIAApi)
+  const [controlMesa, setControlMesa] = useState(null)
+  const controlRef = useRef(null)
+  // Sentarse: `null`, `{ fase: 'enviando' }` o `{ fase: 'error', codigo }`. El
+  // token es de UN intento: el reintento de la misma elección lo repite (si la
+  // primera llamada sí llegó, el servidor devuelve la misma mesa sin cobrar),
+  // y una elección distinta o un «no» definitivo lo renuevan.
+  const [sentando, setSentando] = useState(null)
+  const intento = useRef(null)
+  const enviandoRef = useRef(false)
+  // El aviso de saldo (lámina `laminas/eco1c`): el dinero que vuelve FUERA de
+  // la mesa, anclado a la píldora. Lo pintan el lobby y Retar.
+  const [avisoSaldo, setAvisoSaldo] = useState(null)
+  const finAviso = useCallback((id) => setAvisoSaldo((a) => (a && a.id === id ? null : a)), [])
 
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
   // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
@@ -275,6 +320,34 @@ function App() {
   // (cerrar sesion) y vuelve a arrancar con cualquier login, la misma cuenta u
   // otra. Una sesion nueva es un arranque nuevo. StrictMode sigue cubierto:
   // el remontaje trae el mismo uid, y el mismo uid no arranca dos veces.
+  // ── ECO-1c · P-4 · LA MESA QUE QUEDÓ ABIERTA, AL ARRANCAR ─────────────────
+  // Una vez por cuenta, con la misma guarda que las salas: `recoger_mesa_ia`
+  // cierra la mesa abierta si es de ESTE navegador (una mesa no sobrevive a
+  // recargar la página) o si lleva más de 10 min sin avisos (de otro). Si volvió
+  // algo —o la mesa se cerró sin fichas—, el aviso de saldo lo dice (escena a).
+  // Con red caída no se hace nada: la recogerá la regla C4 al sentarse.
+  const arranqueMesa = useRef(null)
+  useEffect(() => {
+    const decision = arranqueDeSesion(arranqueMesa.current, uidCompleto)
+    arranqueMesa.current = decision.arrancado
+    if (!decision.arrancar) return
+    apiMesa.recoger(idDispositivo()).then((r) => {
+      if (r.codigo !== 'recogida') return
+      tomarSaldo(r.saldo)
+      setAvisoSaldo(avisoDeVuelta(r, { conMonto: 'aviso.saldo.recogida', cero: 'aviso.saldo.recogida.cero' }))
+    })
+  }, [uidCompleto, apiMesa, tomarSaldo])
+
+  // Volver a primer plano reintenta lo que la mesa tenga pendiente (un aviso,
+  // una recarga, la salida) sin esperar a la cuenta atrás del reintento.
+  useEffect(() => {
+    const alCambiar = () => {
+      if (document.visibilityState === 'visible') controlRef.current?.reintentarAhora()
+    }
+    document.addEventListener('visibilitychange', alCambiar)
+    return () => document.removeEventListener('visibilitychange', alCambiar)
+  }, [])
+
   const arranqueSalas = useRef(null)
   const uid = auth.perfil?.id ?? null
   useEffect(() => {
@@ -376,6 +449,122 @@ function App() {
   useEffect(() => {
     pantallaCompleta.current?.fijaDentroMesa(screen === 'table')
   }, [screen])
+
+  // ── ECO-1c · Lo que cuenta el canal de una mesa ──────────────────────────
+  // Sólo la mesa ACTUAL mueve la pantalla y la píldora. Una mesa vieja que aún
+  // cobraba su salida cuando el jugador se sentó en otra la cerró `sentarse_ia`
+  // (C4): lo que conteste ya no es verdad para la píldora, que se relee.
+  const escucharMesa = useCallback((ctl) => {
+    let soltada = false
+    ctl.suscribir((ev) => {
+      const actual = controlRef.current === ctl
+      const saldo = ev.respuesta?.saldo
+      if (!actual) {
+        if (ev.tipo === 'salida' || ev.tipo === 'cerrada') releerSaldo()
+        return
+      }
+      // P-2a · con la salida ya pedida, el «sí» de una recarga que iba delante
+      // no es la cifra final: la píldora sigue en «—» hasta que la salida (que
+      // ya lleva esas fichas) conteste.
+      if (ev.tipo === 'recarga' && ev.ok && !ctl.saliendo) tomarSaldo(saldo)
+      if (ev.tipo === 'red' && ctl.saliendo && !soltada) {
+        // La salida no contestó (o no contesta lo que tiene delante, como una
+        // recarga en vuelo): la píldora deja el «—» y enseña lo que diga el
+        // servidor (la mesa sigue abierta con su última pila). La cola la
+        // sigue reintentando; cuando conteste, la cifra se corrige sola.
+        soltada = true
+        soltarSaldo()
+      }
+      if (ev.tipo === 'salida') {
+        if (ev.respuesta?.codigo === 'ok' || ev.respuesta?.codigo === 'repetido') tomarSaldo(saldo)
+        else soltarSaldo()
+      }
+      if (ev.tipo === 'cerrada') {
+        tomarSaldo(saldo)
+        // C6 · la cerró otro dispositivo MIENTRAS se jugaba aquí: aviso y vuelta
+        // al inicio, sin perder dinero (lo cobró quien la cerró). Si el jugador
+        // ya se había levantado, sólo se toma el saldo.
+        if (!ctl.saliendo) {
+          setAvisoSaldo(avisoDeVuelta({ cobrado: ev.respuesta?.cobrado, saldo },
+            { conMonto: 'aviso.saldo.otro', cero: 'aviso.saldo.otro.cero' }))
+          setControlMesa(null)
+          setMesa(null)
+          setScreen('lobby')
+        }
+      }
+    })
+  }, [tomarSaldo, soltarSaldo, releerSaldo])
+
+  const retar = useCallback(async (elegida) => {
+    if (enviandoRef.current) return
+    // P-6 · con un molde de humano (`?apu=`, sólo desarrollo) la mesa se sienta
+    // con la pila del molde, y ésa es la entrada que se cobra.
+    const entrada = entradaSembradaAPU(elegida.apuesta) ?? elegida.entrada
+    const firma = [elegida.reto, elegida.jugadores, elegida.apuesta, entrada].join('|')
+    if (intento.current?.firma !== firma) intento.current = { firma, token: nuevoToken() }
+    enviandoRef.current = true
+    setSentando({ fase: 'enviando' })
+    const r = await apiMesa.sentarse({ ...elegida, entrada, token: intento.current.token, dispositivo: idDispositivo() })
+    enviandoRef.current = false
+
+    if (r.codigo !== 'ok' && r.codigo !== 'repetido') {
+      if (r.codigo === 'saldo_insuficiente') alSaldoInsuficiente()
+      if (r.codigo !== 'red') intento.current = null
+      setSentando({ fase: 'error', codigo: r.codigo })
+      return
+    }
+
+    intento.current = null
+    tomarSaldo(r.saldo)
+    const ctl = crearControlMesa({ api: apiMesa, mesaId: r.mesaId, pilaInicial: entrada })
+    escucharMesa(ctl)
+    controlRef.current = ctl
+
+    const entrarAMesa = () => {
+      setSentando(null)
+      setAvisoSaldo(null)
+      // La marca va ANTES: desde aquí, un fallo del chunk es de la entrada y
+      // recarga (ARN-3d STOP-2). Si recarga, la mesa queda abierta en el
+      // servidor y la recoge el arranque (es de este dispositivo).
+      marcarEntradaMesa()
+      startTransition(() => {
+        setControlMesa(ctl)
+        // La MESA se arma con la entrada elegida (las IAS se sientan con su
+        // 1,5×, como siempre); un molde de humano sólo cambia la pila del
+        // asiento 0 (`siembraMesaAPU`), que es la que se cobró arriba.
+        setMesa({ ...elegida, mesaId: r.mesaId })
+        setScreen('table')
+      })
+    }
+
+    if (r.anteriorCerrada) {
+      // C4/C5 · escena (c) de la lámina: sentarse cerró una mesa vieja. En
+      // Retar, la píldora cuenta SÓLO la devolución, hacia arriba (de la cifra
+      // de antes de sentarse a esa cifra más lo devuelto), y la mesa nueva
+      // entra cuando acaba la cuenta y medio segundo de lectura. La entrada no
+      // se anima: la píldora no está en la mesa, y al volver ya enseña la cifra
+      // real del servidor.
+      const antes = r.saldo + entrada - r.anteriorCobro
+      setAvisoSaldo(avisoDeVuelta({ cobrado: r.anteriorCobro, saldo: antes + r.anteriorCobro },
+        { conMonto: 'aviso.saldo.recogida', cero: 'aviso.saldo.recogida.cero' }))
+      setTimeout(entrarAMesa, TIEMPOS_AVISO.cuentaIni + TIEMPOS_AVISO.cuentaDur + 500)
+      return
+    }
+    entrarAMesa()
+  }, [apiMesa, tomarSaldo, alSaldoInsuficiente, escucharMesa])
+
+  const levantarse = useCallback((fichas) => {
+    const ctl = controlRef.current
+    if (ctl && !ctl.terminado) {
+      // La píldora enseña «—» hasta que `salir_ia` conteste (plan del STOP-1
+      // §3): la cifra vieja ya no es verdad y la nueva no ha llegado.
+      esperarSaldo()
+      ctl.salir(fichas)
+    }
+    setControlMesa(null)
+    setMesa(null)
+    setScreen('retar-ias')
+  }, [esperarSaldo])
 
   // ── BIE-1 · CARGANDO pinta NADA… hasta los 300 ms ──────────────────────────
   // El fondo del documento ya es el verde abismo (welcome.css:1-6), así que un
@@ -532,19 +721,16 @@ function App() {
   // hace que el asiento 0 se siente con lo que el jugador eligió y las IAS con
   // la pila proporcional de §2.3 (factor 1,5, sellado en 1c-2).
   //
-  // `onLeave` recibe las FICHAS con las que el humano se levanta y las devuelve
-  // al saldo (ECO-1b: al ajuste local, TRANSITORIO hasta ECO-1c). Es la otra
-  // mitad de la resta de abajo, y sin ella el saldo bajaría en cada mesa y no
-  // subiría nunca.
+  // `onLeave` recibe las FICHAS con las que el humano se levanta. ECO-1c: van
+  // a `salir_ia` por el canal de la mesa (`levantarse`), que las cobra UNA vez
+  // y topadas por el techo; la píldora toma el saldo que devuelve.
   if (screen === 'table' && mesa !== null) {
     return (
-      /* APU-1 §5 · `saldo` y `onRecargar`: la recarga gasta BOLSILLO, y el
-         bolsillo vive aquí. La mesa no lo guarda ni lo recuerda —lo LEE para
-         saber qué puede ofrecer, y avisa cuando el jugador gasta—. Es la misma
-         dirección que la entrada, que también sale del bolsillo al sentarse.
-         ECO-1b · el `?? 0` es sólo de forma: «Retar» no deja sentarse
-         mientras la cifra no ha llegado, y un fallo posterior conserva la
-         última, así que en la mesa el saldo siempre es un número. */
+      /* APU-1 §5 · `saldo`: la recarga gasta BOLSILLO, y la mesa lo LEE para
+         saber qué puede ofrecer. ECO-1c · ya no avisa de lo que gasta: la
+         recarga se cobra en el servidor por `control`, y la billetera toma el
+         saldo que devuelve. El `?? 0` es sólo de forma: «Retar» no deja
+         sentarse mientras la cifra no ha llegado. */
       <GameTable
         stake={mesa.apuesta}
         numPlayers={mesa.jugadores}
@@ -552,12 +738,8 @@ function App() {
         entrada={mesa.entrada}
         cuenta={cuenta}
         saldo={billetera.saldo ?? 0}
-        onRecargar={(monto) => billetera.recargar(monto)}
-        onLeave={(fichas) => {
-          billetera.salir(fichas, mesa.entrada)
-          setMesa(null)
-          setScreen('retar-ias')
-        }}
+        control={controlMesa}
+        onLeave={levantarse}
       />
     )
   }
@@ -567,27 +749,16 @@ function App() {
       <RetarIAS
         cuenta={cuenta}
         billetera={billetera}
-        onRetar={(elegida) => {
-          // La entrada sale del bolsillo AQUÍ, al sentarse, y no cuando la mesa
-          // termina: es lo que el jugador arriesga, y la barra superior de la
-          // mesa tiene que enseñarlo desde la primera mano.
-          //
-          // ARN-3d §2.4 · en una TRANSICIÓN: si el chunk de la mesa aún no
-          // llegó, React deja Retar puesta hasta que la mesa está lista, en vez
-          // de pintar el `fallback` del `Suspense` de la raíz (`main.jsx`). Con
-          // la precarga hecha no hay nada que esperar (D12).
-          //
-          // La marca va ANTES: desde aquí, un fallo del chunk es de la entrada
-          // y recarga; hasta aquí era de la precarga y se callaba (STOP-2).
-          marcarEntradaMesa()
-          startTransition(() => {
-            billetera.entrar(elegida.entrada)
-            setMesa(elegida)
-            setScreen('table')
-          })
-        }}
-        onVolver={() => setScreen('lobby')}
-        onLobby={() => setScreen('lobby')}
+        sentando={sentando}
+        avisoSaldo={avisoSaldo}
+        onAvisoFin={finAviso}
+        // ECO-1c · la entrada sale del bolsillo AL SENTARSE, y ahora en el
+        // servidor: `retar` llama a `sentarse_ia` y sólo entra a una mesa que el
+        // servidor abrió. Sigue entrando en una TRANSICIÓN (ARN-3d §2.4) y con
+        // la marca de entrada delante (STOP-2 de ARN-3d).
+        onRetar={retar}
+        onVolver={() => { setSentando(null); setScreen('lobby') }}
+        onLobby={() => { setSentando(null); setScreen('lobby') }}
       />
     )
   }
@@ -601,6 +772,8 @@ function App() {
     <Lobby
       cuenta={cuenta}
       billetera={billetera}
+      aviso={avisoSaldo}
+      onAvisoFin={finAviso}
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
       onCerrarSesion={auth.cerrarSesion}

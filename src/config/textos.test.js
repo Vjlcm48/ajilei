@@ -81,7 +81,11 @@ describe('IDI-0 · diccionario es', () => {
     // BIE-1 es la cuarta: `app.*` es lo que la app dice antes de saber en qué
     // pantalla está —el «Cargando» de la rama CARGANDO—, que no es del lobby
     // ni de ninguna otra superficie.
-    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.']
+    //
+    // ECO-1c es la quinta: `aviso.*` es el aviso de saldo, que no es de una
+    // superficie sino de la píldora, y la píldora está en el lobby, en Retar y
+    // —con la 1d— en la constancia.
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
@@ -160,9 +164,14 @@ describe('IDI-0 · diccionario es', () => {
     //     la pantalla ancha. El TERCERO no se duplica y ahí se ve el motivo: en
     //     la entrada «Techo» es una cifra fija de la mesa, y en la recarga es lo
     //     que FALTA para llenarla, así que dice «Al techo».
+    //   ia.recarga.reintentar = ia.retar.saldo.reintentar  (ECO-1c)
+    //     «Reintentar» en la tarjeta de recarga y en el aviso de lectura de
+    //     Retar: el mismo verbo para dos reintentos distintos (una recarga, una
+    //     lectura), en dos pantallas. Misma razón que las dos de arriba.
     expect(repetidos.sort()).toEqual([
       'ia.recarga.opcion.medio = ia.retar.entrada.medio',
       'ia.recarga.opcion.piso = ia.retar.entrada.piso',
+      'ia.recarga.reintentar = ia.retar.saldo.reintentar',
       'ia.retar.apuesta = sal.armar.apuesta',
       'ia.retar.jugadores = sal.armar.jugadores',
       'lob.ajustes.aria = lob.cfg.titulo',

@@ -1,0 +1,119 @@
+/* ══ ECO-1c · El aviso de saldo ════════════════════════════════════════════
+   Lámina `laminas/eco1c/lamina.html`, aprobada por Victor tal cual (STOP-2).
+   Hoja PROPIA y aditiva, importada por `components/AvisoSaldo.jsx`, igual que
+   `rec.css` con la burbuja de REC-1. Fuera de los protegidos: no toca
+   `gameTable.css` ni `opponentPanel.css`, y no usa `!important` (gana por
+   especificidad donde tiene que ganar).
+
+   Dos piezas:
+     · la CÁPSULA (`.avs`), en `body`, colocada contra la píldora por JS;
+     · el BRILLO de la moneda de la píldora (`.avs-viva` y `.avs-brilla` sobre
+       `.lob-moneda`): un solo halo y un destello, los de LOB-1, una vez.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.avs {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  box-sizing: border-box;
+  max-width: min(22rem, calc(100vw - 32px));
+  padding: 0.45em 0.9em 0.45em 0.55em;
+  background: rgba(var(--green-abyss-rgb), 0.95);
+  border: 1.5px solid rgba(var(--gold-brand-rgb), 0.75);
+  border-radius: 1.1em;
+  box-shadow: 0 0.35em 1.1em rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: avs-entra 200ms ease-out both;
+}
+.avs.is-sale { animation: avs-sale 300ms ease-in forwards; }
+.avs[data-sin-moneda] { padding-left: 0.9em; }
+
+/* El pico apunta al centro de la moneda de la píldora (`--avs-pico`, por JS). */
+.avs::before {
+  content: "";
+  position: absolute;
+  top: -0.36em;
+  left: var(--avs-pico, 50%);
+  width: 0.6em;
+  height: 0.6em;
+  background: rgba(var(--green-abyss-rgb), 0.95);
+  border-left: 1.5px solid rgba(var(--gold-brand-rgb), 0.75);
+  border-top: 1.5px solid rgba(var(--gold-brand-rgb), 0.75);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.avs-moneda { flex: none; display: block; line-height: 0; }
+.avs-moneda .chip-token { display: block; width: 1.25em; height: 1.25em; }
+.avs-texto { min-width: 0; }
+.avs-hc { color: var(--gold-brand); font-weight: 700; white-space: nowrap; }
+
+@keyframes avs-entra {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes avs-sale {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── El brillo de la moneda de la píldora ───────────────────────────────────
+   Mientras vive el aviso, la moneda deja su ciclo de 8 s (lobby.css §10) y
+   obedece al aviso; al irse, vuelve a su ciclo. (0,4,0) gana a
+   `.lobby .lob-moneda .chip-token` (0,3,0) y a su gemelo de `salas.css`. */
+.lob-pildora .lob-moneda.avs-viva { position: relative; }
+.lob-pildora .lob-moneda.avs-viva .chip-token { animation: none; }
+.lob-pildora .lob-moneda.avs-viva::after { animation: none; opacity: 0; }
+
+/* El halo: el de LOB-1 (`lob-halo-moneda`), radio = moneda × 0,5 y oro alto al
+   0,85, con la sombra de apoyo de ChipToken en las tres paradas. Una vez. */
+.lob-pildora .lob-moneda.avs-viva.avs-brilla .chip-token {
+  animation: avs-halo 1100ms ease-in-out 1;
+}
+/* El destello corto sobre el cuadrante superior izquierdo, una vez. */
+.lob-pildora .lob-moneda.avs-viva.avs-brilla::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--ico);
+  height: var(--ico);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%,
+    rgba(var(--gold-brand-hi-rgb), 0.95) 0%,
+    transparent 60%);
+  pointer-events: none;
+  animation: avs-destello 1100ms ease-in-out 1;
+}
+
+@keyframes avs-halo {
+  0%, 100% { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
+  40% {
+    filter:
+      drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45))
+      drop-shadow(0 0 calc(var(--ico) * 0.5) rgba(var(--gold-brand-hi-rgb), 0.85));
+  }
+}
+@keyframes avs-destello {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
+}
+
+/* Con movimiento reducido: sin desplazamiento, sólo aparece y se desvanece.
+   La cuenta y el brillo ya no se encienden (`avisoSaldoCore`, `reducido`). */
+@media (prefers-reduced-motion: reduce) {
+  .avs { animation: avs-funde 200ms linear both; }
+  .avs.is-sale { animation: avs-sale 300ms linear forwards; }
+}
+@keyframes avs-funde {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

@@ -1,9 +1,13 @@
+import { useRef } from 'react'
 import BalanceDisplay from './BalanceDisplay'
+import AvisoSaldo from './AvisoSaldo'
 import { SoundButton } from './SoundButton'
 import { IconoUsuario, IconoMas, IconoAjustes } from './IconosLobby'
 import { montoTexto } from '../config/tapetes'
 import { useIdioma } from '../hooks/useIdioma'
 import { useSounds } from '../hooks/useSounds'
+import { useAvisoSaldo } from '../hooks/useAvisoSaldo'
+import { vidaAviso } from '../hooks/avisoSaldoCore'
 
 // ── SAL-B1 · La barra superior, extraída para poder reusarla ────────────────
 // Rector: AJILEI_SAL-B1_Fase1_v1.0.md §3.1 — «barra superior del lobby (misma
@@ -62,12 +66,25 @@ export default function BarraSuperior({
   // `aria-haspopup="dialog"` donde no hay diálogo es mentirle a un lector de
   // pantalla, y es peor que no anunciar nada.
   ajustesExpandido,
+  aviso = null,
+  onAvisoFin,
 }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
+  // ── ECO-1c · El aviso de saldo ─────────────────────────────────────────
+  // Lámina `laminas/eco1c`. Mientras vive, la píldora enseña la cifra que
+  // CUENTA (de `aviso.desde` a `aviso.hasta`) y no el saldo, y su moneda
+  // brilla una vez. `aviso.clave` es la del texto; `{hc}` se queda como marca
+  // para que la cápsula lo pinte en oro.
+  const pildoraRef = useRef(null)
+  const monedaRef = useRef(null)
+  const textoAviso = aviso ? t(aviso.clave, { hc: '{hc}' }) : ''
+  const avisoVivo = useAvisoSaldo(aviso, vidaAviso(textoAviso.replace('{hc}', montoTexto(aviso?.monto ?? 0))), onAvisoFin)
+  const cifra = avisoVivo.vivo ? avisoVivo.cifra : saldo
+
   const hayHoja = typeof ajustesExpandido === 'boolean'
-  const sinCifra = !Number.isFinite(saldo)
+  const sinCifra = !Number.isFinite(cifra)
 
   return (
     <header className="lob-top">
@@ -84,6 +101,7 @@ export default function BarraSuperior({
       {/* La píldora NO es un botón: es un dato con un atajo dentro. El `+` sí
           lo es, y por eso es el único elemento pulsable de la caja. */}
       <div
+        ref={pildoraRef}
         className="lob-pildora"
         aria-label={t('lob.saldo.aria')}
         data-saldo={estadoSaldo}
@@ -101,8 +119,11 @@ export default function BarraSuperior({
             lámina, así que no se añade una segunda al lado: se envuelve la que
             hay. El lado lo fija `--ico` desde la hoja, no el atributo del
             componente — contrato de iconos. */}
-        <span className="lob-moneda">
-          <BalanceDisplay chips={sinCifra ? '—' : montoTexto(saldo)} size="icon" />
+        <span
+          ref={monedaRef}
+          className={`lob-moneda${avisoVivo.vivo ? ' avs-viva' : ''}${avisoVivo.brilla ? ' avs-brilla' : ''}`}
+        >
+          <BalanceDisplay chips={sinCifra ? '—' : montoTexto(cifra)} size="icon" />
         </span>
         <SoundButton className="lob-mas" data-accion="tienda" aria-label={t('lob.nav.tienda')} onClick={onTienda}>
           <IconoMas />
@@ -124,6 +145,17 @@ export default function BarraSuperior({
       >
         <IconoAjustes />
       </button>
+      {avisoVivo.vivo && (
+        <AvisoSaldo
+          texto={textoAviso}
+          monto={aviso.monto}
+          montoTexto={montoTexto(aviso.monto)}
+          pildoraRef={pildoraRef}
+          monedaRef={monedaRef}
+          saliendo={avisoVivo.saliendo}
+          onCerrar={avisoVivo.cerrar}
+        />
+      )}
     </header>
   )
 }

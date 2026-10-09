@@ -8,6 +8,12 @@
 //   ?apu=saldo:<n>     El saldo arranca en n (1e-i). Desde ECO-1b lo que se
 //                      siembra es la billetera FALSA del bypass
 //                      (`dev/billeteraFalsa.js`); sin bypass no siembra nada.
+//   ?apu=bolsillo:<n>  ECO-1c · tras SENTARSE, la billetera queda en n (un
+//                      ajuste del banco imitado, como `ajuste_admin`). Desde
+//                      P-6 un molde de humano cobra lo que sienta (media
+//                      apuesta en `quiebra`), y el bolsillo de los estados de
+//                      REC-2 ya no se puede sembrar por el saldo inicial sin
+//                      que Retar (con razón) impida sentarse.
 //   ?apu=allinIA       Una IA se sienta con la apuesta de mesa justa.
 //   ?apu=allinHumano   El humano se sienta con 1,5 apuestas.
 //   ?apu=recarga       El humano se sienta con 3 apuestas.
@@ -60,7 +66,8 @@ function pedido() {
 
 /**
  * Lo que `?apu=` pide para el saldo (la billetera falsa, ECO-1b), o `null`.
- * @returns {{saldo:number|null}|null}
+ * ECO-1c · y el bolsillo tras sentarse (`bolsillo:<n>`), o `null`.
+ * @returns {{saldo:number|null, bolsillo:number|null}|null}
  */
 export function siembraAPU() {
   // La puerta del build, EXPLÍCITA y en la primera línea. Delegarla en `pedido()`
@@ -75,11 +82,36 @@ export function siembraAPU() {
   if (partes === null) return null
   // `saldo:2400` → 2400. Cualquier otra cosa no siembra saldo, en vez de
   // sembrar un `NaN` que acabaría pintando «⟦saldo⟧» en la píldora de la barra.
+  let saldo = null
+  let bolsillo = null
   for (const p of partes) {
     const m = /^saldo:(\d+)$/.exec(p)
-    if (m) return { saldo: Number(m[1]) }
+    if (m && saldo === null) saldo = Number(m[1])
+    const b = /^bolsillo:(\d+)$/.exec(p)
+    if (b && bolsillo === null) bolsillo = Number(b[1])
   }
-  return { saldo: null }
+  return { saldo, bolsillo }
+}
+
+/**
+ * ECO-1c · P-6 · la entrada con la que un molde de HUMANO sienta al asiento 0,
+ * o `null` si no se pide ninguno. `App` se sienta en el servidor con ESTA
+ * cifra y no con la que se eligió en Retar: la mesa cobra lo que de verdad
+ * sentó, y al salir el saldo cuadra (el descuadre de la Fase 0 §I.2: entrada
+ * de 1.000, molde de 75, saldo 4.000 en vez de 4.925).
+ */
+export function entradaSembradaAPU(unit) {
+  if (!import.meta.env.DEV) return null
+  const partes = pedido()
+  if (partes === null || !(unit > 0)) return null
+  let factor = null
+  for (const parte of partes) {
+    const [nombre, arg] = parte.split(':')
+    const molde = MOLDES[nombre]
+    if (molde?.humano !== undefined) factor = molde.humano
+    if (nombre === 'sinRival' && arg === 'd12') factor = 1
+  }
+  return factor === null ? null : Math.round(unit * factor)
 }
 
 /**
@@ -90,34 +122,6 @@ export function siembraMesaAPU(estado) {
   if (!import.meta.env.DEV) return estado
   const partes = pedido()
   if (partes === null || !estado?.players) return estado
-
-  // Los cinco moldes de mesa de §3.7, con lo que cada uno siembra. `factor` es
-  // sobre la apuesta de mesa: 1 es «la apuesta justa», que tras el ante deja el
-  // asiento en cero y en all-in.
-  const MOLDES = {
-    // Una sola IA corta: se queda en all-in en el ante de la primera mano y sigue
-    // en la mano, disputando su capa. Los demás apuestan por encima de ella.
-    allinIA:      { ias: [1], factor: 1 },
-    // El humano con 1,5 apuestas: tras el ante le queda media, y media apuesta no
-    // cubre ni el ×1 de nadie. En cuanto alguien abre, su fila de acciones trae
-    // All-in en el sitio de Igualar.
-    allinHumano:  { humano: 1.5 },
-    // Bajo el listón de §5.1 (`pila < 5 × unit`) desde antes de la primera mano,
-    // así que la pregunta automática sale al cerrarla, gane o pierda.
-    recarga:      { humano: 3 },
-    // REC-2 · Media apuesta: no cubre el ante, así que la FORZOSA sale ya en
-    // `WAITING`, antes de la primera mano, sin jugar diez manos para perderlo
-    // todo. Con `saldo:` se elige el caso: `saldo:1600,quiebra` en la mesa de
-    // 100 con entrada al piso deja 600 en el bolsillo (caso 2) y
-    // `saldo:1000,quiebra` lo deja en 0 (caso 3).
-    quiebra:      { humano: 0.5 },
-    // Dos niveles de all-in por debajo del resto: el ante hace la primera capa y
-    // la IA de tres apuestas hace la segunda en cuanto la ronda pase de ahí.
-    capas:        { ias: [1], factor: 1, iasMedias: [2], factorMedio: 3 },
-    // §4.3: nadie con quien apostar. El humano se queda solo con fichas y las
-    // rondas de apuesta dejan de existir.
-    sinRival:     { todasIAS: 1 },
-  }
 
   const unit = estado.unit || 1
   // Se sientan a la vez la pila y la `entrada`: el resultado de la mesa se
@@ -161,4 +165,33 @@ export function siembraMesaAPU(estado) {
   }
 
   return players === estado.players ? estado : { ...estado, players }
+}
+
+// Los cinco moldes de mesa de §3.7, con lo que cada uno siembra. `factor` es
+// sobre la apuesta de mesa: 1 es «la apuesta justa», que tras el ante deja el
+// asiento en cero y en all-in. Fuera de las funciones desde ECO-1c, porque
+// `entradaSembradaAPU` lee los de humano.
+const MOLDES = {
+  // Una sola IA corta: se queda en all-in en el ante de la primera mano y sigue
+  // en la mano, disputando su capa. Los demás apuestan por encima de ella.
+  allinIA:      { ias: [1], factor: 1 },
+  // El humano con 1,5 apuestas: tras el ante le queda media, y media apuesta no
+  // cubre ni el ×1 de nadie. En cuanto alguien abre, su fila de acciones trae
+  // All-in en el sitio de Igualar.
+  allinHumano:  { humano: 1.5 },
+  // Bajo el listón de §5.1 (`pila < 5 × unit`) desde antes de la primera mano,
+  // así que la pregunta automática sale al cerrarla, gane o pierda.
+  recarga:      { humano: 3 },
+  // REC-2 · Media apuesta: no cubre el ante, así que la FORZOSA sale ya en
+  // `WAITING`, antes de la primera mano, sin jugar diez manos para perderlo
+  // todo. Con `saldo:` se elige el caso: `saldo:1600,quiebra` en la mesa de
+  // 100 con entrada al piso deja 600 en el bolsillo (caso 2) y
+  // `saldo:1000,quiebra` lo deja en 0 (caso 3).
+  quiebra:      { humano: 0.5 },
+  // Dos niveles de all-in por debajo del resto: el ante hace la primera capa y
+  // la IA de tres apuestas hace la segunda en cuanto la ronda pase de ahí.
+  capas:        { ias: [1], factor: 1, iasMedias: [2], factorMedio: 3 },
+  // §4.3: nadie con quien apostar. El humano se queda solo con fichas y las
+  // rondas de apuesta dejan de existir.
+  sinRival:     { todasIAS: 1 },
 }

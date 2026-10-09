@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   MOTIVOS, billeteraNueva, paraCuenta, debeLeer, alResponder, respuestaValida, saldoMostrado,
-  entrar as entrarCore, recargar as recargarCore, salir as salirCore,
+  tomarSaldo, esperarSaldo, soltarEspera, lecturaVigente,
 } from './billeteraCore'
 
 // ── ECO-1b · La fuente única del saldo en el cliente ────────────────────────
@@ -19,13 +19,18 @@ import {
 //   · cuando el jugador pide reintentar.
 // Sin cuenta no se llama nunca: `uid` llega `null` fuera de `COMPLETO`.
 //
+// ECO-1c · y lo que el servidor CONTESTA al mover dinero se toma sin releer
+// (`tomar`). Mientras se cobra una salida, `esperar` deja la píldora en «—»;
+// si la salida no contesta, `soltar` relee y enseña lo que haya.
+//
 // ── ESTADO DE PINTURA EN `useState`, CONTROL EN UN `ref` ────────────────────
-// Lo que se pinta (la cifra, el estado, el ajuste) es estado de React. Lo que
-// sólo decide si toca leer (si hay una lectura en vuelo, cuándo fue la última)
-// vive en un `ref`: escribirlo no es un render, y por eso el efecto de arranque
-// puede pedir la lectura sin un `setState` síncrono en su cuerpo, que es lo que
-// `react-hooks/set-state-in-effect` prohíbe. El estado sólo se toca en la
-// respuesta de la red y en los manejadores de evento.
+// Lo que se pinta (la cifra, el estado) es estado de React. Lo que sólo decide
+// si toca leer (si hay una lectura en vuelo, cuándo fue la última, la
+// generación) vive en un `ref`: escribirlo no es un render, y por eso el efecto
+// de arranque puede pedir la lectura sin un `setState` síncrono en su cuerpo,
+// que es lo que `react-hooks/set-state-in-effect` prohíbe.
+
+const controlNuevo = (uid) => ({ uid, enVuelo: false, ultima: null, fallo: false, generacion: 0 })
 
 /**
  * @param {{inicial:number|null, leer:() => Promise<{data:number|null, error:string|null}>}} api
@@ -33,7 +38,7 @@ import {
  */
 export function useBilletera(api, uid) {
   const [guardada, setGuardada] = useState(() => billeteraNueva(uid, api.inicial))
-  const control = useRef({ uid: null, enVuelo: false, ultima: null, fallo: false })
+  const control = useRef(controlNuevo(null))
 
   // La billetera de ESTA cuenta, derivada en cada render y no sincronizada con
   // un efecto: si la guardada es de otra cuenta, se pinta una nueva.
@@ -46,12 +51,15 @@ export function useBilletera(api, uid) {
     ctl.enVuelo = true
     ctl.ultima = ahora
     const deQuien = ctl.uid
+    const generacion = ctl.generacion
     api.leer().then((respuesta) => {
       ctl.enVuelo = false
       ctl.fallo = !respuestaValida(respuesta)
       // Una respuesta que llega cuando ya es otra la cuenta se tira: era de la
-      // anterior y aplicarla aquí le daría a una cuenta la cifra de otra.
+      // anterior y aplicarla aquí le daría a una cuenta la cifra de otra. Y una
+      // que salió antes de un `tomar` trae una cifra vieja (la generación).
       if (control.current.uid !== deQuien) return
+      if (!lecturaVigente(control.current, generacion)) return
       setGuardada((previa) => alResponder(previa, deQuien, respuesta))
     })
   }, [api])
@@ -60,7 +68,7 @@ export function useBilletera(api, uid) {
   // StrictMode monta dos veces: la segunda encuentra la misma cuenta y
   // `debeLeer(ARRANQUE)` dice que ya se pidió.
   useEffect(() => {
-    if (control.current.uid !== uid) control.current = { uid, enVuelo: false, ultima: null, fallo: false }
+    if (control.current.uid !== uid) control.current = controlNuevo(uid)
     if (!uid) return
     leer(MOTIVOS.ARRANQUE)
   }, [uid, leer])
@@ -78,25 +86,29 @@ export function useBilletera(api, uid) {
   const refrescar = useCallback(() => leer(MOTIVOS.REINTENTO), [leer])
   const alSaldoInsuficiente = useCallback(() => leer(MOTIVOS.INSUFICIENTE), [leer])
 
-  // ── El ajuste local · TRANSITORIO hasta ECO-1c ──────────────────────────
-  const entrar = useCallback((entrada) => {
-    setGuardada((previa) => entrarCore(paraCuenta(previa, uid), entrada))
+  // ── ECO-1c · Lo que contesta el servidor al mover dinero ────────────────
+  const tomar = useCallback((saldo) => {
+    control.current.generacion += 1
+    setGuardada((previa) => tomarSaldo(previa, uid, saldo))
   }, [uid])
-  const recargar = useCallback((monto) => {
-    setGuardada((previa) => recargarCore(paraCuenta(previa, uid), monto))
+  const esperar = useCallback(() => {
+    control.current.generacion += 1
+    setGuardada((previa) => esperarSaldo(previa, uid))
   }, [uid])
-  const salir = useCallback((fichas, entrada) => {
-    setGuardada((previa) => salirCore(paraCuenta(previa, uid), fichas, entrada))
-  }, [uid])
+  const soltar = useCallback(() => {
+    setGuardada((previa) => soltarEspera(previa, uid))
+    leer(MOTIVOS.REINTENTO)
+  }, [uid, leer])
 
   return {
     saldo: saldoMostrado(billetera),
     servidor: billetera.servidor,
     estado: billetera.estado,
+    pendiente: billetera.pendiente,
     refrescar,
     alSaldoInsuficiente,
-    entrar,
-    recargar,
-    salir,
+    tomar,
+    esperar,
+    soltar,
   }
 }

@@ -3,9 +3,9 @@
 // ajuste 2 del rector: esto sustituye SÓLO la fuente de la lectura. No fabrica
 // una billetera a mano: fabrica un CLIENTE falso con la forma del de Supabase
 // (`rpc('mi_billetera')`) y lo pasa por `crearBilleteraApi`, que es la capa
-// real. El núcleo (`hooks/billeteraCore.js`), el ajuste local y entrar /
-// recargar / salir son exactamente los de la app, así que el arnés prueba ese
-// código y no un doble suyo. Es el molde de `salasFixtures.js` (A2).
+// real. El núcleo (`hooks/billeteraCore.js`) es exactamente el de la app, así
+// que el arnés prueba ese código y no un doble suyo. Es el molde de
+// `salasFixtures.js` (A2).
 //
 // ── POR QUÉ HACE FALTA ─────────────────────────────────────────────────────
 // Con `VITE_AUTH_BYPASS` la app entra con el perfil ficticio `DevLocal`, que no
@@ -27,35 +27,80 @@
 // verdad y comprueba que `MARCA_BILLETERA_FALSA` no aparece en `dist/`: este
 // comentario es una intención, aquella prueba es la medida.
 
+// ── ECO-1c · YA NO SÓLO LEE: UN BANCO IMITADO POR CARGA DE PÁGINA ───────────
+// Desde la 1c la mesa contra las IAS se abre, se recarga y se cobra en el
+// servidor, así que el bypass necesita un servidor que se MUEVA. Es el banco
+// imitado (`dev/bancoImitado.js`, el contrato SQL de la 1c en JS), UNO por carga
+// de página, y lo comparten la billetera y las mesas: lo que una partida cobra
+// es lo que la píldora lee después. Sigue entrando por las capas reales
+// (`crearBilleteraApi`, `crearMesaIAApi`): lo que cambia es sólo la fuente.
+//
+// P-6 · si `?apu=` pide un molde de humano (`allinHumano`, `recarga`,
+// `quiebra`, `sinRival:d12`), el banco admite su entrada aunque no sea legal:
+// la mesa cobra lo que de verdad sentó (`entradaSembradaAPU`).
+
 import { crearBilleteraApi } from '../lib/billeteraApi'
-import { siembraAPU } from './siembraAPU'
+import { crearMesaIAApi } from '../lib/mesaIAApi'
+import { crearBanco } from './bancoImitado'
+import { siembraAPU, entradaSembradaAPU } from './siembraAPU'
 
 // La huella que busca la guardia sobre `dist/`. Si algún día aparece en el
 // bundle de producción, la puerta se ha roto.
 export const MARCA_BILLETERA_FALSA = 'ajilei:billetera-falsa'
+
+let banco = null
+
+/** El banco imitado del bypass, uno por carga de página, o `null` fuera de él. */
+export function bancoDelBypass() {
+  // ── La primera línea es la que borra el archivo en producción ────────────
+  if (!import.meta.env.DEV) return null
+  if (!import.meta.env.VITE_AUTH_BYPASS) return null
+  if (!banco) {
+    banco = crearBanco({
+      saldo: siembraAPU()?.saldo ?? 5000,
+      entradaDeMolde: entradaSembradaAPU(100) !== null,
+    })
+    // El arnés lo alcanza por aquí (C6, envejecer una mesa) sin ruta propia.
+    if (typeof window !== 'undefined') window.__ajileiBancoImitado = { marca: MARCA_BILLETERA_FALSA, banco }
+  }
+  return banco
+}
 
 /**
  * La billetera simulada, o `null` fuera de desarrollo con bypass.
  * @returns {{inicial:number, leer:Function}|null}
  */
 export function simulacionBilletera() {
-  // ── La primera línea es la que borra el archivo en producción ────────────
   if (!import.meta.env.DEV) return null
-  if (!import.meta.env.VITE_AUTH_BYPASS) return null
-
-  const saldo = siembraAPU()?.saldo ?? 5000
-  return crearBilleteraApi(clienteFalso(saldo), { inicial: saldo })
+  const b = bancoDelBypass()
+  if (!b) return null
+  return crearBilleteraApi(b, { inicial: b.saldo })
 }
 
-// El «servidor» de la billetera falsa. En la 1b el servidor no se mueve nunca
-// —las partidas contra las IAS van al ajuste local—, así que contesta siempre
-// la misma cifra, como haría `mi_billetera()` con una cuenta quieta.
-function clienteFalso(saldo) {
-  return {
-    marca: MARCA_BILLETERA_FALSA,
-    rpc(nombre) {
-      if (nombre !== 'mi_billetera') return Promise.resolve({ data: null, error: null })
-      return Promise.resolve({ data: saldo, error: null })
+/** La API de mesas contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionMesaIA() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  // `?apu=bolsillo:<n>`: tras la PRIMERA mesa abierta, la billetera queda en n
+  // (un ajuste del banco, como `ajuste_admin`), y la respuesta lo dice.
+  const bolsillo = siembraAPU()?.bolsillo ?? null
+  if (bolsillo === null) return crearMesaIAApi(b)
+  let hecho = false
+  return crearMesaIAApi({
+    async rpc(nombre, params) {
+      const r = await b.rpc(nombre, params)
+      if (!hecho && nombre === 'sentarse_ia' && r.data?.codigo === 'ok') {
+        hecho = true
+        b.ajusteAdmin(bolsillo - b.saldo)
+        return { ...r, data: { ...r.data, saldo: b.saldo } }
+      }
+      return r
     },
-  }
+  })
+}
+
+/** Para las pruebas: un banco nuevo en la siguiente llamada. */
+export function olvidarBancoDelBypass() {
+  banco = null
 }

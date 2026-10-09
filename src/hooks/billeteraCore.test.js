@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   CARGANDO, LISTO, ERROR, MOTIVOS, INTERVALO_PRIMER_PLANO_MS, SIN_JUICIO,
   billeteraNueva, paraCuenta, esSaldoValido, debeLeer, alResponder,
-  saldoMostrado, entrar, recargar, salir, saldoParaJuzgar,
+  saldoMostrado, saldoParaJuzgar, tomarSaldo, esperarSaldo, soltarEspera, lecturaVigente,
 } from './billeteraCore'
 import { crearBilleteraApi, ERROR_LECTURA } from '../lib/billeteraApi'
 import { simulacionBilletera } from '../dev/billeteraFalsa'
@@ -10,7 +10,7 @@ import { simulacionBilletera } from '../dev/billeteraFalsa'
 // ── ECO-1b · el núcleo de la billetera del cliente ──────────────────────────
 // Rector: AJILEI_ECO-1_Fase1b_v1.0.md §3.1. Sin jsdom (hallazgo de FRZ-1): el
 // hook es cableado y lo que aquí se sella son sus reglas — lectura, carga,
-// error, ajuste local y refresco.
+// error y refresco; desde la 1c, el saldo que devuelven las funciones de dinero.
 
 const UNO = 'aaaaaaaa-0000-4000-8000-000000000001'
 const DOS = 'aaaaaaaa-0000-4000-8000-000000000002'
@@ -18,7 +18,7 @@ const DOS = 'aaaaaaaa-0000-4000-8000-000000000002'
 describe('ECO-1b · lectura y carga', () => {
   it('una cuenta nueva nace cargando y sin cifra: nunca 0 ni 5.000', () => {
     const b = billeteraNueva(UNO)
-    expect(b).toEqual({ uid: UNO, servidor: null, estado: CARGANDO, ajuste: 0 })
+    expect(b).toEqual({ uid: UNO, servidor: null, estado: CARGANDO, pendiente: false })
     expect(saldoMostrado(b)).toBe(null)
   })
 
@@ -71,50 +71,49 @@ describe('ECO-1b · error', () => {
   })
 })
 
-describe('ECO-1b · el ajuste local (TRANSITORIO hasta ECO-1c)', () => {
+// ── ECO-1c · el ajuste local desaparece ─────────────────────────────────────
+// Lo que hacía el ajuste (bajar al sentarse, al recargar; subir al salir) lo
+// hace ahora el servidor, y la cifra que devuelve se toma tal cual.
+describe('ECO-1c · el saldo que devuelve el servidor', () => {
   const lista = () => alResponder(billeteraNueva(UNO), UNO, { data: 2500, error: null })
 
-  it('entrar resta la entrada, salir suma las fichas: las cuentas de saldoSesion', () => {
-    let b = entrar(lista(), 1000)
-    expect(saldoMostrado(b)).toBe(1500)
-    b = salir(b, 1300, 1000)
-    expect(saldoMostrado(b)).toBe(2800)
-    // El servidor no se movió: el ajuste es aparte.
-    expect(b.servidor).toBe(2500)
-    expect(b.ajuste).toBe(300)
+  it('tomarSaldo fija la cifra sin releer, y lo que no es saldo no toca nada', () => {
+    const b = tomarSaldo(lista(), UNO, 2000)
+    expect(saldoMostrado(b)).toBe(2000)
+    expect(tomarSaldo(b, UNO, null)).toBe(b)
+    expect(tomarSaldo(b, UNO, -5)).toBe(b)
   })
 
-  it('salir sin fichas válidas devuelve la entrada (era `App.jsx:543-547`)', () => {
-    const b = salir(entrar(lista(), 1000), undefined, 1000)
-    expect(saldoMostrado(b)).toBe(2500)
+  it('tomarSaldo saca del error: el servidor acaba de contestar', () => {
+    const mal = alResponder(billeteraNueva(UNO), UNO, { data: null, error: ERROR_LECTURA })
+    expect(tomarSaldo(mal, UNO, 1800)).toMatchObject({ estado: LISTO, servidor: 1800 })
   })
 
-  it('recargar resta, pero nunca deja la cifra bajo cero (era `Math.max(0, p − monto)`)', () => {
-    let b = entrar(lista(), 2000)          // 500
-    b = recargar(b, 300)                   // 200
-    expect(saldoMostrado(b)).toBe(200)
-    b = recargar(b, 900)                   // max(0, 200 − 900) = 0
-    expect(saldoMostrado(b)).toBe(0)
-    b = salir(b, 400, 2000)                // y la salida suma sobre 0, como antes
-    expect(saldoMostrado(b)).toBe(400)
+  it('mientras se cobra una salida la píldora enseña «—» y no se juzga', () => {
+    const b = esperarSaldo(lista(), UNO)
+    expect(saldoMostrado(b)).toBe(null)
+    expect(saldoParaJuzgar(saldoMostrado(b))).toBe(SIN_JUICIO)
+    // Una lectura en medio no quita el pendiente: su cifra es de antes del cobro.
+    expect(saldoMostrado(alResponder(b, UNO, { data: 2500, error: null }))).toBe(null)
+    // El saldo de la salida, sí.
+    expect(saldoMostrado(tomarSaldo(b, UNO, 3300))).toBe(3300)
   })
 
-  it('una relectura del servidor conserva el ajuste: billetera + ajuste', () => {
-    let b = entrar(lista(), 1000)
-    b = alResponder(b, UNO, { data: 2500, error: null })
-    expect(saldoMostrado(b)).toBe(1500)
-    // Un ajuste del administrador a la baja mientras se juega no da negativos.
-    b = alResponder(b, UNO, { data: 500, error: null })
-    expect(saldoMostrado(b)).toBe(0)
+  it('si la salida no contesta, se suelta la espera y vuelve la cifra conocida', () => {
+    expect(saldoMostrado(soltarEspera(esperarSaldo(lista(), UNO), UNO))).toBe(2500)
   })
 
-  it('la billetera es de UNA cuenta: otra cuenta empieza de cero, sin el ajuste de la anterior', () => {
-    const b = entrar(lista(), 1000)
-    const otra = paraCuenta(b, DOS)
-    expect(otra).toEqual(billeteraNueva(DOS))
+  it('una lectura pedida antes de un tomarSaldo ya no vale (la generación)', () => {
+    expect(lecturaVigente({ generacion: 3 }, 3)).toBe(true)
+    expect(lecturaVigente({ generacion: 4 }, 3)).toBe(false)
+    expect(lecturaVigente({}, 0)).toBe(true)
+  })
+
+  it('la billetera es de UNA cuenta: otra cuenta empieza de cero', () => {
+    const b = tomarSaldo(lista(), UNO, 2000)
+    expect(paraCuenta(b, DOS)).toEqual(billeteraNueva(DOS))
     expect(paraCuenta(b, UNO)).toBe(b)
-    // Y una respuesta para la otra cuenta tampoco hereda nada.
-    expect(saldoMostrado(alResponder(b, DOS, { data: 2500, error: null }))).toBe(2500)
+    expect(saldoMostrado(tomarSaldo(b, DOS, 700))).toBe(700)
   })
 })
 
@@ -220,7 +219,7 @@ describe('ECO-1b · la billetera falsa del bypass', () => {
     const respuesta = await api.leer()
     expect(respuesta).toEqual({ data: 5000, error: null })
     // Y el núcleo de la app la trata igual que a la real.
-    const b = entrar(alResponder(billeteraNueva(UNO, api.inicial), UNO, respuesta), 1000)
-    expect(saldoMostrado(b)).toBe(4000)
+    const b = alResponder(billeteraNueva(UNO, api.inicial), UNO, respuesta)
+    expect(saldoMostrado(b)).toBe(5000)
   })
 })
