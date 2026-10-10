@@ -43,6 +43,12 @@ const PROHIBIDAS = [
   // los estados de `?sal=`
   'opciones-fuera-alcance',
   'espera-fantasma',
+  // ECO-1e · A-1 · el Postgres del corredor de guiones (`scripts/guiones.mjs`)
+  // es una dependencia de DESARROLLO: 25 MB de WASM que nadie importa en `src/`.
+  // Estas tres no son de `src/dev/`: son el nombre del paquete y el de su clase.
+  '@electric-sql',
+  'pglite',
+  'PGlite',
 ]
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las

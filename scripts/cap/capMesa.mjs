@@ -135,8 +135,14 @@ const INICIO = ({ semilla, clave, sesion }) => {
  *               'despues' = el banco las aplica y la respuesta se pierde (503)
  *   retrasos    { nombreRpc: ms } → esa RPC tarda en contestar
  *   llamadas    lo anota la ruta: [{ nombre, params, codigo, t }] de las RPC de mesa
+ *
+ * ECO-1e (E6) · `perfil` (opcional) es el perfil que contesta `/rest/v1/profiles`:
+ * un objeto VIVO `{ id, username }` que la ruta lee en cada petición, así que
+ * el modo que lo pasa puede cambiar el nombre y recargar la página. Sin él,
+ * `PERFIL_CAP`, como siempre. Es la forma de medir el lobby con el peor nombre
+ * que admite la regla (`^[A-Za-z0-9_]{6,15}$`) sin un mando de URL en la app.
  */
-export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP, billetera = null } = {}) {
+export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP, billetera = null, perfil = PERFIL_CAP } = {}) {
   // `vista` es una clave de VISTAS_CAP o, para sondas fuera de lo sellado
   // (la variante C de la og-image), un objeto con la misma forma.
   // ARN-3c · D7 · `semilla`: `msg` juega en 4173 por aquí y no puede jugar
@@ -179,7 +185,7 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
       red.supabase.push(`${r.method()} ${u.pathname}`)
       const json = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
       if (u.pathname.startsWith('/rest/v1/profiles')) {
-        return json((r.headers()['accept'] || '').includes('vnd.pgrst.object') ? PERFIL_CAP : [PERFIL_CAP])
+        return json((r.headers()['accept'] || '').includes('vnd.pgrst.object') ? perfil : [perfil])
       }
       if (u.pathname.startsWith('/rest/v1/rpc/')) {
         // mi_sala y compañía: «no hay»; mi_billetera: el saldo (ECO-1b); las

@@ -15,8 +15,9 @@
 //            por defecto. ARN-3e retiró `all`: tardaba ~43 min, 40 de `apu`, y
 //            no era «todo»; `apu` se corre por su nombre.
 //   gate [tag] → DSK-G1: matriz matchMedia del gate + capturas WAITING (diff)
-//   lob    → LOB-1: el lobby post-login, en los 6 viewports de `gate`. OCHO
-//            puntos por celda: (1) `main.lobby` está y `main.welcome-screen` no;
+//   lob    → LOB-1: el lobby post-login, en los 6 viewports de `gate`, más
+//            cuatro celdas con el PEOR NOMBRE que admite la regla (ECO-1e, E6).
+//            DIEZ puntos por celda: (1) `main.lobby` está y `main.welcome-screen` no;
 //            (2) el CTA es alcanzable —dentro del viewport, ≥44px de alto—;
 //            (3) píldora de saldo, ⚙ y los tres de la barra inferior visibles y
 //            dentro; (3b) SIMETRÍA: los seis iconos de acción (⚙, trofeo, tienda,
@@ -29,8 +30,15 @@
 //            hoja ⚙ abre ANCLADA BAJO EL ENGRANAJE (borde superior por debajo de
 //            él, borde derecho a plomo ±2px), «Acerca de» despliega el CC BY y
 //            los créditos Pixabay, y `Escape` cierra; (7) el CTA lleva a la
-//            fila de retos de «Retar a las IAS». Deja capturas en `capturas-lob/`. Consola limpia
-//            entra en el veredicto.
+//            fila de retos de «Retar a las IAS»; (8) LA BARRA Y EL NOMBRE: la
+//            barra mide su hueco (ni ella, ni el lobby ni la página desbordan),
+//            el engranaje queda dentro y el nombre no pisa la píldora; en las
+//            cuatro celdas del nombre —360×640, 390×844, 412×915 y 640×360— se
+//            mide dos veces, con el nombre más estrecho (`iiiiii`) y con 15 «W»:
+//            el engranaje no se mueve, la píldora, la ficha y el engranaje no
+//            ceden, y el nombre cede con «…». Los puntos 1–7 de esas celdas
+//            corren con el nombre ancho. Deja capturas en `capturas-lob/`.
+//            Consola limpia entra en el veredicto.
 //   retar  → APU-1 1e: «Retar a las IAS» en los seis viewports — las cuatro
 //            filas, la cascada en los dos sentidos, el CTA que nombra las tres
 //            cifras, el gris por saldo con `?apu=saldo:<n>`, el contador de
@@ -327,7 +335,7 @@ import {
 // ARN-3c · D4 · el juicio de «¿cabe el texto en su caja?» (lo puro, probado).
 import { juzgaCajaTexto, juzgaSobrante } from './arnes/cajas.mjs'
 // ARN-3c · D7 · `lob` y `msg` entran al bundle real con la sesión simulada de CAP.
-import { contextoCap } from './cap/capMesa.mjs'
+import { contextoCap, PERFIL_CAP } from './cap/capMesa.mjs'
 // MOV-1b-a · las entradas del menú y qué está vivo en cada rama salen de la
 // MISMA fuente única que la app (mismo criterio que consultas.js, niveles.js y
 // tapetes.js). El modo `menu-movil` DERIVA de aquí lo que espera, así que
@@ -925,16 +933,75 @@ const LOB_ISO_RATIO = 60 / 90
 
 // Los puntos del modo, en un solo sitio: el veredicto de celda y la lista de
 // fallos se derivan de aquí, así que añadir uno no puede olvidarse en el otro.
-const LOB_PUNTOS = ['lob.1', 'lob.2', 'lob.3', 'lob.3b', 'lob.3c', 'lob.4', 'lob.5', 'lob.6', 'lob.7']
+const LOB_PUNTOS = ['lob.1', 'lob.2', 'lob.3', 'lob.3b', 'lob.3c', 'lob.4', 'lob.5', 'lob.6', 'lob.7', 'lob.8']
+
+// ── ECO-1e (E6) · EL PEOR NOMBRE POSIBLE ─────────────────────────────────────
+// La 1d encontró que la barra del lobby desbordaba con un nombre real: la
+// lámina la había medido con «DevLocal» y con «Jugador_CAP» (11 caracteres) ya
+// medía 344 px en un hueco de 335, descentrando el CTA (lob.3b) y la hoja ⚙
+// (lob.6). El arreglo vive en `constancia.css` (la barra mide su hueco y cede el
+// NOMBRE, con «…») y hasta la 1e lo vigilaba una casualidad: que el nombre del
+// arnés fuera largo.
+//
+// Ahora se mide con los dos extremos de la regla `^[A-Za-z0-9_]{6,15}$`: el
+// nombre más ESTRECHO (seis «i») como referencia y el más ANCHO (quince «W»).
+// El nombre lo contesta el Supabase falso del arnés (`contextoCap({ perfil })`,
+// un objeto vivo): se cambia y se recarga la página. Ningún mando en la app.
+const LOB_NOMBRE_ESTRECHO = 'iiiiii'
+const LOB_NOMBRE_ANCHO = 'WWWWWWWWWWWWWWW'
+// Los tres teléfonos en vertical y el apaisado más corto: donde la barra tiene
+// menos sitio. 390×844 y 412×915 no están en `LOB_VIEWPORTS`.
+const LOB_NOMBRE_VIEWPORTS = [
+  { w: 360, h: 640, note: 'portrait · nombre de 15' },
+  { w: 390, h: 844, note: 'portrait · nombre de 15' },
+  { w: 412, h: 915, note: 'portrait · nombre de 15' },
+  { w: 640, h: 360, note: 'móvil landscape · nombre de 15' },
+]
+const LOB_TOL_BARRA = 0.5
+
+// La barra superior, medida entera. Devuelve cajas y desbordes; no juzga.
+const LOB_BARRA = `(() => {
+  const caja = (el) => {
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    return { l: +b.left.toFixed(2), r: +b.right.toFixed(2), t: +b.top.toFixed(2), w: +b.width.toFixed(2), h: +b.height.toFixed(2) };
+  };
+  const top = document.querySelector('.lobby > .lob-top');
+  const lobby = document.querySelector('main.lobby');
+  const nombre = top ? top.querySelector('.lob-nombre') : null;
+  const cs = nombre ? getComputedStyle(nombre) : null;
+  return {
+    nombre: nombre ? nombre.textContent : null,
+    barra: caja(top),
+    perfil: caja(top && top.querySelector('.lob-perfil')),
+    cajaNombre: caja(nombre),
+    pildora: caja(top && top.querySelector('.lob-pildora')),
+    ficha: caja(top && top.querySelector('[data-accion="constancia"]')),
+    engranaje: caja(top && top.querySelector('[data-accion="ajustes"]')),
+    barraDesborda: top ? top.scrollWidth - top.clientWidth : null,
+    lobbyDesborda: lobby ? lobby.scrollWidth - lobby.clientWidth : null,
+    paginaDesborda: document.documentElement.scrollWidth - innerWidth,
+    ancho: innerWidth,
+    nombreRecortado: nombre ? nombre.scrollWidth > nombre.clientWidth : null,
+    elipsis: cs ? (cs.textOverflow === 'ellipsis' && cs.overflowX === 'hidden' && cs.whiteSpace === 'nowrap') : null,
+  };
+})()`
 
 async function runLob(browser) {
   const celdas = []
+  const lobCeldas = [
+    ...LOB_VIEWPORTS.map(vp => ({ vp, nombre15: false })),
+    ...LOB_NOMBRE_VIEWPORTS.map(vp => ({ vp, nombre15: true })),
+  ]
 
-  for (const vp of LOB_VIEWPORTS) {
+  for (const { vp, nombre15 } of lobCeldas) {
     // ARN-3c · D7 · al bundle real (4173) con la sesión simulada de CAP: la
     // vista entra tal cual (`{ w, h, dpr, movil }`), como midió AJF-1. La puerta
     // de consola sigue siendo la de siempre: solo `pageerror`.
-    const { ctx, page } = await contextoCap(browser, { w: vp.w, h: vp.h, dpr: 1, movil: false }, BASE_PROD)
+    // ECO-1e · las celdas del nombre traen su perfil (vivo): nacen con el
+    // estrecho, se mide la barra, y pasan al ancho para todo lo demás.
+    const perfil = nombre15 ? { ...PERFIL_CAP, username: LOB_NOMBRE_ESTRECHO } : null
+    const { ctx, page } = await contextoCap(browser, { w: vp.w, h: vp.h, dpr: 1, movil: false }, BASE_PROD, perfil ? { perfil } : {})
     const consola = []
     page.on('pageerror', e => consola.push(`pageerror: ${e.message}`))
     await page.goto(BASE_PROD)
@@ -944,7 +1011,62 @@ async function runLob(browser) {
     await page.waitForTimeout(400)
     await page.mouse.move(5, 5)
 
-    const c = { vp: `${vp.w}x${vp.h}`, note: vp.note }
+    let barraEstrecha = null
+    if (nombre15) {
+      await page.waitForFunction(n => document.querySelector('.lob-top .lob-nombre')?.textContent === n, LOB_NOMBRE_ESTRECHO)
+      barraEstrecha = await page.evaluate(LOB_BARRA)
+      perfil.username = LOB_NOMBRE_ANCHO
+      await page.reload()
+      await page.waitForSelector('main.lobby')
+      await page.waitForFunction(n => document.querySelector('.lob-top .lob-nombre')?.textContent === n, LOB_NOMBRE_ANCHO)
+      await page.waitForTimeout(400)
+      await page.mouse.move(5, 5)
+    }
+
+    const c = { vp: `${vp.w}x${vp.h}${nombre15 ? '·nombre15' : ''}`, note: vp.note }
+
+    // ── lob.8 · la barra y el nombre (ECO-1e, E6) ──────────────────────────
+    // Se mide ANTES que los demás puntos: lob.6 abre la hoja y lob.7 navega.
+    // En todas las celdas: nada desborda, el engranaje está dentro y el nombre
+    // no pisa la píldora. En las del nombre, además, contra la referencia del
+    // nombre estrecho: la barra y el engranaje no se mueven, la píldora, la
+    // ficha y el engranaje no ceden, y el nombre ancho, SI NO CABE, cede con
+    // «…» (el estrecho no cede nunca: si lo hiciera, la referencia no sería
+    // una referencia). A 640×360 los 15 «W» caben enteros (190 px) y no hay
+    // nada que ceder: por eso el modo exige, al final, que el «…» se haya
+    // ejercido en alguna celda, o lo declara sin cobertura.
+    {
+      const b = await page.evaluate(LOB_BARRA)
+      const tol = LOB_TOL_BARRA
+      const d = (x, y, k) => (x && y ? +Math.abs(x[k] - y[k]).toFixed(2) : null)
+      const medible = !!(b.barra && b.engranaje && b.pildora && b.cajaNombre && b.perfil)
+      const sinDesborde = b.barraDesborda <= 0 && b.lobbyDesborda <= 0 && b.paginaDesborda <= 0
+      const engranajeDentro = medible && b.engranaje.r <= b.barra.r + tol && b.engranaje.r <= b.ancho + tol && b.engranaje.l >= b.barra.l - tol
+      const nombreNoPisa = medible && b.cajaNombre.r <= b.pildora.l + tol && b.perfil.r <= b.pildora.l + tol
+      let par = null
+      if (nombre15) {
+        const e = barraEstrecha
+        par = {
+          estrecha: e,
+          dBarra: Math.max(d(b.barra, e.barra, 'l'), d(b.barra, e.barra, 'r'), d(b.barra, e.barra, 'w')),
+          dEngranaje: Math.max(d(b.engranaje, e.engranaje, 'l'), d(b.engranaje, e.engranaje, 'r'), d(b.engranaje, e.engranaje, 't')),
+          dAnchoPildora: d(b.pildora, e.pildora, 'w'),
+          dAnchoFicha: d(b.ficha, e.ficha, 'w'),
+          dAnchoEngranaje: d(b.engranaje, e.engranaje, 'w'),
+          // informativo: la píldora puede correrse con el nombre; el engranaje, no
+          dPildoraIzq: d(b.pildora, e.pildora, 'l'),
+        }
+        par.ok = !!(e.barra && e.engranaje && e.pildora && e.ficha && b.ficha)
+          && e.nombre === LOB_NOMBRE_ESTRECHO && e.nombreRecortado === false
+          && b.nombre === LOB_NOMBRE_ANCHO && b.elipsis === true
+          && par.dBarra <= tol && par.dEngranaje <= tol
+          && par.dAnchoPildora <= tol && par.dAnchoFicha <= tol && par.dAnchoEngranaje <= tol
+      }
+      c['lob.8'] = {
+        ...b, medible, sinDesborde, engranajeDentro, nombreNoPisa, par,
+        ok: medible && sinDesborde && engranajeDentro && nombreNoPisa && (par ? par.ok : true),
+      }
+    }
 
     // ── lob.1 · el lobby está, la Bienvenida no ────────────────────────────
     // La segunda mitad no es redundante: `WelcomeScreen.jsx` SIGUE en el árbol
@@ -1208,7 +1330,7 @@ async function runLob(browser) {
     await page.waitForSelector('main.lobby')
     await page.waitForTimeout(500)
     await page.mouse.move(5, 5)
-    c.shot = `${LOB_OUT_DIR}/lob_${vp.w}x${vp.h}.png`
+    c.shot = `${LOB_OUT_DIR}/lob_${vp.w}x${vp.h}${nombre15 ? '_nombre15' : ''}.png`
     await page.screenshot({ path: c.shot })
 
     celdas.push(c)
@@ -1216,12 +1338,16 @@ async function runLob(browser) {
   }
 
   const ok = celdas.every(c => c.ok)
-  console.log(`\n── lob · el lobby post-login ── ${celdas.filter(c => c.ok).length}/${celdas.length} celdas`)
+  // ECO-1e · el «…» tiene que haberse ejercido: si en ninguna celda del nombre
+  // los 15 «W» dejaron de caber, el punto no midió que el nombre CEDE.
+  const cedio = celdas.filter(c => c['lob.8'].par && c['lob.8'].nombreRecortado).map(c => c.vp)
+  const sinCobertura = cedio.length ? [] : ['lob.8 (el nombre de 15 cupo entero en todas las celdas: el «…» no se ejerció)']
+  console.log(`\n── lob · el lobby post-login ── ${celdas.filter(c => c.ok).length}/${celdas.length} celdas · el nombre de 15 cede en: ${cedio.join(', ') || 'ninguna'}`)
   for (const c of celdas) {
     const fallos = LOB_PUNTOS.filter(k => !c[k].ok)
     console.log(`  ${c.ok ? 'OK  ' : 'FALLA'} ${c.vp} (${c.note})${fallos.length ? ' · ' + fallos.join(', ') : ''}${c.consola.length ? ' · consola: ' + c.consola[0] : ''}`)
   }
-  return { celdas, ok }
+  return { celdas, ok, sinCobertura, nombreCede: cedio }
 }
 
 // ── APU-1 1e · modo `retar` · «Retar a las IAS» ─────────────────────────────
@@ -14195,7 +14321,11 @@ async function runRec(browser) {
 //            es la misma en las cuatro y cumple final = 3.700 − entrada + fichas.
 //            ECO-1c · y es la del SERVIDOR: el banco imitado del contexto
 //            anotó la entrada y la salida, y su saldo es esa cifra (sin el
-//            ajuste local de la 1b, que ya no existe)
+//            ajuste local de la 1b, que ya no existe).
+//            ECO-1e (E4) · se solapa A PROPÓSITO con `mesaia.1`
+//            (`scripts/eco/mesaia.mjs`): éste es el recorrido rápido de la 1b
+//            (una sola cifra, INV-46) y aquél, el del servidor de la 1c (el
+//            libro y la mesa). Se quedan los dos
 //   saldo.3  lectura lenta: hueco «—» sin cifra; la caja no salta al llegar el
 //            saldo; Retar sin gris ni aviso y con el CTA apagado mientras tanto
 //   saldo.4  lectura fallida: nunca «0», «5.000» ni otra cifra inventada; Retar

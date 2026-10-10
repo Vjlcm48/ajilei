@@ -8,14 +8,21 @@
 // usa las APIs de verdad (`lib/mesaIAApi`, `lib/billeteraApi`) y quien contesta
 // es el banco imitado de cada contexto (`contextoCap`, ECO-1c), el contrato de
 // la migración eco1c en JS. El punto 3 va al servidor de desarrollo con bypass,
-// porque la victoria sólo se fuerza con `?cel` (DEV).
+// porque la victoria sólo se fuerza con un molde de `?apu=` (DEV).
 //
 //   mesaia.1  sentarse descuenta la entrada y salir cobra: la píldora dice la
-//             cifra del servidor en las cuatro pantallas, sin relecturas
+//             cifra del servidor en las cuatro pantallas, sin relecturas.
+//             ECO-1e (E4) · se solapa A PROPÓSITO con `saldo.2` de diagDSK:
+//             `saldo` es el recorrido rápido de la 1b (una sola cifra, INV-46)
+//             y éste, el del servidor de la 1c (el libro y la mesa). Se quedan
+//             los dos
 //   mesaia.2  recargar descuenta y las fichas llegan SÓLO tras la confirmación;
 //             con la respuesta perdida, se dice y «Reintentar» la cobra una vez
 //   mesaia.3  salir de una mesa ganada cobra una vez y la celebración cuenta
-//             el saldo real (C8)
+//             el saldo real (C8, Reglas §9). ECO-1e (E1) · mide EL COBRO: una
+//             mano ganada y una recarga antes de la victoria, para que «Saldo
+//             actual» = saldo inicial − entrada − recargas + cobro no pueda
+//             coincidir con ninguna otra cifra del recorrido (ver el bloque)
 //   mesaia.4  partida cortada: (a) al recargar la página, el arranque la recoge
 //             y el aviso de saldo lo dice; (b) con la mesa en otro dispositivo,
 //             sentarse la cierra y el aviso sale en Retar antes de la mesa
@@ -23,20 +30,26 @@
 //   mesaia.6  doble toque al sentarse y al salir: un solo movimiento de cada
 //   mesaia.7  avisos de pila que fallan (respuesta perdida) se reintentan y
 //             llegan una vez y en orden: el récord cuenta cada mano una vez
-//   mesaia.8  los huecos entre avisos de una partida jugada (respaldo de N = 10
-//             min, P-4): informativo, verde si ninguno pasa de N
-//   mesaia.9  P-2 · la salida espera a la recarga en vuelo y, si entra, la lleva:
+//   mesaia.8  REGLA SELLADA (P-4 de la 1c, INV-48): una partida que se juega
+//             nunca calla N = 10 min, el silencio tras el que otro dispositivo
+//             la recoge. Vigila y tiñe: rojo si algún hueco entre avisos
+//             consecutivos llega a N, o si no hubo huecos que medir
+//   mesaia.9  P-2 de la 1c (INV-53) · la salida espera a la recarga en vuelo y,
+//             si entra, la lleva:
 //             (a) la ✕ con la recarga en vuelo 3 s; (b) la recarga 14 s sin
 //             contestar: a los 10 s la tarjeta lo dice, «Reintentar» manda el
 //             mismo seq, la ✕ sigue viva y «Salir con mis fichas» sale. En los
 //             dos, el libro: una recarga, una salida con fichas + recarga, y el
 //             saldo final el de quien no recargó
 //   consola   sin errores (los 503 que provoca el propio arnés no cuentan)
-//   ventana60 ECO-1d · informativo: el máximo de llamadas de cada función de
-//             dinero en cualquier ventana de 60 s de un mismo contexto, contra
-//             su límite por minuto (`LIMITES_SQL`). Es la medida que el plan del
-//             STOP-1 de la 1d prometió para el informe; marca las que pasen de
-//             la MITAD de su tope (si alguna lo hace, se para y se dice).
+//   ventana60 ECO-1e (E3) · VIGILA Y TIÑE: el máximo de llamadas de cada función
+//             de dinero en cualquier ventana de 60 s de un mismo contexto,
+//             contra su límite por minuto (`LIMITES_SQL`). MÁS DE LA MITAD del
+//             tope = rojo. Es la guardia permanente del margen de K7: un
+//             cliente legítimo nunca toca un límite, y el arnés juega más
+//             deprisa que una persona. `informar_pila` no lleva tope y sólo se
+//             reporta. Cuenta los contextos del preview y el banco del bypass
+//             de `mesaia.3`. Si sale rojo, el umbral NO se sube: es un hallazgo.
 //
 // ── `revive` · D-1 (C9) ─────────────────────────────────────────────────────
 // Servidor de desarrollo con bypass: `?apu=saldo:5000,allinIA,gana`, mesa de
@@ -53,6 +66,9 @@ import { LIMITES_SQL } from '../../src/dev/bancoImitado.js'
 
 const VP = { w: 412, h: 915, dpr: 1, movil: true }
 const SALDO = 5000
+// ECO-1e (E1) · la billetera de `mesaia.3`: ni la del arnés ni una cifra que
+// el cobro pueda devolver. Es la misma que sirve el modo `saldo`.
+const SALDO_3 = 3700
 const N_MS = 10 * 60 * 1000
 const numeroDe = (t) => Number(String(t ?? '').replace(/\D/g, '')) || 0
 const RUIDO_ARNES = /status of 503|Failed to load resource/
@@ -238,37 +254,116 @@ export async function runMesaIA(browser, { base, baseDev, externo = false, out =
     await ctx.close()
   }
 
-  // ── mesaia.3 · dev con bypass: la victoria con `?cel` ─────────────────────
+  // ── mesaia.3 · dev con bypass: la mesa ganada y su cobro (ECO-1e, E1) ─────
+  // Hasta la 1e entraba con `?cel`: los rivales nacen sin fichas, la mesa acaba
+  // sin jugar una mano, el cobro ES la entrada y el saldo vuelve a la cifra de
+  // partida. Exigir «Saldo actual = 5.000» pasaba igual si la celebración
+  // pintara el saldo de antes de sentarse: medía el saldo inicial, no el cobro.
+  //
+  // Ahora la receta de `revive` (`allinIA,gana`), mesa de 2, Básico al piso, con
+  // una billetera que no es la del arnés. En papel (mesa de 50, entrada 500):
+  //   3.700 → sentado 3.200 (pila 500) → gana la mano, pila 550 → recarga 500:
+  //   billetera 2.700, pila 1.050 → «Siguiente mano» → victoria, cobro 1.050
+  //   → «Saldo actual» 3.750 = 3.700 − 500 − 500 + 1.050.
+  // Ninguna cifra se clava: entrada, recargas y cobro se LEEN del libro, la pila
+  // de la mesa, y la identidad se exige entera. Y el punto se niega a pasar si
+  // el esperado coincide con otra cifra del recorrido (el saldo de antes, el de
+  // sentado, el de tras recargar, la pila, la entrada o los 5.000 del arnés):
+  // una vara que no puede distinguirlas no mide nada.
   if (externo) {
     sinCobertura.push('mesaia.3 (con --servidor=externo no hay servidor de desarrollo propio)')
     puntos['mesaia.3'] = { ok: true, sinCobertura: true }
   } else {
     const page = await browser.newPage({ viewport: { width: VP.w, height: VP.h } })
     page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`))
-    await page.goto(`${baseDev}/?cel&apu=saldo:${SALDO}`)
-    await recorrerRuta(page, 2, 'basico', 0, 'piso')
-    await page.click('button:has-text("Iniciar mano")')
-    await page.waitForSelector('.cel-screen', { timeout: 20000 })
-    // El relato del saldo termina hacia los 8 s (Victory_Celebration §4.2).
-    await page.waitForTimeout(9500)
-    const celeb = await page.evaluate(() => ({
-      saldo: document.querySelector('.cel-saldo-num')?.textContent?.trim() ?? null,
-      banco: window.__ajileiBancoImitado?.banco?.saldo ?? null,
-      salidas: window.__ajileiBancoImitado?.banco?.libro.filter((l) => l.tipo === 'salida_ia').length ?? null,
-    }))
-    await page.screenshot({ path: `${out}/mesaia3_celebracion.png` })
-    await page.click('.cel-screen button:has-text("Salir de la mesa")')
-    await page.waitForSelector('[data-accion="reto"]')
+    const banco = () => page.evaluate(() => {
+      const b = window.__ajileiBancoImitado?.banco
+      return b ? {
+        saldo: b.saldo, libro: b.libro.map((l) => ({ tipo: l.tipo, monto: l.monto })), intentos: b.intentos,
+        pila: b.mesas.find((m) => m.estado === 'abierta')?.pila_informada ?? null,
+      } : null
+    })
+    await page.goto(`${baseDev}/?apu=saldo:${SALDO_3},allinIA,gana`)
+    await page.waitForSelector('main.lobby .lob-pildora')
     await pildoraLista(page)
-    const tras = await page.evaluate(() => ({
-      pildora: document.querySelector('.lob-pildora .bd-num')?.textContent?.trim() ?? null,
-      salidas: window.__ajileiBancoImitado?.banco?.libro.filter((l) => l.tipo === 'salida_ia').length ?? null,
-      saldo: window.__ajileiBancoImitado?.banco?.saldo ?? null,
-    }))
+    const antes = numeroDe((await leerPildora(page))?.texto)
+    const ruta = await recorrerRuta(page, 2, 'basico', 0, 'piso')
+    const entradaRuta = ruta.monto * 10
+    const sentado = await banco()
+    const mano = await jugarMano(page, nuevoJuego(), { cada: 0, muestraFinal: false })
+    // La recarga voluntaria, para que el término «− recargas» esté vivo. La pila
+    // se lee con la tarjeta YA abierta (VIS-3c, como en mesaia.2).
+    const hay = await page.locator('[data-accion="recargar"]').isVisible().catch(() => false)
+    let pila = null, pilaFinal = null, trasRecarga = null
+    if (hay) {
+      await page.click('[data-accion="recargar"]')
+      await page.waitForSelector('[data-accion="recarga-si"]')
+      await page.waitForTimeout(300)
+      pila = await fichasMesa(page)
+      await page.click('[data-accion="recarga-si"]')
+      await page.waitForSelector('[data-accion="recarga"]', { state: 'detached', timeout: 10000 })
+      await page.waitForTimeout(700)
+      pilaFinal = await fichasMesa(page)
+      trasRecarga = (await banco())?.saldo ?? null
+    } else {
+      // Sin tarjeta que abrir, la mesa retiene el pozo en la cifra que pinta:
+      // la pila es la última que la mesa avisó al servidor. La identidad se
+      // juzga igual, con recargas = 0, y el hueco se declara (código 1).
+      await page.waitForTimeout(1500)
+      pila = pilaFinal = (await banco())?.pila ?? null
+      sinCobertura.push('mesaia.3 (no salió la recarga voluntaria: la identidad se juzgó con recargas = 0)')
+    }
+    await page.locator('button:has-text("Siguiente mano")').click().catch(() => {})
+    const victoria = await page.waitForSelector('.cel-screen', { timeout: 20000 }).then(() => true).catch(() => false)
+    // El relato del saldo termina hacia los 8 s (Victory_Celebration §4.2).
+    if (victoria) await page.waitForTimeout(9500)
+    const enCeleb = await banco()
+    const celeb = {
+      saldo: victoria ? await page.evaluate(() => document.querySelector('.cel-saldo-num')?.textContent?.trim() ?? null) : null,
+      banco: enCeleb?.saldo ?? null,
+      salidas: enCeleb?.libro.filter((l) => l.tipo === 'salida_ia').length ?? null,
+    }
+    await page.screenshot({ path: `${out}/mesaia3_celebracion.png` })
+    let tras = { pildora: null, salidas: null, saldo: null }
+    let fin = enCeleb
+    if (victoria) {
+      await page.click('.cel-screen button:has-text("Salir de la mesa")')
+      await page.waitForSelector('[data-accion="reto"]')
+      await pildoraLista(page)
+      fin = await banco()
+      tras = {
+        pildora: (await leerPildora(page))?.texto ?? null,
+        salidas: fin?.libro.filter((l) => l.tipo === 'salida_ia').length ?? null,
+        saldo: fin?.saldo ?? null,
+      }
+    }
+    // El banco del bypass también cuenta en la ventana de 60 s.
+    vistas.push({ llamadas: (fin?.intentos ?? []).map((x) => ({ nombre: x.funcion, t: x.en })) })
+    const de = (tipo) => (fin?.libro ?? []).filter((l) => l.tipo === tipo)
+    const entrada = -(de('entrada_ia')[0]?.monto ?? NaN)
+    const recargas = -de('recarga_ia').reduce((s, l) => s + l.monto, 0)
+    const cobro = de('salida_ia')[0]?.monto ?? NaN
+    const esperado = SALDO_3 - entrada - recargas + cobro
+    // Las otras cifras del recorrido: el esperado no puede ser ninguna.
+    const otras = {
+      antesDeSentarse: SALDO_3, sentado: SALDO_3 - entrada, trasRecargar: SALDO_3 - entrada - recargas,
+      pila, pilaFinal, entrada, arnes: SALDO,
+    }
+    const coincide = Object.entries(otras).filter(([, v]) => v === esperado).map(([k]) => k)
     puntos['mesaia.3'] = {
-      celeb, tras,
-      ok: celeb.banco === SALDO && numeroDe(celeb.saldo) === celeb.banco && celeb.salidas === 1
-        && tras.salidas === 1 && tras.saldo === SALDO && tras.pildora === montoTexto(SALDO),
+      saldoInicial: SALDO_3, antes, entradaRuta, entrada, recargas, pila, pilaFinal, cobro, esperado, trasRecarga,
+      sentado: sentado?.saldo ?? null, manoCerrada: mano.cerrada, voluntaria: hay, victoria, celeb, tras, otras, coincide,
+      libro: (fin?.libro ?? []).map((l) => `${l.tipo} ${l.monto}`),
+      ok: antes === SALDO_3 && mano.cerrada === true && victoria
+        // el libro: una entrada, una salida y, si hubo tarjeta, una recarga
+        && de('entrada_ia').length === 1 && entrada === entradaRuta && sentado?.saldo === SALDO_3 - entrada
+        && (hay ? de('recarga_ia').length === 1 && recargas > 0 && trasRecarga === SALDO_3 - entrada - recargas
+          && pilaFinal === pila + recargas : de('recarga_ia').length === 0)
+        && de('salida_ia').length === 1 && cobro === pilaFinal
+        // la identidad contable, por los tres caminos que la pintan
+        && Number.isFinite(esperado) && coincide.length === 0
+        && celeb.salidas === 1 && celeb.banco === esperado && numeroDe(celeb.saldo) === esperado
+        && tras.salidas === 1 && tras.saldo === esperado && tras.pildora === montoTexto(esperado),
     }
     await page.close()
   }
@@ -437,8 +532,9 @@ export async function runMesaIA(browser, { base, baseDev, externo = false, out =
     const ts = avisos.filter((l) => !String(l.codigo).startsWith('corte')).map((l) => l.t)
     const huecos = ts.slice(1).map((t, i) => t - ts[i]).sort((x, y) => x - y)
     const p = (q) => huecos.length ? huecos[Math.min(huecos.length - 1, Math.floor(q * huecos.length))] : null
+    // Regla sellada (P-4 de la 1c, INV-48): vigila y tiñe.
     puntos['mesaia.8'] = {
-      informativo: true, avisos: ts.length, manos, maxMs: huecos.at(-1) ?? null, p95Ms: p(0.95), medianaMs: p(0.5),
+      avisos: ts.length, manos, maxMs: huecos.at(-1) ?? null, p95Ms: p(0.95), medianaMs: p(0.5),
       nMs: N_MS, ok: huecos.length > 0 && huecos.at(-1) < N_MS,
     }
     await page.screenshot({ path: `${out}/mesaia7.png` })
@@ -542,11 +638,19 @@ export async function runMesaIA(browser, { base, baseDev, externo = false, out =
 
   puntos.consola = { errores, ok: errores.length === 0 }
   {
+    // ECO-1e (E3) · más de la mitad del tope en una ventana de 60 s = rojo.
     const max = ventana60(vistas.map((b) => b.llamadas))
-    const sobreMitad = Object.entries(max).filter(([n, v]) => LIMITES_SQL[n] !== undefined && v > LIMITES_SQL[n] / 2).map(([n]) => n)
-    // Informativo: no tiñe el veredicto (una partida del arnés es más rápida
-    // que una humana); lo que pase de la mitad va al informe.
-    puntos.ventana60 = { max, limites: { ...LIMITES_SQL }, sobreMitad, informativo: true, ok: true }
+    const tabla = Object.entries(LIMITES_SQL).map(([funcion, tope]) => ({
+      funcion, max: max[funcion] ?? 0, tope, mitad: tope / 2, sobreMitad: (max[funcion] ?? 0) > tope / 2,
+    }))
+    const sobreMitad = tabla.filter((f) => f.sobreMitad).map((f) => f.funcion)
+    puntos.ventana60 = {
+      max, limites: { ...LIMITES_SQL }, tabla, sobreMitad, sinTope: { informar_pila: max.informar_pila ?? 0 },
+      ok: sobreMitad.length === 0,
+    }
+    console.log('── MESAIA · ventana de 60 s (máximo / tope; rojo por encima de la mitad)')
+    for (const f of tabla) console.log(`   ${f.sobreMitad ? '✗' : '✓'} ${f.funcion.padEnd(16)} ${String(f.max).padStart(2)} / ${f.tope}  (mitad ${f.mitad})`)
+    console.log(`   · informar_pila    ${String(max.informar_pila ?? 0).padStart(2)} / sin tope (P-1 de la 1d): sólo se reporta`)
   }
   const verde = Object.values(puntos).every((x) => x.ok === true)
   const resumen = `${verde ? (sinCobertura.length ? 'SIN COBERTURA' : 'VERDE') : 'ROJO'} · ` +
