@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run scripts/ src/",
-    "banco:verificar": "node scripts/bancoVerificar.mjs"
+    "banco:verificar": "node scripts/bancoVerificar.mjs",
+    "guiones": "node scripts/guiones.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
@@ -18,6 +19,7 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

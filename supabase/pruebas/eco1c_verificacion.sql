@@ -1,6 +1,17 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- AJILEI · ECO-1 · Fase 1c — Verificación de las mesas contra las IAS
 -- ═══════════════════════════════════════════════════════════════════════════
+-- ▓▓ RETIRADO DESDE LA 1d (ECO-1e, E10): ESTE GUION NO SE VUELVE A CORRER ▓▓
+-- Tras la migración de la 1d corta en su prueba 9: corre en UNA transacción,
+-- `now()` no se mueve, sienta 16 veces a la misma cuenta y la 11.ª es `limite`
+-- (informe de la 1d, §1.1). No es una regresión. Sus pruebas críticas —un
+-- cobro por mesa, el techo, el libro cuadra— viven en `eco1d_verificacion.sql`
+-- (22 y 23); el resto lo vigilan `src/dev/bancoImitado.test.js` y
+-- `diagDSK mesaia`. `npm run guiones` no lo corre, y la consulta guardada
+-- «ECO-1c · verificación» del SQL Editor tampoco se vuelve a correr. Se queda
+-- en el repo como historia de la corrida 19/19 en la base real (informe de la 1c), y como base si
+-- una ficha lo adapta para que «pase un minuto» (candidato para la 1g).
+--
 -- Ficha AJILEI_ECO-1_Fase1c_v1.0.md §2.1. Migración que verifica:
 -- supabase/migrations/20261008220239_eco1c_mesas_ia.sql.
 --
