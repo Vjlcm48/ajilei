@@ -72,7 +72,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
 
-export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, onJugarIA, onJugarPvP, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -190,6 +190,10 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
         estadoSaldo={billetera?.estado}
         aviso={aviso}
         onAvisoFin={onAvisoFin}
+        // ECO-1d · la ficha de la constancia vive SÓLO en el lobby (lámina
+        // `laminas/eco1d`, ubicación A). `null` mientras no se sabe: caja
+        // reservada.
+        constancia={constancia}
         onPerfil={pronto}
         onTienda={pronto}
         onAjustes={() => setHojaAbierta(true)}

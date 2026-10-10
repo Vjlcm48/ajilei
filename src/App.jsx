@@ -26,7 +26,7 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia } from './dev/billeteraFalsa'
 // ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
 // mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
 // que siembran los moldes de humano en desarrollo (P-6).
@@ -34,7 +34,12 @@ import { mesaIAApi } from './lib/mesaIAApi'
 import { crearControlMesa } from './lib/controlMesaIA'
 import { idDispositivo } from './lib/dispositivo'
 import { entradaSembradaAPU } from './dev/siembraAPU'
-import { avisoDeVuelta, TIEMPOS_AVISO } from './hooks/avisoSaldoCore'
+import { avisoDeVuelta, TIEMPOS_AVISO, encolarAviso, sacarAviso, sustituirFila } from './hooks/avisoSaldoCore'
+// ECO-1d · la constancia: la API de `marcar_ingreso`, cuándo preguntar y la
+// ficha del lobby (lámina `laminas/eco1d`, ubicación A). Y el límite al sentarse.
+import { constanciaApi } from './lib/constanciaApi'
+import { debeMarcar, fichaTrasMarcar, soltarAvisoDeFicha } from './hooks/constanciaCore'
+import { LIMITE_SENTARSE } from './hooks/mesaIACore'
 // `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
 // `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
 // sigue viva y exportada en el hook, que es donde trabaja.
@@ -50,6 +55,8 @@ import { useEsperaVisible } from './hooks/useEsperaVisible'
 // cada vez. `fabricaMesa` da un thenable SÍNCRONO cuando el chunk ya llegó, así
 // que con la precarga hecha `lazy` no suspende (Fase 0 §B4, H3d-2).
 const GameTable = lazy(fabricaMesa)
+// ECO-1d · aplica `f` a la ficha de la constancia guardada como `{ uid, ficha }`.
+const conFicha = (f) => (c) => (c ? { ...c, ficha: f(c.ficha) } : c)
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
 // CUÁNDO: una vez por sesión, en el arranque, y ANTES de intentar nada (§4.1).
 import {
@@ -252,8 +259,33 @@ function App() {
   const enviandoRef = useRef(false)
   // El aviso de saldo (lámina `laminas/eco1c`): el dinero que vuelve FUERA de
   // la mesa, anclado a la píldora. Lo pintan el lobby y Retar.
-  const [avisoSaldo, setAvisoSaldo] = useState(null)
-  const finAviso = useCallback((id) => setAvisoSaldo((a) => (a && a.id === id ? null : a)), [])
+  //
+  // ECO-1d · ES UNA FILA (avisoSaldoCore §«la fila»). La recogida y la
+  // constancia del mismo arranque van una tras otra, nunca a la vez, y la
+  // píldora cuenta cada subida. C5 y C6 —atados a un cambio de pantalla— la
+  // SUSTITUYEN, y arrancan desde la cifra que se está viendo. Entrar en la mesa
+  // la vacía, como antes vaciaba el aviso.
+  //
+  // `constancia` es la ficha del lobby, con el uid de quien la ganó: así otra
+  // cuenta en la misma carga de página no hereda la de la anterior, y no hace
+  // falta ningún `setState` en un efecto para olvidarla.
+  const [filaAvisos, setFilaAvisos] = useState([])
+  const avisoSaldo = filaAvisos[0] ?? null
+  const [constancia, setConstancia] = useState(null)   // { uid, ficha } | null
+  const finAviso = useCallback((id) => {
+    setFilaAvisos((f) => sacarAviso(f, id))
+    setConstancia(conFicha((ficha) => (ficha?.avisoId === id ? soltarAvisoDeFicha(ficha) : ficha)))
+  }, [])
+  const encolarAvisoSaldo = useCallback((a) => setFilaAvisos((f) => encolarAviso(f, a)), [])
+  const sustituirAvisos = useCallback((a) => setFilaAvisos(sustituirFila(a)), [])
+  const vaciarAvisos = useCallback(() => {
+    setFilaAvisos([])
+    setConstancia(conFicha(soltarAvisoDeFicha))
+  }, [])
+  const [apiConstancia] = useState(() => simulacionConstancia() ?? constanciaApi)
+  // Lo que decide si toca preguntar (constanciaCore.debeMarcar). Es un ref: no
+  // pinta nada, y lo leen el arranque y la vuelta a primer plano.
+  const marca = useRef({ ultimoDia: null, enVuelo: false, ultimaLlamada: null })
 
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
   // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
@@ -326,27 +358,60 @@ function App() {
   // recargar la página) o si lleva más de 10 min sin avisos (de otro). Si volvió
   // algo —o la mesa se cerró sin fichas—, el aviso de saldo lo dice (escena a).
   // Con red caída no se hace nada: la recogerá la regla C4 al sentarse.
+  //
+  // ── ECO-1d · LA CONSTANCIA, DETRÁS DE LA RECOGIDA ─────────────────────────
+  // `marcar_ingreso` va DESPUÉS de `recoger_mesa_ia`, una detrás de otra: así
+  // el servidor aplica primero la recogida y después la constancia, cada
+  // respuesta trae su saldo y los dos avisos se encadenan solos (el segundo
+  // empieza donde acabó el primero). Si la recogida no contesta, la constancia
+  // sale igual. El cobro entra en la fila con su aviso; la ficha del lobby
+  // cambia con la respuesta. Sin cobro, el saldo no se toca: la billetera ya
+  // tiene la cifra, y una mesa que se estuviera cerrando no pierde su «—».
+  const marcar = useCallback((uid) => {
+    const m = marca.current
+    m.enVuelo = true
+    m.ultimaLlamada = Date.now()
+    return apiConstancia.marcar().then((r) => {
+      m.enVuelo = false
+      if (r.dia) m.ultimoDia = r.dia
+      if (r.codigo !== 'ok' && r.codigo !== 'ya_marcado') return
+      let aviso = null
+      if (r.cobrado > 0 && Number.isFinite(r.saldo)) {
+        aviso = avisoDeVuelta(r, { conMonto: 'aviso.saldo.constancia', cero: 'aviso.saldo.constancia' })
+        tomarSaldo(r.saldo)
+        encolarAvisoSaldo(aviso)
+      }
+      setConstancia((c) => ({ uid, ficha: fichaTrasMarcar(c?.uid === uid ? c.ficha : null, r, aviso?.id ?? null) }))
+    })
+  }, [apiConstancia, tomarSaldo, encolarAvisoSaldo])
+
   const arranqueMesa = useRef(null)
   useEffect(() => {
     const decision = arranqueDeSesion(arranqueMesa.current, uidCompleto)
     arranqueMesa.current = decision.arrancado
     if (!decision.arrancar) return
+    const uid = uidCompleto
+    marca.current = { ultimoDia: null, enVuelo: false, ultimaLlamada: null }
     apiMesa.recoger(idDispositivo()).then((r) => {
       if (r.codigo !== 'recogida') return
       tomarSaldo(r.saldo)
-      setAvisoSaldo(avisoDeVuelta(r, { conMonto: 'aviso.saldo.recogida', cero: 'aviso.saldo.recogida.cero' }))
-    })
-  }, [uidCompleto, apiMesa, tomarSaldo])
+      encolarAvisoSaldo(avisoDeVuelta(r, { conMonto: 'aviso.saldo.recogida', cero: 'aviso.saldo.recogida.cero' }))
+    }).then(() => marcar(uid))
+  }, [uidCompleto, apiMesa, tomarSaldo, encolarAvisoSaldo, marcar])
 
   // Volver a primer plano reintenta lo que la mesa tenga pendiente (un aviso,
   // una recarga, la salida) sin esperar a la cuenta atrás del reintento.
+  // ECO-1d · y pregunta por la constancia si cambió el día de Chicago (o el
+  // arranque no la obtuvo), nunca en ráfaga: `debeMarcar`.
   useEffect(() => {
     const alCambiar = () => {
-      if (document.visibilityState === 'visible') controlRef.current?.reintentarAhora()
+      if (document.visibilityState !== 'visible') return
+      controlRef.current?.reintentarAhora()
+      if (uidCompleto && debeMarcar(marca.current, Date.now())) marcar(uidCompleto)
     }
     document.addEventListener('visibilitychange', alCambiar)
     return () => document.removeEventListener('visibilitychange', alCambiar)
-  }, [])
+  }, [uidCompleto, marcar])
 
   const arranqueSalas = useRef(null)
   const uid = auth.perfil?.id ?? null
@@ -485,7 +550,7 @@ function App() {
         // al inicio, sin perder dinero (lo cobró quien la cerró). Si el jugador
         // ya se había levantado, sólo se toma el saldo.
         if (!ctl.saliendo) {
-          setAvisoSaldo(avisoDeVuelta({ cobrado: ev.respuesta?.cobrado, saldo },
+          sustituirAvisos(avisoDeVuelta({ cobrado: ev.respuesta?.cobrado, saldo },
             { conMonto: 'aviso.saldo.otro', cero: 'aviso.saldo.otro.cero' }))
           setControlMesa(null)
           setMesa(null)
@@ -493,7 +558,12 @@ function App() {
         }
       }
     })
-  }, [tomarSaldo, soltarSaldo, releerSaldo])
+  }, [tomarSaldo, soltarSaldo, releerSaldo, sustituirAvisos])
+
+  // ECO-1d · la pantalla de AHORA, para los reintentos de sentarse: si el
+  // jugador ya se fue de Retar, el reintento no lo mete en una mesa.
+  const pantallaRef = useRef(screen)
+  useEffect(() => { pantallaRef.current = screen }, [screen])
 
   const retar = useCallback(async (elegida) => {
     if (enviandoRef.current) return
@@ -504,12 +574,24 @@ function App() {
     if (intento.current?.firma !== firma) intento.current = { firma, token: nuevoToken() }
     enviandoRef.current = true
     setSentando({ fase: 'enviando' })
-    const r = await apiMesa.sentarse({ ...elegida, entrada, token: intento.current.token, dispositivo: idDispositivo() })
+    const pedir = () => apiMesa.sentarse({ ...elegida, entrada, token: intento.current.token, dispositivo: idDispositivo() })
+    let r = await pedir()
+    // ECO-1d · K7 · `limite` es «no contesta»: se espera y se vuelve a pedir con
+    // el MISMO token (mesaIACore.LIMITE_SENTARSE). Si el jugador se fue de
+    // Retar mientras, se deja: el token sigue, y su próximo toque es el mismo
+    // intento.
+    for (let i = 0; r.codigo === 'limite' && i < LIMITE_SENTARSE.reintentos; i++) {
+      await new Promise((res) => setTimeout(res, LIMITE_SENTARSE.esperaMs))
+      if (pantallaRef.current !== 'retar-ias') { enviandoRef.current = false; setSentando(null); return }
+      r = await pedir()
+    }
     enviandoRef.current = false
 
     if (r.codigo !== 'ok' && r.codigo !== 'repetido') {
       if (r.codigo === 'saldo_insuficiente') alSaldoInsuficiente()
-      if (r.codigo !== 'red') intento.current = null
+      // `red` y `limite` no son un «no»: el token se queda para el reintento.
+      // `tope_diario` (la válvula) sí: la nota lo dice y el token se renueva.
+      if (r.codigo !== 'red' && r.codigo !== 'limite') intento.current = null
       setSentando({ fase: 'error', codigo: r.codigo })
       return
     }
@@ -522,7 +604,7 @@ function App() {
 
     const entrarAMesa = () => {
       setSentando(null)
-      setAvisoSaldo(null)
+      vaciarAvisos()
       // La marca va ANTES: desde aquí, un fallo del chunk es de la entrada y
       // recarga (ARN-3d STOP-2). Si recarga, la mesa queda abierta en el
       // servidor y la recoge el arranque (es de este dispositivo).
@@ -545,13 +627,13 @@ function App() {
       // se anima: la píldora no está en la mesa, y al volver ya enseña la cifra
       // real del servidor.
       const antes = r.saldo + entrada - r.anteriorCobro
-      setAvisoSaldo(avisoDeVuelta({ cobrado: r.anteriorCobro, saldo: antes + r.anteriorCobro },
+      sustituirAvisos(avisoDeVuelta({ cobrado: r.anteriorCobro, saldo: antes + r.anteriorCobro },
         { conMonto: 'aviso.saldo.recogida', cero: 'aviso.saldo.recogida.cero' }))
       setTimeout(entrarAMesa, TIEMPOS_AVISO.cuentaIni + TIEMPOS_AVISO.cuentaDur + 500)
       return
     }
     entrarAMesa()
-  }, [apiMesa, tomarSaldo, alSaldoInsuficiente, escucharMesa])
+  }, [apiMesa, tomarSaldo, alSaldoInsuficiente, escucharMesa, sustituirAvisos, vaciarAvisos])
 
   const levantarse = useCallback((fichas) => {
     const ctl = controlRef.current
@@ -774,6 +856,7 @@ function App() {
       billetera={billetera}
       aviso={avisoSaldo}
       onAvisoFin={finAviso}
+      constancia={constancia?.uid === uidCompleto ? constancia.ficha : null}
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
       onCerrarSesion={auth.cerrarSesion}

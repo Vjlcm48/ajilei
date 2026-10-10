@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { TIEMPOS_AVISO, cifraAviso, brillaAviso, suenaAviso } from './avisoSaldoCore'
+import { TIEMPOS_AVISO, cifraAviso, brillaAviso, suenaAviso, desdeAlSustituir } from './avisoSaldoCore'
 import { useSounds } from './useSounds'
 
 // ── ECO-1c · El reloj del aviso de saldo ────────────────────────────────────
@@ -12,6 +12,15 @@ import { useSounds } from './useSounds'
 // `useSounds`, así que respeta el ajuste de sonido como todo lo demás.
 //
 // Un toque cierra el aviso antes: `cerrar` adelanta la salida.
+//
+// ECO-1d · LA FILA (avisoSaldoCore §«la fila»). Dos campos del aviso:
+//   · `espera`: los ms antes de entrar (el hueco entre dos avisos de la fila).
+//     Mientras, el aviso ya es el vivo —la píldora se queda en su `desde`, que
+//     es donde acabó el anterior— pero la cápsula no se pinta (`oculto`).
+//   · `sustituye`: C5/C6 cambiaron la fila a medio aviso. Al nacer cuenta desde
+//     la cifra que se estaba viendo, no desde la suya: la píldora no retrocede.
+// Y devuelve `contando` (ya pasó `cuentaIni`), que la ficha de la constancia
+// usa para posar la moneda del día a la vez que la píldora sube.
 
 const VOLUMEN_SUAVE = 0.35
 const reducidoAhora = () => {
@@ -28,6 +37,7 @@ export function useAvisoSaldo(aviso, vida, onFin) {
   const cerradoEn = useRef(null)
   const reloj = useRef(null)
   const finRef = useRef(onFin)
+  const cuadroRef = useRef(null)   // el último cuadro pintado, de cualquier aviso
   const { play } = useSounds()
   useEffect(() => { finRef.current = onFin }, [onFin])
 
@@ -36,28 +46,43 @@ export function useAvisoSaldo(aviso, vida, onFin) {
     if (!aviso) return undefined
     const reducido = reducidoAhora()
     const t0 = performance.now()
+    const espera = Math.max(0, aviso.espera ?? 0)
+    // `sustituye`: desde la cifra del cuadro que se estaba pintando, si era de
+    // otro aviso y no había terminado.
+    const previo = cuadroRef.current
+    const efectivo = aviso.sustituye && previo && previo.id !== aviso.id && !previo.terminado
+      ? { ...aviso, desde: desdeAlSustituir(previo.cifra, aviso) }
+      : aviso
     let sono = false
     let raf = 0
     cerradoEn.current = null
+    const pinta = (c) => { cuadroRef.current = c; setCuadro(c) }
     const paso = () => {
-      const t = performance.now() - t0
+      const t = performance.now() - t0 - espera
+      if (t < 0) {
+        pinta({ id: aviso.id, cifra: efectivo.desde, brilla: false, saliendo: false, oculto: true, contando: false })
+        raf = requestAnimationFrame(paso)
+        return
+      }
       const fin = cerradoEn.current !== null ? Math.min(vida, cerradoEn.current + TIEMPOS_AVISO.sale) : vida
       reloj.current = t
-      if (!sono && suenaAviso(aviso, t) && !reducido) {
+      if (!sono && suenaAviso(efectivo, t) && !reducido) {
         sono = true
         const r = play('chipsCollect')
         try { r?.sound?.volume(VOLUMEN_SUAVE, r.id) } catch { /* sin sonido */ }
       }
       if (t >= fin) {
-        setCuadro({ id: aviso.id, terminado: true })
+        pinta({ id: aviso.id, terminado: true })
         finRef.current?.(aviso.id)
         return
       }
-      setCuadro({
+      pinta({
         id: aviso.id,
-        cifra: cifraAviso(aviso, t, reducido),
-        brilla: brillaAviso(aviso, t, reducido),
+        cifra: cifraAviso(efectivo, t, reducido),
+        brilla: brillaAviso(efectivo, t, reducido),
         saliendo: t >= fin - TIEMPOS_AVISO.sale,
+        oculto: false,
+        contando: t >= TIEMPOS_AVISO.cuentaIni,
       })
       raf = requestAnimationFrame(paso)
     }
@@ -76,11 +101,19 @@ export function useAvisoSaldo(aviso, vida, onFin) {
   const propio = cuadro !== null && cuadro.id === id
   const vivo = aviso !== null && aviso !== undefined && !(propio && cuadro.terminado)
   const enCurso = vivo && propio
+  // Antes de su primer cuadro, un aviso que sustituye a otro a medio pintar ya
+  // enseña la cifra que se veía (la misma cuenta que hará el efecto al nacer).
+  const desdeAntes = !vivo || enCurso ? null
+    : aviso.sustituye && cuadro && !cuadro.terminado && Number.isFinite(cuadro.cifra)
+      ? desdeAlSustituir(cuadro.cifra, aviso) : aviso.desde
   return {
     vivo,
-    cifra: vivo ? (enCurso ? cuadro.cifra : aviso.desde) : null,
+    cifra: vivo ? (enCurso ? cuadro.cifra : desdeAntes) : null,
     brilla: enCurso && cuadro.brilla,
     saliendo: enCurso && cuadro.saliendo,
+    // La cápsula no se pinta mientras el aviso espera su hueco en la fila.
+    oculto: vivo && (enCurso ? cuadro.oculto === true : (aviso.espera ?? 0) > 0),
+    contando: enCurso && cuadro.contando === true,
     cerrar,
   }
 }

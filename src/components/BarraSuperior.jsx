@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import BalanceDisplay from './BalanceDisplay'
 import AvisoSaldo from './AvisoSaldo'
+import FichaConstancia from './FichaConstancia'
 import { SoundButton } from './SoundButton'
 import { IconoUsuario, IconoMas, IconoAjustes } from './IconosLobby'
 import { montoTexto } from '../config/tapetes'
@@ -8,6 +9,7 @@ import { useIdioma } from '../hooks/useIdioma'
 import { useSounds } from '../hooks/useSounds'
 import { useAvisoSaldo } from '../hooks/useAvisoSaldo'
 import { vidaAviso } from '../hooks/avisoSaldoCore'
+import { monedaPosada } from '../hooks/constanciaCore'
 
 // ── SAL-B1 · La barra superior, extraída para poder reusarla ────────────────
 // Rector: AJILEI_SAL-B1_Fase1_v1.0.md §3.1 — «barra superior del lobby (misma
@@ -68,6 +70,10 @@ export default function BarraSuperior({
   ajustesExpandido,
   aviso = null,
   onAvisoFin,
+  // ECO-1d · la ficha de la constancia (lámina `laminas/eco1d`, ubicación A).
+  // `undefined` = esta pantalla no la lleva (sólo el lobby la pasa); `null` =
+  // el lobby la lleva pero aún no se sabe (caja reservada, O1).
+  constancia,
 }) {
   const { t } = useIdioma()
   const { play } = useSounds()
@@ -82,6 +88,8 @@ export default function BarraSuperior({
   const textoAviso = aviso ? t(aviso.clave, { hc: '{hc}' }) : ''
   const avisoVivo = useAvisoSaldo(aviso, vidaAviso(textoAviso.replace('{hc}', montoTexto(aviso?.monto ?? 0))), onAvisoFin)
   const cifra = avisoVivo.vivo ? avisoVivo.cifra : saldo
+  // El día del cobro la moneda del día espera a que su aviso empiece a contar.
+  const posada = monedaPosada(constancia, avisoVivo.vivo ? aviso : null, avisoVivo.contando)
 
   const hayHoja = typeof ajustesExpandido === 'boolean'
   const sinCifra = !Number.isFinite(cifra)
@@ -130,6 +138,8 @@ export default function BarraSuperior({
         </SoundButton>
       </div>
 
+      {constancia !== undefined && <FichaConstancia ficha={constancia} posada={posada} />}
+
       {/* <button> pelado y no `SoundButton` por una razón mecánica: en el lobby
           necesita `ref` para devolverle el foco al cerrar la hoja, y
           `SoundButton` no expone el nodo. El clic de la casa se dispara a mano.
@@ -145,7 +155,7 @@ export default function BarraSuperior({
       >
         <IconoAjustes />
       </button>
-      {avisoVivo.vivo && (
+      {avisoVivo.vivo && !avisoVivo.oculto && (
         <AvisoSaldo
           texto={textoAviso}
           monto={aviso.monto}

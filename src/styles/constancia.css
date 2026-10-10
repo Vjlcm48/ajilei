@@ -1,0 +1,87 @@
+/* ══ ECO-1d · La ficha de la constancia ═══════════════════════════════════
+   Lámina `laminas/eco1d/lamina.html`, ubicación A, aprobada por Victor (STOP-2
+   de la 1d). Hoja PROPIA y aditiva, importada por `components/FichaConstancia.jsx`,
+   igual que `avisoSaldo.css`. No toca `lobby.css` ni los protegidos, y no usa
+   `!important`: sólo clases nuevas (`cst-*`) bajo `.lobby .lob-top`.
+
+   Mide en las unidades del lobby (`--u`, `--ico`), así que escala como la barra.
+   Sin borde ni fondo propios para no competir con la píldora: el oro lo ponen
+   sólo las monedas.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lobby .lob-top .cst-ficha {
+  --cst-pip: calc(var(--ico) * 0.6);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  /* Sin relleno lateral (la lámina llevaba 1 u a cada lado): el `gap` de la
+     barra ya la separa de la píldora y del engranaje, y en vertical cada
+     píxel cuenta (ver «la barra no desborda», abajo). */
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: calc(var(--u) * 3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: none;
+}
+/* O1 · mientras la constancia no se sabe, la caja está y no se ve. */
+.lobby .lob-top .cst-ficha.cst-oculta { visibility: hidden; }
+
+.lobby .lob-top .cst-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--cst-pip) * 0.22);
+  line-height: 0;
+}
+.lobby .lob-top .cst-pip {
+  position: relative;
+  display: block;
+  width: var(--cst-pip);
+  height: var(--cst-pip);
+  border-radius: 50%;
+}
+/* La que falta: un aro tenue del mismo oro, hueco. */
+.lobby .lob-top .cst-pip:not(.is-llena) {
+  box-shadow: inset 0 0 0 1.5px rgba(var(--gold-brand-rgb), 0.42);
+  background: rgba(var(--green-abyss-rgb), 0.55);
+}
+/* La que está: la moneda de la casa (el maestro sellado, sin recolorear). */
+.lobby .lob-top .cst-pip.is-llena {
+  background: url("../assets/heptacoin.svg") center / contain no-repeat;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.45));
+}
+.lobby .lob-top .cst-n { min-inline-size: 2.2ch; }
+
+/* ── La barra no desborda (hallazgo del STOP-3 de la 1d) ────────────────────
+   La lámina midió la barra con «DevLocal». Con nombres reales de 11–12
+   caracteres («Jugador_CAP» del arnés, «ticotest2022»), la ficha llevaba la
+   barra a 344 px en un hueco de 335 (360×640): la `.lob-top`, un elemento de
+   rejilla con `min-width: auto`, crecía con su contenido, el lobby se
+   ensanchaba y descentraba el CTA (lob.3b) y la hoja ⚙ (lob.6). Ya pasaba sin
+   la ficha con un nombre de 15 caracteres anchos.
+   Ahora la barra mide siempre su hueco, y lo que cede es el NOMBRE, con «…»,
+   sólo cuando no cabe: la ficha, la píldora y el engranaje no ceden nunca. Un
+   nombre corto no cambia. Aditivo: tres reglas nuevas, ninguna de lobby.css
+   se reescribe. */
+.lobby > .lob-top { min-width: 0; }
+.lobby .lob-top .lob-perfil { min-width: 0; }
+.lobby .lob-top .lob-nombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* La moneda del día se posa: 0,6 → 1,15 → 1 en 420 ms, una vez. */
+.lobby .lob-top .cst-pip.cst-posa { animation: cst-posa 420ms ease-out 1 both; }
+@keyframes cst-posa {
+  0%   { transform: scale(0.6); }
+  55%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Con movimiento reducido: sin salto. */
+@media (prefers-reduced-motion: reduce) {
+  .lobby .lob-top .cst-pip.cst-posa { animation: none; }
+}

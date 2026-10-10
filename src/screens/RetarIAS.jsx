@@ -200,9 +200,13 @@ export default function RetarIAS({
   const enviando = sentando?.fase === 'enviando'
   let notaCta = null
   if (sentando?.fase === 'error') {
+    // ECO-1d · `limite` (K7: ya se reintentó un minuto con el mismo token) y
+    // `tope_diario` (K8: la válvula, encendida desde el SQL Editor).
     notaCta = t(sentando.codigo === 'red' ? 'ia.retar.sentarse.red'
       : sentando.codigo === 'saldo_insuficiente' ? 'ia.retar.sentarse.saldo'
-        : 'ia.retar.sentarse.otro')
+        : sentando.codigo === 'limite' ? 'ia.retar.sentarse.limite'
+          : sentando.codigo === 'tope_diario' ? 'ia.retar.sentarse.tope'
+            : 'ia.retar.sentarse.otro')
   } else if (sinCifra) {
     // ECO-1b · mientras carga, la nota lo dice; si la lectura falló, lo dice
     // `AvisoLectura` con su botón y la nota calla para no repetirlo.

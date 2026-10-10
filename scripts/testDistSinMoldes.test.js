@@ -35,6 +35,11 @@ const PROHIBIDAS = [
   // ECO-1c · el mando `?apu=bolsillo:<n>` (el literal de su expresión regular;
   // fuera de `src/dev/` «bolsillo» sólo vive en comentarios, que no llegan)
   'bolsillo:',
+  // ECO-1d · los mandos nuevos del banco imitado: sembrar la racha (lo que
+  // `constancia_admin` hace en el SQL Editor) y forzar un `limite`. P-5: no
+  // hay mando de URL para la racha; éstos sólo los alcanza el arnés.
+  'constanciaAdmin',
+  'forzarLimite',
   // los estados de `?sal=`
   'opciones-fuera-alcance',
   'espera-fantasma',
@@ -42,7 +47,8 @@ const PROHIBIDAS = [
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las
 // funciones de mesa de verdad (la falsa no puede ser la única que llega).
-const OBLIGATORIAS = ['mi_billetera', 'sentarse_ia', 'informar_pila', 'recoger_mesa_ia']
+// ECO-1d · y la constancia de verdad.
+const OBLIGATORIAS = ['mi_billetera', 'sentarse_ia', 'informar_pila', 'recoger_mesa_ia', 'marcar_ingreso']
 
 let carpeta = null
 let textos = []

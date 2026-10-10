@@ -41,6 +41,7 @@
 
 import { crearBilleteraApi } from '../lib/billeteraApi'
 import { crearMesaIAApi } from '../lib/mesaIAApi'
+import { crearConstanciaApi } from '../lib/constanciaApi'
 import { crearBanco } from './bancoImitado'
 import { siembraAPU, entradaSembradaAPU } from './siembraAPU'
 
@@ -98,6 +99,14 @@ export function simulacionMesaIA() {
       return r
     },
   })
+}
+
+/** ECO-1d · `marcar_ingreso` contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionConstancia() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  return crearConstanciaApi(b)
 }
 
 /** Para las pruebas: un banco nuevo en la siguiente llamada. */

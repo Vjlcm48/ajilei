@@ -1186,6 +1186,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // La ✕ no se apaga nunca; en la forzosa la tapa el velo, como antes.
   const [recargaVuelo, setRecargaVuelo] = useState(null)   // { seq, monto, estado: 'enviando'|'red', tope }
   const [recargaFallo, setRecargaFallo] = useState(null)   // el código del último «no»
+  // ECO-1d · P-3 · la válvula (K8) encendida y el tope de hoy alcanzado: la
+  // recarga no se hace y no hay nada que reintentar. La tarjeta lo dice con su
+  // texto y queda como la del caso 3 de REC-2 (sin montos ni primario): en la
+  // blanda, seguir sin recargar o «Salir con mis fichas»; en la forzosa, sólo
+  // salir. La mesa en curso sigue y se paga completa.
+  const sinRecargaHoy = recargaFallo === 'tope_diario'
   const recargaVueloRef = useRef(null)
 
   function aplicarRecargaEnMesa(monto) {
@@ -2850,9 +2856,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         >
           <div className="bankrupt-modal apu-recarga">
             <p className="bankrupt-title">{t('ia.recarga.titulo')}</p>
-            <p className="bankrupt-sub" data-accion="recarga-sub" data-rec-servidor={recargaVuelo?.tope ? 'tope' : recargaVuelo?.estado ?? (recargaFallo ? 'no' : '')}>
+            <p className="bankrupt-sub" data-accion="recarga-sub" data-rec-servidor={recargaVuelo?.tope ? 'tope' : recargaVuelo?.estado ?? (sinRecargaHoy ? 'tope_diario' : recargaFallo ? 'no' : '')}>
               {recargaVuelo?.tope
                 ? t('ia.recarga.error.tope')
+                : sinRecargaHoy
+                ? t(recarga.motivo === RECARGA.FORZOSA ? 'ia.recarga.error.tope_diario.forzosa' : 'ia.recarga.error.tope_diario')
                 : recargaVuelo?.estado === 'red'
                 ? t('ia.recarga.error.red')
                 : recargaFallo
@@ -2868,7 +2876,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 primario —un único monto, todo el saldo usable—, y en el 3 no hay
                 nada que ofrecer. Dentro del caso 1 sigue valiendo E-2: los tres
                 están siempre y los inalcanzables se apagan (v1.3 §5.2). */}
-            {tarjRec.caso === CASOS_RECARGA.FILA && (
+            {tarjRec.caso === CASOS_RECARGA.FILA && !sinRecargaHoy && (
             <div className="apu-montos">
               {tarjRec.opciones.map((o) => (
                 <SoundButton
@@ -2895,7 +2903,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   sólo salida. En el caso 2 el primario dice «todo» cuando es
                   todo el saldo usable, y lleva la nota debajo; si lo cortara el
                   techo —rama defensiva, ver `tarjetaRecarga`— dice la cifra. */}
-              {tarjRec.caso === CASOS_RECARGA.FILA && (
+              {tarjRec.caso === CASOS_RECARGA.FILA && !sinRecargaHoy && (
                 <SoundButton
                   className="btn btn-primary"
                   data-accion="recarga-si"
@@ -2907,7 +2915,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                     : t('ia.recarga.si', { hc: recarga.monto })}
                 </SoundButton>
               )}
-              {tarjRec.caso === CASOS_RECARGA.TODO && (
+              {tarjRec.caso === CASOS_RECARGA.TODO && !sinRecargaHoy && (
                 <div className="rec-todo">
                   <SoundButton
                     className="btn btn-primary"
@@ -2926,6 +2934,15 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 <SoundButton className="btn btn-pass" data-accion="recarga-salir" onClick={salir}>
                   {t('ia.recarga.no.forzosa')}
                 </SoundButton>
+              ) : sinRecargaHoy && recarga.motivo !== RECARGA.FORZOSA ? (
+                <>
+                  <SoundButton className="btn btn-pass" data-accion="recarga-no" onClick={rechazarRecarga}>
+                    {t('ia.recarga.seguir')}
+                  </SoundButton>
+                  <SoundButton className="btn btn-pass" data-accion="recarga-salir" onClick={salir}>
+                    {t('ia.recarga.no.forzosa')}
+                  </SoundButton>
+                </>
               ) : (
                 <SoundButton className="btn btn-pass" data-accion="recarga-no" disabled={!!recargaVuelo} onClick={rechazarRecarga}>
                   {recarga.motivo === RECARGA.FORZOSA ? t('ia.recarga.no.forzosa') : t('ia.recarga.no')}

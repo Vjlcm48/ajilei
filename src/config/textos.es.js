@@ -300,6 +300,10 @@ export const TEXTOS_ES = {
   'ia.retar.sentarse.red':     'No pudimos abrir la mesa. Revisa tu conexión y vuelve a intentarlo.',
   'ia.retar.sentarse.saldo':   'Tu saldo no alcanza para esta entrada.',
   'ia.retar.sentarse.otro':    'No pudimos abrir la mesa. Vuelve a intentarlo.',
+  // ECO-1d · K7: tras un minuto de reintentos con el mismo token. K8: la
+  // válvula, encendida desde el SQL Editor (texto provisional de la ficha 1d).
+  'ia.retar.sentarse.limite':  'Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.',
+  'ia.retar.sentarse.tope':    'Llegaste al tope de hoy contra las IAS. Vuelve mañana o juega contra jugadores.',
 
   // Los tres motivos de `entrada.entradaValida` más el cuarto que añade la
   // pantalla (§2.2). El motor no puede juzgar el bolsillo —no lo conoce— y por
@@ -400,6 +404,11 @@ export const TEXTOS_ES = {
   // `ia.recarga.no.forzosa` («Salir con mis fichas»): salir es posible y no
   // pierde nada, porque si la recarga entra la salida la lleva (P-2a).
   'ia.recarga.error.tope':     'El servidor no responde. Si la recarga entra, sus fichas van contigo.',
+  // ECO-1d · P-3 · la válvula: hoy ya no se recarga contra las IAS. La mesa
+  // sigue y se paga completa. En la forzosa sólo queda salir.
+  'ia.recarga.error.tope_diario':         'Llegaste al tope de hoy contra las IAS: hoy no se puede recargar. Sigue con tus fichas o sal con ellas.',
+  'ia.recarga.error.tope_diario.forzosa': 'Llegaste al tope de hoy contra las IAS: hoy no se puede recargar. Tus fichas vuelven a tu saldo.',
+  'ia.recarga.seguir':         'Seguir sin recargar',
   // 1f-A4 · `ia.recarga.nivelado` SE RETIRA. Era la promesa de §5.3 en un
   // renglón aparte, y desde A3 la dicen los dos subtítulos blandos. En el
   // teléfono no se pintaba (no cabía) y en escritorio se pintaba justo debajo
@@ -416,6 +425,12 @@ export const TEXTOS_ES = {
   'aviso.saldo.recogida.cero': 'Tu partida anterior quedó cerrada. No quedaban fichas en la mesa.',
   'aviso.saldo.otro':          'Abriste otra partida en otro dispositivo. Volvieron {hc} HC.',
   'aviso.saldo.otro.cero':     'Abriste otra partida en otro dispositivo. No quedaban fichas en la mesa.',
+
+  // ── ECO-1d · La constancia (lámina `laminas/eco1d`, ubicación A, aprobada) ──
+  // El aviso sale sólo el día del cobro (K4, el texto de la escena d de la
+  // 1c); la ficha del lobby se lee así en un lector de pantalla.
+  'aviso.saldo.constancia':    '+{hc} HC por tu constancia.',
+  'lob.constancia.aria':       'Constancia: día {d} de 3',
 }
 
 export default TEXTOS_ES

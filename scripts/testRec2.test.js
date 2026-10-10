@@ -270,8 +270,10 @@ describe('REC-2 · D-7 · ninguna ruta de la tarjeta llega a monto 0', () => {
   it('el primario sólo se pinta cuando el núcleo da un monto (caso 1 o 2)', () => {
     const primarios = [...src.matchAll(/data-accion="recarga-si"/g)]
     expect(primarios.length).toBe(2)
-    expect(src).toMatch(/tarjRec\.caso === CASOS_RECARGA\.FILA && \(\s*<SoundButton\s+className="btn btn-primary"\s+data-accion="recarga-si"/)
-    expect(src).toMatch(/tarjRec\.caso === CASOS_RECARGA\.TODO && \(\s*<div className="rec-todo">/)
+    // ECO-1d · P-3 · la válvula puede quitar el primario además (`!sinRecargaHoy`):
+    // es una condición MÁS, nunca menos, así que D-7 sigue igual de sellada.
+    expect(src).toMatch(/tarjRec\.caso === CASOS_RECARGA\.FILA(?: && !sinRecargaHoy)? && \(\s*<SoundButton\s+className="btn btn-primary"\s+data-accion="recarga-si"/)
+    expect(src).toMatch(/tarjRec\.caso === CASOS_RECARGA\.TODO(?: && !sinRecargaHoy)? && \(\s*<div className="rec-todo">/)
   })
 
   it('en el núcleo, la tarjeta nunca nace con monto 0', () => {
