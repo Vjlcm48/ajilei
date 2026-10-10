@@ -318,6 +318,7 @@ import { pisoDe } from '../src/engine/entrada.js'
 // (la avería de NIV-UI, contada en la cabecera de aquel módulo).
 import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa, esperarMesa as esperarMesaComun } from './rutaMesa.mjs'
 import { runMesaIA, runRevive } from './eco/mesaia.mjs'
+import { runConstancia } from './eco/constancia.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -399,7 +400,8 @@ const VC_RETRASO_ROCE_MS = (() => {
 })()
 // ECO-1b · `saldo` también: mide la billetera que la API REAL lee del arnés.
 // ECO-1c · y `mesaia`: la mesa contra las IAS contra el servidor imitado.
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia']
+// ECO-1d · y `constancia`: la constancia, los límites y la válvula, también ahí.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -14586,6 +14588,11 @@ try {
   if (MODE === 'revive') {
     try { mkdirSync('capturas-mesaia', { recursive: true }) } catch { /* ya existe */ }
     report.revive = await runRevive(browser, { base: BASE })
+  }
+  // ECO-1d · `constancia` (K3, K7, K8 contra el servidor imitado).
+  if (MODE === 'constancia') {
+    try { mkdirSync('capturas-constancia', { recursive: true }) } catch { /* ya existe */ }
+    report.constancia = await runConstancia(browser, { base: BASE_PROD })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

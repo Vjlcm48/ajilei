@@ -32,6 +32,11 @@
 //             dos, el libro: una recarga, una salida con fichas + recarga, y el
 //             saldo final el de quien no recargó
 //   consola   sin errores (los 503 que provoca el propio arnés no cuentan)
+//   ventana60 ECO-1d · informativo: el máximo de llamadas de cada función de
+//             dinero en cualquier ventana de 60 s de un mismo contexto, contra
+//             su límite por minuto (`LIMITES_SQL`). Es la medida que el plan del
+//             STOP-1 de la 1d prometió para el informe; marca las que pasen de
+//             la MITAD de su tope (si alguna lo hace, se para y se dice).
 //
 // ── `revive` · D-1 (C9) ─────────────────────────────────────────────────────
 // Servidor de desarrollo con bypass: `?apu=saldo:5000,allinIA,gana`, mesa de
@@ -44,6 +49,7 @@ import { contextoCap } from '../cap/capMesa.mjs'
 import { recorrerRuta, esperarMesa } from '../rutaMesa.mjs'
 import { jugarMano, nuevoJuego } from '../arnes/autojuego.mjs'
 import { montoTexto } from '../../src/config/tapetes.js'
+import { LIMITES_SQL } from '../../src/dev/bancoImitado.js'
 
 const VP = { w: 412, h: 915, dpr: 1, movil: true }
 const SALDO = 5000
@@ -90,7 +96,28 @@ async function abandonar(page, { doble = false } = {}) {
 }
 const movs = (banco, tipo) => banco.libro.filter((l) => l.tipo === tipo)
 
+// ECO-1d · las billeteras de cada contexto, para medir la ventana de 60 s.
+const vistas = []
+/** El máximo de llamadas de cada función en una ventana de 60 s, por contexto. */
+export function ventana60(listas) {
+  const max = {}
+  for (const llamadas of listas) {
+    const porNombre = {}
+    for (const l of llamadas ?? []) (porNombre[l.nombre] ??= []).push(l.t)
+    for (const [nombre, ts] of Object.entries(porNombre)) {
+      ts.sort((a, b) => a - b)
+      let j = 0
+      for (let i = 0; i < ts.length; i++) {
+        while (ts[i] - ts[j] >= 60_000) j++
+        max[nombre] = Math.max(max[nombre] ?? 0, i - j + 1)
+      }
+    }
+  }
+  return max
+}
+
 async function contexto(browser, base, billetera, errores) {
+  vistas.push(billetera)
   const { ctx, page } = await contextoCap(browser, VP, base, { billetera })
   page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`))
   page.on('console', (m) => { if (m.type() === 'error' && !RUIDO_ARNES.test(m.text())) errores.push(`console: ${m.text()}`) })
@@ -514,6 +541,13 @@ export async function runMesaIA(browser, { base, baseDev, externo = false, out =
   }
 
   puntos.consola = { errores, ok: errores.length === 0 }
+  {
+    const max = ventana60(vistas.map((b) => b.llamadas))
+    const sobreMitad = Object.entries(max).filter(([n, v]) => LIMITES_SQL[n] !== undefined && v > LIMITES_SQL[n] / 2).map(([n]) => n)
+    // Informativo: no tiñe el veredicto (una partida del arnés es más rápida
+    // que una humana); lo que pase de la mitad va al informe.
+    puntos.ventana60 = { max, limites: { ...LIMITES_SQL }, sobreMitad, informativo: true, ok: true }
+  }
   const verde = Object.values(puntos).every((x) => x.ok === true)
   const resumen = `${verde ? (sinCobertura.length ? 'SIN COBERTURA' : 'VERDE') : 'ROJO'} · ` +
     Object.entries(puntos).map(([k, v]) => `${k} ${v.ok ? '✓' : '✗'}`).join(' · ')
