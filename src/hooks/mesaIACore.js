@@ -40,6 +40,9 @@ export const CODIGOS = Object.freeze({
   SOBRE_TECHO: 'sobre_techo',
   SEQ_VIEJO: 'seq_viejo',
   RED: 'red',
+  // ECO-1d · el límite por minuto (K6) y la válvula (K8).
+  LIMITE: 'limite',
+  TOPE_DIARIO: 'tope_diario',
 })
 
 // Qué hace la cola con cada respuesta.
@@ -48,6 +51,12 @@ export const CODIGOS = Object.freeze({
 //   rechazado  el servidor dijo que no a ESTO (una recarga sin saldo, un
 //              monto fuera de regla): se quita, y quien lo pidió lo cuenta.
 //   reintentar no hubo respuesta: se vuelve a mandar el mismo.
+//
+// ECO-1d · K7 · `limite` es «no contesta», NUNCA un «no» definitivo: se
+// reintenta el mismo con la espera de siempre. Antes de la 1d un código
+// desconocido era `rechazado`, y una salida rechazada habría dejado las fichas
+// en la mesa hasta que la recogiera otra cosa. `tope_diario` (la válvula, sólo
+// en la recarga) sí es un «no»: la recarga no se hace y la mesa sigue.
 export const DESTINOS = Object.freeze({
   HECHO: 'hecho', CERRADA: 'cerrada', RECHAZADO: 'rechazado', REINTENTAR: 'reintentar',
 })
@@ -55,7 +64,7 @@ export const DESTINOS = Object.freeze({
 export function destinoDe(codigo) {
   if (codigo === CODIGOS.OK || codigo === CODIGOS.REPETIDO || codigo === CODIGOS.SEQ_VIEJO) return DESTINOS.HECHO
   if (codigo === CODIGOS.MESA_CERRADA || codigo === CODIGOS.SIN_MESA) return DESTINOS.CERRADA
-  if (codigo === CODIGOS.RED || codigo === null || codigo === undefined) return DESTINOS.REINTENTAR
+  if (codigo === CODIGOS.RED || codigo === CODIGOS.LIMITE || codigo === null || codigo === undefined) return DESTINOS.REINTENTAR
   return DESTINOS.RECHAZADO
 }
 
@@ -170,3 +179,11 @@ export function finDeMano(state) {
   const ganador = capa0 === undefined || capa0 < 0 ? state.winner : capa0
   return { vivos, ganoHumano: ganador === 0 }
 }
+
+// ── ECO-1d · K7 · SENTARSE CON `limite` ─────────────────────────────────────
+// Sentarse no va por la cola (no hay mesa todavía): lo reintenta `retar` en
+// App. Con `limite` el botón sigue en «Sentando…» y se vuelve a pedir con el
+// MISMO token cada 15 s, hasta 4 veces: un minuto, lo que dura la ventana del
+// límite. Si aun así no pasa, la nota lo dice y el token se conserva (el
+// siguiente toque es el mismo intento: nunca dos mesas ni dos cobros).
+export const LIMITE_SENTARSE = Object.freeze({ esperaMs: 15_000, reintentos: 4 })

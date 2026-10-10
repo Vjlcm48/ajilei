@@ -14,7 +14,9 @@
 //
 // Es la migración `20261008220239_eco1c_mesas_ia.sql` leída función a función,
 // para UNA cuenta (la de la sesión): mismas validaciones, en el mismo orden, y
-// mismos códigos. `rpc(nombre, params)` devuelve `{ data, error }` con la forma
+// mismos códigos. ECO-1d le suma la `20261009105658_eco1d_constancia_limites_valvula.sql`:
+// `marcar_ingreso`, los límites por minuto y la válvula, con sus pruebas de
+// contrato y de espejo en el mismo archivo de pruebas. `rpc(nombre, params)` devuelve `{ data, error }` con la forma
 // de PostgREST: el compuesto `mesa_ia_resultado` llega como objeto con las
 // claves en snake_case, y `mi_mesa_ia` como lista.
 //
@@ -37,6 +39,22 @@ export const PISO_SQL = 10
 export const TECHO_SQL = 50
 export const FACTOR_IA_SQL = 1.5
 export const SILENCIO_RECOGIDA_MS = 10 * 60 * 1000
+// ECO-1d · `limite_dinero()`, `bono_constancia_hc()` y `constancia_ciclo()`.
+export const LIMITES_SQL = Object.freeze({
+  sentarse_ia: 10, recargar_ia: 20, salir_ia: 30, recoger_mesa_ia: 10, marcar_ingreso: 6,
+})
+export const BONO_CONSTANCIA_SQL = 500
+export const CICLO_CONSTANCIA_SQL = 3
+
+// `dia_chicago(ts)` de la 1a: la fecha en America/Chicago, con la zona por nombre.
+const FECHA_CHICAGO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
+export const diaChicagoSQL = (ms) => FECHA_CHICAGO.format(new Date(ms))
+/** Suma `n` días a una fecha 'AAAA-MM-DD' (como `date + n` en SQL). */
+export function sumarDias(dia, n) {
+  const d = new Date(`${dia}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
 
 const techoMesa = (apuesta) => TECHO_SQL * apuesta
 const pilaIA = (entrada, apuesta) => Math.min(Math.round(entrada * FACTOR_IA_SQL), techoMesa(apuesta))
@@ -51,14 +69,24 @@ const esEntero = (n) => Number.isInteger(n)
  *   (`allinHumano`, `recarga`, `quiebra`; P-6), que sientan una pila que no es
  *   una entrada legal y tienen que cobrar lo que de verdad sentaron. El SQL no
  *   tiene esta puerta.
+ * @param {boolean} [opciones.limites=true]  cuenta los intentos por minuto
+ *   (ECO-1d). Con `false` no corta nunca por sí solo (sí con `forzarLimite`):
+ *   SÓLO para repetir el recorrido del guion de la 1c, que, como aquél, corre
+ *   todo en el mismo instante y cortaría en la 11.ª sentada.
  */
-export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMolde = false } = {}) {
+export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMolde = false, limites = true } = {}) {
   const b = {
     saldo,
     mesas: new Map(),          // id → fila de `mesas_ia`
     record: new Map(),         // `${reto}:${vivos}` → { jugadas, ganadas_humano, ganadas_ia }
     libro: [],                 // { tipo, monto, saldo_tras, clave, ref }
     ultimoId: 0,
+    // ECO-1d
+    intentos: [],              // { funcion, en } — `intentos_dinero`
+    forzados: {},              // funcion → cuántas respuestas `limite` quedan (mando del arnés)
+    constancia: null,          // { racha, ultimo_dia } — la fila de `constancia`, o ninguna
+    tope: null,                // `ajustes_economia.tope_diario_ia` (null = apagada)
+    cambiosValvula: [],        // `valvula_cambios`
   }
 
   // ── El libro (1a): una línea por cambio, clave única ─────────────────────
@@ -87,6 +115,36 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
     }
   }
 
+  // ── ECO-1d · `contar_intento_dinero` con `limite_dinero` ─────────────────
+  // Purga lo de más de 1 h, anota y cuenta lo de este minuto, en ese orden. El
+  // intento rechazado TAMBIÉN queda anotado (sin `raise`). `forzarLimite` es el
+  // mando del arnés: las próximas `veces` llamadas contestan `limite` (y se
+  // anotan, como en el SQL).
+  function cabe(funcion) {
+    const t = ahora()
+    b.intentos = b.intentos.filter((x) => x.en >= t - 3600_000)
+    b.intentos.push({ funcion, en: t })
+    if ((b.forzados[funcion] ?? 0) > 0) { b.forzados[funcion]--; return false }
+    if (!limites) return true
+    const tope = LIMITES_SQL[funcion]
+    if (tope === undefined) return false
+    return b.intentos.filter((x) => x.funcion === funcion && x.en > t - 60_000).length <= tope
+  }
+
+  // ── ECO-1d · la válvula: `ganancia_ia_hoy` y `valvula_cerrada` (P-2) ─────
+  // Por mesa y en el día de Chicago en que se CIERRA, más lo que daría la
+  // abierta si se cerrara ahora.
+  function gananciaHoy() {
+    const hoy = diaChicagoSQL(ahora())
+    let g = 0
+    for (const m of b.mesas.values()) {
+      if (m.estado === 'cerrada' && diaChicagoSQL(m.cerrada_en) === hoy) g += m.cobrado - m.entrada - m.recargado
+      if (m.estado === 'abierta') g += Math.min(m.pila_informada, m.techo_cobro) - m.entrada - m.recargado
+    }
+    return g
+  }
+  const valvulaCerrada = () => b.tope !== null && gananciaHoy() >= b.tope
+
   // C4 · `cerrar_partida_abierta`
   function cerrarAbierta(motivo) {
     const m = abierta()
@@ -98,6 +156,7 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
   }
 
   function sentarse({ p_reto, p_jugadores, p_apuesta, p_entrada, p_token, p_dispositivo = null }) {
+    if (!cabe('sentarse_ia')) return respuesta('limite')
     if ([p_reto, p_jugadores, p_apuesta, p_entrada, p_token].some((v) => v === null || v === undefined)) {
       return respuesta('argumento_invalido')
     }
@@ -112,6 +171,7 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
     const legal = esEntero(p_entrada) && p_entrada % p_apuesta === 0 && p_entrada >= PISO_SQL * p_apuesta
     const deMolde = entradaDeMolde && esEntero(p_entrada) && p_entrada > 0
     if (!(legal || deMolde) || p_entrada > techoMesa(p_apuesta)) return respuesta('entrada_invalida')
+    if (valvulaCerrada()) return respuesta('tope_diario')
 
     const vieja = abierta()
     const vuelve = vieja ? Math.min(vieja.pila_informada, vieja.techo_cobro) : 0
@@ -139,6 +199,7 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
   }
 
   function recargar({ p_mesa, p_monto, p_seq }) {
+    if (!cabe('recargar_ia')) return respuesta('limite')
     if ([p_mesa, p_monto, p_seq].some((v) => v === null || v === undefined)) return respuesta('argumento_invalido')
     const m = mesaPropia(p_mesa)
     if (!m) return respuesta('sin_mesa')
@@ -148,6 +209,7 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
     if (p_seq <= m.seq_informada) return respuesta('seq_viejo', m)
     if (!esEntero(p_monto) || p_monto <= 0 || p_monto % m.apuesta !== 0) return respuesta('monto_invalido', m)
     if (m.pila_informada + p_monto > techoMesa(m.apuesta)) return respuesta('sobre_techo', m)
+    if (valvulaCerrada()) return respuesta('tope_diario', m)
     const r = aplicar('recarga_ia', -p_monto, clave, m.id)
     if (!r.aplicado) return respuesta(r.motivo, m)
     m.recargado += p_monto
@@ -192,6 +254,7 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
   }
 
   function salir({ p_mesa, p_fichas, p_seq }) {
+    if (!cabe('salir_ia')) return respuesta('limite')
     if ([p_mesa, p_fichas, p_seq].some((v) => v === null || v === undefined) || p_fichas < 0) {
       return respuesta('argumento_invalido')
     }
@@ -218,6 +281,7 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
   }
 
   function recoger({ p_dispositivo = null } = {}) {
+    if (!cabe('recoger_mesa_ia')) return respuesta('limite')
     const m = abierta()
     if (!m) return respuesta('ninguna')
     const mismo = p_dispositivo !== null && m.dispositivo === String(p_dispositivo).slice(0, 64)
@@ -227,8 +291,33 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
     return respuesta('recogida', b.mesas.get(cierre.mesa_id))
   }
 
+  // ── ECO-1d · `marcar_ingreso` (K2–K4) ────────────────────────────────────
+  function respuestaConstancia(codigo, racha, cobrado = 0) {
+    const r = racha ?? 0
+    return {
+      codigo, racha: r, dia_del_ciclo: r > 0 ? ((r - 1) % CICLO_CONSTANCIA_SQL) + 1 : 0,
+      cobrado, saldo: b.saldo, dia: diaChicagoSQL(ahora()),
+    }
+  }
+  function marcarIngreso() {
+    if (!cabe('marcar_ingreso')) return respuestaConstancia('limite', b.constancia?.racha ?? 0)
+    const hoy = diaChicagoSQL(ahora())
+    const c = b.constancia ?? { racha: 0, ultimo_dia: null }
+    if (c.ultimo_dia === hoy) return respuestaConstancia('ya_marcado', c.racha)
+    const racha = c.ultimo_dia === sumarDias(hoy, -1) ? c.racha + 1 : 1
+    b.constancia = { racha, ultimo_dia: hoy }
+    let cobrado = 0
+    if (racha % CICLO_CONSTANCIA_SQL === 0) {
+      // 'repetido' = hoy ya se cobró (la clave es por día): ni paga ni se anuncia.
+      const r = aplicar('constancia', BONO_CONSTANCIA_SQL, `constancia:${hoy}`, hoy)
+      if (r.motivo === 'aplicado') cobrado = BONO_CONSTANCIA_SQL
+    }
+    return respuestaConstancia('ok', racha, cobrado)
+  }
+
   const RPC = {
     mi_billetera: () => b.saldo,
+    marcar_ingreso: marcarIngreso,
     sentarse_ia: sentarse,
     recargar_ia: recargar,
     informar_pila: informar,
@@ -267,10 +356,39 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
       const m = abierta()
       if (m) m.ultimo_aviso_en -= ms
     },
+    // ── ECO-1d · los mandos del SQL Editor y del arnés ─────────────────────
+    /** El día de Chicago de hoy, 'AAAA-MM-DD', con el reloj del banco. */
+    hoy() { return diaChicagoSQL(ahora()) },
+    /** `constancia_admin`: la racha en un estado dado, sin mover dinero. Con
+     *  racha 0 el día va nulo; con racha > 0 hace falta día, y no futuro. */
+    constanciaAdmin(racha, ultimoDia) {
+      if (!Number.isInteger(racha) || racha < 0 || (racha === 0) !== (ultimoDia === null)) return false
+      if (ultimoDia !== null && ultimoDia > diaChicagoSQL(ahora())) return false
+      b.constancia = racha === 0 ? { racha: 0, ultimo_dia: null } : { racha, ultimo_dia: ultimoDia }
+      return true
+    },
+    /** `valvula_ia(p_tope)`: encender o cambiar (tope > 0) o apagar (null). */
+    valvula(tope) {
+      if (tope !== null && !(Number.isInteger(tope) && tope > 0)) return { codigo: 'tope_invalido', tope: b.tope }
+      if (tope === b.tope) return { codigo: 'sin_cambio', tope: b.tope }
+      b.cambiosValvula.push({ antes: b.tope, despues: tope })
+      b.tope = tope
+      return { codigo: tope === null ? 'apagada' : 'encendida', tope }
+    },
+    /** `ganancia_ia_hoy` de la cuenta. */
+    gananciaHoy() { return gananciaHoy() },
+    /** Mando del arnés: las próximas `veces` llamadas a `funcion` dicen `limite`. */
+    forzarLimite(funcion, veces = 1) { b.forzados[funcion] = veces },
+    /** Lo que el guion hace con `update intentos_dinero set en = en - 2 min`. */
+    envejecerIntentos(ms) { for (const x of b.intentos) x.en -= ms },
     // Lecturas para las pruebas y el arnés. Copias: nadie toca el estado.
     get saldo() { return b.saldo },
     get libro() { return b.libro.map((l) => ({ ...l })) },
     get mesas() { return [...b.mesas.values()].map((m) => ({ ...m })) },
     get record() { return Object.fromEntries([...b.record].map(([k, v]) => [k, { ...v }])) },
+    get constancia() { return b.constancia ? { ...b.constancia } : null },
+    get intentos() { return b.intentos.map((x) => ({ ...x })) },
+    get tope() { return b.tope },
+    get cambiosValvula() { return b.cambiosValvula.map((x) => ({ ...x })) },
   }
 }

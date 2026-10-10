@@ -87,6 +87,25 @@ describe('ECO-1c · la cola de avisos', () => {
     expect(destinoDe(undefined)).toBe(DESTINOS.REINTENTAR)
   })
 
+  it('ECO-1d · K7 · `limite` es «no contesta»: la salida se reintenta, nunca se tira', () => {
+    expect(destinoDe(CODIGOS.LIMITE)).toBe(DESTINOS.REINTENTAR)
+    let c = encolarSalida(colaNueva(500), 800)
+    c = enviando(c, 1)
+    const r = alResponder(c, 1, CODIGOS.LIMITE)
+    expect(r.destino).toBe(DESTINOS.REINTENTAR)
+    expect(proximo(r.cola)).toMatchObject({ seq: 1, tipo: TIPOS.SALIDA, fichas: 800 })
+  })
+
+  it('ECO-1d · K8 · `tope_diario` en una recarga es un «no»: se quita y la mesa sigue', () => {
+    let c = encolarRecarga(colaNueva(500), 500)
+    c = encolarPila(c, 450)
+    c = enviando(c, 1)
+    const r = alResponder(c, 1, CODIGOS.TOPE_DIARIO)
+    expect(r.destino).toBe(DESTINOS.RECHAZADO)
+    expect(r.cola.cerrada).toBe(false)
+    expect(proximo(r.cola)).toMatchObject({ seq: 2, tipo: TIPOS.AVISO })
+  })
+
   it('tras una recarga confirmada, la pila que ya conoce el servidor no se vuelve a avisar', () => {
     let c = anotarPila(colaNueva(400), 900)
     c = encolarPila(c, 900)
