@@ -9,6 +9,9 @@
 //   · un documento `AJILEI_*.md` → está en `docs/` o en `docs/reportes/`;
 //   · los ids no se repiten, y una fila «vigilada» tiene vigilante;
 //   · una tabla que no se deja leer (0 filas) es roja, no verde.
+// ECO-1e · y la tercera tabla, la de las varas de ECO-1 (§6): cada vara nombra
+// algo que existe, las de ECO-1 están todas, y la columna «En humo» dice lo
+// mismo que `diagDSK.mjs`.
 // Lo que va entre comillas de código en «Fuente» y «Vigilante» se comprueba;
 // una forma que no se reconoce también es roja (registro §1).
 import { describe, it, expect } from 'vitest'
@@ -49,8 +52,10 @@ function tabla(cabecera) {
 
 const CAB_INV = '| id | Regla | Fuente | Vigilante | Etiqueta |'
 const CAB_DOCS = '| Documento | Qué rige | Vigilado por |'
+const CAB_VARAS = '| Vara | Qué vigila | Puerto | Duración | En humo |'
 const invariantes = tabla(CAB_INV)
 const documentos = tabla(CAB_DOCS)
+const varas = tabla(CAB_VARAS)
 
 const sinLinea = (t) => t.replace(/:\d[\d-]*$/, '')
 const existe = (rel) => existsSync(join(RAIZ, rel))
@@ -127,4 +132,44 @@ describe('ARN-3e · cada documento normativo tiene vigilantes que existen', () =
       expect(rotos(vigilado), `${nombre} · vigilado por`).toEqual([])
     })
   }
+})
+
+// ── ECO-1e · E8 · la lista de varas de ECO-1 (§6) ───────────────────────────
+// Es la lista que nombran las fichas y la que consumirá el orquestador de
+// ARN-4: si un modo se renombra o sale de `humo`, la tabla tiene que cambiar
+// con él.
+describe('ECO-1e · la lista de varas de ECO-1 (§6)', () => {
+  const dsk = texto('scripts/diagDSK.mjs')
+  // Un modo está en `humo` si su línea de despacho lo dice.
+  const enHumo = (modo) => dsk.includes(`MODE === '${modo}' || MODE === 'humo'`)
+
+  it('la tabla tiene filas, todas con sus cinco columnas', () => {
+    expect(varas.length, `${DOC}: no hay filas bajo «${CAB_VARAS}»`).toBeGreaterThan(0)
+    expect(varas.filter((f) => !f.completa).map((f) => f.linea)).toEqual([])
+  })
+
+  it('cada vara nombra algo que existe', () => {
+    for (const { celdas: [vara, vigila] } of varas) {
+      expect(rotos(vara), `vara · ${vara}`).toEqual([])
+      expect(rotos(vigila), `qué vigila · ${vara}`).toEqual([])
+    }
+  })
+
+  it('están las varas de ECO-1 y el corredor de guiones', () => {
+    const nombradas = varas.flatMap((f) => tokens(f.celdas[0]))
+    for (const v of ['diagDSK humo', 'diagDSK lob', 'diagDSK saldo', 'diagDSK mesaia', 'diagDSK revive',
+      'diagDSK constancia', 'diagCEL0 celebracion', 'diagSAL sal', 'scripts/guiones.mjs']) {
+      expect(nombradas, `falta la vara «${v}»`).toContain(v)
+    }
+  })
+
+  it('«En humo» dice lo mismo que diagDSK.mjs', () => {
+    expect(enHumo('lob'), 'la sonda: lob está en humo').toBe(true)
+    expect(enHumo('mesaia'), 'la sonda: mesaia no está en humo').toBe(false)
+    for (const { celdas: [vara, , , , humo] } of varas) {
+      const modo = tokens(vara).map((t) => t.match(/^diagDSK (\S+)$/)?.[1]).find(Boolean)
+      const esperado = !modo || modo === 'humo' ? '—' : (enHumo(modo) ? 'sí' : 'no')
+      expect(humo, `«En humo» de ${vara}`).toBe(esperado)
+    }
+  })
 })
