@@ -23,12 +23,19 @@
         1080,
         2112
       ],
-      "bytes": 1169975,
-      "sha256": "198289a8f290fca3bc603e5e2b4b941fd3b34bc21c3323101a0573e431ad43bc",
+      "bytes": 1169655,
+      "sha256": "b2ef85c5638e86bca3fb5301dd2a3009898cd50410ab26361de413a0de3f9be8",
       "estable": {
         "fraccionDeltaFino": 1,
         "deltaMax": 0,
         "distintos": 0
+      },
+      "resello": {
+        "campana": "CAP-2",
+        "generado": "2026-10-12T05:32:06.487Z",
+        "navegador": "Chromium 151.0.7922.34",
+        "motivo": "PAN-1b (8009d4f): src/styles/tactil.css:29",
+        "anterior": "198289a8f290fca3bc603e5e2b4b941fd3b34bc21c3323101a0573e431ad43bc"
       }
     },
     "mesah.png": {
