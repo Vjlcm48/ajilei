@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import PantallaChips from '../components/PantallaChips'
 import FilaChips from '../components/FilaChips'
 import { useIdioma } from '../hooks/useIdioma'
-import { usePronto } from '../hooks/usePronto'
+import { useVideo } from '../hooks/useVideo'
+import { AJILEI_CONFIG } from '../config/ajileiConfig'
 import { montoTexto } from '../config/tapetes'
 import { nivelPorId } from '../config/niveles'
 import { MOTIVOS_ENTRADA } from '../engine/entrada'
@@ -42,19 +43,23 @@ import { saldoParaJuzgar, ERROR as SALDO_ERROR } from '../hooks/billeteraCore'
 // apuesta sin haberlo decidido hoy. La política vive en `config/memoriaChips.js`
 // y esta pantalla sólo la declara.
 // ── RET-A · El aviso de saldo y su única salida ────────────────────────────
-// Componente aparte, y NO es gusto: `usePronto` lee el contexto que monta
-// `PantallaChips`, y `RetarIAS` está POR ENCIMA de esa carcasa en el árbol, así
-// que allí el hook devuelve `null` y el botón no haría nada. Medido con sonda:
-// el botón estaba y el toast no salía. Aquí abajo el bloque es hijo del Provider
-// y el manejador llega.
-//
 // La DECISIÓN —qué caso y qué frase— se queda en la pantalla: esto sólo pinta.
+//
+// ── ECO-1g · LA SALIDA YA LLEVA A ALGUNA PARTE: EL VIDEO (G3 a) ────────────
+// El botón decía «Conseguir más monedas» y contestaba «Pronto». Ahora dice
+// «Ver un video · +500 HC» y pide el video, con el contador debajo: «Te quedan
+// N de 8 hoy» o, con el tope alcanzado, «Vuelven en 5 h 12 min» y el botón
+// apagado (G6). Las dos frases ocupan la misma caja, siempre presente (O1).
+// El premio y el contador los dice el servidor (`mi_video`), y se preguntan al
+// salir este bloque; mientras no contesta, la caja se queda vacía y el premio
+// es el del espejo.
 function AvisoSaldo({ texto }) {
   const { t } = useIdioma()
-  // El «Pronto» de la carcasa, el mismo del `+` dorado de la cabecera. Fuera de
-  // `PantallaChips` sería `null` y el botón no haría nada, que es preferible a
-  // tumbar la pantalla por un toast.
-  const pronto = usePronto()
+  // El video llega por el contexto de `MarcoVideo`. Fuera de él sería `null` y
+  // el botón no haría nada, que es preferible a tumbar la pantalla.
+  const video = useVideo()
+  const mirar = video?.mirar
+  useEffect(() => { mirar?.() }, [mirar])
 
   return (
     <section className="sal-saldo" data-accion="aviso-saldo">
@@ -66,10 +71,12 @@ function AvisoSaldo({ texto }) {
         type="button"
         className="sal-saldo-cta"
         data-accion="mas-monedas"
-        onClick={pronto}
+        disabled={!video || video.apagado}
+        onClick={video?.pedir}
       >
-        {t('ia.retar.saldo.cta')}
+        {t('video.pedir', { hc: montoTexto(video?.premio ?? AJILEI_CONFIG.economy.videoReward) })}
       </button>
+      <p className="vid-quedan" data-accion="video-quedan">{video?.contador ?? ' '}</p>
     </section>
   )
 }
@@ -397,8 +404,9 @@ export default function RetarIAS({
         alto, y se los cobraría al 100 % de las partidas para un estado que
         casi nadie ve.
 
-        El botón es el ÚNICO nuevo de la pantalla y entra por el `pronto` de
-        la carcasa — el mismo «Pronto» del `+` dorado de la cabecera. */}
+        El botón es el ÚNICO nuevo de la pantalla. Desde ECO-1g pide el video
+        de recompensa (`useVideo`), lo mismo que la fila de la hoja del `+`
+        dorado de la cabecera. */}
       {lecturaFallida && <AvisoLectura onReintentar={billetera?.refrescar} />}
       {aviso.caso !== CASO_ALCANZA && (
         <AvisoSaldo

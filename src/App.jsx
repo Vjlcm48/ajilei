@@ -26,20 +26,28 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo } from './dev/billeteraFalsa'
 // ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
 // mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
 // que siembran los moldes de humano en desarrollo (P-6).
 import { mesaIAApi } from './lib/mesaIAApi'
 import { crearControlMesa } from './lib/controlMesaIA'
 import { idDispositivo } from './lib/dispositivo'
-import { entradaSembradaAPU } from './dev/siembraAPU'
+import { entradaSembradaAPU, videoSembradoAPU } from './dev/siembraAPU'
 import { avisoDeVuelta, TIEMPOS_AVISO, encolarAviso, sacarAviso, sustituirFila } from './hooks/avisoSaldoCore'
 // ECO-1d · la constancia: la API de `marcar_ingreso`, cuándo preguntar y la
 // ficha del lobby (lámina `laminas/eco1d`, ubicación A). Y el límite al sentarse.
 import { constanciaApi } from './lib/constanciaApi'
 import { debeMarcar, fichaTrasMarcar, soltarAvisoDeFicha } from './hooks/constanciaCore'
 import { LIMITE_SENTARSE } from './hooks/mesaIACore'
+// ECO-1g · el video de recompensa: la API de sus tres funciones, el canal que
+// pide y cobra el boleto, la costura del reproductor y el marco que monta sus
+// capas una vez para todas las pantallas con barra.
+import { videoApi } from './lib/videoApi'
+import { crearControlVideo } from './lib/controlVideo'
+import { reproductor } from './lib/reproductor'
+import MarcoVideo from './components/MarcoVideo'
+import { AJILEI_CONFIG } from './config/ajileiConfig'
 // `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
 // `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
 // sigue viva y exportada en el hook, que es donde trabaja.
@@ -287,6 +295,30 @@ function App() {
   // pinta nada, y lo leen el arranque y la vuelta a primer plano.
   const marca = useRef({ ultimoDia: null, enVuelo: false, ultimaLlamada: null })
 
+  // ── ECO-1g · EL VIDEO DE RECOMPENSA ───────────────────────────────────────
+  // Rector ECO-1 1g §2.2. El canal del video (`lib/controlVideo`) se crea UNA
+  // vez, como las APIs de arriba, y vive AQUÍ por las mismas razones que el de
+  // la mesa: sobrevive a los cambios de pantalla, y es `App` quien le presta la
+  // billetera (el cobro devuelve el saldo y se toma sin relectura) y quien
+  // necesita saber si hay un video abierto (la constancia se pospone mientras).
+  // No es estado de React: `App` no se repinta con el video; lo hace
+  // `MarcoVideo`, que se suscribe.
+  //
+  // La API es la del banco imitado del bypass o la real. Los mandos
+  // (`?apu=video:`) sólo existen en desarrollo: en la build son `null` y el
+  // video dura lo que dice `ajileiConfig`.
+  //
+  // `chipsCollect` se precarga al PEDIR el video, unos 40 s antes de sonar en
+  // la celebración: hoy no viaja en el lobby (Fase 0 P.2) y no se le añade.
+  const [video] = useState(() => crearControlVideo({
+    api: simulacionVideo() ?? videoApi,
+    reproductor,
+    duracionMs: AJILEI_CONFIG.economy.video.duracionMs,
+    premioEspejo: AJILEI_CONFIG.economy.videoReward,
+    mandos: videoSembradoAPU(),
+    precargar: () => precargarSonidos(['chipsCollect']),
+  }))
+
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
   // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
   // WhatsApp puede caer en alguien que todavía no tiene cuenta, y este proyecto
@@ -385,6 +417,18 @@ function App() {
     })
   }, [apiConstancia, tomarSaldo, encolarAvisoSaldo])
 
+  // ECO-1g · lo que `App` le presta al canal del video, y de quién es. Otra
+  // cuenta en la misma carga de página no hereda ni el contador ni un video a
+  // medias. `alLibre`: lo que se pospuso mientras había un video abierto —la
+  // constancia de un día que cambió con el video delante— toca al cerrarse.
+  useEffect(() => {
+    video.enchufar({
+      tomarSaldo,
+      alLibre: () => { if (uidCompleto && debeMarcar(marca.current, Date.now())) marcar(uidCompleto) },
+    })
+  }, [video, tomarSaldo, uidCompleto, marcar])
+  useEffect(() => { video.cuenta(uidCompleto) }, [video, uidCompleto])
+
   const arranqueMesa = useRef(null)
   useEffect(() => {
     const decision = arranqueDeSesion(arranqueMesa.current, uidCompleto)
@@ -403,15 +447,20 @@ function App() {
   // una recarga, la salida) sin esperar a la cuenta atrás del reintento.
   // ECO-1d · y pregunta por la constancia si cambió el día de Chicago (o el
   // arranque no la obtuvo), nunca en ráfaga: `debeMarcar`.
+  // ECO-1g · con un video abierto la constancia NO se pregunta aquí: su aviso
+  // caería sobre la capa o se cruzaría con la celebración. Se pospone, y el
+  // canal del video la pide al quedar libre (`alLibre`, arriba). Y el cobro de
+  // un video que se esté reintentando tampoco espera su cuenta atrás.
   useEffect(() => {
     const alCambiar = () => {
       if (document.visibilityState !== 'visible') return
       controlRef.current?.reintentarAhora()
-      if (uidCompleto && debeMarcar(marca.current, Date.now())) marcar(uidCompleto)
+      video.reintentarAhora()
+      if (uidCompleto && !video.ocupado() && debeMarcar(marca.current, Date.now())) marcar(uidCompleto)
     }
     document.addEventListener('visibilitychange', alCambiar)
     return () => document.removeEventListener('visibilitychange', alCambiar)
-  }, [uidCompleto, marcar])
+  }, [uidCompleto, marcar, video])
 
   const arranqueSalas = useRef(null)
   const uid = auth.perfil?.id ?? null
@@ -718,6 +767,19 @@ function App() {
   // es el lobby de la lámina— y el arnés tiene que poder medirlo. Lo que en el
   // bypass no hay es correo, y para eso está la reserva de caja de O1.
 
+  // ── ECO-1g · EL MARCO DEL VIDEO, EN TODAS LAS PANTALLAS CON BARRA ─────────
+  // Esto es una cascada de `return`, no un árbol con una raíz común, así que
+  // cada pantalla que monta `BarraSuperior` se envuelve con el MISMO marco. Como
+  // la forma es idéntica en todas, React conserva el marco al pasar de una a
+  // otra: la hoja, la capa del video y la celebración no se desmontan. La mesa
+  // NO se envuelve (G3: en la mesa no hay video).
+  //
+  // `avisoEnCurso`: la celebración del video espera a que la fila de avisos de
+  // saldo quede vacía; nunca los dos a la vez sobre la píldora.
+  const conVideo = (pantalla) => (
+    <MarcoVideo control={video} avisoEnCurso={filaAvisos.length > 0}>{pantalla}</MarcoVideo>
+  )
+
   // ── SAL-B1 · Las tres pantallas del PvP ───────────────────────────────────
   // Van ANTES de las de vs-IA y en el orden en que se recorren, que es la misma
   // convencion que ya seguian las otras: la cascada se lee como el viaje.
@@ -729,7 +791,7 @@ function App() {
   // LA CASA VA AL LOBBY DESDE LAS TRES (§5.1) y la flecha deshace UN paso, que
   // en `SalaOpciones` coincide con el lobby y en `ArmarMesa` no.
   if (screen === 'sala-opciones') {
-    return (
+    return conVideo(
       <SalaOpciones
         api={api}
         cuenta={cuenta}
@@ -742,12 +804,12 @@ function App() {
         onArmarMesa={() => { olvidarInvitacion(); setScreen('armar-mesa') }}
         onEntrarSala={(nueva) => { olvidarInvitacion(); entrarSala(nueva) }}
         onLobby={() => { olvidarInvitacion(); setScreen('lobby') }}
-      />
+      />,
     )
   }
 
   if (screen === 'armar-mesa') {
-    return (
+    return conVideo(
       <ArmarMesa
         api={api}
         cuenta={cuenta}
@@ -756,12 +818,12 @@ function App() {
         onEntrarSala={entrarSala}
         onVolver={() => setScreen('sala-opciones')}
         onLobby={() => setScreen('lobby')}
-      />
+      />,
     )
   }
 
   if (screen === 'sala-espera') {
-    return (
+    return conVideo(
       <SalaEspera
         api={api}
         cuenta={cuenta}
@@ -777,7 +839,7 @@ function App() {
         // SAL-B2 F1b · «Entrar a la mesa» cuando la mesa arranco: la mesa se
         // CONSERVA en el estado (el stub la nombra) y solo cambia la pantalla.
         onPartida={(mesa) => { if (esMesa(mesa)) setSala(mesa); setScreen('partida-pvp') }}
-      />
+      />,
     )
   }
 
@@ -787,13 +849,13 @@ function App() {
   // espera. La casa hace lo mismo que la casita de la sala (:421): olvida la
   // invitacion, suelta la mesa y va al lobby.
   if (screen === 'partida-pvp') {
-    return (
+    return conVideo(
       <PartidaPvP
         cuenta={cuenta}
         billetera={billetera}
         sala={sala}
         onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); setScreen('lobby') }}
-      />
+      />,
     )
   }
 
@@ -827,7 +889,7 @@ function App() {
   }
 
   if (screen === 'retar-ias') {
-    return (
+    return conVideo(
       <RetarIAS
         cuenta={cuenta}
         billetera={billetera}
@@ -841,7 +903,7 @@ function App() {
         onRetar={retar}
         onVolver={() => { setSentando(null); setScreen('lobby') }}
         onLobby={() => { setSentando(null); setScreen('lobby') }}
-      />
+      />,
     )
   }
 
@@ -850,7 +912,7 @@ function App() {
   // ninguna más: el lobby sigue sin conocer
   // `screen`, ni Supabase, ni la mesa. Lo unico que sabe es que su segundo CTA
   // ahora lleva a alguna parte.
-  return (
+  return conVideo(
     <Lobby
       cuenta={cuenta}
       billetera={billetera}
@@ -860,7 +922,7 @@ function App() {
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
       onCerrarSesion={auth.cerrarSesion}
-    />
+    />,
   )
 }
 

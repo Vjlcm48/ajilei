@@ -237,7 +237,6 @@ export default function SalaOpciones({
         saldo={saldo}
         estadoSaldo={billetera?.estado}
         onPerfil={() => avisar('lob.toast.pronto')}
-        onTienda={() => avisar('lob.toast.pronto')}
         onAjustes={() => avisar('lob.toast.pronto')}
       />
 

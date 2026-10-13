@@ -8,6 +8,7 @@ import { montoTexto } from '../config/tapetes'
 import { useIdioma } from '../hooks/useIdioma'
 import { useSounds } from '../hooks/useSounds'
 import { useAvisoSaldo } from '../hooks/useAvisoSaldo'
+import { useVideo } from '../hooks/useVideo'
 import { vidaAviso } from '../hooks/avisoSaldoCore'
 import { monedaPosada } from '../hooks/constanciaCore'
 
@@ -60,7 +61,6 @@ export default function BarraSuperior({
   saldo = null,
   estadoSaldo,
   onPerfil,
-  onTienda,
   onAjustes,
   ajustesRef,
   // `undefined` = esta pantalla no tiene hoja que abrir, así que el ⚙ no anuncia
@@ -87,7 +87,18 @@ export default function BarraSuperior({
   const monedaRef = useRef(null)
   const textoAviso = aviso ? t(aviso.clave, { hc: '{hc}' }) : ''
   const avisoVivo = useAvisoSaldo(aviso, vidaAviso(textoAviso.replace('{hc}', montoTexto(aviso?.monto ?? 0))), onAvisoFin)
-  const cifra = avisoVivo.vivo ? avisoVivo.cifra : saldo
+  // ── ECO-1g · El video de recompensa ────────────────────────────────────
+  // El «+» dorado abre la hoja «Conseguir monedas» (G3 b). Llega por contexto
+  // (`MarcoVideo`), no por parámetro: las seis pantallas que montan esta barra
+  // lo heredan igual, y eran cinco manejadores de «Pronto» que mantener.
+  //
+  // Mientras dura la celebración del video, la píldora enseña la cifra que
+  // CUENTA y su moneda brilla, con el mismo mecanismo del aviso. El orden es:
+  // aviso vivo → celebración → saldo. Así no salta ni retrocede.
+  const video = useVideo()
+  const celebra = video?.pildora ?? null
+  const cifra = avisoVivo.vivo ? avisoVivo.cifra : (celebra ? celebra.cifra : saldo)
+  const brillaVideo = !avisoVivo.vivo && celebra?.brilla === true
   // El día del cobro la moneda del día espera a que su aviso empiece a contar.
   const posada = monedaPosada(constancia, avisoVivo.vivo ? aviso : null, avisoVivo.contando)
 
@@ -129,11 +140,17 @@ export default function BarraSuperior({
             componente — contrato de iconos. */}
         <span
           ref={monedaRef}
-          className={`lob-moneda${avisoVivo.vivo ? ' avs-viva' : ''}${avisoVivo.brilla ? ' avs-brilla' : ''}`}
+          className={`lob-moneda${avisoVivo.vivo || brillaVideo ? ' avs-viva' : ''}${avisoVivo.brilla || brillaVideo ? ' avs-brilla' : ''}`}
         >
           <BalanceDisplay chips={sinCifra ? '—' : montoTexto(cifra)} size="icon" />
         </span>
-        <SoundButton className="lob-mas" data-accion="tienda" aria-label={t('lob.nav.tienda')} onClick={onTienda}>
+        <SoundButton
+          className="lob-mas"
+          data-accion="tienda"
+          aria-label={t('video.hoja.titulo')}
+          aria-haspopup="dialog"
+          onClick={video?.abrirHoja}
+        >
           <IconoMas />
         </SoundButton>
       </div>

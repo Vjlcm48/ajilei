@@ -1,0 +1,463 @@
+/* ══ ECO-1g · El video de recompensa ═════════════════════════════════════════
+   Rector: AJILEI_ECO-1_Fase1g_v1.0.md §2.2. Es la hoja de la lámina aprobada
+   (`laminas/eco1f`), sin la lluvia ni el video en la mesa, que Victor descartó
+   (2 = A, 1 = B), más el «Guardando tu premio…» del cobro (P-2).
+
+   HOJA NUEVA Y ADITIVA: todas las clases son `vid-*` y ninguna regla de otra
+   hoja cambia. Las capas cuelgan de `.vid-raiz`, que `MarcoVideo` monta en
+   <body> (portal); el contador `.vid-quedan` vive además dentro del bloque de
+   saldo de Retar (`.sal-saldo`), con la unidad `--u` de esa pantalla.
+
+   Mide en `--u`, la misma unidad del lobby y de las salas
+   (`clamp(3.2px, 1vmin, 6px)`), y sólo usa los tokens de `theme.css`.
+   Pisos táctiles: 44 px en la capa, los diálogos y la hoja.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.vid-raiz {
+  --u: clamp(3.2px, 1vmin, 6px);
+  --vid-linea: rgba(var(--text-primary-rgb), 0.14);
+  --vid-margen: max(16px, calc(var(--u) * 3.5));
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  font-family: var(--font-base);
+  font-size: calc(var(--u) * 3.3);
+  line-height: 1.3;
+  letter-spacing: normal;
+  color: var(--text-primary);
+  text-align: left;
+}
+.vid-raiz *, .vid-raiz *::before, .vid-raiz *::after { box-sizing: border-box; }
+/* `:where` para no ganarle por especificidad a ninguna pieza de abajo. */
+:where(.vid-raiz) button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+
+/* ── El contador «Te quedan N de 8 hoy» / «Vuelven en …» ────────────────────
+   Una sola caja para los dos textos, siempre presente (O1). */
+.vid-quedan {
+  display: block;
+  margin: 0;
+  min-height: 1.3em;
+  font-size: calc(var(--u) * 2.7);
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* En el bloque de saldo de Retar (`.sal-saldo`, rejilla centrada). */
+.sal-saldo > .vid-quedan { margin-top: calc(var(--u) * -0.4); }
+/* ── EN EL TRAJE CORTO Y ANCHO DE RETAR, EL CONTADOR VA AL LADO ─────────────
+   Debajo del botón, el contador le cuesta 24 px a la columna. En un 1024×768,
+   un 1366×768 o un iPad girado (1133×744) esos 24 px sacan el CTA de la
+   ventana, y esa pantalla no desplaza: medido con `diagDSK retar`, que salía
+   rojo en sus celdas de 768 de alto. La doctrina de `salas.css` para ese traje
+   es apretar, no desplazar («lo que no cabe NO se scrollea, se aprieta»).
+
+   Aquí no se aprieta nada: con 660 px de columna sobra sitio a los lados del
+   botón, y el contador se sienta a su derecha. El botón sigue centrado donde
+   estaba (columna del medio) y el contador ocupa la tercera, así que pasar de
+   «Te quedan N de 8 hoy» a «Vuelven en…» no mueve el botón (O1). El bloque
+   vuelve a medir lo que medía antes del contador.
+
+   La frontera de alto es la del traje corto de `.es-retar` (800 px). La de
+   ancho deja fuera a los teléfonos girados, que ya desplazan por diseño y
+   conservan el contador debajo, como en la lámina. */
+@media (min-width: 1000px) and (max-height: 800px) {
+  .sal-saldo:has(> .vid-quedan) {
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: calc(var(--u) * 2.4);
+  }
+  .sal-saldo:has(> .vid-quedan) > .sal-saldo-txt { grid-column: 1 / -1; }
+  .sal-saldo:has(> .vid-quedan) > .sal-saldo-cta { grid-column: 2; }
+  .sal-saldo:has(> .vid-quedan) > .vid-quedan {
+    grid-column: 3;
+    justify-self: start;
+    margin-top: 0;
+    text-align: left;
+  }
+}
+
+/* El tope del día: el botón del video, apagado (G6). */
+.sal-saldo .sal-saldo-cta:disabled { opacity: 0.4; cursor: default; }
+.sal-saldo .sal-saldo-cta:disabled:hover { background: transparent; }
+.sal-saldo .sal-saldo-cta:disabled:active { transform: none; }
+
+/* ── Velos ──────────────────────────────────────────────────────────────── */
+.vid-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(var(--green-abyss-rgb), 0.6);
+  animation: vid-funde 200ms ease-out both;
+}
+.vid-velo-oscuro {
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--vid-margen);
+  background: rgba(var(--green-abyss-rgb), 0.78);
+}
+
+/* ══ LA HOJA «CONSEGUIR MONEDAS» ══════════════════════════════════════
+   La misma superficie que la hoja ⚙ del lobby (`.lob-hoja`): fondo de modal,
+   filete, radio de 3 u. Cuelga de la píldora (la coloca el JS). */
+.vid-hoja {
+  position: fixed;
+  z-index: 910;
+  width: min(calc(100vw - 2 * var(--vid-margen)), calc(var(--u) * 76));
+  max-height: calc(100dvh - var(--u) * 20);
+  overflow: auto;
+  background: var(--surface-modal);
+  border: 1px solid var(--vid-linea);
+  border-radius: calc(var(--u) * 3);
+  padding: calc(var(--u) * 3) calc(var(--u) * 4) calc(var(--u) * 2);
+  box-shadow: 0 0.6em 1.8em rgba(0, 0, 0, 0.45);
+  animation: vid-hoja-entra 200ms ease-out both;
+  transform-origin: top center;
+}
+.vid-hoja-t {
+  margin: 0 0 calc(var(--u) * 1.5);
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--text-primary);
+  outline: none;
+}
+.vid-hoja-t:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 4px; }
+
+.vid-fila {
+  width: 100%;
+  min-height: max(44px, calc(var(--u) * 12));
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: calc(var(--u) * 2.4);
+  padding: calc(var(--u) * 1.8) 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--vid-linea);
+  text-align: left;
+  cursor: pointer;
+}
+.vid-fila-ico {
+  width: calc(var(--u) * 8);
+  height: calc(var(--u) * 8);
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--green-abyss);
+  background: var(--gold-brand);
+}
+.vid-fila-ico svg { width: 56%; height: 56%; }
+.vid-fila-txt { min-width: 0; display: grid; gap: 0.15em; }
+.vid-fila-txt b { font-size: calc(var(--u) * 3.4); font-weight: 500; color: var(--text-primary); }
+.vid-fila-premio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: calc(var(--u) * 3.4);
+  font-weight: 700;
+  color: var(--gold-brand);
+  white-space: nowrap;
+}
+.vid-fila-premio .chip-token { width: 1.15em; height: 1.15em; }
+.vid-fila:disabled { cursor: default; }
+.vid-fila:disabled .vid-fila-ico { background: none; color: var(--text-muted); border: 1px solid var(--vid-linea); }
+.vid-fila:disabled .vid-fila-txt b { color: var(--text-muted); }
+.vid-fila:disabled .vid-fila-premio { color: var(--text-muted); }
+.vid-fila:disabled .vid-fila-premio .chip-token { opacity: 0.45; }
+.vid-fila-off { cursor: default; }
+.vid-fila-off .vid-fila-ico { background: none; color: var(--text-muted); border: 1px solid var(--vid-linea); }
+.vid-fila-off .vid-fila-txt b { color: var(--text-muted); }
+/* La pastilla «Pronto», la del lobby (`.lob-pastilla`). */
+.vid-pastilla {
+  font-size: calc(var(--u) * 2.65);
+  color: var(--text-muted);
+  border: 1px solid var(--vid-linea);
+  border-radius: 999px;
+  padding: 0.12em 0.7em;
+  white-space: nowrap;
+}
+
+/* ══ LA CAPA DEL VIDEO ════════════════════════════════════════════════════
+   A pantalla entera. Tres franjas: cabecera (marca y ✕), centro (el consejo) y
+   pie (barra y tiempo). Sirve igual en vertical y en apaisado bajo. */
+.vid-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + var(--vid-margen))
+    calc(env(safe-area-inset-right, 0px) + var(--vid-margen))
+    calc(env(safe-area-inset-bottom, 0px) + var(--vid-margen))
+    calc(env(safe-area-inset-left, 0px) + var(--vid-margen));
+  background:
+    radial-gradient(ellipse 80% 62% at 50% 46%, var(--green-base) 0%, var(--green-deep) 46%, var(--green-abyss) 100%);
+  overflow: hidden;
+  animation: vid-funde 220ms ease-out both;
+}
+/* El isotipo, como marca de agua: detrás de todo y sin pedir atención. */
+.vid-iso {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  height: min(70vh, 110vw);
+  width: auto;
+  transform: translate(-50%, -50%);
+  opacity: 0.07;
+  pointer-events: none;
+  user-select: none;
+}
+.vid-cab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 2);
+}
+.vid-marca {
+  font-size: calc(var(--u) * 2.5);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--vid-linea);
+  border-radius: 999px;
+  padding: 0.3em 0.9em;
+  white-space: nowrap;
+}
+.vid-x {
+  width: max(44px, calc(var(--u) * 9));
+  height: max(44px, calc(var(--u) * 9));
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--green-abyss-rgb), 0.45);
+  border: 1px solid var(--vid-linea);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.vid-x svg { width: 42%; height: 42%; }
+.vid-x:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+
+.vid-centro {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: calc(var(--u) * 2);
+  text-align: center;
+  padding: calc(var(--u) * 2) 0;
+}
+.vid-rotulo {
+  font-size: calc(var(--u) * 2.6);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-brand);
+}
+/* La caja del consejo, reservada a tres renglones: ningún consejo la mueve. */
+.vid-consejo-caja {
+  width: min(100%, 30ch);
+  font-size: calc(var(--u) * 5);
+  line-height: 1.3;
+  min-height: 3.9em;
+  display: grid;
+  align-items: center;
+}
+.vid-consejo {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-wrap: balance;
+  animation: vid-consejo-entra 420ms ease-out both;
+}
+
+.vid-pie { position: relative; display: grid; gap: calc(var(--u) * 1.8); }
+.vid-barra {
+  height: max(4px, calc(var(--u) * 1));
+  border-radius: 999px;
+  background: rgba(var(--text-primary-rgb), 0.16);
+  overflow: hidden;
+}
+.vid-barra > span {
+  display: block;
+  height: 100%;
+  background: var(--gold-brand);
+  transform-origin: left center;
+  transition: transform 120ms linear;
+}
+.vid-pie-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 2);
+  font-size: calc(var(--u) * 2.9);
+  color: var(--text-secondary);
+}
+.vid-premio { display: inline-flex; align-items: center; gap: 0.4em; color: var(--gold-brand); font-weight: 700; white-space: nowrap; }
+.vid-premio .chip-token { width: 1.2em; height: 1.2em; }
+/* El ancho se reserva: de «Faltan 10 s» a «Faltan 9 s» no baila nada. */
+.vid-falta { min-width: 6.4em; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ── El cobro que se reintenta (P-2) ────────────────────────────────────────
+   El video ya terminó: la capa se queda con la barra llena y, en el sitio de
+   «Faltan N s», «Guardando tu premio…». El texto entra con medio segundo de
+   retraso: un cobro que contesta enseguida (lo normal) no llega a enseñarlo.
+   La ✕ no está durante la primera tanda de reintentos; su hueco se conserva. */
+.vid-capa[data-fase="cobrando"] { animation: none; }
+.vid-capa[data-fase="cobrando"] .vid-centro { visibility: hidden; }
+.vid-capa[data-fase="cobrando"] .vid-barra > span { transition: none; }
+.vid-guardando { text-align: right; white-space: nowrap; animation: vid-funde 200ms 450ms ease-out both; }
+.vid-x-hueco { width: max(44px, calc(var(--u) * 9)); height: max(44px, calc(var(--u) * 9)); }
+
+/* En pausa y con la confirmación abierta, el consejo se retira: no se lee nada
+   a través del velo. Su caja sigue ahí (`visibility`), nada se mueve. */
+.vid-capa[data-fase="pausa"] .vid-centro,
+.vid-capa[data-fase="confirma"] .vid-centro { visibility: hidden; }
+
+/* ── En pausa ─────────────────────────────────────────────────────────── */
+.vid-pausa {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: calc(var(--u) * 1.6);
+  background: rgba(var(--green-abyss-rgb), 0.72);
+  border: 0;
+  cursor: pointer;
+  animation: vid-funde 160ms ease-out both;
+}
+.vid-pausa-ico {
+  width: max(64px, calc(var(--u) * 16));
+  height: max(64px, calc(var(--u) * 16));
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--gold-brand);
+  color: var(--green-abyss);
+}
+.vid-pausa-ico svg { width: 48%; height: 48%; }
+.vid-pausa b { font-size: calc(var(--u) * 4.2); font-weight: 500; color: var(--text-primary); }
+.vid-pausa > span:last-child { font-size: calc(var(--u) * 3.1); color: var(--text-secondary); }
+
+/* ── Diálogos ─────────────────────────────────────────────────────── */
+.vid-velo-int {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: var(--vid-margen);
+  background: rgba(var(--green-abyss-rgb), 0.72);
+  animation: vid-funde 160ms ease-out both;
+}
+.vid-dialogo {
+  width: min(100%, calc(var(--u) * 72));
+  background: var(--surface-modal);
+  border: 1px solid var(--vid-linea);
+  border-radius: calc(var(--u) * 3);
+  padding: calc(var(--u) * 4.5) calc(var(--u) * 4.5) calc(var(--u) * 4);
+  box-shadow: 0 0.6em 1.8em rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.vid-dialogo-t {
+  margin: 0;
+  font-size: calc(var(--u) * 3.8);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+.vid-dialogo-sub {
+  margin: calc(var(--u) * 1.6) 0 0;
+  font-size: calc(var(--u) * 3);
+  line-height: 1.4;
+  color: var(--text-secondary);
+  text-wrap: balance;
+}
+.vid-dialogo-acciones {
+  display: grid;
+  gap: calc(var(--u) * 2);
+  margin-top: calc(var(--u) * 4);
+}
+.vid-btn {
+  min-height: max(44px, calc(var(--u) * 10));
+  padding: 0 calc(var(--u) * 4);
+  border-radius: 999px;
+  border: 1px solid var(--gold-brand);
+  background: transparent;
+  color: var(--gold-brand);
+  font-size: calc(var(--u) * 3.3);
+  font-weight: 500;
+  cursor: pointer;
+}
+.vid-btn-oro { background: var(--gold-brand); color: var(--text-dark); font-weight: 700; }
+.vid-btn:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+
+/* ══ LA CELEBRACIÓN ═══════════════════════════════════════════════════════
+   Centrada, sin pico y sin velo que bloquee: se distingue a simple vista del
+   aviso de saldo, que es una cápsula pegada a la píldora. No atrapa toques. */
+.vid-cel {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: var(--vid-margen);
+  pointer-events: none;
+}
+.vid-cel-tarjeta {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 1);
+  padding: calc(var(--u) * 4.5) calc(var(--u) * 8) calc(var(--u) * 4);
+  background: var(--surface-modal);
+  border: 1.5px solid rgba(var(--gold-brand-rgb), 0.75);
+  border-radius: calc(var(--u) * 4);
+  box-shadow: 0 0 0 100vmax rgba(var(--green-abyss-rgb), 0.28), 0 0.8em 2.4em rgba(0, 0, 0, 0.55);
+  text-align: center;
+  animation: vid-cel-entra 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.vid-cel.is-sale .vid-cel-tarjeta { animation: vid-sale 300ms ease-in forwards; }
+.vid-cel-moneda { display: block; line-height: 0; margin-bottom: calc(var(--u) * 1); }
+.vid-cel-moneda .chip-token,
+.vid-cel-vuelo .chip-token { display: block; width: max(56px, calc(var(--u) * 15)); height: max(56px, calc(var(--u) * 15)); }
+.vid-cel-premio { font-size: calc(var(--u) * 7.5); font-weight: 700; line-height: 1.05; color: var(--gold-brand); white-space: nowrap; }
+.vid-cel-sub { font-size: calc(var(--u) * 3.2); color: var(--text-primary); }
+.vid-cel .vid-quedan { margin-top: calc(var(--u) * 0.6); }
+.vid-cel-vuelo { position: fixed; z-index: 1101; line-height: 0; pointer-events: none; will-change: transform; }
+.vid-cel-vuelo .chip-token { width: 100%; height: 100%; }
+
+
+/* ── Movimiento ───────────────────────────────────────────────────────────── */
+@keyframes vid-funde { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vid-sale { from { opacity: 1; } to { opacity: 0; } }
+@keyframes vid-hoja-entra { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes vid-consejo-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes vid-cel-entra { from { opacity: 0; transform: scale(0.86); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .vid-velo, .vid-capa, .vid-pausa, .vid-velo-int, .vid-hoja, .vid-consejo, .vid-cel-tarjeta, .vid-guardando { animation: none; }
+  .vid-cel.is-sale .vid-cel-tarjeta { animation: none; opacity: 0; }
+  .vid-barra > span { transition: none; }
+}
+
+/* ── Apaisado bajo (S25 girado, iPad mini girado en Safari) ─────────────────
+   El alto manda: el consejo se ensancha para ocupar dos renglones y los
+   diálogos ponen sus botones en fila. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .vid-consejo-caja { width: min(100%, 44ch); min-height: 2.6em; }
+  .vid-centro { gap: calc(var(--u) * 1.2); padding: calc(var(--u) * 1) 0; }
+  .vid-dialogo { width: min(100%, calc(var(--u) * 110)); padding: calc(var(--u) * 3.5) calc(var(--u) * 4.5); }
+  .vid-dialogo-acciones { grid-auto-flow: column; grid-auto-columns: 1fr; margin-top: calc(var(--u) * 3); }
+  .vid-cel-tarjeta { padding: calc(var(--u) * 3) calc(var(--u) * 8); }
+}

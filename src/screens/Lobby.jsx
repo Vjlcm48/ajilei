@@ -194,8 +194,9 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
         // `laminas/eco1d`, ubicación A). `null` mientras no se sabe: caja
         // reservada.
         constancia={constancia}
+        // ECO-1g · el «+» dorado ya no pasa por aquí: `BarraSuperior` abre la
+        // hoja «Conseguir monedas» por el contexto del video (`useVideo`).
         onPerfil={pronto}
-        onTienda={pronto}
         onAjustes={() => setHojaAbierta(true)}
         ajustesRef={ajustesRef}
         ajustesExpandido={hojaAbierta}

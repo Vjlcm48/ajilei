@@ -49,7 +49,6 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, onLo
         saldo={saldo}
         estadoSaldo={billetera?.estado}
         onPerfil={() => avisar('lob.toast.pronto')}
-        onTienda={() => avisar('lob.toast.pronto')}
         onAjustes={() => avisar('lob.toast.pronto')}
       />
 

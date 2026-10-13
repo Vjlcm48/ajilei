@@ -4,7 +4,6 @@ import '../styles/salas.css'
 import BarraSuperior from './BarraSuperior'
 import { IconoVolver, IconoCasa } from './IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
-import { ProntoContext } from '../hooks/usePronto'
 
 // ── APU-1 1e · K-3a · La carcasa de las pantallas de chips ──────────────────
 // Rector: AJILEI_APU-1_Fase1e_v1.0.md §2.1.
@@ -20,8 +19,8 @@ import { ProntoContext } from '../hooks/usePronto'
 // dos aquí, con sus dos `data-accion` de contrato.
 //
 // ── EL TOAST VIVE EN LA CARCASA, Y NO ES DETALLE ────────────────────────────
-// Los tres accesos de la barra superior —perfil, tienda, ⚙— no llevan a ninguna
-// parte todavía y responden «Pronto». Eso es comportamiento de la CARCASA, no
+// Dos accesos de la barra superior —perfil y ⚙— no llevan a ninguna parte
+// todavía y responden «Pronto». Eso es comportamiento de la CARCASA, no
 // de la pantalla: `ArmarMesa` y `RetarIAS` no tienen nada que decir al respecto
 // y duplicar el `setTimeout` en cada una sería dejar dos relojes que limpiar.
 // Es el único aviso de estas dos pantallas, así que es uno y no tres.
@@ -34,12 +33,14 @@ import { ProntoContext } from '../hooks/usePronto'
 // parámetro que nadie llega a leer. La política —que es lo que L-6 quiere
 // compartido— vive entera en `config/memoriaChips.js` y las dos pantallas
 // declaran la suya con dos listas de campos distintas. Consignado en §E.
-// ── RET-A · EL «PRONTO» BAJA A LOS HIJOS, EL MARCADO NO SUBE ───────────────
-// «Retar a las IAS» necesita dentro del cuerpo un botón que diga lo mismo que el
-// `+` dorado de la cabecera. Lo que se comparte es el MANEJADOR, por contexto
-// (`hooks/usePronto.js`, que explica por qué no es un parámetro de render); el
-// bloque se queda en la pantalla que lo pinta, porque es UI de una sola de las
-// dos y subirlo aquí le daría a `ArmarMesa` un trozo de marcado que no usa.
+// ── ECO-1g · EL «+» Y EL BOTÓN DE RETAR YA NO SON «PRONTO» ─────────────────
+// RET-A bajaba el «Pronto» a los hijos por contexto (`hooks/usePronto.js`) para
+// que el botón «Conseguir más monedas» de Retar dijera lo mismo que el `+`
+// dorado. Con el video de recompensa los dos llevan a alguna parte: el `+` abre
+// la hoja «Conseguir monedas» desde `BarraSuperior` y el botón de Retar pide el
+// video, los dos por el contexto del video (`hooks/useVideo.js`). `usePronto`
+// se queda sin consumidores y su `Provider` sale de aquí. El perfil y el ⚙
+// siguen diciendo «Pronto» con el aviso de esta carcasa.
 
 export default function PantallaChips({
   titulo,
@@ -68,15 +69,9 @@ export default function PantallaChips({
 
   useEffect(() => () => clearTimeout(relojToast.current), [])
 
-  // Los tres accesos dicen lo mismo, así que hay UN aviso y no tres relojes.
-  //
-  // ── ECO-1: conectar a la tienda / videos ──────────────────────────────────
-  // Éste es EL punto: el `+` dorado de la píldora, el avatar, el ⚙ y —desde
-  // RET-A— el botón «Conseguir más monedas» de «Retar a las IAS» entran todos
-  // por aquí. El día que haya tienda, lo que hoy es un toast se convierte en una
-  // ruta y las cuatro entradas la heredan sin tocarse. Por eso el botón nuevo
-  // recibe este manejador en vez de montar el suyo: dos «Pronto» serían dos
-  // sitios que alguien tendría que acordarse de conectar.
+  // Los dos accesos que quedan —el avatar y el ⚙— dicen lo mismo, así que hay
+  // UN aviso y no dos relojes. (El `+` dorado y el botón de Retar salieron de
+  // aquí con ECO-1g: ver la cabecera.)
   const pronto = useCallback(() => {
     setToast('lob.toast.pronto')
     clearTimeout(relojToast.current)
@@ -94,7 +89,6 @@ export default function PantallaChips({
         aviso={aviso}
         onAvisoFin={onAvisoFin}
         onPerfil={pronto}
-        onTienda={pronto}
         onAjustes={pronto}
       />
 
@@ -112,7 +106,7 @@ export default function PantallaChips({
       </div>
 
       <div className={`sal-cuerpo${clase ? ` ${clase}` : ''}`}>
-        <ProntoContext.Provider value={pronto}>{children}</ProntoContext.Provider>
+        {children}
 
         <section className="sal-accion">
           <button
