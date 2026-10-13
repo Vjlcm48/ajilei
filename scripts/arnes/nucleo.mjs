@@ -205,6 +205,7 @@ export const VEREDICTO_DSK = Object.freeze({
   mesaia: ARRIBA('verde'),      // ECO-1c · la mesa contra las IAS en el servidor (INV-47–49)
   revive: ARRIBA('verde'),      // ECO-1c · D-1: la IA quebrada no vuelve
   constancia: ARRIBA('verde'),  // ECO-1d · constancia, límites y válvula (INV-50–52)
+  video: ARRIBA('verde'),       // ECO-1g · el video de recompensa contra un boleto (INV-54)
   // `matrixOk`
   gate: ARRIBA('matrixOk'),
   // booleanos por celda (diagnósticos de DSK que nunca juntaron un `passed`)
@@ -219,7 +220,7 @@ export const VEREDICTO_DSK = Object.freeze({
 export const MODOS_DSK = Object.freeze([
   'humo', 'd1d2', 'd3', 'bug', 'shots', 'gate', 'lob', 'retar', 'apu', 'b1', 'tactil', 'p1', 'p2',
   'r1', 'r2', 'o1', 'h1', 'm1', 'a1', 'f1', 'z1', 'o2', 'a2', 'u1', 'menu-movil', 'u2', 'u3',
-  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo', 'mesaia', 'revive', 'constancia',
+  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo', 'mesaia', 'revive', 'constancia', 'video',
 ])
 const CLAVES_META = new Set(['mode', 'ts', 'arnes', 'error', 'veredicto', 'codigo'])
 

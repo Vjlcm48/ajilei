@@ -40,6 +40,15 @@ const PROHIBIDAS = [
   // hay mando de URL para la racha; éstos sólo los alcanza el arnés.
   'constanciaAdmin',
   'forzarLimite',
+  // ECO-1g · los mandos del video de recompensa (`?apu=video:<ms>`,
+  // `?apu=video:sin`, `?apu=video:cierra`). La huella es el LITERAL de su
+  // expresión regular en `siembraAPU.videoSembradoAPU`, no `video:` a secas:
+  // esa cadena la pueden traer las tablas de etiquetas de `react-dom`. Si
+  // aparece, un video se podría acortar en producción. Y los dos mandos del
+  // banco imitado que sólo alcanza el arnés.
+  '|sin|cierra',
+  'sembrarVideosCobrados',
+  'envejecerBoleto',
   // los estados de `?sal=`
   'opciones-fuera-alcance',
   'espera-fantasma',
@@ -54,7 +63,11 @@ const PROHIBIDAS = [
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las
 // funciones de mesa de verdad (la falsa no puede ser la única que llega).
 // ECO-1d · y la constancia de verdad.
-const OBLIGATORIAS = ['mi_billetera', 'sentarse_ia', 'informar_pila', 'recoger_mesa_ia', 'marcar_ingreso']
+// ECO-1g · y el video de verdad: el contador, el boleto y su cobro.
+const OBLIGATORIAS = [
+  'mi_billetera', 'sentarse_ia', 'informar_pila', 'recoger_mesa_ia', 'marcar_ingreso',
+  'mi_video', 'pedir_boleto', 'cobrar_boleto',
+]
 
 let carpeta = null
 let textos = []

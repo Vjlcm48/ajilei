@@ -327,6 +327,7 @@ import { pisoDe } from '../src/engine/entrada.js'
 import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa, esperarMesa as esperarMesaComun } from './rutaMesa.mjs'
 import { runMesaIA, runRevive } from './eco/mesaia.mjs'
 import { runConstancia } from './eco/constancia.mjs'
+import { runVideo } from './eco/video.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -409,7 +410,8 @@ const VC_RETRASO_ROCE_MS = (() => {
 // ECO-1b · `saldo` también: mide la billetera que la API REAL lee del arnés.
 // ECO-1c · y `mesaia`: la mesa contra las IAS contra el servidor imitado.
 // ECO-1d · y `constancia`: la constancia, los límites y la válvula, también ahí.
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia']
+// ECO-1g · y `video`: el video de recompensa, con videos de 40 s de verdad.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -1619,6 +1621,8 @@ async function runRetar(browser) {
         hayBloque: Boolean(bloque),
         texto: bloque?.querySelector('p')?.textContent?.trim() ?? '',
         boton: bloque?.querySelector('[data-accion="mas-monedas"]')?.textContent?.trim() ?? '',
+        // ECO-1g · el contador del video, debajo del botón («Te quedan N de 8 hoy»).
+        contador: bloque?.querySelector('[data-accion="video-quedan"]')?.textContent?.trim() ?? '',
         botonAlto: Math.round(bloque?.querySelector('[data-accion="mas-monedas"]')?.getBoundingClientRect().height ?? 0),
         // Sin rojo ni naranja en ninguna de las dos piezas: la casa reserva esos
         // dos para los problemas, y un bolsillo corto no lo es.
@@ -1650,6 +1654,10 @@ async function runRetar(browser) {
     // Avanzado. Se mide la geometría AQUÍ también, porque es el estado con un
     // bloque de más en la columna — el que de verdad puede empujar el CTA.
     await irAPro(RETAR_SALDO_AVISO)
+    // ECO-1g · el contador lo contesta `mi_video` (el banco imitado del bypass)
+    // un instante después de salir el bloque: se espera a que esté, o la celda
+    // mediría la caja vacía.
+    await page.waitForFunction(() => /\d/.test(document.querySelector('.sal-saldo [data-accion="video-quedan"]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {})
     const aviso = await leerSaldo()
     const geoAviso = await medirGeoRetar(page)
     c.shotAviso = `${RETAR_OUT_DIR}/retar_aviso_${vp.w}x${vp.h}.png`
@@ -1662,14 +1670,27 @@ async function runRetar(browser) {
     // componente que está por ENCIMA de ella, donde el contexto todavía no
     // existe—. No lo cazó ninguna vara: lo cazó una captura. Un botón que se
     // mide sólo por su aspecto es un botón a medio medir.
+    //
+    // ECO-1g · el botón ya no contesta «Pronto»: ABRE EL VIDEO de recompensa
+    // (la capa «Video de prueba»), y el «Pronto» no sale. Aquí sólo se mide que
+    // lleva a donde dice; el recorrido entero (ver, cobrar, el tope) es del
+    // modo `video`. Se cierra con la ✕ y «Salir», que no cobra ni cuenta.
     await page.click('[data-accion="mas-monedas"]')
+    await page.waitForSelector('[data-accion="video"][data-fase="corriendo"]', { timeout: 5000 }).catch(() => {})
     await page.waitForTimeout(220)
-    const toast = await page.evaluate(() => {
-      const n = document.querySelector('.sal-toast')
-      return { on: n?.classList.contains('is-on') ?? false, texto: n?.textContent?.trim() ?? '' }
-    })
-    c.shotPronto = `${RETAR_OUT_DIR}/retar_pronto_${vp.w}x${vp.h}.png`
-    await page.screenshot({ path: c.shotPronto })
+    const video = await page.evaluate(() => ({
+      abierta: !!document.querySelector('[data-accion="video"]'),
+      marca: document.querySelector('[data-accion="video-marca"]')?.textContent?.trim() ?? '',
+      toast: document.querySelector('.sal-toast')?.classList.contains('is-on') ?? false,
+    }))
+    c.shotVideo = `${RETAR_OUT_DIR}/retar_video_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shotVideo })
+    if (video.abierta) {
+      await page.click('[data-accion="video-cerrar"]')
+      await page.click('[data-accion="video-salir"]')
+      await page.waitForSelector('[data-accion="video"]', { state: 'detached', timeout: 5000 }).catch(() => {})
+    }
+    video.cerrada = !(await page.evaluate(() => !!document.querySelector('[data-accion="video"]')))
 
     const sinRojo = (colores) => colores.length > 0 && colores.every((col) => {
       const [r, g, b] = col.match(/\d+/g).map(Number)
@@ -1679,7 +1700,7 @@ async function runRetar(browser) {
     })
 
     c['retar.4'] = {
-      gris, aviso, geoAviso, toast,
+      gris, aviso, geoAviso, video,
       // 1f-A4 · Pro pide 2.000 · 4.000 · 6.000 · 10.000 de piso. Con 2.400
       // sobrevive SÓLO la primera: tres chips apagados y NINGÚN aviso, porque
       // hay mesa a tiro. Es el caso 0 del rector.
@@ -1691,11 +1712,12 @@ async function runRetar(browser) {
         // su botón al mínimo táctil de la casa y sin un hueco sin llenar.
         && aviso.apagadas === 4 && aviso.hayBloque && !aviso.avisoMesa
         && aviso.texto.includes('Avanzado') && !aviso.texto.includes('⟦')
-        && aviso.boton === 'Conseguir más monedas' && aviso.botonAlto >= 40
+        // ECO-1g · el rótulo y el contador del video (el premio y los 8 los
+        // dice el servidor; aquí, el banco imitado del bypass).
+        && aviso.boton === 'Ver un video · +500 HC' && aviso.contador === 'Te quedan 8 de 8 hoy' && aviso.botonAlto >= 40
         && sinRojo(aviso.colores)
-        // …y al pulsarlo sale el MISMO «Pronto» que el `+` dorado de la
-        // cabecera, que es de donde lo toma prestado.
-        && toast.on && toast.texto === 'Pronto'
+        // …y al pulsarlo se abre el video, no el «Pronto»; y se puede cerrar.
+        && video.abierta && video.marca === 'Video de prueba' && !video.toast && video.cerrada
         // …y la nota del CTA se ha ido, que es el ajuste del rector al revisar
         // RET-A: no puede convivir con un aviso que dice que no hay nada que
         // elegir.
@@ -14636,7 +14658,9 @@ try {
   // ECO-1b · `saldo` mide además la sala de espera, a la que sólo se llega con
   // `?sal=` (DEV y bypass): su servidor de desarrollo va DESPUÉS del preview y
   // su build (INV-43), en `--puerto-aux=N` o 5173.
-  if (!EXTERNO && (MODE === 'saldo' || MODE === 'mesaia')) {
+  // ECO-1g · `video` también: sus tres mandos (`?apu=video:`) sólo existen en
+  // desarrollo con bypass, y los comprueba su punto auxiliar.
+  if (!EXTERNO && (MODE === 'saldo' || MODE === 'mesaia' || MODE === 'video')) {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5173, bypass: true })
   }
   if (!EXTERNO && (MODE === 'luz' || MODE === 'rev')) {
@@ -14723,6 +14747,12 @@ try {
   if (MODE === 'constancia') {
     try { mkdirSync('capturas-constancia', { recursive: true }) } catch { /* ya existe */ }
     report.constancia = await runConstancia(browser, { base: BASE_PROD })
+  }
+  // ECO-1g · `video` (G1–G8, S1–S5 contra el servidor imitado, con videos de
+  // 40 s reales en contextos paralelos) y sus mandos de desarrollo.
+  if (MODE === 'video') {
+    try { mkdirSync('capturas-video', { recursive: true }) } catch { /* ya existe */ }
+    report.video = await runVideo(browser, { base: BASE_PROD, baseDev: BASE_SALDO_DEV, externo: EXTERNO })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)
