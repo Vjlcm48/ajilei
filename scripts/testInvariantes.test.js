@@ -158,7 +158,7 @@ describe('ECO-1e · la lista de varas de ECO-1 (§6)', () => {
   it('están las varas de ECO-1 y el corredor de guiones', () => {
     const nombradas = varas.flatMap((f) => tokens(f.celdas[0]))
     for (const v of ['diagDSK humo', 'diagDSK lob', 'diagDSK saldo', 'diagDSK mesaia', 'diagDSK revive',
-      'diagDSK constancia', 'diagCEL0 celebracion', 'diagSAL sal', 'scripts/guiones.mjs']) {
+      'diagDSK constancia', 'diagDSK video', 'diagCEL0 celebracion', 'diagSAL sal', 'scripts/guiones.mjs']) {
       expect(nombradas, `falta la vara «${v}»`).toContain(v)
     }
   })
