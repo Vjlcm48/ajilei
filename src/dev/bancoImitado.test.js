@@ -5,10 +5,13 @@ import process from 'node:process'
 import {
   crearBanco, APUESTAS_SQL, PISO_SQL, TECHO_SQL, FACTOR_IA_SQL, SILENCIO_RECOGIDA_MS,
   LIMITES_SQL, BONO_CONSTANCIA_SQL, CICLO_CONSTANCIA_SQL, sumarDias,
+  VIDEO_PREMIO_SQL, VIDEO_TOPE_SQL, VIDEO_MINIMO_S_SQL, VIDEO_VIDA_MS_SQL, videoReinicioSQL, diaChicagoSQL,
 } from './bancoImitado'
 import { NIVELES } from '../config/niveles'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
 import { CICLO_CONSTANCIA } from '../hooks/constanciaCore'
+import { ESPERAS_COBRO_MS } from '../hooks/videoCore'
+import { ESPERAS_RED_MS } from '../lib/controlMesaIA'
 
 // ── ECO-1c · el banco imitado cumple el contrato del SQL ────────────────────
 // Los casos son los del guion `supabase/pruebas/eco1c_verificacion.sql`, con
@@ -384,8 +387,16 @@ describe('ECO-1d · las cifras de la 1d, en espejo', () => {
   const dir = join(process.cwd(), 'supabase', 'migrations')
   const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.includes('eco1d_constancia'))), 'utf8')
 
+  // ECO-1g · `limite_dinero` es un `case` cerrado y cada tanda que añade una
+  // función de dinero la REDEFINE entera. El espejo es la definición MÁS
+  // RECIENTE (la última migración, por orden de nombre, que la trae), no la de
+  // la 1d: así la próxima redefinición no deja esta prueba mirando una vieja.
+  const ultimaDefinicion = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
+    .map((f) => /function public\.limite_dinero[\s\S]*?\$fn\$;/.exec(readFileSync(join(dir, f), 'utf8'))?.[0])
+    .filter(Boolean).pop()
+
   it('limite_dinero: SQL = modelo; informar_pila sin límite', () => {
-    const bloque = /function public\.limite_dinero[\s\S]*?\$fn\$;/.exec(sql)[0]
+    const bloque = ultimaDefinicion
     const enSql = Object.fromEntries([...bloque.matchAll(/when '(\w+)'\s+then (\d+)/g)].map((m) => [m[1], Number(m[2])]))
     expect(enSql).toEqual({ ...LIMITES_SQL })
     expect(enSql.informar_pila).toBeUndefined()
@@ -395,5 +406,229 @@ describe('ECO-1d · las cifras de la 1d, en espejo', () => {
     expect(/bono_constancia_hc\(\)\s*returns bigint[^$]*\$fn\$ select (\d+)::bigint/.exec(sql)[1]).toBe(String(BONO_CONSTANCIA_SQL))
     expect(/constancia_ciclo\(\)\s*returns integer[^$]*\$fn\$ select (\d+) \$fn\$/.exec(sql)[1]).toBe(String(CICLO_CONSTANCIA_SQL))
     expect(CICLO_CONSTANCIA).toBe(CICLO_CONSTANCIA_SQL)
+  })
+})
+
+// ── ECO-1g · el video de recompensa cumple el contrato del SQL ──────────────
+// Los casos son los del guion `supabase/pruebas/eco1g_verificacion.sql`, con
+// las MISMAS cifras; cada prueba lleva el número de la fila del guion que
+// repite. Lo que el guion hace envejeciendo filas, aquí lo hace el reloj.
+// Sin su par aquí: 17 (sin sesión), 18 y 19 (permisos y tabla), que son de la
+// base y no del modelo; y de la 16, «ajeno» (el banco es de UNA cuenta).
+describe('ECO-1g · banco imitado · el video (guion 1g)', () => {
+  const S = 1000
+  const ms = (isoTexto) => new Date(isoTexto).getTime()
+  const videos = (b) => b.libro.filter((l) => l.tipo === 'video')
+  // Un video entero: pedir, dejar pasar el mínimo y cobrar.
+  const ver = (ll, reloj) => {
+    const p = ll('pedir_boleto')
+    reloj.t += VIDEO_MINIMO_S_SQL * S
+    return ll('cobrar_boleto', { p_boleto: p.boleto_id })
+  }
+
+  it('2 · mi_video: quedan 8 de 8, el premio y la próxima medianoche de Chicago; no escribe', () => {
+    const { b, ll, reloj } = banco()
+    const r = ll('mi_video')
+    expect(r).toMatchObject({ codigo: 'ok', quedan: 8, tope: 8, premio: 500 })
+    expect(ms(r.ahora)).toBe(reloj.t)
+    expect(ms(r.reinicio_en)).toBe(videoReinicioSQL(reloj.t))
+    expect(ms(r.reinicio_en)).toBeGreaterThan(reloj.t)
+    expect(diaChicagoSQL(ms(r.reinicio_en))).toBe(sumarDias(diaChicagoSQL(reloj.t), 1))
+    expect(diaChicagoSQL(ms(r.reinicio_en) - 1)).toBe(diaChicagoSQL(reloj.t))
+    expect(b.intentos).toHaveLength(0)
+    expect(b.boletos).toHaveLength(0)
+  })
+
+  it('3 · 4 · 5 · 6 · 21 · pedir, cobrar pronto, cobrar a tiempo y cobrar otra vez', () => {
+    const { b, ll, reloj } = banco()
+    // 3 · un boleto que vence a los 10 min; el recién emitido no descuenta
+    const p = ll('pedir_boleto')
+    expect(p).toMatchObject({ codigo: 'ok', minimo_s: 35, quedan: 8 })
+    expect(p.boleto_id).toBeTruthy()
+    expect(ms(p.vence_en) - ms(p.emitido_en)).toBe(VIDEO_VIDA_MS_SQL)
+    expect(ms(p.emitido_en)).toBe(reloj.t)
+    // 4 · antes de los 35 s: demasiado_pronto, con lo que falta y sin cobro
+    reloj.t += 10 * S
+    expect(ll('cobrar_boleto', { p_boleto: p.boleto_id }))
+      .toMatchObject({ codigo: 'demasiado_pronto', cobrado: 0, saldo: 2500, quedan: 8, faltan_s: 25, premio: 500 })
+    expect(videos(b)).toHaveLength(0)
+    // 5 · a los 35 s: +500, una línea `video`
+    reloj.t += 25 * S
+    expect(ll('cobrar_boleto', { p_boleto: p.boleto_id }))
+      .toMatchObject({ codigo: 'ok', cobrado: 500, saldo: 3000, quedan: 7, faltan_s: 0, premio: 500 })
+    expect(videos(b)).toEqual([{ tipo: 'video', monto: 500, saldo_tras: 3000, clave: `video:${p.boleto_id}`, ref: p.boleto_id }])
+    // 6 · 21 · otra vez: ya_cobrado, el saldo ya subido, el premio dicho y UN movimiento
+    expect(ll('cobrar_boleto', { p_boleto: p.boleto_id }))
+      .toMatchObject({ codigo: 'ya_cobrado', cobrado: 0, saldo: 3000, quedan: 7, premio: 500 })
+    expect(videos(b)).toHaveLength(1)
+    expect(b.saldo).toBe(3000)
+  })
+
+  it('7 · S1: pedir con uno vivo anula el anterior, y el anulado no se cobra', () => {
+    const { b, ll, reloj } = banco()
+    const viejo = ll('pedir_boleto').boleto_id
+    reloj.t += 20 * S
+    const nuevo = ll('pedir_boleto').boleto_id
+    expect(nuevo).not.toBe(viejo)
+    expect(b.boletos.filter((x) => x.cobrado_en === null && x.anulado_en === null).map((x) => x.id)).toEqual([nuevo])
+    reloj.t += 40 * S
+    expect(ll('cobrar_boleto', { p_boleto: viejo })).toMatchObject({ codigo: 'anulado', cobrado: 0, saldo: 2500 })
+    expect(ll('cobrar_boleto', { p_boleto: nuevo })).toMatchObject({ codigo: 'ok', cobrado: 500 })
+    expect(videos(b)).toHaveLength(1)
+  })
+
+  it('8 · vencido a los 10 min, sin cobro; el ya cobrado sigue diciendo ya_cobrado pasados 11', () => {
+    const { b, ll, reloj } = banco()
+    const p = ll('pedir_boleto').boleto_id
+    reloj.t += VIDEO_VIDA_MS_SQL
+    expect(ll('cobrar_boleto', { p_boleto: p })).toMatchObject({ codigo: 'vencido', cobrado: 0, saldo: 2500 })
+    expect(videos(b)).toHaveLength(0)
+    const r = ver(ll, reloj)
+    expect(r.codigo).toBe('ok')
+    const cobrado = b.boletos.find((x) => x.cobrado_en !== null).id
+    reloj.t += 11 * 60 * S
+    expect(ll('cobrar_boleto', { p_boleto: cobrado })).toMatchObject({ codigo: 'ya_cobrado', saldo: 3000 })
+  })
+
+  it('9 · G2: el boleto sin cobrar (el video cerrado antes) no cuenta para el tope', () => {
+    const { b, ll } = banco()
+    for (let i = 0; i < 5; i++) ll('pedir_boleto')
+    expect(ll('mi_video').quedan).toBe(8)
+    expect(b.saldo).toBe(2500)
+  })
+
+  it('10 · 11 · 12 · ocho al día: el noveno pedido es tope_dia sin efectos, y al día siguiente vuelve', () => {
+    const { b, ll, reloj } = banco()
+    for (let i = 1; i <= 8; i++) {
+      // Un minuto entre uno y otro: el límite por minuto no es lo que se prueba aquí.
+      reloj.t += 60 * S
+      expect(ver(ll, reloj)).toMatchObject({ codigo: 'ok', quedan: 8 - i })
+    }
+    expect(b.saldo).toBe(2500 + 8 * 500)
+    const boletos = b.boletos.length
+    const r = ll('pedir_boleto')
+    expect(r).toMatchObject({ codigo: 'tope_dia', boleto_id: null, emitido_en: null, vence_en: null, quedan: 0 })
+    expect(b.boletos).toHaveLength(boletos)
+    expect(ll('mi_video').quedan).toBe(0)
+    // 12 · al día siguiente de Chicago (26 h: el día de otoño dura 25)
+    reloj.t += 26 * 3600 * S
+    expect(ll('mi_video').quedan).toBe(8)
+    expect(ver(ll, reloj)).toMatchObject({ codigo: 'ok', quedan: 7 })
+  })
+
+  it('11 · la guarda de tope_dia en el cobro: con 8 cobrados, un boleto vivo no paga', () => {
+    const { b, ll, reloj } = banco()
+    const p = ll('pedir_boleto').boleto_id
+    b.sembrarVideosCobrados(8)
+    reloj.t += VIDEO_MINIMO_S_SQL * S
+    expect(ll('cobrar_boleto', { p_boleto: p })).toMatchObject({ codigo: 'tope_dia', cobrado: 0, saldo: 2500, quedan: 0 })
+    expect(videos(b)).toHaveLength(0)
+  })
+
+  it('13 · el reinicio es la medianoche de Chicago, también los dos días del cambio de hora', () => {
+    // 2026-11-01: el día de 25 h (vuelve la hora de invierno). 2026-03-08: el de 23 h.
+    const mediodia = (dia) => new Date(`${dia}T18:00:00Z`).getTime()
+    expect(new Date(videoReinicioSQL(mediodia('2026-10-31'))).toISOString()).toBe('2026-11-01T05:00:00.000Z')
+    expect(new Date(videoReinicioSQL(mediodia('2026-11-01'))).toISOString()).toBe('2026-11-02T06:00:00.000Z')
+    expect(videoReinicioSQL(mediodia('2026-11-01')) - videoReinicioSQL(mediodia('2026-10-31'))).toBe(25 * 3600 * S)
+    expect(new Date(videoReinicioSQL(mediodia('2026-03-07'))).toISOString()).toBe('2026-03-08T06:00:00.000Z')
+    expect(new Date(videoReinicioSQL(mediodia('2026-03-08'))).toISOString()).toBe('2026-03-09T05:00:00.000Z')
+    expect(videoReinicioSQL(mediodia('2026-03-08')) - videoReinicioSQL(mediodia('2026-03-07'))).toBe(23 * 3600 * S)
+    // Un segundo antes de la medianoche, el reinicio es esa medianoche; en ella, la siguiente.
+    const medianoche = new Date('2026-07-15T05:00:00Z').getTime()
+    expect(videoReinicioSQL(medianoche - S)).toBe(medianoche)
+    expect(videoReinicioSQL(medianoche)).toBe(medianoche + 24 * 3600 * S)
+  })
+
+  it('14 · el límite al pedir: el 11.º del minuto es limite sin efectos, y queda anotado', () => {
+    const { b, ll, reloj } = banco()
+    for (let i = 0; i < 10; i++) expect(ll('pedir_boleto').codigo).toBe('ok')
+    const vivo = b.boletos.find((x) => x.anulado_en === null).id
+    expect(ll('pedir_boleto')).toMatchObject({ codigo: 'limite', boleto_id: null, quedan: 8 })
+    expect(b.boletos).toHaveLength(10)
+    expect(b.boletos.find((x) => x.anulado_en === null).id).toBe(vivo)
+    expect(b.intentos.filter((x) => x.funcion === 'pedir_boleto')).toHaveLength(11)
+    reloj.t += 61 * S
+    expect(ll('pedir_boleto').codigo).toBe('ok')
+  })
+
+  it('15 · K7: un cobro cortado por el límite se cobra entero después, con el mismo boleto', () => {
+    const { b, ll, reloj } = banco()
+    const p = ll('pedir_boleto').boleto_id
+    reloj.t += VIDEO_MINIMO_S_SQL * S
+    b.forzarLimite('cobrar_boleto', 2)
+    expect(ll('cobrar_boleto', { p_boleto: p })).toMatchObject({ codigo: 'limite', cobrado: 0, saldo: 2500, quedan: 8, premio: 500 })
+    expect(ll('cobrar_boleto', { p_boleto: p }).codigo).toBe('limite')
+    expect(b.boletos[0]).toMatchObject({ cobrado_en: null, anulado_en: null })
+    expect(ll('cobrar_boleto', { p_boleto: p })).toMatchObject({ codigo: 'ok', cobrado: 500, saldo: 3000 })
+    expect(videos(b)).toHaveLength(1)
+    // y el tope de verdad: 20 por minuto
+    const otro = crearBanco({ saldo: 0, ahora: () => 5_000_000 })
+    for (let i = 0; i < 20; i++) expect(otro.llamar('cobrar_boleto', { p_boleto: 'x' }).codigo).toBe('inexistente')
+    expect(otro.llamar('cobrar_boleto', { p_boleto: 'x' }).codigo).toBe('limite')
+  })
+
+  it('16 · un boleto que no existe no se cobra', () => {
+    const { b, ll } = banco()
+    expect(ll('cobrar_boleto', { p_boleto: 'boleto-de-otro' })).toMatchObject({ codigo: 'inexistente', cobrado: 0, saldo: 2500 })
+    expect(ll('cobrar_boleto', {})).toMatchObject({ codigo: 'inexistente' })
+    expect(videos(b)).toHaveLength(0)
+  })
+
+  it('20 · el libro cuadra: cada boleto cobrado tiene su movimiento y ninguno más', () => {
+    const { b, ll, reloj } = banco()
+    for (let i = 0; i < 3; i++) { reloj.t += 60 * S; ver(ll, reloj) }
+    ll('pedir_boleto')                      // uno sin cobrar
+    const cobrados = b.boletos.filter((x) => x.cobrado_en !== null)
+    expect(cobrados).toHaveLength(3)
+    expect(videos(b).map((l) => l.clave).sort()).toEqual(cobrados.map((x) => `video:${x.id}`).sort())
+    expect(b.saldo).toBe(2500 + b.libro.reduce((s, l) => s + l.monto, 0))
+  })
+
+  it('el mando de desarrollo acorta el mínimo; `rpc` contesta con la forma de PostgREST', async () => {
+    const reloj = { t: 1_000_000_000 }
+    const b = crearBanco({ saldo: 0, ahora: () => reloj.t, videoMinimoS: 3 })
+    const { data: p, error } = await b.rpc('pedir_boleto')
+    expect(error).toBeNull()
+    expect(p.minimo_s).toBe(3)
+    reloj.t += 3 * S
+    expect((await b.rpc('cobrar_boleto', { p_boleto: p.boleto_id })).data).toMatchObject({ codigo: 'ok', saldo: 500 })
+  })
+})
+
+describe('ECO-1g · las cifras del video, en espejo', () => {
+  const dir = join(process.cwd(), 'supabase', 'migrations')
+  const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.includes('eco1g_video'))), 'utf8')
+  const cifra = (nombre) => new RegExp(`function public\\.${nombre}\\(\\)[^$]*\\$fn\\$ select ([^$]+?) \\$fn\\$`).exec(sql)[1]
+
+  it('el premio, el tope, el mínimo y la vida del boleto: SQL = modelo', () => {
+    expect(cifra('video_premio_hc')).toBe(`${VIDEO_PREMIO_SQL}::bigint`)
+    expect(cifra('video_tope_dia')).toBe(String(VIDEO_TOPE_SQL))
+    expect(cifra('video_minimo_s')).toBe(String(VIDEO_MINIMO_S_SQL))
+    expect(cifra('video_vida_boleto')).toBe(`interval '${VIDEO_VIDA_MS_SQL / 60000} minutes'`)
+  })
+
+  it('el espejo del cliente (`videoReward`, `maxVideosPerDay`) dice lo mismo que el SQL', () => {
+    // El premio lo dice el servidor (`premio` en `mi_video` y `cobrar_boleto`);
+    // el del cliente sólo se usa mientras el servidor no ha contestado.
+    expect(AJILEI_CONFIG.economy.videoReward).toBe(VIDEO_PREMIO_SQL)
+    expect(AJILEI_CONFIG.economy.maxVideosPerDay).toBe(VIDEO_TOPE_SQL)
+    // El video visible dura más que el mínimo del servidor (S2: sitio a la latencia).
+    expect(AJILEI_CONFIG.economy.video.duracionMs).toBeGreaterThan(VIDEO_MINIMO_S_SQL * 1000)
+    expect(AJILEI_CONFIG.economy.video.duracionMs).toBeLessThan(VIDEO_VIDA_MS_SQL)
+  })
+
+  it('los reintentos del cobro son los de la casa, y caben holgados en el límite', () => {
+    expect([...ESPERAS_COBRO_MS]).toEqual([...ESPERAS_RED_MS])
+    // El primer minuto: la llamada inicial (t = 0) más los reintentos que caen
+    // antes de los 60 s (1, 3, 7, 15, 30 y 45 s). El de los 60 s ya es otro minuto.
+    let t = 0
+    let llamadas = 1
+    for (let i = 0; t + ESPERAS_COBRO_MS[Math.min(i, ESPERAS_COBRO_MS.length - 1)] < 60000; i++) {
+      t += ESPERAS_COBRO_MS[Math.min(i, ESPERAS_COBRO_MS.length - 1)]
+      llamadas += 1
+    }
+    expect(llamadas).toBe(7)
+    expect(llamadas).toBeLessThan(LIMITES_SQL.cobrar_boleto / 2)
   })
 })

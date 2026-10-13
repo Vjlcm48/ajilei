@@ -16,7 +16,10 @@
 // para UNA cuenta (la de la sesión): mismas validaciones, en el mismo orden, y
 // mismos códigos. ECO-1d le suma la `20261009105658_eco1d_constancia_limites_valvula.sql`:
 // `marcar_ingreso`, los límites por minuto y la válvula, con sus pruebas de
-// contrato y de espejo en el mismo archivo de pruebas. `rpc(nombre, params)` devuelve `{ data, error }` con la forma
+// contrato y de espejo en el mismo archivo de pruebas. ECO-1g le suma la
+// `20261012230807_eco1g_video.sql`: `mi_video`, `pedir_boleto` y `cobrar_boleto`
+// (el video de recompensa contra un boleto), con las cuatro cifras del video y
+// los dos límites nuevos. `rpc(nombre, params)` devuelve `{ data, error }` con la forma
 // de PostgREST: el compuesto `mesa_ia_resultado` llega como objeto con las
 // claves en snake_case, y `mi_mesa_ia` como lista.
 //
@@ -40,11 +43,19 @@ export const TECHO_SQL = 50
 export const FACTOR_IA_SQL = 1.5
 export const SILENCIO_RECOGIDA_MS = 10 * 60 * 1000
 // ECO-1d · `limite_dinero()`, `bono_constancia_hc()` y `constancia_ciclo()`.
+// ECO-1g · la 1g la redefine con los dos nombres del video.
 export const LIMITES_SQL = Object.freeze({
   sentarse_ia: 10, recargar_ia: 20, salir_ia: 30, recoger_mesa_ia: 10, marcar_ingreso: 6,
+  pedir_boleto: 10, cobrar_boleto: 20,
 })
 export const BONO_CONSTANCIA_SQL = 500
 export const CICLO_CONSTANCIA_SQL = 3
+// ECO-1g · `video_premio_hc()`, `video_tope_dia()`, `video_minimo_s()` y
+// `video_vida_boleto()` (10 minutos, aquí en ms).
+export const VIDEO_PREMIO_SQL = 500
+export const VIDEO_TOPE_SQL = 8
+export const VIDEO_MINIMO_S_SQL = 35
+export const VIDEO_VIDA_MS_SQL = 10 * 60 * 1000
 
 // `dia_chicago(ts)` de la 1a: la fecha en America/Chicago, con la zona por nombre.
 const FECHA_CHICAGO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -55,6 +66,20 @@ export function sumarDias(dia, n) {
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }
+
+/**
+ * ECO-1g · `video_reinicio(ts)`: la próxima medianoche de Chicago después de
+ * `ms`, como instante. La medianoche de Chicago cae a las 05:00 UTC (horario de
+ * verano) o a las 06:00 UTC (de invierno); el cambio de hora es a las 2 de la
+ * madrugada, así que la medianoche nunca es ambigua. Se prueba la primera y, si
+ * a esa hora Chicago aún no cambió de día, es la segunda.
+ */
+export function videoReinicioSQL(ms) {
+  const [a, m, d] = sumarDias(diaChicagoSQL(ms), 1).split('-').map(Number)
+  const verano = Date.UTC(a, m - 1, d, 5)
+  return diaChicagoSQL(verano) === diaChicagoSQL(verano - 1) ? Date.UTC(a, m - 1, d, 6) : verano
+}
+const iso = (ms) => new Date(ms).toISOString()
 
 const techoMesa = (apuesta) => TECHO_SQL * apuesta
 const pilaIA = (entrada, apuesta) => Math.min(Math.round(entrada * FACTOR_IA_SQL), techoMesa(apuesta))
@@ -73,8 +98,15 @@ const esEntero = (n) => Number.isInteger(n)
  *   (ECO-1d). Con `false` no corta nunca por sí solo (sí con `forzarLimite`):
  *   SÓLO para repetir el recorrido del guion de la 1c, que, como aquél, corre
  *   todo en el mismo instante y cortaría en la 11.ª sentada.
+ * @param {number} [opciones.videoMinimoS=35]  los segundos mínimos entre pedir
+ *   y cobrar un boleto (ECO-1g, S2). SÓLO el mando de desarrollo
+ *   `?apu=video:<ms>` lo baja, para que un video corto se pueda cobrar; el SQL
+ *   no tiene esta puerta.
  */
-export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMolde = false, limites = true } = {}) {
+export function crearBanco({
+  saldo = 5000, ahora = () => Date.now(), entradaDeMolde = false, limites = true,
+  videoMinimoS = VIDEO_MINIMO_S_SQL,
+} = {}) {
   const b = {
     saldo,
     mesas: new Map(),          // id → fila de `mesas_ia`
@@ -87,6 +119,9 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
     constancia: null,          // { racha, ultimo_dia } — la fila de `constancia`, o ninguna
     tope: null,                // `ajustes_economia.tope_diario_ia` (null = apagada)
     cambiosValvula: [],        // `valvula_cambios`
+    // ECO-1g
+    boletos: [],               // { id, emitido_en, vence_en, cobrado_en, anulado_en } — `boletos_video`
+    ultimoBoleto: 0,
   }
 
   // ── El libro (1a): una línea por cambio, clave única ─────────────────────
@@ -315,9 +350,82 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
     return respuestaConstancia('ok', racha, cobrado)
   }
 
+  // ── ECO-1g · el video de recompensa: `mi_video`, `pedir_boleto`, `cobrar_boleto` ──
+  // La migración leída función a función, para la cuenta de la sesión. Lo que
+  // el SQL contesta a otra cuenta o sin cuenta (`sin_sesion`, `sin_billetera`,
+  // `ajeno`) aquí no puede darse: el boleto de otro es `inexistente`. Los
+  // instantes viajan como texto ISO, que es como PostgREST da un `timestamptz`.
+  const videoCobradosHoy = () => {
+    const hoy = diaChicagoSQL(ahora())
+    return b.boletos.filter((x) => x.cobrado_en !== null && diaChicagoSQL(x.cobrado_en) === hoy).length
+  }
+  const videoQuedan = () => Math.max(0, VIDEO_TOPE_SQL - videoCobradosHoy())
+
+  function miVideo() {
+    return {
+      codigo: 'ok', quedan: videoQuedan(), tope: VIDEO_TOPE_SQL,
+      ahora: iso(ahora()), reinicio_en: iso(videoReinicioSQL(ahora())), premio: VIDEO_PREMIO_SQL,
+    }
+  }
+
+  function respuestaBoleto(codigo, boleto = null) {
+    return {
+      codigo,
+      boleto_id: boleto?.id ?? null,
+      emitido_en: boleto ? iso(boleto.emitido_en) : null,
+      vence_en: boleto ? iso(boleto.vence_en) : null,
+      ahora: iso(ahora()),
+      minimo_s: videoMinimoS,
+      quedan: videoQuedan(),
+      reinicio_en: iso(videoReinicioSQL(ahora())),
+    }
+  }
+
+  function respuestaCobro(codigo, cobrado = 0, faltan = 0) {
+    return {
+      codigo, cobrado, saldo: b.saldo, quedan: videoQuedan(),
+      reinicio_en: iso(videoReinicioSQL(ahora())), faltan_s: Math.max(0, faltan), premio: VIDEO_PREMIO_SQL,
+    }
+  }
+
+  function pedirBoleto() {
+    if (!cabe('pedir_boleto')) return respuestaBoleto('limite')
+    // El tope se mira ANTES de anular: con los 8 cobrados ni se emite ni se anula.
+    if (videoCobradosHoy() >= VIDEO_TOPE_SQL) return respuestaBoleto('tope_dia')
+    // S1 · un solo boleto vivo: pedir anula el anterior (también si ya venció).
+    for (const x of b.boletos) if (x.cobrado_en === null && x.anulado_en === null) x.anulado_en = ahora()
+    const boleto = {
+      id: `boleto-imitado-${++b.ultimoBoleto}`,
+      emitido_en: ahora(), vence_en: ahora() + VIDEO_VIDA_MS_SQL, cobrado_en: null, anulado_en: null,
+    }
+    b.boletos.push(boleto)
+    return respuestaBoleto('ok', boleto)
+  }
+
+  function cobrarBoleto({ p_boleto = null } = {}) {
+    if (!cabe('cobrar_boleto')) return respuestaCobro('limite')
+    const x = b.boletos.find((y) => y.id === p_boleto)
+    if (!x) return respuestaCobro('inexistente')
+    // «Ya cobrado» va ANTES que anulado y vencido: el reintento de un cobro que
+    // sí entró recibe `ya_cobrado` con el saldo ya subido (S3).
+    if (x.cobrado_en !== null) return respuestaCobro('ya_cobrado')
+    if (x.anulado_en !== null) return respuestaCobro('anulado')
+    if (ahora() >= x.vence_en) return respuestaCobro('vencido')
+    const desde = x.emitido_en + videoMinimoS * 1000
+    if (ahora() < desde) return respuestaCobro('demasiado_pronto', 0, Math.ceil((desde - ahora()) / 1000))
+    if (videoCobradosHoy() >= VIDEO_TOPE_SQL) return respuestaCobro('tope_dia')
+    const r = aplicar('video', VIDEO_PREMIO_SQL, `video:${x.id}`, x.id)
+    if (r.motivo !== 'aplicado') return respuestaCobro('error_libro')
+    x.cobrado_en = ahora()
+    return respuestaCobro('ok', VIDEO_PREMIO_SQL)
+  }
+
   const RPC = {
     mi_billetera: () => b.saldo,
     marcar_ingreso: marcarIngreso,
+    mi_video: miVideo,
+    pedir_boleto: pedirBoleto,
+    cobrar_boleto: cobrarBoleto,
     sentarse_ia: sentarse,
     recargar_ia: recargar,
     informar_pila: informar,
@@ -390,5 +498,25 @@ export function crearBanco({ saldo = 5000, ahora = () => Date.now(), entradaDeMo
     get intentos() { return b.intentos.map((x) => ({ ...x })) },
     get tope() { return b.tope },
     get cambiosValvula() { return b.cambiosValvula.map((x) => ({ ...x })) },
+    // ── ECO-1g · el video ──────────────────────────────────────────────────
+    get boletos() { return b.boletos.map((x) => ({ ...x })) },
+    /** Lo que el guion hace con `update boletos_video set emitido_en = … - n s`:
+     *  el boleto vivo «se pidió hace `ms`» (y vence `ms` antes). */
+    envejecerBoleto(ms) {
+      for (const x of b.boletos) {
+        if (x.cobrado_en === null && x.anulado_en === null) { x.emitido_en -= ms; x.vence_en -= ms }
+      }
+    },
+    /** Mando del arnés: `n` videos ya cobrados hoy (sólo los boletos: la cuenta
+     *  del día, sin tocar el saldo ni el libro), para llegar al octavo sin ver
+     *  siete. En el SQL Editor sería insertar las filas a mano. */
+    sembrarVideosCobrados(n) {
+      for (let i = 0; i < n; i++) {
+        b.boletos.push({
+          id: `boleto-sembrado-${++b.ultimoBoleto}`,
+          emitido_en: ahora() - 60_000, vence_en: ahora() + VIDEO_VIDA_MS_SQL, cobrado_en: ahora(), anulado_en: null,
+        })
+      }
+    },
   }
 }

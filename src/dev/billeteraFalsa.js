@@ -42,8 +42,10 @@
 import { crearBilleteraApi } from '../lib/billeteraApi'
 import { crearMesaIAApi } from '../lib/mesaIAApi'
 import { crearConstanciaApi } from '../lib/constanciaApi'
-import { crearBanco } from './bancoImitado'
-import { siembraAPU, entradaSembradaAPU } from './siembraAPU'
+import { crearVideoApi } from '../lib/videoApi'
+import { crearBanco, VIDEO_MINIMO_S_SQL } from './bancoImitado'
+import { siembraAPU, entradaSembradaAPU, videoSembradoAPU } from './siembraAPU'
+import { AJILEI_CONFIG } from '../config/ajileiConfig'
 
 // La huella que busca la guardia sobre `dist/`. Si algún día aparece en el
 // bundle de producción, la puerta se ha roto.
@@ -57,9 +59,15 @@ export function bancoDelBypass() {
   if (!import.meta.env.DEV) return null
   if (!import.meta.env.VITE_AUTH_BYPASS) return null
   if (!banco) {
+    // ECO-1g · con `?apu=video:<ms>` el video dura menos que los 35 s que el
+    // servidor exige entre pedir y cobrar: el banco del bypass acorta su mínimo
+    // en la misma proporción (35 de cada 40), o el cliente esperaría el resto.
+    const corto = videoSembradoAPU()?.duracionMs ?? null
     banco = crearBanco({
       saldo: siembraAPU()?.saldo ?? 5000,
       entradaDeMolde: entradaSembradaAPU(100) !== null,
+      videoMinimoS: corto === null ? VIDEO_MINIMO_S_SQL
+        : Math.min(VIDEO_MINIMO_S_SQL, Math.floor((corto / AJILEI_CONFIG.economy.video.duracionMs) * VIDEO_MINIMO_S_SQL)),
     })
     // El arnés lo alcanza por aquí (C6, envejecer una mesa) sin ruta propia.
     if (typeof window !== 'undefined') window.__ajileiBancoImitado = { marca: MARCA_BILLETERA_FALSA, banco }
@@ -107,6 +115,14 @@ export function simulacionConstancia() {
   const b = bancoDelBypass()
   if (!b) return null
   return crearConstanciaApi(b)
+}
+
+/** ECO-1g · el video de recompensa contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionVideo() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  return crearVideoApi(b)
 }
 
 /** Para las pruebas: un banco nuevo en la siguiente llamada. */

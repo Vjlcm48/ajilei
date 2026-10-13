@@ -85,7 +85,11 @@ describe('IDI-0 · diccionario es', () => {
     // ECO-1c es la quinta: `aviso.*` es el aviso de saldo, que no es de una
     // superficie sino de la píldora, y la píldora está en el lobby, en Retar y
     // —con la 1d— en la constancia.
-    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.']
+    //
+    // ECO-1g es la sexta: `video.*` es el video de recompensa, una pieza que se
+    // pide desde Retar y desde el «+» de la píldora y se ve encima de todas las
+    // pantallas con barra.
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
@@ -168,6 +172,12 @@ describe('IDI-0 · diccionario es', () => {
     //     «Reintentar» en la tarjeta de recarga y en el aviso de lectura de
     //     Retar: el mismo verbo para dos reintentos distintos (una recarga, una
     //     lectura), en dos pantallas. Misma razón que las dos de arriba.
+    //
+    //   sal.volver.aria = video.sin.volver  (ECO-1g)
+    //     «Volver»: el nombre accesible de la flecha de las pantallas de chips y
+    //     el botón del mensaje «Ahora no hay videos disponibles». Dos piezas de
+    //     dos campañas; el segundo es un rótulo a la vista y un idioma futuro
+    //     puede querer «Cerrar» ahí sin tocar la flecha.
     expect(repetidos.sort()).toEqual([
       'ia.recarga.opcion.medio = ia.retar.entrada.medio',
       'ia.recarga.opcion.piso = ia.retar.entrada.piso',
@@ -183,6 +193,7 @@ describe('IDI-0 · diccionario es', () => {
       'sal.espera.cod.eti = sal.opciones.codigo.aria',
       'sal.espera.fin.entrar.nota = sal.partida.pronto',
       'sal.espera.sentados = sal.opciones.mesa.estado',
+      'sal.volver.aria = video.sin.volver',
     ])
   })
 
@@ -204,9 +215,15 @@ describe('IDI-0 · diccionario es', () => {
     // La forzosa NO la lleva, y es deliberado: ahí no hay nivelación que
     // prometer — o se recarga o se sale de la mesa (§5.4).
     expect(TEXTOS_ES['ia.recarga.sub.forzosa']).not.toContain('nivelan')
-    // Y nadie más la dice: una sola voz en todas las pantallas.
+    // Y nadie más la dice EN LA MESA: una sola voz en todas sus pantallas.
+    //
+    // ECO-1g · el consejo 7 del video de recompensa («Si recargas fichas en la
+    // mesa, las IAS se nivelan contigo.») la menciona, y no rompe la regla: es
+    // un consejo que se lee FUERA de la mesa, en el relleno del video, no un
+    // segundo renglón de la tarjeta de recarga. Texto aprobado por Victor (G10).
     const dicen = Object.keys(TEXTOS_ES).filter((k) => /se nivelan/.test(TEXTOS_ES[k]))
-    expect(dicen.sort()).toEqual(['ia.recarga.sub.automatica', 'ia.recarga.sub.voluntaria'])
+    expect(dicen.sort()).toEqual(['ia.recarga.sub.automatica', 'ia.recarga.sub.voluntaria', 'video.consejo.7'])
+    expect(dicen.filter((k) => k.startsWith('ia.'))).toHaveLength(2)
   })
 })
 

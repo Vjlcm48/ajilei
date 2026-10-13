@@ -23,6 +23,11 @@
 //   ?apu=sinRival:d12  Todas, el humano incluido.
 //   ?apu=gana          ARN-3d · el humano gana la PRIMERA mano: prepara el
 //                      reparto, no las pilas (`repartoGanador.js`).
+//   ?apu=video:<ms>    ECO-1g · el video de recompensa dura <ms> a la vista (y
+//                      el banco imitado del bypass acorta en proporción los
+//                      segundos mínimos antes de cobrar).
+//   ?apu=video:sin     ECO-1g · el reproductor contesta «no hay video».
+//   ?apu=video:cierra  ECO-1g · el video se cierra solo antes de tiempo.
 // Se pueden encadenar con comas: `?apu=saldo:900,allinIA`.
 //
 // ── EL MOLDE NO INVENTA ESTADOS, SIEMBRA PILAS ─────────────────────────────
@@ -91,6 +96,28 @@ export function siembraAPU() {
     if (b && bolsillo === null) bolsillo = Number(b[1])
   }
   return { saldo, bolsillo }
+}
+
+/**
+ * ECO-1g · lo que `?apu=video:` pide para el video de recompensa, o `null`.
+ * Los tres mandos de la Fase 0 §J.4: acortar los ~40 s, que no haya video, y
+ * que se cierre antes de tiempo. SÓLO en desarrollo: en la build los videos
+ * duran lo que dice `ajileiConfig` y el servidor exige sus segundos.
+ * @returns {{duracionMs?:number, disponible?:false, cierra?:true}|null}
+ */
+export function videoSembradoAPU() {
+  if (!import.meta.env.DEV) return null
+  const partes = pedido()
+  if (partes === null) return null
+  let mandos = null
+  for (const p of partes) {
+    const m = /^video:(\d+|sin|cierra)$/.exec(p)
+    if (!m) continue
+    if (m[1] === 'sin') mandos = { ...mandos, disponible: false }
+    else if (m[1] === 'cierra') mandos = { ...mandos, cierra: true }
+    else if (Number(m[1]) > 0) mandos = { ...mandos, duracionMs: Number(m[1]) }
+  }
+  return mandos
 }
 
 /**

@@ -203,11 +203,22 @@ export const AJILEI_CONFIG = {
     // ECO-1b (B5) · al día con lo sellado (Reglas de ECO-1 §7): el video vale
     // 500 HC con un tope de 8 al día, y la constancia da 500 HC cada 3 días
     // seguidos de ingreso. `bonoDiario` (50) se retira: no existe en las reglas.
-    // SIGUEN SIN LECTORES, a propósito: la verdad de estas cifras está en el
-    // servidor (sub-tandas de video y constancia de ECO-1); aquí sólo dejan de
+    // La verdad de estas cifras está en el servidor; aquí sólo dejan de
     // contradecirla.
+    //
+    // ECO-1g · `videoReward` y `maxVideosPerDay` son el ESPEJO de
+    // `video_premio_hc()` y `video_tope_dia()` (la prueba de espejo de
+    // `dev/bancoImitado.test.js` los compara con el SQL). El premio que se
+    // pinta y se celebra es el que DICE EL SERVIDOR (`premio` en `mi_video` y
+    // `cobrar_boleto`); `videoReward` sólo se lee mientras no ha contestado.
+    // `maxVideosPerDay` sigue sin lectores: el tope lo trae `mi_video`.
     videoReward: 500,
     maxVideosPerDay: 8,
+    // ECO-1g · lo que dura el video A LA VISTA (G4): sólo cuenta el tiempo con
+    // la pestaña visible. El servidor exige 35 s desde que emite el boleto
+    // (`video_minimo_s()`); los 5 de diferencia son para la latencia (S2). En
+    // desarrollo con bypass lo acorta el mando `?apu=video:<ms>`.
+    video: { duracionMs: 40000 },
     constancia: { monto: 500, dias: 3 },
   },
 }

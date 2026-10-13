@@ -283,7 +283,8 @@ export const TEXTOS_ES = {
   // bolsillo corto no es un fallo, es un estado del que se sale.
   'ia.retar.saldo.reto':      'Tu saldo no alcanza para este reto. Puedes jugar en {reto} o conseguir más monedas.',
   'ia.retar.saldo.ninguno':   'Te faltan fichas para sentarte en una mesa.',
-  'ia.retar.saldo.cta':       'Conseguir más monedas',
+  // ECO-1g · `ia.retar.saldo.cta` («Conseguir más monedas») SE RETIRA: el botón
+  // del bloque lleva ahora al video y dice `video.pedir`.
 
   // ECO-1b · la cifra viene del servidor y puede tardar o fallar. Mientras
   // tarda, el CTA de Retar se apaga y su nota lo dice; si la lectura falla sin
@@ -431,6 +432,62 @@ export const TEXTOS_ES = {
   // 1c); la ficha del lobby se lee así en un lector de pantalla.
   'aviso.saldo.constancia':    '+{hc} HC por tu constancia.',
   'lob.constancia.aria':       'Constancia: día {d} de 3',
+
+  // ── ECO-1g · El video de recompensa (lámina `laminas/eco1f`, aprobada) ───
+  // Prefijo nuevo, `video.`: no es de una pantalla sino de una pieza que se
+  // pide desde dos (Retar y el «+» de la píldora) y se ve encima de todas.
+  // Textos T1–T9 de la ficha de la 1g §2.4, con los dos retoques de Victor
+  // (T5 con coma; T7 «…ninguno de tus 8 videos de hoy»).
+  //
+  // `{hc}` es el premio y `{total}` el tope del día: LOS DICE EL SERVIDOR
+  // (`mi_video`, `cobrar_boleto`), no van escritos aquí.
+  //
+  // T1 · el botón del bloque de saldo de Retar.
+  'video.pedir':           'Ver un video · +{hc} HC',
+  // T2 · el contador, y T8 en su misma caja (O1) cuando se acabaron los de hoy.
+  // Dos frases y no un plural calculado (doctrina de `config/textos.js`).
+  'video.quedan':          'Te quedan {n} de {total} hoy',
+  'video.queda.uno':       'Te queda 1 de {total} hoy',
+  'video.vuelven':         'Vuelven en {tiempo}',
+  'video.tiempo.hm':       '{h} h {m} min',
+  'video.tiempo.m':        '{m} min',
+  // T3 · la hoja del «+» dorado. La fila apagada dice `lob.toast.pronto`.
+  'video.hoja.titulo':     'Conseguir monedas',
+  'video.hoja.video':      'Ver un video',
+  'video.hoja.paquetes':   'Paquetes de monedas',
+  // «+500 HC»: en la fila de la hoja y, T9, en la tarjeta de la celebración.
+  'video.premio.corto':    '+{hc} HC',
+  // T4 · la capa.
+  'video.marca':           'Video de prueba',
+  'video.consejo.rotulo':  'Consejo',
+  'video.falta':           'Faltan {s} s',
+  'video.premio':          '+{hc} HC al terminar',
+  'video.cerrar.aria':     'Cerrar el video',
+  // T5 · la ✕.
+  'video.salir.aviso':     'Si sales ahora, no ganas los {hc} HC.',
+  'video.salir.seguir':    'Seguir viendo',
+  'video.salir.salir':     'Salir',
+  // T6 · al volver de la pantalla bloqueada.
+  'video.pausa':           'En pausa',
+  'video.pausa.seguir':    'Toca para seguir',
+  // T7 · no hay video: no se abrió nada y no se descontó nada.
+  'video.sin':             'Ahora no hay videos disponibles',
+  'video.sin.sub':         'Prueba de nuevo en un momento. No se descontó ninguno de tus {total} videos de hoy.',
+  'video.sin.volver':      'Volver',
+  // T9 · la celebración.
+  'video.cel.sub':         '¡Video completado!',
+  // P-2 del rector · el video terminó y el cobro se está reintentando (K7).
+  'video.guardando':       'Guardando tu premio…',
+  // G10 · los ocho consejos del relleno, de reglas y de estrategia. Uno cada
+  // 6,5 s; cada video empieza por uno distinto.
+  'video.consejo.1':       'En mesas de 4 y 5 jugadores juega el comodín: el 7 de Oros.',
+  'video.consejo.2':       'El comodín se suma a tu mejor palo.',
+  'video.consejo.3':       'En el descarte, cambia las cartas que no ayudan a tu mejor palo.',
+  'video.consejo.4':       'Retirarte de una mano no te saca de la mesa: guardas fichas para la siguiente.',
+  'video.consejo.5':       'Si todos se retiran menos uno, ese gana la mano sin enseñar sus cartas.',
+  'video.consejo.6':       'Para retar a las IAS necesitas al menos 10 veces la apuesta de la mesa.',
+  'video.consejo.7':       'Si recargas fichas en la mesa, las IAS se nivelan contigo.',
+  'video.consejo.8':       'Entra tres días seguidos y cobra 500 HC por tu constancia.',
 }
 
 export default TEXTOS_ES
