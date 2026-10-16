@@ -33,6 +33,9 @@ import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacion
 import { mesaIAApi } from './lib/mesaIAApi'
 import { crearControlMesa } from './lib/controlMesaIA'
 import { idDispositivo } from './lib/dispositivo'
+import { TOPE_RED_MS } from './lib/red'
+import { saldoRecordado } from './lib/saldoRecordado'
+import CuentaSinRed from './components/CuentaSinRed'
 import { entradaSembradaAPU, videoSembradoAPU } from './dev/siembraAPU'
 import { avisoDeVuelta, TIEMPOS_AVISO, encolarAviso, sacarAviso, sustituirFila } from './hooks/avisoSaldoCore'
 // ECO-1d · la constancia: la API de `marcar_ingreso`, cuándo preguntar y la
@@ -51,7 +54,7 @@ import { AJILEI_CONFIG } from './config/ajileiConfig'
 // `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
 // `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
 // sigue viva y exportada en el hook, que es donde trabaja.
-import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL, COMPLETO } from './hooks/useAuth'
+import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL, COMPLETO, SIN_RED } from './hooks/useAuth'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
 import { creaPantallaCompleta } from './lib/pantallaCompletaCore'
@@ -243,6 +246,17 @@ function App() {
   const [apiBilletera] = useState(() => simulacionBilletera() ?? billeteraApi)
   const uidCompleto = auth.estado === COMPLETO ? (auth.perfil?.id ?? null) : null
   const billetera = useBilletera(apiBilletera, uidCompleto)
+  // IOS-1c · la cifra recordada (`lib/saldoRecordado`) se borra al cerrar
+  // sesión, por el botón o porque la sesión acabó de verdad (SIN_SESION: sólo
+  // un error no reintentable lleva ahí, nunca una red caída).
+  const cerrarSesionDeAuth = auth.cerrarSesion
+  const cerrarSesion = useCallback(() => {
+    saldoRecordado.borrar()
+    return cerrarSesionDeAuth()
+  }, [cerrarSesionDeAuth])
+  useEffect(() => {
+    if (auth.estado === SIN_SESION) saldoRecordado.borrar()
+  }, [auth.estado])
   const { tomar: tomarSaldo, esperar: esperarSaldo, soltar: soltarSaldo, refrescar: releerSaldo, alSaldoInsuficiente } = billetera
 
   // ── ECO-1c · LA MESA CONTRA LAS IAS, EN EL SERVIDOR ──────────────────────
@@ -454,7 +468,9 @@ function App() {
   useEffect(() => {
     const alCambiar = () => {
       if (document.visibilityState !== 'visible') return
-      controlRef.current?.reintentarAhora()
+      // IOS-1c · y lo que lleve colgado más que el tope de red se fuerza (mismo
+      // `seq`: no cobra dos veces). Lo recién salido no se toca.
+      controlRef.current?.reintentarAhora({ forzarTrasMs: TOPE_RED_MS })
       video.reintentarAhora()
       if (uidCompleto && !video.ocupado() && debeMarcar(marca.current, Date.now())) marcar(uidCompleto)
     }
@@ -569,7 +585,6 @@ function App() {
   // cobraba su salida cuando el jugador se sentó en otra la cerró `sentarse_ia`
   // (C4): lo que conteste ya no es verdad para la píldora, que se relee.
   const escucharMesa = useCallback((ctl) => {
-    let soltada = false
     ctl.suscribir((ev) => {
       const actual = controlRef.current === ctl
       const saldo = ev.respuesta?.saldo
@@ -581,14 +596,10 @@ function App() {
       // no es la cifra final: la píldora sigue en «—» hasta que la salida (que
       // ya lleva esas fichas) conteste.
       if (ev.tipo === 'recarga' && ev.ok && !ctl.saliendo) tomarSaldo(saldo)
-      if (ev.tipo === 'red' && ctl.saliendo && !soltada) {
-        // La salida no contestó (o no contesta lo que tiene delante, como una
-        // recarga en vuelo): la píldora deja el «—» y enseña lo que diga el
-        // servidor (la mesa sigue abierta con su última pila). La cola la
-        // sigue reintentando; cuando conteste, la cifra se corrige sola.
-        soltada = true
-        soltarSaldo()
-      }
+      // IOS-1c · un fallo de red de la salida YA NO suelta el «cobrando»: lo
+      // que leería la billetera con la mesa abierta es la cifra sin sus fichas,
+      // la falsa que S3 prohíbe. La cola la reintenta sola (con el tope de red
+      // y forzada al volver a primer plano) y la píldora espera a su respuesta.
       if (ev.tipo === 'salida') {
         if (ev.respuesta?.codigo === 'ok' || ev.respuesta?.codigo === 'repetido') tomarSaldo(saldo)
         else soltarSaldo()
@@ -721,7 +732,13 @@ function App() {
   }
 
   if (auth.estado === SESION_SIN_PERFIL) {
-    return <Bautizo onConfirmar={auth.crearPerfil} onCerrarSesion={auth.cerrarSesion} />
+    return <Bautizo onConfirmar={auth.crearPerfil} onCerrarSesion={cerrarSesion} />
+  }
+
+  // IOS-1c · la sesión o el perfil no se pudieron saber por la red: ni la
+  // Portada ni el Bautizo, que serían mentira (escena g de la lámina).
+  if (auth.estado === SIN_RED) {
+    return <CuentaSinRed onReintentar={auth.reintentar} onCerrarSesion={cerrarSesion} />
   }
 
   // ── El paquete de cuenta que baja a las pantallas ──────────────────────────
@@ -754,7 +771,7 @@ function App() {
     username: auth.perfil?.username ?? '',
     correo: auth.correo ?? '',
     cambiarNombre: auth.cambiarNombre,
-    cerrarSesion: auth.cerrarSesion,
+    cerrarSesion,
   }
 
   // ── LOB-1 · `cuentaLobby` se retira ────────────────────────────────────────
@@ -921,7 +938,7 @@ function App() {
       constancia={constancia?.uid === uidCompleto ? constancia.ficha : null}
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
-      onCerrarSesion={auth.cerrarSesion}
+      onCerrarSesion={cerrarSesion}
     />,
   )
 }

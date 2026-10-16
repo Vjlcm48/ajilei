@@ -291,6 +291,7 @@ export const TEXTOS_ES = {
   // ninguna cifra conocida, un aviso lo dice y ofrece reintentar (ajuste 1 del
   // rector). Ninguna enseña un número: no se inventa un saldo.
   'ia.retar.saldo.cargando':   'Cargando tu saldo…',
+  'ia.retar.saldo.cobrando':   'Cobrando tu mesa…',
   'ia.retar.saldo.error':      'No pudimos leer tu saldo. Revisa tu conexión.',
   'ia.retar.saldo.reintentar': 'Reintentar',
 

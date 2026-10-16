@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
+import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { TOPE_ESPERA_MS, conTope } from '../lib/red'
+import { ESPERAS_RED_MS } from '../lib/controlMesaIA'
 
 // ── SUP-2b · La puerta: fuente única del estado de sesión ────────────────────
 // Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.1 y §1.2, con la
@@ -35,6 +38,39 @@ export const COMPLETO = 'COMPLETO'
 // desaparece a mitad de transición. CARGANDO no pinta una pantalla propia: pinta
 // NADA, sobre el mismo fondo, y dura lo que tarda el SDK en leer su almacén.
 export const CARGANDO = 'CARGANDO'
+
+// ── IOS-1c · …y el quinto: no se sabe porque NO HAY RED ─────────────────────
+// Rector: AJILEI_IOS-1_Fase1c_v1.0.md §3.4 y la respuesta 3 al STOP-1. Dos
+// esperas que antes no tenían salida, o la tenían mala:
+//   · la sesión: con el token caducado y la red caída, `getSession()` devuelve
+//     `session: null` con un `AuthRetryableFetchError` (auth-js
+//     `GoTrueClient.ts`, `__loadSession`) aunque la sesión siga guardada. Eso
+//     NO es «no hay sesión»: es «no se pudo refrescar». Sólo un error no
+//     reintentable lleva a SIN_SESION;
+//   · el perfil: un fallo de red al leer `profiles` caía al Bautizo, y un
+//     jugador con nombre podía acabar eligiéndolo otra vez.
+// Pasado el tope de red sin respuesta, o con un fallo de red, el estado es
+// SIN_RED: la tarjeta «No pudimos cargar tu cuenta», que se reintenta sola y
+// con su botón. Lo que conteste tarde se aplica igual.
+export const SIN_RED = 'SIN_RED'
+
+/** IOS-1c · ¿Es un fallo de red (reintentable) y no una respuesta del servidor? */
+export function esFalloDeRed(error) {
+  if (!error) return false
+  if (isAuthRetryableFetchError(error)) return true
+  // PostgREST: sin código de Postgres ni estado HTTP es que no llegó
+  // (`FetchError`, el `AbortError` del tope); un 5xx tampoco es una respuesta.
+  const estado = Number(error.status ?? 0)
+  return (!error.code && estado === 0) || estado >= 500
+}
+
+/** IOS-1c · la espera antes del reintento `n` (1, 2, 4, 8 y luego 15 s, la escalera de la mesa). */
+export function esperaDeReintento(n) {
+  return ESPERAS_RED_MS[Math.max(0, Math.min(n - 1, ESPERAS_RED_MS.length - 1))]
+}
+
+export const MENSAJE_RED = 'No contesta el servidor — revisa tu conexión e inténtalo de nuevo'
+const TOPE = Symbol('tope')
 
 // ── Bypass de desarrollo (§1.2) ─────────────────────────────────────────────
 // PUERTA DOBLE, copiada literal de src/dev/siembraCEL.js: el gate del build Y la
@@ -84,6 +120,10 @@ export function useAuth() {
   // Los tres valores son distintos y los tres significan algo: colapsar
   // "no se sabe" con "no hay" es exactamente el parpadeo que CARGANDO evita.
   const [sesion, setSesion] = useState(undefined)
+  // IOS-1c · la sesión no se pudo saber por la red (SIN_RED mientras `sesion`
+  // siga `undefined`), y cuántas veces se ha vuelto a preguntar.
+  const [sinRed, setSinRed] = useState(false)
+  const [intentoSesion, setIntentoSesion] = useState(0)
 
   // ── El perfil se guarda CON SU DUEÑO, y no suelto ─────────────────────────
   // El estado no es "el perfil": es "el perfil DE ESTE uid". La diferencia no es
@@ -95,6 +135,9 @@ export function useAuth() {
   //   `.uid` null   = todavía no se ha resuelto ninguno
   //   `.perfil` null = ese uid NO tiene fila en `profiles`
   const [cargaPerfil, setCargaPerfil] = useState({ uid: null, perfil: null })
+  // IOS-1c · los fallos de red al leerlo, también con su dueño, y el intento.
+  const [falloPerfil, setFalloPerfil] = useState({ uid: null, n: 0 })
+  const [intentoPerfil, setIntentoPerfil] = useState(0)
 
   // ── Efecto A · la sesión. NO consulta nada ────────────────────────────────
   // El callback de `onAuthStateChange` corre CON EL CERROJO DE AUTH TOMADO: una
@@ -106,15 +149,43 @@ export function useAuth() {
   useEffect(() => {
     if (AUTH_BYPASS) return
     let vivo = true
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evento, s) => {
-      if (vivo) setSesion(s ?? null)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((evento, s) => {
+      if (!vivo) return
+      // IOS-1c · el INITIAL_SESSION nulo llega también cuando el refresco falló
+      // por la red: quien decide entre «no hay» y «no se pudo» es `getSession`,
+      // que trae el error. Una sesión que llega (el refresco automático del SDK
+      // al volver la red) se toma siempre.
+      if (evento === 'INITIAL_SESSION' && !s) return
+      setSesion(s ?? null)
     })
-    // `onAuthStateChange` ya emite INITIAL_SESSION al suscribirse, pero
-    // `getSession` se llama igual: es el único camino que no depende de que ese
-    // evento exista en la versión del SDK que se instale mañana.
-    supabase.auth.getSession().then(({ data }) => { if (vivo) setSesion(data.session ?? null) })
     return () => { vivo = false; subscription.unsubscribe() }
   }, [])
+
+  // `onAuthStateChange` ya emite INITIAL_SESSION al suscribirse, pero
+  // `getSession` se llama igual: es el único camino que no depende de que ese
+  // evento exista en la versión del SDK que se instale mañana.
+  // IOS-1c · y con tope: si no contesta en `TOPE_ESPERA_MS`, SIN_RED (lo que
+  // conteste después se aplica igual); un fallo de red se vuelve a preguntar
+  // con la escalera de la mesa.
+  useEffect(() => {
+    if (AUTH_BYPASS) return
+    let vivo = true
+    let reintento = null
+    const tope = setTimeout(() => { if (vivo) setSinRed(true) }, TOPE_ESPERA_MS)
+    supabase.auth.getSession().then(({ data, error }) => {
+      clearTimeout(tope)
+      if (!vivo) return
+      if (data?.session) { setSinRed(false); setSesion(data.session); return }
+      if (error && esFalloDeRed(error)) {
+        setSinRed(true)
+        reintento = setTimeout(() => { if (vivo) setIntentoSesion((n) => n + 1) }, esperaDeReintento(intentoSesion + 1))
+        return
+      }
+      setSinRed(false)
+      setSesion((previa) => (previa === undefined ? null : previa))
+    })
+    return () => { vivo = false; clearTimeout(tope); clearTimeout(reintento) }
+  }, [intentoSesion])
 
   const uid = sesion?.user?.id ?? null
 
@@ -127,27 +198,41 @@ export function useAuth() {
   // que es una respuesta del exterior y no una cascada: es exactamente la forma
   // que la regla de React describe como correcta —suscribirse a un sistema
   // externo y llamar a setState en su callback.
+  //
+  // IOS-1c · «NO EXISTE» Y «NO SE PUDO» SON COSAS DISTINTAS. `.maybeSingle()`
+  // sin fila contesta `{ data: null, error: null }`: no hay perfil, Bautizo.
+  // Con `error` (el tope, la red, un 5xx) el perfil NO se sabe: SIN_RED, y se
+  // vuelve a leer con la escalera. Antes los dos caían al Bautizo (el «coste
+  // declarado» de SUP-2b), y con el tope de red eso habría mandado al Bautizo a
+  // jugadores con nombre por una red lenta. Pasado el tope sin respuesta,
+  // también SIN_RED; si contesta tarde, se aplica.
   useEffect(() => {
     if (AUTH_BYPASS) return
     if (!uid) return                          // sin sesión no hay perfil que consultar
     let vivo = true
+    let reintento = null
+    const tope = setTimeout(() => {
+      if (vivo) setFalloPerfil((f) => (f.uid === uid ? f : { uid, n: 0 }))
+    }, TOPE_ESPERA_MS)
     supabase
       .from('profiles')
       .select('id, username')
       .eq('id', uid)
       .maybeSingle()
       .then(({ data, error }) => {
+        clearTimeout(tope)
         if (!vivo) return
-        // COSTE DECLARADO: si la consulta falla por red, se trata como "no hay
-        // perfil" y el jugador aterriza en el Bautizo. Es la única salida que no
-        // deja la app colgada en CARGANDO para siempre, y si además ya tenía
-        // nombre, la base lo defiende: el insert rebota con 23505 y el mensaje
-        // traducido dice "ya está tomado". Feo, pero nunca incorrecto.
-        if (error) console.warn('SUP-2b: no se pudo leer el perfil —', error.message)
+        if (error) {
+          console.warn('SUP-2b: no se pudo leer el perfil —', error.message)
+          setFalloPerfil((f) => ({ uid, n: f.uid === uid ? f.n + 1 : 1 }))
+          reintento = setTimeout(() => { if (vivo) setIntentoPerfil((i) => i + 1) }, esperaDeReintento(intentoPerfil + 1))
+          return
+        }
+        setFalloPerfil({ uid: null, n: 0 })
         setCargaPerfil({ uid, perfil: data ?? null })
       })
-    return () => { vivo = false }
-  }, [uid])
+    return () => { vivo = false; clearTimeout(tope); clearTimeout(reintento) }
+  }, [uid, intentoPerfil])
 
   // ¿Lo que hay en memoria es de ESTA sesión? Se deriva comparando dueños, que
   // es lo que evita tener que vaciar el estado desde el efecto. Mientras no
@@ -160,13 +245,21 @@ export function useAuth() {
   // gate en cada render. Un `useState` de estado más un efecto que lo persigue
   // es la vía conocida de que la pantalla y la sesión se cuenten cosas distintas
   // durante un fotograma.
+  const perfilSinRed = uid != null && falloPerfil.uid === uid
   const estado = AUTH_BYPASS
     ? COMPLETO
-    : sesion === undefined ? CARGANDO
+    : sesion === undefined ? (sinRed ? SIN_RED : CARGANDO)
     : sesion === null ? SIN_SESION
-    : perfil === undefined ? CARGANDO
+    : perfil === undefined ? (perfilSinRed ? SIN_RED : CARGANDO)
     : perfil === null ? SESION_SIN_PERFIL
     : COMPLETO
+
+  // IOS-1c · el «Reintentar» de la tarjeta SIN_RED: vuelve a preguntar ya lo
+  // que no se pudo saber (la sesión o el perfil).
+  const reintentar = useCallback(() => {
+    if (sesion === undefined) setIntentoSesion((n) => n + 1)
+    else setIntentoPerfil((n) => n + 1)
+  }, [sesion])
 
   const perfilVivo = AUTH_BYPASS ? PERFIL_DEV : (perfil ?? null)
 
@@ -177,12 +270,18 @@ export function useAuth() {
 
   // `shouldCreateUser: true` es lo que funde entrar y registrarse en un solo
   // gesto (§1.3): si el correo no existe, la cuenta nace con el código.
+  // IOS-1c · las dos esperas de la puerta terminan en el tope (S7): «Enviando…»
+  // y «Entrando…» vuelven con un mensaje y el botón disponible. Lo que conteste
+  // tarde se aplica igual (un `verifyOtp` que acaba entrando emite SIGNED_IN).
   const enviarCodigo = useCallback(async (correo) => {
-    const { error } = await supabase.auth.signInWithOtp({
+    const r = await conTope(supabase.auth.signInWithOtp({
       email: correo,
       options: { shouldCreateUser: true },
-    })
+    }), TOPE_ESPERA_MS, TOPE)
+    if (r === TOPE) return { ok: false, mensaje: MENSAJE_RED }
+    const { error } = r
     if (!error) return { ok: true }
+    if (esFalloDeRed(error)) return { ok: false, mensaje: MENSAJE_RED }
     // 429 es el límite de reenvío del propio Supabase; el resto se dice sin
     // tecnicismos, como pide el §1.3.
     if (error.status === 429) return { ok: false, mensaje: 'Demasiados intentos — espera un momento antes de pedir otro código' }
@@ -193,7 +292,10 @@ export function useAuth() {
   // lo recoge. Una escritura de estado desde este manejador sería una segunda
   // fuente de verdad compitiendo con la suscripción.
   const verificarCodigo = useCallback(async (correo, codigo) => {
-    const { error } = await supabase.auth.verifyOtp({ email: correo, token: codigo, type: 'email' })
+    const r = await conTope(supabase.auth.verifyOtp({ email: correo, token: codigo, type: 'email' }), TOPE_ESPERA_MS, TOPE)
+    if (r === TOPE) return { ok: false, mensaje: MENSAJE_RED }
+    const { error } = r
+    if (error && esFalloDeRed(error)) return { ok: false, mensaje: MENSAJE_RED }
     if (error) return { ok: false, mensaje: 'Código incorrecto o vencido — pide uno nuevo' }
     return { ok: true }
   }, [])
@@ -205,14 +307,32 @@ export function useAuth() {
   const crearPerfil = useCallback(async (username) => {
     if (AUTH_BYPASS) return { ok: false, mensaje: 'Bypass de desarrollo: no hay cuenta real que bautizar' }
     if (!uid) return { ok: false, mensaje: 'La sesión expiró — vuelve a entrar' }
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({ id: uid, username })
-      .select('id, username')
-      .single()
-    if (error) return { ok: false, mensaje: traducirErrorUsername(error) }
-    setCargaPerfil({ uid, perfil: data })
-    return { ok: true }
+    // IOS-1c · «Guardando…» termina en el tope (S7). Y si la inserción llegó
+    // pero la respuesta se perdió, el reintento chocaría con el propio jugador
+    // (23505, «ya está tomado»): ante un fallo de red o un 23505 se relee el
+    // perfil, y si ya es suyo, está hecho.
+    const trabajo = (async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({ id: uid, username })
+        .select('id, username')
+        .single()
+      if (!error) {
+        setCargaPerfil({ uid, perfil: data })
+        return { ok: true }
+      }
+      if (esFalloDeRed(error) || error.code === '23505') {
+        const leido = await supabase.from('profiles').select('id, username').eq('id', uid).maybeSingle()
+        if (leido.data) {
+          setCargaPerfil({ uid, perfil: leido.data })
+          return { ok: true }
+        }
+        if (esFalloDeRed(error)) return { ok: false, mensaje: MENSAJE_RED }
+      }
+      return { ok: false, mensaje: traducirErrorUsername(error) }
+    })()
+    const r = await conTope(trabajo, TOPE_ESPERA_MS, TOPE)
+    return r === TOPE ? { ok: false, mensaje: MENSAJE_RED } : r
   }, [uid])
 
   // Mismo camino y misma traducción que el bautizo: el UPDATE pasa por el mismo
@@ -243,6 +363,6 @@ export function useAuth() {
 
   return {
     estado, perfil: perfilVivo, correo: sesion?.user?.email ?? null,
-    enviarCodigo, verificarCodigo, crearPerfil, cambiarNombre, cerrarSesion,
+    enviarCodigo, verificarCodigo, crearPerfil, cambiarNombre, cerrarSesion, reintentar,
   }
 }

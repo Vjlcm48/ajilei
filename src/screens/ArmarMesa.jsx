@@ -235,6 +235,8 @@ export default function ArmarMesa({
       cuenta={cuenta}
       saldo={saldo}
       estadoSaldo={billetera?.estado}
+      recordado={billetera?.recordado ?? null}
+      cobrando={billetera?.pendiente === true}
       // Aquí la flecha y la casa DEJAN de coincidir: la flecha deshace un paso
       // —vuelve a `SalaOpciones`, §4.5— y la casa salta al lobby de un tirón
       // (§5.1). Tener las dos es lo que hace que el jugador que entró a mirar

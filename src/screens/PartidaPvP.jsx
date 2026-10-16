@@ -48,6 +48,8 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, onLo
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
         estadoSaldo={billetera?.estado}
+        recordado={billetera?.recordado ?? null}
+        cobrando={billetera?.pendiente === true}
         onPerfil={() => avisar('lob.toast.pronto')}
         onAjustes={() => avisar('lob.toast.pronto')}
       />

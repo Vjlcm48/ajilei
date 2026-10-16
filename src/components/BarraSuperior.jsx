@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import '../styles/pildora.css'
 import BalanceDisplay from './BalanceDisplay'
 import AvisoSaldo from './AvisoSaldo'
 import FichaConstancia from './FichaConstancia'
@@ -55,11 +56,23 @@ import { monedaPosada } from '../hooks/constanciaCore'
 // la moneda y un hueco «—» con caja reservada (O1), nunca una cifra inventada.
 // `estadoSaldo` —cargando, listo o error— viaja al atributo `data-saldo` para
 // que el arnés lo lea (modo `saldo` de diagDSK, INV-46).
+//
+// ── IOS-1c · lo que se enseña mientras no hay cifra del servidor ───────────
+// Lámina `laminas/ios1c`, elecciones de Victor (2026-10-16):
+//   · `recordado` (escena b2): la última cifra que este aparato vio del
+//     servidor, atenuada y con un pulso suave, sin texto. Al llegar la real,
+//     cambio directo (escena c, A). `data-saldo-recordado` para el arnés;
+//   · `cobrando` (escena d3): se cobra la salida de una mesa y la cifra de
+//     antes de sentarse sería falsa: tres puntos. `data-saldo-cobrando`.
+// Los dos sólo actúan sin cifra del servidor; el aviso y la celebración del
+// video siguen mandando por delante. Sin ninguno de los dos, el «—» de ECO-1b.
 
 export default function BarraSuperior({
   usuario = '',
   saldo = null,
   estadoSaldo,
+  recordado = null,
+  cobrando = false,
   onPerfil,
   onAjustes,
   ajustesRef,
@@ -104,6 +117,11 @@ export default function BarraSuperior({
 
   const hayHoja = typeof ajustesExpandido === 'boolean'
   const sinCifra = !Number.isFinite(cifra)
+  const enCobro = sinCifra && cobrando
+  const conRecuerdo = sinCifra && !cobrando && Number.isFinite(recordado)
+  const numero = enCobro
+    ? <span className="pil-puntos" aria-hidden="true"><i /><i /><i /></span>
+    : conRecuerdo ? montoTexto(recordado) : sinCifra ? '—' : montoTexto(cifra)
 
   return (
     <header className="lob-top">
@@ -125,6 +143,8 @@ export default function BarraSuperior({
         aria-label={t('lob.saldo.aria')}
         data-saldo={estadoSaldo}
         data-saldo-vacio={sinCifra ? '' : undefined}
+        data-saldo-recordado={conRecuerdo ? '' : undefined}
+        data-saldo-cobrando={enCobro ? '' : undefined}
         aria-busy={sinCifra && estadoSaldo !== 'error' ? 'true' : undefined}
       >
         {/* ECO-1b · la cifra es la de la billetera (ver la cabecera). Sin cifra,
@@ -142,7 +162,7 @@ export default function BarraSuperior({
           ref={monedaRef}
           className={`lob-moneda${avisoVivo.vivo || brillaVideo ? ' avs-viva' : ''}${avisoVivo.brilla || brillaVideo ? ' avs-brilla' : ''}`}
         >
-          <BalanceDisplay chips={sinCifra ? '—' : montoTexto(cifra)} size="icon" />
+          <BalanceDisplay chips={numero} size="icon" />
         </span>
         <SoundButton
           className="lob-mas"

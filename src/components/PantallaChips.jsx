@@ -49,6 +49,9 @@ export default function PantallaChips({
   saldo,
   // ECO-1b · cargando, listo o error: viaja a `data-saldo` de la píldora.
   estadoSaldo,
+  // IOS-1c · la cifra recordada y el cobro de una salida, sólo para la píldora.
+  recordado = null,
+  cobrando = false,
   // ECO-1c · el aviso de saldo (lámina `laminas/eco1c`), para la píldora.
   aviso = null,
   onAvisoFin,
@@ -86,6 +89,8 @@ export default function PantallaChips({
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
         estadoSaldo={estadoSaldo}
+        recordado={recordado}
+        cobrando={cobrando}
         aviso={aviso}
         onAvisoFin={onAvisoFin}
         onPerfil={pronto}

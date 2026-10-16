@@ -1,0 +1,45 @@
+/* ── IOS-1c · La píldora mientras no hay cifra del servidor ──────────────────
+   Lámina `laminas/ios1c`, elecciones de Victor (2026-10-16). La importa
+   `BarraSuperior.jsx`, así que vale igual bajo `.lobby` y bajo `.sal`. Aditiva:
+   sólo actúa con `data-saldo-recordado` o `data-saldo-cobrando`, que la barra
+   pone únicamente sin cifra del servidor. La caja reservada del número sigue
+   siendo la de `[data-saldo-vacio]` (lobby.css, salas.css), así que llegar la
+   cifra real no empuja el `+`.
+
+   b2 · la cifra recordada: atenuada y con un pulso suave («poniéndose al día»).
+   La moneda no se atenúa: lo que no es del servidor es la cifra. */
+.lob-pildora[data-saldo-recordado] .bd-num {
+  opacity: 0.5;
+  animation: pil-recordado 1.8s ease-in-out infinite;
+}
+@keyframes pil-recordado {
+  0%, 100% { opacity: 0.38; }
+  50% { opacity: 0.68; }
+}
+
+/* d3 · cobrando la salida de una mesa: tres puntos en el sitio del número. */
+.lob-pildora .pil-puntos {
+  display: inline-flex;
+  gap: 0.18em;
+  align-items: center;
+  justify-content: center;
+}
+.lob-pildora .pil-puntos i {
+  inline-size: 0.32em;
+  block-size: 0.32em;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pil-punto 1.2s ease-in-out infinite;
+}
+.lob-pildora .pil-puntos i:nth-child(2) { animation-delay: 0.2s; }
+.lob-pildora .pil-puntos i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes pil-punto {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-0.12em); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lob-pildora[data-saldo-recordado] .bd-num,
+  .lob-pildora .pil-puntos i { animation: none; }
+  .lob-pildora .pil-puntos i { opacity: 0.6; }
+}

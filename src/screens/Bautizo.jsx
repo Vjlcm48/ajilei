@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import '../styles/puerta.css'
 import '../styles/bautizo.css'
 import { Wordmark } from '../components/Wordmark'
-import { REGLA_USERNAME } from '../hooks/useAuth'
+import { nombreLimpio, nombreValido, avisoDelNombre, AVISO_NOMBRE, PAUSA_AVISO_MS } from './bautizoCore'
 // BIE-1 · Los tres botones del Bautizo suenan con el clic, como el resto de la
 // puerta (D1: suenan los botones, no los huecos). `SoundButton` trae su propio
 // `useSounds`; esta pantalla no necesita ningún otro sonido.
@@ -26,6 +26,12 @@ import { SoundButton } from '../components/SoundButton'
 // copia la lista, no se adivina: se intenta el insert/update y se traduce lo que
 // responda. Duplicar la regla en el cliente era garantizar dos verdades — y la
 // del cliente sería la que se queda vieja.
+//
+// ── IOS-1c · el nombre recortado y el aviso (lámina `laminas/ios1c`, f2) ────
+// Se juzga y se envía el nombre SIN los espacios del principio y del final, y
+// el campo se limpia solo al salir de él o tras 1,2 s sin teclear. La línea fija
+// de la regla se quita: el aviso «De 6 a 15 letras, números o _, sin espacios»
+// sale en la ranura de avisos SÓLO cuando el nombre no vale (`bautizoCore.js`).
 
 export default function Bautizo({
   modo = 'bautizo', actual = '', onConfirmar, onCancelar, onCerrarSesion,
@@ -33,6 +39,8 @@ export default function Bautizo({
   const [nombre, setNombre] = useState(actual)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState(null)
+  // IOS-1c · el jugador dejó de escribir (1,2 s) o salió del campo.
+  const [pausado, setPausado] = useState(false)
   const campo = useRef(null)
   const edicion = modo === 'edicion'
 
@@ -48,16 +56,30 @@ export default function Bautizo({
     return () => document.removeEventListener('keydown', onKey, true)
   }, [edicion, onCancelar])
 
-  const valido = REGLA_USERNAME.test(nombre)
+  const limpio = nombreLimpio(nombre)
+  const valido = nombreValido(nombre)
   // En edición, confirmar el mismo nombre es un viaje de red para no cambiar
   // nada — y la base lo devolvería con 23505 contra el propio jugador.
-  const sinCambio = edicion && nombre === actual
+  const sinCambio = edicion && limpio === actual
+  const aviso = avisoDelNombre(nombre, { pausado })
+
+  // IOS-1c · la pausa: 1,2 s sin teclear limpian el campo y dejan hablar al
+  // aviso de «corto». La escritura vive en el callback del reloj, no en el
+  // cuerpo del efecto.
+  useEffect(() => {
+    if (pausado) return
+    const id = setTimeout(() => {
+      setPausado(true)
+      setNombre((n) => nombreLimpio(n))
+    }, PAUSA_AVISO_MS)
+    return () => clearTimeout(id)
+  }, [nombre, pausado])
 
   const confirmar = useCallback(async () => {
     if (ocupado) return
     setOcupado(true)
     setError(null)
-    const r = await onConfirmar(nombre)
+    const r = await onConfirmar(limpio)
     if (r.ok) {
       // En bautizo el componente se desmonta al pasar a COMPLETO; en edición lo
       // cierra quien lo abrió. En ninguno de los dos casos hay que apagar
@@ -68,7 +90,7 @@ export default function Bautizo({
     }
     setOcupado(false)
     setError(r.mensaje)
-  }, [nombre, ocupado, edicion, onConfirmar, onCancelar])
+  }, [limpio, ocupado, edicion, onConfirmar, onCancelar])
 
   const cuerpo = (
     <section className={`puerta-card bautizo-card${edicion ? ' is-edicion' : ''}`}>
@@ -93,20 +115,21 @@ export default function Bautizo({
           type="text"
           autoComplete="off"
           autoCapitalize="none"
+          autoCorrect="off"
           spellCheck="false"
           maxLength={15}
           placeholder="tunombre"
           value={nombre}
-          onChange={(e) => { setNombre(e.target.value); if (error) setError(null) }}
+          onChange={(e) => { setNombre(e.target.value); setPausado(false); if (error) setError(null) }}
+          onBlur={() => { setPausado(true); setNombre((n) => nombreLimpio(n)) }}
           disabled={ocupado}
         />
 
-        {/* La regla, VISIBLE y permanente (§1.4). No es un mensaje de error: es
-            el contrato, y por eso vive fuera de la ranura de avisos y no la
-            ocupa. Su alto es fijo, así que un error debajo no la mueve. */}
-        <p className="bautizo-regla">6 a 15 caracteres: letras, números y guion bajo</p>
-
-        <p className="puerta-aviso" role="status">{error ?? ''}</p>
+        {/* IOS-1c · la línea fija de la regla (§1.4) se quitó (lámina f2): la
+            regla sale en la ranura de avisos sólo cuando el nombre no vale. El
+            error de la base, si lo hay, manda. La ranura tiene alto mínimo
+            (`puerta.css`), así que aparecer no mueve el botón. */}
+        <p className="puerta-aviso" role="status" data-accion="aviso-nombre">{error ?? (aviso ? AVISO_NOMBRE : '')}</p>
 
         <SoundButton type="submit" className="puerta-btn" disabled={ocupado || !valido || sinCambio}>
           {ocupado ? 'Guardando…' : 'Confirmar'}

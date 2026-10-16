@@ -188,6 +188,8 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
         usuario={usuario}
         saldo={billetera?.saldo ?? null}
         estadoSaldo={billetera?.estado}
+        recordado={billetera?.recordado ?? null}
+        cobrando={billetera?.pendiente === true}
         aviso={aviso}
         onAvisoFin={onAvisoFin}
         // ECO-1d · la ficha de la constancia vive SÓLO en el lobby (lámina

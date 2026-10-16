@@ -131,7 +131,16 @@ export default function RetarIAS({
   const saldo = billetera?.saldo ?? null
   const juicio = saldoParaJuzgar(saldo)
   const sinCifra = saldo === null
-  const lecturaFallida = sinCifra && billetera?.estado === SALDO_ERROR
+  // IOS-1c · la cifra recordada (escena b2 de `laminas/ios1c`) enciende el
+  // botón dorado (S4) pero NO juzga: `juicio` sigue sin juicio sin cifra del
+  // servidor, así que ninguna mesa sale en gris, no hay «no te alcanza» y el
+  // bloque del video no sale. Si no alcanza, lo dice el servidor al sentarse
+  // (`ia.retar.sentarse.saldo`). Mientras se cobra una salida no hay cifra
+  // recordada (la de antes de sentarse sería falsa) y el botón espera.
+  const recordado = billetera?.recordado ?? null
+  const cobrando = billetera?.pendiente === true
+  const sinNingunaCifra = sinCifra && recordado === null
+  const lecturaFallida = sinNingunaCifra && !cobrando && billetera?.estado === SALDO_ERROR
 
   // El inicializador perezoso corre UNA vez: leer el almacenamiento en cada
   // render sería trabajo repetido y dejaría que un cambio de saldo reescribiera
@@ -214,7 +223,9 @@ export default function RetarIAS({
         : sentando.codigo === 'limite' ? 'ia.retar.sentarse.limite'
           : sentando.codigo === 'tope_diario' ? 'ia.retar.sentarse.tope'
             : 'ia.retar.sentarse.otro')
-  } else if (sinCifra) {
+  } else if (cobrando) {
+    notaCta = t('ia.retar.saldo.cobrando')
+  } else if (sinNingunaCifra) {
     // ECO-1b · mientras carga, la nota lo dice; si la lectura falló, lo dice
     // `AvisoLectura` con su botón y la nota calla para no repetirlo.
     notaCta = lecturaFallida ? null : t('ia.retar.saldo.cargando')
@@ -248,6 +259,8 @@ export default function RetarIAS({
       cuenta={cuenta}
       saldo={saldo}
       estadoSaldo={billetera?.estado}
+      recordado={billetera?.recordado ?? null}
+      cobrando={billetera?.pendiente === true}
       aviso={avisoSaldo}
       onAvisoFin={onAvisoFin}
       onVolver={onVolver}
@@ -255,7 +268,7 @@ export default function RetarIAS({
       cta={{
         clase: 'es-retar',
         etiqueta: rotuloCta,
-        disabled: enviando || sinCifra || !completo || !veredicto.ok,
+        disabled: enviando || sinNingunaCifra || cobrando || !completo || !veredicto.ok,
         onClick: () => {
           // Se recuerda lo que el jugador llegó a USAR, no por dónde paseó el
           // dedo — y de eso, sólo los tres campos de la política.

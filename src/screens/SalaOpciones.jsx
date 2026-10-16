@@ -236,6 +236,8 @@ export default function SalaOpciones({
         usuario={cuenta?.username ?? ''}
         saldo={saldo}
         estadoSaldo={billetera?.estado}
+        recordado={billetera?.recordado ?? null}
+        cobrando={billetera?.pendiente === true}
         onPerfil={() => avisar('lob.toast.pronto')}
         onAjustes={() => avisar('lob.toast.pronto')}
       />
