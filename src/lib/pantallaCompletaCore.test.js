@@ -8,7 +8,10 @@ import { describe, test, expect, vi } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
-import { aplica, pedir, reentrar, creaPantallaCompleta, CONSULTA_TACTIL, SIN_PANTALLA_COMPLETA } from './pantallaCompletaCore'
+import {
+  aplica, pedir, reentrar, creaPantallaCompleta, esSafariDeIPad,
+  CONSULTA_TACTIL, CONSULTA_HORIZONTAL, SIN_PANTALLA_COMPLETA,
+} from './pantallaCompletaCore'
 
 // ── Dobles del DOM ──────────────────────────────────────────────────────────
 // Un nodo con `closest` de verdad sobre una cadena de padres: `marcado` dice si
@@ -25,8 +28,9 @@ function creaNodo({ marcado = false, padre = null } = {}) {
 }
 
 // `consultas`: las media queries que dan `true`. Por omisión, un teléfono en el
-// navegador (táctil y sin instalar).
-function monta({ consultas = [CONSULTA_TACTIL], api = true, standalone, rechaza = false } = {}) {
+// navegador (táctil y sin instalar). `callout`: el `CSS.supports` de WebKit de
+// iOS/iPadOS para `-webkit-touch-callout` (IOS-1 1a).
+function monta({ consultas = [CONSULTA_TACTIL], api = true, standalone, rechaza = false, callout = false } = {}) {
   const oyentes = {}
   const doc = {
     fullscreenElement: null,
@@ -48,6 +52,7 @@ function monta({ consultas = [CONSULTA_TACTIL], api = true, standalone, rechaza 
     document: doc,
     navigator: standalone === undefined ? {} : { standalone },
     matchMedia: (q) => ({ matches: consultas.includes(q) }),
+    CSS: { supports: (p, v) => callout && p === '-webkit-touch-callout' && v === 'none' },
   }
   return {
     doc, win, pide,
@@ -224,5 +229,126 @@ describe('pantallaCompletaCore · INV-45 (PAN-1 1c, R1–R5)', () => {
     m.sale()
     pc.alGesto(undefined)
     expect(m.pide).toHaveBeenCalledTimes(3)
+  })
+})
+
+// IOS-1 1a (P1, opción C+B): en Safari del iPad, nunca fuera de la mesa y,
+// dentro, solo en horizontal. El resto, como en PAN-1. Lo que esto NO prueba: que
+// el iPad de verdad dé esas señales (el WebKit de Playwright en Windows no las
+// da); eso lo valida Victor en el aparato.
+describe('pantallaCompletaCore · Safari del iPad (IOS-1 1a)', () => {
+  const IPAD_VERTICAL = { consultas: [CONSULTA_TACTIL], callout: true }
+  const IPAD_HORIZONTAL = { consultas: [CONSULTA_TACTIL, CONSULTA_HORIZONTAL], callout: true }
+
+  // El recorrido entero: toques fuera, entrar en la mesa, «Iniciar mano».
+  function recorre(opciones) {
+    const m = monta(opciones)
+    const pc = creaPantallaCompleta(m.doc, m.win)
+    pc.engancha()
+    m.doc.despacha('pointerup')
+    m.doc.despacha('pointerup')
+    const fuera = m.pide.mock.calls.length
+    pc.fijaDentroMesa(true)
+    m.sale()
+    const pidio = pc.reentrar()
+    return { m, pc, fuera, pidio }
+  }
+
+  test('11 · Safari del iPad, fuera de la mesa: ningún toque pide (ni en horizontal)', () => {
+    for (const o of [IPAD_VERTICAL, IPAD_HORIZONTAL]) {
+      const m = monta(o)
+      expect(esSafariDeIPad(m.win)).toBe(true)
+      const pc = creaPantallaCompleta(m.doc, m.win)
+      pc.engancha()
+      for (let i = 0; i < 5; i++) m.doc.despacha('pointerup')
+      expect(m.pide).not.toHaveBeenCalled()
+    }
+  })
+
+  test('12 · Safari del iPad, mesa en vertical: «Iniciar mano» y «Siguiente mano» no piden', () => {
+    const { m, fuera, pidio } = recorre(IPAD_VERTICAL)
+    expect(fuera).toBe(0)
+    expect(pidio).toBe(false)
+    expect(reentrar(m.doc, m.win)).toBe(false)
+    expect(m.pide).not.toHaveBeenCalled()
+  })
+
+  test('13 · Safari del iPad, mesa en horizontal: «Iniciar mano» pide, y solo dentro de la mesa', () => {
+    const { m, pc, fuera, pidio } = recorre(IPAD_HORIZONTAL)
+    expect(fuera).toBe(0)
+    expect(pidio).toBe(true)
+    expect(m.pide).toHaveBeenCalledTimes(1)
+    expect(m.pide).toHaveBeenCalledWith({ navigationUI: 'hide' })
+    // La de GameTable, sin el controlador, igual.
+    m.sale()
+    expect(reentrar(m.doc, m.win)).toBe(true)
+    // Al dejar la mesa (R3: no se sale), los toques de fuera siguen sin pedir.
+    pc.fijaDentroMesa(false)
+    m.sale()
+    m.doc.despacha('pointerup')
+    expect(m.pide).toHaveBeenCalledTimes(2)
+    expect(m.doc.exitFullscreen).not.toHaveBeenCalled()
+  })
+
+  test('14 · tableta Android (sin la capacidad de iOS), fuera de la mesa: pide como hoy', () => {
+    for (const consultas of [[CONSULTA_TACTIL], [CONSULTA_TACTIL, CONSULTA_HORIZONTAL]]) {
+      const { m, fuera, pidio } = recorre({ consultas })
+      expect(esSafariDeIPad(m.win)).toBe(false)
+      expect(fuera).toBe(1)
+      expect(pidio).toBe(true)
+    }
+  })
+
+  test('15 · teléfono Android: sin cambio, fuera y dentro, en las dos orientaciones', () => {
+    for (const consultas of [[CONSULTA_TACTIL], [CONSULTA_TACTIL, CONSULTA_HORIZONTAL]]) {
+      const m = monta({ consultas })
+      const pc = creaPantallaCompleta(m.doc, m.win)
+      pc.engancha()
+      m.doc.despacha('pointerup')
+      expect(m.pide).toHaveBeenCalledTimes(1)
+      pc.fijaDentroMesa(true)
+      m.sale()
+      m.doc.despacha('pointerup')               // dentro, un gesto no reentra (R4)
+      expect(m.pide).toHaveBeenCalledTimes(1)
+      expect(pc.reentrar()).toBe(true)
+      expect(m.pide).toHaveBeenCalledTimes(2)
+    }
+  })
+
+  test('16 · iPhone (sin la API): no pide en ningún caso', () => {
+    for (const consultas of [[CONSULTA_TACTIL], [CONSULTA_TACTIL, CONSULTA_HORIZONTAL]]) {
+      const { m, fuera, pidio } = recorre({ consultas, api: false, callout: true })
+      expect(esSafariDeIPad(m.win)).toBe(false)
+      expect(fuera).toBe(0)
+      expect(pidio).toBe(false)
+    }
+  })
+
+  test('17 · la app instalada en el iPad: no pide en ningún caso', () => {
+    for (const o of [
+      { ...IPAD_HORIZONTAL, standalone: true },
+      { ...IPAD_HORIZONTAL, consultas: [...IPAD_HORIZONTAL.consultas, '(display-mode: standalone)'] },
+    ]) {
+      const { m, fuera, pidio } = recorre(o)
+      expect(fuera).toBe(0)
+      expect(pidio).toBe(false)
+      expect(m.pide).not.toHaveBeenCalled()
+    }
+  })
+
+  test('18 · Mac con ratón (con la capacidad de iOS): no pide, ni fuera ni en la mesa', () => {
+    for (const consultas of [[], [CONSULTA_HORIZONTAL]]) {
+      const { m, fuera, pidio } = recorre({ consultas, callout: true })
+      expect(esSafariDeIPad(m.win)).toBe(false)
+      expect(fuera).toBe(0)
+      expect(pidio).toBe(false)
+    }
+  })
+
+  test('19 · iPad con teclado y panel táctil (entrada principal fina): no pide, como un computador', () => {
+    const { m, fuera, pidio } = recorre({ consultas: ['(pointer: coarse)', CONSULTA_HORIZONTAL], callout: true })
+    expect(esSafariDeIPad(m.win)).toBe(false)
+    expect(fuera).toBe(0)
+    expect(pidio).toBe(false)
   })
 })

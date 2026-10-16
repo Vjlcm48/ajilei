@@ -20,11 +20,22 @@
 //        → `creaPantallaCompleta`.
 //   R5 · instalada como PWA ya nace a pantalla completa (manifiesto) y esto no
 //        hace nada → `instalada`.
-//   R6 · sin bloqueo del giro; R7 · Safari no tiene la API y esto no hace nada.
+//   R6 · sin bloqueo del giro; R7 · Safari del iPhone no tiene la API y esto no
+//        hace nada.
 //   Y la exclusión: un toque dentro de `[data-sin-pantalla-completa]` no pide
 //   → `SIN_PANTALLA_COMPLETA`.
+//
+// IOS-1 1a (P1, opción C+B, Victor, 2026-10-14): Safari del iPad SÍ tiene la API,
+// y pedirla a cada toque fuera de la mesa le quita la barra, le pone su ✕ y le
+// roba el teclado al primer toque (F-3); entrar y salir en vertical descuadra el
+// óvalo de las mesas de 2 y 3 (F-5). En Safari del iPad: nunca fuera de la mesa
+// y, dentro, solo en horizontal → `esSafariDeIPad` y `pideAqui`. Al girar a
+// vertical no se sale a propósito (R3 sigue): Safari la suelta solo, y si no, la
+// mesa vertical queda como en la app instalada. Plan de respaldo P2 (si F-5
+// vuelve al girar): `pideAqui` devuelve `false` en el iPad.
 
 export const CONSULTA_TACTIL = '(hover: none) and (pointer: coarse)'
+export const CONSULTA_HORIZONTAL = '(orientation: landscape)'
 
 const coincide = (win, consulta) => !!win?.matchMedia?.(consulta)?.matches
 
@@ -42,6 +53,24 @@ export function aplica(win) {
     && typeof doc?.documentElement?.requestFullscreen === 'function'
     && doc.fullscreenEnabled !== false
     && !instalada(win)
+}
+
+// IOS-1 1a · Safari del iPad, por capacidad y nunca por el nombre del aparato:
+// táctil, con la API (el iPhone no la tiene) y con `-webkit-touch-callout`, que
+// solo da WebKit de iOS/iPadOS (Android no lo tiene; la Mac con ratón no es
+// táctil). El único sitio que reconoce el aparato.
+export function esSafariDeIPad(win) {
+  return coincide(win, CONSULTA_TACTIL)
+    && typeof win?.document?.documentElement?.requestFullscreen === 'function'
+    && !!win?.CSS?.supports?.('-webkit-touch-callout', 'none')
+}
+
+// IOS-1 1a · la política por aparato, en un punto. En Safari del iPad, solo
+// dentro de la mesa y en horizontal; en lo demás, como siempre (R1–R5 deciden
+// en `aplica`). P2 = devolver `false` en la rama del iPad.
+function pideAqui(win, { dentroMesa }) {
+  if (esSafariDeIPad(win)) return dentroMesa && coincide(win, CONSULTA_HORIZONTAL)
+  return true
 }
 
 // R2 · pide la pantalla completa ANTES de devolver. Si ya la hay, nada. La
@@ -72,12 +101,14 @@ const excluido = (e) => !!e?.target?.closest?.(SIN_PANTALLA_COMPLETA)
 // pide y solo `reentrar` lo hace. El estado lo fija la app con `fijaDentroMesa`.
 export function creaPantallaCompleta(doc, win) {
   let dentroMesa = false
-  const alGesto = (e) => { if (!dentroMesa && !excluido(e)) pedir(doc, win) }
+  const alGesto = (e) => {
+    if (!dentroMesa && !excluido(e) && pideAqui(win, { dentroMesa: false })) pedir(doc, win)
+  }
   return {
     fijaDentroMesa(v) { dentroMesa = !!v },
     estaDentroMesa: () => dentroMesa,
     alGesto,
-    reentrar: () => pedir(doc, win),
+    reentrar: () => reentrar(doc, win),
     // `pointerup` activa la página según la especificación cuando el puntero no
     // es un ratón (en táctil, siempre). En CAPTURA, para que llegue antes que
     // cualquier `stopPropagation` de la pantalla y antes de que el clic cambie
@@ -89,6 +120,9 @@ export function creaPantallaCompleta(doc, win) {
   }
 }
 
-// La reentrada explícita de la mesa. No depende de la política: la mesa la
-// llama solo donde R4 lo permite.
-export const reentrar = (doc, win) => pedir(doc, win)
+// La reentrada explícita de la mesa. No depende de la política de R4: la mesa la
+// llama solo donde R4 lo permite. Sí de la del aparato (IOS-1 1a): en Safari del
+// iPad, solo en horizontal.
+export function reentrar(doc, win) {
+  return pideAqui(win, { dentroMesa: true }) && pedir(doc, win)
+}
