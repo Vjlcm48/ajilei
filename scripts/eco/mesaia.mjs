@@ -560,7 +560,11 @@ export async function runMesaIA(browser, { base, baseDev, externo = false, out =
     await page.waitForTimeout(300)
     const fichas = await fichasMesa(page)
     const entrada = -movs(b.banco, 'entrada_ia')[0].monto
-    b.retrasos = { recargar_ia: caso === 'tope' ? 14000 : 3000 }
+    // IOS-1c · con el tope de red (8 s), una recarga que tardara SIEMPRE 14 s
+    // no contestaría nunca: se corta y se reintenta sola. La red del caso
+    // `tope` se cuelga en las tres primeras y luego vuelve; la tarjeta del tope
+    // (P-2b) sale igual a los 10 s, y la salida sigue esperando a la recarga.
+    b.retrasos = { recargar_ia: caso === 'tope' ? { ms: 14000, veces: 3 } : 3000 }
     // Las recargas se cuentan AL SALIR de la página: `b.llamadas` las anota la
     // ruta al contestar, tras el retraso, y el reintento forzado contestaría
     // cuando el contexto ya se cerró.
@@ -622,7 +626,8 @@ export async function runMesaIA(browser, { base, baseDev, externo = false, out =
       r.ok = r.ok && r.topeMs >= 9500 && r.topeMs < 13000 && r.recargasAlTope === 0
         && (r.tarjeta.sub ?? '').includes('no responde') && r.tarjeta.si === 'Reintentar' && r.tarjeta.siApagado === false
         && r.tarjeta.salir === 'Salir con mis fichas' && r.tarjeta.xViva
-        && enviadas.length === 2 && enviadas[0] === enviadas[1] && enviadas[0] != null
+        // IOS-1c · el reintento forzado y los del tope de red: todos con el MISMO seq.
+        && enviadas.length >= 2 && enviadas.every((q) => q === enviadas[0]) && enviadas[0] != null
     }
     await page.screenshot({ path: `${out}/mesaia9-${caso}.png` })
     await ctx.close()

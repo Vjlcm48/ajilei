@@ -141,8 +141,24 @@ const INICIO = ({ semilla, clave, sesion }) => {
  * el modo que lo pasa puede cambiar el nombre y recargar la página. Sin él,
  * `PERFIL_CAP`, como siempre. Es la forma de medir el lobby con el peor nombre
  * que admite la regla (`^[A-Za-z0-9_]{6,15}$`) sin un mando de URL en la app.
+ *
+ * IOS-1c · `retrasos[nombre]` admite también `{ ms, veces }`: sólo las próximas
+ * `veces` llamadas tardan (la petición colgada de la app que vuelve de segundo
+ * plano, y el reintento que ya no se cuelga). Y `cuenta` (opcional), otro objeto
+ * VIVO para la puerta (modo `saldo`, celdas 13 y 14):
+ *   perfilRetrasoMs, perfilVeces  `/rest/v1/profiles` tarda (las `perfilVeces`
+ *                                 primeras; sin ella, todas)
+ *   perfilFalla                   `/rest/v1/profiles` contesta 503
+ *   perfilVacio                   «no hay perfil» (lo que lleva al Bautizo)
+ *   sesionCaducada                la sesión guardada nace con el token vencido:
+ *                                 el SDK lo refresca al arrancar
+ *   tokenRetrasoMs, tokenVeces    `/auth/v1/token` tarda (las `tokenVeces` primeras)
+ *   tokenFalla                    `/auth/v1/token` no llega (sin red)
+ *   tokens                        lo anota la ruta: cuántos refrescos se pidieron
+ * Una petición que la app ya canceló (el tope de red de la 1c) y que la ruta
+ * contesta tarde no es un error del arnés: se ignora.
  */
-export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP, billetera = null, perfil = PERFIL_CAP } = {}) {
+export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP, billetera = null, perfil = PERFIL_CAP, cuenta = null } = {}) {
   // `vista` es una clave de VISTAS_CAP o, para sondas fuera de lo sellado
   // (la variante C de la og-image), un objeto con la misma forma.
   // ARN-3c · D7 · `semilla`: `msg` juega en 4173 por aquí y no puede jugar
@@ -164,7 +180,13 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
     access_token: 'cap.' + Buffer.from(JSON.stringify({ sub: user.id, exp: ahora + dura })).toString('base64url') + '.cap',
     token_type: 'bearer', expires_in: dura, expires_at: ahora + dura, refresh_token: 'cap-refresh', user,
   }
-  await ctx.addInitScript(INICIO, { semilla, clave: `sb-${ref}-auth-token`, sesion })
+  // IOS-1c · la sesión guardada con el token ya vencido: el SDK la refresca al
+  // arrancar por `/auth/v1/token`, que contesta la de siempre (lejana).
+  const guardada = cuenta?.sesionCaducada
+    ? { ...sesion, expires_in: 3600, expires_at: ahora - 120,
+        access_token: 'cap.' + Buffer.from(JSON.stringify({ sub: user.id, exp: ahora - 120 })).toString('base64url') + '.cap' }
+    : sesion
+  await ctx.addInitScript(INICIO, { semilla, clave: `sb-${ref}-auth-token`, sesion: guardada })
 
   // ARN-3c · D6 · el terreno común (`aislarNavegador`) ya desvía los sockets no
   // locales al nacer el contexto, y un socket desviado NO dispara
@@ -177,7 +199,17 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
   const origen = new URL(base).host
   // UNA ruta para todo: lo local pasa, Supabase se contesta aquí, lo demás se
   // corta y se anota (es la puerta cap.red, no un error silencioso).
+  const tardar = (ms) => new Promise((ok) => setTimeout(ok, ms))
   await ctx.route('**/*', async (route) => {
+    try {
+      await atender(route)
+    } catch (e) {
+      // IOS-1c · la app canceló la petición (el tope de red) antes de que la
+      // ruta contestara, o el contexto ya se cerró: no es un fallo del arnés.
+      if (!/aborted|already handled|closed|Target page|has been closed/i.test(String(e?.message ?? e))) throw e
+    }
+  })
+  async function atender(route) {
     const r = route.request()
     const u = new URL(r.url())
     if (u.protocol === 'data:' || u.protocol === 'blob:' || u.host === origen) return route.continue()
@@ -185,6 +217,18 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
       red.supabase.push(`${r.method()} ${u.pathname}`)
       const json = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
       if (u.pathname.startsWith('/rest/v1/profiles')) {
+        if (cuenta) {
+          cuenta.perfiles = (cuenta.perfiles ?? 0) + 1
+          if (cuenta.perfilRetrasoMs && (cuenta.perfilVeces === undefined || cuenta.perfilVeces > 0)) {
+            if (cuenta.perfilVeces !== undefined) cuenta.perfilVeces -= 1
+            await tardar(cuenta.perfilRetrasoMs)
+          }
+          if (cuenta.perfilFalla) {
+            return route.fulfill({ status: 503, contentType: 'application/json',
+              body: JSON.stringify({ code: 'PGRST000', message: 'arnés: perfil caído', details: null, hint: null }) })
+          }
+          if (cuenta.perfilVacio) return json([])
+        }
         return json((r.headers()['accept'] || '').includes('vnd.pgrst.object') ? perfil : [perfil])
       }
       if (u.pathname.startsWith('/rest/v1/rpc/')) {
@@ -199,7 +243,11 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
             billetera.__saldoVisto = billetera.saldo
           }
           const retraso = billetera.retrasos?.[nombre]
-          if (retraso) await new Promise((ok) => setTimeout(ok, retraso))
+          if (typeof retraso === 'number' && retraso > 0) await tardar(retraso)
+          if (retraso && typeof retraso === 'object' && retraso.veces > 0) {
+            retraso.veces -= 1
+            await tardar(retraso.ms)
+          }
           const corte = billetera.cortes?.[nombre]
           if (corte && corte.veces > 0) {
             corte.veces -= 1
@@ -229,12 +277,22 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
         return json(respuesta)
       }
       if (u.pathname.startsWith('/auth/v1/user')) return json(user)
-      if (u.pathname.startsWith('/auth/v1/token')) return json(sesion)
+      if (u.pathname.startsWith('/auth/v1/token')) {
+        if (cuenta) {
+          cuenta.tokens = (cuenta.tokens ?? 0) + 1
+          if (cuenta.tokenFalla) return route.abort('failed')   // ERR_FAILED: el vigía lo reconoce como corte del arnés
+          if (cuenta.tokenRetrasoMs && (cuenta.tokenVeces === undefined || cuenta.tokenVeces > 0)) {
+            if (cuenta.tokenVeces !== undefined) cuenta.tokenVeces -= 1
+            await tardar(cuenta.tokenRetrasoMs)
+          }
+        }
+        return json(sesion)
+      }
       return json([])
     }
     red.fuera.push(`${r.method()} ${r.url()}`)
     return route.abort()
-  })
+  }
   const page = await ctx.newPage()
   page.on('websocket', (ws) => red.sockets.push(ws.url()))
   const errores = []

@@ -14437,6 +14437,26 @@ async function runRec(browser) {
 //            y la píldora y los chips se ponen al día
 //   saldo.6  dev con bypass: la sala de espera y Armar una mesa dicen la cifra
 //            de `?apu=saldo:3700`, listas desde el primer fotograma
+//
+// IOS-1c (AJILEI_IOS-1_Fase1c_v1.0.md §5.5) · las cuatro sondas de F-7 de la
+// Fase 0 y la puerta, como celdas. Nacieron rojas contra `65ad9eb`:
+//   saldo.7  arranque con la primera `mi_billetera` colgada 30 s y sin cifra
+//            recordada: el «—» dura el tope y un reintento (≤ 11 s), no 30 s
+//   saldo.8  con cifra recordada (300) y la lectura colgada: atenuada en la
+//            píldora, Retar con el botón encendido, ninguna mesa en gris, sin
+//            bloque del video, y el botón sienta (lo decide el servidor)
+//   saldo.9  salir con la primera `salir_ia` colgada 30 s: «cobrando» (los tres
+//            puntos y «Cobrando tu mesa…»), y la cifra del banco en ≤ 11 s
+//   saldo.10 lo mismo con un `informar_pila` colgado delante de la salida
+//   saldo.11 la cifra recordada: la de otra cuenta no sale; se escribe con la
+//            del servidor; «Cerrar sesión» la borra
+//   saldo.12 sin red un rato: la recordada se queda (nunca «—»), la lectura se
+//            reintenta sola (≥ 4 en 16 s), Retar dice lo de la red al tocar, y
+//            al volver la red la cifra real llega sola
+//   saldo.13 el perfil colgado o caído: «No pudimos cargar tu cuenta», nunca el
+//            Bautizo, y entra solo; control: sin perfil, al Bautizo
+//   saldo.14 el token caducado con el refresco colgado o sin red: nunca la
+//            Portada ni el «—», y la cifra llega
 const SALDO_OUT_DIR = 'capturas-saldo'
 const SALDO_SERVIDO = 3700
 const SALDO_VP = { w: 412, h: 915, dpr: 1, movil: true }
@@ -14500,6 +14520,74 @@ async function saldoContexto(browser, billetera) {
   const errores = []
   page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`))
   return { ctx, page, errores }
+}
+
+// ── IOS-1c · ayudas de las celdas saldo.7–14 ────────────────────────────────
+// El tope de red de la 1c (`src/lib/red.js`) se copia aquí a propósito: el
+// arnés corre también contra árboles que no lo tienen (la base, para ver las
+// celdas nacer rojas).
+const TOPE_1C = 8000
+const TOPE_ESPERA_1C = TOPE_1C + 2000
+const hastaQue = async (f, limite) => {
+  const t0 = Date.now()
+  while (!f() && Date.now() - t0 < limite) await new Promise((ok) => setTimeout(ok, 50))
+}
+// Las peticiones canceladas por el tope (o que la ruta corta a propósito)
+// salen en la consola como fallos de red: son lo que se mide, no un error.
+const noEsDeRed = (m) => !/Failed to load resource|net::ERR|503|Service Unavailable|AbortError|Failed to fetch|aborted/i.test(m)
+async function sembrarRecordado(ctx, uid, saldo) {
+  await ctx.addInitScript(({ uid: u, saldo: s }) => {
+    try {
+      if (!sessionStorage.getItem('ios1c.sembrado')) {
+        localStorage.setItem('ajilei.saldoVisto', JSON.stringify({ uid: u, saldo: s, en: Date.now() }))
+        sessionStorage.setItem('ios1c.sembrado', '1')
+      }
+    } catch { /* sin almacén no hay recuerdo */ }
+  }, { uid, saldo })
+}
+async function leerPildoraIos(page) {
+  const p = await leerPildora(page)
+  if (!p) return p
+  const marcas = await page.evaluate(() => {
+    const el = document.querySelector('.lob-pildora')
+    return { recordado: !!el?.hasAttribute('data-saldo-recordado'), cobrando: !!el?.hasAttribute('data-saldo-cobrando') }
+  })
+  return { ...p, ...marcas }
+}
+// Lo que se ve cada 100 ms hasta `fin(estado)` o `limite`. `cambios` guarda
+// sólo las transiciones, para el informe.
+async function vigilar(page, fin, limite, alMedio = null) {
+  const t0 = Date.now()
+  const linea = []
+  const cambios = []
+  let previo = ''
+  for (;;) {
+    const e = await page.evaluate(() => {
+      const p = document.querySelector('.lob-pildora')
+      return {
+        pildora: p ? {
+          texto: p.querySelector('.bd-num')?.textContent?.trim() ?? '',
+          estado: p.dataset.saldo ?? null,
+          recordado: p.hasAttribute('data-saldo-recordado'),
+          cobrando: p.hasAttribute('data-saldo-cobrando'),
+        } : null,
+        portada: !!document.querySelector('#entrada-correo'),
+        bautizo: !!document.querySelector('#bautizo-nombre'),
+        sinRed: !!document.querySelector('[data-accion="cuenta-sin-red"]'),
+        lobby: !!document.querySelector('main.lobby'),
+        cargando: !!document.querySelector('.cargando'),
+      }
+    }).catch(() => null)
+    const t = Date.now() - t0
+    if (e) {
+      linea.push({ t, ...e })
+      const firma = JSON.stringify(e)
+      if (firma !== previo) { cambios.push({ t, ...e }); previo = firma }
+      alMedio?.(e, t)
+    }
+    if ((e && fin(e)) || t > limite) return { t, linea, cambios, ultimo: e }
+    await page.waitForTimeout(100)
+  }
 }
 
 async function runSaldo(browser) {
@@ -14698,6 +14786,227 @@ async function runSaldo(browser) {
     puntos['saldo.6'] = {
       espera, armar,
       ok: [espera, armar].every((p) => p && p.texto === servida && p.estado === 'listo' && !p.vacio),
+    }
+  }
+
+  // ══ IOS-1c · las sondas de F-7 y la puerta, celdas permanentes ═══════════
+  // Rector: AJILEI_IOS-1_Fase1c_v1.0.md §5.5. Nacen rojas contra `65ad9eb`
+  // (ninguna petición tenía tope) y salen verdes con el arreglo.
+  {
+    // ── saldo.7 · sonda a: el arranque con la primera lectura colgada 30 s ──
+    const b = { saldo: SALDO_SERVIDO, retrasoMs: 30000 }
+    const c = await saldoContexto(browser, b)
+    await c.page.goto(BASE_PROD)
+    await c.page.waitForSelector('main.lobby .lob-pildora', { timeout: 15000 })
+    await hastaQue(() => (b.lecturas ?? 0) >= 1, 5000)
+    b.retrasoMs = 0                      // la colgada sigue; las siguientes contestan
+    const v = await vigilar(c.page, (e) => e.pildora?.estado === 'listo', 40000)
+    errores.push(...c.errores.filter(noEsDeRed))
+    await c.ctx.close()
+    puntos['saldo.7'] = {
+      msHastaCifra: v.t, vara: TOPE_1C + 3000, lecturas: b.lecturas, linea: v.cambios,
+      ok: v.ultimo?.pildora?.texto === servida && v.t <= TOPE_1C + 3000
+        && v.linea.every((e) => !e.pildora || ['—', servida].includes(e.pildora.texto)),
+    }
+  }
+
+  {
+    // ── saldo.8 · sonda a2: con cifra recordada, Retar funciona y no juzga ──
+    // 300 recordadas: si se juzgara con ellas, todas las mesas de Pro saldrían
+    // en gris y el bloque del video aparecería. La lectura sigue colgada.
+    const b = { saldo: SALDO_SERVIDO, retrasoMs: 30000 }
+    const c = await saldoContexto(browser, b)
+    await sembrarRecordado(c.ctx, PERFIL_CAP.id, 300)
+    await c.page.goto(BASE_PROD)
+    await c.page.waitForSelector('main.lobby .lob-pildora', { timeout: 15000 })
+    const lobby = await leerPildoraIos(c.page)
+    await saldoIr.retar(c.page)
+    await c.page.click('[data-accion="reto"]:nth-of-type(3)')
+    await c.page.click('[data-accion="jugadores"]:nth-of-type(1)')
+    await c.page.click('[data-accion="apuesta"]:nth-of-type(1)')
+    await c.page.waitForTimeout(150)
+    await c.page.click('[data-accion="entrada"]:nth-of-type(1)')
+    await c.page.waitForTimeout(150)
+    const retar = { ...(await leerRetar(c.page)), pildora: await leerPildoraIos(c.page) }
+    await c.page.screenshot({ path: `${SALDO_OUT_DIR}/saldo8_retar_recordado.png` })
+    let sentado = false
+    if (retar.ctaApagado === false) {
+      await c.page.click('[data-accion="cta"]')
+      sentado = await c.page.waitForSelector('button:has-text("Iniciar mano")', { timeout: 15000 }).then(() => true, () => false)
+    }
+    errores.push(...c.errores.filter(noEsDeRed))
+    await c.ctx.close()
+    puntos['saldo.8'] = {
+      lobby, retar, sentado,
+      ok: lobby?.recordado === true && lobby.texto === '300' && retar.pildora?.recordado === true
+        && retar.ctaApagado === false && retar.grises === 0 && !retar.avisoSaldo && retar.avisoLectura === null
+        && sentado,
+    }
+  }
+
+  {
+    // ── saldo.9 · sonda b: salir con la primera `salir_ia` colgada 30 s ─────
+    // ── saldo.10 · sonda c: salir con un `informar_pila` colgado delante ────
+    for (const [punto, colgada] of [['saldo.9', 'salir_ia'], ['saldo.10', 'informar_pila']]) {
+      const b = { saldo: SALDO_SERVIDO, retrasos: {} }
+      const c = await saldoContexto(browser, b)
+      await c.page.goto(BASE_PROD)
+      await c.page.waitForSelector('main.lobby .lob-pildora[data-saldo="listo"]')
+      await recorrerRutaComun(c.page, 2, 'basico', 0, 'piso')
+      if (colgada === 'informar_pila') b.retrasos.informar_pila = { ms: 30000, veces: 1 }
+      await c.page.click('button:has-text("Iniciar mano")')
+      await c.page.waitForTimeout(2500)
+      if (colgada === 'salir_ia') b.retrasos.salir_ia = { ms: 30000, veces: 1 }
+      await c.page.click('.btn-leave'); await c.page.waitForTimeout(200)
+      await c.page.click('.leave-modal button:has-text("Abandonar mesa")')
+      await c.page.waitForSelector('[data-accion="reto"]')
+      const enRetar = { ...(await leerRetar(c.page)), pildora: await leerPildoraIos(c.page) }
+      await c.page.screenshot({ path: `${SALDO_OUT_DIR}/${punto.replace('.', '')}_cobrando.png` })
+      const v = await vigilar(c.page, (e) => /\d/.test(e.pildora?.texto ?? '') && !e.pildora?.cobrando && !e.pildora?.recordado, 45000)
+      await c.page.waitForTimeout(300)
+      const final = await leerPildoraIos(c.page)
+      const libro = (b.banco?.libro ?? []).map((l) => l.tipo)
+      errores.push(...c.errores.filter(noEsDeRed))
+      await c.ctx.close()
+      puntos[punto] = {
+        msHastaCifra: v.t, vara: TOPE_1C + 3000, enRetar, final: final?.texto, banco: b.banco?.saldo, libro, linea: v.cambios,
+        ok: v.t <= TOPE_1C + 3000 && final?.texto === saldoTexto(b.banco?.saldo)
+          && enRetar.pildora?.cobrando === true && enRetar.ctaApagado === true && enRetar.nota === 'Cobrando tu mesa…'
+          && libro.filter((t) => t === 'salida_ia').length === 1 && libro.filter((t) => t === 'entrada_ia').length === 1,
+      }
+    }
+  }
+
+  {
+    // ── saldo.11 · la cifra recordada: de quién es, cuándo se escribe y se borra
+    const leerAlmacen = (page) => page.evaluate(() => {
+      try { return JSON.parse(localStorage.getItem('ajilei.saldoVisto') ?? 'null') } catch { return 'roto' }
+    })
+    // (a) la de otra cuenta no sale: «—» mientras carga.
+    const b1 = { saldo: SALDO_SERVIDO, retrasoMs: 2500 }
+    const c1 = await saldoContexto(browser, b1)
+    await sembrarRecordado(c1.ctx, 'otra-cuenta-0000-4000-8000-000000000000', 999)
+    await c1.page.goto(BASE_PROD)
+    await c1.page.waitForSelector('main.lobby .lob-pildora')
+    const ajena = await leerPildoraIos(c1.page)
+    errores.push(...c1.errores.filter(noEsDeRed))
+    await c1.ctx.close()
+    // (b) se escribe con la cifra del servidor, y (c) se borra al cerrar sesión.
+    const b2 = { saldo: SALDO_SERVIDO }
+    const c2 = await saldoContexto(browser, b2)
+    await c2.page.goto(BASE_PROD)
+    await c2.page.waitForSelector('main.lobby .lob-pildora[data-saldo="listo"]')
+    await c2.page.waitForTimeout(200)
+    const escrita = await leerAlmacen(c2.page)
+    await c2.page.click('[data-accion="ajustes"]')
+    await c2.page.click('[data-accion="cerrar-sesion"]')
+    await c2.page.waitForSelector('#entrada-correo', { timeout: 10000 }).catch(() => {})
+    await c2.page.waitForTimeout(300)
+    const trasCerrar = await leerAlmacen(c2.page)
+    errores.push(...c2.errores.filter(noEsDeRed))
+    await c2.ctx.close()
+    puntos['saldo.11'] = {
+      ajena, escrita, trasCerrar,
+      ok: ajena?.texto === '—' && ajena.recordado === false
+        && escrita?.uid === PERFIL_CAP.id && escrita.saldo === SALDO_SERVIDO && trasCerrar === null,
+    }
+  }
+
+  {
+    // ── saldo.12 · sin red un rato: la cifra recordada se queda, la lectura se
+    // reintenta sola, Retar dice lo de la red y la cifra real llega sola ─────
+    const b = { saldo: SALDO_SERVIDO, falla: true, cortes: { sentarse_ia: { veces: 99, modo: 'antes' } } }
+    const c = await saldoContexto(browser, b)
+    await sembrarRecordado(c.ctx, PERFIL_CAP.id, 3200)
+    await c.page.goto(BASE_PROD)
+    await c.page.waitForSelector('main.lobby .lob-pildora', { timeout: 15000 })
+    const sinRed = await vigilar(c.page, () => false, 16000)
+    const lecturas16 = b.lecturas ?? 0
+    await saldoIr.retar(c.page)
+    await c.page.click('[data-accion="reto"]:nth-of-type(1)')
+    await c.page.click('[data-accion="jugadores"]:nth-of-type(1)')
+    await c.page.click('[data-accion="apuesta"]:nth-of-type(1)')
+    await c.page.waitForTimeout(150)
+    await c.page.click('[data-accion="entrada"]:nth-of-type(1)')
+    await c.page.waitForTimeout(150)
+    const antesDeTocar = await leerRetar(c.page)
+    if (antesDeTocar.ctaApagado === false) await c.page.click('[data-accion="cta"]')
+    await c.page.waitForFunction(() => /conexión/.test(document.querySelector('[data-accion="cta-nota"]')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {})
+    const trasTocar = { ...(await leerRetar(c.page)), pildora: await leerPildoraIos(c.page) }
+    await c.page.screenshot({ path: `${SALDO_OUT_DIR}/saldo12_sin_red.png` })
+    b.falla = false
+    b.cortes.sentarse_ia.veces = 0
+    const vuelta = await vigilar(c.page, (e) => e.pildora?.estado === 'listo' && e.pildora.texto === servida, 20000)
+    errores.push(...c.errores.filter(noEsDeRed))
+    await c.ctx.close()
+    puntos['saldo.12'] = {
+      lecturas16, msVuelta: vuelta.t, antesDeTocar, trasTocar, linea: sinRed.cambios,
+      ok: sinRed.linea.every((e) => e.pildora?.recordado === true && e.pildora.texto === '3.200')
+        && lecturas16 >= 4 && antesDeTocar.ctaApagado === false
+        && trasTocar.nota.includes('Revisa tu conexión') && trasTocar.pildora?.recordado === true
+        && vuelta.ultimo?.pildora?.texto === servida && vuelta.t <= 17000,
+    }
+  }
+
+  {
+    // ── saldo.13 · el perfil lento o caído nunca lleva al Bautizo ──────────
+    const recorre = async (cuenta, fin, limite, alMedio = null) => {
+      const { ctx, page, errores: e } = await contextoCap(browser, SALDO_VP, BASE_PROD, { billetera: { saldo: SALDO_SERVIDO }, cuenta })
+      await page.goto(BASE_PROD)
+      const v = await vigilar(page, fin, limite, alMedio)
+      errores.push(...e.filter(noEsDeRed))
+      await ctx.close()
+      return v
+    }
+    // (a) la primera lectura del perfil, colgada 30 s.
+    const lento = await recorre({ perfilRetrasoMs: 30000, perfilVeces: 1 }, (e) => e.lobby, 40000)
+    // (b) el perfil caído un rato, y la red que vuelve: entra sola.
+    const cuentaB = { perfilFalla: true }
+    const caido = await recorre(cuentaB, (e) => e.lobby, 45000, (e, t) => { if (t > 14000) cuentaB.perfilFalla = false })
+    // (c) control: sin perfil de verdad, al Bautizo.
+    const vacio = await recorre({ perfilVacio: true }, (e) => e.bautizo, 15000)
+    const primero = (v, k) => v.linea.find((e) => e[k])?.t ?? null
+    puntos['saldo.13'] = {
+      lento: { sinRedEn: primero(lento, 'sinRed'), lobbyEn: lento.t, bautizo: lento.linea.some((e) => e.bautizo), linea: lento.cambios },
+      caido: { sinRedEn: primero(caido, 'sinRed'), lobbyEn: caido.t, bautizo: caido.linea.some((e) => e.bautizo), linea: caido.cambios },
+      vacio: { bautizoEn: vacio.t, bautizo: !!vacio.ultimo?.bautizo },
+      ok: !lento.linea.some((e) => e.bautizo) && primero(lento, 'sinRed') !== null && primero(lento, 'sinRed') <= TOPE_ESPERA_1C + 1500
+        && !!lento.ultimo?.lobby
+        && !caido.linea.some((e) => e.bautizo) && primero(caido, 'sinRed') !== null && !!caido.ultimo?.lobby
+        && !!vacio.ultimo?.bautizo,
+    }
+  }
+
+  {
+    // ── saldo.14 · el token caducado: ni la Portada ni el «—» ───────────────
+    const recorre = async (cuenta, fin, limite, alMedio = null) => {
+      const { ctx, page, errores: e } = await contextoCap(browser, SALDO_VP, BASE_PROD, { billetera: { saldo: SALDO_SERVIDO }, cuenta })
+      await sembrarRecordado(ctx, PERFIL_CAP.id, 3200)
+      await page.goto(BASE_PROD)
+      const v = await vigilar(page, fin, limite, alMedio)
+      errores.push(...e.filter(noEsDeRed))
+      await ctx.close()
+      return v
+    }
+    const conCifra = (e) => e.pildora?.estado === 'listo' && e.pildora.texto === servida
+    // (a) el refresco del token, colgado 30 s la primera vez.
+    const lento = await recorre({ sesionCaducada: true, tokenRetrasoMs: 30000, tokenVeces: 1 }, conCifra, 45000)
+    // (b) sin red para refrescarlo MÁS que la ventana de reintentos del SDK
+    // (30 s): el SDK se rinde y dice «sin sesión» —la Portada, hasta la 1c—.
+    // Luego la red vuelve. El SDK guarda el fallo 60 s por token de refresco
+    // (`REFRESH_FAILURE_COOLDOWN_MS`) y nadie puede adelantarlo: la tarjeta g
+    // se va sola cuando vence, no antes. Por eso el límite es largo.
+    const cuentaB = { sesionCaducada: true, tokenFalla: true }
+    let vuelveRed = null
+    const caido = await recorre(cuentaB, conCifra, 120000, (e, t) => { if (t > 32000 && cuentaB.tokenFalla) { cuentaB.tokenFalla = false; vuelveRed = t } })
+    const nunca = (v, k) => !v.linea.some((e) => e[k])
+    const sinGuion = (v) => v.linea.every((e) => !e.pildora || e.pildora.texto !== '—')
+    puntos['saldo.14'] = {
+      lento: { msHastaCifra: lento.t, portada: !nunca(lento, 'portada'), sinRed: !nunca(lento, 'sinRed'), linea: lento.cambios },
+      caido: { msHastaCifra: caido.t, vuelveRed, portada: !nunca(caido, 'portada'), sinRed: !nunca(caido, 'sinRed'), linea: caido.cambios },
+      ok: nunca(lento, 'portada') && nunca(lento, 'sinRed') && sinGuion(lento) && conCifra(lento.ultimo ?? {})
+        && lento.t <= TOPE_ESPERA_1C + 3000
+        && nunca(caido, 'portada') && !nunca(caido, 'sinRed') && sinGuion(caido) && conCifra(caido.ultimo ?? {}),
     }
   }
 
