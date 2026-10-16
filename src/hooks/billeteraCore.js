@@ -32,8 +32,26 @@
 // El estado guarda el `uid` al que pertenece, igual que `useAuth` guarda el
 // perfil con su dueño. Si se cierra sesión y entra otra cuenta en la misma carga
 // de página, `paraCuenta` empieza de cero: la cifra de la anterior no se cuela.
+//
+// ── IOS-1c · NINGUNA LECTURA SIN SALIDA ─────────────────────────────────────
+// Rector: AJILEI_IOS-1_Fase1c_v1.0.md §3.2. Una lectura colgada bloqueaba a
+// todas las demás (`enVuelo`) y un fallo no se reintentaba hasta otro cambio de
+// visibilidad. Ahora una lectura en vuelo CADUCA pasado el tope de red (la
+// espera de un refresco de sesión no la cubre el tope del transporte: informe
+// de la 1c, §1), y tras un fallo la lectura se reintenta sola, con la escalera
+// de la mesa, mientras la app se ve.
+//
+// ── IOS-1c · LA CIFRA RECORDADA ─────────────────────────────────────────────
+// Al arrancar (V-1) la píldora enseña, atenuada, la última cifra que este
+// aparato vio DEL SERVIDOR para esta cuenta (`lib/saldoRecordado.js`). Es sólo
+// para la vista: `saldoMostrado` sigue nulo, y por eso ningún juez la ve —ni
+// mesas en gris, ni «no te alcanza», ni el bloque del video—. Al cobrar una
+// salida (V-2) no hay cifra recordada: la de antes de sentarse sería falsa.
 
 /** Los tres estados de la lectura. */
+import { TOPE_RED_MS } from '../lib/red'
+import { ESPERAS_RED_MS } from '../lib/controlMesaIA'
+
 export const CARGANDO = 'cargando'
 export const LISTO = 'listo'
 export const ERROR = 'error'
@@ -59,6 +77,17 @@ export const MOTIVOS = Object.freeze({
 // lectura FALLÓ no hay espera: quien vuelve a la app tras cortarse la red tiene
 // que ver su saldo ya, no dentro de quince segundos.
 export const INTERVALO_PRIMER_PLANO_MS = 15000
+
+// IOS-1c · una lectura que lleva más que esto en vuelo se da por perdida: la
+// siguiente sale aunque aquélla no haya contestado (y su respuesta, si llega,
+// se tira: ya no es la vigente).
+export const CADUCIDAD_LECTURA_MS = TOPE_RED_MS
+
+/** IOS-1c · cuánto se espera para reintentar tras `fallos` lecturas fallidas seguidas. */
+export function esperaReintento(fallos) {
+  const i = Math.max(0, Math.min(fallos - 1, ESPERAS_RED_MS.length - 1))
+  return ESPERAS_RED_MS[i]
+}
 
 /** La billetera de una cuenta que todavía no se ha leído. */
 export function billeteraNueva(uid, servidor = null) {
@@ -97,14 +126,16 @@ export function respuestaValida(respuesta) {
  * `control` es lo que el hook guarda fuera del render: la cuenta, si hay una
  * lectura en vuelo, cuándo se pidió la última y si falló. Las reglas:
  *   · sin cuenta, nunca;
- *   · nunca dos lecturas a la vez, sea cual sea el motivo;
+ *   · nunca dos lecturas a la vez, sea cual sea el motivo, salvo que la que
+ *     vuela haya caducado (IOS-1c);
  *   · el arranque, una sola vez por cuenta (StrictMode monta dos veces);
  *   · primer plano, como mucho una vez cada 15 s, salvo tras un fallo;
  *   · un `saldo_insuficiente` o un reintento, siempre que no haya otra en vuelo.
  */
 export function debeLeer(control, motivo, ahora) {
   if (!control || !control.uid) return false
-  if (control.enVuelo) return false
+  // IOS-1c · en vuelo, sí; colgada más allá de la caducidad, ya no bloquea.
+  if (control.enVuelo && !(ahora - (control.enVueloDesde ?? ahora) >= CADUCIDAD_LECTURA_MS)) return false
   switch (motivo) {
     case MOTIVOS.ARRANQUE:
       return control.ultima === null
@@ -139,6 +170,17 @@ export function alResponder(billetera, uid, respuesta) {
     return { ...propia, servidor: respuesta.data, estado: LISTO }
   }
   return { ...propia, estado: ERROR }
+}
+
+/**
+ * IOS-1c · la cifra recordada que se puede enseñar, o `null`.
+ * Sólo en V-1 (sin cifra del servidor y sin cobro en curso) y sólo si el
+ * recuerdo es de ESTA cuenta y es un saldo válido.
+ */
+export function recordadoPara(billetera, recuerdo) {
+  if (!billetera || billetera.servidor !== null || billetera.pendiente) return null
+  if (!recuerdo || recuerdo.uid !== billetera.uid || !billetera.uid) return null
+  return esSaldoValido(recuerdo.saldo) ? recuerdo.saldo : null
 }
 
 /** La cifra que se enseña, o `null` si todavía no se sabe o se está cobrando. */

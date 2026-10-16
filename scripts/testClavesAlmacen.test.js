@@ -10,7 +10,7 @@
 //   · un archivo que toque `localStorage`/`sessionStorage` y no esté en
 //     ACCESORES (todo acceso pasa por los módulos que ya lo hacen);
 //   · una entrada de CLAVES que ya no aparezca en el código (la lista no envejece).
-// Los comentarios no cuentan. Censo de ARN-3e (2026-10-03): 12 claves.
+// Los comentarios no cuentan. Censo de ARN-3e (2026-10-03): 12 claves; IOS-1c añade `ajilei.saldoVisto`.
 // Fuera de alcance: la sesión de Supabase (`sb-…-auth-token`), que la escribe
 // la biblioteca y no el código de `src/`.
 import { describe, it, expect } from 'vitest'
@@ -30,6 +30,7 @@ const CLAVES = [
   { clave: 'ajilei.salaConfig', almacen: 'local', fuente: 'SAL (APU-1_Fase0) · salas.js' },
   { clave: 'ajilei.recargaPorChunk', almacen: 'session', fuente: 'ARN-3d (D11) · main.jsx' },
   { clave: 'ajilei.dispositivo', almacen: 'local', fuente: 'ECO-1 Fase 1c (P-4) · dispositivo.js' },
+  { clave: 'ajilei.saldoVisto', almacen: 'local', fuente: 'IOS-1 Fase 1c (S2) · saldoRecordado.js · solo para la vista, nadie juzga con ella' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -43,6 +44,7 @@ const ACCESORES = [
   'src/hooks/useUtilitiesMenu.js', // ajilei.consultas
   'src/main.jsx',                  // ajilei.recargaPorChunk (sessionStorage)
   'src/lib/dispositivo.js',        // ajilei.dispositivo (ECO-1c, P-4)
+  'src/lib/saldoRecordado.js',     // ajilei.saldoVisto (IOS-1c, S2)
 ]
 
 const fuentes = archivos('src', (n) => /\.(jsx?)$/.test(n) && !/\.test\.jsx?$/.test(n))

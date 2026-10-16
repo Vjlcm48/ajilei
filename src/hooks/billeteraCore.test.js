@@ -3,7 +3,9 @@ import {
   CARGANDO, LISTO, ERROR, MOTIVOS, INTERVALO_PRIMER_PLANO_MS, SIN_JUICIO,
   billeteraNueva, paraCuenta, esSaldoValido, debeLeer, alResponder,
   saldoMostrado, saldoParaJuzgar, tomarSaldo, esperarSaldo, soltarEspera, lecturaVigente,
+  CADUCIDAD_LECTURA_MS, esperaReintento, recordadoPara,
 } from './billeteraCore'
+import { TOPE_RED_MS } from '../lib/red'
 import { crearBilleteraApi, ERROR_LECTURA } from '../lib/billeteraApi'
 import { simulacionBilletera } from '../dev/billeteraFalsa'
 
@@ -221,5 +223,50 @@ describe('ECO-1b · la billetera falsa del bypass', () => {
     // Y el núcleo de la app la trata igual que a la real.
     const b = alResponder(billeteraNueva(UNO, api.inicial), UNO, respuesta)
     expect(saldoMostrado(b)).toBe(5000)
+  })
+})
+
+// ── IOS-1c · ninguna lectura sin salida y la cifra recordada ────────────────
+describe('IOS-1c · la lectura colgada caduca y la fallida se reintenta', () => {
+  const ctl = (extra) => ({ uid: UNO, enVuelo: false, enVueloDesde: null, ultima: 0, fallo: false, generacion: 0, ...extra })
+
+  it('una lectura en vuelo bloquea hasta la caducidad (el tope de red), y después no', () => {
+    expect(CADUCIDAD_LECTURA_MS).toBe(TOPE_RED_MS)
+    const c = ctl({ enVuelo: true, enVueloDesde: 1000 })
+    expect(debeLeer(c, MOTIVOS.REINTENTO, 1000 + CADUCIDAD_LECTURA_MS - 1)).toBe(false)
+    expect(debeLeer(c, MOTIVOS.REINTENTO, 1000 + CADUCIDAD_LECTURA_MS)).toBe(true)
+    expect(debeLeer(c, MOTIVOS.PRIMER_PLANO, 1000 + 60000)).toBe(true)
+  })
+
+  it('la escalera es la de la mesa: 1, 2, 4, 8 y luego 15 s', () => {
+    expect([1, 2, 3, 4, 5, 6, 40].map(esperaReintento)).toEqual([1000, 2000, 4000, 8000, 15000, 15000, 15000])
+  })
+})
+
+describe('IOS-1c · recordadoPara', () => {
+  const recuerdo = { uid: UNO, saldo: 12450, en: 1 }
+
+  it('en V-1 (sin cifra del servidor) enseña la recordada de ESTA cuenta', () => {
+    expect(recordadoPara(billeteraNueva(UNO), recuerdo)).toBe(12450)
+  })
+
+  it('nunca la de otra cuenta, ni una que no sea un saldo', () => {
+    expect(recordadoPara(billeteraNueva(DOS), recuerdo)).toBe(null)
+    expect(recordadoPara(billeteraNueva(UNO), { uid: UNO, saldo: -1 })).toBe(null)
+    expect(recordadoPara(billeteraNueva(UNO), { uid: UNO, saldo: 1.5 })).toBe(null)
+    expect(recordadoPara(billeteraNueva(UNO), null)).toBe(null)
+    expect(recordadoPara(billeteraNueva(null), { uid: null, saldo: 5 })).toBe(null)
+  })
+
+  it('con la cifra del servidor ya no hace falta; cobrando una salida (V-2) no vale', () => {
+    expect(recordadoPara(billeteraNueva(UNO, 12700), recuerdo)).toBe(null)
+    expect(recordadoPara(esperarSaldo(billeteraNueva(UNO), UNO), recuerdo)).toBe(null)
+  })
+
+  it('no juzga: la cifra que se enseña y la que se juzga siguen sin saldo', () => {
+    const b = billeteraNueva(UNO)
+    expect(recordadoPara(b, recuerdo)).toBe(12450)
+    expect(saldoMostrado(b)).toBe(null)
+    expect(saldoParaJuzgar(saldoMostrado(b))).toBe(SIN_JUICIO)
   })
 })

@@ -30,6 +30,10 @@ import {
 // haría nada. Es el mismo `seq`, así que no cobra dos veces; de las dos
 // respuestas cuenta la primera, y el fallo de un envío ya reemplazado no
 // programa otro reintento.
+//
+// IOS-1c · con `{ forzarTrasMs }` (volver a primer plano) se fuerza sólo lo que
+// lleve EN VUELO más de ese tiempo: lo colgado de verdad, no lo que acaba de
+// salir. Rector: AJILEI_IOS-1_Fase1c_v1.0.md §3.2.
 
 export const ESPERAS_RED_MS = Object.freeze([1000, 2000, 4000, 8000, 15000])
 
@@ -38,7 +42,7 @@ export const ESPERAS_RED_MS = Object.freeze([1000, 2000, 4000, 8000, 15000])
  * @param {object} o.api       la de `crearMesaIAApi`
  * @param {string} o.mesaId
  * @param {number} o.pilaInicial  la entrada: lo que el servidor ya sabe (seq 0)
- * @param {object} [o.reloj]   `setTimeout`/`clearTimeout` (las pruebas dan uno falso)
+ * @param {object} [o.reloj]   `setTimeout`/`clearTimeout` y, si lo trae, `now()` (las pruebas dan uno falso)
  */
 export function crearControlMesa({ api, mesaId, pilaInicial, reloj = globalThis }) {
   let cola = colaNueva(pilaInicial)
@@ -48,6 +52,8 @@ export function crearControlMesa({ api, mesaId, pilaInicial, reloj = globalThis 
   let ultimaRespuesta = null
   let salida = null
   let envio = 0              // el número del último envío: los anteriores ya no mandan
+  let enviadoEn = null       // IOS-1c · cuándo salió lo que está en vuelo
+  const ahora = () => (typeof reloj.now === 'function' ? reloj.now() : Date.now())
   const oyentes = new Set()
 
   const emitir = (ev) => {
@@ -68,6 +74,7 @@ export function crearControlMesa({ api, mesaId, pilaInicial, reloj = globalThis 
     if (!it) return
     cola = enviando(cola, it.seq)
     const id = ++envio
+    enviadoEn = ahora()
     mandar(it).then((r) => responder(it, r ?? { codigo: CODIGOS.RED }, id))
   }
 
@@ -153,12 +160,13 @@ export function crearControlMesa({ api, mesaId, pilaInicial, reloj = globalThis 
       bombear()
       return promesa
     },
-    reintentarAhora({ forzar = false } = {}) {
+    reintentarAhora({ forzar = false, forzarTrasMs = null } = {}) {
       if (terminado) return
+      const colgado = forzarTrasMs !== null && enviadoEn !== null && ahora() - enviadoEn >= forzarTrasMs
       if (espera !== null) {
         reloj.clearTimeout(espera)
         espera = null
-      } else if (forzar && cola.enVuelo !== null) {
+      } else if ((forzar || colgado) && cola.enVuelo !== null) {
         cola = { ...cola, enVuelo: null }
       } else {
         return

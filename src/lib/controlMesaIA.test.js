@@ -243,3 +243,44 @@ describe('ECO-1c · mesaIAApi', () => {
     expect(una.mesaId).toBe('x')
   })
 })
+
+// ── IOS-1c · volver a primer plano fuerza sólo lo colgado ───────────────────
+describe('IOS-1c · reintentarAhora({ forzarTrasMs })', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('lo recién salido no se toca; lo que lleva más que el tope se reenvía con el mismo seq y cobra una vez', async () => {
+    const m = montaje()
+    const c = await sentar(m)
+    let t = 0
+    const reloj = { ...m.reloj, now: () => t }
+    // La salida llega al banco y su respuesta no vuelve hasta que se suelte:
+    // la petición colgada de la app que vuelve de segundo plano (sonda c de F-7).
+    let soltar = null
+    const api = {
+      ...m.api,
+      salir: (...a) => {
+        const r = m.api.salir(...a)
+        if (soltar !== null) return r
+        return new Promise((ok) => { soltar = () => r.then(ok) })
+      },
+    }
+    const c2 = crearControlMesa({ api, mesaId: c.mesaId, pilaInicial: 500, reloj })
+    const p = c2.salir(500)
+    await vaciar()
+    const salidas = () => m.red.llamadas.filter(([n]) => n === 'salir_ia').map(([, q]) => q.p_seq)
+    t = 1000
+    c2.reintentarAhora({ forzarTrasMs: 8000 })   // vuelve al segundo: no está colgada todavía
+    await vaciar()
+    expect(salidas()).toEqual([1])
+    t = 9000
+    c2.reintentarAhora({ forzarTrasMs: 8000 })   // vuelve a los 9 s: sí
+    const r = await p
+    expect(salidas()).toEqual([1, 1])
+    // La primera ya cobró en el banco: el reenvío forzado contesta `repetido`
+    // con el mismo saldo, sin un segundo movimiento.
+    expect(r).toMatchObject({ codigo: 'repetido', saldo: 2500 })
+    soltar()
+    await vaciar()
+    expect(m.banco.libro.filter((l) => l.tipo === 'salida_ia')).toHaveLength(1)
+  })
+})

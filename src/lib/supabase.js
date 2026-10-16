@@ -20,8 +20,14 @@
 //    `createClient`. Dos instancias del SDK sobre el mismo proyecto se pisan la
 //    sesión en almacenamiento y abren dos sockets de tiempo real, que es
 //    justamente lo que un PvP no puede permitirse.
+//
+// 4. IOS-1c · NINGUNA PETICIÓN SIN TOPE. Todo el HTTP del SDK —las RPC, las
+//    tablas y la autenticación— pasa por `fetchConTope` (`red.js`): pasados
+//    8 s, la petición cuenta como fallo de red y arrancan los reintentos que ya
+//    existen. El tiempo real va por websocket y no pasa por aquí.
 
 import { createClient } from '@supabase/supabase-js'
+import { fetchConTope, TOPE_RED_MS } from './red'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -32,4 +38,9 @@ if (!url || !publishableKey) {
   )
 }
 
-export const supabase = createClient(url, publishableKey)
+// `fetch` se resuelve en cada llamada, no al crear el cliente: así lo que
+// sustituya `globalThis.fetch` después (el arnés no lo hace; una extensión
+// podría) sigue valiendo.
+export const supabase = createClient(url, publishableKey, {
+  global: { fetch: fetchConTope((...a) => globalThis.fetch(...a), TOPE_RED_MS) },
+})
