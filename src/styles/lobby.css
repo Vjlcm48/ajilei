@@ -855,3 +855,19 @@ body.lobby-activa #root {
   .lobby .lob-marca { padding-bottom: 0; flex: none; }
   .lobby .lob-accion { width: min(50%, calc(var(--u) * 92)); }
 }
+
+/* IOS-1 1b (F-8, P4) · horizontal de 661 a 749 de alto, la banda que no tenía
+   traje: el iPad en Safari y las laptops en ventana. La columna no encoge y
+   «Jugar contra jugadores» se montaba sobre el menú (−36 px a 661). Es el traje
+   de 660 entero con el isotipo a 32 unidades, a medio camino entre el 26 de
+   arriba y el de siempre. Medido de 521 a 830: el hueco hasta el menú nunca
+   baja de 8 px (+19 a 661, +59 a 749, +8,5 a 750, donde ya no hace falta). La
+   orientación deja fuera los teléfonos en vertical (360×704, 360×740). */
+@media (orientation: landscape) and (min-height: 661px) and (max-height: 749px) {
+  .lobby {
+    --iso-lobby: calc(var(--u) * 32);
+    --lob-cta-h: max(44px, calc(var(--u) * 10));
+  }
+  .lobby .lob-marca { padding-bottom: calc(var(--u) * 2.5); gap: calc(var(--u) * 1.2); }
+  .lobby .lob-accion { gap: calc(var(--u) * 2); }
+}
