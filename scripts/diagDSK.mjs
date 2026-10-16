@@ -328,6 +328,7 @@ import { recorrerRuta as recorrerRutaComun, ENTRADA_ARNES, irALaMesa, esperarMes
 import { runMesaIA, runRevive } from './eco/mesaia.mjs'
 import { runConstancia } from './eco/constancia.mjs'
 import { runVideo } from './eco/video.mjs'
+import { runTam } from './ios/tam.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -411,7 +412,8 @@ const VC_RETRASO_ROCE_MS = (() => {
 // ECO-1c · y `mesaia`: la mesa contra las IAS contra el servidor imitado.
 // ECO-1d · y `constancia`: la constancia, los límites y la válvula, también ahí.
 // ECO-1g · y `video`: el video de recompensa, con videos de 40 s de verdad.
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video']
+// IOS-1 1b · y `tam`: las pantallas bajas en horizontal (521–831 de alto).
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -935,7 +937,7 @@ const LOB_ISO_RATIO = 60 / 90
 
 // Los puntos del modo, en un solo sitio: el veredicto de celda y la lista de
 // fallos se derivan de aquí, así que añadir uno no puede olvidarse en el otro.
-const LOB_PUNTOS = ['lob.1', 'lob.2', 'lob.3', 'lob.3b', 'lob.3c', 'lob.4', 'lob.5', 'lob.6', 'lob.7', 'lob.8']
+const LOB_PUNTOS = ['lob.1', 'lob.2', 'lob.3', 'lob.3b', 'lob.3c', 'lob.4', 'lob.5', 'lob.6', 'lob.7', 'lob.8', 'lob.9', 'lob.10']
 
 // ── ECO-1e (E6) · EL PEOR NOMBRE POSIBLE ─────────────────────────────────────
 // La 1d encontró que la barra del lobby desbordaba con un nombre real: la
@@ -957,6 +959,8 @@ const LOB_NOMBRE_VIEWPORTS = [
   { w: 360, h: 640, note: 'portrait · nombre de 15' },
   { w: 390, h: 844, note: 'portrait · nombre de 15' },
   { w: 412, h: 915, note: 'portrait · nombre de 15' },
+  // IOS-1 1b · el más ancho de la ficha de G-1 (§4.3: 360, 390, 412 y 440).
+  { w: 440, h: 956, note: 'portrait · nombre de 15' },
   { w: 640, h: 360, note: 'móvil landscape · nombre de 15' },
 ]
 const LOB_TOL_BARRA = 0.5
@@ -989,6 +993,56 @@ const LOB_BARRA = `(() => {
   };
 })()`
 
+// ── IOS-1 1b (G-1) · la MISMA barra en las pantallas de salas ───────────────
+// `BarraSuperior` se monta también bajo `.sal` (Retar, Salas, Armar mesa) con
+// su copia de estilo (`salas.css` §2), y ahí el «…» no estaba: con 15 «W» el
+// engranaje se salía 27–33 px. La medida es la de lob.8, con la raíz cambiada.
+const LOB_BARRA_SAL = LOB_BARRA
+  .replaceAll('.lobby > .lob-top', '.sal > .lob-top')
+  .replaceAll('main.lobby', 'main.sal')
+const LOB_IR_SAL = {
+  // lob.9 · Retar (el CTA del lobby)
+  'lob.9': { boton: '[data-accion="jugar-ia"]', listo: '[data-accion="reto"]:not([disabled])' },
+  // lob.10 · Salas (el CTA de jugadores)
+  'lob.10': { boton: '[data-accion="jugar-pvp"]', listo: 'main.sal [data-accion="armar"]' },
+}
+// Desde el lobby, a la pantalla del punto, con el nombre ya pintado en su barra.
+async function lobIrASal(page, punto, nombre) {
+  await page.click(LOB_IR_SAL[punto].boton)
+  await page.waitForSelector(LOB_IR_SAL[punto].listo, { timeout: 6000 })
+  await page.waitForFunction(n => document.querySelector('.sal > .lob-top .lob-nombre')?.textContent === n, nombre, { timeout: 6000 })
+  await page.waitForTimeout(250)
+}
+// El juicio de lob.9/lob.10: el de lob.8 sin la ficha (las salas no la llevan) y
+// con la pantalla de salas en vez del lobby.
+function lobJuzgaBarraSal(b, estrecha, nombre15) {
+  const tol = LOB_TOL_BARRA
+  const d = (x, y, k) => (x && y ? +Math.abs(x[k] - y[k]).toFixed(2) : null)
+  const medible = !!(b && b.barra && b.engranaje && b.pildora && b.cajaNombre && b.perfil)
+  if (!medible) return { ...b, medible, ok: false }
+  const sinDesborde = b.barraDesborda <= 0 && b.lobbyDesborda <= 0 && b.paginaDesborda <= 0
+  const engranajeDentro = b.engranaje.r <= b.barra.r + tol && b.engranaje.r <= b.ancho + tol && b.engranaje.l >= b.barra.l - tol
+  const nombreNoPisa = b.cajaNombre.r <= b.pildora.l + tol && b.perfil.r <= b.pildora.l + tol
+  let par = null
+  if (nombre15) {
+    const e = estrecha
+    par = {
+      estrecha: e,
+      dBarra: e?.barra ? Math.max(d(b.barra, e.barra, 'l'), d(b.barra, e.barra, 'r'), d(b.barra, e.barra, 'w')) : null,
+      dEngranaje: e?.engranaje ? Math.max(d(b.engranaje, e.engranaje, 'l'), d(b.engranaje, e.engranaje, 'r'), d(b.engranaje, e.engranaje, 't')) : null,
+      dAnchoPildora: d(b.pildora, e?.pildora, 'w'),
+      dAnchoEngranaje: d(b.engranaje, e?.engranaje, 'w'),
+      dPildoraIzq: d(b.pildora, e?.pildora, 'l'),   // informativo: la píldora va tras el nombre
+    }
+    par.ok = !!(e && e.barra && e.engranaje && e.pildora)
+      && e.nombre === LOB_NOMBRE_ESTRECHO && e.nombreRecortado === false
+      && b.nombre === LOB_NOMBRE_ANCHO && b.elipsis === true
+      && par.dBarra <= tol && par.dEngranaje <= tol
+      && par.dAnchoPildora <= tol && par.dAnchoEngranaje <= tol
+  }
+  return { ...b, medible, sinDesborde, engranajeDentro, nombreNoPisa, par, ok: sinDesborde && engranajeDentro && nombreNoPisa && (par ? par.ok : true) }
+}
+
 async function runLob(browser) {
   const celdas = []
   const lobCeldas = [
@@ -1014,9 +1068,19 @@ async function runLob(browser) {
     await page.mouse.move(5, 5)
 
     let barraEstrecha = null
+    // IOS-1 1b · la referencia del nombre estrecho también en Retar y en Salas.
+    const barraSalEstrecha = {}
     if (nombre15) {
       await page.waitForFunction(n => document.querySelector('.lob-top .lob-nombre')?.textContent === n, LOB_NOMBRE_ESTRECHO)
       barraEstrecha = await page.evaluate(LOB_BARRA)
+      for (const punto of Object.keys(LOB_IR_SAL)) {
+        try {
+          await lobIrASal(page, punto, LOB_NOMBRE_ESTRECHO)
+          barraSalEstrecha[punto] = await page.evaluate(LOB_BARRA_SAL)
+        } catch { /* sin referencia: el punto sale rojo */ }
+        await page.goto(BASE_PROD)
+        await page.waitForSelector('main.lobby')
+      }
       perfil.username = LOB_NOMBRE_ANCHO
       await page.reload()
       await page.waitForSelector('main.lobby')
@@ -1321,6 +1385,22 @@ async function runLob(browser) {
       nivelOk = true
     } catch { /* queda en false y el veredicto lo canta */ }
     c['lob.7'] = { llegaARetarIAS: nivelOk, ok: nivelOk }
+
+    // ── lob.9 / lob.10 · la barra de Retar y la de Salas (IOS-1 1b, G-1) ───
+    // Lo de lob.8 en las pantallas de salas: nada desborda, el engranaje
+    // dentro y el nombre sin pisar la píldora; con el de 15 «W», además, el
+    // engranaje en el mismo píxel que con el estrecho y el nombre con «…».
+    const nombreCelda = nombre15 ? LOB_NOMBRE_ANCHO : PERFIL_CAP.username
+    for (const punto of Object.keys(LOB_IR_SAL)) {
+      let b = null
+      try {
+        await page.goto(BASE_PROD)
+        await page.waitForSelector('main.lobby')
+        await lobIrASal(page, punto, nombreCelda)
+        b = await page.evaluate(LOB_BARRA_SAL)
+      } catch { /* sin medida: rojo */ }
+      c[punto] = lobJuzgaBarraSal(b, barraSalEstrecha[punto], nombre15)
+    }
 
     c.consola = consola
     c.ok = LOB_PUNTOS.every(k => c[k].ok) && consola.length === 0
@@ -14753,6 +14833,11 @@ try {
   if (MODE === 'video') {
     try { mkdirSync('capturas-video', { recursive: true }) } catch { /* ya existe */ }
     report.video = await runVideo(browser, { base: BASE_PROD, baseDev: BASE_SALDO_DEV, externo: EXTERNO })
+  }
+  // IOS-1 1b · `tam` (INV-55): el botón principal se alcanza en las pantallas
+  // bajas en horizontal, con el gesto real del usuario.
+  if (MODE === 'tam') {
+    report.tam = await runTam(browser, { base: BASE_PROD })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)
