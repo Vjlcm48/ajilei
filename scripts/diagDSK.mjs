@@ -1498,19 +1498,16 @@ async function medirGeoRetar(page) {
         const cta = document.querySelector('[data-accion="cta"]')
         const chips = [...document.querySelectorAll('.sal-chip')]
         const r0 = cta?.getBoundingClientRect()
-        // El traje apaisado bajo de §13 de `salas.css`: ahí la columna es más alta
-        // que la ventana a propósito y es `.sal` quien desplaza («lo que no cabe NO
-        // se scrollea, se aprieta — salvo en el apaisado bajo»).
+        // IOS-1 1e · el botón va ANCLADO al pie (`.sal.es-anclada`): ya no hay
+        // traje apaisado en el que la pantalla desplace para llegar a él. Tiene
+        // que estar dentro SIEMPRE, sin tocar nada; lo que no cabe son las filas,
+        // que desplazan dentro del cuerpo. `apaisado` se sigue informando.
         const apaisado = window.matchMedia('(orientation: landscape) and (max-height: 520px)').matches
-        // ¿Se LLEGA al CTA? En el traje normal tiene que estar ya dentro; en el
-        // apaisado basta con que desplazando se alcance, que es la promesa de ese
-        // traje. Un CTA al que no se llega de ninguna de las dos formas es una
-        // pantalla sin salida.
-        if (apaisado && sal) sal.scrollTop = sal.scrollHeight
         await new Promise((ok) => requestAnimationFrame(ok))
         const r1 = cta?.getBoundingClientRect()
         return {
           apaisado,
+          anclada: Boolean(sal?.classList.contains('es-anclada')),
           desbordaH: de.scrollWidth > de.clientWidth + 1,
           desbordaDoc: de.scrollHeight > de.clientHeight + 1,
           salDesplaza: sal ? sal.scrollHeight > sal.clientHeight + 1 : false,
@@ -1606,11 +1603,23 @@ async function runRetar(browser) {
         && casc.trasCambiarReto.entVivos === 0,
     }
 
-    // retar.3 · el CTA: apagado hasta las cuatro, y entonces nombra las cifras
+    // retar.3 · el CTA: apagado hasta las cuatro, y entonces la caja de encima
+    // nombra las cifras. IOS-1 1e: el botón dice SIEMPRE «Sentarme a la mesa» y
+    // mide siempre lo mismo (una línea, la misma caja apagado y encendido); las
+    // cifras que antes decía él van en el resumen de la caja.
+    const botonDe = () => page.evaluate(() => {
+      const b = document.querySelector('[data-accion="cta"]')
+      const r = b?.getBoundingClientRect()
+      const rg = document.createRange()
+      if (b) rg.selectNodeContents(b)
+      return b ? { w: +r.width.toFixed(1), h: +r.height.toFixed(1), lineas: rg.getClientRects().length } : null
+    })
     const apagado = await page.evaluate(() => ({
       disabled: document.querySelector('[data-accion="cta"]')?.disabled ?? null,
+      texto: document.querySelector('[data-accion="cta"]')?.textContent?.trim() ?? '',
       nota: document.querySelector('[data-accion="cta-nota"]')?.textContent?.trim() ?? '',
     }))
+    apagado.caja = await botonDe()
     await page.click('[data-accion="jugadores"]:nth-of-type(4)')   // mesa de 5
     await page.click('[data-accion="apuesta"]:nth-of-type(1)')     // Pro · 200
     await page.waitForTimeout(120)
@@ -1619,18 +1628,23 @@ async function runRetar(browser) {
     const encendido = await page.evaluate(() => ({
       disabled: document.querySelector('[data-accion="cta"]')?.disabled ?? null,
       texto: document.querySelector('[data-accion="cta"]')?.textContent?.trim() ?? '',
+      resumen: document.querySelector('[data-accion="cta-nota"].is-resumen')?.textContent?.trim() ?? '',
       pila: document.querySelector('[data-accion="aviso-pila"]')?.textContent?.trim() ?? '',
     }))
+    encendido.caja = await botonDe()
     c['retar.3'] = {
       apagado, encendido,
-      // 1f-A4 · 4 IAS · mesa 200 · entrada 4.000 (20 × 200, el medio nuevo) ·
-      // pila de cada IA 6.000 (round(4.000 × 1,5), bajo el techo de 10.000).
-      // Eran 3.000 y 4.500 con el medio de 15×. Las cifras se comprueban porque
-      // son el contrato de APU-1, no adorno del rótulo.
+      // 1f-A4 · mesa de 5 · 200 por mano · entrada 4.000 (20 × 200, el medio
+      // nuevo) · pila de cada IA 6.000 (round(4.000 × 1,5), bajo el techo de
+      // 10.000). Las cifras se comprueban porque son el contrato de APU-1, no
+      // adorno del rótulo; desde IOS-1 1e las dice el resumen de la caja.
       ok: apagado.disabled === true && apagado.nota.length > 0
         && encendido.disabled === false
-        && encendido.texto.includes('4 IAS') && encendido.texto.includes('200')
-        && encendido.texto.includes('4.000')
+        && apagado.texto === 'Sentarme a la mesa' && encendido.texto === 'Sentarme a la mesa'
+        && !!apagado.caja && !!encendido.caja && apagado.caja.lineas === 1 && encendido.caja.lineas === 1
+        && Math.abs(apagado.caja.w - encendido.caja.w) <= 0.5 && Math.abs(apagado.caja.h - encendido.caja.h) <= 0.5
+        && encendido.resumen.includes('5 jug') && encendido.resumen.includes('200')
+        && encendido.resumen.includes('4.000')
         && encendido.pila.includes('6.000'),
     }
 
@@ -1668,9 +1682,7 @@ async function runRetar(browser) {
       ok: abre === '2.000' && subido === '2.400'
         && suelo.monto === '2.000' && suelo.menosApagado === true
         && !geoContador.desbordaH
-        && (geoContador.apaisado
-          ? geoContador.ctaAlcanzable
-          : (geoContador.ctaDentroSinTocar && !geoContador.desbordaDoc)),
+        && geoContador.ctaDentroSinTocar && !geoContador.desbordaDoc,
     }
 
     // retar.4 · el gris por saldo, con la siembra de `?apu`
@@ -1804,9 +1816,7 @@ async function runRetar(browser) {
         && !aviso.notaVisible
         // …y el bloque de más no deja el CTA fuera de la ventana.
         && !geoAviso.desbordaH && geoAviso.rotos === 0
-        && (geoAviso.apaisado
-          ? geoAviso.ctaAlcanzable
-          : (geoAviso.ctaDentroSinTocar && !geoAviso.desbordaDoc)),
+        && geoAviso.ctaDentroSinTocar && !geoAviso.desbordaDoc,
     }
 
     // retar.6 · geometría y silencio
@@ -1814,13 +1824,11 @@ async function runRetar(browser) {
     c['retar.6'] = {
       ...geo,
       // El piso táctil de la campaña son 40px (no WCAG). Nada desborda a lo
-      // ANCHO en ningún traje; a lo alto, el apaisado bajo desplaza por diseño y
-      // el resto tiene que caber — que es lo que la columna de cuatro filas pone
-      // en riesgo, y la razón del `row-gap` propio de `.es-retar`.
+      // ANCHO en ningún traje. IOS-1 1e: el CTA, anclado, dentro sin tocar nada
+      // en TODOS los trajes (también el apaisado bajo); ni el documento ni la
+      // pantalla desplazan.
       ok: !geo.desbordaH && geo.chipMin >= 40 && geo.rotos === 0
-        && (geo.apaisado
-          ? geo.ctaAlcanzable
-          : (geo.ctaDentroSinTocar && !geo.desbordaDoc)),
+        && geo.anclada && geo.ctaDentroSinTocar && !geo.desbordaDoc && !geo.salDesplaza,
     }
 
     c.consola = consola
