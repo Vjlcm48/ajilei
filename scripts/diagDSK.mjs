@@ -329,6 +329,7 @@ import { runMesaIA, runRevive } from './eco/mesaia.mjs'
 import { runConstancia } from './eco/constancia.mjs'
 import { runVideo } from './eco/video.mjs'
 import { runTam } from './ios/tam.mjs'
+import { runWebkit } from './ios/webkit.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -413,7 +414,7 @@ const VC_RETRASO_ROCE_MS = (() => {
 // ECO-1d · y `constancia`: la constancia, los límites y la válvula, también ahí.
 // ECO-1g · y `video`: el video de recompensa, con videos de 40 s de verdad.
 // IOS-1 1b · y `tam`: las pantallas bajas en horizontal (521–831 de alto).
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam']
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -15155,6 +15156,12 @@ try {
   // bajas en horizontal, con el gesto real del usuario.
   if (MODE === 'tam') {
     report.tam = await runTam(browser, { base: BASE_PROD })
+  }
+  // IOS-1 1f · `webkit` (INV-55): la matriz de `tam` en el WebKit de Playwright,
+  // en los tamaños de Apple. Lanza su propio WebKit; el aviso de las franjas
+  // del área segura va fijo en la salida.
+  if (MODE === 'webkit') {
+    report.webkit = await runWebkit({ base: BASE_PROD })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

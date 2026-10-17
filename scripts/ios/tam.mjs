@@ -10,9 +10,10 @@
 // cuerpo por debajo de la zona. Este modo lo mide así:
 //
 // A · EL BARRIDO (de la 1b, recableado). Alto en horizontal de 521 a 831 de 10
-// en 10, en dos perfiles de Chromium (laptop con ratón a 1366, tableta táctil a
-// 1280), UN contexto por pantalla y `setViewportSize` (la receta de la Fase 0:
-// no depende de las barras de ningún navegador).
+// en 10, en tres perfiles de Chromium (laptop con ratón a 1366, tableta táctil a
+// 1280 y, desde la 1f, una ventana estrecha de 820 que es la que deja filas
+// bajo el botón), UN contexto por pantalla y `setViewportSize` (la receta de la
+// Fase 0: no depende de las barras de ningún navegador).
 //   tam.1  el botón principal se toca SIN desplazar nada (las tres pantallas
 //          ancladas); en el lobby, de entrada o tras el gesto real del usuario
 //   tam.2  la caja de nota o resumen, si dice algo, se ve entera y va ENCIMA
@@ -28,14 +29,17 @@
 //          táctil por CDP en la tableta) las lleva hasta el final, sin mover el
 //          botón: lo que no cabe se alcanza
 //
-// B · LA MATRIZ (1e). Los 16 tamaños de la lámina 1d, más las fronteras de la
-// variante B (899/900 de ancho, 830/831 de alto) y el roce anotado de la casa
-// a 800×601 y 800×611; en siete estados (Retar elegido, sin elegir, con el
-// bloque del video, con el error al sentarse y con la lectura fallida; Salas;
-// Armar mesa). Un contexto por perfil (ratón / táctil) y pantalla.
+// B · LA MATRIZ (1e, completada en la 1f). Los 16 tamaños de la lámina 1d y
+// los de la Fase 0 (§C.2), más las fronteras de la variante B (899/900 de
+// ancho, 830/831 de alto), la línea de los 860 (831, 845, 860 y 861 de alto) y
+// el roce anotado de la casa a 800×601 y 800×611; en siete estados (Retar
+// elegido, sin elegir, con el bloque del video, con el error al sentarse y con
+// la lectura fallida; Salas; Armar mesa). Un contexto por perfil (ratón /
+// táctil) y pantalla.
 //   tam.7  el botón dorado, ENTERO a la vista y tocable, en todas las celdas
-//   tam.8  0 px de filas bajo el botón en todo tamaño salvo el teléfono acostado
-//          (915×412), donde sólo se informan; la página no desplaza nunca
+//   tam.8  0 px de filas bajo el botón en todo tamaño salvo los teléfonos
+//          acostados y las celdas que sólo informan; la página no desplaza
+//          nunca. Desde la 1f, también de 831 a 860 de alto en horizontal ancho
 //   tam.9  la variante B entra y sale donde debe: dos columnas a 900×600 y a
 //          1366×830; una a 899×600 y a 1366×831
 //   tam.10 piso táctil: ningún tocable NUEVO o MOVIDO por debajo de 44 en los
@@ -66,6 +70,12 @@ export const ALTOS_TAM = Object.freeze(Array.from({ length: 32 }, (_, i) => 521 
 export const PERFILES_TAM = Object.freeze([
   { id: 'laptop', w: 1366, movil: false, gesto: 'rueda' },
   { id: 'tableta', w: 1280, movil: true, gesto: 'tactil' },
+  // IOS-1f · con la línea de los 860, a 1366 y 1280 ya nada desborda de 521 a
+  // 831 (dos columnas hasta 830, el traje en 831) y tam.6 se quedaba sin nada
+  // que recorrer. Una ventana estrecha (una columna, < 900) sí deja filas bajo
+  // el botón en lo bajo: es la que ejerce el gesto. Solo la carcasa: el lobby
+  // tiene sus propios trajes y no es de esta medida.
+  { id: 'estrecha', w: 820, movil: false, gesto: 'rueda', pantallas: ['retar', 'retar-video', 'salas', 'armar'] },
 ])
 export const PANTALLAS_TAM = Object.freeze(['lobby', 'retar', 'retar-video', 'salas', 'armar'])
 
@@ -87,15 +97,39 @@ export const TAMANOS_MATRIZ = Object.freeze([
   { id: '360x640', w: 360, h: 640, tactil: true },
   { id: '440x956', w: 440, h: 956, tactil: true },
   { id: '915x412', w: 915, h: 412, tactil: true, acostado: true },
-  // Fronteras de la variante B (tam.9) y el roce de la casa (tam.11). Fuera
-  // de la lista de la lámina: sus filas bajo el botón se INFORMAN (tam.8 no
-  // les pide 0 px; el criterio de la ficha es la lista de arriba).
+  // Fronteras de la variante B (tam.9) y el roce de la casa (tam.11). Sus
+  // filas bajo el botón se INFORMAN (tam.8 no les pide 0 px).
   { id: '899x600', w: 899, h: 600, tactil: false, frontera: false, informa: true },
   { id: '900x600', w: 900, h: 600, tactil: false, frontera: true, informa: true },
   { id: '1366x830', w: 1366, h: 830, tactil: false, frontera: true, informa: true },
-  { id: '1366x831', w: 1366, h: 831, tactil: false, frontera: false, informa: true },
   { id: '800x601', w: 800, h: 601, tactil: false, informa: true },
   { id: '800x611', w: 800, h: 611, tactil: false, informa: true },
+  // IOS-1f (T1) · la línea de los 860: en horizontal ancho, de 831 a 860 de alto,
+  // una columna con el traje apretado y 0 px de filas (tam.8, ESTRICTO). La 861
+  // ya no lleva traje: se informa.
+  { id: '1366x831', w: 1366, h: 831, tactil: false, frontera: false },
+  { id: '1366x845', w: 1366, h: 845, tactil: false },
+  { id: '1366x860', w: 1366, h: 860, tactil: false },
+  { id: '1366x861', w: 1366, h: 861, tactil: false, informa: true },
+  // IOS-1f (T3) · la lista de la Fase 0 (§C.2) que no estaba ya arriba. Los
+  // tamaños «con barras» son ESTIMADOS (lo dice la Fase 0); el iPhone acostado
+  // (832 de ancho: sin `viewport-fit=cover`, Safari no deja a la página las
+  // franjas de la isla) cae fuera de las dos columnas y se informa como el
+  // teléfono acostado.
+  { id: '440x763', w: 440, h: 763, tactil: true },                      // iph-saf-v
+  { id: '832x440', w: 832, h: 440, tactil: true, acostado: true },      // iph-app-h
+  { id: '832x390', w: 832, h: 390, tactil: true, acostado: true },      // iph-saf-h
+  { id: '744x1133', w: 744, h: 1133, tactil: true },                    // ipm-app-v
+  { id: '1133x744', w: 1133, h: 744, tactil: true },                    // ipm-app-h
+  { id: '1133x637', w: 1133, h: 637, tactil: true },                    // ipm-saf-h
+  { id: '820x1180', w: 820, h: 1180, tactil: true },                    // ip11-app-v
+  { id: '1180x820', w: 1180, h: 820, tactil: true },                    // ip11-app-h
+  { id: '820x1073', w: 820, h: 1073, tactil: true },                    // ip11-saf-v
+  { id: '1024x1259', w: 1024, h: 1259, tactil: true },                  // ip13-saf-v
+  { id: '1366x917', w: 1366, h: 917, tactil: true },                    // ip13-saf-h
+  { id: '876x1248', w: 876, h: 1248, tactil: true },                    // and-g-v
+  { id: '1400x724', w: 1400, h: 724, tactil: true },                    // and-g-h
+  { id: '1366x633', w: 1366, h: 633, tactil: false },                   // lap-1366
 ])
 export const ESTADOS_MATRIZ = Object.freeze(['retar', 'retar-falta', 'retar-video', 'retar-error', 'retar-lectura', 'salas', 'armar'])
 const PRONTO_EN = ['1366x623', '412x915', '360x640']
@@ -185,13 +219,24 @@ const LEE = ({ boton, nota, tol }) => {
   }
   // Tocables visibles, dentro de la ventana. Una fila que pasa por debajo de la
   // zona anclada está TAPADA a propósito: no cuenta como tocable a la vista.
+  // IOS-1f · y lo que está dentro del cuerpo se mide RECORTADO a la caja del
+  // cuerpo, que desplaza con `overflow`: una fila que sube por encima de su
+  // borde no se ve ni se toca, aunque su caja cruce la cabecera.
   const sel = 'button, input, select, textarea, a[href], [role="button"]'
   const solapa = (a, c) => Math.min(a.right, c.right) - Math.max(a.left, c.left) > tol && Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top) > tol
+  const cajaCuerpo = cuerpo ? cuerpo.getBoundingClientRect() : null
+  const rectDe = (e) => {
+    const r = e.getBoundingClientRect()
+    if (!cajaCuerpo || !cuerpo.contains(e)) return r
+    const left = Math.max(r.left, cajaCuerpo.left), right = Math.min(r.right, cajaCuerpo.right)
+    const top = Math.max(r.top, cajaCuerpo.top), bottom = Math.min(r.bottom, cajaCuerpo.bottom)
+    return { left, right, top, bottom, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }
+  }
   const vivos = [...raiz.querySelectorAll(sel)].filter((e) => {
     if (!e.getClientRects().length) return false
     const cs = getComputedStyle(e)
     if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0 || cs.pointerEvents === 'none') return false
-    const r = e.getBoundingClientRect()
+    const r = rectDe(e)
     if (!(r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw)) return false
     if (zonaEl && cuerpo.contains(e) && !zonaEl.contains(e) && solapa(r, zonaEl.getBoundingClientRect())) return false
     return true
@@ -203,8 +248,8 @@ const LEE = ({ boton, nota, tol }) => {
       const p = vivos[i]
       const q = vivos[j]
       if (p.contains(q) || q.contains(p)) continue
-      const a = p.getBoundingClientRect()
-      const c = q.getBoundingClientRect()
+      const a = rectDe(p)
+      const c = rectDe(q)
       const x = Math.min(a.right, c.right) - Math.max(a.left, c.left)
       const y = Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top)
       if (x > tol && y > tol) solapes.push(`${nombre(p)}×${nombre(q)} ${Math.min(x, y).toFixed(1)}`)
@@ -327,7 +372,7 @@ const cajaBien = (l) => !l.notaVisible || (dentro(l.nota, l.vh) && (!l.boton || 
 async function barrido(browser, { base, perfiles, altos, pantallas, cdp, errores }) {
   const filas = []
   const corre = async (perfil) => {
-    for (const pantalla of pantallas) {
+    for (const pantalla of perfil.pantallas ?? pantallas) {
       const { ctx, page } = await contextoCap(browser, { w: perfil.w, h: 700, dpr: 1, movil: perfil.movil }, base, opcionesDe(pantalla))
       page.on('pageerror', (e) => errores.push(`${perfil.id} ${pantalla} · pageerror: ${e.message}`))
       const sesion = perfil.gesto === 'tactil' && cdp ? await ctx.newCDPSession(page) : null
@@ -391,7 +436,7 @@ async function barrido(browser, { base, perfiles, altos, pantallas, cdp, errores
 }
 
 // ── B · La matriz de la 1e ──────────────────────────────────────────────────
-async function matriz(browser, { base, tamanos, estados, errores }) {
+export async function matriz(browser, { base, tamanos, estados, errores }) {
   const celdas = []
   const corre = async (tactil) => {
     const lista = tamanos.filter((t) => t.tactil === tactil)
@@ -467,7 +512,7 @@ export async function runTam(browser, {
     conMatriz ? matriz(browser, { base, tamanos, estados, errores }) : Promise.resolve([]),
   ])
 
-  const esperadas = perfiles.length * pantallas.length * altos.length
+  const esperadas = perfiles.reduce((n, p) => n + (p.pantallas ?? pantallas).length, 0) * altos.length
   const fallosDe = (k) => filas.filter((f) => !f[k]).map((f) => `${f.perfil} ${f.pantalla} ${f.h}`)
   const medidas = celdas.filter((c) => c.medida)
   const nombre = (c) => `${c.estado} ${c.tam}`
