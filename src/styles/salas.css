@@ -1668,12 +1668,20 @@ body.sal-activa #root {
   bottom: calc(100% + var(--u) * 1.4);
 }
 
-/* ── A · el traje apretado (horizontal, hasta 800 de alto) ─────────────────
+/* ── A · el traje apretado (horizontal hasta 800; en una columna, hasta 860) ─
    Piso táctil de 44: el chip baja de 57 a 44,4 y el botón de 66 a 54; el aire
    de la cabecera, de las filas y del relleno se recorta. Nada de lo que se
    mueve o se aprieta baja de 44 (`.sal-unir` mide 0,8 · `--cta-h`: con 54 caía
-   a 43,2 y lleva su propio piso). */
-@media (orientation: landscape) and (max-height: 800px) {
+   a 43,2 y lleva su propio piso).
+   IOS-1f (T1, decisión 4 de Victor) · en UNA columna el traje llega a 860 de
+   alto: de 831 a ~855 en horizontal ancho ya no había dos columnas y Retar
+   dejaba 7 px de filas bajo el botón (24 con el video). La banda de las dos
+   columnas (≥ 900 × ≤ 830) no cambia: de 801 a 830 sigue sin traje. Por eso
+   la línea es una lista: hasta 800 siempre; de 801 a 860, sólo fuera de B
+   (estrecha, o de 831 en adelante). */
+@media (orientation: landscape) and (max-height: 800px),
+  (orientation: landscape) and (max-height: 860px) and (max-width: 899px),
+  (orientation: landscape) and (min-height: 831px) and (max-height: 860px) {
   .sal.es-anclada {
     --pad: calc(var(--u) * 2.4);
     --chip-h: max(44px, calc(var(--u) * 7.4));

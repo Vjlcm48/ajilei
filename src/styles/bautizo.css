@@ -29,18 +29,9 @@
   text-align: left;
 }
 
-/* ── La regla, que es contrato y no aviso ───────────────────────────────────
-   Vive FUERA de `.puerta-aviso` a propósito: aquella ranura se ocupa y se vacía
-   con lo que responda la base, y la regla tiene que estar siempre. Alto propio y
-   fijo, así que cuando llega un error se pinta debajo sin desplazarla.
-   El texto es el del §1.4, palabra por palabra: es el mismo contrato que el
-   CHECK `profiles_username_formato_chk` de SUP-2a, dicho en castellano. */
-.bautizo-regla {
-  margin: 8px 0 0;
-  font-size: 0.76rem;
-  line-height: 1.35;
-  color: var(--text-faint);
-}
+/* IOS-1f (T5) · `.bautizo-regla` se borró: la línea fija de la regla salió del
+   JSX en la 1c (lámina f2) y la regla sale en la ranura de avisos sólo cuando
+   el nombre no vale (`Bautizo.jsx`). */
 
 /* En el modal la caja es más apretada: sobre la mesa hay menos aire que sobre el
    lienzo del lobby, y el velo ya hace el trabajo de separar del fondo. */
