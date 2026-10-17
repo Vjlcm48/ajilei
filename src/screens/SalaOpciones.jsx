@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import '../styles/salas.css'
 
 import BarraSuperior from '../components/BarraSuperior'
+import CajaAccion from '../components/CajaAccion'
+import { cajaDeAccion } from '../components/zonaAccionCore'
+import { useDesborde } from '../hooks/useDesborde'
 import { IconoVolver, IconoCasa } from '../components/IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
 import { montoTexto } from '../config/tapetes'
@@ -228,8 +231,15 @@ export default function SalaOpciones({
     onEntrarSala?.(data)
   }
 
+  // IOS-1 1e · la zona anclada, igual que en `PantallaChips` (esta pantalla
+  // repite su marcado a mano): el cuerpo desplaza por dentro si no cabe, el
+  // botón queda al pie con su nota ENCIMA, la casa sube a la cabecera y el aviso
+  // flotante vive en la zona, apoyado encima de ella.
+  const cuerpoRef = useRef(null)
+  useDesborde(cuerpoRef)
+
   return (
-    <main className="sal">
+    <main className="sal es-anclada">
       <div className="sal-fondo" aria-hidden="true" />
 
       <BarraSuperior
@@ -257,9 +267,18 @@ export default function SalaOpciones({
           <IconoVolver />
         </button>
         <h1>{t('sal.opciones.titulo')}</h1>
+        <button
+          type="button"
+          className="sal-casa"
+          data-accion="casa"
+          aria-label={t('sal.casa.aria')}
+          onClick={() => onLobby?.()}
+        >
+          <IconoCasa />
+        </button>
       </div>
 
-      <div className="sal-cuerpo">
+      <div ref={cuerpoRef} className="sal-cuerpo">
 
         {/* ── Bloque 1 · ¿Te invitaron? ──────────────────────────────────── */}
         <section className="sal-bloque">
@@ -369,6 +388,7 @@ export default function SalaOpciones({
             alcanza ninguna apuesta se encontrará los chips apagados en la
             pantalla siguiente, que es donde ese hecho se explica con cifras. */}
         <section className="sal-bloque sal-accion">
+          <CajaAccion caja={cajaDeAccion({ aviso: t('sal.opciones.armar.nota') })} />
           <button
             type="button"
             className="sal-cta es-opciones"
@@ -377,27 +397,16 @@ export default function SalaOpciones({
           >
             {t('sal.opciones.armar')}
           </button>
-          <small>{t('sal.opciones.armar.nota')}</small>
+          {/* El toast recoge lo que no cabe bajo el campo de código: el error de
+              unirse por tarjeta y los tres controles de la barra, que todavía no
+              llevan a ninguna parte. `role="status"` lo anuncia sin robar el
+              foco. La caja se reserva siempre y sólo se apaga con `visibility`
+              (O1). IOS-1 1e · vive en la zona y sale apoyado encima de ella. */}
+          <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
+            {toast !== null ? t(toast) : ' '}
+          </div>
         </section>
 
-      </div>
-
-      <button
-        type="button"
-        className="sal-casa"
-        data-accion="casa"
-        aria-label={t('sal.casa.aria')}
-        onClick={() => onLobby?.()}
-      >
-        <IconoCasa />
-      </button>
-
-      {/* El toast recoge lo que no cabe bajo el campo de código: el error de
-          unirse por tarjeta y los tres controles de la barra, que todavía no
-          llevan a ninguna parte. `role="status"` lo anuncia sin robar el foco.
-          La caja se reserva siempre y sólo se apaga con `visibility` (O1). */}
-      <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
-        {toast !== null ? t(toast) : ' '}
       </div>
     </main>
   )

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import '../styles/salas.css'
 
 import BarraSuperior from './BarraSuperior'
+import CajaAccion from './CajaAccion'
+import { useDesborde } from '../hooks/useDesborde'
 import { IconoVolver, IconoCasa } from './IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
 
@@ -41,6 +43,20 @@ import { useIdioma } from '../hooks/useIdioma'
 // video, los dos por el contexto del video (`hooks/useVideo.js`). `usePronto`
 // se queda sin consumidores y su `Provider` sale de aquí. El perfil y el ⚙
 // siguen diciendo «Pronto» con el aviso de esta carcasa.
+//
+// ── IOS-1 1e · LA ZONA ANCLADA ──────────────────────────────────────────────
+// Rector: AJILEI_IOS-1_Fase1e_v1.0.md (lámina `laminas/ios1d`, decisiones de
+// Victor del 2026-10-16). La acción deja de viajar al final de la columna: es
+// una ZONA fija al pie (`.sal-accion`, `sticky` dentro del cuerpo), con el
+// bloque que la pantalla mande (`pie`: el video de Retar), la caja de nota o
+// resumen (`cta.caja`, ver `CajaAccion`) y el botón dorado, siempre del mismo
+// tamaño y siempre entero a la vista. Si las filas no caben, desplaza el CUERPO
+// por debajo de la zona; la pantalla ya no desplaza nunca (`es-anclada`).
+// La casa sube a la cabecera, a la derecha de la flecha (el pie es del botón),
+// y el «Pronto» vive dentro de la zona, apoyado justo encima de ella.
+//
+// `SalaOpciones` repite este marcado a mano (no usa esta carcasa): un cambio
+// aquí se hace también allí.
 
 export default function PantallaChips({
   titulo,
@@ -58,9 +74,13 @@ export default function PantallaChips({
   onVolver,
   onLobby,
   cta,
+  // IOS-1 1e · lo que la pantalla pone en la zona anclada, encima de la caja.
+  pie = null,
   children,
 }) {
   const { t } = useIdioma()
+  const cuerpo = useRef(null)
+  useDesborde(cuerpo)
 
   const [toast, setToast] = useState(null)
   const relojToast = useRef(null)
@@ -82,7 +102,7 @@ export default function PantallaChips({
   }, [])
 
   return (
-    <main className="sal">
+    <main className="sal es-anclada">
       <div className="sal-fondo" aria-hidden="true" />
 
       <BarraSuperior
@@ -108,12 +128,25 @@ export default function PantallaChips({
           <IconoVolver />
         </button>
         <h1>{titulo}</h1>
+        <button
+          type="button"
+          className="sal-casa"
+          data-accion="casa"
+          aria-label={t('sal.casa.aria')}
+          onClick={() => onLobby?.()}
+        >
+          <IconoCasa />
+        </button>
       </div>
 
-      <div className={`sal-cuerpo${clase ? ` ${clase}` : ''}`}>
+      <div ref={cuerpo} className={`sal-cuerpo${clase ? ` ${clase}` : ''}`}>
         {children}
 
         <section className="sal-accion">
+          {pie}
+          {/* La caja va ENCIMA del botón y crece hacia arriba: la zona está
+              anclada al pie, así que nada de lo que diga mueve el botón. */}
+          <CajaAccion caja={cta?.caja} />
           <button
             type="button"
             className={`sal-cta${cta?.clase ? ` ${cta.clase}` : ''}`}
@@ -123,26 +156,10 @@ export default function PantallaChips({
           >
             {cta?.etiqueta}
           </button>
-          {/* O1 · la nota reserva su caja: aparece y desaparece según el estado
-              de la pantalla, y sin reserva movería el CTA bajo el dedo. */}
-          <small data-accion="cta-nota" role={cta?.alerta ? 'alert' : undefined}>
-            {cta?.nota ?? ' '}
-          </small>
+          <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
+            {toast !== null ? t(toast) : ' '}
+          </div>
         </section>
-      </div>
-
-      <button
-        type="button"
-        className="sal-casa"
-        data-accion="casa"
-        aria-label={t('sal.casa.aria')}
-        onClick={() => onLobby?.()}
-      >
-        <IconoCasa />
-      </button>
-
-      <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
-        {toast !== null ? t(toast) : ' '}
       </div>
     </main>
   )

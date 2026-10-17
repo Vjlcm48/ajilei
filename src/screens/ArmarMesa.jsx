@@ -16,6 +16,7 @@ import {
 import { MEMORIA_PVP } from '../config/salaRecordada'
 import { saldoParaJuzgar } from '../hooks/billeteraCore'
 import { claveDeError } from '../lib/salasApi'
+import { cajaDeAccion } from '../components/zonaAccionCore'
 import {
   alcanza,
   buscarCombinacion,
@@ -205,7 +206,7 @@ export default function ArmarMesa({
     if (!esUnirme && tipo === 'abierta') releerMesas()
   }
 
-  // ── La nota bajo el CTA ─────────────────────────────────────────────────
+  // ── La nota de la caja (encima del CTA desde IOS-1 1e) ──────────────────
   // Un solo hueco para tres cosas, en orden de urgencia: el error manda sobre la
   // nota informativa, porque es la respuesta a lo último que hizo el jugador.
   //
@@ -247,8 +248,19 @@ export default function ArmarMesa({
         etiqueta: t(rotuloCta),
         disabled: ocupado,
         onClick: pulsar,
-        nota: notaCta,
-        alerta: Boolean(error),
+        // IOS-1 1e · la caja de encima del botón: el error manda, luego la nota
+        // de «unirme», y sin ninguna de las dos, el resumen de la mesa.
+        caja: cajaDeAccion({
+          error: error ? notaCta : null,
+          aviso: error ? null : notaCta,
+          resumen: {
+            formas: ['sal.armar.resumen', 'sal.armar.resumen.corta'].map((clave) => t(clave, {
+              tipo: t(tipo === 'privada' ? 'sal.armar.privada' : 'sal.armar.abierta'),
+              n: jugadores,
+              hc: montoTexto(apuesta),
+            })),
+          },
+        }),
       }}
     >
       {/* ── Jugadores ────────────────────────────────────────────────────── */}

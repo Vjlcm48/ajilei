@@ -107,6 +107,11 @@ export const TEXTOS_ES = {
   'sal.armar.privada.d':     'Con código para compartir. Solo entra quien lo tenga.',
   'sal.armar.abierta':       'Abierta',
   'sal.armar.abierta.d':     'Visible para todos. Entra quien quiera.',
+  // IOS-1 1e · el resumen de la caja de encima del botón: la mesa que se va a
+  // crear, en la forma larga o, si no cabe, en la corta. `{tipo}` es el rótulo
+  // del modo (`sal.armar.privada` / `sal.armar.abierta`).
+  'sal.armar.resumen':       '{tipo} · {n} jugadores · {hc} por mano',
+  'sal.armar.resumen.corta': '{tipo} · {n} jug. · {hc}/mano',
   'sal.armar.cta.privada':   'Crear mesa privada',
   'sal.armar.cta.abrir':     'Abrir mesa',
   'sal.armar.cta.unirme':    'Unirme a esa mesa',
@@ -262,13 +267,17 @@ export const TEXTOS_ES = {
   // Lo que la cuarta fila promete antes de pulsar. Sale de `entrada.pilaIA`.
   'ia.retar.aviso.pila':      'Cada IA se sienta con {hc} HC.',
 
-  // El CTA dice las tres decisiones en voz alta, que es lo que lo convierte en
-  // una confirmación y no en un botón. Dos frases y no un plural calculado: el
-  // español no pluraliza las siglas con una `s`.
-  'ia.retar.cta':             'Retar a {n} IAS · mesa {hc} · entras con {entrada}',
-  'ia.retar.cta.una':         'Retar a 1 IA · mesa {hc} · entras con {entrada}',
-  'ia.retar.cta.vacio':       'Elige tu mesa',
+  // IOS-1 1e · el botón dorado dice SIEMPRE lo mismo y mide siempre lo mismo
+  // (decisión 2 de Victor, 2026-10-16). Las cifras que antes decía el botón
+  // («Retar a 4 IAS · mesa 200 · entras con 4.000», `ia.retar.cta` y
+  // `ia.retar.cta.una`, retiradas con `ia.retar.cta.vacio`) pasan al resumen de
+  // la caja de encima, que sigue haciendo de confirmación: se lee justo antes de
+  // pulsar. La forma corta es la que la caja usa si la larga no cabe (lo decide
+  // la medida, `CajaAccion`); `{n}` son los JUGADORES de la mesa, tú incluido.
+  'ia.retar.cta.sentarme':    'Sentarme a la mesa',
   'ia.retar.cta.falta':       'Elige reto, jugadores, apuesta y entrada.',
+  'ia.retar.resumen':         '{reto} · {n} jugadores · {hc} por mano · entras con {entrada}',
+  'ia.retar.resumen.corta':   '{reto} · {n} jug. · {hc}/mano · entras con {entrada}',
 
   // ── RET-A · El aviso de saldo ─────────────────────────────────────────────
   // Releva a `ia.retar.aviso.saldo`, que explicaba el gris mesa a mesa y en

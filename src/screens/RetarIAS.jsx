@@ -16,6 +16,7 @@ import {
   avisoDeSaldo, CASO_ALCANZA, CASO_RETO_MENOR, guardaDeSaldo,
 } from './retarCore'
 import { saldoParaJuzgar, ERROR as SALDO_ERROR } from '../hooks/billeteraCore'
+import { cajaDeAccion } from '../components/zonaAccionCore'
 
 // ── APU-1 1e · «Retar a las IAS» ────────────────────────────────────────────
 // Rector: AJILEI_APU-1_Fase1e_v1.0.md §2.2. Boceto aprobado por Victor en
@@ -214,43 +215,56 @@ export default function RetarIAS({
   }
 
   const enviando = sentando?.fase === 'enviando'
-  let notaCta = null
-  if (sentando?.fase === 'error') {
-    // ECO-1d · `limite` (K7: ya se reintentó un minuto con el mismo token) y
-    // `tope_diario` (K8: la válvula, encendida desde el SQL Editor).
-    notaCta = t(sentando.codigo === 'red' ? 'ia.retar.sentarse.red'
+
+  // ── IOS-1 1e · La caja de encima del botón ────────────────────────────────
+  // Una sola caja con prioridad (`cajaDeAccion`, decisión 3 de Victor): error >
+  // cobrando > cargando > «Elige…» > no alcanza > resumen. Los textos y el orden
+  // de las condiciones son los de la nota de antes; lo nuevo es el resumen, que
+  // sale cuando la mesa está entera y se puede pulsar.
+  //
+  // ECO-1d · `limite` (K7: ya se reintentó un minuto con el mismo token) y
+  // `tope_diario` (K8: la válvula, encendida desde el SQL Editor).
+  const error = sentando?.fase === 'error'
+    ? t(sentando.codigo === 'red' ? 'ia.retar.sentarse.red'
       : sentando.codigo === 'saldo_insuficiente' ? 'ia.retar.sentarse.saldo'
         : sentando.codigo === 'limite' ? 'ia.retar.sentarse.limite'
           : sentando.codigo === 'tope_diario' ? 'ia.retar.sentarse.tope'
             : 'ia.retar.sentarse.otro')
-  } else if (cobrando) {
-    notaCta = t('ia.retar.saldo.cobrando')
-  } else if (sinNingunaCifra) {
-    // ECO-1b · mientras carga, la nota lo dice; si la lectura falló, lo dice
-    // `AvisoLectura` con su botón y la nota calla para no repetirlo.
-    notaCta = lecturaFallida ? null : t('ia.retar.saldo.cargando')
-  } else if (!completo) {
-    notaCta = t('ia.retar.cta.falta')
-  } else if (!veredicto.ok) {
-    notaCta = t(MOTIVOS_TEXTO[veredicto.motivo] ?? 'ia.entrada.monto_invalido', {
-      hc: montoTexto(unit * 5),
-      techo: montoTexto(tope),
-      saldo: montoTexto(saldo),
-    })
-  }
+    : null
+  const resumen = completo && veredicto.ok
+    ? {
+        cifra: montoTexto(entrada),
+        formas: ['ia.retar.resumen', 'ia.retar.resumen.corta'].map((clave) => t(clave, {
+          reto: nivelPorId(reto).nombre,
+          n: jugadores,
+          hc: montoTexto(apuesta),
+          entrada: montoTexto(entrada),
+        })),
+      }
+    : null
+  const caja = cajaDeAccion({
+    error,
+    cobrando: cobrando ? t('ia.retar.saldo.cobrando') : null,
+    // ECO-1b · mientras carga, la caja lo dice; si la lectura falló, lo dice
+    // `AvisoLectura` con su botón y la caja calla (`callar`) para no repetirlo.
+    cargando: sinNingunaCifra ? t('ia.retar.saldo.cargando') : null,
+    falta: !completo ? t('ia.retar.cta.falta') : null,
+    noAlcanza: completo && !veredicto.ok
+      ? t(MOTIVOS_TEXTO[veredicto.motivo] ?? 'ia.entrada.monto_invalido', {
+          hc: montoTexto(unit * 5),
+          techo: montoTexto(tope),
+          saldo: montoTexto(saldo),
+        })
+      : null,
+    resumen,
+    // Con el bloque del video (RET-A) o el de la lectura fallida, la caja
+    // calla: «Elige reto…» contradiría al párrafo de encima (ajuste del rector
+    // a RET-A) y ese bloque ocupa ya su sitio en la zona.
+    callar: lecturaFallida || aviso.caso !== CASO_ALCANZA,
+  })
 
-  // «Retar a 1 IA» y «Retar a 4 IAS» son dos frases, no una con un plural
-  // calculado: el español no pluraliza las siglas con una `s` y meter una regla
-  // de pluralización en `t()` para un solo caso sería traer i18next por la
-  // puerta de atrás (doctrina de `config/textos.js`).
-  const rivales = jugadores !== null ? jugadores - 1 : 0
-  const rotuloCta = enviando ? t('ia.retar.sentando') : completo
-    ? t(rivales === 1 ? 'ia.retar.cta.una' : 'ia.retar.cta', {
-        n: rivales,
-        hc: montoTexto(apuesta),
-        entrada: montoTexto(entrada),
-      })
-    : t('ia.retar.cta.vacio')
+  // El rótulo no cambia con la mesa: las cifras van en la caja (decisión 2).
+  const rotuloCta = enviando ? t('ia.retar.sentando') : t('ia.retar.cta.sentarme')
 
   return (
     <PantallaChips
@@ -275,8 +289,22 @@ export default function RetarIAS({
           MEMORIA_RETO.guardar(config)
           onRetar?.({ reto, jugadores, apuesta, entrada })
         },
-        nota: notaCta,
+        caja,
       }}
+      // IOS-1 1e · el bloque de saldo viaja CON la zona anclada (decisión 4):
+      // en ese estado es la única acción posible, y tiene que verse sin bajar.
+      pie={(
+        <>
+          {lecturaFallida && <AvisoLectura onReintentar={billetera?.refrescar} />}
+          {aviso.caso !== CASO_ALCANZA && (
+            <AvisoSaldo
+              texto={aviso.caso === CASO_RETO_MENOR
+                ? t('ia.retar.saldo.reto', { reto: nivelPorId(aviso.retoSugerido).nombre })
+                : t('ia.retar.saldo.ninguno')}
+            />
+          )}
+        </>
+      )}
     >
       {/* ── 1 · Reto ─────────────────────────────────────────────────────── */}
       <FilaChips
@@ -419,15 +447,10 @@ export default function RetarIAS({
 
         El botón es el ÚNICO nuevo de la pantalla. Desde ECO-1g pide el video
         de recompensa (`useVideo`), lo mismo que la fila de la hoja del `+`
-        dorado de la cabecera. */}
-      {lecturaFallida && <AvisoLectura onReintentar={billetera?.refrescar} />}
-      {aviso.caso !== CASO_ALCANZA && (
-        <AvisoSaldo
-          texto={aviso.caso === CASO_RETO_MENOR
-            ? t('ia.retar.saldo.reto', { reto: nivelPorId(aviso.retoSugerido).nombre })
-            : t('ia.retar.saldo.ninguno')}
-        />
-      )}
+        dorado de la cabecera.
+
+        IOS-1 1e · el bloque se pinta en la zona anclada (`pie`, arriba), no
+        aquí al final de las filas. */}
     </PantallaChips>
   )
 }

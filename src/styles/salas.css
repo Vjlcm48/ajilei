@@ -1249,7 +1249,13 @@ body.sal-activa #root {
    cuando no cabe. Ahí caen el iPad en Safari, las tabletas con barras y toda
    laptop 1366×768 en ventana, y apretar no bastaba: el botón dorado de Retar
    quedaba recortado bajo `overflow: hidden` sin forma de llegar a él. Es el
-   bloque que sigue al traje acostado. */
+   bloque que sigue al traje acostado.
+
+   IOS-1 1e (decisión 9 de Victor, 2026-10-16): en Retar, Salas y Armar mesa
+   (`.sal.es-anclada`, §16) ese parche y el traje acostado SE QUITAN: el botón
+   va anclado al pie y lo que no cabe son las filas, que desplazan dentro del
+   cuerpo. Los dos bloques siguen aquí acotados con `:not(.es-anclada)` porque
+   la sala de espera y la partida comparten `.sal` y están fuera de la 1e. */
 @media (max-height: 660px) {
   .sal-cab { margin-top: calc(var(--u) * 1.5); }
   .sal-cuerpo { row-gap: calc(var(--u) * 2.2); padding-top: calc(var(--u) * 1.5); }
@@ -1261,11 +1267,11 @@ body.sal-activa #root {
   /* Misma columna; la pantalla desplaza. La tercera fila deja de ser `1fr`
      porque en este traje el cuerpo mide lo que mide y es el contenedor quien
      scrollea. */
-  .sal { grid-template-rows: auto auto auto; overflow: auto; }
-  .sal-cuerpo { align-content: start; row-gap: calc(var(--u) * 3); }
+  .sal:not(.es-anclada) { grid-template-rows: auto auto auto; overflow: auto; }
+  .sal:not(.es-anclada) .sal-cuerpo { align-content: start; row-gap: calc(var(--u) * 3); }
   /* La ventanilla sigue siendo de tres tarjetas: la promesa es de la lista, no
      del viewport, y aquí es cuando más falta hace que la caja no crezca. */
-  .sal-casa { position: fixed; }
+  .sal:not(.es-anclada) .sal-casa { position: fixed; }
 }
 /* IOS-1 1b · la excepción de arriba. Ni filas ni medidas: `overflow-y: auto`
    solo crea desplazamiento si el contenido YA desborda (hoy se recortaba), así
@@ -1276,8 +1282,8 @@ body.sal-activa #root {
    `max-width` (§1)—, para que caiga en el mismo píxel que hoy en cualquier
    ancho. */
 @media (orientation: landscape) and (min-height: 521px) and (max-height: 830px) {
-  .sal { overflow-y: auto; }
-  .sal-casa {
+  .sal:not(.es-anclada) { overflow-y: auto; }
+  .sal:not(.es-anclada) .sal-casa {
     position: fixed;
     left: calc(max(0px, (100% - var(--u) * 213) / 2) + env(safe-area-inset-left, 0px) + var(--pad));
   }
@@ -1421,28 +1427,13 @@ body.sal-activa #root {
 .sal-paso:focus-visible { border-color: var(--gold-brand); color: var(--gold-brand); }
 .sal-paso[disabled] { opacity: 0.35; cursor: default; }
 
-/* ── EL CTA QUE DICE TRES CIFRAS ──────────────────────────────────
-   «Retar a 4 IAS · mesa 200 · entras con 3.000» son 43 caracteres, contra los 18
-   del «Crear mesa privada» para el que se dimensionó `.sal-cta`. Con el ancho
-   fijo de `--cta-w` y `white-space: nowrap`, en un 360 de ancho la frase se
-   cortaba en «entra…» — y el CTA es justo la pieza que no puede mentir sobre
-   lo que va a pasar al pulsarlo.
-   La caja pasa a medir lo que mide su texto, con el ancho de la lámina como
-   MÍNIMO, y se le deja envolver en dos líneas. Envolver y no encoger la letra:
-   IDI-1 trae cuatro idiomas más y en alguno esta frase será más larga todavía,
-   así que la solución tiene que aguantar un texto que hoy no existe. */
-.sal-cta.es-retar {
-  width: auto;
-  min-width: var(--cta-w);
-  max-width: 100%;
-  height: auto;
-  min-height: var(--cta-h);
-  padding: calc(var(--u) * 1.6) calc(var(--u) * 4);
-  white-space: normal;
-  line-height: 1.25;
-  font-size: calc(var(--u) * 3.8);
-  text-wrap: balance;
-}
+/* ── EL CTA DE TAMAÑO CONSTANTE (IOS-1 1e) ─────────────────────────────────
+   Hasta la 1e el botón decía las tres cifras («Retar a 4 IAS · mesa 200 ·
+   entras con 3.000»), medía lo que su texto y envolvía en dos líneas. Desde la
+   1e dice siempre «Sentarme a la mesa» (decisión 2 de Victor) y las cifras van
+   en la caja de encima (§16): vuelve a ser el `.sal-cta` de la lámina,
+   `--cta-w` × `--cta-h`, en una línea, con la letra de `.es-opciones`. */
+.sal-cta.es-retar { font-size: calc(var(--u) * 4.4); }
 
 /* O1 · el contador se RESERVA. Montarlo sólo al abrir «Otra…» añadía una línea
    de flex a la fila, y esa línea empujaba el CTA fuera de la ventana en un
@@ -1523,21 +1514,14 @@ body.sal-activa #root {
 }
 .sal-cuerpo.es-retar:has(.sal-saldo) .sal-contador { display: none; }
 
-/* ── Y LA NOTA DEL CTA, QUE SE OCULTA PERO NO SE SUELTA ────────────────────
-   Decidido por el rector al revisar RET-A. La nota dice «Elige reto, jugadores,
-   apuesta y entrada» —es la de la cascada incompleta— y con el aviso puesto no
-   hay nada que elegir: contradice al párrafo que tiene justo encima. Se oculta
-   mientras el aviso esté; no se reescribe ni se sustituye por otra frase.
-
-   `visibility: hidden` y NO `display: none`, y aquí la diferencia se midió: esta
-   caja está DEBAJO del CTA, así que devolverla no regala margen, lo cobra. Con
-   `display: none` la columna se acortaba 15 px y el CTA bajaba con ella —de 54
-   px de margen a 39 en un 360×640—, justo al revés de lo que el ajuste busca.
-   Ocultar sin soltar la caja deja la geometría intacta al píxel, saca la frase
-   del árbol de accesibilidad igual —un lector de pantalla no debe leer una
-   instrucción imposible— y es el mismo idioma que `.sal-aviso` usa desde SAL-2
-   para su hueco reservado. En el caso 0 la nota sigue exactamente como estaba. */
-.sal-cuerpo.es-retar:has(.sal-saldo) .sal-accion small { visibility: hidden; }
+/* ── Y LA NOTA DEL CTA, QUE SE CALLA CON EL AVISO ──────────────────────────
+   Decidido por el rector al revisar RET-A: con el aviso puesto, «Elige reto,
+   jugadores, apuesta y entrada» contradice al párrafo de encima. Hasta la 1e se
+   ocultaba aquí con `visibility: hidden` (la nota iba DEBAJO del CTA y soltarla
+   lo bajaba). Desde IOS-1 1e la nota es la caja de ENCIMA del botón y la calla
+   `cajaDeAccion` (`callar`): suelta su línea, que es justo la que ocupa el
+   bloque del video en la misma zona, y el botón no se mueve porque la zona está
+   anclada al pie. */
 
 /* ── EL TRAJE CORTO DE `.es-retar` ─────────────────────────────────────────
    Cuatro filas con su aviso, más el contador reservado, más el CTA. En un
@@ -1551,11 +1535,16 @@ body.sal-activa #root {
 
    Se consideró arreglarlo a lo ancho —en un 1024 sobran 364 px a los lados de la
    columna, que son 660— repartiendo las cuatro filas en dos columnas cuando hay
-   sitio. Victor lo miró y lo descartó: la lámina de esta pantalla es la MISMA que
-   la de «Armar una mesa», y una columna que se parte en dos según el viewport son
-   dos pantallas que el jugador tiene que reconocer como una. Aquí se aprieta y
-   no se ensancha; `.sal-cuerpo.es-retar` hereda su `width: var(--col)` de
-   `.sal-cuerpo` sin tocarlo, y así se queda. */
+   sitio. Victor lo miró y lo descartó entonces: la lámina de esta pantalla es la
+   MISMA que la de «Armar una mesa», y una columna que se parte en dos según el
+   viewport son dos pantallas que el jugador tiene que reconocer como una.
+
+   REABIERTO POR VICTOR EL 2026-10-16 (IOS-1 1d, decisión 10), con una sola
+   condición: dos columnas SÓLO en horizontal ancho y bajo —`(orientation:
+   landscape) and (min-width: 900px) and (max-height: 830px)`—, y en las tres
+   pantallas a la vez (§16, variante B de la lámina `laminas/ios1d`). Era lo
+   único que hacía caber la laptop de 1366×623 sin bajar del piso táctil. Fuera
+   de esa banda sigue siendo una columna, apretada como dice este bloque. */
 @media (max-height: 800px) {
   .sal-cuerpo.es-retar {
     row-gap: calc(var(--u) * 1.1);
@@ -1565,11 +1554,177 @@ body.sal-activa #root {
   .sal-cuerpo.es-retar .sal-bloque h2 { margin-bottom: calc(var(--u) * 0.5); }
   .sal-cuerpo.es-retar .sal-aviso { margin-top: calc(var(--u) * 0.5); }
   .sal-cuerpo.es-retar .sal-accion { gap: calc(var(--u) * 0.8); }
-  /* El CTA envuelve en dos líneas cuando hace falta, así que su relleno es lo
-     último que se aprieta: quitarlo de más lo dejaría pegado al texto. */
-  .sal-cta.es-retar { padding-block: calc(var(--u) * 1.1); }
   /* RET-A · el bloque de saldo se aprieta con el resto. Aparece justo en los
      bolsillos cortos, que es cuando la columna ya está llena de filas apagadas:
      si no se apretara, sería él quien empujara el CTA fuera de un 1024×768. */
   .sal-saldo { gap: calc(var(--u) * 0.9); }
+}
+
+/* ══ 16 · IOS-1 1e · LA ZONA ANCLADA ═══════════════════════════════════════
+   Rector: AJILEI_IOS-1_Fase1e_v1.0.md. Lámina `laminas/ios1d` (variantes A y
+   B), decisiones de Victor del 2026-10-16. Vale para las tres pantallas de la
+   carcasa —Retar, Salas y Armar mesa—, que llevan `.sal.es-anclada`; la sala de
+   espera y la partida no la llevan y siguen como estaban.
+
+   EL BOTÓN SIEMPRE A LA VISTA. La acción (`.sal-accion`: el bloque del video,
+   la caja de nota o resumen y el botón dorado) es `sticky` al pie del cuerpo, y
+   el cuerpo pasa a desplazar por dentro. Si las filas no caben, son ellas las
+   que pasan por debajo de la zona; el botón no se mueve, mida lo que mida el
+   alto. La pantalla ya no desplaza nunca (el parche de la 1b y el traje
+   acostado de §13 quedan fuera de `.es-anclada`). La zona está DENTRO del
+   cuerpo, encima del relleno de `.sal`, que ya lleva el área segura de abajo
+   (`env(safe-area-inset-bottom)`).
+
+   EL AIRE. El cuerpo deja la rejilla con `space-evenly` por una columna flex:
+   el sobrante se reparte debajo de cada fila y encima de la primera, y la zona
+   se queda con su parte arriba (`margin-top: auto`), así que con sitio de sobra
+   las filas respiran y el botón sigue al pie. Al desbordar, los márgenes
+   automáticos valen 0 y todo cae a `start`. */
+.sal.es-anclada .sal-cuerpo {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-bottom: 0;
+}
+.sal.es-anclada .sal-cuerpo > * { flex: none; }
+.sal.es-anclada .sal-cuerpo > :not(.sal-accion) { margin-bottom: auto; }
+.sal.es-anclada .sal-cuerpo > :first-child { margin-top: auto; }
+.sal.es-anclada .sal-cuerpo > .sal-accion {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-top: auto;
+  padding-top: calc(var(--u) * 2.4);
+  gap: calc(var(--u) * 1.2);
+}
+/* Sólo cuando hay filas pasando por debajo (`data-desborda`, que pone
+   `useDesborde`) la zona apaga lo que tapa contra el verde del fondo. Si todo
+   cabe, no tiene fondo propio: sería una franja oscura sin motivo. */
+.sal.es-anclada .sal-cuerpo[data-desborda] > .sal-accion {
+  background: linear-gradient(180deg,
+    rgba(var(--green-abyss-rgb), 0) 0,
+    rgba(var(--green-abyss-rgb), 0.94) calc(var(--u) * 2.4));
+}
+/* El bloque del video (y el de la lectura fallida) viaja dentro de la zona
+   (decisión 4). Su botón es un tocable MOVIDO: piso de 44, no de 40. */
+.sal.es-anclada .sal-accion .sal-saldo-cta { min-height: max(44px, var(--chip-h)); }
+
+/* ── La caja de encima del botón (`CajaAccion`) ────────────────────────────
+   Una línea reservada. La nota o el resumen, nunca los dos (`cajaDeAccion`).
+   Una nota de dos líneas crece HACIA ARRIBA: la zona está anclada al pie, así
+   que come filas y nunca empuja el botón. El resumen va en una línea y, si ni
+   la forma corta cabe, se corta con «…». */
+.sal-caja {
+  width: 100%;
+  min-height: 1.35em;
+  margin: 0;
+  font-size: calc(var(--u) * 3.1);
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.sal-caja.is-nada { visibility: hidden; }
+.sal-caja.is-callada { display: none; }
+.sal-caja.is-nota { color: var(--text-muted); }
+.sal-caja.is-alerta { color: var(--bet-orange); }
+.sal-caja.is-resumen {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sal-caja b { font-weight: 500; color: var(--gold-brand); }
+/* La regla invisible con la que `CajaAccion` mide cada forma: fuera del flujo,
+   en una línea y sin recortar, para leer su ancho natural. */
+.sal-caja-regla {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: calc(var(--u) * 3.1);
+  font-weight: 400;
+}
+.sal-caja-regla > span { display: block; }
+
+/* ── La casa en la cabecera; el «Pronto» encima de la zona ─────────────────
+   El pie es del botón: la casa sube al extremo derecho de la fila de la flecha
+   (decisión 5). Las dos navegan —la flecha deshace un paso, la casa salta al
+   lobby— y ahora están en la misma fila. El título puede encogerse antes de
+   tocarla. El aviso flotante vive dentro de la zona y sale apoyado justo encima
+   de ella (decisión 6): nunca tapa el botón ni el bloque del video. */
+.sal.es-anclada .sal-cab .sal-casa {
+  position: static;
+  margin-left: auto;
+  flex: none;
+}
+.sal.es-anclada .sal-cab h1 { min-width: 0; }
+.sal.es-anclada .sal-accion > .sal-toast {
+  position: absolute;
+  bottom: calc(100% + var(--u) * 1.4);
+}
+
+/* ── A · el traje apretado (horizontal, hasta 800 de alto) ─────────────────
+   Piso táctil de 44: el chip baja de 57 a 44,4 y el botón de 66 a 54; el aire
+   de la cabecera, de las filas y del relleno se recorta. Nada de lo que se
+   mueve o se aprieta baja de 44 (`.sal-unir` mide 0,8 · `--cta-h`: con 54 caía
+   a 43,2 y lleva su propio piso). */
+@media (orientation: landscape) and (max-height: 800px) {
+  .sal.es-anclada {
+    --pad: calc(var(--u) * 2.4);
+    --chip-h: max(44px, calc(var(--u) * 7.4));
+    --cta-h: max(48px, calc(var(--u) * 9));
+  }
+  .sal.es-anclada .sal-unir { height: max(44px, calc(var(--cta-h) * 0.8)); }
+  .sal.es-anclada .sal-cab { margin-top: calc(var(--u) * 1.2); }
+  .sal.es-anclada .sal-cab h1 { font-size: calc(var(--u) * 4); }
+  .sal.es-anclada .sal-cuerpo {
+    row-gap: calc(var(--u) * 1);
+    padding-top: calc(var(--u) * 1);
+  }
+  .sal.es-anclada .sal-bloque h2 { margin-bottom: calc(var(--u) * 0.6); }
+  .sal.es-anclada .sal-cuerpo .sal-aviso { margin-top: calc(var(--u) * 0.3); }
+  .sal.es-anclada .sal-cuerpo > .sal-accion { padding-top: calc(var(--u) * 1.4); gap: calc(var(--u) * 0.8); }
+  .sal.es-anclada .sal-saldo { gap: calc(var(--u) * 0.8); }
+}
+
+/* ── B · dos columnas (horizontal, ≥ 900 de ancho y ≤ 830 de alto) ─────────
+   Decisiones 1 y 10 de Victor. La columna se ensancha a 196u (≈ 1176 px con
+   `--u` = 6) y se parte en dos; la zona va al pie de la DERECHA, de modo que la
+   mano que elige la entrada acaba encima del botón.
+     Retar:      izq. reto y jugadores · der. apuesta, entrada y la zona.
+     Armar mesa: izq. jugadores y apuesta · der. el modo y la zona.
+     Salas:      izq. la ventanilla de mesas (1,25 fr: con la mitad justa
+                 cortaba «200 HC por m…») · der. el código y la zona.
+   Fuera de la banda, una columna (A). El teléfono acostado (915×412) cae
+   dentro: es la decisión 7. */
+@media (orientation: landscape) and (min-width: 900px) and (max-height: 830px) {
+  .sal.es-anclada { --col: min(100%, calc(var(--u) * 196)); }
+  .sal.es-anclada .sal-cuerpo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    column-gap: calc(var(--u) * 8);
+    row-gap: calc(var(--u) * 2.4);
+    align-content: stretch;
+  }
+  .sal.es-anclada .sal-cuerpo > * { margin: 0; }
+  .sal.es-anclada .sal-cuerpo > .sal-accion { grid-area: 4 / 2; align-self: end; }
+
+  .sal.es-anclada .sal-cuerpo.es-retar > :nth-child(1) { grid-area: 1 / 1; }
+  .sal.es-anclada .sal-cuerpo.es-retar > :nth-child(2) { grid-area: 2 / 1; }
+  .sal.es-anclada .sal-cuerpo.es-retar > :nth-child(3) { grid-area: 1 / 2; }
+  .sal.es-anclada .sal-cuerpo.es-retar > :nth-child(4) { grid-area: 2 / 2; }
+
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(1) { grid-area: 1 / 1; }
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(2) { grid-area: 2 / 1; }
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(3) { grid-area: 1 / 2 / 3 / 3; }
+
+  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) > :nth-child(1) { grid-area: 1 / 2; }
+  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) > :nth-child(2) { grid-area: 1 / 1 / 5 / 2; align-self: center; }
 }
