@@ -256,10 +256,17 @@ export function useAuth() {
 
   // IOS-1c · el «Reintentar» de la tarjeta SIN_RED: vuelve a preguntar ya lo
   // que no se pudo saber (la sesión o el perfil).
+  //
+  // IOS-1f (T6) · RECARGA LA PÁGINA. Tras un refresco del token fallido, el SDK
+  // (auth-js 2.112.4) guarda el fallo 60 s por token en `lastRefreshFailure`,
+  // un campo de la instancia de GoTrueClient: vive SOLO EN MEMORIA, nunca en el
+  // almacén. Volver a preguntar sin recargar devolvía ese fallo guardado durante
+  // un minuto aunque la red ya hubiera vuelto. Recargar crea un cliente nuevo,
+  // sin la caché, con la sesión intacta en el almacén. Los reintentos SOLOS de
+  // arriba (la escalera de `esperaDeReintento`) no cambian.
   const reintentar = useCallback(() => {
-    if (sesion === undefined) setIntentoSesion((n) => n + 1)
-    else setIntentoPerfil((n) => n + 1)
-  }, [sesion])
+    window.location.reload()
+  }, [])
 
   const perfilVivo = AUTH_BYPASS ? PERFIL_DEV : (perfil ?? null)
 
