@@ -117,7 +117,7 @@
     );
 }
 
-@media (min-width: 768px) and (min-height: 900px) {
+@media (min-width: 768px) and (min-height: 900px) and (orientation: landscape) {
   :root {
     --card-w: 91px;
     --card-h: 142px;

@@ -239,7 +239,7 @@ h1.cel-ajilei {
 }
 
 /* ── Móvil vertical ─────────────────────────────────────────────────────── */
-@media (max-width: 767px) and (orientation: portrait) {
+@media (orientation: portrait) {
   .cel-screen { gap: 14px; padding: 18px; }
   h1.cel-ajilei { font-size: 40px; }
   /* Sin tope en `ch`: a 18px, 20ch dejaban la caja en ~200px cuando la columna
@@ -319,7 +319,7 @@ h1.cel-ajilei {
    <img> lleva el 56 de escritorio (ChipToken `size="hero"`), así que aquí sólo
    hace falta el escalón de móvil, y en las dos consultas por separado porque
    no existe una que las una sin arrastrar escritorio. */
-@media (max-width: 767px) and (orientation: portrait) {
+@media (orientation: portrait) {
   .cel-netas-ico .chip-token { width: 60px; height: 60px; }
 }
 @media (orientation: landscape) and (max-height: 600px) {

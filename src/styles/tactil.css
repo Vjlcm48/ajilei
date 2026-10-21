@@ -23,7 +23,7 @@
 }
 
 /* ── Vertical (teléfono) ── */
-@media (max-width: 767px) and (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) and (pointer: coarse) {
   /* Multiplicadores: ancho visible 31,7 → 35,5; zona −13,5 arriba (aire con las cartas,
      inertes en la apuesta) y +0,5 abajo (hasta el pseudo de BT-1). Ancla: padding-box (borde 1). */
   .game-table-screen .player-bar .mult-row .btn-mult { position: relative; min-width: 35.5px; }
@@ -63,7 +63,7 @@
 }
 
 /* ── Teléfono, las dos orientaciones: fichas y nombres ── */
-@media (max-width: 767px) and (orientation: portrait) and (pointer: coarse),
+@media (orientation: portrait) and (pointer: coarse),
        (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
   /* Ficha de la IA (28×28, opponentPanel.css:505-517): crece más hacia ARRIBA, porque el panel
      siguiente (contexto de apilamiento propio) le pinta encima por abajo. */
@@ -110,4 +110,52 @@
   content: ''; position: absolute;
   top: min(0px, calc(50% - 20px)); bottom: min(0px, calc(50% - 20px));
   left: min(0px, calc(50% - 20px)); right: min(0px, calc(50% - 20px));
+}
+
+/* ── TAB-1 · Tableta horizontal: zonas de 44 px VISIBLES ─────────────────────────
+   Ficha TAB-1 1b–1e §1.2.6. Con la escala de la mesa (`zoom` en #root,
+   src/styles/escala.css) el iPad horizontal va a ×0,923 con barras y a ×0,965 a
+   pantalla completa, y el piso de 40 px PROPIOS de arriba se ve a 37–39. Aquí cada
+   zona pide 44 px VISIBLES = 44/f propios, y nunca menos que hoy: cada borde es
+   `min(lo de hoy, lo que pide 44/f)`. Solo bajo `[data-escala="h"]` y con dedo:
+   el celular, el ratón y la vertical no evalúan ni una regla de este bloque.
+   Las cuentas en px propios, con los altos de hoy medidos en C (1180×820):
+   · Botones de acción (33): el hueco de 12 con los multiplicadores se reparte a
+     medias, así que crecen hasta 6 hacia arriba y el resto hacia abajo (16 libres
+     hasta el borde de la zona).
+   · Multiplicadores (28; el pseudo ancla al padding-box, 26): 6 por debajo del
+     borde (su mitad del hueco) y el resto hacia arriba, hacia el aire con las
+     cartas (28), inertes en la apuesta. A LO ANCHO NO CRECEN: están embaldosados
+     al centro del hueco (paso 45,7) y más ancho sería pisar al vecino.
+   · ⋮ y ✕: el hueco de 8 entre los dos se queda en 3,5 + 4; la ✕ crece hacia su
+     derecha, donde no hay nada.
+   · Ficha de la IA (28): centrada. Gana por especificidad (0,6,x) a la de hoy. */
+@media (any-pointer: coarse) {
+  html[data-escala="h"] .game-table-screen .action-area .btn:not(.btn-mult) {
+    --tab-arriba: clamp(3.5px, calc(22px / var(--escala) - 50%), 6px);
+  }
+  html[data-escala="h"] .game-table-screen .action-area .btn:not(.btn-mult)::after {
+    top: calc(-1 * var(--tab-arriba));
+    bottom: min(-3.5px, calc(100% + var(--tab-arriba) - 44px / var(--escala)));
+  }
+  html[data-escala="h"] .game-table-screen .mult-row .btn-mult::after {
+    top: min(-7px, calc(100% + 7px - 44px / var(--escala)));
+  }
+  html[data-escala="h"] .game-table-screen .header-right .utilities-trigger::after {
+    top: min(-6px, calc(50% - 22px / var(--escala)));
+    bottom: min(-6px, calc(50% - 22px / var(--escala)));
+    left: min(-2px, max(-3.5px, calc(50% - 22px / var(--escala))));
+    right: min(-2px, max(-3.5px, calc(50% - 22px / var(--escala))));
+  }
+  html[data-escala="h"] .game-table-screen .header-right .btn-leave::after {
+    top: min(-7px, calc(50% - 22px / var(--escala)));
+    bottom: min(-7px, calc(50% - 22px / var(--escala)));
+    right: min(-8px, calc(100% + 4px - 44px / var(--escala)));
+  }
+  html[data-escala="h"] .game-table-screen .opp-corner-chip::after {
+    top: min(-6px, calc(50% - 22px / var(--escala)));
+    bottom: min(-6px, calc(50% - 22px / var(--escala)));
+    left: min(-6px, calc(50% - 22px / var(--escala)));
+    right: min(-6px, calc(50% - 22px / var(--escala)));
+  }
 }

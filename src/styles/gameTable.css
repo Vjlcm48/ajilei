@@ -1111,7 +1111,7 @@
 /* ── Desktop card scaling (+20%) ────────────────────────────────────────────
    --card-w / --card-h are redefined in theme.css at this same breakpoint.
    Only zone min-heights that depend on card-h are overridden here.          */
-@media (min-width: 768px) and (min-height: 900px) {
+@media (min-width: 768px) and (min-height: 900px) and (orientation: landscape) {
   .ai-zone    { min-height: 234px; }
   .game-table { min-height: min(830px, 100%); }
 }
@@ -1127,7 +1127,7 @@
    Scope: (min-width:768) and (min-height:601) → cubre escritorio, laptop landscape
    >600px y tablets, y NO solapa con los bloques móviles (portrait max-width:767 /
    landscape max-height:600). 2 y 3 jug no se tocan. */
-@media (min-width: 768px) and (min-height: 601px) {
+@media (min-width: 768px) and (min-height: 601px) and (orientation: landscape) {
   .table-four .center-zone,
   .table-five .center-zone {
     display: grid;
@@ -1162,7 +1162,7 @@
    imponía el layout vertical. Con esta condición el bloque vertical es exclusivo
    de portrait y el nuevo bloque landscape (abajo) gobierna el horizontal. El
    comportamiento en portrait queda idéntico (misma regla, condición más estrecha). */
-@media (max-width: 767px) and (orientation: portrait) {
+@media (orientation: portrait) {
   /* Tokens de carta LOCALES al tablero (no se toca theme.css). C4.2.2: cartas del
      humano +5% (58→61 / 90→95); rivales 45×70; mazo proporcional. Solo el
      subárbol del juego los ve. El slot contenedor sigue al token automáticamente. */

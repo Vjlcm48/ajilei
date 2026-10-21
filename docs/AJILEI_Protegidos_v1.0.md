@@ -38,6 +38,12 @@
   de este documento y compara cada fila con los bytes del árbol. Entra en la §5
   la regla que la acompaña, **«la huella se re-mide en el mismo commit»**, y la
   §4 aclara que su «cinco archivos» es la constancia de la v1.1.
+- **Actualización v1.7 (2026-10-20):** TAB-1 1d. **La lista sigue siendo las
+  mismas seis.** Victor autorizó (R-4 del informe de la Fase 0 de TAB-1) abrir
+  la **puerta del traje A**: cuatro líneas de condición de `@media`, tres en
+  `gameTable.css` y una en `opponentPanel.css`, sin tocar geometría ni valores.
+  Sus dos filas de la §3 se re-miden aquí, en el mismo cambio que los archivos
+  (§5), y nace la **§7.5** con el rango y su autoridad.
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -118,8 +124,8 @@ pendiente de la decisión de Victor.
 | `src/engine/aiPlayer.js` | `8cfc3736cba2` | `3a8ea7b0386c7ddf` | 1445 | NIV-1, NIV-2, NIV-CAL, APU-1 1c, **1c-2** |
 | `src/engine/deck.js` | `eb61426083ca` | `69f92d6b9aac433c` | 69 | APU-1 **1b-ii y 1d-i** (siembra pre-autorizada) |
 | `src/config/seatLayouts.js` | `0d1bb8ea66a8` | `0049051fd4b8b891` | 59 | — (intacto desde el sellado) |
-| `src/styles/opponentPanel.css` | `3ce6383eec0d` | `50c98d51a91c3994` | 1084 | — (intacto desde el refresco de 2026-08-26) |
-| `src/styles/gameTable.css` | `1e21371c8543` | `269120a496910995` | 6289 | — (intacto desde el refresco de 2026-08-26) |
+| `src/styles/opponentPanel.css` | `fbc9f3d08ede` | `4b91338a205e4a6a` | 1084 | **TAB-1 1d** (la puerta del traje A, 1 línea; §7.5) |
+| `src/styles/gameTable.css` | `6eedfa949259` | `e97a1565c29bc5a6` | 6289 | **TAB-1 1d** (la puerta del traje A, 3 líneas; §7.5) |
 
 **Las seis filas se volvieron a medir el 2026-09-22**, al cerrar la campaña, y
 salen **idénticas una a una** a las de arriba: blob, `sha256` y líneas. Entre el
@@ -363,3 +369,28 @@ promete.
    midió viva**, por `getComputedStyle` y `getBoundingClientRect` contra el
    servidor de desarrollo, sin volver a leer la hoja; y la regla culpable
    resultó estar en `apu.css`, que es de esta campaña.
+
+### 7.5 · TAB-1 — la puerta del traje A (v1.7)
+
+La mesa del teléfono en vertical (traje A) se abría con `(max-width: 767px) and
+(orientation: portrait)`; las tabletas verticales de 768 en adelante caían en una
+base huérfana (traje D, informe de la Fase 0 de TAB-1, TF-1). TAB-1 lleva el traje
+A a **toda ventana vertical** y lo amplía con un factor (`src/lib/escala.js`,
+`src/styles/escala.css`). La apertura es **solo de condición**: ni una regla, ni
+un valor, ni una línea más.
+
+| Archivo | Línea | Antes | Después | Autoridad |
+|---|---|---|---|---|
+| `gameTable.css` | `:1114` | `@media (min-width: 768px) and (min-height: 900px) {` | `@media (min-width: 768px) and (min-height: 900px) and (orientation: landscape) {` | R-4, Victor (ficha TAB-1 1b–1e §3) |
+| `gameTable.css` | `:1130` | `@media (min-width: 768px) and (min-height: 601px) {` | `@media (min-width: 768px) and (min-height: 601px) and (orientation: landscape) {` | R-4 |
+| `gameTable.css` | `:1165` | `@media (max-width: 767px) and (orientation: portrait) {` | `@media (orientation: portrait) {` | R-4 |
+| `opponentPanel.css` | `:645` | `@media (max-width: 767px) and (orientation: portrait) {` | `@media (orientation: portrait) {` | R-4 |
+
+Las dos primeras retiran la base D de la vertical sin tocarla en horizontal (allí
+vive el traje de escritorio, que sigue igual); las dos últimas abren A a toda
+vertical. Las nueve reglas hermanas de las hojas NO protegidas (`theme.css:120`,
+`voz2.css:72,170`, `tactil.css:26,66`, `celebracion.css:242,322`,
+`embellecimiento.css:517` y el espejo JSX `GameTable.jsx`) cambian en la misma
+tanda con la misma transformación. `seatLayouts.js`, el motor, la IA y la baraja:
+ninguna apertura.
+

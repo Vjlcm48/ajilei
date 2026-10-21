@@ -642,7 +642,7 @@
    desde el anclaje, e invadir paneles vecinos es esperado. M4-3 migró las
    esquineras de mesa 4 y M3-3 migró mesa 3 entera (anclas top-left/top-right);
    del modelo viejo solo queda IA2 de mesa 4 (carta grande in-flow). */
-@media (max-width: 767px) and (orientation: portrait) {
+@media (orientation: portrait) {
   /* ── H2 · Header a UNA LÍNEA (rediseño de panel; M4-1 suma mesa 4;
      M3-1 suma mesa 3 — sus dos paneles top-left/top-right, fila aún 168) ────
      Nombre anclado a la izquierda (con ellipsis de reserva para usernames

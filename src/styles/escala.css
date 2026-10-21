@@ -1,0 +1,137 @@
+/* ══ TAB-1 · La mesa según el tamaño: traje + escala ══════════════════════════
+   Rector: AJILEI_TAB-1_Fase1b-1e_Codigo_v1.0.md. Parte del borrador de la
+   lámina (`laminas/tab1/escala.css`).
+
+   HOJA ADITIVA, como luz/voz2/rev/rec/tactil.css: sin `!important`. TODO vive
+   bajo `html[data-escala]`, que escribe `useEscalaMesa` (src/lib/escala.js)
+   SOLO mientras la mesa está montada y SOLO fuera del celular:
+     · el celular no evalúa ni una regla de esta hoja (queda idéntico al píxel);
+     · el lobby, Retar, Salas y Armar mesa no la ven nunca (ficha §1.4).
+   Cada regla gana a la que corrige por ESPECIFICIDAD (`html[data-escala]` suma
+   0,1,1), nunca por el orden de carga: da igual dónde se importe la hoja.
+
+   Mecanismo (R-1): `zoom: var(--escala)` sobre `#root`. Lo que cuesta:
+     1. las unidades de ventana dentro de `#root` se multiplican por el factor
+        (Fase 0, TF-8): cada regla de la mesa que usa vw/vh/svh/dvh lleva aquí
+        una GEMELA dividida por `--escala`; la regla original no se edita;
+     2. `#root` ampliado deja desplazamiento de documento: su `min-height` se
+        divide también;
+     3. lo que se coloca midiendo desde JS (cartas en vuelo, monedas, globo de
+        VOZ-2) convierte sus cajas a px propios en su componente (`aPropios`). */
+
+/* ── 1 · El factor y lo que arrastra ──────────────────────────────────────── */
+html[data-escala] {
+  /* La ventana vista desde DENTRO de #root ampliado. */
+  --tab-vw: calc(100vw / var(--escala));
+  --tab-vh: calc(100vh / var(--escala));
+  --tab-svh: calc(100svh / var(--escala));
+}
+html[data-escala] #root {
+  zoom: var(--escala);
+  min-height: var(--tab-svh);                               /* gemela de index.css:62 */
+}
+html[data-escala] .game-table-screen {
+  height: calc(100dvh / var(--escala));                     /* gemela de gameTable.css:6 */
+}
+
+/* Las dos reglas de ventana de la mesa que valen en TODOS los trajes (no son
+   del traje A, y la Fase 0 no las listó):
+   · la palabra AJILEI de la celebración (gameTable.css:373, 11vw);
+   · la lluvia de monedas (celebracion.css:404, 100vh): con f < 1 las monedas
+     se pararían a la vista antes del borde inferior. Una @keyframes no se
+     puede pisar por especificidad, así que la gemela es una copia con otro
+     nombre y la regla cambia solo el nombre de la primera animación. */
+html[data-escala] .vc-ajilei {
+  font-size: clamp(44px, calc(var(--tab-vw) * 0.11), 132px);
+}
+html[data-escala] .cel-gota {
+  animation-name: tab-cel-caida, cel-giro, cel-vela;
+}
+@keyframes tab-cel-caida {
+  from { translate: 0 calc(-1 * var(--gota-lado, 24px) - 8px); }
+  to   { translate: var(--gota-deriva, 0px) calc(var(--tab-vh) + var(--gota-lado, 24px)); }
+}
+
+/* ── 2 · Vertical de lado corto ≥ 600: el traje A ampliado ──────────────────
+   Las 9 reglas de ventana del traje A (gameTable.css), con `--tab-vw` y
+   `--tab-svh` en vez de 100vw y 100svh. Cada gemela vale EXACTAMENTE donde
+   vale su original: mismo selector y, si el original lo pisan reglas
+   posteriores, la gemela las excluye (ver :1402). El atributo `tv` solo existe
+   en vertical, así que no hace falta repetir la media del traje. */
+html[data-escala="tv"] .game-table-screen {
+  --hcard-w: clamp(61px, calc((var(--tab-vw) - 80px) / 5), 75px);                  /* :1190 */
+}
+html[data-escala="tv"] .table-wide:not(.table-four):not(.table-five) .table-mid {
+  /* :1402. Las mesas 4 y 5 lo pisan con su padding fijo (:1411 y :1443, igual
+     especificidad y después): la gemela no las toca. */
+  padding-top: max(0px, calc((var(--tab-svh) - var(--o1-static-v)) / 2));
+}
+html[data-escala="tv"] .table-wide:not(.table-five) .opp-top-center.opp-winner .opp-cards {
+  width: calc(var(--tab-vw) - 42px);                                                 /* :1576 */
+}
+html[data-escala="tv"] .table-three .center-zone {
+  height: min(max(96px, calc(var(--tab-svh) - var(--o1-static3-v))), var(--tab-tope-ovalo-3));   /* :1628 + tope */
+}
+html[data-escala="tv"] .table-two .center-zone {
+  height: min(max(96px, calc(var(--tab-svh) - var(--o1-static2-v))), var(--tab-tope-ovalo-2));   /* :1981 + tope */
+}
+@media (max-height: 772px) {
+  /* :2013, el A′ de las pantallas bajas: después de la gemela de :1190. */
+  html[data-escala="tv"] .game-table-screen {
+    --hcard-w: clamp(51px, calc((var(--tab-vw) - 80px) / 5), 58px);
+  }
+}
+html[data-escala="tv"] .game-table.table-five {
+  --pv5-k: clamp(0.85px, calc((var(--tab-vw) / 2 - 40px) / 140), 1.25px);            /* :2229 */
+}
+html[data-escala="tv"] .game-table.table-four {
+  --pv4-k: clamp(0.85px, calc((var(--tab-vw) / 2 - 40px) / 140), 1.25px);            /* :2288 */
+}
+html[data-escala="tv"] .game-table.table-three {
+  --pv3-k: clamp(0.85px, calc((var(--tab-vw) / 2 - 40px) / 140), 1.25px);            /* :2357 */
+}
+
+/* ── 3 · Regla del óvalo v2: el tope de seguridad de las mesas 3 y 2 ─────────
+   Hoy el óvalo elástico es `max(96px, 100svh − estático)` (:1628, :1981): en una
+   pantalla muy alta se comería media mesa. Fuera del celular no pasa de
+   P-óvalo(S25) × 1,2 del alto de la mesa (§1.2.1). Con A×f no actúa en ningún
+   tamaño medido (lámina 1a §3.2): el factor ya llena el alto. Alto propio de la
+   mesa en A = ventana propia − 16 (el padding 8 + 8 de la pantalla en A).
+   Si actúa, lo que sobra lo reparte el propio traje, que centra la columna
+   (`.game-table-screen` es flex centrado): el bloque queda centrado. */
+html[data-escala="tv"] {
+  --tab-mesa-h: calc(var(--tab-svh) - 16px);
+  --tab-tope-ovalo-3: calc(var(--tab-mesa-h) * 0.3697 * 1.2);   /* P-óvalo del S25, mesa 3 */
+  --tab-tope-ovalo-2: calc(var(--tab-mesa-h) * 0.3799 * 1.2);   /* P-óvalo del S25, mesa 2 */
+}
+
+/* ── 4 · R-7 · Pantalla completa del iPad: la banda del pie y la ✕ ──────────
+   Solo en horizontal: «Iniciar mano» pide la pantalla completa también en
+   vertical (PAN-1 1c) y allí no hay banda (lámina 1a §5). La banda (≈28 px CSS,
+   Fase 0 TF-11) y la ✕ (x 21–78) son VISUALES: no escalan con el factor, así
+   que en px propios miden 28/f y 64/f. El factor ya descuenta la banda
+   (`RESERVA_PIE_FS`, src/lib/escala.js). El relleno de abajo es el de HOY más
+   la banda: 16 px, y 8 px hasta 800 de alto (gameTable.css:4269). */
+@media (orientation: landscape) {
+  :root:fullscreen[data-escala] .game-table-screen {
+    padding-bottom: calc(16px + 28px / var(--escala));
+  }
+  :root:fullscreen[data-escala] .game-table-screen .table-header {
+    padding-left: calc(64px / var(--escala));
+  }
+}
+@media (orientation: landscape) and (max-height: 800px) {
+  :root:fullscreen[data-escala] .game-table-screen {
+    padding-bottom: calc(8px + 28px / var(--escala));
+  }
+}
+
+/* ── 5 · Las etiquetas pequeñas no bajan de 10 px visibles (§1.1.2) ──────────
+   «Mano #N» y las insignias MANO / TURNO / PIE / P / M miden 10 px en todos los
+   trajes (gameTable.css:588 y :981). Con f < 1 bajarían a 8,7: su tamaño
+   propio pasa a 10/f. Con f ≥ 1 el `max` deja los 10 de siempre. La altura de
+   la pastilla es la line-height heredada ya RESUELTA (gameTable.css:4287), así
+   que la letra crece sin mover la fila (O1; lo mide el modo `tab`). */
+html[data-escala="h"] .game-table-screen :is(.hand-badge, .seat-badge) {
+  font-size: max(10px, calc(10px / var(--escala)));
+}

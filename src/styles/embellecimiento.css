@@ -514,7 +514,7 @@ span.vc-ajilei    { --wm-track: 0.23em; } /* gameTable.css .vc-ajilei (en em) */
 @media (max-width: 680px) {
   h1.welcome-title { --wm-track: 8px; }   /* welcome.css @680                 */
 }
-@media (max-width: 767px) and (orientation: portrait) {
+@media (orientation: portrait) {
   h1.table-title   { --wm-track: 3px; }   /* gameTable.css portrait           */
 }
 @media (orientation: landscape) and (max-height: 600px) {
