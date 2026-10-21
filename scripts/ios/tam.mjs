@@ -130,6 +130,13 @@ export const TAMANOS_MATRIZ = Object.freeze([
   { id: '876x1248', w: 876, h: 1248, tactil: true },                    // and-g-v
   { id: '1400x724', w: 1400, h: 724, tactil: true },                    // and-g-h
   { id: '1366x633', w: 1366, h: 633, tactil: false },                   // lap-1366
+  // TAB-1 1e · el alto útil MEDIDO del iPad mini 6 (Fase 0 TF-3, lámina 1a
+  // §3.0): Safari con barras y app instalada en vertical; con barras y a
+  // pantalla completa en horizontal. Las estimaciones de arriba se conservan.
+  { id: '744x1047', w: 744, h: 1047, tactil: true },                    // ipm-saf-v (medido)
+  { id: '744x1100', w: 744, h: 1100, tactil: true },                    // ipm-app-v (medido)
+  { id: '1133x658', w: 1133, h: 658, tactil: true },                    // ipm-saf-h (medido)
+  { id: '1133x716', w: 1133, h: 716, tactil: true },                    // ipm-pc-h (medido)
 ])
 export const ESTADOS_MATRIZ = Object.freeze(['retar', 'retar-falta', 'retar-video', 'retar-error', 'retar-lectura', 'salas', 'armar'])
 const PRONTO_EN = ['1366x623', '412x915', '360x640']
@@ -158,7 +165,7 @@ function opcionesDe(pantalla) {
   return {}
 }
 
-async function irA(page, base, pantalla) {
+export async function irA(page, base, pantalla) {
   await page.goto(base, { waitUntil: 'load' })
   await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
   if (pantalla === 'lobby') return

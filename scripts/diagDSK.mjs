@@ -330,6 +330,7 @@ import { runConstancia } from './eco/constancia.mjs'
 import { runVideo } from './eco/video.mjs'
 import { runTam } from './ios/tam.mjs'
 import { runWebkit } from './ios/webkit.mjs'
+import { runTab, VARAS_TAB } from './tab/tab.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -400,6 +401,13 @@ const MSG_SEMILLA_ARG = (() => {
   if (/^\d+$/.test(v)) return { modo: 'explicita', base: Number(v) }
   return { modo: 'invalida', valor: v }
 })()
+// TAB-1 1e · `tab --ref=<url>`: la referencia de V-fuera (un `vite preview` de
+// otra versión, p. ej. `main`). Sin ella, V-fuera mide solo la huella.
+const TAB_REF = (() => {
+  const i = process.argv.findIndex(a => a.startsWith('--ref='))
+  if (i < 0) return null
+  return process.argv.splice(i, 1)[0].slice('--ref='.length) || null
+})()
 // ARN-3d §2.5 · `vc --retrasa-roce=<ms>` retrasa SOLO `chips-collect.mp3` en
 // la página de `vc·jugado`: es la vara de su precarga (antes `loading` en el
 // `play` de la primera celebración, después `loaded`). Sin la bandera, nada.
@@ -414,7 +422,8 @@ const VC_RETRASO_ROCE_MS = (() => {
 // ECO-1d · y `constancia`: la constancia, los límites y la válvula, también ahí.
 // ECO-1g · y `video`: el video de recompensa, con videos de 40 s de verdad.
 // IOS-1 1b · y `tam`: las pantallas bajas en horizontal (521–831 de alto).
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit']
+// TAB-1 1e · y `tab`: la escala de la mesa, contra el bundle real.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit', 'tab']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -15162,6 +15171,13 @@ try {
   // del área segura va fijo en la salida.
   if (MODE === 'webkit') {
     report.webkit = await runWebkit({ base: BASE_PROD })
+  }
+  // TAB-1 1e · `tab` (INV-56…58): la escala de la mesa, de verdad. Es el ÚNICO
+  // modo que pide la escala real; los demás corren con `escala=1` (comun.mjs).
+  // `tab cel h …` corre solo esas varas.
+  if (MODE === 'tab') {
+    const pedidas = process.argv.slice(3).filter(a => VARAS_TAB.includes(a))
+    report.tab = await runTab(browser, { base: BASE_PROD, ref: TAB_REF, varas: pedidas.length ? pedidas : VARAS_TAB })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

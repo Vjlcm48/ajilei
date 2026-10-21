@@ -31,8 +31,14 @@ import { matriz } from './tam.mjs'
 export const AVISO_WEBKIT = 'WebKit no simula las franjas del área segura: el iPhone acostado no queda medido de verdad'
 
 export const TAMANOS_WEBKIT = Object.freeze([
-  { id: '744x1026', w: 744, h: 1026, tactil: true, n: 'iPad mini 6 vertical, Safari con barras' },
-  { id: '1133x637', w: 1133, h: 637, tactil: true, n: 'iPad mini 6 horizontal, Safari con barras' },
+  // Las dos primeras son la estimación de IOS-1 (se conservan con su nombre);
+  // TAB-1 1e añade el alto útil MEDIDO en las fotos (Fase 0 TF-3, lámina 1a §3.0).
+  { id: '744x1026', w: 744, h: 1026, tactil: true, n: 'iPad mini 6 vertical, Safari con barras (estimación de IOS-1)' },
+  { id: '1133x637', w: 1133, h: 637, tactil: true, n: 'iPad mini 6 horizontal, Safari con barras (estimación de IOS-1)' },
+  { id: '744x1047', w: 744, h: 1047, tactil: true, n: 'iPad mini 6 vertical, Safari con barras (medido)' },
+  { id: '744x1100', w: 744, h: 1100, tactil: true, n: 'iPad mini 6 vertical, app instalada (medido)' },
+  { id: '1133x658', w: 1133, h: 658, tactil: true, n: 'iPad mini 6 horizontal, Safari con barras (medido)' },
+  { id: '1133x716', w: 1133, h: 716, tactil: true, n: 'iPad mini 6 horizontal, pantalla completa (medido)' },
   { id: '1180x713', w: 1180, h: 713, tactil: true, n: 'iPad 11" horizontal, Safari' },
   { id: '440x956', w: 440, h: 956, tactil: true, n: 'iPhone 17 Pro Max vertical' },
   { id: '956x440', w: 956, h: 440, tactil: true, acostado: true, franjas: true, n: 'iPhone 17 Pro Max acostado, ventana entera' },

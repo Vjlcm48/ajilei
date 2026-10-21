@@ -356,6 +356,41 @@ export async function aislarContexto(ctx) {
   return propio
 }
 
+// ── TAB-1 · el interruptor `escala=1` ───────────────────────────────────────
+// Desde TAB-1 la mesa se amplía o se reduce con `zoom` en #root fuera del
+// celular (src/lib/escala.js), y eso movería las líneas base de los modos
+// sellados en escritorio y tableta (o1, o2, a1/A1_PRE, a2, gate, tactil,
+// vuelos, cap, msg, apu…). R-5 del informe de la Fase 0: en vez de re-sellar,
+// TODO contexto del arnés nace con la escala forzada a 1 —el `<html>` sin
+// `data-escala` ni `--escala`, que es exactamente la mesa de antes de TAB-1— y
+// solo el modo `tab`, que mide la escala, la pide real con `escalaReal()`.
+// El guion de inicio NO deshace la escritura: la IMPIDE. `setAttribute` y
+// `style.setProperty` se filtran SOLO para `data-escala` y `--escala` sobre el
+// `<html>`, de modo que el atributo no existe ni un instante (un observador que
+// lo borrara después dejaría una tarea con zoom en la que un efecto de layout
+// podría medir). `escalaActual()` lee entonces 1, así que los vuelos y las
+// capas que se colocan midiendo quedan también como hoy. `__arnesEscala1` lo
+// deja dicho en la página para quien quiera comprobarlo.
+export const ESCALA_1 = () => {
+  const esHtml = (el) => el === document.documentElement
+  const setAttr = Element.prototype.setAttribute
+  Element.prototype.setAttribute = function (k, v) {
+    if (k === 'data-escala' && esHtml(this)) return undefined
+    return setAttr.call(this, k, v)
+  }
+  const setProp = CSSStyleDeclaration.prototype.setProperty
+  CSSStyleDeclaration.prototype.setProperty = function (k, ...resto) {
+    if (k === '--escala' && document.documentElement && this === document.documentElement.style) return undefined
+    return setProp.call(this, k, ...resto)
+  }
+  window.__arnesEscala1 = true
+}
+let escalaDelArnes = 'forzada'
+/** El modo `tab` (y solo él) mide la escala de verdad. */
+export function escalaReal(real = true) { escalaDelArnes = real ? 'real' : 'forzada' }
+/** Fuerza la escala 1 en un contexto concreto (V-cel la compara con la real). */
+export async function forzarEscala1(ctx) { await ctx.addInitScript(ESCALA_1); ctx.__escala = 'forzada' }
+
 /**
  * Engancha el aislamiento en TODO contexto que abra este navegador. Se aplica
  * solo en `navegadorArnes()`; un navegador lanzado aparte (el WebKit de
@@ -367,6 +402,8 @@ export function aislarNavegador(browser) {
   browser.newContext = async (opciones) => {
     const ctx = await nuevo(opciones)
     await aislarContexto(ctx)
+    if (escalaDelArnes === 'forzada') await forzarEscala1(ctx)
+    else ctx.__escala = 'real'
     return ctx
   }
   browser.__aislado = true
