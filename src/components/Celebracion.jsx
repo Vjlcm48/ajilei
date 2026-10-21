@@ -10,6 +10,7 @@ import { SoundButton } from './SoundButton'
 import { frasePara, recuerdaFrase } from '../config/frasesVictoria'
 import { fraseForzadaCEL } from '../dev/siembraCEL'
 import '../styles/celebracion.css'
+import { aPropios, escalaActual } from '../lib/escala'
 
 // ── DSK-VC2 · Superficies de la celebración ─────────────────────────────────
 // Documento rector: docs/AJILEI_Victory_Celebration_v1.0.md §3.
@@ -208,9 +209,11 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
     const id = requestAnimationFrame(() => {
       const t = tarjetaRef.current, m = monedaRef.current, d = posadaRef.current
       if (!t || !m || !d) return
-      const tr = t.getBoundingClientRect()
+      // TAB-1 · la tarjeta vive dentro de #root ampliado: px propios al medir.
+      const f = escalaActual()
+      const tr = aPropios(t.getBoundingClientRect(), f)
       const centro = (r) => ({ x: r.x + r.width / 2 - tr.x, y: r.y + r.height / 2 - tr.y })
-      setVuelo({ desde: centro(m.getBoundingClientRect()), hasta: centro(d.getBoundingClientRect()) })
+      setVuelo({ desde: centro(aPropios(m.getBoundingClientRect(), f)), hasta: centro(aPropios(d.getBoundingClientRect(), f)) })
     })
     return () => cancelAnimationFrame(id)
   }, [numeros.tramo])

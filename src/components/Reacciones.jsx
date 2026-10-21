@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect } from 'react'
+import { aPropios, escalaActual } from '../lib/escala'
 import {
   REACCIONES,
   REACCION_TOTAL_MS,
@@ -65,9 +66,13 @@ export function ReaccionesSelector({ anchor, bloqueado, onElegir }) {
 
 // Caja de un elemento SÓLO si está pintada: `display: contents` y los ocultos
 // devuelven 0×0, y una caja de cero es una medida que miente.
+// TAB-1 · Bajo la escala de la mesa (`zoom` en #root) la burbuja es `fixed`
+// DENTRO del árbol ampliado: TODA caja pasa a px propios al medirla
+// (`aPropios`), y las cuentas y lo que se escribe quedan en px propios. Con
+// f = 1 (el celular) `aPropios` devuelve la misma caja: nada cambia.
 function filoDe(sel) {
   const e = document.querySelector(sel)
-  const b = e && e.getBoundingClientRect()
+  const b = e && aPropios(e.getBoundingClientRect(), escalaActual())
   return b && b.width > 0 && b.height > 0 ? b : null
 }
 
@@ -76,7 +81,7 @@ function filoDe(sel) {
 function filosArea() {
   const el = document.querySelector('.game-table')
   if (!el) return null
-  const r = el.getBoundingClientRect()
+  const r = aPropios(el.getBoundingClientRect(), escalaActual())
   const cs = getComputedStyle(el)
   return {
     izq: r.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft),
@@ -128,7 +133,7 @@ const MARGEN_D6 = 8
 function cajaSinEntrada(el) {
   const previo = el.style.animation
   el.style.animation = 'none'
-  const caja = el.getBoundingClientRect()
+  const caja = aPropios(el.getBoundingClientRect(), escalaActual())
   el.style.animation = previo
   return caja
 }
@@ -149,7 +154,7 @@ function anclaDelDisparador(el, area) {
   let techo = Infinity
   for (const sel of TECHOS_D6) {
     for (const e of document.querySelectorAll(sel)) {
-      const b = e.getBoundingClientRect()
+      const b = aPropios(e.getBoundingClientRect(), escalaActual())
       if (b.width <= 0 || b.height <= 0) continue
       if (b.top < techo) techo = b.top
     }
@@ -203,7 +208,8 @@ export function ReaccionBurbuja({ activa, anchorSel, onCerrar }) {
 
     const rango = document.createRange()
     rango.selectNodeContents(nodo)
-    const tinta = rango.getBoundingClientRect()
+    const f = escalaActual()
+    const tinta = aPropios(rango.getBoundingClientRect(), f)
 
     // ── Móvil · satélite del ⋮ (D6) ───────────────────────────────────────
     // Una sola rama para las dos orientaciones. Si el disparador no estuviera
@@ -218,14 +224,14 @@ export function ReaccionBurbuja({ activa, anchorSel, onCerrar }) {
     // slots se montan aunque estén vacíos), así que no hace falta suponer nada.
     const slot1 = document.querySelector('.player-zone .card-slot-wrapper')
     const corredor = slot1
-      ? slot1.getBoundingClientRect().left - area.izq
+      ? aPropios(slot1.getBoundingClientRect(), f).left - area.izq
       : area.der - area.izq
     const tope = Math.max(REACCION_MIN_W_PX, corredor - REACCION_GAP_PX)
 
     // Dos fases dentro del MISMO frame (useLayoutEffect corre antes de pintar):
     // se aplica el tope, se mide la caja resultante y recién entonces se coloca.
     el.style.maxWidth = `${tope}px`
-    const caja = el.getBoundingClientRect()
+    const caja = aPropios(el.getBoundingClientRect(), f)
 
     const centroTinta = tinta.left + tinta.width / 2
     const izq = Math.min(Math.max(centroTinta - caja.width / 2, area.izq), area.der - caja.width)

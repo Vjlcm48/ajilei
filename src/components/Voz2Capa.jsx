@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { anchoCapa, colocaCapa } from '../hooks/voz2Core'
+import { aPropios, escalaActual } from '../lib/escala'
 
 // ── VOZ-2 · La frase entera, desplegada ─────────────────────────────────────
 // Rector: AJILEI_VOZ-2_Fase1_v1.0.md (D2, D3, D9, D10, D13). Forma y sitio, los
@@ -37,8 +38,13 @@ export function Voz2Capa({ id, texto, abierta, onCerrar }) {
       if (el.hidden) return
       const ov = ovaloDe(ancla())
       if (!ov) return
-      const o = ov.getBoundingClientRect()
-      const vp = { width: document.documentElement.clientWidth, height: window.innerHeight }
+      // TAB-1 · la capa es `fixed` dentro de `#root` ampliado: el óvalo Y la
+      // ventana pasan a px propios ANTES de las cuentas (el alto de la capa,
+      // `offsetHeight`, ya es propio). Dividir solo la salida mezclaba una caja
+      // visual con un alto propio (lámina 1a §5).
+      const f = escalaActual()
+      const o = aPropios(ov.getBoundingClientRect(), f)
+      const vp = { width: document.documentElement.clientWidth / f, height: window.innerHeight / f }
       const ancho = anchoCapa(o, vp)
       el.style.width = `${ancho}px`
       const { x, y } = colocaCapa({ ovalo: o, vp, ancho, alto: el.offsetHeight })

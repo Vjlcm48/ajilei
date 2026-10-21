@@ -42,6 +42,8 @@ import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
 import { useTapetes } from '../hooks/useTapetes'
 import { useCongelado } from '../hooks/useCongelado'
+import { useEscalaMesa } from '../hooks/useEscalaMesa'
+import { aPropios, escalaActual } from '../lib/escala'
 import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
 import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
 import { VIVAS_ESCRITORIO, VIVAS_MOVIL, PRESENTES_MOVIL_HORIZONTAL } from '../config/menuEntradas'
@@ -77,6 +79,8 @@ import '../styles/voz2.css'
 import '../styles/rev.css'
 import '../styles/rec.css'
 import '../styles/tactil.css'
+// TAB-1 · la escala de la mesa (solo bajo html[data-escala], que escribe useEscalaMesa)
+import '../styles/escala.css'
 
 const TURN_TIME  = 20
 const WARNING_AT = 5
@@ -107,7 +111,7 @@ const LANDSCAPE_TABLE_MQ = '(orientation: landscape) and (max-height: 600px)'
 // portrait de gameTable.css/opponentPanel.css. Distingue el teléfono en vertical
 // del ESCRITORIO (donde isLandscapeTable también es false pero el canje de manos
 // debe seguir instantáneo — su CSS de coreografía no existe).
-const PORTRAIT_TABLE_MQ = '(max-width: 767px) and (orientation: portrait)'
+const PORTRAIT_TABLE_MQ = '(orientation: portrait)'
 
 // DSK-G1 · Espejo POSITIVO del landscape móvil para ESCRITORIO / laptop / tablet
 // landscape: misma orientación horizontal, pero altura amplia (min-height:601px)
@@ -406,6 +410,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // volver; `congeladoRef` es para leer la verdad DENTRO de un timer o un
   // manejador, donde el valor capturado sería el de otro render.
   const { congelado, congeladoRef, diferir } = useCongelado()
+  // TAB-1 · la escala vive SOLO mientras la mesa está montada (src/lib/escala.js).
+  useEscalaMesa()
 
   // Position refs: one 5-slot row + one deck anchor per seat
   const slotRefs = useRef(null)
@@ -616,11 +622,16 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       console.warn(`[VIS-3] vuelo sin ${origen ? 'destino' : 'origen'}: winner=${game.winner}`)
       return null
     }
-    const a = origen.getBoundingClientRect()
-    const b = destino.getBoundingClientRect()
+    // TAB-1 · las monedas vuelan dentro de `#root` ampliado: posiciones en px
+    // propios. El `lado` sigue VISUAL a propósito: `FichaViajera` lo divide
+    // entre el lado de su propia moneda, que también mide visual.
+    const f = escalaActual()
+    const b0 = destino.getBoundingClientRect()
+    const a = aPropios(origen.getBoundingClientRect(), f)
+    const b = aPropios(b0, f)
     return {
       desde: { x: a.left + a.width / 2, y: a.top + a.height / 2 },
-      hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2, lado: b.width },
+      hasta: { x: b.left + b.width / 2, y: b.top + b.height / 2, lado: b0.width },
       fichas: VIAJE_N,
       // VIS-3c · La retención viaja DENTRO de la geometría, y por dos razones.
       // La primera es de higiene: `ultimoPozoRef.current` no puede leerse durante
@@ -729,8 +740,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       return
     }
 
-    const dr = deckEl.getBoundingClientRect()
-    const sr = slotEl.getBoundingClientRect()
+    // TAB-1 · la carta en vuelo es `fixed` DENTRO de `#root` ampliado: lo que
+    // escribe se vuelve a ampliar, así que las cajas pasan a px propios aquí,
+    // al crear el vuelo, y en ningún otro sitio (dividir también al pintar
+    // dividía dos veces: lámina 1a §5).
+    const f = escalaActual()
+    const dr = aPropios(deckEl.getBoundingClientRect(), f)
+    const sr = aPropios(slotEl.getBoundingClientRect(), f)
     play('cardDeal')
     setFlyingCards(prev => [...prev, {
       id: `fly-${phase}-${step}`,
@@ -1418,8 +1434,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const slotEl = slotRefs.current[seat][idx]?.current
     const deckEl = deckRefs.current[gameRef.current.pieIndex]?.current
     if (!slotEl || !deckEl) return
-    const sr = slotEl.getBoundingClientRect()
-    const dr = deckEl.getBoundingClientRect()
+    // TAB-1 · px propios al crear el vuelo (ver `launchFlyingCard`).
+    const f = escalaActual()
+    const sr = aPropios(slotEl.getBoundingClientRect(), f)
+    const dr = aPropios(deckEl.getBoundingClientRect(), f)
     play('cardDeal')
     setFlyingCards(prev => [...prev, {
       id: `dout-${seat}-${idx}`,
@@ -1436,8 +1454,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const deckEl = deckRefs.current[gameRef.current.pieIndex]?.current
     const slotEl = slotRefs.current[seat][idx]?.current
     if (!deckEl || !slotEl) { markRefilled(seat, idx); return }
-    const dr = deckEl.getBoundingClientRect()
-    const sr = slotEl.getBoundingClientRect()
+    // TAB-1 · px propios al crear el vuelo (ver `launchFlyingCard`).
+    const f = escalaActual()
+    const dr = aPropios(deckEl.getBoundingClientRect(), f)
+    const sr = aPropios(slotEl.getBoundingClientRect(), f)
     play('cardDeal')
     setFlyingCards(prev => [...prev, {
       id: `din-${seat}-${idx}`,

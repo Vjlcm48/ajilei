@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { CONSULTAS_KEY, CONSULTAS_GRATIS } from '../config/consultas'
+import { aPropios, escalaActual } from '../lib/escala'
 
 // ── DSK-U1 · Estado y protocolo de cierre del menú de utilidades ─────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda 2026-08-04).
@@ -71,8 +72,18 @@ const OBSTACULOS_H = ['.action-area', '.player-zone .cards-row']
 const TOP_MIN = `calc(${PANEL_MARGIN}px + env(safe-area-inset-top, 0px))`
 // Tope inferior de cualquier superficie de esta familia: que su pie no pase del
 // filo del área segura. Es función del alto porque cada satélite mide lo suyo.
-const topeInferior = (alto) =>
-  `calc(100dvh - ${alto + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px))`
+const topeInferior = (alto, f = 1) => (f === 1
+  ? `calc(100dvh - ${alto + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px))`
+  : `calc(100dvh / ${f} - ${alto + PANEL_MARGIN}px - env(safe-area-inset-bottom, 0px) / ${f})`)
+// TAB-1 · Bajo la escala de la mesa (`zoom` en #root, src/lib/escala.js) el
+// panel y sus satélites son `fixed` DENTRO del árbol ampliado: lo que escriben
+// se vuelve a ampliar. Por eso las cajas medidas pasan a px propios al medir
+// (`aPropios`) y la ventana y el área segura —visuales— se dividen por el
+// factor dentro de la pinza. Con f = 1 (el celular) las cadenas son las de
+// siempre, carácter a carácter.
+const topMin = (f = 1) => (f === 1
+  ? TOP_MIN
+  : `calc(${PANEL_MARGIN}px + env(safe-area-inset-top, 0px) / ${f})`)
 const TOP_MAX = topeInferior(PANEL_H)
 
 // ── SUP-2b · El alto en MÓVIL HORIZONTAL es OTRO ───────────────────────
@@ -104,11 +115,11 @@ const TECHOS_SATELITE = [
   '.timer-display', '.player-zone .cards-row', '.action-area', '.player-bar-right',
 ]
 
-function techoFilaDeJuego() {
+function techoFilaDeJuego(f = 1) {
   let techo = Infinity
   for (const sel of TECHOS_SATELITE) {
     for (const el of document.querySelectorAll(sel)) {
-      const r = el.getBoundingClientRect()
+      const r = aPropios(el.getBoundingClientRect(), f)
       if (r.width <= 0 || r.height <= 0) continue   // ocultos y `display: contents`
       if (r.top < techo) techo = r.top
     }
@@ -123,22 +134,26 @@ function techoFilaDeJuego() {
 // Devuelve `right` como número y `top` como longitud CSS: la pinza se emite como
 // `clamp()` en línea por la misma razón que la del panel —el área segura sólo se
 // conoce desde CSS y una hoja no corrige un valor en línea sin `!important`—.
-export function anclaSatelite(rect, alto) {
+export function anclaSatelite(rectVisual, alto) {
   const horizontal = window.matchMedia(HORIZONTAL_MQ).matches
   const h = typeof alto === 'number' ? alto : (horizontal ? alto.h : alto.v)
-  if (!rect) return { right: PANEL_MARGIN, top: TOP_MIN }
+  const f = escalaActual()
+  if (!rectVisual) return { right: PANEL_MARGIN, top: topMin(f) }
+  const rect = aPropios(rectVisual, f)
+  const anchoVentana = window.innerWidth / f
   // Vertical: nace bajo el disparador, como en escritorio. Horizontal: a su
   // izquierda y pegado al techo, porque debajo del ⋮ no hay banda libre —en
   // mesas 5 y 4 vive a media altura, sobre la fila de juego.
   const right = horizontal
-    ? window.innerWidth - (rect.left - PANEL_GAP)
-    : window.innerWidth - rect.right
+    ? anchoVentana - (rect.left - PANEL_GAP)
+    : anchoVentana - rect.right
   const nominal = horizontal ? PANEL_MARGIN : rect.bottom + PANEL_GAP
-  const techo = techoFilaDeJuego()
+  const techo = techoFilaDeJuego(f)
+  const seguraAbajo = f === 1 ? 'env(safe-area-inset-bottom, 0px)' : `env(safe-area-inset-bottom, 0px) / ${f}`
   const tope = techo == null
-    ? topeInferior(h)
-    : `min(calc(${techo - h}px - env(safe-area-inset-bottom, 0px)), ${topeInferior(h)})`
-  return { right, top: `clamp(${TOP_MIN}, ${nominal}px, ${tope})` }
+    ? topeInferior(h, f)
+    : `min(calc(${techo - h}px - ${seguraAbajo}), ${topeInferior(h, f)})`
+  return { right, top: `clamp(${topMin(f)}, ${nominal}px, ${tope})` }
 }
 
 // Altos MÁXIMOS de cada satélite. Se declaran porque el ancla se calcula ANTES
@@ -239,10 +254,11 @@ export function useUtilitiesMenu(enabled = true) {
       if (prev) return null
       const el = triggerRef.current
       if (!el) return null
-      const r = el.getBoundingClientRect()
+      const f = escalaActual()
+      const r = aPropios(el.getBoundingClientRect(), f)
       // `left` sigue siendo un número; `top` sale ya como longitud CSS con la
       // pinza dentro — ver la nota de arriba.
-      const pinza = (px, tope = TOP_MAX) => `clamp(${TOP_MIN}, ${px}px, ${tope})`
+      const pinza = (px, tope = f === 1 ? TOP_MAX : topeInferior(PANEL_H, f)) => `clamp(${topMin(f)}, ${px}px, ${tope})`
 
       // MOV-1a-c · D4.1 · en MÓVIL HORIZONTAL el panel no cuelga del
       // disparador: se aparta a la izquierda de la columna de acción. Abajo no
@@ -257,7 +273,7 @@ export function useUtilitiesMenu(enabled = true) {
         const filos = OBSTACULOS_H
           .map(sel => document.querySelector(sel))
           .filter(Boolean)
-          .map(el => el.getBoundingClientRect().left)
+          .map(el => aPropios(el.getBoundingClientRect(), f).left)
         if (filos.length) {
           const izq = Math.min(...filos) - PANEL_GAP - PANEL_W
           // El techo, y no el filo del disparador. D4.1 pedía alinearlo con el
@@ -274,7 +290,7 @@ export function useUtilitiesMenu(enabled = true) {
           // habría tapado 514,17px² a 812×375 y 709,04 a 640×360. Por eso en
           // esta piel "Cuenta" no monta y el panel se queda en 244 —y por eso
           // la pinza de aquí usa ese alto y no el de escritorio.
-          return { left: Math.max(izq, PANEL_MARGIN), top: pinza(PANEL_MARGIN, TOP_MAX_HORIZONTAL) }
+          return { left: Math.max(izq, PANEL_MARGIN), top: pinza(PANEL_MARGIN, f === 1 ? TOP_MAX_HORIZONTAL : topeInferior(PANEL_H_HORIZONTAL, f)) }
         }
         // Sin obstáculos (GAME_OVER y pantallas terminales) no hay nada que
         // esquivar: vale la colocación de siempre.

@@ -4,6 +4,7 @@ import ChipToken from './ChipToken'
 import { GodeteIcon } from './TapetesPanel'
 import { BADGE_POPUP_MS } from '../config/consultas'
 import { ENTRADA, VIVAS_ESCRITORIO } from '../config/menuEntradas'
+import { aPropios, escalaActual } from '../lib/escala'
 
 // ── DSK-U1 / U1b · Menú de utilidades (SOLO gate de escritorio) ─────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda y apéndices).
@@ -155,8 +156,10 @@ export function UtilitiesPanel({
       if (prev) return null
       const el = badgeRef.current
       if (!el) return null
-      const r = el.getBoundingClientRect()
-      return { right: window.innerWidth - r.left + 8, top: r.top + r.height / 2 }
+      // TAB-1 · el popup es `fixed` dentro de #root ampliado: px propios.
+      const f = escalaActual()
+      const r = aPropios(el.getBoundingClientRect(), f)
+      return { right: window.innerWidth / f - r.left + 8, top: r.top + r.height / 2 }
     })
   }
 
