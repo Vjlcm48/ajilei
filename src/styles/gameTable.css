@@ -1124,9 +1124,9 @@
        [A igualar]  [comodín]
    El pozo queda a la izquierda; mensaje y comodín se apilan a la derecha. No se toca
    la forma/tamaño/piel del óvalo (eso lo da .center-zone base).
-   Scope: (min-width:768) and (min-height:601) → cubre escritorio, laptop landscape
-   >600px y tablets, y NO solapa con los bloques móviles (portrait max-width:767 /
-   landscape max-height:600). 2 y 3 jug no se tocan. */
+   Scope: (min-width:768) and (min-height:601) and (orientation:landscape) → escritorio,
+   laptop y tableta EN HORIZONTAL de más de 600 de alto (la tableta vertical va al traje A
+   ×f, TAB-1 1d). NO solapa con portrait ni con B (max-height:600). 2 y 3 jug no se tocan. */
 @media (min-width: 768px) and (min-height: 601px) and (orientation: landscape) {
   .table-four .center-zone,
   .table-five .center-zone {
@@ -1150,18 +1150,18 @@
   .table-five .center-zone .comodin-note { grid-column: 2; grid-row: 2; }
 }
 
-/* ── Móvil vertical (<768px) — Tanda C4.2 ────────────────────────────────────
+/* ── Vertical (traje A) — Tanda C4.2 · TAB-1 1d ─────────────────────────────
    Reorganiza el tablero en una sola columna que cabe en 100dvh sin scroll:
    IAs arriba → zona central (pozo + comodín) → cartas del humano + acciones
    ancladas al fondo. Todas las reglas viven bajo .game-table-screen / clases de
-   la mesa → cero impacto en desktop (≥768px) ni en otras pantallas. El mazo
-   (Pie) sigue anclado a su asiento, como en desktop — no se reubica (eso exigiría
-   tocar la lógica de vuelo).
+   la mesa → cero impacto en horizontal (escritorio, laptop, teléfono acostado) ni en
+   otras pantallas. El mazo (Pie) sigue anclado a su asiento, como en desktop — no se
+   reubica (eso exigiría tocar la lógica de vuelo).
    C5.1: acotado a `orientation: portrait` — antes era solo `max-width: 767px`, lo
-   que filtraba a teléfonos pequeños EN HORIZONTAL (ancho <768 en landscape) y les
-   imponía el layout vertical. Con esta condición el bloque vertical es exclusivo
-   de portrait y el nuevo bloque landscape (abajo) gobierna el horizontal. El
-   comportamiento en portrait queda idéntico (misma regla, condición más estrecha). */
+   que filtraba a teléfonos pequeños EN HORIZONTAL y les imponía el layout vertical.
+   TAB-1 1d (Protegidos v1.7 §7.5): sin el max-width, el traje A vale para TODA ventana
+   vertical; de 600 de lado corto en adelante lo amplía escala.css (data-escala="tv").
+   El horizontal lo gobierna el bloque landscape (abajo); `hb` es TAB-2 (escala.css). */
 @media (orientation: portrait) {
   /* Tokens de carta LOCALES al tablero (no se toca theme.css). C4.2.2: cartas del
      humano +5% (58→61 / 90→95); rivales 45×70; mazo proporcional. Solo el

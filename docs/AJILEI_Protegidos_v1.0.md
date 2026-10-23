@@ -1,7 +1,7 @@
-# AJILEI — Archivos protegidos · Lista canónica v1.6
+# AJILEI — Archivos protegidos · Lista canónica v1.8
 
 - **Archivo:** `docs/AJILEI_Protegidos_v1.0.md`
-- **Versión:** 1.6
+- **Versión:** 1.8
 - **Estado:** **LISTA CANÓNICA ÚNICA.** Sellado 2026-08-20 por Victor
   (HEPTACREATION LLC), al cierre de la campaña IDN-1.
 - **Actualización v1.1 (2026-08-26):** se cierra el hueco de reconstrucción
@@ -44,6 +44,13 @@
   `gameTable.css` y una en `opponentPanel.css`, sin tocar geometría ni valores.
   Sus dos filas de la §3 se re-miden aquí, en el mismo cambio que los archivos
   (§5), y nace la **§7.5** con el rango y su autoridad.
+- **Actualización v1.8 (2026-10-22):** TAB-2 2c. **La lista sigue siendo las
+  mismas seis.** Victor autorizó (decisión 8 tras la lámina 2a, ficha TAB-2
+  2b–2d §4) corregir **dos comentarios desfasados** de `gameTable.css`: solo
+  texto de comentario, en dos rangos, sin añadir ni quitar una línea. Su fila de
+  la §3 se re-mide aquí, en el mismo cambio que el archivo (§5), y nace la
+  **§7.6** con los rangos, la vara y las huellas de antes y después. Es la única
+  apertura de un protegido en TAB-2.
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -125,7 +132,7 @@ pendiente de la decisión de Victor.
 | `src/engine/deck.js` | `eb61426083ca` | `69f92d6b9aac433c` | 69 | APU-1 **1b-ii y 1d-i** (siembra pre-autorizada) |
 | `src/config/seatLayouts.js` | `0d1bb8ea66a8` | `0049051fd4b8b891` | 59 | — (intacto desde el sellado) |
 | `src/styles/opponentPanel.css` | `fbc9f3d08ede` | `4b91338a205e4a6a` | 1084 | **TAB-1 1d** (la puerta del traje A, 1 línea; §7.5) |
-| `src/styles/gameTable.css` | `6eedfa949259` | `e97a1565c29bc5a6` | 6289 | **TAB-1 1d** (la puerta del traje A, 3 líneas; §7.5) |
+| `src/styles/gameTable.css` | `87c9cb519bdb` | `9b6b716f23ade19a` | 6289 | TAB-1 1d (la puerta del traje A, 3 líneas; §7.5) · **TAB-2 2c** (dos comentarios, mismas líneas; §7.6) |
 
 **Las seis filas se volvieron a medir el 2026-09-22**, al cerrar la campaña, y
 salen **idénticas una a una** a las de arriba: blob, `sha256` y líneas. Entre el
@@ -394,3 +401,33 @@ vertical. Las nueve reglas hermanas de las hojas NO protegidas (`theme.css:120`,
 tanda con la misma transformación. `seatLayouts.js`, el motor, la IA y la baraja:
 ninguna apertura.
 
+### 7.6 · TAB-2 — dos comentarios de `gameTable.css` (v1.8)
+
+TAB-1 1d cambió la condición de dos `@media` (§7.5) y dejó desfasados los dos
+comentarios que las explican: el de la rejilla 2×2 del óvalo (`:1130`) seguía
+diciendo que cubría las tabletas en vertical y que el bloque vertical era
+`portrait max-width:767`, y el del traje A (`:1165`) seguía titulándose «Móvil
+vertical (<768px)» y describiendo una condición que ya no existe (informe de la
+Fase 0 de TAB-2, §7). La apertura es **solo de comentario**.
+
+| Rango | Qué decía de más | Qué dice ahora | Autoridad |
+|---|---|---|---|
+| `gameTable.css:1119-1129` (cambian `:1127-1129`) | que la media cubre «tablets» y no solapa con «portrait max-width:767» | la media lleva `(orientation:landscape)`: escritorio, laptop y tableta EN HORIZONTAL de más de 600 de alto; la tableta vertical va al traje A ×f (TAB-1 1d) | decisión 8 de Victor tras la lámina 2a (ficha TAB-2 2b–2d §4) |
+| `gameTable.css:1153-1164` (cambian `:1153`, `:1157-1159` y `:1161-1164`) | el título «Móvil vertical (<768px)», «cero impacto en desktop (≥768px)» y la nota C5.1 como condición vigente | título «Vertical (traje A) — Tanda C4.2 · TAB-1 1d»; «cero impacto en horizontal»; la nota de TAB-1 1d (sin el `max-width`, el traje A vale para toda ventana vertical y `escala.css` lo amplía); `hb` es de TAB-2 y vive en `escala.css` | la misma |
+
+**Vara de la apertura.** El número de líneas no cambia (6.289 antes y después):
+siguen valiendo todas las referencias por número de línea de este documento y
+de los informes (`:1130`, `:1165`, `:2397`, `:2721`, `:4251`…). `gameTable.css`
+**sin comentarios** (quitados con `/\*[\s\S]*?\*/`) es idéntico al byte antes y
+después: `sha256` `844124febd60dd2a…` en los dos. El `git diff` solo toca líneas
+de los dos rangos.
+
+| | blob git | `sha256` |
+|---|---|---|
+| Antes (`abc2ebc`) | `6eedfa949259` | `e97a1565c29bc5a6ebb846d65bfdb6770de05e48f9f67210cc93479a28103a4b` |
+| Después (TAB-2 2c) | `87c9cb519bdb` | `9b6b716f23ade19aaf0a6941efbc3c2bc219b4eca9cbf451dda9181c5ac47306` |
+
+La frase del óvalo de las mesas 3, 4 y 5 en las ventanas bajas con ratón (`hb`)
+**no** se cambió aquí: `gameTable.css:2721-2723` sigue a 9 px y la de 10 vive en
+`src/styles/escala.css` (§7), que gana por especificidad. Los otros cinco
+protegidos, sin apertura.
