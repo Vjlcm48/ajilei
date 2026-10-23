@@ -111,17 +111,19 @@ html[data-escala="tv"] {
    Fase 0 TF-11) y la ✕ (x 21–78) son VISUALES: no escalan con el factor, así
    que en px propios miden 28/f y 64/f. El factor ya descuenta la banda
    (`RESERVA_PIE_FS`, src/lib/escala.js). El relleno de abajo es el de HOY más
-   la banda: 16 px, y 8 px hasta 800 de alto (gameTable.css:4269). */
+   la banda: 16 px, y 8 px hasta 800 de alto (gameTable.css:4269).
+   Solo `h` (TAB-2): en horizontal no hay otro atributo que `h` y `hb`, y `hb`
+   lleva el traje B con su relleno de 6 px, que estas reglas pisarían. */
 @media (orientation: landscape) {
-  :root:fullscreen[data-escala] .game-table-screen {
+  :root:fullscreen[data-escala="h"] .game-table-screen {
     padding-bottom: calc(16px + 28px / var(--escala));
   }
-  :root:fullscreen[data-escala] .game-table-screen .table-header {
+  :root:fullscreen[data-escala="h"] .game-table-screen .table-header {
     padding-left: calc(64px / var(--escala));
   }
 }
 @media (orientation: landscape) and (max-height: 800px) {
-  :root:fullscreen[data-escala] .game-table-screen {
+  :root:fullscreen[data-escala="h"] .game-table-screen {
     padding-bottom: calc(8px + 28px / var(--escala));
   }
 }
@@ -134,4 +136,88 @@ html[data-escala="tv"] {
    que la letra crece sin mover la fila (O1; lo mide el modo `tab`). */
 html[data-escala="h"] .game-table-screen :is(.hand-badge, .seat-badge) {
   font-size: max(10px, calc(10px / var(--escala)));
+}
+
+/* ── 6 · TAB-2 · La mesa hasta los bordes (2b, variante c «acotada») ─────────
+   Rector: AJILEI_TAB-2_Fase2b-2d_Codigo_v1.0.md §2; medido en la lámina 2a
+   (`laminas/tab2/variantes.js`). Las franjas de los lados son la jaula de
+   `#root` (index.css:57-67: 1126 px y un borde de 1 px transparente en la mesa,
+   luz.css:120), que bajo la escala se amplía con el factor y deja ver el
+   `body` (Fase 0 §3).
+   M2b: `#root` sale de la jaula y la pantalla llega a los bordes; su relleno
+   lateral conserva el contenido de hoy (1124 − 2 × 20 = 1084 px propios). El
+   borde de 1 px también se quita, o deja ≈ 1,3 px de `body` a cada lado (2a
+   §3); el relleno mínimo suma ese px (21 = 20 + 1), y por debajo de 1126 px
+   propios el contenido mide lo mismo que hoy.
+   `hb` (§7) comparte el `#root` suelto y el radial; su relleno es el de B. */
+html:is([data-escala="h"], [data-escala="hb"]) #root {
+  width: auto;
+  max-width: none;
+  margin: 0;
+  border-inline: 0;
+}
+html[data-escala="h"] .game-table-screen {
+  padding-inline: max(21px, calc((100% - 1124px) / 2 + 20px));
+}
+
+/* El radial, del tamaño de HOY. `circle at center` (gameTable.css:12) llega a la
+   esquina más lejana de su caja, que hoy es la pantalla de 1124 px propios (o de
+   la ventana menos el borde, si es más estrecha) por el alto de la pantalla.
+   Con ese radio explícito, dentro de la antigua caja el degradado es el de hoy
+   al píxel y fuera de ella sigue el último color (`darkest`, o la viñeta máxima
+   del tricolor), con la filigrana de borde a borde: «esa oscuridad a los lados
+   realza el centro» (Victor, tras la lámina).
+   RESPALDO: un navegador sin `hypot()` (anterior a Chrome 120, Safari 15.4 o
+   Firefox 118) se salta el bloque entero por el `@supports` y se queda con el
+   fondo de hoy estirado a toda la pantalla (la variante b): sin franja y con el
+   tricolor entero. Sin el `@supports` NO se saltaría: una declaración con
+   `var()` se acepta al leerla y, al no poder calcularse, deja el fondo VACÍO
+   (TAB-2 2b, hallazgo H-2). */
+@supports (width: hypot(1px, 1px)) {
+  html:is([data-escala="h"], [data-escala="hb"]) {
+    --tab-radio: hypot(min(562px, calc(50vw / var(--escala) - 1px)), calc(50dvh / var(--escala)));
+  }
+  html:is([data-escala="h"], [data-escala="hb"]) .game-table-screen {
+    background:
+      var(--filigrana),
+      radial-gradient(circle var(--tab-radio) at center, var(--green-base) 0%, var(--green-deep) 55%, var(--green-darkest) 100%);
+  }
+  /* La gemela del tricolor (tapetes.css:288-301): la viñeta con el mismo radio. */
+  html:is([data-escala="h"], [data-escala="hb"]) body[data-tapete="tricolor"] .game-table-screen {
+    background:
+      var(--filigrana),
+      radial-gradient(circle var(--tab-radio) at center,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, var(--tap-tri-vineta-fondo)) 100%),
+      linear-gradient(to bottom,
+        var(--tap-tri-amarillo) 0%,
+        var(--tap-tri-amarillo) var(--tap-tri-p1),
+        var(--tap-tri-azul)     var(--tap-tri-p2),
+        var(--tap-tri-azul)     var(--tap-tri-p3),
+        var(--tap-tri-rojo)     var(--tap-tri-p4),
+        var(--tap-tri-rojo)     100%);
+  }
+}
+
+/* ── 7 · TAB-2 · R-2 como B′: la ventana baja con ratón (`hb`, 2c) ───────────
+   Rector: ficha 2b–2d §3. Horizontal, alto ≤ 600, ancho ≥ 1024 y ratón (la
+   doble llave, src/lib/escala.js): la laptop de poco alto se queda con el
+   traje B del teléfono acostado, con f = 1, y solo cambian dos cosas.
+   1 · Los bordes: el `#root` suelto y el radial de §6. El relleno lateral de B
+       es `--ls-screen-padx` (gameTable.css:2408), no 20: el contenido conserva
+       su ancho de hoy, y el mínimo suma el px del borde quitado.
+   2 · La frase del óvalo de las mesas 3, 4 y 5, de 9 a 10 px (gameTable.css:
+       2721-2723, protegido; aquí gana por especificidad, 0,4,1 frente a 0,2,0).
+       Su caja sigue de 16 px de alto: el óvalo no crece (O1, 36 celdas de la
+       lámina 2a). 10 y no 12: a 12 la crónica larga («La IA sube a 1000. ¿Qué
+       haces?») hace tres líneas y sale 4,5 px del óvalo; 10 es el mayor tamaño
+       en que las cuatro frases medidas caben siempre (vara de Victor: ≥ 10 en
+       `hb` para estas mesas; la de 2 sigue en 12).
+   Las reglas generales de §1 valen lo mismo con f = 1 (medido: 0,00 px), y las
+   de pantalla completa de §4 son solo de `h`. */
+html[data-escala="hb"] .game-table-screen {
+  padding-inline: max(calc(var(--ls-screen-padx) + 1px), calc((100% - 1124px) / 2 + var(--ls-screen-padx)));
+}
+html[data-escala="hb"] .game-table-screen :is(.table-wide, .table-four, .table-three) .game-message {
+  font-size: 10px;
 }
