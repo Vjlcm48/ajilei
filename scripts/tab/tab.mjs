@@ -35,7 +35,17 @@
 //   V-giro   744×1100 → 1100×744 → 744×1100 en pleno reparto: cabe en los tres
 //            estados, con su atributo, y sin errores de página
 //
-// `diagDSK tab [cel] [tv] [h] [vuelo] [fuera] [giro]` corre solo esas varas.
+//   V-borde  (TAB-2) la mesa hasta los bordes, en `h` y `hb`: franja 0 desde
+//            x = 0,25 y W − 0,75, costura de mediana ≤ 2 y deriva ≤ 0,75 (0 con
+//            f = 1) frente a la geometría de hoy sellada en `ref/t2_geometria.json`
+//   V-hb     (TAB-2) la ventana baja con ratón: clase `hb`, sin desplazar, frase
+//            ≥ 10 en las mesas 3–5 y ≥ 12 en la de 2, O1 al byte, la crónica
+//            dentro del óvalo y deriva 0 frente a B fuera de la frase
+//   V-frontera (TAB-2) los 16 casos de la doble llave en su clase; los que
+//            quedan sin atributo, byte a byte como hoy
+//
+// `diagDSK tab [cel] [tv] [h] [vuelo] [fuera] [giro] [borde] [hb] [frontera]`
+// corre solo esas varas. `TAB_CONTROL=sin-m2b|frase12` es un control rojo.
 //
 // UN VERDE MIDE LO QUE DICE. Una celda que no llegó a su estado sale «no
 // medida» y la vara no es verde. Las fotos se toman con TODAS las animaciones
@@ -49,10 +59,10 @@ import { recorrerRuta } from '../rutaMesa.mjs'
 import { escalaReal, forzarEscala1 } from '../arnes/comun.mjs'
 import { irA } from '../ios/tam.mjs'
 import * as V from '../voz2/voz2Mesa.mjs'
-import { escalaDe, RESERVA_PIE_FS } from '../../src/lib/escala.js'
+import { escalaDe, RESERVA_PIE_FS, MEDIA_RATON } from '../../src/lib/escala.js'
 import { anchoCapa, colocaCapa } from '../../src/hooks/voz2Core.js'
 
-export const VARAS_TAB = Object.freeze(['cel', 'tv', 'h', 'vuelo', 'fuera', 'giro'])
+export const VARAS_TAB = Object.freeze(['cel', 'tv', 'h', 'vuelo', 'fuera', 'giro', 'borde', 'hb', 'frontera'])
 export const RUTA_T3 = new URL('./ref/t3_matriz.csv', import.meta.url)
 const PAR = 6
 // `TAB_SOLO=<expresión>` acota V-tv y V-h a las celdas «<tamaño> m<mesa> <estado>»
@@ -848,6 +858,342 @@ async function varaGiro(browser, base) {
   return { ok: pasos.length === 2 && pasos.every((p) => p.ok) && !errores.length, pasos, errores }
 }
 
+// ══ TAB-2 · V-borde, V-hb y V-frontera ═════════════════════════════════════
+// Rector: AJILEI_TAB-2_Fase2b-2d_Codigo_v1.0.md §5. La geometría «de hoy» con la
+// que se comparan V-borde (deriva) y V-frontera (byte a byte) es un DATO del
+// arnés, `ref/t2_geometria.json`, medido con `sellarT2()` contra un `vite
+// preview` de `abc2ebc` (la base de TAB-2, sin M2b ni `hb`). Se resella solo
+// si la mesa cambia a propósito, y el commit que lo haga lo dice.
+export const RUTA_T2 = new URL('./ref/t2_geometria.json', import.meta.url)
+// `TAB_CONTROL=<nombre>` es la prueba de que cada vara nueva sabe ponerse roja
+// (ficha §5): `sin-m2b` devuelve la jaula a la mesa en la sonda, `frase12` sube
+// la frase de `hb` a 12 px. Una corrida con control nunca es la vara.
+const CONTROL = process.env.TAB_CONTROL || null
+const CSS_CONTROL = {
+  // Especificidad 1,1,2 y 0,3,2: ganan a M2b (1,1,1 y 0,2,1) sin `!important`.
+  'sin-m2b': `html[data-escala] body #root { width: 1126px; max-width: 100%; margin: 0 auto; border-inline: 1px solid transparent; }
+    html[data-escala="h"] body .game-table-screen { padding-inline: 20px; }
+    html[data-escala="hb"] body .game-table-screen { padding-inline: var(--ls-screen-padx); }`,
+  frase12: 'html[data-escala="hb"] body .game-table-screen :is(.table-wide, .table-four, .table-three) .game-message { font-size: 12px; }',
+}
+async function ponerControl(page) {
+  if (CONTROL && CSS_CONTROL[CONTROL]) { await page.addStyleTag({ content: CSS_CONTROL[CONTROL] }); await raf2(page) }
+}
+
+// Las celdas. `movil: false` = ratón (`hover: hover`, `pointer: fine`).
+export const BORDE = Object.freeze({
+  tamanos: [
+    { id: '1366x623', w: 1366, h: 623, movil: false, clase: 'h', n: 'laptop de Victor' },
+    { id: '1920x929', w: 1920, h: 929, movil: false, clase: 'h', n: 'monitor de Victor' },
+    { id: '3440x1290', w: 3440, h: 1290, movil: false, clase: 'h', n: 'ultrapanorámico' },
+    { id: '1133x716', w: 1133, h: 716, movil: true, clase: 'h', n: 'iPad mini 6 en horizontal' },
+    { id: '1180x820', w: 1180, h: 820, movil: true, clase: 'h', n: 'iPad 11" en horizontal' },
+    { id: '3840x1960', w: 3840, h: 1960, movil: false, clase: 'h', n: 'monitor 4K' },
+    { id: '1280x577', w: 1280, h: 577, movil: false, clase: 'hb', n: 'laptop 1280' },
+    { id: '1242x566', w: 1242, h: 566, movil: false, clase: 'hb', n: 'laptop de Victor al 110 %' },
+    { id: '1093x498', w: 1093, h: 498, movil: false, clase: 'hb', n: 'laptop de Victor al 125 %' },
+    { id: '1024x600', w: 1024, h: 600, movil: false, clase: 'hb', n: 'netbook' },
+  ],
+  mesas: [2, 5], tapetes: ['verde', 'tricolor'],
+})
+export const HB = Object.freeze({
+  tamanos: BORDE.tamanos.filter((t) => t.clase === 'hb'),
+  mesas: [5, 4, 3, 2], estados: ['reposo', 'turno', 'resultado'],
+})
+// Las varas de la frase en `hb` (decisión 3 de Victor tras la lámina 2a).
+export const PISO_FRASE_HB = Object.freeze({ 2: 12, 3: 10, 4: 10, 5: 10 })
+// La crónica de apuestas no tiene el recorte de VOZ-2: las cuatro frases del
+// modo `cronica` de la lámina 2a (la primera, a 12 px, sale 4,5 px del óvalo).
+export const CRONICA = Object.freeze(['La IA sube a 1000. ¿Qué haces?', 'La IA apuesta 1000. ¿Qué haces?', 'Vas all-in con 12500 HC.', 'A las 3 — IA 4 abre.'])
+const LARGA_VOZ2 = 'Ganaste la mano con un Ajilei de oros y te llevas el pozo entero de la mesa, felicidades, sigue así'
+// Los 16 casos de la frontera (lámina 2a §5.2), con la clase que les toca. Los
+// que quedan sin atributo se comparan además byte a byte con la geometría de hoy.
+export const FRONTERA = Object.freeze([
+  { id: '956x402', w: 956, h: 402, movil: true, attr: null, n: 'iPhone 16/17 Pro Max acostado' },
+  { id: '932x390', w: 932, h: 390, movil: true, attr: null, n: 'iPhone 15 Plus / Pro Max acostado' },
+  { id: '891x370', w: 891, h: 370, movil: true, attr: null, n: 'Galaxy S25 Ultra acostado' },
+  { id: '915x412', w: 915, h: 412, movil: true, attr: null, n: 'Galaxy S25 acostado' },
+  { id: '960x411', w: 960, h: 411, movil: true, attr: null, n: 'Xperia 1 acostado' },
+  { id: '1006x411', w: 1006, h: 411, movil: true, attr: null, n: 'Galaxy Z Flip 6 acostado' },
+  { id: '905x369', w: 905, h: 369, movil: true, attr: null, n: 'Galaxy Z Fold 6 exterior acostado' },
+  { id: '1030x420', w: 1030, h: 420, movil: true, attr: null, n: 'TRAMPA: 1030×420 táctil' },
+  { id: '1006x411r', w: 1006, h: 411, movil: false, attr: null, n: 'teléfono con ratón' },
+  { id: '823x707', w: 823, h: 707, movil: true, attr: 'h', n: 'Fold 6 interior acostado' },
+  { id: '980x560', w: 980, h: 560, movil: true, attr: null, n: 'iPad en ventana' },
+  { id: '1133x500', w: 1133, h: 500, movil: true, attr: null, n: 'iPad en ventana' },
+  { id: '1280x577', w: 1280, h: 577, movil: false, attr: 'hb', n: 'laptop 1280' },
+  { id: '1242x566', w: 1242, h: 566, movil: false, attr: 'hb', n: 'laptop al 110 %' },
+  { id: '1093x498', w: 1093, h: 498, movil: false, attr: 'hb', n: 'laptop al 125 %' },
+  { id: '1024x600', w: 1024, h: 600, movil: false, attr: 'hb', n: 'netbook' },
+])
+const PISO_DERIVA = 0.75
+const PISO_COSTURA = 2
+
+// Una página en la mesa `n` con el tapete pedido, sin sonido y sin pantalla completa.
+async function abrirMesaT2(browser, base, v, n, tapete = 'verde', { contar = false } = {}) {
+  const { ctx, page, errores } = await contextoCap(browser, { w: v.w, h: v.h, dpr: 1, movil: !!v.movil }, base, { semilla: SEMILLA })
+  await ctx.addInitScript(SIN_PANTALLA_COMPLETA)
+  if (contar) await ctx.addInitScript(CONTAR_ESCRITURAS)
+  await ctx.addInitScript((t) => {
+    try {
+      localStorage.setItem('ajilei.sound', 'off')
+      localStorage.setItem('ajilei.tapete', t)
+      localStorage.setItem('ajilei.tapetes.comprados', JSON.stringify(['verde', 'grafito', 'azul', 'vinotinto', 'tricolor']))
+    } catch { /* sin almacén: el tapete de siempre */ }
+  }, tapete)
+  page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`))
+  await page.goto(base, { waitUntil: 'networkidle' })
+  await recorrerRuta(page, n, 'basico', 0, 'medio')
+  await page.waitForSelector('button:has-text("Iniciar mano")', { timeout: 20000 })
+  await page.mouse.move(2, 2)
+  return { ctx, page, errores }
+}
+async function quietaT2(page, estado) {
+  if (!(await aEstado(page, estado))) return false
+  await page.evaluate(() => { document.scrollingElement.scrollTop = 0; const s = document.querySelector('.game-table-screen'); if (s) s.scrollTop = 0 })
+  await page.evaluate(CONGELAR)
+  await page.waitForTimeout(300)
+  await quietas(page)
+  return true
+}
+
+// Franja: px seguidos, desde cada borde hacia dentro, que pinta html/body/#root.
+// Se barre desde x = 0,25 y W − 0,75 (lección de la 2a: empezar en 1,5 escondía
+// 1,3 px de body), en tres alturas, y se queda el peor.
+const FRANJA = () => {
+  const W = innerWidth, H = innerHeight, html = document.documentElement, root = document.getElementById('root')
+  const tieneFondo = (e) => { const s = getComputedStyle(e); if (s.backgroundImage !== 'none') return true; const c = s.backgroundColor; return !(c === 'transparent' || /rgba\(.*,\s*0\)$/.test(c)) }
+  const pintor = (x, y) => {
+    let e = document.elementFromPoint(x, y)
+    if (!e || e === html) return 'HTML'
+    if (e === root) return '#root'
+    while (e && e !== document.body && e !== html && !tieneFondo(e)) e = e.parentElement
+    if (!e || e === html) return 'HTML'
+    return e === document.body ? 'BODY' : 'otro'
+  }
+  const NO = new Set(['HTML', 'BODY', '#root'])
+  const corre = (x0, y0, dx, n) => { let k = 0; while (k < n && NO.has(pintor(x0 + dx * k, y0))) k++; return k }
+  const ys = [0.1, 0.5, 0.9].map((t) => H * t)
+  return { izq: Math.max(...ys.map((y) => corre(0.25, y, 1, W / 2))), der: Math.max(...ys.map((y) => corre(W - 0.75, y, -1, W / 2))) }
+}
+// Las cajas de la mesa que M2b no puede mover.
+const ANCLAS_T2 = () => {
+  const c = (s) => { const e = [...document.querySelectorAll(s)].find((x) => x.getClientRects().length); if (!e) return null; const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map((v) => Math.round(v * 100) / 100) }
+  const todas = (s) => [...document.querySelectorAll(s)].filter((x) => x.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map((v) => Math.round(v * 100) / 100) })
+  return {
+    mesa: c('.game-table'), ovalo: c('.center-zone') || c('.felt-oval.oval-right') || c('.two-ovals'), mid: c('.table-mid'), cabecera: c('.table-header'),
+    jugador: c('.player-zone'), pozo: c('.pot-box'), frase: c('.game-message'), rivales: todas('.opp-panel, .ai-zone'),
+    cartas: todas('.player-zone .playing-card, .player-zone .card-slot-wrapper'), botones: todas('.action-area button, .btn-mult'),
+  }
+}
+export function derivaT2(a, b, sin = []) {
+  if (!a || !b) return Infinity
+  let m = 0
+  const lado = (x, y) => { if (!x || !y) { if (x || y) m = Infinity; return } for (let i = 0; i < 4; i++) m = Math.max(m, Math.abs(x[i] - y[i])) }
+  for (const k of Object.keys(a)) {
+    if (sin.includes(k)) continue
+    if (Array.isArray(a[k]?.[0])) { if ((a[k]?.length || 0) !== (b[k]?.length || 0)) m = Infinity; else a[k].forEach((r, i) => lado(r, b[k][i])) } else lado(a[k], b[k])
+  }
+  return +m.toFixed(2)
+}
+// La luz de unos puntos de una foto (en la página, con OffscreenCanvas).
+async function luces(page, png, puntos) {
+  return page.evaluate(async ({ b64, puntos }) => {
+    const bm = await createImageBitmap(await (await fetch('data:image/png;base64,' + b64)).blob())
+    const c = new OffscreenCanvas(bm.width, bm.height); const g = c.getContext('2d'); g.drawImage(bm, 0, 0)
+    return puntos.map(([k, x, y]) => { const d = g.getImageData(Math.min(bm.width - 1, Math.max(0, Math.round(x))), Math.min(bm.height - 1, Math.max(0, Math.round(y))), 1, 1).data; return [k, 0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]] })
+  }, { b64: png.toString('base64'), puntos })
+}
+// Costura: el salto de luz a ±4 px del antiguo borde de #root, en 9 alturas, y
+// la mediana de los 9 (un escalón está en todas las alturas). Cada columna se
+// PROMEDIA sobre un periodo vertical entero de la filigrana (sus líneas de ±45°
+// cada 29 px se repiten cada 29·√2 ≈ 41 px en vertical): sin eso, a 820 de alto
+// las 9 alturas (múltiplos de 82 = 2 × 41) caen todas en la misma fase del
+// dibujo y un solo cruce de línea pasa por escalón (TAB-2 2b, hallazgo H-4).
+// Sin antiguo borde a la vista (≤ 8 px), no aplica.
+const PERIODO_FILIGRANA = 41
+async function costuraT2(page, W, H, f) {
+  const x0 = (W - Math.min(W, 1126 * f)) / 2
+  if (x0 <= 8) return null
+  const png = await page.screenshot()
+  const ys = Array.from({ length: 9 }, (_, i) => Math.round(H * (0.1 + 0.1 * i)))
+  const puntos = ys.flatMap((y) => Array.from({ length: PERIODO_FILIGRANA }, (_, k) => [[`a${y}`, x0 - 4, y + k], [`b${y}`, x0 + 4, y + k]]).flat())
+  const suma = {}
+  for (const [k, l] of await luces(page, png, puntos)) suma[k] = (suma[k] || 0) + l / PERIODO_FILIGRANA
+  const d = ys.map((y) => Math.abs(suma[`b${y}`] - suma[`a${y}`])).sort((a, b) => a - b)
+  return { x0: +x0.toFixed(1), mediana: +d[4].toFixed(2), max: +d[8].toFixed(2) }
+}
+const claveT2 = (t, n) => `${t.id} m${n}`
+function leerT2() {
+  try { return JSON.parse(readFileSync(RUTA_T2, 'utf8')) } catch { return null }
+}
+
+// ── V-borde ────────────────────────────────────────────────────────────────
+async function varaBorde(browser, base) {
+  const ref = leerT2()
+  const tareas = []
+  for (const t of BORDE.tamanos) for (const n of BORDE.mesas) for (const tap of BORDE.tapetes) if (pasaSolo(t, n, tap)) tareas.push({ t, n, tap })
+  const celdas = await V.enPool(tareas, PAR, async ({ t, n, tap }) => {
+    const c = { tam: t.id, n, tapete: tap, clase: t.clase }
+    let ctx = null
+    try {
+      const a = await abrirMesaT2(browser, base, t, n, tap)
+      ctx = a.ctx
+      const { page, errores } = a
+      if (!(await quietaT2(page, 'reposo'))) return { ...c, medida: false, motivo: 'sin reposo' }
+      await ponerControl(page)
+      const h = await page.evaluate(HUELLA_ESCALA)
+      const f = parseFloat(h.f) || 1
+      const franja = await page.evaluate(FRANJA)
+      const costura = await costuraT2(page, t.w, t.h, f)
+      const anclas = await page.evaluate(ANCLAS_T2)
+      const r = ref?.borde?.[claveT2(t, n)]
+      const deriva = r ? derivaT2(r, anclas, t.clase === 'hb' ? ['frase'] : []) : null
+      const piso = f === 1 ? 0 : PISO_DERIVA
+      const motivos = []
+      if (h.attr !== t.clase) motivos.push(`clase ${h.attr} ≠ ${t.clase}`)
+      if (franja.izq || franja.der) motivos.push(`franja ${franja.izq} · ${franja.der} px`)
+      if (costura && costura.mediana > PISO_COSTURA) motivos.push(`costura de mediana ${costura.mediana} > ${PISO_COSTURA}`)
+      if (deriva == null) motivos.push('sin referencia sellada')
+      else if (deriva > piso + 0.005) motivos.push(`deriva ${deriva} px > ${piso}`)
+      if (errores.length) motivos.push(`errores: ${errores.slice(0, 2).join(' · ')}`)
+      return { ...c, medida: true, ok: motivos.length === 0, motivos, f, franja, costura, deriva }
+    } catch (e) { return { ...c, medida: false, motivo: String(e.message).split('\n')[0] } } finally { if (ctx) await ctx.close() }
+  })
+  return { ok: celdas.length > 0 && celdas.every((c) => c.medida && c.ok), celdas, referencia: ref ? ref.origen : null }
+}
+
+// ── V-hb ───────────────────────────────────────────────────────────────────
+// La frase a 9 px, la de hoy: lo que la vara de O1 compara con la de `hb`.
+const CSS_FRASE_9 = 'html[data-escala] body .game-table-screen :is(.table-wide, .table-four, .table-three) .game-message { font-size: 9px; }'
+const CRONICA_EN = (frases) => {
+  const p = document.querySelector('.game-message'), o = document.querySelector('.center-zone')
+  if (!p || !o) return null
+  const ob = o.getBoundingClientRect()
+  return frases.map((fr) => {
+    p.textContent = fr
+    const rg = document.createRange(); rg.selectNodeContents(p)
+    const t = rg.getBoundingClientRect()
+    const lineas = new Set([...rg.getClientRects()].map((r) => Math.round(r.top))).size
+    return { frase: fr, lineas, sale: +Math.max(ob.top - t.top, t.bottom - ob.bottom, ob.left - t.left, t.right - ob.right, 0).toFixed(2) }
+  })
+}
+async function varaHb(browser, base) {
+  const ref = leerT2()
+  const tareas = []
+  for (const t of HB.tamanos) for (const n of HB.mesas) for (const e of HB.estados) if (pasaSolo(t, n, e)) tareas.push({ t, n, e })
+  const celdas = await V.enPool(tareas, PAR, async ({ t, n, e }) => {
+    const c = { tam: t.id, n, estado: e }
+    let ctx = null
+    try {
+      const a = await abrirMesaT2(browser, base, t, n)
+      ctx = a.ctx
+      const { page, errores } = a
+      if (!(await quietaT2(page, e))) return { ...c, medida: false, motivo: `sin ${e}` }
+      await ponerControl(page)
+      const motivos = []
+      let recorte = null
+      if (e === 'resultado') {
+        recorte = await V.ponerTexto(page, LARGA_VOZ2)
+        if (recorte !== '1') motivos.push(`el resultado no salió recortado con «…» (${recorte})`)
+      }
+      const m = await page.evaluate(MEDIR_TAB)
+      const turno = e === 'turno' ? await page.evaluate(() => ({ badge: [...document.querySelectorAll('.seat-badge')].some((b) => /TURNO/.test(b.innerText)), crono: !!document.querySelector('.timer-display') })) : null
+      if (turno && !(turno.badge && turno.crono)) motivos.push(`turno sin TURNO o sin cronómetro (${JSON.stringify(turno)})`)
+      // O1 al byte: el óvalo y su fila con la frase de `hb` y con la de hoy.
+      const a1 = await page.evaluate(ANCLAS_T2)
+      const tag = await page.addStyleTag({ content: CSS_FRASE_9 })
+      await raf2(page)
+      const a0 = await page.evaluate(ANCLAS_T2)
+      await tag.evaluate((s) => s.remove())
+      await raf2(page)
+      const o1 = JSON.stringify(a1.ovalo) === JSON.stringify(a0.ovalo) && JSON.stringify(a1.mid) === JSON.stringify(a0.mid)
+      // Deriva 0 frente a B fuera de la frase (la geometría de hoy, sellada en reposo).
+      const r = e === 'reposo' ? ref?.borde?.[claveT2(t, n)] : undefined
+      const deriva = r === undefined && e !== 'reposo' ? undefined : r ? derivaT2(r, a1, ['frase']) : null
+      // La crónica, al final: reescribe el texto de la frase.
+      const cronica = e === 'turno' && n !== 2 ? await page.evaluate(CRONICA_EN, CRONICA) : null
+      if (m.attr !== 'hb' || m.f !== 1) motivos.push(`clase ${m.attr} ×${m.f} ≠ hb ×1`)
+      if (m.desplaza.pantalla !== 0 || m.desplaza.doc !== 0 || m.desplaza.ancho !== 0 || m.fuera.length) motivos.push(`no cabe: ${m.fuera.join(' · ') || JSON.stringify(m.desplaza)}`)
+      if (m.frase == null || m.frase < PISO_FRASE_HB[n] - 0.01) motivos.push(`frase ${m.frase} px < ${PISO_FRASE_HB[n]}`)
+      if (!o1) motivos.push(`la frase mueve el óvalo (O1): ${JSON.stringify({ hb: [a1.ovalo, a1.mid], hoy: [a0.ovalo, a0.mid] })}`)
+      if (deriva === null) motivos.push('sin referencia sellada')
+      else if (deriva !== undefined && deriva > 0.005) motivos.push(`deriva ${deriva} px frente a B`)
+      if (e === 'turno' && n !== 2 && !cronica) motivos.push('crónica sin medir')
+      for (const x of cronica || []) if (x.sale > 0.5) motivos.push(`«${x.frase}» sale ${x.sale} px del óvalo (${x.lineas} líneas)`)
+      if (errores.length) motivos.push(`errores: ${errores.slice(0, 2).join(' · ')}`)
+      return { ...c, medida: true, ok: motivos.length === 0, motivos, f: m.f, frase: m.frase && +m.frase.toFixed(2), o1, deriva: deriva ?? null, recorte, cronica, carta: m.cartaJ && +m.cartaJ.h.toFixed(1) }
+    } catch (x) { return { ...c, medida: false, motivo: String(x.message).split('\n')[0] } } finally { if (ctx) await ctx.close() }
+  })
+  return { ok: celdas.length > 0 && celdas.every((c) => c.medida && c.ok), celdas }
+}
+
+// ── V-frontera ─────────────────────────────────────────────────────────────
+async function filaFrontera(browser, base, t) {
+  const { ctx, page, errores } = await abrirMesaT2(browser, base, t, 5, 'verde', { contar: true })
+  try {
+    await mesaQuieta(page, 3000)
+    const huella = await page.evaluate(HUELLA_ESCALA)
+    const raton = await page.evaluate((q) => matchMedia(q).matches, MEDIA_RATON)
+    const fila = filaT3({ tam: t.id, n: 5, estado: 'reposo', ...(await medirT3Estable(page)) })
+    return { huella, raton, fila, errores }
+  } finally { await ctx.close() }
+}
+async function varaFrontera(browser, base) {
+  const ref = leerT2()
+  const casos = FRONTERA.filter((t) => pasaSolo(t, 5, 'reposo'))
+  const celdas = await V.enPool(casos, PAR, async (t) => {
+    const c = { tam: t.id, n: t.n, esperado: t.attr }
+    try {
+      const r = await filaFrontera(browser, base, t)
+      const motivos = []
+      if (r.huella.attr !== t.attr) motivos.push(`clase ${r.huella.attr} ≠ ${t.attr}`)
+      if (r.raton !== !t.movil) motivos.push(`el contexto no es el pedido (ratón ${r.raton})`)
+      let igual = null
+      if (t.attr === null) {
+        if (r.huella.f || r.huella.zoom !== '1' || r.huella.escrituras !== 0) motivos.push(`huella ${JSON.stringify(r.huella)}`)
+        const antes = ref?.frontera?.[t.id]
+        igual = antes ? antes === r.fila : null
+        if (igual === null) motivos.push('sin referencia sellada')
+        else if (!igual) motivos.push(`distinta de hoy:\n        antes ${antes}\n        ahora ${r.fila}`)
+      }
+      if (r.errores.length) motivos.push(`errores: ${r.errores.slice(0, 2).join(' · ')}`)
+      return { ...c, medida: true, ok: motivos.length === 0, motivos, attr: r.huella.attr, raton: r.raton, igual }
+    } catch (e) { return { ...c, medida: false, motivo: String(e.message).split('\n')[0] } }
+  })
+  return { ok: celdas.length > 0 && celdas.every((c) => c.medida && c.ok), celdas }
+}
+
+/**
+ * Sella `ref/t2_geometria.json` contra `base` (un `vite preview` de la versión
+ * de referencia): las anclas de V-borde y V-hb en reposo, y las filas de
+ * V-frontera de los casos que deben quedar como hoy. Devuelve los datos.
+ */
+export async function sellarT2(browser, base, { origen, navegador } = {}) {
+  escalaReal(true)
+  try {
+    const borde = {}
+    const celdas = [...BORDE.tamanos.flatMap((t) => BORDE.mesas.map((n) => ({ t, n }))), ...HB.tamanos.flatMap((t) => [3, 4].map((n) => ({ t, n })))]
+    await V.enPool(celdas, PAR, async ({ t, n }) => {
+      const { ctx, page } = await abrirMesaT2(browser, base, t, n)
+      try {
+        if (!(await quietaT2(page, 'reposo'))) throw new Error(`sin reposo en ${claveT2(t, n)}`)
+        borde[claveT2(t, n)] = await page.evaluate(ANCLAS_T2)
+      } finally { await ctx.close() }
+    })
+    const frontera = {}
+    await V.enPool(FRONTERA.filter((t) => t.attr === null), PAR, async (t) => {
+      frontera[t.id] = (await filaFrontera(browser, base, t)).fila
+    })
+    const ordena = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]))
+    const datos = { origen, navegador, sellado: new Date().toISOString().slice(0, 10), borde: ordena(borde), frontera: ordena(frontera) }
+    // Una celda por línea: el diff de un resellado se lee celda a celda.
+    const bloque = (o) => `{\n${Object.entries(o).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n }`
+    writeFileSync(RUTA_T2, `{\n "origen": ${JSON.stringify(origen)},\n "navegador": ${JSON.stringify(navegador)},\n "sellado": ${JSON.stringify(datos.sellado)},\n "borde": ${bloque(datos.borde)},\n "frontera": ${bloque(datos.frontera)}\n}\n`)
+    return datos
+  } finally { escalaReal(false) }
+}
+
 // ══ El modo ════════════════════════════════════════════════════════════════
 /** Corre las varas pedidas. Devuelve `{ verde, varas, resumen }`. */
 export async function runTab(browser, { base, ref = null, varas = VARAS_TAB } = {}) {
@@ -861,10 +1207,13 @@ export async function runTab(browser, { base, ref = null, varas = VARAS_TAB } = 
     if (varas.includes('tv')) out.tv = await varaTv(browser, base)
     if (varas.includes('vuelo')) out.vuelo = await varaVuelo(browser, base)
     if (varas.includes('giro')) out.giro = await varaGiro(browser, base)
+    if (varas.includes('borde')) out.borde = await varaBorde(browser, base)
+    if (varas.includes('hb')) out.hb = await varaHb(browser, base)
+    if (varas.includes('frontera')) out.frontera = await varaFrontera(browser, base)
   } finally { escalaReal(false) }
   const verde = Object.values(out).every((v) => v.ok)
-  const nombre = { cel: 'V-cel', tv: 'V-tv', h: 'V-h', vuelo: 'V-vuelo', fuera: 'V-fuera', giro: 'V-giro' }
-  const resumen = `${SOLO ? `ACOTADA a /${SOLO.source}/ (no es la vara) · ` : ''}${verde ? 'VERDE' : 'ROJO'} · ` + Object.entries(out).map(([k, v]) => `${nombre[k]} ${v.ok ? '✓' : '✗'}`).join(' · ') + ` · ${((Date.now() - t0) / 1000).toFixed(0)} s`
+  const nombre = { cel: 'V-cel', tv: 'V-tv', h: 'V-h', vuelo: 'V-vuelo', fuera: 'V-fuera', giro: 'V-giro', borde: 'V-borde', hb: 'V-hb', frontera: 'V-frontera' }
+  const resumen = `${CONTROL ? `CONTROL ${CONTROL} (no es la vara) · ` : ''}${SOLO ? `ACOTADA a /${SOLO.source}/ (no es la vara) · ` : ''}${verde ? 'VERDE' : 'ROJO'} · ` + Object.entries(out).map(([k, v]) => `${nombre[k]} ${v.ok ? '✓' : '✗'}`).join(' · ') + ` · ${((Date.now() - t0) / 1000).toFixed(0)} s`
   console.log(`── TAB · ${resumen}`)
   if (out.cel) {
     const c = out.cel
@@ -887,6 +1236,11 @@ export async function runTab(browser, { base, ref = null, varas = VARAS_TAB } = 
     console.log(`   V-fuera ${out.fuera.pantallas.length - malas.length}/${out.fuera.pantallas.length} pantallas bien${out.fuera.referencia ? ` frente a ${out.fuera.referencia} (${identicas} idénticas al píxel, el resto equivalentes)` : ' (sin referencia: solo la huella)'} · entrar y salir ${out.fuera.visitas.filter((v) => v.ok).length}/${out.fuera.visitas.length}`)
     for (const c of malas) console.log(`     ✗ ${c.celda}: ${c.motivo || `huella ${JSON.stringify(c.huella)} · distintos ${c.distintos}`}`)
     for (const v of out.fuera.visitas.filter((x) => !x.ok)) console.log(`     ✗ ${v.tam}: ${v.motivo || JSON.stringify({ antes: v.antes, dentro: v.dentro, despues: v.despues, errores: v.errores })}`)
+  }
+  for (const k of ['borde', 'hb', 'frontera']) if (out[k]) {
+    const malas = out[k].celdas.filter((c) => !c.medida || !c.ok)
+    console.log(`   ${nombre[k].padEnd(7)} ${out[k].celdas.length - malas.length}/${out[k].celdas.length} celdas bien${out[k].referencia ? ` · referencia ${out[k].referencia}` : ''}`)
+    for (const c of malas.slice(0, 12)) console.log(`     ✗ ${c.tam} ${c.n}${c.tapete ? ' ' + c.tapete : ''}${c.estado ? ' ' + c.estado : ''}: ${c.medida ? c.motivos.join(' · ') : c.motivo}`)
   }
   if (out.giro) for (const p of out.giro.pasos) console.log(`   V-giro  ${p.ok ? '✓' : '✗'} → ${p.a} ${p.attr} ×${p.f} · en reparto ${p.enReparto} · desplaza ${JSON.stringify(p.desplaza)}${p.fuera?.length ? ' · fuera ' + p.fuera.join(' · ') : ''}`)
   return { verde, varas: out, resumen, reservaPie: RESERVA_PIE_FS }
