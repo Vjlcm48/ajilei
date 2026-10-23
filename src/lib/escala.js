@@ -4,10 +4,20 @@
 // octubre: «traje + escala». Un solo factor (`zoom` sobre `#root`, en
 // `src/styles/escala.css`) amplía o reduce la mesa entera sin deformarla.
 //
+//   Horizontal de alto ≤ 600, ancho ≥ 1024
+//     y ratón (`hover` + `pointer: fine`) → `hb`: el traje B con f = 1 (TAB-2)
 //   Celular (lado corto < 600)            → nada: ni atributo ni variable
 //   Vertical de lado corto ≥ 600          → `tv`: el traje A del teléfono ×f
 //   Horizontal de alto > 600 (traje C)    → `h`: se reduce hasta caber o crece
-//   Horizontal de alto ≤ 600 (traje B)    → nada (R-2, sub-tanda propia)
+//   Horizontal de alto ≤ 600 (traje B)    → nada: el teléfono acostado y el
+//     iPad en ventana, como antes de TAB-1
+//
+// `hb` (TAB-2 2c, R-2 como B′): la laptop de poco alto no es un teléfono, pero
+// el traje que le cabe es el del teléfono acostado. Se queda con él, sin
+// factor, y solo cambian los bordes y la frase del óvalo (`escala.css`). La
+// DOBLE LLAVE —ancho Y puntero— es la que no atrapa nunca un teléfono: el más
+// ancho acostado mide ≈ 1006 (Z Flip), y un teléfono o un iPad con el dedo
+// tienen `hover: none` y `pointer: coarse` (lámina 2a §5.2).
 //
 // Reglas que esto cumple por construcción:
 //  · O1: el factor depende SOLO de la ventana (y de la pantalla completa, que
@@ -40,6 +50,11 @@ export const REF = Object.freeze({
 // que hoy acaba el teléfono acostado (traje B, `max-height: 600px`).
 export const LADO_CELULAR = 600
 
+// La doble llave de `hb`: el ancho mínimo y la media del ratón. Las dos a la
+// vez; cualquiera sola deja la ventana donde estaba.
+export const ANCHO_HB = 1024
+export const MEDIA_RATON = '(hover: hover) and (pointer: fine)'
+
 // R-7 · La banda oscura que Safari pinta sobre el pie en pantalla completa
 // horizontal (Fase 0, TF-11: ≈28 px CSS). Es VISUAL: no escala con el factor.
 // Se descuenta del alto útil para que la mesa entera quede por encima.
@@ -53,14 +68,17 @@ export const orientacionDe = (ancho, alto) => (alto >= ancho ? 'vertical' : 'hor
 
 /**
  * La clase de la ventana y el atributo que le toca.
- * @param {{ancho:number, alto:number, orientacion?:'vertical'|'horizontal'}} v
- * @returns {{clase:'celular'|'vertical-ancha'|'horizontal'|'horizontal-b', atributo:'tv'|'h'|null}}
+ * @param {{ancho:number, alto:number, orientacion?:'vertical'|'horizontal', raton?:boolean}} v
+ *   `raton`: casa `MEDIA_RATON`. Sin él, la ventana se trata como táctil.
+ * @returns {{clase:'celular'|'vertical-ancha'|'horizontal'|'horizontal-b'|'horizontal-b-raton', atributo:'tv'|'h'|'hb'|null}}
  */
-export function clasificar({ ancho, alto, orientacion = orientacionDe(ancho, alto) }) {
+export function clasificar({ ancho, alto, orientacion = orientacionDe(ancho, alto), raton = false }) {
+  // Antes que el celular: 1280×577 tiene el lado corto < 600 y no es un teléfono.
+  if (orientacion === 'horizontal' && alto <= 600 && ancho >= ANCHO_HB && raton) return { clase: 'horizontal-b-raton', atributo: 'hb' }
   if (Math.min(ancho, alto) < LADO_CELULAR) return { clase: 'celular', atributo: null }
   if (orientacion === 'vertical') return { clase: 'vertical-ancha', atributo: 'tv' }
-  // R-2 sigue aplazada: la ventana horizontal que hoy cae en el traje del
-  // teléfono acostado (alto ≤ 600) queda exactamente como hoy.
+  // La ventana horizontal que cae en el traje del teléfono acostado (alto ≤ 600)
+  // sin la doble llave queda exactamente como antes de TAB-1.
   if (alto <= 600) return { clase: 'horizontal-b', atributo: null }
   return { clase: 'horizontal', atributo: 'h' }
 }
@@ -70,7 +88,7 @@ export const altoEfectivo = ({ alto, orientacion, pantallaCompleta }) =>
   (pantallaCompleta && orientacion === 'horizontal' ? alto - RESERVA_PIE_FS : alto)
 
 /**
- * El factor (§2). 1 en las clases sin atributo.
+ * El factor (§2). 1 en las clases sin atributo y en `hb`.
  * @param {{ancho:number, alto:number, orientacion?:string, pantallaCompleta?:boolean}} v
  */
 export function factorDe(v) {
@@ -141,27 +159,34 @@ export function ventanaDe(win) {
     // así JSX, CSS y escala no se desincronizan.
     orientacion: win.matchMedia('(orientation: portrait)').matches ? 'vertical' : 'horizontal',
     pantallaCompleta: !!doc.fullscreenElement,
+    // Una sola media para las dos llaves del puntero: `hover` y `pointer`
+    // describen el puntero PRINCIPAL, así que se leen juntos.
+    raton: win.matchMedia(MEDIA_RATON).matches,
   }
 }
 
 /**
  * Engancha la escala a una ventana: la escribe ya, la recalcula con `resize`,
- * `orientationchange`, el cambio de orientación de `matchMedia` y
- * `fullscreenchange`, y devuelve la función que la desengancha Y la borra.
+ * `orientationchange`, el cambio de orientación de `matchMedia`, el del ratón
+ * (uno que se conecta o se desconecta) y `fullscreenchange`, y devuelve la
+ * función que la desengancha Y la borra.
  */
 export function enganchaEscala(win) {
   const doc = win.document
   const recalcular = () => aplicarEscala(doc, escalaDe(ventanaDe(win)))
   const mq = win.matchMedia('(orientation: portrait)')
+  const mqRaton = win.matchMedia(MEDIA_RATON)
   recalcular()
   win.addEventListener('resize', recalcular)
   win.addEventListener('orientationchange', recalcular)
   mq.addEventListener('change', recalcular)
+  mqRaton.addEventListener('change', recalcular)
   doc.addEventListener('fullscreenchange', recalcular)
   return () => {
     win.removeEventListener('resize', recalcular)
     win.removeEventListener('orientationchange', recalcular)
     mq.removeEventListener('change', recalcular)
+    mqRaton.removeEventListener('change', recalcular)
     doc.removeEventListener('fullscreenchange', recalcular)
     quitarEscala(doc)
   }

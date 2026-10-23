@@ -2,8 +2,8 @@
 // Las cifras son las de la ficha 1b–1e §2; los bordes, los de sus referencias.
 import { describe, test, expect } from 'vitest'
 import {
-  REF, LADO_CELULAR, RESERVA_PIE_FS, clasificar, factorDe, escalaDe, aPropios, escalaActual,
-  aplicarEscala, quitarEscala, enganchaEscala, orientacionDe, altoEfectivo,
+  REF, LADO_CELULAR, RESERVA_PIE_FS, ANCHO_HB, MEDIA_RATON, clasificar, factorDe, escalaDe, aPropios, escalaActual,
+  aplicarEscala, quitarEscala, enganchaEscala, orientacionDe, altoEfectivo, ventanaDe,
 } from './escala'
 
 const f = (ancho, alto, extra = {}) => factorDe({ ancho, alto, ...extra })
@@ -127,8 +127,8 @@ describe('aPropios', () => {
 })
 
 // ── El hook, por su camino real con un DOM falso ────────────────────────────
-function creaDOM({ ancho, alto, vertical = alto >= ancho, completa = false }) {
-  const oyentes = { win: {}, doc: {}, mq: {} }
+function creaDOM({ ancho, alto, vertical = alto >= ancho, completa = false, raton = false }) {
+  const oyentes = { win: {}, doc: {}, mq: {}, mqRaton: {} }
   const alta = (k) => (t, fn) => { (oyentes[k][t] ||= []).push(fn) }
   const baja = (k) => (t, fn) => { oyentes[k][t] = (oyentes[k][t] || []).filter((x) => x !== fn) }
   const atributos = new Map()
@@ -145,11 +145,12 @@ function creaDOM({ ancho, alto, vertical = alto >= ancho, completa = false }) {
     },
   }
   const mq = { get matches() { return estado.vertical }, addEventListener: alta('mq'), removeEventListener: baja('mq') }
-  const estado = { vertical }
+  const mqRaton = { get matches() { return estado.raton }, addEventListener: alta('mqRaton'), removeEventListener: baja('mqRaton') }
+  const estado = { vertical, raton }
   const document = { documentElement: html, fullscreenElement: completa ? html : null, addEventListener: alta('doc'), removeEventListener: baja('doc') }
   const win = {
     innerWidth: ancho, innerHeight: alto, document,
-    matchMedia: () => mq,
+    matchMedia: (q) => (q === MEDIA_RATON ? mqRaton : q === '(orientation: portrait)' ? mq : null),
     addEventListener: alta('win'), removeEventListener: baja('win'),
   }
   const despacha = (k, t) => (oyentes[k][t] || []).slice().forEach((fn) => fn())
@@ -164,7 +165,7 @@ describe('enganchaEscala (el hook useEscalaMesa)', () => {
     expect(d.atributos.get('data-escala')).toBe('tv')
     expect(d.estilo.get('--escala')).toBe('1.301')
     expect(escalaActual(d.document)).toBe(1.301)
-    expect(d.cuantos()).toBe(4)
+    expect(d.cuantos()).toBe(5)
     soltar()
     expect(d.atributos.has('data-escala')).toBe(false)
     expect(d.estilo.has('--escala')).toBe(false)
@@ -218,3 +219,87 @@ describe('enganchaEscala (el hook useEscalaMesa)', () => {
   })
 })
 
+// ── TAB-2 2c · `hb`: el traje B con la doble llave (R-2 como B′) ───────────
+describe('la clase hb', () => {
+  test('horizontal, alto ≤ 600, ancho ≥ 1024 y ratón → hb con factor 1', () => {
+    expect(ANCHO_HB).toBe(1024)
+    expect(MEDIA_RATON).toBe('(hover: hover) and (pointer: fine)')
+    for (const [w, h] of [[1280, 577], [1242, 566], [1093, 498], [1024, 600], [1920, 400]]) {
+      expect(clasificar({ ancho: w, alto: h, raton: true })).toEqual({ clase: 'horizontal-b-raton', atributo: 'hb' })
+      expect(escalaDe({ ancho: w, alto: h, raton: true })).toEqual({ clase: 'horizontal-b-raton', atributo: 'hb', f: 1 })
+    }
+  })
+
+  test('cada llave sola no basta', () => {
+    expect(clasificar({ ancho: 1280, alto: 577 }).atributo).toBeNull()                 // sin ratón
+    expect(clasificar({ ancho: 1023, alto: 577, raton: true }).atributo).toBeNull()    // 1 px corto
+    expect(clasificar({ ancho: 1280, alto: 601, raton: true })).toEqual({ clase: 'horizontal', atributo: 'h' })
+    expect(clasificar({ ancho: 577, alto: 1280, raton: true }).atributo).toBeNull()    // vertical: celular
+    expect(clasificar({ ancho: 1280, alto: 600, raton: false })).toEqual({ clase: 'horizontal-b', atributo: null })
+  })
+
+  test('la orientación que llega manda también aquí', () => {
+    expect(clasificar({ ancho: 1100, alto: 500, orientacion: 'vertical', raton: true }).atributo).toBeNull()
+  })
+
+  // Los 16 casos de la frontera (lámina 2a §5.2). `raton` es lo que da la
+  // emulación de Chromium: el dedo es `hover: none` y `pointer: coarse`.
+  test.each([
+    ['iPhone 16/17 Pro Max acostado', 956, 402, false, null],
+    ['iPhone 15 Plus / Pro Max acostado', 932, 390, false, null],
+    ['Galaxy S25 Ultra acostado', 891, 370, false, null],
+    ['Galaxy S25 acostado', 915, 412, false, null],
+    ['Xperia 1 acostado', 960, 411, false, null],
+    ['Galaxy Z Flip 6 acostado', 1006, 411, false, null],
+    ['Galaxy Z Fold 6 exterior acostado', 905, 369, false, null],
+    ['TRAMPA 1030×420 táctil', 1030, 420, false, null],
+    ['teléfono con ratón 1006×411', 1006, 411, true, null],
+    ['Fold 6 interior acostado', 823, 707, false, 'h'],
+    ['iPad en ventana 980×560', 980, 560, false, null],
+    ['iPad en ventana 1133×500', 1133, 500, false, null],
+    ['laptop 1280×577', 1280, 577, true, 'hb'],
+    ['laptop 1242×566 (110 %)', 1242, 566, true, 'hb'],
+    ['laptop 1093×498 (125 %)', 1093, 498, true, 'hb'],
+    ['netbook 1024×600', 1024, 600, true, 'hb'],
+  ])('%s (%i×%i, ratón %s) → %s', (_, w, h, raton, atributo) => {
+    expect(clasificar({ ancho: w, alto: h, raton }).atributo).toBe(atributo)
+  })
+
+  test('ventanaDe lee la media del ratón', () => {
+    const d = creaDOM({ ancho: 1280, alto: 577, raton: true })
+    expect(ventanaDe(d.win)).toMatchObject({ ancho: 1280, alto: 577, orientacion: 'horizontal', raton: true })
+  })
+
+  test('el hook escribe hb y lo BORRA al desmontar', () => {
+    const d = creaDOM({ ancho: 1280, alto: 577, raton: true })
+    const soltar = enganchaEscala(d.win)
+    expect(d.atributos.get('data-escala')).toBe('hb')
+    expect(d.estilo.get('--escala')).toBe('1')
+    soltar()
+    expect(d.atributos.size + d.estilo.size).toBe(0)
+    expect(d.cuantos()).toBe(0)
+  })
+
+  test('un ratón que se conecta o se desconecta recalcula la clase', () => {
+    const d = creaDOM({ ancho: 1280, alto: 577 })
+    const soltar = enganchaEscala(d.win)
+    expect(d.atributos.size).toBe(0)                  // con el dedo: el traje B de siempre
+    d.estado.raton = true
+    d.despacha('mqRaton', 'change')
+    expect(d.atributos.get('data-escala')).toBe('hb')
+    d.estado.raton = false
+    d.despacha('mqRaton', 'change')
+    expect(d.atributos.size + d.estilo.size).toBe(0)
+    soltar()
+  })
+
+  test('el teléfono con ratón no recibe nada, ni al conectarlo ni al girar', () => {
+    const d = creaDOM({ ancho: 411, alto: 1006, raton: true })
+    const soltar = enganchaEscala(d.win)
+    Object.assign(d.win, { innerWidth: 1006, innerHeight: 411 }); d.estado.vertical = false
+    d.despacha('mq', 'change')
+    d.despacha('mqRaton', 'change')
+    expect(d.atributos.size + d.estilo.size).toBe(0)
+    soltar()
+  })
+})
