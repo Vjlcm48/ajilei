@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useId, createRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useId, createRef } from 'react'
 import '../styles/gameTable.css'
 import '../styles/apu.css'
 import PlayingCard from './PlayingCard'
@@ -17,8 +17,9 @@ import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
 import { puntosDe } from '../config/niveles'
-import { composeResultado, claseTono, vozResto } from '../hooks/resultadoCore'
+import { claseTono, vozResto } from '../hooks/resultadoCore'
 import { componeCronica, componeCapas } from '../hooks/cronicaCore'
+import { lecturaDeMano, resultadoDeMano } from '../hooks/manoCore'
 import { useVoz2Recorte } from '../hooks/useVoz2Recorte'
 import { Voz2Capa } from './Voz2Capa'
 import { siembraCEL } from '../dev/siembraCEL'
@@ -474,6 +475,24 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const { phase, currentBet } = game
   const human        = game.players[0]
 
+  // ── VOZ-3 · QUIÉN GANÓ LA MANO, LEÍDO DE LAS FICHAS ──────────────────────
+  // `game.winner` es el dueño de la capa de ARRIBA (`gameEngine.js:285`, `:292`):
+  // con un all-in corto, quien sólo recupera su vuelto. La mano la gana quien
+  // gana la capa principal, y todo lo que la mesa deriva del fin de la mano
+  // —titular, tono, cola de capas, mano en grande, celebración, monedas,
+  // retención, «Manos ganadas» y la espera de la recarga— sale de esta lectura
+  // y de ningún otro sitio (`manoCore.lecturaDeMano`). `null` fuera del pago y
+  // mientras se recoge la mano.
+  //
+  // `ganadorVisible` es la puerta de compatibilidad para los consumidores que
+  // reciben un asiento (`useCelebracion`, `useSesion`): en el pago, el
+  // principal; en el fin de partida, el `winner` de `startHand` —el último con
+  // fichas—, que no es el de una mano y no cambia con VOZ-3.
+  const lectura = useMemo(() => lecturaDeMano(game), [game])
+  const ganadorVisible = phase === PHASES.PAYOUT ? (lectura?.principal ?? null) : game.winner
+  const destinoVuelo = lectura?.destinoVuelo ?? null
+  const retencionVuelo = lectura?.retencion ?? 0
+
   // ── APU-1 1e · SALIR DEVUELVE LAS FICHAS ─────────────────────────────────
   // Rector 1e §2.3. `onLeave` recibe con cuántas fichas se levanta el humano,
   // para que el saldo de la sesión suba con lo ganado. Las cuatro salidas de
@@ -504,14 +523,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // MSG-U1 · El resultado se COMPONE desde el estado, no se hereda del motor.
   // Vale null fuera de PAYOUT/GAME_OVER, y ahí toma el relevo `cronica`
   // (MSG-U2/REN-2): el interruptor sigue siendo la fase, jamás el texto.
-  const resultado = composeResultado({
-    phase,
-    winner: game.winner,
-    players: game.players,
-    numPlayers: game.numPlayers,
-    manoIndex: game.manoIndex,
-    ruleN: game.handRules.ruleN,
-  })
+  // VOZ-3 · en el pago, con el principal como ganador y el tono de la lectura
+  // (que añade `neutro`); en el fin de partida, como siempre.
+  const resultado = resultadoDeMano(game, lectura)
   // VOZ-2 · ¿La frase de resultado se pintó recortada? Lo mide la caja, no la
   // longitud (D4): ver `useVoz2Recorte`. Se publica en el `.voz2-texto` como
   // `data-voz2-recortada`, y el arnés lo contrasta con los glifos visibles.
@@ -603,23 +617,31 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // baja un nivel, a `.chip-token`, y el vuelo pasa a ir de moneda a moneda.
   //
   // EL DESTINO SE RESUELVE POR IDENTIFICADOR (VIS-3a), no por clase de posición
-  // ni por orden DOM: `game.winner` es el índice del motor y `data-coin-target`
-  // lleva ese mismo índice. Por eso funciona igual si gana el humano (0) o
+  // ni por orden DOM: el destino es un índice de asiento del motor y
+  // `data-coin-target` lleva ese mismo índice. Por eso funciona igual si gana el humano (0) o
   // cualquier IA, y por eso PvP lo heredará sin tocar nada.
   //
   // `lado` es el ANCHO MEDIDO de la moneda destino, y de él sale la escala de
   // llegada. Medido y no escrito, con motivo: en mesa 5 a 1024x600 la moneda del
   // pozo mide 11 px porque el CSS de landscape móvil la achica, mientras su
   // atributo `width` sigue diciendo 24. Un número escrito mentiría ahí.
+  //
+  // VOZ-3 · D9 · el destino es el PRINCIPAL (`lectura.destinoVuelo`), no
+  // `game.winner`: con un all-in corto, las monedas volaban a la IA que sólo
+  // recuperaba su vuelto. Y lo que la pila del destino retiene durante el vuelo
+  // es lo que COBRA él (`retiene`), no el pozo entero: en cuanto cobran dos
+  // asientos, restar el pozo bajaba la pila del principal por debajo de lo que
+  // tenía. Las devoluciones y los cobros ajenos no vuelan: aparecen al aterrizar.
+  // Con una sola capa, `retiene` es el pozo y todo queda como antes (D11).
   const geometriaViaje = useCallback(() => {
     const moneda = (sel) => document.querySelector(`${sel} .chip-token`)
     const origen  = moneda('[data-coin-source="pot"]')
-    const destino = moneda(`[data-coin-target="${game.winner}"]`)
+    const destino = moneda(`[data-coin-target="${destinoVuelo}"]`)
     if (!origen || !destino) {
       // No debería ocurrir: VIS-3a midió 1 origen y 1 destino por jugador vivo
       // en las siete celdas. Si ocurriera, NO se vuela y —lo que importa— no se
       // retiene ningún saldo (§Fase 3): sin vuelo no hay nada que diferir.
-      console.warn(`[VIS-3] vuelo sin ${origen ? 'destino' : 'origen'}: winner=${game.winner}`)
+      console.warn(`[VIS-3] vuelo sin ${origen ? 'destino' : 'origen'}: destino=${destinoVuelo}`)
       return null
     }
     // TAB-1 · las monedas vuelan dentro de `#root` ampliado: posiciones en px
@@ -641,9 +663,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       // miden las monedas, así que la cifra retenida no puede desincronizarse de
       // la que el vuelo está ilustrando.
       pozo: ultimoPozoRef.current,
-      winner: game.winner,
+      winner: destinoVuelo,
+      retiene: retencionVuelo,
     }
-  }, [game.winner])
+  }, [destinoVuelo, retencionVuelo])
 
   // VC2b · El asa del sonido del ganador, para que la celebración pueda
   // encadenarse a su final. Se lee con una función estable, nunca durante el
@@ -653,10 +676,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const showdownAudioRef = useRef(null)
   const precedenteViaje = useCallback(() => showdownAudioRef.current, [])
 
+  // VOZ-3 · D10 · «Manos ganadas» = el principal es el humano, la misma regla
+  // que el récord del servidor (`finDeMano`).
   const sesion = useSesion({
     phase,
     handCount: game.handCount,
-    winner: game.winner,
+    winner: ganadorVisible,
     humanScore: human.score,
     enPayout: phase === PHASES.PAYOUT,
   })
@@ -875,7 +900,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // nada: el sonido no espera al fotograma.
   useLayoutEffect(() => {
     if (phase !== PHASES.PAYOUT) { showdownAudioRef.current = null; return }
-    const w = game.winner
+    // VOZ-3 · el principal tiene `score` exactamente cuando hubo volteo, igual
+    // que lo tenía `winner`: el sonido no cambia, sólo de dónde se lee.
+    const w = ganadorVisible
     const isShowdown = w !== null && game.players[w].score
     showdownAudioRef.current = isShowdown ? play('showdown') : null
   }, [phase]) // eslint-disable-line
@@ -907,10 +934,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     })
   }, [esVictoriaDeMesa, control, human.chips])
 
+  // VOZ-3 · el nivel sigue al principal (`lectura.nivel` es este mismo decisor
+  // con el mismo asiento): `mano` o `ajilei` si es el humano, `recoleccion` si
+  // es una IA, también con el tono `neutro` (D4: sin pulso ni fanfarria).
   const celebracion = useCelebracion({
     enabled: true,
     phase,
-    winner: game.winner,
+    winner: ganadorVisible,
     humanCards: human.cards,
     ruleN: game.handRules.ruleN,
     play,
@@ -970,14 +1000,15 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // retención. Un estado paralelo tendría que replicar esos seis caminos y
   // envejecería el día que se añada un séptimo.
   //
-  // INVARIANTES. Nunca se muestra menos que `chips - pozo` (se resta el pozo una
-  // vez y sólo al ganador). Nunca se retiene sin vuelo (sin `activa` no hay
+  // INVARIANTES. Nunca se muestra menos que `chips - retiene` (se resta una vez
+  // y sólo al principal, y `retiene` es lo que él cobra: VOZ-3 D9; con una sola
+  // capa es el pozo entero, como antes). Nunca se retiene sin vuelo (sin `activa` no hay
   // retención, y `geometriaViaje` devuelve null si no encuentra las monedas, con
   // lo que `activa` no llega a armarse). El movimiento reducido no necesita
   // gate: hoy la celebración no lo consulta (Fase 0), así que no hay caso en el
   // que el vuelo se omita y la retención quede colgada.
   const retencion = celebracion.activa && llevaViaje(celebracion.activa.nivel)
-    ? { winner: celebracion.activa.winner, pozo: celebracion.activa.pozo, volando: !celebracion.activa.esperando }
+    ? { winner: celebracion.activa.winner, pozo: celebracion.activa.pozo, retiene: celebracion.activa.retiene, volando: !celebracion.activa.esperando }
     : null
   // El pozo enseña su cifra hasta que sale la primera moneda; en ese instante,
   // 0. Sin volteo la espera es cero, así que las dos cosas pasan en el mismo
@@ -986,7 +1017,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
 
   // Sólo el GANADOR retiene, y sólo para pintar: `playerChips` —el que gobierna
   // qué apuestas se pueden hacer— sigue leyendo el valor real del motor.
-  const saldoMostrado = (i, chips) => chips - (retencion && retencion.winner === i ? retencion.pozo : 0)
+  const saldoMostrado = (i, chips) => chips - (retencion && retencion.winner === i ? retencion.retiene : 0)
 
   const burbujaViva = reacciones.activa?.id ?? null
   const retirarBurbuja = reacciones.cerrarBurbuja
@@ -1321,9 +1352,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // decide. Sin vuelo previsto —mano ganada por retiros, o la forzosa entre
   // manos, que no viene de ningún pago— lista en el acto.
   const enPago     = phase === PHASES.PAYOUT
-  const vueloMano  = enPago && llevaViaje(decideCelebracion({
-    phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN,
-  }))
+  // VOZ-3 · el nivel de la lectura: el mismo decisor con el principal.
+  const vueloMano  = enPago && llevaViaje(lectura?.nivel ?? null)
   const celebrando = !!celebracion.activa
   // Se anota DURANTE el render y no en un efecto: es el molde de React para
   // guardar algo del render anterior, y un `setState` síncrono en un efecto
@@ -1544,14 +1574,18 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // dieciocho diagnósticos desaparecieron de golpe. Una vara que BAJA sin que
   // nadie haya arreglado nada es una vara que hay que ir a mirar.
   const capasPozo  = isPayoutPhase ? repartoPorCapas(game) : []
-  const capasTexto = isPayoutPhase ? componeCapas(capasPozo, game.players, game.winner) : null
+  // VOZ-3 · la cola sale de la lectura: lo de los demás y las devoluciones (D5–D8).
+  const capasTexto = isPayoutPhase ? componeCapas(lectura, game.players) : null
 
   // ── Showdown winner emphasis ──────────────────────────────────────────────
   // Active until "Siguiente mano" (isClearing). Only when the hand reached
   // showdown (winner has a score) — fold-wins reveal nothing.
+  // VOZ-3 · el asiento es el PRINCIPAL: la mano en grande, las cartas
+  // resaltadas, el chip de puntos y `opp-winner` son los de quien ganó la mano,
+  // no los de quien recuperó su vuelto.
   const showdownWinnerSeat =
-    isPayoutPhase && !isClearing && game.winner !== null && game.players[game.winner].score
-      ? game.winner
+    isPayoutPhase && !isClearing && lectura && game.players[lectura.principal].score
+      ? lectura.principal
       : null
 
   // ── Revelar Manos (spec v1.0) · Tanda R1 ──────────────────────────────────
