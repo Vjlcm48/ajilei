@@ -2029,7 +2029,8 @@ if (hacerSolo('cap')) {
 //   node scripts/diagPUE.mjs voz2 --celdas=360x640      (filtra por subcadena)
 //
 // · voz2.c1          el óvalo del pago es el de la tabla C1 de la Fase 0 (D1).
-// · voz2.ovalo       con las 9 formas, Δ = 0 del óvalo y de su interior (pozo,
+// · voz2.ovalo       con las formas de `formasVoz2` (9, y 11 desde VOZ-3 con
+//                    C1 y C3), Δ = 0 del óvalo y de su interior (pozo,
 //                    «A igualar», comodín). El `<p>` NO puntúa aquí: C-3
 //                    (two-ovals, alto automático) y C-4 (escritorio 4/5, ahora
 //                    estirado) se imprimen aparte, ni escondidos ni tomados por
@@ -2341,7 +2342,7 @@ if (hacerSolo('voz2')) {
     const recortadas = c.porForma.filter((f) => f.marca === '1').map((f) => f.id)
     const resumen = `óvalo Δmax ${peorD(c, 'ovalo')} · pozo ${peorD(c, 'pozo')} · igualar ${peorD(c, 'igualar')} · comodín ${peorD(c, 'comodin')}`
     const info = `<p> Δmax ${peorD(c, 'msg')} (no puntúa: C-3/C-4) · ${c.estilo.fontSize}/${c.estilo.lineHeight} alto ${c.estilo.pAlto} · justify-self ${c.estilo.justifySelf}`
-    const recorte = `recortadas ${recortadas.length}/9 [${recortadas.join(', ')}] · real «${c.original}» ve ${c.glifosReal.visibles}/${c.glifosReal.total} marca ${c.marcaReal}` +
+    const recorte = `recortadas ${recortadas.length}/${c.porForma.length} [${recortadas.join(', ')}] · real «${c.original}» ve ${c.glifosReal.visibles}/${c.glifosReal.total} marca ${c.marcaReal}` +
       c.porForma.filter((f) => !f.recorteOk).map((f) => ` · ✗${f.id}: ve ${f.visibles}/${f.total}, marca ${f.marca}`).join('')
     if (!control) {
       anota(`voz2.c1 ${c.celda}`, c.c1Ok, `Δ contra la tabla C1 = ${c.dC1} px`)

@@ -81,9 +81,22 @@ const compone = (n, winner, asientos, { manoIndex = 0, phase = PHASES.PAYOUT } =
     cards: a.cards ?? CORR, score: a.score === undefined ? sc('Bastos', 27) : a.score, eliminated: !!a.eliminated })),
 }).texto
 
+// VOZ-3 · `componeCapas` recibe la LECTURA de la mano (`manoCore.lecturaDeMano`)
+// y no una lista de capas. Aquí se le da la lectura mínima que la frase usa
+// —principal, lo que se llevan los demás y lo que vuelve—: el compositor es el
+// real, y la forma de cada caso es la de §C del informe de VOZ-3.
+const lectura = (n, principal, otras, devoluciones) => ({ principal, numPlayers: n, otras, devoluciones })
+
 /**
- * Las nueve formas de una mesa, en el orden del informe de la Fase 0 §B1.
- * `fin-gana` no llega nunca al óvalo (D16): va como referencia de longitud.
+ * Las formas de una mesa, en el orden del informe de la Fase 0 de VOZ-2 §B1,
+ * y al final las dos de VOZ-3 (C1 y C3). `fin-gana` no llega nunca al óvalo
+ * (D16): va como referencia de longitud.
+ *
+ * VOZ-3 (Fase 1, 1c.1) · `peor` y `corriente+1capa` cambian de texto a
+ * propósito: «N vuelven sin igualar» desaparece y la devolución se dice por
+ * asiento (D5). `IA+tellevas` sale ahora del compositor y queda al byte (la
+ * cola de APU-1 se conserva, D8). Las longitudes nuevas van en el informe de
+ * la Fase 1 de VOZ-3; las de las demás formas no cambian.
  */
 export function formasVoz2(n) {
   const W = n - 1
@@ -91,22 +104,31 @@ export function formasVoz2(n) {
   const jug = Array.from({ length: n }, (_, i) => ({ name: nombre(n, i) }))
   const corrIA = compone(n, W, iguales.map((a, i) => (i === W ? { score: sc('Espadas', 41) } : a)))
   const multi = compone(n, W, Array.from({ length: n }, () => ({ cards: NAT, score: sc('Espadas', 51) })), { manoIndex: (W + 1) % n })
-  // Peor caso factible: N capas como mucho (la del principal, N−2 ajenas y la
-  // que vuelve), montos de 6 cifras (pro 1000 × techo 50).
-  const peor = [{ monto: 250000, ganador: W }]
-  for (let s = 0, k = 0; s < n && k < n - 2; s++) if (s !== W && ++k) peor.push({ monto: 125000, ganador: s })
-  peor.push({ monto: 100000, ganador: -1 })
-  const unaCapa = componeCapas([{ monto: 300, ganador: W }, { monto: 200, ganador: n === 2 ? 0 : 1 }], jug, W)
+  // Peor caso factible: el titular más largo, N−2 capas ajenas y una
+  // devolución a cada uno de los demás (VOZ-3 · la capa sin elegibles las da
+  // todas a la vez), con montos de 6 cifras (pro 1000 × techo 50).
+  const demas = Array.from({ length: n }, (_, s) => s).filter((s) => s !== W)
+  const peor = lectura(n, W, demas.slice(0, n - 2).map((asiento) => ({ asiento, monto: 125000 })),
+    demas.map((asiento) => ({ asiento, monto: 100000 })))
+  // La IA principal y una devolución: a ti en la mesa de 2 (C3), a IA 1 en las
+  // demás.
+  const unaCapa = componeCapas(lectura(n, W, [], [{ asiento: n === 2 ? 0 : 1, monto: 200 }]), jug)
+  // VOZ-3 · C1 y C3 tal como los compone la mesa: la mano tuya con una
+  // devolución a la IA 1, y su espejo.
+  const tuya41 = compone(n, 0, iguales.map((a, i) => (i === 0 ? { score: sc('Espadas', 41) } : a)))
+  const ia41 = compone(n, 1, iguales.map((a, i) => (i === 1 ? { score: sc('Espadas', 41) } : a)))
   return [
-    { id: 'corta', texto: compone(n, 0, iguales.map((a, i) => (i === 0 ? { score: sc('Espadas', 41) } : a))) },
+    { id: 'corta', texto: tuya41 },
     { id: 'corriente-IA', texto: corrIA },
     { id: 'retiros-humano', texto: compone(n, 0, Array.from({ length: n }, () => ({ score: null }))) },
     { id: 'fin-gana', texto: compone(n, 0, iguales, { phase: PHASES.GAME_OVER }) },
     { id: 'empate-cerca-IA', texto: compone(n, W, iguales, { manoIndex: (W + 1) % n }) },
     { id: 'multi-ajilei-IA', texto: multi },
     { id: 'corriente+1capa', texto: `${corrIA} ${unaCapa}` },
-    { id: 'peor', texto: `${multi} ${componeCapas(peor, jug, W)}` },
-    { id: 'IA+tellevas', texto: `${corrIA} El pozo se partió: Te llevas otros 1500 Heptacoins.` },
+    { id: 'peor', texto: `${multi} ${componeCapas(peor, jug)}` },
+    { id: 'IA+tellevas', texto: `${corrIA} ${componeCapas(lectura(n, W, [{ asiento: 0, monto: 1500 }], []), jug)}` },
+    { id: 'C1', texto: `${tuya41} ${componeCapas(lectura(n, 0, [], [{ asiento: 1, monto: 350 }]), jug)}` },
+    { id: 'C3', texto: `${ia41} ${componeCapas(lectura(n, 1, [], [{ asiento: 0, monto: 350 }]), jug)}` },
   ]
 }
 
@@ -131,6 +153,14 @@ export const HOJAS_CONTROL = {
 // Mismo conductor que las sondas de la Fase 0: Pasar/Igualar/Iniciar y «Sin
 // descartar» hasta que el óvalo lleve tono de resultado; después la revelación
 // (+3,72 s, REC-1) y la mesa quieta (`getAnimations` y vuelos a cero).
+// VOZ-3 · el pago se reconoce por `data-tono` (gana, pierde o neutro), nunca
+// por la clase: el tono `neutro` (D4) no lleva `msg-win` ni `msg-lose`.
+// VOZ-3 · el tono del resultado de una MANO, si el óvalo lo lleva. Lo comparte
+// todo el arnés: es la única señal del pago que no depende del color.
+export const TONOS_DE_PAGO = ['gana', 'pierde', 'neutro']
+export const TONO_DE_PAGO = () => [...document.querySelectorAll('.game-message')]
+  .map((m) => m.dataset.tono).find((t) => t === 'gana' || t === 'pierde' || t === 'neutro') ?? null
+
 export async function abrirCeldaEnPago(browser, vista, n, base, { dpr = 1, control = null } = {}) {
   const { ctx, page, red, errores } = await contextoCap(browser, { w: vista.w, h: vista.h, dpr, movil: vista.movil }, base)
   const r = { celda: etiquetaCelda(vista, n), vista: vista.id, mesa: n }
@@ -142,8 +172,7 @@ export async function abrirCeldaEnPago(browser, vista, n, base, { dpr = 1, contr
     let enPago = false
     for (let i = 0; i < 480 && !enPago; i++) {
       await page.waitForTimeout(200)
-      enPago = await page.evaluate(() => [...document.querySelectorAll('.game-message')]
-        .some((m) => m.classList.contains('msg-win') || m.classList.contains('msg-lose')))
+      enPago = await page.evaluate(TONO_DE_PAGO)
       if (enPago) break
       const b = page.locator('.action-buttons button:has-text("Pasar"), .action-buttons button:has-text("Igualar"), button:has-text("Iniciar mano")').first()
       if (await b.count() && await b.isEnabled().catch(() => false)) { await b.click({ timeout: 1500 }).catch(() => {}); await page.mouse.move(5, 5); continue }
@@ -223,6 +252,10 @@ export const MEDIR_VOZ2 = ({ formas, estilo = null }) => {
     const cs = getComputedStyle(sp)
     const n = parseInt(cs.webkitLineClamp, 10)
     if (!Number.isFinite(n)) return null
+    // VOZ-3 · D16 · una caja de 0 px no deja leer nada. El clon con ese ancho
+    // partía la frase en una letra por línea y la búsqueda devolvía 4–14
+    // «leídos» que no existen (tableta vertical m4/m5, informe de VOZ-3 §E.3).
+    if (sp.clientWidth === 0) return 0
     const lh = parseFloat(cs.lineHeight)
     const c = document.createElement('div')
     Object.assign(c.style, { position: 'absolute', left: '-9999px', top: '0', visibility: 'hidden', width: sp.clientWidth + 'px',

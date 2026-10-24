@@ -23,6 +23,17 @@
 //   ?apu=sinRival:d12  Todas, el humano incluido.
 //   ?apu=gana          ARN-3d · el humano gana la PRIMERA mano: prepara el
 //                      reparto, no las pilas (`repartoGanador.js`).
+//   ?apu=allin         VOZ-3 · C1: el humano se sienta con 1,5 apuestas y la
+//                      mejor mano; la IA 1, con una mano fuerte pero menor
+//                      (`ordenAllin`), apuesta, y el humano contesta con su
+//                      All-in. Gana la capa principal y a la IA le vuelve su
+//                      sobrante: «¡Ganas con…! A la IA se le devuelven…».
+//   ?apu=allin-espejo  VOZ-3 · C3: el espejo. La IA 1 se sienta con 1,5
+//                      apuestas y la mejor mano; el humano apuesta en su
+//                      primer turno y le vuelve el sobrante: «La IA gana con…
+//                      Se te devuelven…». Los dos son para la mesa de 2 (en
+//                      las de 3 a 5 lo más probable, no lo seguro: ver
+//                      `repartoGanador.js`).
 //   ?apu=video:<ms>    ECO-1g · el video de recompensa dura <ms> a la vista (y
 //                      el banco imitado del bypass acorta en proporción los
 //                      segundos mínimos antes de cobrar).
@@ -55,7 +66,7 @@
 // sembrar una sesión real: en producción estas funciones devuelven `null` (o la
 // identidad) en su primera línea y el minificador se lleva el archivo entero.
 
-import { armarRepartoGanador } from './repartoGanador'
+import { armarRepartoGanador, armarRepartoAllin } from './repartoGanador'
 
 export const APU_PARAM = 'apu'
 
@@ -169,6 +180,11 @@ export function siembraMesaAPU(estado) {
       armarRepartoGanador(players.filter((p) => !p.eliminated).length)
       continue
     }
+    // VOZ-3 · D13 · estos dos preparan el reparto Y siembran pilas (abajo, en
+    // `MOLDES`): el corto se sienta con 1,5 apuestas.
+    if (nombre === 'allin' || nombre === 'allin-espejo') {
+      armarRepartoAllin(players.filter((p) => !p.eliminated).length, nombre === 'allin-espejo')
+    }
     const molde = MOLDES[nombre]
     if (!molde) continue
 
@@ -221,4 +237,8 @@ const MOLDES = {
   // §4.3: nadie con quien apostar. El humano se queda solo con fichas y las
   // rondas de apuesta dejan de existir.
   sinRival:     { todasIAS: 1 },
+  // VOZ-3 · D13 · el corto de C1 es el humano (como `allinHumano`) y el de C3,
+  // la IA 1. El reparto lo arma `siembraMesaAPU` arriba.
+  allin:        { humano: 1.5 },
+  'allin-espejo': { ias: [1], factor: 1.5 },
 }

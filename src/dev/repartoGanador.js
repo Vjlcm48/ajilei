@@ -1,6 +1,7 @@
 // ── repartoGanador.js · ARN-3d §2.5 (D14) · el humano gana la PRIMERA mano ──
 // Rector: AJILEI_ARN-3d_v1.0.md §0 D14 y la revisión del STOP-1. Lo consume
 // `?apu=gana` (`siembraAPU.js`), con la misma doble puerta que los demás moldes.
+// VOZ-3 · y `?apu=allin` / `?apu=allin-espejo` (más abajo, `ordenAllin`).
 //
 // PARA QUÉ. `vc` necesita una mano GANADA por el humano para medir la
 // celebración de mano (el roce de fichas, el Δ de la barra, el reloj, el mudo y
@@ -160,7 +161,83 @@ export function tiradasPara(orden) {
  * @param {number} n  vivos en la mesa
  */
 export function armarRepartoGanador(n) {
-  const tiradas = tiradasPara(ordenGanador(n))
+  armarOrden(ordenGanador(n))
+}
+
+// ── VOZ-3 · D13 · `?apu=allin` y `?apu=allin-espejo` ────────────────────────
+// Rector: AJILEI_VOZ-3_Fase1_v1.0.md §3 1c.3. Los dos casos que VOZ-3 corrige,
+// pintados por el camino de verdad: un all-in corto que GANA la capa principal
+// mientras el rival recupera su sobrante (C1), y su espejo (C3). El molde
+// prepara el reparto; las pilas las siembra `siembraAPU.js` (1,5 apuestas al
+// corto: tras el ante le queda media, que no cubre ninguna apuesta).
+//
+// C1 · `ordenAllin(n)`. El humano recibe la mano de `ordenGanador` (50, o 51
+// con 5 vivos) y la IA 1 una mano FUERTE pero menor: cuatro «diez» de Oros y
+// el 6 de Oros = 46. Es la mano que hace apostar a una IA (la cabecera de este
+// archivo lo midió: «46 de Oros contra 50» dejaba al humano en All-in), y con
+// media apuesta en la pila el humano solo puede contestar con su All-in. Sus
+// mejoras posibles no la pasan de 50: el As de Oros sigue al fondo, y con las
+// tres «diez» de Oros que quedan empata a 50, que en la primera mano es del
+// humano por ser la Mano. Con 4 y 5 vivos el comodín es del humano.
+//
+// C3 · `ordenAllinEspejo(n)`. Las manos del humano y de la IA 1 se cambian de
+// sitio: la IA 1 (el corto) tiene la mejor, y el humano una floja. El humano,
+// que es la Mano, apuesta en su primer turno; la IA 1 contesta con su All-in y
+// a él le vuelve el sobrante.
+//
+// LO QUE NO CONTROLA, como `ordenGanador`: las posiciones son las de «nadie se
+// retira a las 2». En la mesa de 2 eso es siempre así (retirarse acaba la
+// mano); en las de 3 a 5, si una IA se retira a las 2, la segunda vuelta se
+// corre y las manos de la IA 1 cambian. Y las IAS deciden con su propio azar:
+// el molde hace probable que la IA 1 apueste (C1) o pague (C3), no seguro. Las
+// celdas de `apu` que lo usan reintentan y, si no se da, lo declaran «sin
+// cobertura».
+const OROS_FUERTE = ['2-Oros', '3-Oros', '4-Oros', '5-Oros', '6-Oros']
+const posicionesDe = (seat, n) => [seat, n + seat, 2 * n + seat, 3 * n + seat, 4 * n + seat]
+
+/**
+ * C1: el humano con la mejor mano y la IA 1 con 46 de Oros. Puro.
+ * @param {number} n  vivos en la mesa (2–5)
+ * @returns {string[]}
+ */
+export function ordenAllin(n) {
+  const T = ordenGanador(n)
+  // Una posición de la IA 1 puede estar ya ocupada por una «diez» de Copas que
+  // el humano necesita si alguien se retira a las 2 (mesa de 3: la 10 es suya
+  // con k = 2). Esa no se toca: la IA 1 se queda con cuatro de Oros y esa.
+  const reservada = (id) => COPAS_DIEZ.includes(id) || id === COMODIN
+  let i = 0
+  for (const q of posicionesDe(1, n)) {
+    if (reservada(T[q])) continue
+    const j = T.indexOf(OROS_FUERTE[i++])
+    ;[T[q], T[j]] = [T[j], T[q]]
+  }
+  return T
+}
+
+/**
+ * C3: la IA 1 con la mejor mano y el humano con una floja. Puro.
+ * @param {number} n  vivos en la mesa (2–5)
+ * @returns {string[]}
+ */
+export function ordenAllinEspejo(n) {
+  const T = ordenGanador(n)
+  const h = posicionesDe(0, n), a = posicionesDe(1, n)
+  h.forEach((q, i) => { [T[q], T[a[i]]] = [T[a[i]], T[q]] })
+  return T
+}
+
+/**
+ * Arma el reparto de C1 (o de C3 con `espejo`), como `armarRepartoGanador`.
+ * @param {number} n  vivos en la mesa
+ * @param {boolean} [espejo]
+ */
+export function armarRepartoAllin(n, espejo = false) {
+  armarOrden(espejo ? ordenAllinEspejo(n) : ordenAllin(n))
+}
+
+function armarOrden(orden) {
+  const tiradas = tiradasPara(orden)
   let k = 0
   setRng(() => {
     const v = tiradas[k++]

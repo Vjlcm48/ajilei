@@ -688,7 +688,8 @@ async function vuelosEn(browser, base, v, n) {
     // Una mano entera: reparto, descartes de las IAS y el pago con sus monedas.
     const t0 = Date.now(); let pago = false
     while (Date.now() - t0 < 90000) {
-      pago = await page.evaluate(() => [...document.querySelectorAll('.game-message')].some((m) => m.classList.contains('msg-win') || m.classList.contains('msg-lose')))
+      // VOZ-3 · el pago por `data-tono` (gana, pierde o neutro), no por la clase.
+      pago = !!(await page.evaluate(V.TONO_DE_PAGO))
       if (pago) break
       const b = page.locator('.action-buttons button:has-text("Pasar"), .action-buttons button:has-text("Igualar"), button:has-text("Iniciar mano")').first()
       if (await b.count() && await b.isEnabled().catch(() => false)) { await b.click({ timeout: 1500 }).catch(() => {}); await page.mouse.move(5, 5); continue }

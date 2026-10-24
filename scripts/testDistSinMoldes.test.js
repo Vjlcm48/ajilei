@@ -32,6 +32,8 @@ const PROHIBIDAS = [
   'ajilei:banco-imitado',
   // la tabla de moldes de `siembraAPU`
   'allinHumano',
+  // VOZ-3 · D13 · el molde de C3 (`?apu=allin-espejo`): nunca a producción
+  'allin-espejo',
   // ECO-1c · el mando `?apu=bolsillo:<n>` (el literal de su expresión regular;
   // fuera de `src/dev/` «bolsillo» sólo vive en comentarios, que no llegan)
   'bolsillo:',

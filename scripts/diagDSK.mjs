@@ -338,6 +338,7 @@ import {
 } from './arnes/autojuego.mjs'
 // ARN-3c · D4 · el juicio de «¿cabe el texto en su caja?» (lo puro, probado).
 import { juzgaCajaTexto, juzgaSobrante } from './arnes/cajas.mjs'
+import { asientoDeNombre, principalPorCartas } from './arnes/oraculo.mjs'
 // ARN-3c · D7 · `lob` y `msg` entran al bundle real con la sesión simulada de CAP.
 import { contextoCap, PERFIL_CAP } from './cap/capMesa.mjs'
 // MOV-1b-a · las entradas del menú y qué está vivo en cada rama salen de la
@@ -2844,6 +2845,118 @@ async function runRec2(browser) {
   return { filas, ok }
 }
 
+// ── VOZ-3 · D13 · apu.8 y apu.9: C1 y C3 PINTADOS, por el molde ────────────
+// Rector: AJILEI_VOZ-3_Fase1_v1.0.md §3 1c.3. `?apu=allin` siembra C1 (el
+// humano corto con la mejor mano: la IA 1 apuesta y él contesta con su
+// All-in) y `?apu=allin-espejo` siembra C3 (la IA 1 corta con la mejor mano:
+// el humano apuesta y ella contesta con el suyo). Los dos en la mesa de 2,
+// que es donde el molde es exacto (`repartoGanador.js`). Lo que se juzga es lo
+// que se ve: el tono del óvalo (`data-tono`, la señal del pago, D12 de VOZ-3),
+// la frase entera, el chip de la mano en grande y que el pozo se partió.
+// Que la IA apueste (C1) o pague (C3) es cosa de su azar: si en tres mesas no
+// se da el all-in, el punto queda «sin cobertura», no rojo (ARN-3b D4).
+const APU_VOZ3_VISTAS = [
+  { w: 360, h: 640, movil: true, nota: 'móvil portrait' },
+  { w: 1366, h: 768, movil: false, nota: 'escritorio' },
+]
+const APU_VOZ3_CASOS = [
+  { id: 'apu.8', caso: 'C1', molde: 'allin', tono: 'gana', chip: '0',
+    frase: /^¡Ganas con [A-Za-z]+, \d+ pts! A la IA se le devuelven \d+ Heptacoins\.$/ },
+  { id: 'apu.9', caso: 'C3', molde: 'allin-espejo', tono: 'pierde', chip: '1',
+    frase: /^La IA gana con [A-Za-z]+, \d+ pts\. Se te devuelven \d+ Heptacoins\.$/ },
+]
+// El pago, leído en una sola evaluación: tono, frase entera (el span de VOZ-2,
+// no lo que se lee antes del «…»), capas y dónde está el chip de ganador.
+const APU_VOZ3_PAGO = () => {
+  const m = document.querySelector('.game-message')
+  const tono = m?.dataset.tono
+  if (tono !== 'gana' && tono !== 'pierde' && tono !== 'neutro') return null
+  const sp = m.querySelector(':scope > .voz2-texto')
+  const chips = [...document.querySelectorAll('.win-score-chip')].map((e) => {
+    if (e.closest('.player-zone')) return '0'
+    const z = e.closest('.opp-panel, .ai-zone')
+    return z?.querySelector('[data-coin-target]')?.getAttribute('data-coin-target') ?? '?'
+  })
+  return { tono, texto: (sp || m).textContent.trim(), clase: m.className, capas: Number(m.dataset.capas || 0), chips }
+}
+async function apuVoz3Mano(page, caso, intentos = 3) {
+  const espejo = caso.molde === 'allin-espejo'
+  for (let i = 0; i < intentos; i++) {
+    await page.goto(`${BASE}/?apu=${caso.molde}`)
+    await recorrerRuta(page, 2, 'basico', 0, 'medio')
+    let abrio = false, allin = false, pago = null
+    const t0 = Date.now()
+    while (Date.now() - t0 < 90000 && !pago) {
+      pago = await page.evaluate(APU_VOZ3_PAGO)
+      if (pago) break
+      // El guion de la prueba de Victor (§4 de la ficha): en C1 el humano pasa
+      // hasta que la IA abre y contesta con All-in; en C3 abre él en su primer
+      // turno. No descarta (el reparto es el del molde) y nunca pulsa
+      // «Siguiente mano».
+      const hecho = await page.evaluate(({ espejo, abrio }) => {
+        const pulsa = (sel) => { const b = document.querySelector(sel); if (b && !b.disabled) { b.click(); return true } return false }
+        const porTexto = (t) => { const b = [...document.querySelectorAll('.btn')].find((x) => x.textContent.trim() === t && !x.disabled); if (b) { b.click(); return true } return false }
+        if (porTexto('Iniciar mano')) return 'iniciar'
+        if (espejo && !abrio && pulsa('[data-accion="apostar"]')) return 'apostar'
+        if (!espejo && pulsa('[data-accion="allin"]')) return 'allin'
+        if (pulsa('[data-accion="pasar"]')) return 'pasar'
+        if (espejo && pulsa('[data-accion="igualar"]')) return 'igualar'
+        if (porTexto('Sin descartar')) return 'descarte'
+        return null
+      }, { espejo, abrio })
+      if (hecho === 'apostar') abrio = true
+      if (hecho === 'allin') allin = true
+      await page.waitForTimeout(hecho ? 320 : 200)
+    }
+    if (pago) {
+      // La revelación y la celebración asientan; la frase ya no cambia.
+      await page.waitForTimeout(900)
+      pago = await page.evaluate(APU_VOZ3_PAGO) ?? pago
+    }
+    // C1 sin el All-in del humano, o C3 sin la apuesta, no es el caso: otra mesa.
+    if (pago && pago.capas > 1 && (espejo ? abrio : allin)) return { logrado: true, intentos: i + 1, ...pago }
+  }
+  return { logrado: false, intentos }
+}
+async function runApuVoz3(browser) {
+  try { mkdirSync(APU_TEL_DIR, { recursive: true }) } catch { /* ya existe */ }
+  const filas = []
+  for (const vp of APU_VOZ3_VISTAS) {
+    for (const caso of APU_VOZ3_CASOS) {
+      const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, ...(vp.movil ? { hasTouch: true, isMobile: true } : {}) })
+      const consola = []
+      page.on('pageerror', (e) => consola.push(`pageerror: ${e.message}`))
+      page.on('console', (m) => {
+        if (m.type() !== 'error' && m.type() !== 'warning') return
+        if (APU_RUIDO_CONOCIDO.some((r) => r.test(m.text()))) return
+        consola.push(`${m.type()}: ${m.text()}`)
+      })
+      const tag = `${vp.w}x${vp.h}`
+      let r
+      try { r = await apuVoz3Mano(page, caso) } catch (e) { r = { logrado: false, excepcion: e.message.split('\n')[0] } }
+      const fila = { id: caso.id, caso: caso.caso, vp: tag, ...r, consola }
+      if (r.logrado) {
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: `${vp.movil ? APU_TEL_DIR : APU_OUT_DIR}/apu_voz3_${caso.caso}_${tag}.png` })
+        fila.ok = r.tono === caso.tono && caso.frase.test(r.texto) && !r.texto.includes('El pozo se partió')
+          && r.chips.length === 1 && r.chips[0] === caso.chip && consola.length === 0
+      } else {
+        fila.ok = r.excepcion ? false : null
+        fila.estado = r.excepcion ? 'excepcion' : 'sinCobertura'
+      }
+      filas.push(fila)
+      await page.close()
+    }
+  }
+  const sinCobertura = filas.filter((f) => f.ok === null).map((f) => `${f.vp} ${f.id} (${f.caso}: el all-in no se dio en ${f.intentos} mesas)`)
+  const ok = filas.every((f) => f.ok !== false)
+  console.log(`\n── apu · VOZ-3 · C1 y C3 con el molde ── ${filas.filter((f) => f.ok).length}/${filas.length}${sinCobertura.length ? ` · ${sinCobertura.length} sin cobertura` : ''}`)
+  for (const f of filas) {
+    console.log(`  ${f.ok ? 'OK  ' : f.ok === null ? 'S/C ' : 'FALLA'} ${f.id} ${f.caso} ${f.vp.padEnd(9)} ${f.logrado ? `tono ${f.tono} · chip ${f.chips.join(',') || '—'} · capas ${f.capas} · «${f.texto}» (mesa ${f.intentos})` : (f.excepcion ?? `sin cobertura en ${f.intentos} mesas`)}${f.consola.length ? ' · consola: ' + f.consola[0] : ''}`)
+  }
+  return { filas, ok, sinCobertura }
+}
+
 async function runApu(browser) {
   const celdas = []
   try { mkdirSync(APU_OUT_DIR, { recursive: true }) } catch { /* ya existe */ }
@@ -2856,7 +2969,7 @@ async function runApu(browser) {
   // REC-2 · `apu rec2` corre SÓLO los estados de REC-2; una celda filtrada
   // (`apu 360x640`) no los corre, y el JSON lo dice (`rec2: null`).
   for (const vp of APU_VIEWPORTS) {
-    if (vpFilter === 'rec2') break
+    if (vpFilter === 'rec2' || vpFilter === 'voz3') break
     if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
     // 1f §A.1 · `hasTouch`/`isMobile` sólo en las celdas de teléfono: es lo que
     // hace existir la media query táctil y el piso de 40 px. Las cuatro de
@@ -3217,7 +3330,10 @@ async function runApu(browser) {
       // Quién gana cada capa y cuándo toca nombrarlo es puro y lo sella Vitest
       // (`testMesaAPU1` §6), que es donde se puede fijar el reparto a mano.
       ok: huboCapas && capas.capas > 1 && capas.texto.length > 0 && capas.tono.length > 0
-        && (!capas.texto.includes('El pozo se partió') || /se lleva|vuelven|Te llevas/.test(capas.texto)),
+        // VOZ-3 · «N vuelven sin igualar» ya no existe: lo que vuelve se dice
+        // «se le devuelven» / «Se te devuelven» (D5), y puede ir sin «El pozo
+        // se partió» delante.
+        && (!capas.texto.includes('El pozo se partió') || /se lleva|devuelven?|Te llevas/.test(capas.texto)),
     }
     if (!huboCapas) {
       c['apu.5'].estado = 'sinCobertura'
@@ -3450,8 +3566,10 @@ async function runApu(browser) {
   }
 
   const rec2 = (!vpFilter || vpFilter === 'rec2') ? await runRec2(browser) : null
-  const ok = celdas.every((c) => c.ok) && (rec2 ? rec2.ok : true)
-  const sinCobertura = celdas.flatMap((c) => (c.sinCobertura ?? []).map((s) => `${c.vp} ${s}`))
+  // VOZ-3 · `apu voz3` corre sólo apu.8 y apu.9; una celda filtrada no los corre.
+  const voz3 = (!vpFilter || vpFilter === 'voz3') ? await runApuVoz3(browser) : null
+  const ok = celdas.every((c) => c.ok) && (rec2 ? rec2.ok : true) && (voz3 ? voz3.ok : true)
+  const sinCobertura = [...celdas.flatMap((c) => (c.sinCobertura ?? []).map((s) => `${c.vp} ${s}`)), ...(voz3?.sinCobertura ?? [])]
   console.log(`\n── apu · la mesa de APU-1 ── ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas${sinCobertura.length ? ` · ${sinCobertura.length} punto(s) sin cobertura` : ''}`)
   for (const c of celdas) {
     const fallos = [
@@ -3487,7 +3605,7 @@ async function runApu(browser) {
       console.log(`      tarjeta ${b.modal.ancho}×${b.modal.alto} en ${b.modal.top} · tapa ${b.solapeCartas} px² de ${b.areaCartas} de la mano`)
     }
   }
-  return { celdas, ok, rec2, sinCobertura }
+  return { celdas, ok, rec2, voz3, sinCobertura }
 }
 
 // ── DSK-B1 · Presupuesto vertical de la columna central (mesa 5) ──────────────
@@ -9079,7 +9197,8 @@ async function runU2(browser) {
         const m = document.querySelector('.game-message')
         const f = document.querySelector('.u2-frase')
         return {
-          fin: m ? (m.classList.contains('msg-win') ? 'win' : m.classList.contains('msg-lose') ? 'lose' : null) : null,
+          // VOZ-3 · el pago por `data-tono`, no por la clase (el `neutro` no lleva).
+          fin: ({ gana: 'win', pierde: 'lose', neutro: 'neutro' })[m?.dataset.tono] ?? null,
           selector: !!document.querySelector('.u2-selector'),
           fraseOff: f ? f.disabled : null,
           vcCapa: !!document.querySelector('.vc-capa'),
@@ -9816,11 +9935,10 @@ async function vcHastaVictoria(page, maxManos = 18) {
     for (let i = 0; i < 120 && !fin; i++) {
       await vcEspera(page, 250)
       fin = await page.evaluate(() => {
+        // VOZ-3 · el pago por `data-tono` (gana, pierde o neutro), no por la
+        // clase: una mano `neutro` no lleva ni `msg-win` ni `msg-lose`.
         const m = document.querySelector('.game-message')
-        if (!m) return null
-        if (m.classList.contains('msg-win')) return 'win'
-        if (m.classList.contains('msg-lose')) return 'lose'
-        return null
+        return ({ gana: 'win', pierde: 'lose', neutro: 'neutro' })[m?.dataset.tono] ?? null
       })
       if (fin) break
       await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
@@ -10626,7 +10744,8 @@ async function msgRevelaYLee(page, nombres) {
 // ── ARN-3 · La auditoría de UNA mano, compartida por P2 y por la caza ───────
 // Sale de dentro del bucle de P2 sin cambiar una coma de lo que juzga: mismas
 // puertas, mismo instante de captura (`msgLee` PRIMERO — los taps mueven el
-// chip de ganador al panel destapado, así que leer después falsearía `idxGana`).
+// chip de ganador al panel destapado, así que leer después falsearía `chipEn`).
+// VOZ-3 · D12 · el ganador ya no sale del chip sino de las cartas (`principal`).
 // Lo único nuevo es de dónde salen las cartas y las dos puertas que eso añade.
 async function msgAuditaMano(page, n, mano, juego, dep) {
   // VOZ-2 · 1b · dos fotogramas: la marca de recorte la pone el producto desde
@@ -10634,8 +10753,12 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
   await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
   const l = await msgLee(page)
   const conScore = l.zonas.filter(z => z.score)
-  const idxGana  = conScore.findIndex(z => z.gana)
-  const hayShowdown = conScore.length > 0 && idxGana >= 0
+  // VOZ-3 · D12 · el showdown se reconoce por las bandas de puntos, no por el
+  // chip de ganador: el chip lo pinta la mesa, y quién gana lo decide abajo el
+  // oráculo con las cartas. El chip se sigue leyendo AQUÍ (antes de los toques,
+  // que lo mueven) solo para juzgarlo: tiene que estar en el principal.
+  const chipEn = conScore.find(z => z.gana)?.nombre ?? null
+  const hayShowdown = conScore.length > 0
   // ARN-2 · las dos lecturas de la Mano, la observada en vuelo y la derivada de
   // la rotación. Se registran las dos SIEMPRE y se exige que concuerden.
   const manoVista   = juego.manoVista
@@ -10682,13 +10805,29 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
   }) : []
   const cartasLeidas  = hayShowdown && conScore.every(z => lectura.leidas[z.nombre]?.cartas.length === 5)
   const cartasCuadran = hayShowdown && cruce.every(c => c.ok)
+  // ── VOZ-3 · D12 · EL ORÁCULO, DE LAS CARTAS Y DE LA MANO ─────────────────
+  // Antes `idxGana` salía del chip de puntos de la pantalla, que seguía a
+  // `game.winner` (la capa de ARRIBA): en un all-in corto que gana la
+  // principal, la mesa decía «La IA gana…», el chip estaba en la IA y el arnés
+  // componía lo mismo y lo daba por bueno (Fase 0 de VOZ-3, §G.1). Ahora el
+  // ganador es el de la capa 0 —la mejor mano entre los finalistas, y si
+  // empatan la más cercana a la Mano—, con las cartas que el arnés leyó y
+  // cruzó contra la banda, y la Mano leída en vuelo (`arnes/oraculo.mjs`).
+  // Con las cartas sin leer o sin la Mano no hay oráculo y no se compone nada.
+  const principal = hayShowdown && cartasLeidas && cartasCuadran
+    ? principalPorCartas(conScore.map(z => ({
+      asiento: asientoDeNombre(z.nombre),
+      puntos: getBestSuitScore(lectura.leidas[z.nombre].cartas, reglas.ruleN, reglas.comodinEnabled).points,
+    })), asientoDeNombre(manoVista), n)
+    : null
+  const nombrePrincipal = principal === null ? null : (conScore.find(z => asientoDeNombre(z.nombre) === principal)?.nombre ?? null)
   // El toque destapa manos; no puede tocar lo que se juzga. Se comprueba en vez
   // de suponerse.
   const textoTrasLeer = lectura.taps.length ? await msgTexto(page) : l.texto
 
   let esperado = null, via = 'plantilla'
   if (hayShowdown) {
-    if (cartasLeidas && cartasCuadran) {
+    if (cartasLeidas && cartasCuadran && nombrePrincipal !== null) {
       // Reconstrucción completa desde la página, ahora también las cartas.
       via = 're-derivado'
       // ── APU-1 1e · LOS ASIENTOS VAN ENTEROS, NO SÓLO LOS DEL SHOWDOWN ─────
@@ -10717,7 +10856,7 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
         score: (z && z.score) ? { palo: z.score.palo, points: z.score.pts } : null,
         eliminated: !z,
       }))
-      const idxGanaEnMesa = orden.findIndex(z => z && z.gana)
+      const idxGanaEnMesa = orden.findIndex(z => z && z.nombre === nombrePrincipal)
       esperado = dep.composeResultado({
         // `numPlayers` y `ruleN` salen de lo VIVO, no del tamaño de arranque: la
         // voz de la mesa de dos y la tabla de reglas dependen de cuántos quedan,
@@ -10740,8 +10879,8 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
     } else {
       // Sin cartas fiables NO se compone nada: antes se rellenaba con una mano
       // inventada y el veredicto salía igual de verde. Ahora falta el insumo y
-      // se dice.
-      via = 'sin-cartas'
+      // se dice. VOZ-3 · y sin la Mano leída, el oráculo no puede desempatar.
+      via = cartasLeidas && cartasCuadran ? 'sin-mano' : 'sin-cartas'
     }
   }
   const claseEsperada = dep.claseTono(l.tono)
@@ -10757,7 +10896,9 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
     // solo manoSeat, y por eso mismo digno de verse).
     manoCuantas: juego.manoCuantas,
     chapaOculta: manoEnChapa === null,
-    ganaLaMano: !!(manoVista && conScore[idxGana] && conScore[idxGana].nombre === manoVista),
+    ganaLaMano: !!(manoVista && nombrePrincipal === manoVista),
+    // VOZ-3 · D12 · quién gana según el oráculo, y dónde puso la mesa el chip.
+    principal: nombrePrincipal, chipEn,
     // El insumo de la Mano sólo LLEGA al texto por la vía del desempate: sin
     // empate a puntos, resultadoCore.js:117 calcula `desempate` y no lo usa. Por
     // eso la condición que mordía es la conjunción de tres cosas, y se registran
@@ -10836,8 +10977,12 @@ async function msgAuditaMano(page, n, mano, juego, dep) {
   m.visto = v ? { n: v.n, total: v.total, recortada: v.recortada, contiguo: v.contiguo, texto: v.texto } : null
   m.vistoEsPrefijo = !!v && v.contiguo && v.n > 0 && (contra.startsWith(v.texto) || v.texto.startsWith(contra)) && l.texto.startsWith(v.texto) &&
     (v.n < v.total) === v.recortada
+  // VOZ-3 · D12 · la mano en grande (el chip, `showdownWinnerSeat`) es la del
+  // principal que dice el oráculo, no la del dueño de la capa de arriba.
+  m.chipDelPrincipal = via !== 're-derivado' || m.chipEn === m.principal
   m.ok = m.coincide && m.sinPierdes && m.sinVozVieja && m.tonoAplicado && m.pantallaLimpia &&
-    m.manoLeida && m.manoConcuerda && m.manoCruce && m.cartasOk && m.mensajeEstable && m.vistoEsPrefijo
+    m.manoLeida && m.manoConcuerda && m.manoCruce && m.cartasOk && m.mensajeEstable && m.vistoEsPrefijo &&
+    m.chipDelPrincipal
   return m
 }
 
@@ -10945,9 +11090,10 @@ async function msgJuegaUnaMano(page, primera, barrido = null) {
       const v = await msgLeeMano(page)
       if (v.turno && !v.showdown) { manoVista = v.mano; manoCuantas = v.cuantas }
     }
+    // VOZ-3 · el pago por `data-tono` (gana, pierde o neutro), no por la clase.
     const fin = await page.evaluate(() => {
-      const m = document.querySelector('.game-message')
-      return !!m && (m.classList.contains('msg-win') || m.classList.contains('msg-lose'))
+      const t = document.querySelector('.game-message')?.dataset.tono
+      return t === 'gana' || t === 'pierde' || t === 'neutro'
     })
     if (fin) return { jugada: true, manoVista, manoCuantas }
     await clickIf(page, '.action-buttons button:has-text("Pasar")') ||
@@ -11282,7 +11428,7 @@ async function runMSG(browser) {
     // ARN-2 · la Mano se imprime en cada mano junto con si su pastilla estaba
     // oculta y si el desempate lo ganó ella: ése es el registro con el que se
     // demuestra que la condición del hallazgo ① se ejercitó, y no un "confía".
-    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.encogio ? ` (mesa de ${m.vivos}, rotación n/a)` : (m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`)}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} ${msgCartasResumen(m)} visto:${m.visto ? `${m.visto.n}/${m.visto.total}${m.visto.recortada ? ' recortada' : ''}` : '—'}${m.vistoEsPrefijo ? '✓' : '✗'}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`msg·jugado T${celda.n} ${celda.vp.w}x${celda.vp.h} (${celda.gate}) · ${r.ok ? 'OK' : 'FALLA'} ruta=${r.manos[0]?.ruta ?? '—'} pantalla sin "(N pts)"=${r.manos.every(m => m.pantallaLimpia)} ${r.manos.map(m => `[${m.via} "${m.texto}" tono=${m.tono} mano=${m.manoVista}${m.encogio ? ` (mesa de ${m.vivos}, rotación n/a)` : (m.manoConcuerda ? '' : `≠rot:${m.manoRotada}`)}${m.chapaOculta ? ' chapaOCULTA' : ` chapa:${m.manoEnChapa}`}${m.ganaLaMano ? ' GANA-LA-MANO' : ''} gana:${m.principal ?? '—'}${m.chipDelPrincipal ? '' : ` ✗chip:${m.chipEn}`} ${msgCartasResumen(m)} visto:${m.visto ? `${m.visto.n}/${m.visto.total}${m.visto.recortada ? ' recortada' : ''}` : '—'}${m.vistoEsPrefijo ? '✓' : '✗'}${m.ok ? '' : ' ✗esperado="' + m.esperado + '" vozVieja=' + JSON.stringify(m.vozVieja)}]`).join(' ')}${r.error ? ' · ' + r.error : ''}`)
     await page.context().close()
   }
 
@@ -12341,9 +12487,9 @@ async function runVuelo(browser) {
         })
         if (r.cerrada) {
           fin = await page.evaluate(() => {
+            // VOZ-3 · por `data-tono`, no por la clase (el `neutro` no lleva).
             const m = document.querySelector('.game-message')
-            if (!m) return 'fin'
-            return m.classList.contains('msg-win') ? 'win' : (m.classList.contains('msg-lose') ? 'lose' : 'fin')
+            return ({ gana: 'win', pierde: 'lose', neutro: 'neutro' })[m?.dataset.tono] ?? 'fin'
           })
         }
         if (fin === esc.quien) break
@@ -12388,7 +12534,7 @@ async function runVuelo(browser) {
         // está auditando: el chip de puntaje del showdown, o el humano si el
         // mensaje es de victoria.
         const m = document.querySelector('.game-message')
-        if (m && m.classList.contains('msg-win')) return '0'
+        if (m && m.dataset.tono === 'gana') return '0'
         const p = [...document.querySelectorAll('.opp-panel, .ai-zone')].find(x => x.querySelector('.win-score-chip'))
         if (p) { const t = p.querySelector('[data-coin-target]'); return t ? t.getAttribute('data-coin-target') : null }
         return null
