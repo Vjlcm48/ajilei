@@ -20,7 +20,8 @@
 //            desplazar, las P con su semáforo frente al S25 sin ningún rojo,
 //            zona táctil ≥ 44 y el factor de la fórmula
 //   V-h      horizontal (laptop, iPad, monitores): cabe sin desplazar ni un px,
-//            etiquetas ≥ 10 px visibles (y sin mover la maqueta: O1), frase
+//            etiquetas ≥ 10 px visibles (las insignias y, desde TAB-3, «Pozo» y
+//            el comodín) y sin mover la maqueta (O1), frase
 //            ≥ 12 px visibles, nada bajo la banda de R-7, la ✕ no pisa el logo,
 //            y el factor de la fórmula
 //   V-vuelo  con f ≠ 1 (×1,301 y ×0,874): las cartas en vuelo y las monedas
@@ -44,8 +45,15 @@
 //   V-frontera (TAB-2) los 16 casos de la doble llave en su clase; los que
 //            quedan sin atributo, byte a byte como hoy
 //
-// `diagDSK tab [cel] [tv] [h] [vuelo] [fuera] [giro] [borde] [hb] [frontera]`
-// corre solo esas varas. `TAB_CONTROL=sin-m2b|frase12` es un control rojo.
+//   V-frase  (TAB-3) en el pago, la frase del óvalo tiene caja y se lee: el
+//            sujeto entero y no menos letras que el 360×640 de la misma corrida
+//            (la mesa de 2 en «dos óvalos», que el acostado 915×412)
+//   V-óvalo-fases (TAB-3) una mano entera en `tv` y en la banda P, mesas 4 y
+//            5: un solo ancho de óvalo y un solo sitio del pozo (O1)
+//
+// `diagDSK tab [cel] [tv] [h] [vuelo] [fuera] [giro] [borde] [hb] [frontera]
+// [frase]` corre solo esas varas (`frase` = V-frase y V-óvalo-fases).
+// `TAB_CONTROL=sin-m2b|frase12|sin-frase` es un control rojo.
 //
 // UN VERDE MIDE LO QUE DICE. Una celda que no llegó a su estado sale «no
 // medida» y la vara no es verde. Las fotos se toman con TODAS las animaciones
@@ -62,7 +70,7 @@ import * as V from '../voz2/voz2Mesa.mjs'
 import { escalaDe, RESERVA_PIE_FS, MEDIA_RATON } from '../../src/lib/escala.js'
 import { anchoCapa, colocaCapa } from '../../src/hooks/voz2Core.js'
 
-export const VARAS_TAB = Object.freeze(['cel', 'tv', 'h', 'vuelo', 'fuera', 'giro', 'borde', 'hb', 'frontera'])
+export const VARAS_TAB = Object.freeze(['cel', 'tv', 'h', 'vuelo', 'fuera', 'giro', 'borde', 'hb', 'frontera', 'frase'])
 export const RUTA_T3 = new URL('./ref/t3_matriz.csv', import.meta.url)
 const PAR = 6
 // `TAB_SOLO=<expresión>` acota V-tv y V-h a las celdas «<tamaño> m<mesa> <estado>»
@@ -272,7 +280,9 @@ const MEDIR_TAB = () => {
   const banda = pc && W > H ? 28 : 0
   const bajoBanda = banda ? Math.max(0, ...Object.values(piezas).filter(Boolean).map((r) => r.b - (H - banda))) : 0
   const logo = R(q('.table-title')[0] || q('.table-brand')[0])
-  const chicas = q('.hand-badge, .seat-badge').map((e) => ({ t: e.innerText.trim(), px: parseFloat(getComputedStyle(e).fontSize) * f }))
+  // TAB-3 (D3h) · también «Pozo» y la nota del comodín (escala.css §5). «A
+  // igualar» lleva la misma clase y se queda como está: no entra.
+  const chicas = q('.hand-badge, .seat-badge, .pot-box .pot-label, .comodin-note').map((e) => ({ t: e.innerText.trim(), px: parseFloat(getComputedStyle(e).fontSize) * f }))
   return {
     W, H, f, attr: html.getAttribute('data-escala'), zoom: getComputedStyle(document.getElementById('root')).zoom, pc,
     gt, oval, cartaJ, pz: pzr, logo,
@@ -580,7 +590,7 @@ async function celdaMesa(browser, base, v, n, estado, opc = {}) {
     if (opc.o1) {
       // O1 de las etiquetas: las anclas con la regla de 10 px y sin ella.
       const a = await page.evaluate(ANCLAS)
-      await page.addStyleTag({ content: 'html[data-escala] body .game-table-screen :is(.hand-badge, .seat-badge) { font-size: 10px; }' })
+      await page.addStyleTag({ content: 'html[data-escala] body .game-table-screen :is(.hand-badge, .seat-badge, .pot-box .pot-label) { font-size: 10px; } html[data-escala] body .game-table-screen .comodin-note { font-size: 11px; }' })
       await raf2(page)
       const b = await page.evaluate(ANCLAS)
       o1 = { iguales: JSON.stringify(a) === JSON.stringify(b), a, b }
@@ -876,6 +886,11 @@ const CSS_CONTROL = {
     html[data-escala="h"] body .game-table-screen { padding-inline: 20px; }
     html[data-escala="hb"] body .game-table-screen { padding-inline: var(--ls-screen-padx); }`,
   frase12: 'html[data-escala="hb"] body .game-table-screen :is(.table-wide, .table-four, .table-three) .game-message { font-size: 12px; }',
+  // TAB-3 · la gemela apagada: el óvalo de 4 y 5 vuelve a medir su contenido y
+  // la frase a su sitio de hoy, en `tv` y en la banda P (escala.css §2 y §8).
+  // `body` suma un elemento: gana a las dos sin `!important`.
+  'sin-frase': `:is(html[data-escala="tv"], html:not([data-escala])) body .game-table-screen .table-wide .center-zone { justify-self: auto; }
+    :is(html[data-escala="tv"], html:not([data-escala])) body .game-table-screen .table-wide .center-zone .game-message { flex-basis: 0%; order: 0; }`,
 }
 async function ponerControl(page) {
   if (CONTROL && CSS_CONTROL[CONTROL]) { await page.addStyleTag({ content: CSS_CONTROL[CONTROL] }); await raf2(page) }
@@ -1195,6 +1210,179 @@ export async function sellarT2(browser, base, { origen, navegador } = {}) {
   } finally { escalaReal(false) }
 }
 
+// ══ TAB-3 · V-frase y V-óvalo-fases ════════════════════════════════════════
+// Rector: AJILEI_TAB-3_Fase1_v1.0.md D10; propuesta en la §7 del informe de la
+// Fase 0. Comparan por GEOMETRÍA (cajas, anchos, letras leídas), nunca por
+// píxeles: el raster de la mesa no es determinista ni dentro de una página
+// (lámina de la Fase 1, control hoy/hoy).
+//
+// V-frase, en el pago (`V.abrirCeldaEnPago`), con la frase real y con C1 y el
+// titular largo inyectados (`V.MEDIR_VOZ2`, que restaura el texto):
+//   1 · la caja de la frase mide más de 0;
+//   (a) se lee el sujeto entero del titular antes del «…»;
+//   (b) se leen al menos tantas letras como en la referencia de la MISMA
+//       corrida, misma mesa y misma frase: el 360×640, salvo la mesa de 2 en
+//       «dos óvalos», que se compara con el teléfono acostado 915×412 (D3).
+//       Si la frase real de la celda no es la de su referencia, se mide además
+//       la de la referencia en la celda (`ref:360x640`, `ref:915x412`) y (b) se
+//       juzga con esa.
+// V-óvalo-fases: una mano entera jugada (del reposo al pago, una muestra cada
+// 150 ms): el óvalo de 4 y 5 tiene UN solo ancho y el pozo UN solo sitio (O1).
+//
+// Normativas: `tv`, `h`, `hb` y la banda P (440×763). Informativas (se dicen,
+// no tiñen): los demás teléfonos, el acostado 915×412 y la celda SINTÉTICA de
+// la segunda franja de P (450×980: ningún aparato medido cae ahí, pero la regla
+// tiene que valer en ella y el control tiene que tumbarla).
+// `TAB_CONTROL=sin-frase` apaga la gemela (S5 y P): las dos varas, rojas.
+const P440 = Object.freeze({ id: '440x763', w: 440, h: 763, movil: true, n: 'iPhone grande, Safari vertical (banda P)' })
+export const FRASE = Object.freeze({
+  referencias: [
+    ...[2, 3, 4, 5].map((n) => ({ t: { id: '360x640', w: 360, h: 640, movil: true }, n })),
+    { t: { id: '915x412', w: 915, h: 412, movil: true }, n: 2 },
+  ],
+  normativas: [
+    ...TV.tamanos.flatMap((t) => [2, 3, 4, 5].map((n) => ({ t: { ...t, movil: true }, n }))),
+    ...HB.tamanos.flatMap((t) => [2, 3, 4, 5].map((n) => ({ t, n }))),
+    ...HZ.tamanos.filter((t) => !t.pc).flatMap((t) => [2, 4, 5].map((n) => ({ t, n }))),
+    ...[2, 4, 5].map((n) => ({ t: P440, n })),
+  ],
+  informativas: [
+    ...[2, 4, 5].map((n) => ({ t: { id: '440x956', w: 440, h: 956, movil: true, n: 'iPhone 17 Pro Max vertical' }, n })),
+    ...[4, 5].map((n) => ({ t: { id: '915x412', w: 915, h: 412, movil: true, n: 'Galaxy S25 acostado' }, n })),
+    ...[4, 5].map((n) => ({ t: { id: '450x980', w: 450, h: 980, movil: true, n: 'SINTÉTICA: segunda franja de P' }, n })),
+  ],
+})
+export const FASES_OVALO = Object.freeze({ tamanos: [...TV.tamanos.map((t) => ({ ...t, movil: true })), P440], mesas: [4, 5] })
+const SUJETO = /^(¡Ganas|La IA gana|IA \d+ gana|Empate|¡(Ambos|Tres|Cuatro|Cinco) con AJILEI!|Los demás se retiran|¡La IA se retira!)/
+export const sujetoDe = (t) => t.match(SUJETO)?.[0] ?? t.split(' ')[0]
+const SUJETO_FORMA = { C1: '¡Ganas', empate: 'Empate' }
+const formasFrase = (n) => {
+  const fs = V.formasVoz2(n)
+  return [{ id: 'C1', texto: fs.find((x) => x.id === 'C1').texto }, { id: 'empate', texto: fs.find((x) => x.id === 'empate-cerca-IA').texto }]
+}
+
+async function medirFrase(browser, base, t, n, reales = {}) {
+  const c = await V.abrirCeldaEnPago(browser, { id: t.id, w: t.w, h: t.h, movil: t.movil ?? true }, n, base)
+  try {
+    await ponerControl(c.page)
+    await quietas(c.page)
+    const info = await c.page.evaluate(() => {
+      const p = [...document.querySelectorAll('.game-message')].find((e) => e.getClientRects().length)
+      return { real: p?.querySelector('.voz2-texto')?.textContent ?? null, ruta: p?.closest('.felt-oval') ? 'dos óvalos' : 'centro', attr: document.documentElement.getAttribute('data-escala'), f: parseFloat(document.documentElement.style.getPropertyValue('--escala')) || 1 }
+    })
+    if (info.real == null) return { medida: false, motivo: 'sin .voz2-texto en el pago' }
+    const formas = [{ id: 'real', texto: info.real }, ...formasFrase(n)]
+    for (const [k, texto] of Object.entries(reales)) if (texto && texto !== info.real) formas.push({ id: `ref:${k}`, texto })
+    const m = await c.page.evaluate(V.MEDIR_VOZ2, { formas })
+    if (m.error) return { medida: false, motivo: m.error }
+    const porId = Object.fromEntries(m.formas.map((x) => [x.id, { leidos: x.leidos, car: x.car, caja: x.anclas.texto?.w ?? 0 }]))
+    return { medida: true, ...info, caja: m.base.texto?.w ?? 0, formas: porId, errores: c.errores }
+  } finally { await c.ctx.close() }
+}
+function juzgarFrase(m, ref, refId = null) {
+  const motivos = []
+  if (!(m.caja > 0.5)) motivos.push(`caja de la frase ${m.caja} px`)
+  for (const id of ['real', 'C1', 'empate']) {
+    const x = m.formas[id]
+    if (!x) { motivos.push(`${id} sin medir`); continue }
+    const suj = id === 'real' ? sujetoDe(m.real) : SUJETO_FORMA[id]
+    if (x.leidos < suj.length) motivos.push(`${id}: ${x.leidos}/${x.car}, no se lee «${suj}»`)
+    if (!ref) continue
+    const mio = id === 'real' && m.formas[`ref:${refId}`] ? m.formas[`ref:${refId}`] : x
+    const suyo = ref.formas[id]
+    if (suyo && mio.leidos < suyo.leidos) motivos.push(`${id}: ${mio.leidos} < ${suyo.leidos} de la referencia`)
+  }
+  return motivos
+}
+async function varaFrase(browser, base) {
+  const ok = (x) => pasaSolo(x.t, x.n, 'pago')
+  const refs = {}
+  await V.enPool(FRASE.referencias, PAR, async ({ t, n }) => {
+    try { refs[`${t.id} m${n}`] = await medirFrase(browser, base, t, n) } catch (e) { refs[`${t.id} m${n}`] = { medida: false, motivo: String(e.message).split('\n')[0] } }
+  })
+  const celdas = []
+  for (const [k, m] of Object.entries(refs)) {
+    const [tam, mn] = k.split(' ')
+    celdas.push({ tam, n: +mn.slice(1), papel: 'referencia', medida: m.medida, motivo: m.motivo ?? null, ...(m.medida ? { ok: juzgarFrase(m, null).length === 0, motivos: juzgarFrase(m, null), clase: m.attr, f: m.f, ruta: m.ruta, caja: m.caja, formas: m.formas } : {}) })
+  }
+  const tareas = [...FRASE.normativas.map((x) => ({ ...x, papel: 'normativa' })), ...FRASE.informativas.map((x) => ({ ...x, papel: 'informativa' }))].filter(ok)
+  const hechas = await V.enPool(tareas, PAR, async ({ t, n, papel }) => {
+    const c = { tam: t.id, n, papel }
+    // La referencia se decide por la ruta, que solo se sabe en la página: la de
+    // 2 en «dos óvalos» va contra el acostado; el resto, contra el 360×640. Se
+    // miden en la celda las frases reales de las dos candidatas.
+    const reales = { '360x640': refs[`360x640 m${n}`]?.real, ...(n === 2 ? { '915x412': refs['915x412 m2']?.real } : {}) }
+    try {
+      const m = await medirFrase(browser, base, t, n, reales)
+      if (!m.medida) return { ...c, medida: false, motivo: m.motivo }
+      const refId = m.ruta === 'dos óvalos' ? '915x412' : '360x640'
+      const ref = refs[`${refId} m${refId === '915x412' ? 2 : n}`]
+      if (!ref?.medida) return { ...c, medida: false, motivo: `la referencia ${refId} no se midió` }
+      const motivos = juzgarFrase(m, ref, refId)
+      if (m.errores?.length) motivos.push(`errores: ${m.errores.slice(0, 2).join(' · ')}`)
+      return { ...c, medida: true, ok: motivos.length === 0, motivos, clase: m.attr, f: m.f, ruta: m.ruta, contra: refId, caja: m.caja, formas: m.formas }
+    } catch (e) { return { ...c, medida: false, motivo: String(e.message).split('\n')[0] } }
+  })
+  celdas.push(...hechas)
+  const cuentan = celdas.filter((c) => c.papel !== 'informativa')
+  return { ok: cuentan.length > 0 && cuentan.every((c) => c.medida && c.ok), celdas }
+}
+
+// V-óvalo-fases: el óvalo y el pozo a lo largo de una mano.
+const MUESTRA_OVALO = () => {
+  const vis = (e) => !!e && e.getClientRects().length > 0
+  const cz = document.querySelector('.center-zone')
+  if (!vis(cz)) return null
+  const b = cz.getBoundingClientRect(), pz = document.querySelector('.pot-box')
+  const p = vis(pz) ? pz.getBoundingClientRect() : null
+  return { w: b.width, pozo: p ? [p.x, p.y] : null, frase: (document.querySelector('.game-message')?.textContent || '').trim().slice(0, 50) }
+}
+// Distintos, con 0,1 px de holgura (el subpíxel de un mismo sitio no es otro sitio).
+const distintos = (vals) => { const out = []; for (const v of vals) if (!out.some((o) => (Array.isArray(v) ? v.every((x, i) => Math.abs(x - o[i]) <= 0.1) : Math.abs(v - o) <= 0.1))) out.push(v); return out }
+async function manoOvalo(browser, base, t, n) {
+  const { ctx, page, errores } = await abrirMesa(browser, base, t, n)
+  try {
+    await ponerControl(page)
+    const muestras = []
+    let pago = false
+    for (let i = 0; i < 480; i++) {
+      await page.waitForTimeout(150)
+      const m = await page.evaluate(MUESTRA_OVALO)
+      if (m) muestras.push(m)
+      if (await page.evaluate(V.TONO_DE_PAGO)) { pago = true; break }
+      const b = page.locator('.action-buttons button:has-text("Pasar"), .action-buttons button:has-text("Igualar"), button:has-text("Iniciar mano")').first()
+      if (await b.count() && await b.isEnabled().catch(() => false)) { await b.click({ timeout: 1500 }).catch(() => {}); await page.mouse.move(5, 5); continue }
+      const d = page.locator('button:has-text("Sin descartar")').first()
+      if (await d.count()) await d.click({ timeout: 1500 }).catch(() => {})
+    }
+    if (!pago) return { medida: false, motivo: 'la mano no llegó al pago' }
+    await page.waitForTimeout(4500); await mesaQuieta(page, 8000)
+    const fin = await page.evaluate(MUESTRA_OVALO)
+    if (fin) muestras.push(fin)
+    return { medida: true, muestras, errores }
+  } finally { await ctx.close() }
+}
+async function varaOvaloFases(browser, base) {
+  const tareas = []
+  for (const t of FASES_OVALO.tamanos) for (const n of FASES_OVALO.mesas) if (pasaSolo(t, n, 'mano')) tareas.push({ t, n })
+  const celdas = await V.enPool(tareas, PAR, async ({ t, n }) => {
+    const c = { tam: t.id, n }
+    try {
+      const r = await manoOvalo(browser, base, t, n)
+      if (!r.medida) return { ...c, medida: false, motivo: r.motivo }
+      const anchos = distintos(r.muestras.map((m) => m.w)), pozos = distintos(r.muestras.filter((m) => m.pozo).map((m) => m.pozo))
+      const frases = new Set(r.muestras.map((m) => m.frase)).size
+      const motivos = []
+      if (r.muestras.length < 10 || frases < 3) motivos.push(`mano corta: ${r.muestras.length} muestras, ${frases} frases`)
+      if (anchos.length !== 1) motivos.push(`${anchos.length} anchos de óvalo (${anchos.map((x) => x.toFixed(1)).join(' / ')})`)
+      if (pozos.length !== 1) motivos.push(`el pozo en ${pozos.length} sitios`)
+      if (r.errores.length) motivos.push(`errores: ${r.errores.slice(0, 2).join(' · ')}`)
+      return { ...c, medida: true, ok: motivos.length === 0, motivos, muestras: r.muestras.length, frases, anchos: anchos.map((x) => +x.toFixed(2)), pozos: pozos.length }
+    } catch (e) { return { ...c, medida: false, motivo: String(e.message).split('\n')[0] } }
+  })
+  return { ok: celdas.length > 0 && celdas.every((c) => c.medida && c.ok), celdas }
+}
+
 // ══ El modo ════════════════════════════════════════════════════════════════
 /** Corre las varas pedidas. Devuelve `{ verde, varas, resumen }`. */
 export async function runTab(browser, { base, ref = null, varas = VARAS_TAB } = {}) {
@@ -1211,9 +1399,10 @@ export async function runTab(browser, { base, ref = null, varas = VARAS_TAB } = 
     if (varas.includes('borde')) out.borde = await varaBorde(browser, base)
     if (varas.includes('hb')) out.hb = await varaHb(browser, base)
     if (varas.includes('frontera')) out.frontera = await varaFrontera(browser, base)
+    if (varas.includes('frase')) { out.frase = await varaFrase(browser, base); out.fases = await varaOvaloFases(browser, base) }
   } finally { escalaReal(false) }
   const verde = Object.values(out).every((v) => v.ok)
-  const nombre = { cel: 'V-cel', tv: 'V-tv', h: 'V-h', vuelo: 'V-vuelo', fuera: 'V-fuera', giro: 'V-giro', borde: 'V-borde', hb: 'V-hb', frontera: 'V-frontera' }
+  const nombre = { cel: 'V-cel', tv: 'V-tv', h: 'V-h', vuelo: 'V-vuelo', fuera: 'V-fuera', giro: 'V-giro', borde: 'V-borde', hb: 'V-hb', frontera: 'V-frontera', frase: 'V-frase', fases: 'V-óvalo-fases' }
   const resumen = `${CONTROL ? `CONTROL ${CONTROL} (no es la vara) · ` : ''}${SOLO ? `ACOTADA a /${SOLO.source}/ (no es la vara) · ` : ''}${verde ? 'VERDE' : 'ROJO'} · ` + Object.entries(out).map(([k, v]) => `${nombre[k]} ${v.ok ? '✓' : '✗'}`).join(' · ') + ` · ${((Date.now() - t0) / 1000).toFixed(0)} s`
   console.log(`── TAB · ${resumen}`)
   if (out.cel) {
@@ -1243,6 +1432,16 @@ export async function runTab(browser, { base, ref = null, varas = VARAS_TAB } = 
     console.log(`   ${nombre[k].padEnd(7)} ${out[k].celdas.length - malas.length}/${out[k].celdas.length} celdas bien${out[k].referencia ? ` · referencia ${out[k].referencia}` : ''}`)
     for (const c of malas.slice(0, 12)) console.log(`     ✗ ${c.tam} ${c.n}${c.tapete ? ' ' + c.tapete : ''}${c.estado ? ' ' + c.estado : ''}: ${c.medida ? c.motivos.join(' · ') : c.motivo}`)
   }
+  if (out.frase) {
+    const cel = out.frase.celdas
+    const malas = (papel) => cel.filter((c) => c.papel === papel && (!c.medida || !c.ok))
+    const n = (papel) => cel.filter((c) => c.papel === papel).length
+    console.log(`   V-frase ${n('normativa') - malas('normativa').length}/${n('normativa')} normativas bien · referencias ${n('referencia') - malas('referencia').length}/${n('referencia')} · informativas ${n('informativa') - malas('informativa').length}/${n('informativa')} (no tiñen)`)
+    const fila = (c) => `${c.tam} m${c.n}${c.papel === 'normativa' ? '' : ` (${c.papel})`}: ${c.medida ? (c.ok ? 'bien' : c.motivos.join(' · ')) : c.motivo}`
+    for (const c of [...malas('referencia'), ...malas('normativa')].slice(0, 16)) console.log(`     ✗ ${fila(c)}`)
+    for (const c of cel.filter((x) => x.papel === 'informativa')) console.log(`     ${c.medida && c.ok ? '·' : '!'} ${fila(c)}${c.medida ? ` · caja ${c.caja} · real ${c.formas.real.leidos}/${c.formas.real.car} · C1 ${c.formas.C1.leidos}/${c.formas.C1.car}` : ''}`)
+  }
+  if (out.fases) for (const c of out.fases.celdas) console.log(`   V-óvalo-fases ${c.medida && c.ok ? '✓' : '✗'} ${c.tam} m${c.n}${c.medida ? ` · ${c.muestras} muestras, ${c.frases} frases · ${c.ok ? `1 ancho (${c.anchos[0]}) · pozo en 1 sitio` : c.motivos.join(' · ')}` : ' · ' + c.motivo}`)
   if (out.giro) for (const p of out.giro.pasos) console.log(`   V-giro  ${p.ok ? '✓' : '✗'} → ${p.a} ${p.attr} ×${p.f} · en reparto ${p.enReparto} · desplaza ${JSON.stringify(p.desplaza)}${p.fuera?.length ? ' · fuera ' + p.fuera.join(' · ') : ''}`)
   return { verde, varas: out, resumen, reservaPie: RESERVA_PIE_FS }
 }
