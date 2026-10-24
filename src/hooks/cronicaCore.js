@@ -25,6 +25,9 @@ import { PHASES } from '../engine/gameEngine'
 
 // La marca. Vive aquí y no en el motor: ése es el punto entero de REN-2.
 export const MONEDA = 'Heptacoins'
+// El singular, por regla (VOZ-3 D5): los montos son múltiplos de la apuesta de
+// mesa y hoy nunca llega a volver una sola, pero la frase no depende de eso.
+export const MONEDA_UNA = 'Heptacoin'
 
 // ── Verbo de la acción, deducido de la transición ───────────────────────────
 // Mismo método que `inferAction` en GameTable (que rotula el panel del rival):
@@ -169,16 +172,23 @@ export function componeFase(estado, prev = null) {
 // entre dos asientos —y el jugador vería su saldo subir menos de lo que el
 // mensaje promete, sin ninguna forma de saber por qué—.
 //
-// SE CUENTA LO QUE NO SE VE. La capa que gana el ganador principal ya la dice
-// el resultado, así que aquí sólo salen las OTRAS: las que se lleva alguien
-// distinto y la que no se lleva nadie. Esa última no se pierde —es la apuesta
-// que nadie igualó y vuelve a quien la puso (D-7)— y decirlo importa: es
-// dinero que el jugador vio salir de su pila y le vuelve.
+// SE CUENTA LO QUE NO SE VE. Lo que gana el principal ya lo dice el resultado,
+// así que aquí sólo sale lo de los DEMÁS: lo que se lleva otro asiento y lo que
+// le vuelve a quien lo puso. Lo que vuelve no se pierde —es la apuesta que nadie
+// pudo igualar— y decirlo importa: es dinero que el jugador vio salir de su pila
+// y le vuelve.
 //
-// `capas` llega ya resuelta (`mesaCore.repartoPorCapas`), que es quien sabe con
-// qué puntaje se decide cada una. Aquí sólo se pone en palabras.
-export function componeCapas(capas, players, ganadorPrincipal) {
-  if (!Array.isArray(capas) || capas.length <= 1) return null
+// VOZ-3 · Recibe la LECTURA de la mano (`manoCore.lecturaDeMano`), no las capas
+// con un «ganador principal» al lado: quién es el principal, qué parte de cada
+// capa es vuelto y qué parte se ganó ya están contados allí, y aquí sólo se
+// ponen en palabras. Antes el principal era `game.winner` —el dueño de la capa
+// de arriba—, y con un all-in corto eso hacía titular a quien sólo recuperaba
+// su vuelto (informe de la Fase 0 de VOZ-3, §A.3).
+//
+// `players` da los nombres. La mesa de dos dice «la IA»; las de 3 a 5, el
+// nombre del asiento, igual que `resultadoCore.sujetoInicial`.
+export function componeCapas(lectura, players) {
+  if (!lectura) return null
   const nombre = (seat) => (seat === 0 ? 'Tú' : (players?.[seat]?.name ?? 'la mesa'))
 
   // APU-1 1e-iv · E-23. SE AGRUPA POR GANADOR Y SE SUMA. Un asiento puede
@@ -187,24 +197,29 @@ export function componeCapas(capas, players, ganadorPrincipal) {
   // correcta y se leía como un tartamudeo. Cuántas capas fueron es mecánica
   // del reparto; lo que esta frase existe para explicar es por qué el saldo
   // sube menos de lo que promete el resultado, y para eso lo que importa es
-  // CUÁNTO y A QUIÉN. Se conserva el orden de primera aparición para que la
-  // frase siga leyendo el pozo de abajo arriba, como se reparte.
-  const suma = new Map()
-  for (const capa of capas) {
-    if (capa.ganador === ganadorPrincipal) continue
-    const clave = capa.ganador < 0 ? -1 : capa.ganador
-    suma.set(clave, (suma.get(clave) ?? 0) + capa.monto)
-  }
+  // CUÁNTO y A QUIÉN. `lectura.otras` ya viene agrupada y en orden de primera
+  // aparición, para que la frase siga leyendo el pozo de abajo arriba.
+  const otras = lectura.otras.map(({ asiento, monto }) => (asiento === 0
+    ? `Te llevas otros ${monto} ${MONEDA}.`
+    : `${nombre(asiento)} se lleva ${monto}.`))
 
-  const frases = []
-  for (const [ganador, monto] of suma) {
-    if (ganador < 0) { frases.push(`${monto} vuelven sin igualar.`); continue }
-    frases.push(ganador === 0
-      ? `Te llevas otros ${monto} ${MONEDA}.`
-      : `${nombre(ganador)} se lleva ${monto}.`)
-  }
-  if (!frases.length) return null
-  return `El pozo se partió: ${frases.join(' ')}`
+  // VOZ-3 · D5 · lo que vuelve, al final y en orden de asiento, con UNA sola
+  // forma en todo el juego. D6: la devolución al propio principal no se
+  // anuncia —ya ganó la mano, y decirlo no cambia la lectura—, así que las
+  // frases que hoy acertaban (C2, C4, C6b) quedan al byte.
+  const devoluciones = lectura.devoluciones
+    .filter(({ asiento }) => asiento !== lectura.principal)
+    .map(({ asiento, monto }) => {
+      const verbo = monto === 1 ? 'devuelve' : 'devuelven'
+      const moneda = monto === 1 ? MONEDA_UNA : MONEDA
+      if (asiento === 0) return `Se te ${verbo} ${monto} ${moneda}.`
+      const quien = lectura.numPlayers === 2 ? 'A la IA' : `A ${nombre(asiento)}`
+      return `${quien} se le ${verbo} ${monto} ${moneda}.`
+    })
+
+  // Sin «El pozo se partió:» cuando lo único que hay es una devolución (D5).
+  const frases = [otras.length ? `El pozo se partió: ${otras.join(' ')}` : null, ...devoluciones].filter(Boolean)
+  return frases.length ? frases.join(' ') : null
 }
 
 // ── La crónica de una transición ────────────────────────────────────────────

@@ -20,6 +20,7 @@ import {
   nivelarLasIAS, repartoPorCapas, pozoPartido, umbralRecarga,
 } from '../src/hooks/mesaCore.js'
 import { componeCapas } from '../src/hooks/cronicaCore.js'
+import { lecturaDeMano } from '../src/hooks/manoCore.js'
 import { AJILEI_CONFIG } from '../src/config/ajileiConfig.js'
 import { techoDe, pisoDe, jugadoresVsIA } from '../src/engine/entrada.js'
 import { apuestasDe } from '../src/config/niveles.js'
@@ -749,23 +750,26 @@ describe('6. §4.2 · Las capas, y la frase que las cuenta', () => {
     const g = mesa([300, 300], { phase: PHASES.PAYOUT, winner: 0 })
     g.players = g.players.map(p => ({ ...p, contribMano: 300, score: { palo: 'Oros', points: 30 } }))
     expect(pozoPartido(g)).toBe(false)
-    expect(componeCapas(repartoPorCapas(g), g.players, 0)).toBe(null)
+    expect(componeCapas(lecturaDeMano(g), g.players)).toBe(null)
   })
 
-  it('la frase nombra sólo lo que el resultado NO dice ya', () => {
+  // VOZ-3 · el principal es quien gana la capa 0 (la IA 1, con 45), no el que
+  // `winner` diga. Hasta VOZ-3 esta prueba fijaba como principal al dueño de la
+  // capa de arriba y esperaba «IA 1 se lleva 300»: era el defecto, sellado.
+  it('la frase nombra sólo lo que el resultado NO dice ya, y al humano le habla de tú', () => {
     const g = conCapas()
-    const texto = componeCapas(repartoPorCapas(g), g.players, 0)
-    // El ganador principal (asiento 0) no se repite: su capa ya la dice el
-    // resultado. Lo que se cuenta es la otra.
-    expect(texto).toBe('El pozo se partió: IA 1 se lleva 300.')
+    const lectura = lecturaDeMano(g)
+    expect(lectura.principal).toBe(1)
+    // La capa del principal no se repite: ya la dice el resultado. Lo que se
+    // cuenta es la otra, que se lleva el humano.
+    expect(componeCapas(lectura, g.players)).toBe('El pozo se partió: Te llevas otros 400 Heptacoins.')
   })
 
-  it('cuando la capa se la lleva el humano, se le habla de tú', () => {
+  it('cuando el humano es el principal, su capa no se cuenta y la de otro sí', () => {
     const g = conCapas()
-    g.players[1] = { ...g.players[1], score: { palo: 'Copas', points: 10 } }
-    g.winner = 1
-    const texto = componeCapas(repartoPorCapas(g), g.players, 1)
-    expect(texto).toContain('Te llevas')
+    g.players = g.players.map((p, i) => ({ ...p, score: { palo: 'Copas', points: [50, 45, 30][i] } }))
+    expect(lecturaDeMano(g).principal).toBe(0)
+    expect(componeCapas(lecturaDeMano(g), g.players)).toBe(null)
   })
 
   // D-7: la apuesta que nadie igualó VUELVE a quien la puso. Es dinero que el
@@ -786,7 +790,9 @@ describe('6. §4.2 · Las capas, y la frase que las cuenta', () => {
     const reparto = repartoPorCapas(g)
     expect(reparto.map(c => c.monto)).toEqual([300, 400])
     expect(reparto.map(c => c.ganador)).toEqual([1, -1])
-    expect(componeCapas(reparto, g.players, 1)).toBe('El pozo se partió: 400 vuelven sin igualar.')
+    // VOZ-3 · D5: una sola forma de decir «vuelve», a quien lo puso (aquí el
+    // humano, que se retiró). Antes: «El pozo se partió: 400 vuelven sin igualar.»
+    expect(componeCapas(lecturaDeMano(g), g.players)).toBe('Se te devuelven 400 Heptacoins.')
   })
 
   // ── E-23 (1e-iv) · UN GANADOR, UNA VEZ ───────────────────────────────────
@@ -796,36 +802,35 @@ describe('6. §4.2 · Las capas, y la frase que las cuenta', () => {
   // elegible: los repetidos son consecutivos y salen solos en cuanto hay tres
   // capas. La frase los sumaba por separado y nombraba dos veces al mismo.
   //
-  // Tres niveles de all-in (100, 300, 500) parten el pozo en tres capas, y el
-  // ganador principal es el de la de ARRIBA —que es la única que el resultado
-  // ya cuenta—, con lo que las otras dos quedan para esta frase.
+  // Dos niveles de all-in (el humano con 100, la IA 3 con 300) y dos IAS a 500
+  // parten el pozo en tres capas. El humano tiene la mejor mano y es el
+  // principal (VOZ-3: la capa 0), así que las dos de arriba quedan para esta
+  // frase. Hasta VOZ-3 el principal era el de la capa de ARRIBA.
   function tresCapas(puntajes) {
-    const g = mesa([100, 300, 500, 500], { phase: PHASES.PAYOUT, pot: 1400, manoIndex: 0, winner: 2 })
+    const g = mesa([100, 500, 500, 300], { phase: PHASES.PAYOUT, pot: 1400, manoIndex: 0, winner: 1 })
     g.players = g.players.map((p, i) => ({
       ...p,
-      contribMano: [100, 300, 500, 500][i],
-      allIn: i < 2,
+      contribMano: [100, 500, 500, 300][i],
+      allIn: i === 0 || i === 3,
       score: { palo: 'Copas', points: puntajes[i] },
     }))
     return g
   }
 
   it('dos capas del MISMO asiento se dicen una sola vez, con la suma', () => {
-    const g = tresCapas([30, 50, 40, 20])
+    const g = tresCapas([50, 45, 40, 20])
     const reparto = repartoPorCapas(g)
     expect(reparto.map(c => c.monto)).toEqual([400, 600, 400])
-    expect(reparto.map(c => c.ganador)).toEqual([1, 1, 2])
-    // Antes de E-23: «IA 1 se lleva 400. IA 1 se lleva 600.»
-    expect(componeCapas(reparto, g.players, 2)).toBe('El pozo se partió: IA 1 se lleva 1000.')
+    expect(reparto.map(c => c.ganador)).toEqual([0, 1, 1])
+    // Antes de E-23: «IA 1 se lleva 600. IA 1 se lleva 400.»
+    expect(componeCapas(lecturaDeMano(g), g.players)).toBe('El pozo se partió: IA 1 se lleva 1000.')
   })
 
   it('dos capas de asientos DISTINTOS se siguen diciendo por separado', () => {
-    const g = tresCapas([50, 45, 40, 20])
+    const g = tresCapas([50, 30, 20, 45])
     const reparto = repartoPorCapas(g)
-    expect(reparto.map(c => c.ganador)).toEqual([0, 1, 2])
-    const texto = componeCapas(reparto, g.players, 2)
-    expect(texto).toContain('Te llevas otros 400')
-    expect(texto).toContain('IA 1 se lleva 600.')
+    expect(reparto.map(c => c.ganador)).toEqual([0, 3, 1])
+    expect(componeCapas(lecturaDeMano(g), g.players)).toBe('El pozo se partió: IA 3 se lleva 600. IA 1 se lleva 400.')
   })
 })
 
