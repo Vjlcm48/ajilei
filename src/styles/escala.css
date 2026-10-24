@@ -5,7 +5,9 @@
    HOJA ADITIVA, como luz/voz2/rev/rec/tactil.css: sin `!important`. TODO vive
    bajo `html[data-escala]`, que escribe `useEscalaMesa` (src/lib/escala.js)
    SOLO mientras la mesa está montada y SOLO fuera del celular:
-     · el celular no evalúa ni una regla de esta hoja (queda idéntico al píxel);
+     · el celular no evalúa ni una regla de esta hoja (queda idéntico al píxel),
+       con UNA excepción declarada: §8 (TAB-3, la banda P), que vale solo en el
+       teléfono vertical cuya pista cubre el contenido del óvalo de 4 y 5;
      · el lobby, Retar, Salas y Armar mesa no la ven nunca (ficha §1.4).
    Cada regla gana a la que corrige por ESPECIFICIDAD (`html[data-escala]` suma
    0,1,1), nunca por el orden de carga: da igual dónde se importe la hoja.
@@ -91,6 +93,27 @@ html[data-escala="tv"] .game-table.table-three {
   --pv3-k: clamp(0.85px, calc((var(--tab-vw) / 2 - 40px) / 140), 1.25px);            /* :2357 */
 }
 
+/* TAB-3 · La frase del pago en las mesas 4 y 5 (S5). Rector:
+   AJILEI_TAB-3_Fase1_v1.0.md; causa en la Fase 0, §B.3. El óvalo es una celda
+   de la rejilla de `.table-mid` con `justify-items: center` (gameTable.css:1348),
+   así que mide lo que su contenido; la frase, con `contain: inline-size`
+   (voz2.css), no aporta nada. Si la pista cubre el contenido (pozo + «A igualar»
+   oculto + comodín + huecos + relleno: en `tv` siempre), todo cabe en una fila y
+   la frase se queda en 0 px. Y como la crónica no lleva `contain`, el óvalo
+   cambia de ancho con cada fase de la mano (8 a 15 anchos, O1).
+   1 · el óvalo ocupa su pista, como ya hace en el celular (318 de 360): un solo
+       ancho en toda la mano;
+   2 · la frase va en su propia fila, DEBAJO del pozo y el comodín (`order` 1,
+       los demás 0): se lee entera y el pozo no se mueve.
+   El alto del óvalo es el fijo de O1 (`--o1-oval-h`): no crece por su texto. */
+html[data-escala="tv"] .game-table-screen .table-wide .center-zone {
+  justify-self: stretch;
+}
+html[data-escala="tv"] .game-table-screen .table-wide .center-zone .game-message {
+  flex-basis: 100%;
+  order: 1;
+}
+
 /* ── 3 · Regla del óvalo v2: el tope de seguridad de las mesas 3 y 2 ─────────
    Hoy el óvalo elástico es `max(96px, 100svh − estático)` (:1628, :1981): en una
    pantalla muy alta se comería media mesa. Fuera del celular no pasa de
@@ -136,6 +159,19 @@ html[data-escala="tv"] {
    que la letra crece sin mover la fila (O1; lo mide el modo `tab`). */
 html[data-escala="h"] .game-table-screen :is(.hand-badge, .seat-badge) {
   font-size: max(10px, calc(10px / var(--escala)));
+}
+/* TAB-3 (D3h) · El rótulo «Pozo» y la nota del comodín, igual: en `h` miden 10 y
+   11 px propios, y con f < 1 se veían a 8,7 y 9,6. El rótulo tiene alto propio
+   (la caja del pozo no cambia, medido) y la nota crece a lo ancho en su fila,
+   sin mover el óvalo. Con f ≥ 1 el `max` deja los 10 y 11 de siempre.
+   Solo el rótulo DEL POZO (`.pot-box`): «A igualar» lleva la misma clase, y su
+   caja, oculta en el pago pero en la fila de la frase, crecía 6,6 px y empujaba
+   la frase de las mesas 2 y 3 (V-borde, 1366×623). */
+html[data-escala="h"] .game-table-screen .pot-box .pot-label {
+  font-size: max(10px, calc(10px / var(--escala)));
+}
+html[data-escala="h"] .game-table-screen .comodin-note {
+  font-size: max(11px, calc(10px / var(--escala)));
 }
 
 /* ── 6 · TAB-2 · La mesa hasta los bordes (2b, variante c «acotada») ─────────
@@ -220,4 +256,31 @@ html[data-escala="hb"] .game-table-screen {
 }
 html[data-escala="hb"] .game-table-screen :is(.table-wide, .table-four, .table-three) .game-message {
   font-size: 10px;
+}
+
+/* ── 8 · TAB-3 · La banda P: el teléfono vertical cuya pista cubre el óvalo ───
+   La ÚNICA excepción a «el celular no evalúa esta hoja» (cabecera). El mismo
+   mecanismo de §2 (TAB-3) también deja la frase en 0 px en un teléfono: su
+   pista mide el ancho − 42 y el contenido del óvalo de 4 y 5 mide 367,6 con alto
+   ≤ 772 (gameTable.css:2158/2174 encogen hueco y comodín) y 401,75 por encima.
+   Las dos franjas son exactamente donde la pista lo cubre:
+     · alto ≤ 772 y ancho ≥ 410 (410 − 42 = 368): el iPhone grande en Safari
+       vertical, 440×763;
+     · alto > 772 y ancho ≥ 444 (444 − 42 = 402): ninguno de los 85 tamaños de
+       la Fase 0; 440×956 se queda fuera, como debe (hoy se lee).
+   Debajo de esas franjas el contenido ya desborda la pista y salta de fila solo:
+   el óvalo ya va a todo su ancho y la frase tiene sitio, así que la regla
+   sobra y no se pone. Hasta 599 de ancho: de 600 en adelante la vertical es
+   `tv` (§2). Sin `[data-escala]` y dentro de la mesa, como el resto de la hoja.
+   `772.01px` es el complemento de `max-height: 772px` sin la sintaxis de rango
+   (`height > 772px`), que el minificador ya rompió una vez (TAB-2). */
+@media (orientation: portrait) and (min-width: 410px) and (max-width: 599px) and (max-height: 772px),
+       (orientation: portrait) and (min-width: 444px) and (max-width: 599px) and (min-height: 772.01px) {
+  html:not([data-escala]) .game-table-screen .table-wide .center-zone {
+    justify-self: stretch;
+  }
+  html:not([data-escala]) .game-table-screen .table-wide .center-zone .game-message {
+    flex-basis: 100%;
+    order: 1;
+  }
 }
