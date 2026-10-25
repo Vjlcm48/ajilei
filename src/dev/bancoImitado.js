@@ -19,9 +19,13 @@
 // contrato y de espejo en el mismo archivo de pruebas. ECO-1g le suma la
 // `20261012230807_eco1g_video.sql`: `mi_video`, `pedir_boleto` y `cobrar_boleto`
 // (el video de recompensa contra un boleto), con las cuatro cifras del video y
-// los dos límites nuevos. `rpc(nombre, params)` devuelve `{ data, error }` con la forma
+// los dos límites nuevos. RNK-1b le suma la `20261024191731_rnk1a_libro_puntos.sql`:
+// `informar_pila` con `p_fin_mano` y `p_fin_ajilei`, el libro de puntos, el
+// total por jugador y las tres lecturas del ranking (`ranking_top`,
+// `ranking_mio`, `mini_perfil`), contra unos cuantos jugadores sembrados.
+// `rpc(nombre, params)` devuelve `{ data, error }` con la forma
 // de PostgREST: el compuesto `mesa_ia_resultado` llega como objeto con las
-// claves en snake_case, y `mi_mesa_ia` como lista.
+// claves en snake_case, y `mi_mesa_ia` y las lecturas del ranking como lista.
 //
 // PURO: sin `import.meta`, sin DOM y sin red, para que el arnés (Node) lo
 // importe tal cual. En la app sólo lo importa código detrás de la puerta doble
@@ -56,6 +60,27 @@ export const VIDEO_PREMIO_SQL = 500
 export const VIDEO_TOPE_SQL = 8
 export const VIDEO_MINIMO_S_SQL = 35
 export const VIDEO_VIDA_MS_SQL = 10 * 60 * 1000
+// RNK-1a · `puntos_reto_ia()`, `extra_ajilei()` e `ia_tope_manos_minuto()`. La
+// tabla de humanos (`sentados + 3`) vive en el `check` del libro y aquí no hace
+// falta: el banco, como el SQL de hoy, sólo escribe líneas `ias`.
+export const PUNTOS_RETO_SQL = Object.freeze({ basico: 1, avanzado: 2, pro: 3 })
+export const EXTRA_AJILEI_SQL = Object.freeze({ 0: 0, 51: 1, 52: 2 })
+export const TOPE_MANOS_MINUTO_SQL = 12
+/** `ranking_franja(puesto, total)`: ceil(puesto·20/total)·5, en enteros. */
+export const franjaSQL = (puesto, total) => Math.floor((puesto * 20 + total - 1) / total) * 5
+
+// RNK-1b · Jugadores de mentira para las lecturas del ranking, con cifras y
+// fechas distintas (y un empate en cada ranking que decide la fecha). Sólo los
+// usa quien los pide (`crearBanco({ sembrados })`); las fechas son relativas
+// al reloj del banco al nacer (`…Hace`, en ms).
+export const SEMBRADOS_DEMO = Object.freeze([
+  Object.freeze({ username: 'Bachaquero_VE', puntos: 96, puntosHace: 9e7, saldo: 21400, saldoHace: 8e7 }),
+  Object.freeze({ username: 'ElCatire88', puntos: 74, puntosHace: 8e7, saldo: 48700, saldoHace: 7e7 }),
+  Object.freeze({ username: 'Yulimar77', puntos: 41, puntosHace: 6e7, saldo: 9800, saldoHace: 5e7 }),
+  Object.freeze({ username: 'Mochima_21', puntos: 41, puntosHace: 5e7, saldo: 9800, saldoHace: 4e7 }),
+  Object.freeze({ username: 'Turpial_Rojo', puntos: 11, puntosHace: 3e7, saldo: 3150, saldoHace: 2e7 }),
+  Object.freeze({ username: 'Araguaney5', puntos: null, saldo: 2500, saldoHace: 1e7 }),
+])
 
 // `dia_chicago(ts)` de la 1a: la fecha en America/Chicago, con la zona por nombre.
 const FECHA_CHICAGO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -105,10 +130,12 @@ const esEntero = (n) => Number.isInteger(n)
  */
 export function crearBanco({
   saldo = 5000, ahora = () => Date.now(), entradaDeMolde = false, limites = true,
-  videoMinimoS = VIDEO_MINIMO_S_SQL,
+  videoMinimoS = VIDEO_MINIMO_S_SQL, usuario = 'test1976', sembrados = [],
 } = {}) {
+  const nace = ahora()
   const b = {
     saldo,
+    saldoEn: nace,             // RNK-1b · `billeteras.actualizada_en`: el desempate de Fortunas
     mesas: new Map(),          // id → fila de `mesas_ia`
     record: new Map(),         // `${reto}:${vivos}` → { jugadas, ganadas_humano, ganadas_ia }
     libro: [],                 // { tipo, monto, saldo_tras, clave, ref }
@@ -122,6 +149,10 @@ export function crearBanco({
     // ECO-1g
     boletos: [],               // { id, emitido_en, vence_en, cobrado_en, anulado_en } — `boletos_video`
     ultimoBoleto: 0,
+    // RNK-1b
+    puntos: [],                // `libro_puntos` de la cuenta: { origen, nivel, sentados, puntos_base, ajilei, extra, mesa_id, mano, creado_en }
+    total: null,               // `puntos_totales` de la cuenta: { puntos, manos, ajileis, actualizado_en }, o ninguna
+    otros: [],                 // los demás jugadores: { username, saldo, saldoEn, total }
   }
 
   // ── El libro (1a): una línea por cambio, clave única ─────────────────────
@@ -129,6 +160,7 @@ export function crearBanco({
     if (b.libro.some((l) => l.clave === clave)) return { aplicado: true, motivo: 'repetido' }
     if (b.saldo + monto < 0) return { aplicado: false, motivo: 'saldo_insuficiente' }
     b.saldo += monto
+    b.saldoEn = ahora()
     b.libro.push({ tipo, monto, saldo_tras: b.saldo, clave, ref })
     return { aplicado: true, motivo: 'aplicado' }
   }
@@ -224,6 +256,7 @@ export function crearBanco({
       token_apertura: p_token, dispositivo: p_dispositivo === null ? null : String(p_dispositivo).slice(0, 64),
       reemplazo_de: cierre.cerrada ? cierre.mesa_id : null, reemplazo_cobro: cierre.cobrado ?? 0,
       abierta_en: ahora(), ultimo_aviso_en: ahora(), cerrada_en: null,
+      mano_informada: 0, manos_recientes: [],   // RNK-1a
     }
     b.mesas.set(id, mesa)
     return respuesta('ok', mesa, cierre.cerrada, cierre.cobrado)
@@ -256,7 +289,29 @@ export function crearBanco({
     return respuesta('ok', m)
   }
 
-  function informar({ p_mesa, p_seq, p_pila, p_fin_vivos = null, p_fin_gano = null }) {
+  // ── RNK-1a · `libro_puntos` y su disparador `libro_puntos_suma_total` ────
+  // La línea entra si su (origen, mesa, mano) es nueva (`on conflict do
+  // nothing`); el total nace con la primera y suma `puntos_base + extra`, y su
+  // fecha es la de la última línea: «cuándo llegó a esta cifra».
+  function anotarPuntos(linea) {
+    if (b.puntos.some((l) => l.origen === linea.origen && l.mesa_id === linea.mesa_id && l.mano === linea.mano)) return
+    b.puntos.push(linea)
+    const t = b.total ?? { puntos: 0, manos: 0, ajileis: 0, actualizado_en: null }
+    b.total = {
+      puntos: t.puntos + linea.puntos_base + linea.extra,
+      manos: t.manos + 1,
+      ajileis: t.ajileis + (linea.ajilei > 0 ? 1 : 0),
+      actualizado_en: linea.creado_en,
+    }
+  }
+
+  // RNK-1a · la migración §6, en el mismo orden. Cualquiera de los cuatro
+  // `p_fin_*` = fin de mano. Sin `p_fin_mano` (cliente de antes de la 1b):
+  // récord sí, libro no. Una anomalía no anota el fin en ningún sitio, y la
+  // pila se guarda igual.
+  function informar({
+    p_mesa, p_seq, p_pila, p_fin_vivos = null, p_fin_gano = null, p_fin_mano = null, p_fin_ajilei = null,
+  }) {
     if ([p_mesa, p_seq, p_pila].some((v) => v === null || v === undefined) || p_pila < 0) {
       return respuesta('argumento_invalido')
     }
@@ -267,25 +322,128 @@ export function crearBanco({
     let anomalias = 0
     let pila = p_pila
     if (pila > m.techo_cobro) { pila = m.techo_cobro; anomalias++ }
-    const fin = p_fin_vivos !== null || p_fin_gano !== null
+    const fin = p_fin_vivos !== null || p_fin_gano !== null || p_fin_mano !== null || p_fin_ajilei !== null
+    const ajilei = p_fin_ajilei ?? 0
+    let anota = false
+    let libro = false
+    let recientes = m.manos_recientes
     if (fin) {
       if (p_fin_vivos === null || p_fin_gano === null || p_fin_vivos < 2 || p_fin_vivos > m.jugadores) {
         anomalias++
+      } else if (p_fin_mano === null) {
+        anota = true
       } else {
-        const k = `${m.reto}:${p_fin_vivos}`
-        const r = b.record.get(k) ?? { jugadas: 0, ganadas_humano: 0, ganadas_ia: 0 }
-        b.record.set(k, {
-          jugadas: r.jugadas + 1,
-          ganadas_humano: r.ganadas_humano + (p_fin_gano ? 1 : 0),
-          ganadas_ia: r.ganadas_ia + (p_fin_gano ? 0 : 1),
-        })
+        const ultima = b.puntos.filter((l) => l.origen === 'ias' && l.mesa_id === m.id)
+          .reduce((x, l) => Math.max(x, l.mano), 0)
+        recientes = m.manos_recientes.filter((t) => t > ahora() - 60_000)
+        if (p_fin_mano < 1 || p_fin_mano <= m.mano_informada || p_fin_mano <= ultima
+            || !(ajilei in EXTRA_AJILEI_SQL) || (ajilei === 52 && p_fin_vivos !== 5)
+            || recientes.length >= TOPE_MANOS_MINUTO_SQL) {
+          anomalias++
+        } else {
+          anota = true
+          libro = true
+        }
       }
+    }
+    if (anota) {
+      const k = `${m.reto}:${p_fin_vivos}`
+      const r = b.record.get(k) ?? { jugadas: 0, ganadas_humano: 0, ganadas_ia: 0 }
+      b.record.set(k, {
+        jugadas: r.jugadas + 1,
+        ganadas_humano: r.ganadas_humano + (p_fin_gano ? 1 : 0),
+        ganadas_ia: r.ganadas_ia + (p_fin_gano ? 0 : 1),
+      })
+    }
+    if (libro && p_fin_gano) {
+      anotarPuntos({
+        origen: 'ias', nivel: m.reto, sentados: p_fin_vivos, puntos_base: PUNTOS_RETO_SQL[m.reto],
+        ajilei, extra: EXTRA_AJILEI_SQL[ajilei], mesa_id: m.id, mano: p_fin_mano, creado_en: ahora(),
+      })
     }
     m.pila_informada = pila
     m.seq_informada = p_seq
     m.anomalias += anomalias
     m.ultimo_aviso_en = ahora()
+    if (libro) {
+      m.mano_informada = p_fin_mano
+      m.manos_recientes = [...recientes, ahora()]
+    }
     return respuesta('ok', m)
+  }
+
+  // ── RNK-1a · las tres lecturas del ranking ───────────────────────────────
+  // Los demás jugadores (las cuentas fabricadas del guion): saldo y, si tiene
+  // puntos, su total, cada uno con su fecha.
+  function sembrar({ username, puntos = null, saldo = 0, puntosEn = ahora(), saldoEn = ahora(), manos, ajileis = 0 }) {
+    b.otros.push({
+      username, saldo, saldoEn,
+      total: puntos ? { puntos, manos: manos ?? puntos, ajileis, actualizado_en: puntosEn } : null,
+    })
+  }
+  for (const j of sembrados) {
+    sembrar({
+      username: j.username, puntos: j.puntos, saldo: j.saldo ?? 0,
+      puntosEn: nace - (j.puntosHace ?? 0), saldoEn: nace - (j.saldoHace ?? 0),
+    })
+  }
+
+  // El orden del Ajuste A, el mismo que `puesto_maestros` / `puesto_fortunas`
+  // y `ranking_top`: cifra de mayor a menor, quien llegó antes a esa cifra, y
+  // el nombre sin mayúsculas. Puesto único. Nunca un uuid.
+  const porNombre = (x, y) => {
+    const a = x.toLowerCase()
+    const c = y.toLowerCase()
+    return a < c ? -1 : a > c ? 1 : 0
+  }
+  function filasRanking(ranking) {
+    let filas
+    if (ranking === 'maestros') {
+      filas = b.otros.filter((o) => o.total)
+        .map((o) => ({ username: o.username, cifra: o.total.puntos, fecha: o.total.actualizado_en, yo: false }))
+      if (b.total) filas.push({ username: usuario, cifra: b.total.puntos, fecha: b.total.actualizado_en, yo: true })
+    } else if (ranking === 'fortunas') {
+      filas = b.otros.map((o) => ({ username: o.username, cifra: o.saldo, fecha: o.saldoEn, yo: false }))
+      filas.push({ username: usuario, cifra: b.saldo, fecha: b.saldoEn, yo: true })
+    } else {
+      return null
+    }
+    return filas.sort((p, q) => q.cifra - p.cifra || p.fecha - q.fecha || porNombre(p.username, q.username))
+  }
+
+  // `ranking_top`: 100 filas exactas, `row_number()`.
+  function rankingTop({ p_ranking = null } = {}) {
+    const filas = filasRanking(p_ranking)
+    if (!filas) return []
+    return filas.slice(0, 100).map((f, i) => ({ puesto: i + 1, username: f.username, cifra: f.cifra, es_tu: f.yo }))
+  }
+
+  // `ranking_mio`: en Maestros sin puntos, CERO filas («Gana tu primera mano
+  // para entrar»).
+  function rankingMio({ p_ranking = null } = {}) {
+    const filas = filasRanking(p_ranking)
+    if (!filas) return []
+    const i = filas.findIndex((f) => f.yo)
+    if (i < 0) return []
+    return [{ puesto: i + 1, total: filas.length, franja: franjaSQL(i + 1, filas.length), cifra: filas[i].cifra }]
+  }
+
+  // `mini_perfil`: por nombre sin mayúsculas; puesto y puntos nulos sin puntos.
+  function miniPerfil({ p_username = null } = {}) {
+    if (p_username === null || p_username === undefined) return []
+    const buscado = String(p_username).toLowerCase()
+    const nombre = buscado === usuario.toLowerCase()
+      ? usuario
+      : b.otros.find((o) => o.username.toLowerCase() === buscado)?.username
+    if (!nombre) return []
+    const lugar = (ranking) => {
+      const filas = filasRanking(ranking)
+      const i = filas.findIndex((f) => f.username === nombre)
+      return i < 0 ? { puesto: null, cifra: null } : { puesto: i + 1, cifra: filas[i].cifra }
+    }
+    const m = lugar('maestros')
+    const f = lugar('fortunas')
+    return [{ username: nombre, puesto_maestros: m.puesto, puntos: m.cifra, puesto_fortunas: f.puesto, saldo: f.cifra }]
   }
 
   function salir({ p_mesa, p_fichas, p_seq }) {
@@ -432,6 +590,9 @@ export function crearBanco({
     salir_ia: salir,
     mi_mesa_ia: miMesa,
     recoger_mesa_ia: recoger,
+    ranking_top: rankingTop,
+    ranking_mio: rankingMio,
+    mini_perfil: miniPerfil,
   }
 
   return {
@@ -498,6 +659,22 @@ export function crearBanco({
     get intentos() { return b.intentos.map((x) => ({ ...x })) },
     get tope() { return b.tope },
     get cambiosValvula() { return b.cambiosValvula.map((x) => ({ ...x })) },
+    // ── RNK-1b · el libro de puntos y los demás jugadores ──────────────────
+    get puntos() { return b.puntos.map((l) => ({ ...l })) },
+    get total() { return b.total ? { ...b.total } : null },
+    get usuario() { return usuario },
+    /** Lo que el guion hace con `update mesas_ia set manos_recientes = … - 61 s` (B21). */
+    envejecerManos(ms) { for (const m of b.mesas.values()) m.manos_recientes = m.manos_recientes.map((t) => t - ms) },
+    /** Un jugador más para las lecturas, como las cuentas fabricadas del guion. */
+    sembrarJugador(j) { sembrar(j) },
+    /** Una línea del libro de OTRA cuenta (B18): su total sube y estrena fecha. */
+    sumarPuntos(username, n) {
+      const o = b.otros.find((x) => x.username === username)
+      if (!o || !(n > 0)) return false
+      const t = o.total ?? { puntos: 0, manos: 0, ajileis: 0 }
+      o.total = { ...t, puntos: t.puntos + n, manos: t.manos + 1, actualizado_en: ahora() }
+      return true
+    },
     // ── ECO-1g · el video ──────────────────────────────────────────────────
     get boletos() { return b.boletos.map((x) => ({ ...x })) },
     /** Lo que el guion hace con `update boletos_video set emitido_en = … - n s`:

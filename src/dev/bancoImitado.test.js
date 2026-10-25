@@ -6,6 +6,7 @@ import {
   crearBanco, APUESTAS_SQL, PISO_SQL, TECHO_SQL, FACTOR_IA_SQL, SILENCIO_RECOGIDA_MS,
   LIMITES_SQL, BONO_CONSTANCIA_SQL, CICLO_CONSTANCIA_SQL, sumarDias,
   VIDEO_PREMIO_SQL, VIDEO_TOPE_SQL, VIDEO_MINIMO_S_SQL, VIDEO_VIDA_MS_SQL, videoReinicioSQL, diaChicagoSQL,
+  PUNTOS_RETO_SQL, EXTRA_AJILEI_SQL, TOPE_MANOS_MINUTO_SQL, franjaSQL,
 } from './bancoImitado'
 import { NIVELES } from '../config/niveles'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
@@ -630,5 +631,225 @@ describe('ECO-1g · las cifras del video, en espejo', () => {
     }
     expect(llamadas).toBe(7)
     expect(llamadas).toBeLessThan(LIMITES_SQL.cobrar_boleto / 2)
+  })
+})
+
+// ═══ RNK-1b · el libro de puntos y las lecturas del ranking ══════════════════
+// Los casos del guion `supabase/pruebas/rnk1a_verificacion.sql` que pasan por
+// las funciones (B8–B11, B19–B22) y por las lecturas (B12, B13, B18, B23), con
+// sus MISMAS cifras. El guion habla de varias cuentas; el banco imita una (la
+// de la sesión) y las demás son jugadores sembrados, así que cada recorrido
+// pone a la cuenta de la sesión en el papel de la del guion que toca.
+// El reloj NO se mueve en el primer recorrido, como el guion en su transacción.
+
+const informar = (ll, mesa, seq, pila, vivos = null, gano = null, mano = null, ajilei = null) =>
+  ll('informar_pila', {
+    p_mesa: mesa, p_seq: seq, p_pila: pila,
+    p_fin_vivos: vivos, p_fin_gano: gano, p_fin_mano: mano, p_fin_ajilei: ajilei,
+  })
+const jugadasDe = (b, reto) => Object.entries(b.record).filter(([k]) => k.startsWith(`${reto}:`))
+  .reduce((x, [, v]) => ({ jugadas: x.jugadas + v.jugadas, ganadas_humano: x.ganadas_humano + v.ganadas_humano, ganadas_ia: x.ganadas_ia + v.ganadas_ia }),
+    { jugadas: 0, ganadas_humano: 0, ganadas_ia: 0 })
+const mesaDe = (b, id) => b.mesas.find((m) => m.id === id)
+
+describe('RNK-1b · banco imitado · informar_pila con el libro (guion de la 1a)', () => {
+  const { b, ll } = banco({ limites: false })
+  let M, E
+
+  it('B8 · gana la mano 1 (pro, 5 vivos, AJILEI 52): libro, récord y mano 1', () => {
+    M = sentar(ll, 'pro', 5, 200, 2000, T('rnk-b')).mesa_id
+    const r = informar(ll, M, 1, 2000, 5, true, 1, 52)
+    expect(r.codigo).toBe('ok')
+    expect(b.puntos).toEqual([expect.objectContaining({
+      origen: 'ias', nivel: 'pro', sentados: 5, puntos_base: 3, ajilei: 52, extra: 2, mesa_id: M, mano: 1,
+    })])
+    expect(jugadasDe(b, 'pro')).toMatchObject({ jugadas: 1, ganadas_humano: 1 })
+    expect(mesaDe(b, M)).toMatchObject({ mano_informada: 1, anomalias: 0 })
+    expect(mesaDe(b, M).manos_recientes).toHaveLength(1)
+    expect(b.total).toMatchObject({ puntos: 5, manos: 1, ajileis: 1 })
+  })
+
+  it('B9 · la mano 1 repetida y la mano 0: anomalía, libro y récord sin cambio, la pila sí', () => {
+    expect(informar(ll, M, 2, 2100, 5, true, 1, 0).codigo).toBe('ok')
+    expect(informar(ll, M, 3, 2050, 5, true, 0, 0).codigo).toBe('ok')
+    expect(b.puntos).toHaveLength(1)
+    expect(jugadasDe(b, 'pro').jugadas).toBe(1)
+    expect(mesaDe(b, M)).toMatchObject({ mano_informada: 1, anomalias: 2, seq_informada: 3, pila_informada: 2050 })
+  })
+
+  it('B10 · pierde la mano 2: mano_informada 2, récord sí, libro no', () => {
+    expect(informar(ll, M, 4, 1900, 4, false, 2, null).codigo).toBe('ok')
+    expect(b.puntos).toHaveLength(1)
+    expect(jugadasDe(b, 'pro')).toMatchObject({ jugadas: 2, ganadas_ia: 1 })
+    expect(mesaDe(b, M)).toMatchObject({ mano_informada: 2, anomalias: 2 })
+    expect(mesaDe(b, M).manos_recientes).toHaveLength(2)
+  })
+
+  it('B19 · sin p_fin_mano (cliente de antes de la 1b): récord sí; libro, mano y tope no', () => {
+    expect(ll('informar_pila', { p_mesa: M, p_seq: 5, p_pila: 1900, p_fin_vivos: 3, p_fin_gano: true }).codigo).toBe('ok')
+    expect(b.puntos).toHaveLength(1)
+    expect(jugadasDe(b, 'pro').jugadas).toBe(3)
+    expect(b.record['pro:3']).toMatchObject({ ganadas_humano: 1 })
+    expect(mesaDe(b, M)).toMatchObject({ mano_informada: 2, anomalias: 2 })
+    expect(mesaDe(b, M).manos_recientes).toHaveLength(2)
+  })
+
+  it('B20 · AJILEI 50, AJILEI 52 con 4 vivos, mano sin vivos: tres anomalías', () => {
+    expect(informar(ll, M, 6, 1900, 5, true, 3, 50).codigo).toBe('ok')
+    expect(informar(ll, M, 7, 1900, 4, true, 3, 52).codigo).toBe('ok')
+    informar(ll, M, 8, 1900, null, null, 3, null)
+    expect(b.puntos).toHaveLength(1)
+    expect(jugadasDe(b, 'pro').jugadas).toBe(3)
+    expect(mesaDe(b, M)).toMatchObject({ mano_informada: 2, anomalias: 5, seq_informada: 8 })
+  })
+
+  it('B22 · AJILEI 51 sin ganar la mano: récord sí, libro no', () => {
+    expect(informar(ll, M, 9, 1900, 4, false, 3, 51).codigo).toBe('ok')
+    expect(b.puntos).toHaveLength(1)
+    expect(jugadasDe(b, 'pro').jugadas).toBe(4)
+    expect(mesaDe(b, M)).toMatchObject({ mano_informada: 3, anomalias: 5 })
+  })
+
+  it('B11 · 13 fines de mano en el mismo minuto: el 13.º es anomalía y no entra', () => {
+    E = sentar(ll, 'basico', 2, 50, 500, T('rnk-e')).mesa_id
+    for (let i = 1; i <= 12; i++) expect(informar(ll, E, i, 500, 2, false, i, null).codigo).toBe('ok')
+    expect(mesaDe(b, E).anomalias).toBe(0)
+    expect(informar(ll, E, 13, 500, 2, true, 13, 0).codigo).toBe('ok')
+    expect(b.puntos.filter((l) => l.mesa_id === E)).toHaveLength(0)
+    expect(jugadasDe(b, 'basico').jugadas).toBe(12)
+    expect(mesaDe(b, E)).toMatchObject({ anomalias: 1, mano_informada: 12, seq_informada: 13 })
+    expect(mesaDe(b, E).manos_recientes).toHaveLength(12)
+  })
+
+  it('B21 · 61 s después la ventana se vacía y la mano 13 entra (básico, 1 punto)', () => {
+    b.envejecerManos(61_000)
+    expect(informar(ll, E, 14, 550, 2, true, 13, 0).codigo).toBe('ok')
+    expect(b.puntos.filter((l) => l.mesa_id === E)).toEqual([expect.objectContaining({ puntos_base: 1, extra: 0, mano: 13 })])
+    expect(mesaDe(b, E)).toMatchObject({ mano_informada: 13, anomalias: 1 })
+    expect(mesaDe(b, E).manos_recientes).toHaveLength(1)
+    expect(b.total).toMatchObject({ puntos: 6, manos: 2, ajileis: 1 })   // 5 de la mesa pro + 1
+  })
+
+  it('el total es la suma del libro (B25)', () => {
+    expect(b.total.puntos).toBe(b.puntos.reduce((x, l) => x + l.puntos_base + l.extra, 0))
+    expect(b.total.manos).toBe(b.puntos.length)
+  })
+})
+
+describe('RNK-1b · banco imitado · las lecturas del ranking (guion de la 1a)', () => {
+  // La cuenta de la sesión es rnk_a_verif y llega a 10 por las funciones: pro
+  // con AJILEI 52 (5), pro con AJILEI 51 (4) y básico (1). Los demás, sembrados
+  // con las cifras del guion: D 5 (llegó antes) · B 5 (después) · E 1.
+  const reloj = { t: 1_000_000_000 }
+  const b = crearBanco({ saldo: 2500, ahora: () => reloj.t, limites: false, usuario: 'rnk_a_verif' })
+  const ll = (n, p) => b.llamar(n, p)
+  b.sembrarJugador({ username: 'rnk_d_verif', puntos: 5, puntosEn: reloj.t - 3000, saldo: 2500, saldoEn: reloj.t - 9000 })
+  b.sembrarJugador({ username: 'rnk_b_verif', puntos: 5, puntosEn: reloj.t - 2000, saldo: 500, saldoEn: reloj.t - 9000 })
+  b.sembrarJugador({ username: 'rnk_e_verif', puntos: 1, puntosEn: reloj.t - 1000, saldo: 2000, saldoEn: reloj.t - 9000 })
+  b.sembrarJugador({ username: 'rnk_c_verif', puntos: null, saldo: 2500, saldoEn: reloj.t - 9000 })
+
+  it('B13 · sin puntos, ranking_mio(maestros) → cero filas', () => {
+    expect(ll('ranking_mio', { p_ranking: 'maestros' })).toEqual([])
+    expect(ll('ranking_mio', { p_ranking: 'otro' })).toEqual([])
+  })
+
+  it('B12 · ranking_top maestros: puestos únicos 1-2-3-4; en el empate a 5, D (llegó antes) delante de B', () => {
+    const P = sentar(ll, 'pro', 5, 200, 2000, T('rnk-a1')).mesa_id
+    informar(ll, P, 1, 2000, 5, true, 1, 52)
+    informar(ll, P, 2, 2000, 5, true, 2, 51)
+    const Q = sentar(ll, 'basico', 2, 50, 500, T('rnk-a2')).mesa_id
+    informar(ll, Q, 1, 500, 2, true, 1, 0)
+    expect(b.total.puntos).toBe(10)
+    const top = ll('ranking_top', { p_ranking: 'maestros' })
+    expect(top.map((f) => [f.puesto, f.username, f.cifra, f.es_tu])).toEqual([
+      [1, 'rnk_a_verif', 10, true], [2, 'rnk_d_verif', 5, false], [3, 'rnk_b_verif', 5, false], [4, 'rnk_e_verif', 1, false],
+    ])
+    for (const f of top) expect(Object.keys(f).sort()).toEqual(['cifra', 'es_tu', 'puesto', 'username'])
+  })
+
+  it('B13 · ranking_mio maestros de A: puesto 1 de 4, franja 25 %, cifra 10', () => {
+    expect(ll('ranking_mio', { p_ranking: 'maestros' })).toEqual([{ puesto: 1, total: 4, franja: 25, cifra: 10 }])
+  })
+
+  it('B14 · fortunas: puesto único, franja con la fórmula entera; empate de saldo → fecha', () => {
+    const mio = ll('ranking_mio', { p_ranking: 'fortunas' })[0]
+    const top = ll('ranking_top', { p_ranking: 'fortunas' })
+    expect(top.map((f) => f.puesto)).toEqual([1, 2, 3, 4, 5])
+    // C y D empatan a 2.500 con la misma fecha: decide el nombre (c antes que d).
+    expect(top.findIndex((f) => f.username === 'rnk_c_verif')).toBeLessThan(top.findIndex((f) => f.username === 'rnk_d_verif'))
+    expect(mio).toEqual({ puesto: top.find((f) => f.es_tu).puesto, total: 5, franja: franjaSQL(mio.puesto, 5), cifra: b.saldo })
+    expect([franjaSQL(1, 3), franjaSQL(2, 3), franjaSQL(3, 3), franjaSQL(28, 100), franjaSQL(5, 100), franjaSQL(1, 1)])
+      .toEqual([35, 70, 100, 30, 5, 100])
+  })
+
+  it('B15 · mini_perfil: sin mayúsculas; nadie → cero filas; sin puntos → nulos; nunca un uuid', () => {
+    expect(ll('mini_perfil', { p_username: 'RNK_D_VERIF' })).toEqual([
+      { username: 'rnk_d_verif', puesto_maestros: 2, puntos: 5, puesto_fortunas: expect.any(Number), saldo: 2500 },
+    ])
+    expect(ll('mini_perfil', { p_username: 'nadie' })).toEqual([])
+    expect(ll('mini_perfil', { p_username: 'rnk_c_verif' })[0]).toMatchObject({ puesto_maestros: null, puntos: null, saldo: 2500 })
+    expect(ll('mini_perfil', { p_username: 'RNK_A_VERIF' })[0]).toMatchObject({ username: 'rnk_a_verif', puesto_maestros: 1, puntos: 10 })
+  })
+
+  it('B18 · empate a 2: X (antes) delante; Y sube; X sube después y en el nuevo empate a 3 queda detrás', () => {
+    reloj.t += 1000
+    b.sembrarJugador({ username: 'rnk_x_verif', puntos: 2, puntosEn: reloj.t, saldo: 0 })
+    reloj.t += 1000
+    b.sembrarJugador({ username: 'rnk_y_verif', puntos: 2, puntosEn: reloj.t, saldo: 0 })
+    const puesto = (u) => ll('mini_perfil', { p_username: u })[0].puesto_maestros
+    expect([puesto('rnk_x_verif'), puesto('rnk_y_verif')]).toEqual([4, 5])
+    reloj.t += 1000
+    b.sumarPuntos('rnk_y_verif', 1)
+    expect([puesto('rnk_x_verif'), puesto('rnk_y_verif')]).toEqual([5, 4])
+    reloj.t += 1000
+    b.sumarPuntos('rnk_x_verif', 1)
+    expect([puesto('rnk_x_verif'), puesto('rnk_y_verif')]).toEqual([5, 4])
+    const top = ll('ranking_top', { p_ranking: 'maestros' })
+    expect(top.find((f) => f.username === 'rnk_x_verif').puesto).toBe(5)
+    expect(top.find((f) => f.username === 'rnk_y_verif').puesto).toBe(4)
+  })
+
+  it('B23 · el corte: 100 filas exactas con puestos 1…100; el último en llegar al empate, fuera y último', () => {
+    for (let i = 1; i <= 101; i++) {
+      reloj.t += 1
+      b.sembrarJugador({ username: `rnkcorte_${String(i).padStart(3, '0')}`, puntos: 1, puntosEn: reloj.t, saldo: 0 })
+    }
+    const top = ll('ranking_top', { p_ranking: 'maestros' })
+    expect(top).toHaveLength(100)
+    expect(top.map((f) => f.puesto)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1))
+    expect(top.some((f) => f.username === 'rnkcorte_101')).toBe(false)
+    expect(ll('mini_perfil', { p_username: 'rnkcorte_101' })[0].puesto_maestros).toBe(107)
+    expect(ll('ranking_mio', { p_ranking: 'maestros' })[0]).toMatchObject({ puesto: 1, total: 107, franja: 5 })
+  })
+})
+
+describe('RNK-1b · las cifras del libro de puntos, en espejo', () => {
+  const dir = join(process.cwd(), 'supabase', 'migrations')
+  const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.includes('rnk1a_libro_puntos'))), 'utf8')
+
+  it('puntos por reto, el extra del AJILEI y el tope por minuto: SQL = modelo = niveles.js', () => {
+    const reto = /function public\.puntos_reto_ia[\s\S]*?\$fn\$;/.exec(sql)[0]
+    for (const r of ['basico', 'avanzado', 'pro']) {
+      expect(Number(new RegExp(`when '${r}'\\s+then (\\d+)`).exec(reto)[1])).toBe(PUNTOS_RETO_SQL[r])
+      expect(NIVELES.find((n) => n.id === r).puntos).toBe(PUNTOS_RETO_SQL[r])
+    }
+    const extra = /when 51 then (\d+) when 52 then (\d+) else (\d+)/.exec(/function public\.extra_ajilei[\s\S]*?\$fn\$;/.exec(sql)[0])
+    expect({ 0: Number(extra[3]), 51: Number(extra[1]), 52: Number(extra[2]) }).toEqual({ ...EXTRA_AJILEI_SQL })
+    expect(/ia_tope_manos_minuto\(\)[\s\S]*?\$fn\$ select (\d+) \$fn\$/.exec(sql)[1]).toBe(String(TOPE_MANOS_MINUTO_SQL))
+  })
+
+  it('la franja: la fórmula entera del SQL = franjaSQL', () => {
+    expect(sql).toMatch(/\(\(\(p_puesto \* 20 \+ p_total - 1\) \/ p_total\) \* 5\)::smallint/)
+    for (let total = 1; total <= 60; total++) {
+      for (let puesto = 1; puesto <= total; puesto++) {
+        expect(franjaSQL(puesto, total)).toBe(Math.ceil((puesto * 100) / total / 5) * 5)
+      }
+    }
+  })
+
+  it('el orden del ranking (Ajuste A): cifra, fecha, nombre, en las dos lecturas del SQL', () => {
+    expect(sql).toMatch(/order by t\.puntos desc, t\.actualizado_en, lower\(p\.username\)/)
+    expect(sql).toMatch(/order by b\.saldo desc, b\.actualizada_en, lower\(p\.username\)/)
+    expect(sql).toMatch(/limit 100;/)
   })
 })
