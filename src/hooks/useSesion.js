@@ -14,8 +14,13 @@ import { sesionInicial, anotarMano } from './sesionCore'
 // Observa la ENTRADA en PAYOUT, no cada render en PAYOUT: la guarda por
 // handCount vive en el núcleo, pero además se dispara una sola vez por
 // transición para no depender sólo de ella.
+//
+// RNK-1b · I-7 · «ganó» y los puntos salen del MISMO `fin` (`finDeMano`) que
+// `GameTable` manda al servidor, calculado una vez por mano. Ya no se lee un
+// asiento ganador aquí: `fin.ganoHumano` es la capa principal (INV-63) y
+// `puntos` es el `total` de `puntosDeMano` para esa mano.
 
-export function useSesion({ phase, handCount, winner, humanScore, enPayout }) {
+export function useSesion({ phase, handCount, fin, puntos, humanScore, enPayout }) {
   const [sesion, anotar] = useReducer(anotarMano, undefined, sesionInicial)
   const faseAnteriorRef = useRef(phase)
 
@@ -23,9 +28,9 @@ export function useSesion({ phase, handCount, winner, humanScore, enPayout }) {
     const antes = faseAnteriorRef.current
     faseAnteriorRef.current = phase
     if (antes === phase) return
-    if (!enPayout) return
-    anotar({ handCount, gano: winner === 0, score: humanScore })
-  }, [phase, enPayout, handCount, winner, humanScore])
+    if (!enPayout || !fin) return
+    anotar({ handCount, gano: fin.ganoHumano, puntos, ajilei: fin.ajilei, score: humanScore })
+  }, [phase, enPayout, handCount, fin, puntos, humanScore])
 
   return sesion
 }

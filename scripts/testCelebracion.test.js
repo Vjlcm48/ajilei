@@ -10,6 +10,8 @@ import {
 } from '../src/hooks/sesionCore.js'
 import { PHASES } from '../src/engine/gameEngine.js'
 import { AJILEI_CONFIG } from '../src/config/ajileiConfig.js'
+import { puntosDeMano } from '../src/lib/puntos.js'
+import { puntosDe } from '../src/config/niveles.js'
 
 // ── DSK-VC2 · Los dos núcleos puros ─────────────────────────────────────────
 // Documento rector: docs/AJILEI_Victory_Celebration_v1.0.md §2 y §5.
@@ -261,6 +263,47 @@ describe('VC2 · sesión', () => {
     expect(s.manosJugadas).toBe(2)
     expect(s.manosGanadas).toBe(2)
     expect(s.mejorMano).toEqual({ palo: 'Oros', pts: 30 })
+  })
+
+  // RNK-1b · I-7 · «Puntos obtenidos» = Σ de los puntos de las manos GANADAS,
+  // cada una con el `total` de `puntosDeMano` del mismo fin que va al servidor.
+  it('RNK-1b · suma los puntos y los AJILEI sólo de las manos ganadas', () => {
+    let s = sesionInicial()
+    expect(s.puntos).toBe(0)
+    expect(s.ajileis).toBe(0)
+    const pro = (ajilei) => puntosDeMano({ origen: 'ias', nivel: 'pro', sentados: 5, ajilei }).total
+    s = anotarMano(s, { handCount: 1, gano: true, puntos: pro(0), ajilei: 0, score: score('Oros', 30) })
+    s = anotarMano(s, { handCount: 2, gano: false, puntos: pro(51), ajilei: 51, score: score('Copas', 51) })
+    s = anotarMano(s, { handCount: 3, gano: true, puntos: pro(52), ajilei: 52, score: score('Bastos', 52) })
+    expect(s.manosGanadas).toBe(2)
+    expect(s.puntos).toBe(3 + 5)          // la perdida, con su AJILEI, no suma nada
+    expect(s.ajileis).toBe(1)
+  })
+
+  it('RNK-1b · la MISMA mano no suma puntos dos veces', () => {
+    let s = sesionInicial()
+    s = anotarMano(s, { handCount: 1, gano: true, puntos: 2, ajilei: 0, score: score('Oros', 30) })
+    const repetida = anotarMano(s, { handCount: 1, gano: true, puntos: 2, ajilei: 0, score: score('Oros', 30) })
+    expect(repetida).toBe(s)
+    expect(repetida.puntos).toBe(2)
+  })
+
+  it('RNK-1b · «Puntos obtenidos» = Σ puntosDeMano de las ganadas, en los tres retos', () => {
+    for (const nivel of ['basico', 'avanzado', 'pro']) {
+      const manos = [
+        { gano: true, ajilei: 0 }, { gano: false, ajilei: 0 }, { gano: true, ajilei: 51 },
+        { gano: true, ajilei: 0 }, { gano: false, ajilei: 52 },
+      ]
+      let s = sesionInicial()
+      let esperado = 0
+      manos.forEach((m, i) => {
+        const p = puntosDeMano({ origen: 'ias', nivel, sentados: 2, ajilei: m.ajilei }).total
+        if (m.gano) esperado += p
+        s = anotarMano(s, { handCount: i + 1, gano: m.gano, puntos: p, ajilei: m.ajilei, score: null })
+      })
+      expect(s.puntos).toBe(esperado)
+      expect(s.puntos).toBe(3 * puntosDe(nivel) + 1)
+    }
   })
 
   it('fichas netas es un delta con signo contra el saldo de entrada', () => {

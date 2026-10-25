@@ -3,7 +3,8 @@ import {
   TIPOS, CODIGOS, DESTINOS, destinoDe, colaNueva, encolarPila, encolarRecarga,
   encolarSalida, proximo, enviando, alResponder, anotarPila, finDeMano,
 } from './mesaIACore'
-import { PHASES, createInitialState } from '../engine/gameEngine'
+import { PHASES, createInitialState, makeHandRules } from '../engine/gameEngine'
+import { createDeck } from '../engine/deck'
 import { nivelarLasIAS } from './mesaCore'
 
 // ── ECO-1c · el núcleo de la mesa contra las IAS ────────────────────────────
@@ -189,15 +190,23 @@ describe('ECO-1c · P-2a · la salida espera a la recarga pendiente', () => {
 })
 
 // ── El fin de mano · la capa 0, no `winner` ─────────────────────────────────
+// RNK-1b · el pago lleva `handRules` (lo congela `startHand`) y `handCount`,
+// como el de verdad: `finDeMano` lee de ahí `vivos` y `mano`.
+const MAZO = Object.fromEntries(createDeck().map((c) => [c.id, c]))
+const cartas = (...ids) => ids.map((id) => MAZO[id])
+const AJILEI_51 = cartas('1-Copas', '3-Copas', '10-Copas', '11-Copas', '12-Copas')
+
 function enPago(players, extra = {}) {
+  const vivos = extra.aliveCount ?? players.length
   return {
-    phase: PHASES.PAYOUT, aliveCount: players.length, manoIndex: 0, winner: null,
-    players: players.map((p, i) => ({ id: i, folded: false, allIn: false, score: null, chips: 0, ...p })),
+    phase: PHASES.PAYOUT, aliveCount: vivos, handRules: makeHandRules(vivos), handCount: 1,
+    manoIndex: 0, winner: null,
+    players: players.map((p, i) => ({ id: i, folded: false, allIn: false, score: null, chips: 0, cards: [], ...p })),
     ...extra,
   }
 }
 
-describe('ECO-1c · finDeMano (C7)', () => {
+describe('ECO-1c · finDeMano (C7) · RNK-1b · con la mano y el AJILEI', () => {
   it('fuera de PAYOUT no hay fin de mano', () => {
     expect(finDeMano({ phase: PHASES.BET_1 })).toBe(null)
   })
@@ -207,7 +216,7 @@ describe('ECO-1c · finDeMano (C7)', () => {
       { contribMano: 100, allIn: true, score: { points: 40 } },
       { contribMano: 300, score: { points: 30 } },
     ], { winner: 1 })
-    expect(finDeMano(s)).toEqual({ vivos: 2, ganoHumano: true })
+    expect(finDeMano(s)).toEqual({ vivos: 2, ganoHumano: true, mano: 1, ajilei: 0 })
   })
 
   it('por retiros: gana el que se queda, sin score', () => {
@@ -215,8 +224,8 @@ describe('ECO-1c · finDeMano (C7)', () => {
       { contribMano: 50, folded: true },
       { contribMano: 100 },
       { contribMano: 50, folded: true },
-    ], { winner: 1 })
-    expect(finDeMano(s)).toEqual({ vivos: 3, ganoHumano: false })
+    ], { winner: 1, handCount: 4 })
+    expect(finDeMano(s)).toEqual({ vivos: 3, ganoHumano: false, mano: 4, ajilei: 0 })
   })
 
   it('empate: lo gana el más cercano a la Mano, como en el motor', () => {
@@ -225,13 +234,37 @@ describe('ECO-1c · finDeMano (C7)', () => {
     expect(finDeMano(enPago(pl, { manoIndex: 0, winner: 0 })).ganoHumano).toBe(true)
   })
 
-  it('vivos es aliveCount: las eliminadas no cuentan', () => {
+  it('vivos es handRules.ruleN: las eliminadas no cuentan', () => {
     const s = enPago([
       { contribMano: 100, score: { points: 30 } },
       { contribMano: 100, score: { points: 20 } },
       { contribMano: 0, folded: true, eliminated: true },
     ], { aliveCount: 2 })
     expect(finDeMano(s).vivos).toBe(2)
+    expect(finDeMano(s).vivos).toBe(s.handRules.ruleN)
+  })
+
+  it('mano es handCount', () => {
+    const pl = [{ contribMano: 100, score: { points: 30 } }, { contribMano: 100, score: { points: 20 } }]
+    expect(finDeMano(enPago(pl, { handCount: 1 })).mano).toBe(1)
+    expect(finDeMano(enPago(pl, { handCount: 17 })).mano).toBe(17)
+  })
+
+  it('gana con AJILEI 51 → ajilei 51', () => {
+    const s = enPago([
+      { contribMano: 100, cards: AJILEI_51, score: { points: 51 } },
+      { contribMano: 100, score: { points: 30 } },
+    ])
+    expect(finDeMano(s)).toEqual({ vivos: 2, ganoHumano: true, mano: 1, ajilei: 51 })
+  })
+
+  it('tiene AJILEI pero NO gana la mano → ajilei 0 (§2.4.3, §2.5)', () => {
+    // La IA, Mano, empata a 51 y el empate es suyo: el AJILEI del humano no cobra.
+    const s = enPago([
+      { contribMano: 100, cards: AJILEI_51, score: { points: 51 } },
+      { contribMano: 100, score: { points: 51 } },
+    ], { manoIndex: 1, winner: 1 })
+    expect(finDeMano(s)).toEqual({ vivos: 2, ganoHumano: false, mano: 1, ajilei: 0 })
   })
 })
 

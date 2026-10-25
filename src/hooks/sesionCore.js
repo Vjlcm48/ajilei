@@ -14,6 +14,8 @@ export function sesionInicial() {
   return {
     manosJugadas: 0,
     manosGanadas: 0,
+    puntos: 0,              // RNK-1b · Σ de los puntos de las manos ganadas
+    ajileis: 0,             // RNK-1b · cuántas manos ganadas con AJILEI
     mejorMano: null,        // { palo, pts } — la mejor del humano en la partida
     ultimaManoContada: null, // identidad (handCount) de la última mano sumada
   }
@@ -23,12 +25,18 @@ export function sesionInicial() {
 // del marcador: la GUARDA de idempotencia. Sin ella, cualquier re-render o
 // doble disparo de StrictMode contaría la misma mano dos veces — y una cifra de
 // "manos jugadas" inflada es peor que no mostrarla.
-export function anotarMano(sesion, { handCount, gano, score }) {
+//
+// RNK-1b · `puntos` y `ajilei` llegan ya calculados del MISMO fin de mano que
+// viaja al servidor (`finDeMano` → `puntosDeMano`, en `GameTable`): la sesión
+// suma, no decide. Sólo cuentan en una mano ganada, como en el libro (§2.1).
+export function anotarMano(sesion, { handCount, gano, puntos = 0, ajilei = 0, score }) {
   if (sesion.ultimaManoContada === handCount) return sesion
   const mejor = mejorDe(sesion.mejorMano, score)
   return {
     manosJugadas: sesion.manosJugadas + 1,
     manosGanadas: sesion.manosGanadas + (gano ? 1 : 0),
+    puntos: sesion.puntos + (gano ? puntos : 0),
+    ajileis: sesion.ajileis + (gano && ajilei > 0 ? 1 : 0),
     mejorMano: mejor,
     ultimaManoContada: handCount,
   }

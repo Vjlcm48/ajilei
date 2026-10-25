@@ -16,7 +16,7 @@ import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
-import { puntosDe } from '../config/niveles'
+import { puntosDeMano } from '../lib/puntos'
 import { claseTono, vozResto } from '../hooks/resultadoCore'
 import { componeCronica, componeCapas } from '../hooks/cronicaCore'
 import { lecturaDeMano, resultadoDeMano } from '../hooks/manoCore'
@@ -493,6 +493,21 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const destinoVuelo = lectura?.destinoVuelo ?? null
   const retencionVuelo = lectura?.retencion ?? 0
 
+  // ── RNK-1b · I-7 · UN fin de mano por mano, para el servidor y la sesión ──
+  // `finDeMano` (capa principal, `ruleN`, `handCount` y AJILEI) se calcula UNA
+  // vez al entrar en el pago —memo por `handCount`— y lo usan las dos cosas que
+  // dependen de él: el aviso de fin de mano a la cola del servidor (abajo) y
+  // «Manos ganadas» / «Puntos obtenidos» de la sesión (`useSesion`). Así no
+  // pueden discrepar. Los puntos son `puntosDeMano`, espejo de la regla del
+  // servidor (INV-65); al servidor nunca viaja la cifra, sólo el fin.
+  const finMano = useMemo(
+    () => (phase === PHASES.PAYOUT ? finDeMano(game) : null),
+    [phase, game.handCount], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const puntosMano = finMano
+    ? puntosDeMano({ origen: 'ias', nivel: game.nivelIA, sentados: finMano.vivos, ajilei: finMano.ajilei }).total
+    : 0
+
   // ── APU-1 1e · SALIR DEVUELVE LAS FICHAS ─────────────────────────────────
   // Rector 1e §2.3. `onLeave` recibe con cuántas fichas se levanta el humano,
   // para que el saldo de la sesión suba con lo ganado. Las cuatro salidas de
@@ -515,7 +530,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     if (!control) return
     let fin = null
     if (phase === PHASES.PAYOUT && finAvisadoRef.current !== game.handCount) {
-      fin = finDeMano(game)
+      fin = finMano
       finAvisadoRef.current = game.handCount
     }
     control.pila(human.chips, fin)
@@ -677,11 +692,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const precedenteViaje = useCallback(() => showdownAudioRef.current, [])
 
   // VOZ-3 · D10 · «Manos ganadas» = el principal es el humano, la misma regla
-  // que el récord del servidor (`finDeMano`).
+  // que el récord del servidor. RNK-1b · I-7 · y ya no una regla igual, sino el
+  // MISMO `finMano` que viaja al servidor, con sus puntos.
   const sesion = useSesion({
     phase,
     handCount: game.handCount,
-    winner: ganadorVisible,
+    fin: finMano,
+    puntos: puntosMano,
     humanScore: human.score,
     enPayout: phase === PHASES.PAYOUT,
   })
@@ -2337,7 +2354,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               sesion={sesion}
               netas={fichasNetas(human.chips, human.entrada)}
               saldo={control ? saldoFinal : human.chips}
-              puntos={sesion.manosGanadas * puntosDe(game.nivelIA)}
+              puntos={sesion.puntos}
               precedente={precedenteToc}
               onLeave={salir}
             />

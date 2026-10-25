@@ -22,6 +22,7 @@
 
 import { PHASES } from '../engine/gameEngine'
 import { ganadoresPorCapa } from '../engine/pozos'
+import { ajileiDe } from '../lib/puntos'
 
 // P-2b · lo que espera la tarjeta de recarga una respuesta antes de decir que
 // no la hay y ofrecer «Reintentar» (el mismo `seq`) y salir con las fichas.
@@ -87,7 +88,7 @@ function encolar(cola, item) {
 
 /**
  * La pila del humano cambió (o terminó una mano). Con `fin` = `{ vivos,
- * ganoHumano }` es el aviso de fin de mano, que va SIEMPRE aunque la pila no
+ * ganoHumano, mano, ajilei }` (`finDeMano`) es el aviso de fin de mano, que va SIEMPRE aunque la pila no
  * haya cambiado (quien pierde ya la bajó al apostar). Sin `fin`, una pila igual
  * a la última avisada no se manda.
  */
@@ -159,11 +160,21 @@ export function anotarPila(cola, pila) {
   return { ...cola, ultimaPila: pila }
 }
 
-// ── El fin de mano (C7) ─────────────────────────────────────────────────────
-// `vivos` es `aliveCount`: lo fija `startHand` al empezar la mano y vale de 2 a
-// 5 en toda mano jugada. `ganoHumano`: el asiento 0 se lleva la CAPA 0, el pozo
-// principal (Reglas §5). No se usa `winner`, que es el ganador de la capa
-// SUPERIOR (`doShowdown`), la trampa de VOZ-3.
+// ── El fin de mano (C7, y RNK-1b) ───────────────────────────────────────────
+// `vivos` es `handRules.ruleN` (K-7): los vivos que el motor CONGELA al barajar
+// el Pie (`startHand`), de 2 a 5 en toda mano jugada. `startHand` escribe
+// `aliveCount` y `handRules` juntos, así que en el pago valen lo mismo (H-3,
+// lo sella `testRnk1b`); se lee `ruleN` porque es la regla de la mano.
+// `ganoHumano`: el asiento 0 se lleva la CAPA 0, el pozo principal (Reglas §5,
+// INV-63). No se usa `winner`, que es el ganador de la capa SUPERIOR
+// (`doShowdown`), la trampa de VOZ-3.
+//
+// RNK-1b · `mano` es `handCount`: 1 en la primera mano de la mesa y +1 en cada
+// `startHand`. Una mesa del servidor es UN montaje de `GameTable` con su estado
+// nuevo, y la app nunca reanuda una mesa tras recargar (la recoge el arranque),
+// así que `mano` crece de uno en uno dentro de cada `mesas_ia`, como exige
+// `informar_pila`. `ajilei`: 0/51/52 con las cartas del humano, SÓLO si ganó la
+// mano (normativo §2.4.3 y §2.5: un AJILEI que no gana no da nada).
 //
 // En PAYOUT el estado conserva `contribMano`, `folded` y `score`, que es todo
 // lo que `capasDe` y `ganadoresPorCapa` necesitan, y todo el que no se retiró
@@ -174,10 +185,15 @@ const puntaje = (p) => p?.score?.points ?? 0
 
 export function finDeMano(state) {
   if (state?.phase !== PHASES.PAYOUT) return null
-  const vivos = state.aliveCount
   const capa0 = ganadoresPorCapa(state, puntaje)[0]
   const ganador = capa0 === undefined || capa0 < 0 ? state.winner : capa0
-  return { vivos, ganoHumano: ganador === 0 }
+  const ganoHumano = ganador === 0
+  return {
+    vivos: state.handRules.ruleN,
+    ganoHumano,
+    mano: state.handCount,
+    ajilei: ganoHumano ? ajileiDe(state.players[0]?.cards, state.handRules) : 0,
+  }
 }
 
 // ── ECO-1d · K7 · SENTARSE CON `limite` ─────────────────────────────────────

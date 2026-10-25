@@ -76,11 +76,17 @@ export function crearMesaIAApi(cliente = supabase) {
     recargar(mesa, monto, seq) {
       return llamar('recargar_ia', { p_mesa: mesa, p_monto: monto, p_seq: seq })
     },
-    /** `fin` = `{ vivos, ganoHumano }` en el aviso de fin de mano; si no, nulo. */
+    /**
+     * `fin` = `{ vivos, ganoHumano, mano, ajilei }` (`finDeMano`) en el aviso de
+     * fin de mano; si no, nulo. RNK-1b · `mano` y `ajilei` viajan para el libro
+     * de puntos (migración `20261024191731_rnk1a_libro_puntos.sql`): el servidor
+     * deriva los puntos, el cliente nunca manda una cifra (INV-65).
+     */
     informar(mesa, seq, pila, fin = null) {
       return llamar('informar_pila', {
         p_mesa: mesa, p_seq: seq, p_pila: pila,
         p_fin_vivos: fin ? fin.vivos : null, p_fin_gano: fin ? fin.ganoHumano : null,
+        p_fin_mano: fin ? fin.mano ?? null : null, p_fin_ajilei: fin ? fin.ajilei ?? null : null,
       })
     },
     salir(mesa, fichas, seq) {
