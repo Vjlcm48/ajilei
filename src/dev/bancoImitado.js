@@ -667,8 +667,16 @@ export function crearBanco({
     envejecerManos(ms) { for (const m of b.mesas.values()) m.manos_recientes = m.manos_recientes.map((t) => t - ms) },
     /** Un jugador más para las lecturas, como las cuentas fabricadas del guion. */
     sembrarJugador(j) { sembrar(j) },
-    /** Una línea del libro de OTRA cuenta (B18): su total sube y estrena fecha. */
+    /** Una línea del libro de OTRA cuenta (B18): su total sube y estrena fecha.
+     *  RNK-1c · con el nombre de la PROPIA cuenta, su total sube igual (sin
+     *  línea, como los sembrados): es lo que deja al bypass en su puesto. */
     sumarPuntos(username, n) {
+      if (typeof username === 'string' && username.toLowerCase() === usuario.toLowerCase()) {
+        if (!(n > 0)) return false
+        const t = b.total ?? { puntos: 0, manos: 0, ajileis: 0 }
+        b.total = { ...t, puntos: t.puntos + n, manos: t.manos + 1, actualizado_en: ahora() }
+        return true
+      }
       const o = b.otros.find((x) => x.username === username)
       if (!o || !(n > 0)) return false
       const t = o.total ?? { puntos: 0, manos: 0, ajileis: 0 }

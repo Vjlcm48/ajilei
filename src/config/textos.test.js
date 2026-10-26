@@ -89,7 +89,10 @@ describe('IDI-0 · diccionario es', () => {
     // ECO-1g es la sexta: `video.*` es el video de recompensa, una pieza que se
     // pide desde Retar y desde el «+» de la píldora y se ve encima de todas las
     // pantallas con barra.
-    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.']
+    //
+    // RNK-1c es la séptima: `rnk.*` es la pantalla «Rankings» (y, con la 1c-ii
+    // y la 1e, su mini-perfil y la tarjeta de SumaMente).
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
@@ -178,6 +181,10 @@ describe('IDI-0 · diccionario es', () => {
     //     el botón del mensaje «Ahora no hay videos disponibles». Dos piezas de
     //     dos campañas; el segundo es un rótulo a la vista y un idioma futuro
     //     puede querer «Cerrar» ahí sin tocar la flecha.
+    //
+    //   lob.nav.rankings = rnk.titulo  (RNK-1c)
+    //     La pantalla se llama como el botón de la barra que la abre, igual que
+    //     `lob.cta.pvp = sal.opciones.titulo`: le dice al jugador que llegó.
     expect(repetidos.sort()).toEqual([
       'ia.recarga.opcion.medio = ia.retar.entrada.medio',
       'ia.recarga.opcion.piso = ia.retar.entrada.piso',
@@ -186,6 +193,7 @@ describe('IDI-0 · diccionario es', () => {
       'ia.retar.jugadores = sal.armar.jugadores',
       'lob.ajustes.aria = lob.cfg.titulo',
       'lob.cta.pvp = sal.opciones.titulo',
+      'lob.nav.rankings = rnk.titulo',
       'sal.armar.abierta = sal.espera.tipo.abierta',
       'sal.armar.privada = sal.espera.tipo.privada',
       'sal.armar.titulo = sal.opciones.armar',

@@ -498,6 +498,46 @@ export const TEXTOS_ES = {
   'video.consejo.6':       'Para retar a las IAS necesitas al menos 10 veces la apuesta de la mesa.',
   'video.consejo.7':       'Si recargas fichas en la mesa, las IAS se nivelan contigo.',
   'video.consejo.8':       'Entra tres días seguidos y cobra 500 HC por tu constancia.',
+
+  // ── RNK-1c · La pantalla «Rankings» ──────────────────────────────────────
+  // Rector: AJILEI_RNK-1_Fase1c-i_v1.0.md §3 (textos del informe 1-L §5). Las
+  // del mini-perfil (`rnk.perfil.*`) son de la 1c-ii (abajo) y las de SumaMente
+  // (`rnk.suma.*`), de la 1e. «Reintentar» no se repite: la pantalla usa
+  // `ia.retar.saldo.reintentar`, el reintento de otra lectura.
+  'rnk.titulo':            'Rankings',
+  'rnk.pestana.maestros':  'Los grandes maestros',
+  'rnk.pestana.fortunas':  'Las grandes fortunas',
+  'rnk.sub.maestros':      'Se gana jugando. No se compra.',
+  'rnk.sub.fortunas':      'Saldo total en Heptacoins.',
+  'rnk.col.puesto':        'Puesto',
+  'rnk.col.jugador':       'Jugador',
+  'rnk.col.puntos':        'Puntos',
+  'rnk.col.hc':            'Heptacoins',
+  'rnk.tu':                'Tu posición',
+  'rnk.tu.puesto':         'Puesto {n}',
+  // La franja la da el servidor (`ranking_mio`), en pasos del 5 % hacia arriba.
+  'rnk.tu.franja':         'Puesto {n} · dentro del {p} %',
+  'rnk.tu.vacio':          'Gana tu primera mano para entrar',
+  'rnk.tu.yo':             'tú',
+  'rnk.fin':               'Se muestran los 100 primeros.',
+  'rnk.cargando':          'Cargando…',
+  'rnk.sinred':            'No se pudo cargar el ranking.',
+
+  // ── RNK-1c-ii · El mini-perfil ───────────────────────────────────────────
+  // Rector: AJILEI_RNK-1_Fase1c-ii_v1.0.md §4. Los rótulos de las dos líneas
+  // son los de las pestañas (`rnk.pestana.*`), «Gana tu primera mano para
+  // entrar» (la tarjeta propia) es `rnk.tu.vacio` y el «Pronto» de «Editar» es
+  // `lob.toast.pronto`: ninguno se repite aquí. La ajena sin puntos dice
+  // `rnk.perfil.sinpuntos` (Ajuste B).
+  'rnk.perfil.cerrar':     'Cerrar',
+  'rnk.perfil.pais':       'País y estado',
+  'rnk.perfil.puntos':     'Puesto {n} · {p} puntos',
+  'rnk.perfil.hc':         'Puesto {n} · {s} Heptacoins',
+  'rnk.perfil.sinpuntos':  'Aún no está en este ranking',
+  'rnk.perfil.correo':     'Correo',
+  'rnk.perfil.solo_tu':    'Solo lo ves tú.',
+  'rnk.perfil.editar':     'Editar',
+  'rnk.perfil.nohay':      'Jugador no encontrado',
 }
 
 export default TEXTOS_ES
