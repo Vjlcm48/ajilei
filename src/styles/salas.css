@@ -1736,3 +1736,21 @@ body.sal-activa #root {
   .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) > :nth-child(1) { grid-area: 1 / 2; }
   .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) > :nth-child(2) { grid-area: 1 / 1 / 5 / 2; align-self: center; }
 }
+
+/* ══ 17 · RNK-1c · LA LISTA QUE DESPLAZA POR DENTRO ══════════════════════════
+   Rector: AJILEI_RNK-1_Fase1c-i_v1.0.md §2.2 (camino (a) de la lámina 1-L).
+   Con `.sal--lista-interna` (prop `listaInterna` de `PantallaChips`) el cuerpo
+   ya no desplaza: barra, cabecera, lo de arriba de la lista y la zona anclada
+   quedan quietos, y desplaza SÓLO el bloque marcado `.sal-desplaza`, que se
+   queda con todo el alto que sobra. Sin la clase, nada de §16 cambia: Retar,
+   Salas y Armar mesa no la llevan. Lo propio de cada pantalla (la rejilla de
+   dos columnas de Rankings, sus aires) vive en su hoja. */
+.sal.es-anclada.sal--lista-interna .sal-cuerpo { overflow: hidden; }
+.sal.es-anclada.sal--lista-interna .sal-cuerpo > * { margin: 0; }
+.sal.es-anclada.sal--lista-interna .sal-cuerpo > .sal-desplaza {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}

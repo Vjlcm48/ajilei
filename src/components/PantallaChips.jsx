@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import '../styles/salas.css'
 
 import BarraSuperior from './BarraSuperior'
@@ -57,6 +57,21 @@ import { useIdioma } from '../hooks/useIdioma'
 //
 // `SalaOpciones` repite este marcado a mano (no usa esta carcasa): un cambio
 // aquí se hace también allí.
+//
+// ── RNK-1c · UNA PANTALLA SIN BOTÓN DORADO Y CON LA LISTA POR DENTRO ────────
+// Rector: AJILEI_RNK-1_Fase1c-i_v1.0.md §2.2 (camino (a) de la lámina 1-L).
+// Rankings no tiene acción principal: con `cta={null}` no se pintan ni la caja
+// ni el botón, y la zona anclada se queda con lo que la pantalla mande en `pie`
+// (allí, «Tu posición»). Con `listaInterna` el cuerpo deja de desplazar y lo
+// hace sólo el bloque de la pantalla marcado `.sal-desplaza` (salas.css §17).
+// `raiz` son atributos para la raíz (`data-ranking`, que elige el fondo). Sin
+// estas tres props, Retar, Salas y Armar mesa salen idénticos a como estaban.
+//
+// ── RNK-1c-ii · LA PANTALLA TAMBIÉN PUEDE PEDIR EL TOAST ────────────────────
+// Rector: AJILEI_RNK-1_Fase1c-ii_v1.0.md §2.2. «Jugador no encontrado» sale por
+// este mismo toast (un aviso, un reloj), no por uno de la pantalla: con
+// `avisoRef`, la carcasa deja en `avisoRef.current.avisar(clave)` la misma
+// función que usan el avatar y el ⚙. Sin la prop, nada cambia.
 
 export default function PantallaChips({
   titulo,
@@ -76,6 +91,11 @@ export default function PantallaChips({
   cta,
   // IOS-1 1e · lo que la pantalla pone en la zona anclada, encima de la caja.
   pie = null,
+  // RNK-1c · sólo desplaza el bloque `.sal-desplaza` de la pantalla.
+  listaInterna = false,
+  raiz = null,
+  // RNK-1c-ii · `{ avisar(claveTexto) }` para la pantalla.
+  avisoRef = null,
   children,
 }) {
   const { t } = useIdioma()
@@ -95,14 +115,16 @@ export default function PantallaChips({
   // Los dos accesos que quedan —el avatar y el ⚙— dicen lo mismo, así que hay
   // UN aviso y no dos relojes. (El `+` dorado y el botón de Retar salieron de
   // aquí con ECO-1g: ver la cabecera.)
-  const pronto = useCallback(() => {
-    setToast('lob.toast.pronto')
+  const avisar = useCallback((claveTexto) => {
+    setToast(claveTexto)
     clearTimeout(relojToast.current)
     relojToast.current = setTimeout(() => setToast(null), 2600)
   }, [])
+  const pronto = useCallback(() => avisar('lob.toast.pronto'), [avisar])
+  useImperativeHandle(avisoRef, () => ({ avisar }), [avisar])
 
   return (
-    <main className="sal es-anclada">
+    <main className={`sal es-anclada${listaInterna ? ' sal--lista-interna' : ''}`} {...raiz}>
       <div className="sal-fondo" aria-hidden="true" />
 
       <BarraSuperior
@@ -146,16 +168,18 @@ export default function PantallaChips({
           {pie}
           {/* La caja va ENCIMA del botón y crece hacia arriba: la zona está
               anclada al pie, así que nada de lo que diga mueve el botón. */}
-          <CajaAccion caja={cta?.caja} />
-          <button
-            type="button"
-            className={`sal-cta${cta?.clase ? ` ${cta.clase}` : ''}`}
-            data-accion="cta"
-            disabled={Boolean(cta?.disabled)}
-            onClick={cta?.onClick}
-          >
-            {cta?.etiqueta}
-          </button>
+          {cta !== null && <CajaAccion caja={cta?.caja} />}
+          {cta !== null && (
+            <button
+              type="button"
+              className={`sal-cta${cta?.clase ? ` ${cta.clase}` : ''}`}
+              data-accion="cta"
+              disabled={Boolean(cta?.disabled)}
+              onClick={cta?.onClick}
+            >
+              {cta?.etiqueta}
+            </button>
+          )}
           <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
             {toast !== null ? t(toast) : ' '}
           </div>

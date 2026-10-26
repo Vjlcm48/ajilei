@@ -115,6 +115,28 @@
       transparent 0px, transparent 28px,
       rgba(var(--gold-dim-rgb), 0.05) 28px, rgba(var(--gold-dim-rgb), 0.05) 29px
     );
+
+  /* RNK-1c ── VINO · el fondo de «Las grandes fortunas» (decisión de Victor,
+     2026-10-24; lámina `laminas/rnk1`, `?fondo=vino`). La rampa vinotinto del
+     icono deja de ser sólo del activo (Sistema de Diseño v1.3 :6) para UNA
+     pantalla: Rankings, pestaña Fortunas. Es la misma forma que la rampa verde
+     de las pantallas de lobby (`salas.css:157-165`), tres paradas:
+       --vino        #7c1d30  el filete del isotipo y de la moneda (la base)
+       --vino-deep   #5a1426  el fieltro Vinotinto (`tapetes.css:200`)
+       --vino-abyss  #1e070d  el fondo, un escalón bajo el abisal del tapete
+     `--vino-bright` / `--vino-hondo` son el círculo de las iniciales sobre vino
+     (la pareja de `--green-bright` / `--green-deep`). El oro NO cambia. */
+  --vino:            #7c1d30;
+  --vino-rgb:        124, 29, 48;
+  --vino-deep:       #5a1426;
+  --vino-abyss:      #1e070d;
+  --vino-abyss-rgb:  30, 7, 13;
+  --vino-bright:     #8f2a40;
+  --vino-hondo:      #41101c;
+  --fondo-vino:
+    radial-gradient(ellipse 70% 55% at 50% 42%, var(--vino) 0%, transparent 70%),
+    radial-gradient(ellipse 120% 90% at 50% 100%, var(--vino-deep) 0%, transparent 60%),
+    var(--vino-abyss);
 }
 
 @media (min-width: 768px) and (min-height: 900px) and (orientation: landscape) {
