@@ -1,0 +1,194 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · RNK-1c-ii · El mini-perfil
+   Rector: AJILEI_RNK-1_Fase1c-ii_v1.0.md §2.1. Autoridad visual: la lámina
+   `laminas/rnk1` (`perfil-ajeno`, `perfil-propio`), medidas del informe 1-L
+   §4: ancho min(100%, 92u, 400px), ✕ de 44, círculo de 72, alto 317 / 468;
+   en horizontal de ≤ 520 de alto, dos columnas en 600 de ancho (174 / 278).
+
+   SE VALE SOLA. La tarjeta vive en `body` (portal) y la abrirán pantallas que
+   no cargan `salas.css` (la victoria, 1d): todo sale de `theme.css` y de esta
+   hoja. Trae su propio `--u` (el de la carcasa, clamp(3.2px, 1vmin, 6px)) y su
+   propia letra, porque fuera de `#root` no hereda nada de la pantalla.
+
+   NI UN HEX: los colores son tokens de `theme.css` o `rgba(var(--…-rgb), α)`.
+   El negro del velo es el 62 % de la lámina. Sin transición de entrada.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mp-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.mp-tarjeta {
+  --u: clamp(3.2px, 1vmin, 6px);
+  position: relative;
+  box-sizing: border-box;
+  width: min(100%, calc(var(--u) * 92), 400px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 20px 20px 18px;
+  background: var(--surface-modal);
+  color: var(--text-primary);
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font: 500 16px/1.25 system-ui, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: normal;
+  text-align: center;
+}
+.mp-tarjeta * { box-sizing: border-box; }
+
+/* La ✕, 44 × 44 en la esquina. */
+.mp-cerrar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.mp-cerrar svg { width: 22px; height: 22px; }
+.mp-cerrar:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: -2px; }
+
+/* ── Quién es ───────────────────────────────────────────────────────────── */
+/* El círculo de 72 px (el de la fila, más grande): la caja de AVA-1. */
+.mp-av {
+  --av: 72px;
+  width: var(--av);
+  height: var(--av);
+  margin: 4px auto 10px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--green-bright) 0%, var(--green-deep) 100%);
+  border: 2px solid var(--text-secondary);
+  font-size: calc(var(--av) * 0.44);
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.mp-nom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+.mp-nom b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+/* El hueco de la corona Premium: caja reservada, contorno tenue, invisible (O1). */
+.mp-corona { width: 22px; height: 22px; flex: none; color: var(--text-faint); visibility: hidden; }
+/* «País y estado»: hueco hasta que haya datos. */
+.mp-pais {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  margin: 8px auto 0;
+  padding: 0 12px;
+  border: 1px dashed rgba(var(--text-primary-rgb), 0.28);
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.mp-pais i { width: 18px; height: 12px; border: 1px dashed rgba(var(--text-primary-rgb), 0.35); border-radius: 2px; }
+
+/* ── Sus rankings ───────────────────────────────────────────────────────── */
+.mp-sep { height: 1px; margin: 14px 0; border: 0; background: rgba(var(--gold-brand-rgb), 0.18); }
+.mp-rk { display: grid; gap: 4px; padding: 6px 2px; text-align: left; }
+.mp-rk small,
+.mp-correo small {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.mp-linea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  min-height: 1.25em;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.mp-linea em { font-style: normal; font-weight: 600; color: var(--gold-brand); }
+.mp-hc { display: inline-flex; align-items: center; gap: 6px; }
+.mp-moneda { width: 18px; height: 18px; display: block; flex: none; }
+.mp-nada { font-size: 14.5px; font-weight: 400; color: var(--text-secondary); }
+.mp-chica { font-size: 12.5px; color: var(--text-muted); }
+
+/* ── Solo en el propio: el correo y «Editar · Pronto» ───────────────────── */
+.mp-correo { display: grid; gap: 3px; padding: 2px; text-align: left; }
+/* La línea del correo reserva su alto aunque venga vacía (el bypass no tiene
+   correo): la tarjeta propia mide lo mismo con o sin él (O1). */
+.mp-correo span { min-height: 1.25em; font-size: 15px; overflow-wrap: anywhere; }
+/* «Solo lo ves tú.» a 15 px, como se SELLÓ: en la lámina el 11,5 de
+   `.rnk-p-solo` lo pisaba `.rnk-p-correo span` por especificidad, y con ese
+   15 px salen la imagen aprobada y el alto de 468 (informe 1c-ii §M). */
+.mp-correo .mp-solo { margin-top: 2px; font-size: 15px; font-weight: 400; color: var(--text-faint); }
+.mp-editar {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid rgba(var(--text-primary-rgb), 0.14);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 15px;
+  cursor: default;
+}
+.mp-editar span {
+  padding: 2px 8px;
+  border: 1px solid rgba(var(--text-primary-rgb), 0.25);
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── El teléfono acostado (horizontal, ≤ 520 de alto) ───────────────────
+   Dos columnas en 600 de ancho —quién es / sus rankings— para caber sin
+   desplazar en 412 de alto. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .mp-tarjeta {
+    width: min(100%, 600px);
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    column-gap: 22px;
+    align-items: center;
+    padding: 18px 22px 16px;
+  }
+  .mp-id { padding-right: 18px; border-right: 1px solid rgba(var(--gold-brand-rgb), 0.18); }
+  .mp-av { --av: 64px; }
+  .mp-sep1 { display: none; }
+  .mp-datos .mp-sep { margin: 10px 0; }
+  .mp-editar { margin-top: 10px; }
+}

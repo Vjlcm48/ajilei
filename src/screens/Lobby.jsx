@@ -72,7 +72,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
 
-export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onRankings, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -265,7 +265,9 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
 
       {/* ── Barra inferior ─────────────────────────────────────────────── */}
       <nav className="lob-nav" aria-label={t('lob.cfg.titulo')}>
-        <SoundButton className="lob-nav-btn" data-accion="rankings" onClick={pronto}>
+        {/* RNK-1c · Rankings ya lleva a su pantalla; Tienda y «Cómo se juega»
+            siguen diciendo «Pronto». */}
+        <SoundButton className="lob-nav-btn" data-accion="rankings" onClick={() => onRankings?.()}>
           <IconoTrofeo /><span>{t('lob.nav.rankings')}</span>
         </SoundButton>
         {/* La Tienda al centro es el ÚNICO oro sólido de la barra: regla del oro

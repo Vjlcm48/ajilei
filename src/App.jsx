@@ -14,6 +14,7 @@ import PartidaPvP from './screens/PartidaPvP'
 // APU-1 1e · «Retar a las IAS» releva a `NivelSelect` + `ModeSelect`, que se
 // RETIRAN del árbol en esta tanda (rector 1e §2.3) junto con `TableSelect`.
 import RetarIAS from './screens/RetarIAS'
+import Rankings from './screens/Rankings'
 // ARN-3d §2.4 (B11) · la mesa viaja en su propio chunk y entra por `lazy`. El
 // especificador vive en `lib/cargarMesa`, el mismo que precarga el lobby; aquí
 // NO puede quedar un import estático de `GameTable` (lo vigila
@@ -26,7 +27,8 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking } from './dev/billeteraFalsa'
+import { rankingApi } from './lib/rankingApi'
 // ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
 // mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
 // que siembran los moldes de humano en desarrollo (P-6).
@@ -270,6 +272,9 @@ function App() {
   // El `ref` es para los manejadores (saber si un evento es de la mesa actual);
   // el estado, para pasárselo a la mesa.
   const [apiMesa] = useState(() => simulacionMesaIA() ?? mesaIAApi)
+  // RNK-1c · los rankings, por el MISMO interruptor: el banco imitado del
+  // bypass (con sus jugadores sembrados) o la API real.
+  const [apiRanking] = useState(() => simulacionRanking() ?? rankingApi)
   const [controlMesa, setControlMesa] = useState(null)
   const controlRef = useRef(null)
   // Sentarse: `null`, `{ fase: 'enviando' }` o `{ fase: 'error', codigo }`. El
@@ -924,6 +929,24 @@ function App() {
     )
   }
 
+  // ── RNK-1c · Rankings ────────────────────────────────────────────────────
+  // Rector RNK-1 1c-i §2.1. Pantalla con barra: va con el marco del video y SIN
+  // `data-escala` (INV-59, la escala es sólo de la mesa). Flecha y casa vuelven
+  // al lobby. `onJugador` (el mini-perfil) llega con la 1c-ii.
+  if (screen === 'rankings') {
+    return conVideo(
+      <Rankings
+        api={apiRanking}
+        cuenta={cuenta}
+        billetera={billetera}
+        aviso={avisoSaldo}
+        onAvisoFin={finAviso}
+        onVolver={() => setScreen('lobby')}
+        onLobby={() => setScreen('lobby')}
+      />,
+    )
+  }
+
   // La caída de la cascada sigue siendo el destino de `COMPLETO`. CUATRO props
   // desde SAL-B1 —entra `onJugarPvP`; ECO-1b cambia `saldo` por `billetera`— y
   // ninguna más: el lobby sigue sin conocer
@@ -938,6 +961,7 @@ function App() {
       constancia={constancia?.uid === uidCompleto ? constancia.ficha : null}
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
+      onRankings={() => setScreen('rankings')}
       onCerrarSesion={cerrarSesion}
     />,
   )

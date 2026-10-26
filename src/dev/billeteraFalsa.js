@@ -43,7 +43,9 @@ import { crearBilleteraApi } from '../lib/billeteraApi'
 import { crearMesaIAApi } from '../lib/mesaIAApi'
 import { crearConstanciaApi } from '../lib/constanciaApi'
 import { crearVideoApi } from '../lib/videoApi'
+import { crearRankingApi } from '../lib/rankingApi'
 import { crearBanco, VIDEO_MINIMO_S_SQL } from './bancoImitado'
+import { sembradosRanking, PUNTOS_DEL_BYPASS } from './sembradosRanking'
 import { siembraAPU, entradaSembradaAPU, videoSembradoAPU } from './siembraAPU'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
 
@@ -68,7 +70,14 @@ export function bancoDelBypass() {
       entradaDeMolde: entradaSembradaAPU(100) !== null,
       videoMinimoS: corto === null ? VIDEO_MINIMO_S_SQL
         : Math.min(VIDEO_MINIMO_S_SQL, Math.floor((corto / AJILEI_CONFIG.economy.video.duracionMs) * VIDEO_MINIMO_S_SQL)),
+      // RNK-1c · la cuenta del bypass es `DevLocal` (`PERFIL_DEV`,
+      // `useAuth.js:90`), y Rankings la reconoce por el nombre; con los
+      // jugadores sembrados la pantalla sale llena, como en la lámina.
+      usuario: 'DevLocal',
+      sembrados: sembradosRanking(),
     })
+    // …y con sus puntos queda en el puesto 7 de Maestros (banda y «· tú» a la vez).
+    banco.sumarPuntos('DevLocal', PUNTOS_DEL_BYPASS)
     // El arnés lo alcanza por aquí (C6, envejecer una mesa) sin ruta propia.
     if (typeof window !== 'undefined') window.__ajileiBancoImitado = { marca: MARCA_BILLETERA_FALSA, banco }
   }
@@ -123,6 +132,14 @@ export function simulacionVideo() {
   const b = bancoDelBypass()
   if (!b) return null
   return crearVideoApi(b)
+}
+
+/** RNK-1c · los rankings contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionRanking() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  return crearRankingApi(b)
 }
 
 /** Para las pruebas: un banco nuevo en la siguiente llamada. */
