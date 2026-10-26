@@ -11,7 +11,7 @@
 //   d3     → matriz de 4 viewports: bbox de mesa/óvalo/paneles/mazos/abanico/botones + overflow
 //   bug    → reproduce la revelación finalista y mide el reflow del panel ganador
 //   shots  → capturas de los 4 viewports (+ la del bug si 'bug' corre antes)
-//   humo   → d1d2 + d3 + bug + shots + gate + lob + retar (~4 min). Es el modo
+//   humo   → d1d2 + d3 + bug + shots + gate + lob + retar + rnk (~4 min). Es el modo
 //            por defecto. ARN-3e retiró `all`: tardaba ~43 min, 40 de `apu`, y
 //            no era «todo»; `apu` se corre por su nombre.
 //   gate [tag] → DSK-G1: matriz matchMedia del gate + capturas WAITING (diff)
@@ -331,6 +331,7 @@ import { runVideo } from './eco/video.mjs'
 import { runTam } from './ios/tam.mjs'
 import { runWebkit } from './ios/webkit.mjs'
 import { runTab, VARAS_TAB } from './tab/tab.mjs'
+import { runRnk } from './rnk/rnk.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -424,7 +425,8 @@ const VC_RETRASO_ROCE_MS = (() => {
 // ECO-1g · y `video`: el video de recompensa, con videos de 40 s de verdad.
 // IOS-1 1b · y `tam`: las pantallas bajas en horizontal (521–831 de alto).
 // TAB-1 1e · y `tab`: la escala de la mesa, contra el bundle real.
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit', 'tab']
+// RNK-1c-ii · y `rnk`: la pantalla Rankings y el mini-perfil, contra el banco imitado.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -15324,6 +15326,12 @@ try {
   if (MODE === 'tab') {
     const pedidas = process.argv.slice(3).filter(a => VARAS_TAB.includes(a))
     report.tab = await runTab(browser, { base: BASE_PROD, ref: TAB_REF, varas: pedidas.length ? pedidas : VARAS_TAB })
+  }
+  // RNK-1c-ii · `rnk`: Rankings y el mini-perfil (el bundle real, la sesión
+  // simulada y el banco imitado con los 139 sembrados del bypass). Entra en
+  // `humo`: cuesta ~10 s y usa el mismo preview que `lob`.
+  if (MODE === 'rnk' || MODE === 'humo') {
+    report.rnk = await runRnk(browser, { base: BASE_PROD })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)
