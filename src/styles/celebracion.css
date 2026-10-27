@@ -181,15 +181,13 @@ h1.cel-ajilei {
 
 /* ── 4 y 5 · Los dos controles ──────────────────────────────────────────────
    CEL-2e · El ranking deja de ser un rótulo inerte con pastilla y pasa a ser un
-   control secundario de verdad: se pulsa y contesta "Próximamente". El estado
-   `disabled` y la pastilla `.soon-tag` desaparecen — un control que responde no
-   puede anunciarse como deshabilitado.
+   control secundario de verdad. RNK-1d · contesta abriendo tu mini-perfil, y
+   `disabled` vuelve con otro sentido: sólo hasta que llega `saldoFinal`.
 
    El grupo. En escritorio y en móvil vertical es una COLUMNA con `gap: inherit`,
    así que hereda el hueco de `.cel-screen` y los dos controles se ven
    exactamente donde estaban. En móvil horizontal se vuelve fila. Un solo árbol
-   para las dos disposiciones.
-   Y es el bloque contenedor del aviso, que va fuera de flujo. */
+   para las dos disposiciones. */
 .cel-acciones {
   position: relative;
   display: flex;
@@ -210,32 +208,14 @@ h1.cel-ajilei {
   cursor: pointer;
 }
 
-/* ── El aviso "Próximamente" ────────────────────────────────────────────────
-   FUERA DE FLUJO, y ésa es toda su geometría: aparece y desaparece sin mover un
-   píxel de la columna. Va encima del grupo y no debajo porque en móvil
-   horizontal los controles están pegados al filo inferior.
-   La región vive siempre en el árbol —lo exige `aria-live`— así que cuando está
-   vacía no debe pintar nada: sin texto, sin caja. */
-.cel-aviso {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  color: var(--gold-brand);
-  font-size: 14px;
-  font-weight: 700;
-  pointer-events: none;
-}
-
-.cel-aviso:empty { display: none; }
-
-.cel-aviso:not(:empty) {
-  padding: 6px 12px;
-  background: var(--surface-modal);
-  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
-  border-radius: 999px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+/* RNK-1d · Apagado hasta `saldoFinal`: la MISMA caja, sólo opacidad (O1). Ni
+   el `:hover` de `.btn` (que levanta 2 px) ni el puntero de mano: un botón
+   apagado no se mueve al pasarle por encima. Al encenderse no salta nada. */
+.cel-acciones .cel-ranking:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+  transform: none;
 }
 
 /* ── Móvil vertical ─────────────────────────────────────────────────────── */

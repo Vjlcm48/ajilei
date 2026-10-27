@@ -890,6 +890,8 @@ function App() {
   // `onLeave` recibe las FICHAS con las que el humano se levanta. ECO-1c: van
   // a `salir_ia` por el canal de la mesa (`levantarse`), que las cobra UNA vez
   // y topadas por el techo; la píldora toma el saldo que devuelve.
+  // RNK-1d · `apiRanking`, la misma de Rankings: la usa el mini-perfil propio
+  // que abre «Ver tu nuevo ranking» en la victoria.
   if (screen === 'table' && mesa !== null) {
     return (
       /* APU-1 §5 · `saldo`: la recarga gasta BOLSILLO, y la mesa lo LEE para
@@ -905,6 +907,7 @@ function App() {
         cuenta={cuenta}
         saldo={billetera.saldo ?? 0}
         control={controlMesa}
+        apiRanking={apiRanking}
         onLeave={levantarse}
       />
     )
@@ -932,7 +935,7 @@ function App() {
   // ── RNK-1c · Rankings ────────────────────────────────────────────────────
   // Rector RNK-1 1c-i §2.1. Pantalla con barra: va con el marco del video y SIN
   // `data-escala` (INV-59, la escala es sólo de la mesa). Flecha y casa vuelven
-  // al lobby. `onJugador` (el mini-perfil) llega con la 1c-ii.
+  // al lobby. El mini-perfil lo abre `Rankings` por dentro: `App` no pasa `onJugador`.
   if (screen === 'rankings') {
     return conVideo(
       <Rankings

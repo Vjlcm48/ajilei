@@ -10,7 +10,9 @@ import {
 } from '../src/hooks/sesionCore.js'
 import { PHASES } from '../src/engine/gameEngine.js'
 import { AJILEI_CONFIG } from '../src/config/ajileiConfig.js'
-import { puntosDeMano } from '../src/lib/puntos.js'
+import { puntosDeMano, ajileiDe } from '../src/lib/puntos.js'
+import { createDeck } from '../src/engine/deck.js'
+import { makeHandRules } from '../src/engine/gameEngine.js'
 import { puntosDe } from '../src/config/niveles.js'
 
 // ── DSK-VC2 · Los dos núcleos puros ─────────────────────────────────────────
@@ -304,6 +306,20 @@ describe('VC2 · sesión', () => {
       expect(s.puntos).toBe(esperado)
       expect(s.puntos).toBe(3 * puntosDe(nivel) + 1)
     }
+  })
+
+  // RNK-1d §2.2 · «Puntos obtenidos» es UNA cifra con el extra ya dentro: una
+  // mano ganada con un AJILEI natural de 51 en Básico vale 1 + 1 = 2, no 1.
+  // El AJILEI sale de las cartas reales (`ajileiDe`), como en `GameTable`.
+  it('RNK-1d · una mano ganada con AJILEI 51 en Básico da 2 puntos, no 1', () => {
+    const mazo = Object.fromEntries(createDeck().map((c) => [c.id, c]))
+    const natural = ['1-Copas', '3-Copas', '10-Copas', '11-Copas', '12-Copas'].map((id) => mazo[id])
+    const ajilei = ajileiDe(natural, makeHandRules(2))
+    expect(ajilei).toBe(51)
+    const p = puntosDeMano({ origen: 'ias', nivel: 'basico', sentados: 2, ajilei }).total
+    const s = anotarMano(sesionInicial(), { handCount: 1, gano: true, puntos: p, ajilei, score: score('Copas', 51) })
+    expect(s.puntos).toBe(2)
+    expect(s.puntos).not.toBe(puntosDe('basico'))
   })
 
   it('fichas netas es un delta con signo contra el saldo de entrada', () => {

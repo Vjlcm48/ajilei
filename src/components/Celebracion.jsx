@@ -9,6 +9,7 @@ import { LluviaHeptacoins } from './LluviaHeptacoins'
 import { SoundButton } from './SoundButton'
 import { frasePara, recuerdaFrase } from '../config/frasesVictoria'
 import { fraseForzadaCEL } from '../dev/siembraCEL'
+import { useIdioma } from '../hooks/useIdioma'
 import '../styles/celebracion.css'
 import { aPropios, escalaActual } from '../lib/escala'
 
@@ -310,13 +311,10 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
   )
 }
 
-// CEL-2e · lo que dura el aviso "Próximamente" si nadie lo toca otra vez.
-const AVISO_MS = 3000
-
 // ── CEL-1 · La pantalla de victoria de mesa ─────────────────────────────────
 // Rector: lámina CEL-1, validada por Victor. Cinco piezas en columna sobre el
 // fieltro: AJILEI, la frase del ganador, la tarjeta, un botón primario ÚNICO y
-// el enlace de ranking, inerte.
+// el de ranking (RNK-1d: abre tu mini-perfil).
 //
 // ES UN COMPONENTE Y NO UNA RAMA MÁS DEL JSX DE GameTable, por una razón que no
 // es de orden: la frase se elige AL MONTAR LA PANTALLA. Con la elección dentro
@@ -327,7 +325,14 @@ const AVISO_MS = 3000
 //
 // La pantalla de DERROTA no pasa por aquí y no cambia ni un byte: sigue siendo
 // `.game-over-screen` con su mensaje. La frase es del ganador.
-export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onLeave }) {
+//
+// RNK-1d · «Ver tu nuevo ranking» abre TU mini-perfil (`abrirRanking`, con el
+// botón para devolverle el foco al cerrar). La tarjeta la monta `GameTable`,
+// que tiene la API y la cuenta; aquí sólo vive el botón. `listoRanking` dice
+// que llegó `saldoFinal` —el libro ya tiene la última mano (Fase 0 §E.2)—:
+// antes, el botón está en su sitio y con su caja pero apagado (O1).
+export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onLeave, listoRanking = false, abrirRanking }) {
+  const { t } = useIdioma()
   // CEL-2c · la frase se sortea al montar y se RECUERDA aparte, desde un efecto:
   // así la que se ve y la que se guarda son siempre la misma, también bajo el
   // doble montaje de StrictMode. Mismo molde que la bolsa de melodías.
@@ -337,22 +342,6 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onL
   // CEL-2 · El arco. `precedente` es el toc-toc que GameTable ya disparaba al
   // entrar en GAME_OVER: aquí no se dispara nada, se ESPERA a que termine.
   const { fase, numeros, melodia, oculta, quietud } = useCoreografia({ precedente, netas, saldo })
-
-  // ── CEL-2e · "Próximamente", bajo demanda ─────────────────────────────────
-  // El control del ranking deja de nacer deshabilitado y con pastilla: ahora se
-  // pulsa y contesta. El aviso se retira solo a los 3 s, o antes con un segundo
-  // toque, y NUNCA navega a ningún sitio.
-  const [aviso, setAviso] = useState(false)
-  const avisoTimer = useRef(0)
-  const alternaAviso = useCallback(() => {
-    clearTimeout(avisoTimer.current)
-    setAviso(v => {
-      if (v) return false                 // segundo toque: se va antes de los 3 s
-      avisoTimer.current = setTimeout(() => setAviso(false), AVISO_MS)
-      return true
-    })
-  }, [])
-  useEffect(() => () => clearTimeout(avisoTimer.current), [])
 
   // ── CEL-2e · El brillo de la moneda, en armonía con el del nombre ─────────
   // El período NO se escribe aquí: se LEE del EMB-1 vivo. El resplandor del
@@ -408,22 +397,21 @@ export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onL
           pantalla (`gap: inherit`), así que apilados se ven exactamente como
           antes; en móvil horizontal el grupo se vuelve fila y los pone lado a
           lado. Que exista el grupo es lo que permite las dos cosas sin dos
-          árboles distintos.
-          El grupo es también el bloque contenedor del aviso, que va fuera de
-          flujo: al aparecer no desplaza ni un píxel. */}
+          árboles distintos. */}
       <div className="cel-acciones">
         <SoundButton className="btn btn-primary" onClick={onLeave}>Salir de la mesa</SoundButton>
 
-        {/* Ya no nace deshabilitado ni lleva pastilla: es un control de verdad,
-            secundario (borde de marca, fondo transparente, texto oro). Sigue
-            siendo <button> y sigue sin `href` — no navega a ningún sitio, y
-            eso es puerta del arnés. */}
-        <SoundButton className="btn cel-ranking" onClick={alternaAviso}>Ver tu nuevo ranking</SoundButton>
-
-        {/* La región viva se monta SIEMPRE y lo que cambia es su texto. Un
-            `aria-live` que nace junto con su contenido no se anuncia: el lector
-            necesita la región presente para notar el cambio. */}
-        <span className="cel-aviso" role="status" aria-live="polite">{aviso ? 'Próximamente' : ''}</span>
+        {/* Control secundario (borde de marca, fondo transparente, texto oro).
+            Sigue siendo <button> y sigue sin `href` — no navega a ningún sitio,
+            y eso es puerta del arnés. RNK-1d · apagado hasta `saldoFinal`, con
+            la misma caja (sólo opacidad, `celebracion.css`). */}
+        <SoundButton
+          className="btn cel-ranking"
+          disabled={!listoRanking}
+          onClick={(e) => abrirRanking?.(e.currentTarget)}
+        >
+          {t('rnk.victoria.ver')}
+        </SoundButton>
       </div>
     </div>
   )

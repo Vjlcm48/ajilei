@@ -23,7 +23,9 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 // dos líneas quedan en hueco hasta que contesta `mini_perfil`, y sin red dicen
 // «No se pudo cargar el ranking.» en pequeño. Si el jugador no existe, la
 // tarjeta no se queda: avisa con `onNoHay` y quien la abrió la cierra, pone el
-// toast y vuelve a pedir la lista.
+// toast y vuelve a pedir la lista. RNK-1d · quien no pasa `onNoHay` (la
+// victoria, que abre la tuya) se queda con la tarjeta y las líneas dicen lo
+// mismo que sin red: no hay lista que volver a pedir.
 //
 // LO AJENO NUNCA LLEVA CORREO. El propio enseña el de la sesión (`correo`, que
 // el cliente ya tiene: no viaja por la RPC) y «Editar · Pronto» apagado.
@@ -99,6 +101,7 @@ export default function MiniPerfil({ username, inicial, propio = false, correo =
   }, [])
 
   const { maestros, fortunas } = lineasDe(estado === 'listo' ? respuesta.perfil : null, propio)
+  const estadoLineas = estado === 'nohay' && !onNoHay ? 'sinred' : estado
   // El nombre lo pone el servidor cuando contesta (las mayúsculas de verdad);
   // hasta entonces, el de la fila.
   const nombre = estado === 'listo' ? respuesta.perfil.username : username
@@ -140,11 +143,11 @@ export default function MiniPerfil({ username, inicial, propio = false, correo =
           <hr className="mp-sep mp-sep1" />
           <div className="mp-rk" data-mp-linea="maestros">
             <small>{t('rnk.pestana.maestros')}</small>
-            <Linea linea={maestros} estado={estado} t={t} />
+            <Linea linea={maestros} estado={estadoLineas} t={t} />
           </div>
           <div className="mp-rk" data-mp-linea="fortunas">
             <small>{t('rnk.pestana.fortunas')}</small>
-            <Linea linea={fortunas} estado={estado} t={t} />
+            <Linea linea={fortunas} estado={estadoLineas} t={t} />
           </div>
           {propio && (
             <>

@@ -62,7 +62,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // cambia es la cara y que los textos ya no viven en el JSX.
 //
 // ── LO QUE ESTA PANTALLA NO SABE ────────────────────────────────────────────
-// No conoce `screen`, ni Supabase, ni la mesa. Recibe tres props y ya. Es lo que
+// No conoce `screen`, ni Supabase, ni la mesa. Recibe sus props y ya. Es lo que
 // permite que `App.jsx` siga siendo el único sitio del proyecto que sabe cómo se
 // pasa de una pantalla a otra —el patrón de la casa desde NIV-UI: un estado y
 // una cascada de `if`, sin router—.

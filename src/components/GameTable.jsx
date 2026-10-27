@@ -11,6 +11,8 @@ import { TapetesPanel } from './TapetesPanel'
 import { CuentaPanel } from './CuentaPanel'
 import Bautizo from '../screens/Bautizo'
 import { CelebracionMesa, PulsoNombre, AjileiOverlay, PantallaVictoria } from './Celebracion'
+import MiniPerfil from './MiniPerfil'
+import { inicialDe } from '../screens/salaEsperaCore'
 import { useCelebracion } from '../hooks/useCelebracion'
 import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
@@ -314,7 +316,9 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) 
 // que crea `App` al sentarse: los avisos de pila (C3), las recargas y el cobro
 // de la victoria (C8) pasan por él. Releva a `onRecargar`, que restaba del ajuste
 // local de la 1b. Sin `control` la mesa juega como antes, sin servidor.
-export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null }) {
+// RNK-1d · `apiRanking` es la MISMA de `App` (el banco imitado del bypass o la
+// real): la usa sólo el mini-perfil propio que abre la victoria.
+export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -950,6 +954,27 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       if (Number.isFinite(r?.saldo)) setSaldoFinal(r.saldo)
     })
   }, [esVictoriaDeMesa, control, human.chips])
+
+  // ── RNK-1d · «VER TU NUEVO RANKING» ──────────────────────────────────────
+  // Abre TU mini-perfil (el de Rankings, por portal en `<body>`: fuera de
+  // `#root` no hereda el `zoom` de la mesa, INV-59) y no navega. Se enciende
+  // con `saldoFinal`: `salir_ia` contesta después de que el libro anotó la
+  // última mano (Fase 0 §E.2), así que la tarjeta ya trae los puntos nuevos.
+  // Sin `control` no hay libro que esperar y el botón nace encendido, como
+  // «Saldo actual» pinta entonces las fichas de la mesa; sin `apiRanking`, no
+  // hay tarjeta que abrir y se queda apagado. Al cerrar, el foco vuelve al
+  // botón que la abrió.
+  const listoRanking = !!apiRanking && (!control || saldoFinal !== null)
+  const [perfilVictoria, setPerfilVictoria] = useState(false)
+  const origenPerfil = useRef(null)
+  const abrirRanking = useCallback((el) => {
+    origenPerfil.current = el ?? null
+    setPerfilVictoria(true)
+  }, [])
+  const cerrarRanking = useCallback(() => {
+    setPerfilVictoria(false)
+    if (origenPerfil.current?.isConnected) origenPerfil.current.focus()
+  }, [])
 
   // VOZ-3 · el nivel sigue al principal (`lectura.nivel` es este mismo decisor
   // con el mismo asiento): `mano` o `ajilei` si es el humano, `recoleccion` si
@@ -2350,6 +2375,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                levanta con 900 había «perdido 4.100». `entrada` la escribe el
                motor al sentar el asiento y la sube cada recarga, así que una
                mesa con segundo round también cuadra. */
+            <>
             <PantallaVictoria
               sesion={sesion}
               netas={fichasNetas(human.chips, human.entrada)}
@@ -2357,7 +2383,22 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               puntos={sesion.puntos}
               precedente={precedenteToc}
               onLeave={salir}
+              listoRanking={listoRanking}
+              abrirRanking={abrirRanking}
             />
+            {/* RNK-1d · tu tarjeta, sin `onNoHay`: si el banco no te tiene, las
+                líneas dicen «No se pudo cargar el ranking.» y la tarjeta se queda. */}
+            {perfilVictoria && apiRanking && (
+              <MiniPerfil
+                api={apiRanking}
+                username={cuenta?.username ?? ''}
+                inicial={inicialDe(cuenta?.username ?? '')}
+                propio
+                correo={cuenta?.correo ?? ''}
+                onCerrar={cerrarRanking}
+              />
+            )}
+            </>
           ) : (
           <div className="game-over-screen">
             {/* MSG-U1 · el TEXTO sale del compositor, no del motor; desde

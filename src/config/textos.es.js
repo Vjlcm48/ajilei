@@ -538,6 +538,11 @@ export const TEXTOS_ES = {
   'rnk.perfil.solo_tu':    'Solo lo ves tú.',
   'rnk.perfil.editar':     'Editar',
   'rnk.perfil.nohay':      'Jugador no encontrado',
+
+  // ── RNK-1d · La victoria ─────────────────────────────────────────────────
+  // Rector: AJILEI_RNK-1_Fase1d_v1.0.md §4. Sólo la frase que Rankings toca: el
+  // resto de la pantalla de victoria pasa a `t()` con IDI-1 (K-9).
+  'rnk.victoria.ver':      'Ver tu nuevo ranking',
 }
 
 export default TEXTOS_ES
