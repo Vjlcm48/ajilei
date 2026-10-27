@@ -28,6 +28,8 @@ import { recorrerRuta, esperarMesa } from './rutaMesa.mjs'
 import { mayoriaDeFallos, separarConocidos, encadenadoHonesto, leeHonesto } from './arnes/varas.mjs'
 import { apuestasDe } from '../src/config/niveles.js'
 import { pisoDe } from '../src/engine/entrada.js'
+// RNK-1d · el texto del botón de ranking sale del diccionario, como en la app.
+import { t } from '../src/config/textos.js'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 // ARN-3a · terreno común: el arnés levanta su propio servidor de desarrollo con
 // bypass (5173 o `--puerto=N`) dentro de su proceso; `--servidor=externo` usa
@@ -169,6 +171,9 @@ async function alaVictoria(page, mesa, semilla = '', opciones = {}) {
   // único que cambia al entrar con más es cuánto dice la tarjeta que se lleva
   // el jugador —y esa cifra la comparan las puertas de CEL-1 y CEL-2.
   await recorrerRuta(page, mesa, 'basico', 0, 'piso')
+  // RNK-1d · quien necesite tocar la página antes de jugar (retener `salir_ia`
+  // en el banco imitado) lo hace aquí, con la mesa ya montada.
+  if (opciones.antesDeJugar) await opciones.antesDeJugar(page)
   // EL PASO. Uno.
   await page.click('button:has-text("Iniciar mano")')
   // CEL-1 partió la pantalla terminal en dos: la VICTORIA es `.cel-screen` y la
@@ -1358,94 +1363,145 @@ async function puertaFrases(browser, fallos) {
   return pares
 }
 
-// ── CEL-2e · La puerta del aviso "Proximamente" ─────────────────────────────
-// Cuatro cosas: que aparezca al tocar, que NO desplace nada (va fuera de flujo),
-// que se retire solo antes de 3,5 s, que un segundo toque lo quite antes, y que
-// no navegue a ningun sitio.
+// ── RNK-1d · La puerta de «Ver tu nuevo ranking» ────────────────────────────
+// Rector: AJILEI_RNK-1_Fase1d_v1.0.md §2.5. Reescribe la de CEL-2e (el aviso
+// «Próximamente» ya no existe). Por celda:
+//   · antes de `saldoFinal` el botón está, apagado (`disabled`), con su caja;
+//     para verlo se RETIENE `salir_ia` en el banco imitado del bypass
+//     (`window.__ajileiBancoImitado`) hasta medirlo, y luego se suelta;
+//   · al llegar `saldoFinal` se enciende y la caja es LA MISMA (O1);
+//   · al pulsarlo: `[role="dialog"]` con el username de la sesión, llega a
+//     `listo`, FUERA de `#root` (portal en `<body>`: no hereda el `zoom` de la
+//     mesa, INV-59) y mide lo mismo que la tarjeta propia abierta desde
+//     Rankings en el mismo viewport (se abre allí también y se compara);
+//   · ✕ la cierra, el foco vuelve a `.cel-ranking`, no hay navegación y la
+//     victoria sigue en pantalla.
+const RNK_VER = t('rnk.victoria.ver')
+// La propia de la lámina (informe 1c-ii), donde la hay; en las demás manda la
+// comparación con la de Rankings.
+const RNK_PROPIA_H = { '412x915': 468.3, '915x412': 277.5 }
+const RNK_CELDAS = [[412, 915], [915, 412], [1366, 768]]
+
+const TARJETA_MP = () => {
+  const t = document.querySelector('.mp-tarjeta')
+  if (!t) return null
+  const b = t.getBoundingClientRect()
+  const velo = document.querySelector('.mp-velo')
+  const root = document.getElementById('root')
+  return {
+    w: Math.round(b.width * 100) / 100, h: Math.round(b.height * 100) / 100,
+    rol: t.getAttribute('role'),
+    nombre: document.getElementById(t.getAttribute('aria-labelledby'))?.textContent ?? null,
+    estado: velo?.dataset.mpEstado ?? null,
+    propio: velo?.dataset.mpPropio !== undefined,
+    enRoot: root.contains(t),
+    padreBody: velo?.parentElement === document.body,
+    maestros: t.querySelector('[data-mp-linea="maestros"] .mp-linea')?.textContent ?? null,
+    zoomRoot: getComputedStyle(root).zoom,
+  }
+}
+
 async function puertaRanking(browser, fallos) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 })
-  const page = await ctx.newPage()
-  const r = {}
-  const geometria = () => page.evaluate(() => {
-    const caja = (sel) => {
-      const e = document.querySelector(sel)
+  const salida = {}
+  for (const [w, h] of RNK_CELDAS) {
+    const id = `${w}x${h}`
+    const r = { id }
+    salida[id] = r
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 })
+    const page = await ctx.newPage()
+    const caja = () => page.evaluate(() => {
+      const e = document.querySelector('.cel-acciones .cel-ranking')
       if (!e) return null
       const b = e.getBoundingClientRect()
-      return [Math.round(b.x * 100) / 100, Math.round(b.y * 100) / 100, Math.round(b.width * 100) / 100, Math.round(b.height * 100) / 100]
+      return {
+        x: Math.round(b.x * 100) / 100, y: Math.round(b.y * 100) / 100,
+        w: Math.round(b.width * 100) / 100, h: Math.round(b.height * 100) / 100,
+        disabled: e.disabled === true, texto: e.textContent.replace(/\s+/g, ' ').trim(),
+        href: e.getAttribute('href'), opacidad: getComputedStyle(e).opacity,
+      }
+    })
+    try {
+      // 1 · la tarjeta propia desde Rankings, la vara de la comparación.
+      await page.goto(BASE, { waitUntil: 'networkidle' })
+      await page.click('[data-accion="rankings"]')
+      await page.waitForSelector('main.sal[data-rnk-estado="listo"]', { timeout: 15000 })
+      await page.click('.rnk-tu .rnk-fila, [data-accion="rnk-tu-abre"]')
+      await page.waitForSelector('.mp-velo[data-mp-estado="listo"]', { timeout: 5000 })
+      await page.waitForTimeout(150)
+      r.desdeRankings = await page.evaluate(TARJETA_MP)
+
+      // 2 · la victoria con `salir_ia` retenido.
+      await alaVictoria(page, 5, '', {
+        reposo: false,
+        antesDeJugar: (p) => p.evaluate(() => {
+          const b = window.__ajileiBancoImitado?.banco
+          if (!b) throw new Error('sin banco imitado')
+          const rpc = b.rpc.bind(b)
+          window.__rnkSoltar = null
+          b.rpc = (nombre, params) => (nombre === 'salir_ia'
+            ? new Promise((ok) => { window.__rnkSoltar = () => ok(rpc(nombre, params)) })
+            : rpc(nombre, params))
+        }),
+      })
+      await page.waitForSelector('.cel-screen', { timeout: 15000 })
+      await page.waitForFunction(() => typeof window.__rnkSoltar === 'function', null, { timeout: 10000 })
+      await page.mouse.move(2, 2)
+      await page.waitForTimeout(300)
+      r.apagado = await caja()
+      // Se suelta el cobro: `saldoFinal` llega y el botón se enciende.
+      await page.evaluate(() => window.__rnkSoltar())
+      await page.waitForSelector('.cel-acciones .cel-ranking:not([disabled])', { timeout: 5000 })
+      await page.waitForTimeout(100)
+      r.encendido = await caja()
+      // Al reposo, y se pulsa.
+      await page.mouse.click(1, 1)
+      await page.waitForSelector('.cel-screen[data-fase="reposo"]', { timeout: 20000 })
+      await page.waitForTimeout(200)
+      r.url = page.url()
+      await page.click('.cel-acciones .cel-ranking')
+      await page.waitForSelector('.mp-velo[data-mp-estado="listo"]', { timeout: 5000 })
+      await page.waitForTimeout(150)
+      r.desdeVictoria = await page.evaluate(TARJETA_MP)
+      await page.screenshot({ path: `${OUT}/rnk1d-tarjeta-${id}.png` })
+      await page.click('.mp-cerrar')
+      await page.waitForTimeout(100)
+      r.cerrada = (await page.locator('.mp-velo').count()) === 0
+      r.foco = await page.evaluate(() => document.activeElement?.classList.contains('cel-ranking') ?? false)
+      r.urlFinal = page.url()
+      r.sigueEnPantalla = await page.locator('.cel-screen').count()
+    } catch (e) { fallos.push(`ranking ${id}: ${String(e.message).split('\n')[0]}`) }
+    await ctx.close()
+
+    const a = r.apagado, e = r.encendido, v = r.desdeVictoria, k = r.desdeRankings
+    if (!a) { fallos.push(`ranking ${id}: no hay .cel-ranking antes de saldoFinal`); continue }
+    if (a.disabled !== true) fallos.push(`ranking ${id}: antes de saldoFinal el botón NO está apagado`)
+    if (a.texto !== RNK_VER) fallos.push(`ranking ${id}: el botón dice «${a.texto}» y no «${RNK_VER}»`)
+    if (!e || e.disabled) fallos.push(`ranking ${id}: al llegar saldoFinal el botón no se enciende`)
+    else {
+      const d = Math.max(Math.abs(a.x - e.x), Math.abs(a.y - e.y), Math.abs(a.w - e.w), Math.abs(a.h - e.h))
+      if (d > 0.5) fallos.push(`ranking ${id}: la caja cambia al encenderse (apagado ${JSON.stringify(a)} · encendido ${JSON.stringify(e)})`)
     }
-    return {
-      titulo: caja('h1.cel-ajilei'), frase: caja('.cel-frase'), tarjeta: caja('.cel-tarjeta'),
-      primario: caja('.cel-acciones .btn-primary'), ranking: caja('.cel-acciones .cel-ranking'),
+    // ≥ 44 sólo donde la casa lo exige hoy (móvil horizontal, CEL-2e): ver la celda.
+    if (w > h && h <= 600 && a.h < 44) fallos.push(`ranking ${id}: el botón mide ${a.h} de alto y el mínimo táctil es 44`)
+    if (a.href != null) fallos.push(`ranking ${id}: el botón navega a ${a.href}`)
+    if (!v) fallos.push(`ranking ${id}: al pulsar no se abrió la tarjeta`)
+    else {
+      if (v.rol !== 'dialog') fallos.push(`ranking ${id}: la tarjeta no es un dialog (${v.rol})`)
+      if (v.nombre !== 'DevLocal') fallos.push(`ranking ${id}: la tarjeta es de «${v.nombre}» y no de la sesión (DevLocal)`)
+      if (v.estado !== 'listo' || !v.propio) fallos.push(`ranking ${id}: la tarjeta no es la propia en «listo» (${v.estado}, propio=${v.propio})`)
+      if (v.enRoot || !v.padreBody) fallos.push(`ranking ${id}: la tarjeta está dentro de #root (enRoot=${v.enRoot}, body=${v.padreBody})`)
+      if (!k) fallos.push(`ranking ${id}: no se pudo medir la tarjeta desde Rankings`)
+      else if (Math.abs(v.w - k.w) > 0.5 || Math.abs(v.h - k.h) > 0.5) {
+        fallos.push(`ranking ${id}: la tarjeta mide ${v.w}×${v.h} desde la victoria y ${k.w}×${k.h} desde Rankings (zoom de #root ${v.zoomRoot})`)
+      }
+      if (id in RNK_PROPIA_H && Math.abs(v.h - RNK_PROPIA_H[id]) > 2) fallos.push(`ranking ${id}: la tarjeta mide ${v.h} de alto y la lámina ${RNK_PROPIA_H[id]}`)
     }
-  })
-  const aviso = () => page.evaluate(() => {
-    const e = document.querySelector('.cel-aviso')
-    if (!e) return null
-    const b = e.getBoundingClientRect()
-    const cs = getComputedStyle(e)
-    return {
-      texto: e.textContent.trim(),
-      vive: cs.display !== 'none' && b.width > 0 && b.height > 0,
-      viva: e.getAttribute('aria-live'),
-      papel: e.getAttribute('role'),
-      // Fuera de flujo: si fuera estatico, empujaria a sus hermanos.
-      posicion: cs.position,
-    }
-  })
-  try {
-    await alaVictoria(page, 5)     // asentada en reposo
-    r.url = page.url()
-    r.antes = await geometria()
-    r.avisoAntes = await aviso()
-
-    await page.click('.cel-acciones .cel-ranking')
-    // EL RATON SE APARTA ANTES DE MEDIR, y esto lo enseñó un rojo de la primera
-    // corrida: la puerta cantó "la columna se movió al aparecer el aviso" con un
-    // desplazamiento de 2 px del ranking. No era el aviso — era el `:hover` de la
-    // familia `.btn`, que levanta el botón 2 px y que el ranking heredó al pasar
-    // a ser un botón de verdad. Medido: con el ratón fuera, la caja es idéntica
-    // con y sin aviso; con el ratón encima, sube 2 px se toque o no se toque.
-    // Comparar geometría con el puntero posado sobre el control mide el hover,
-    // no el aviso.
-    await page.mouse.move(4, 4)
-    await page.waitForTimeout(150)
-    r.conAviso = await aviso()
-    r.despues = await geometria()
-    await page.screenshot({ path: `${OUT}/cel2e-proximamente.png` })
-
-    // Se retira solo. Se mira a los 3,5 s, que es el tope del encargo.
-    await page.waitForTimeout(3400)
-    r.trasEspera = await aviso()
-
-    // Y el segundo toque lo quita antes de los 3 s.
-    await page.click('.cel-acciones .cel-ranking')
-    await page.waitForTimeout(150)
-    r.segundoToque = await aviso()
-    await page.click('.cel-acciones .cel-ranking')
-    await page.waitForTimeout(150)
-    r.tercerToque = await aviso()
-    await page.mouse.move(4, 4)
-
-    r.urlFinal = page.url()
-    r.sigueEnPantalla = await page.locator('.cel-screen').count()
-  } catch (e) { fallos.push(`ranking: ${e.message}`) }
-  await ctx.close()
-
-  if (r.avisoAntes?.vive) fallos.push('ranking: el aviso se ve sin haberlo tocado')
-  if (r.avisoAntes?.viva !== 'polite') fallos.push(`ranking: la region viva no es polite (${r.avisoAntes?.viva})`)
-  if (r.avisoAntes?.papel !== 'status') fallos.push(`ranking: la region viva no tiene role=status (${r.avisoAntes?.papel})`)
-  if (!r.conAviso?.vive) fallos.push('ranking: el aviso NO aparecio al tocar')
-  if (r.conAviso?.texto !== 'Próximamente') fallos.push(`ranking: el aviso dice "${r.conAviso?.texto}"`)
-  if (r.conAviso?.posicion !== 'absolute') fallos.push(`ranking: el aviso esta en flujo (${r.conAviso?.posicion})`)
-  if (JSON.stringify(r.antes) !== JSON.stringify(r.despues)) {
-    fallos.push(`ranking: la columna se movio al aparecer el aviso\n      antes  ${JSON.stringify(r.antes)}\n      despues ${JSON.stringify(r.despues)}`)
+    if (!r.cerrada) fallos.push(`ranking ${id}: ✕ no cerró la tarjeta`)
+    if (!r.foco) fallos.push(`ranking ${id}: al cerrar, el foco no volvió a .cel-ranking`)
+    if (r.url !== r.urlFinal) fallos.push(`ranking ${id}: NAVEGÓ de ${r.url} a ${r.urlFinal}`)
+    if (r.sigueEnPantalla !== 1) fallos.push(`ranking ${id}: la pantalla de victoria se fue`)
   }
-  if (r.trasEspera?.vive) fallos.push('ranking: el aviso sigue ahi pasados 3,5 s')
-  if (!r.segundoToque?.vive) fallos.push('ranking: el aviso no volvio con otro toque')
-  if (r.tercerToque?.vive) fallos.push('ranking: un segundo toque no lo quita')
-  if (r.url !== r.urlFinal) fallos.push(`ranking: NAVEGO de ${r.url} a ${r.urlFinal}`)
-  if (r.sigueEnPantalla !== 1) fallos.push('ranking: la pantalla de victoria se fue')
-  return r
+  return salida
 }
 
 // ── La puerta del salto por toque ───────────────────────────────────────────
@@ -1603,10 +1659,18 @@ async function modoCelebracion(browser) {
         if (d.puntos !== '0')       fallos.push(`${id}: "Puntos obtenidos" ${d.puntos} != 0`)
 
         if (d.primarios !== 1)                  fallos.push(`${id}: ${d.primarios} botones primarios, debe haber 1`)
-        // CEL-2e · el ranking deja de ser inerte: ni `disabled`, ni pastilla, y
-        // sigue sin `href` — un control que contesta no puede anunciarse
-        // deshabilitado, y el que no navega no debe parecer un enlace.
-        if (d.acciones?.rankingDisabled)     fallos.push(`${id}: el ranking sigue deshabilitado`)
+        // CEL-2e · el ranking deja de ser inerte: ni pastilla, y sigue sin
+        // `href` — el que no navega no debe parecer un enlace. RNK-1d · en
+        // reposo `saldoFinal` ya llegó, así que tiene que estar ENCENDIDO (el
+        // apagado de antes lo mide `puertaRanking`) y dice `rnk.victoria.ver`.
+        // El alto ≥ 44 es puerta sólo en móvil horizontal (abajo, desde
+        // CEL-2e): fuera de él el botón mide lo que el primario (30 y 35 px),
+        // y subirlo movería la columna. Se informa (`inf.altoRanking`) y queda
+        // como pregunta del informe 1d §M.
+        if (!d.ranking)                      fallos.push(`${id}: no hay botón de ranking`)
+        else if (d.ranking.etiqueta !== t('rnk.victoria.ver')) fallos.push(`${id}: el ranking dice «${d.ranking.etiqueta}»`)
+        if (d.acciones?.rankingDisabled)     fallos.push(`${id}: el ranking sigue apagado en reposo (saldoFinal no llegó)`)
+        if (d.acciones) (inf.altoRanking ??= {})[id] = round(d.acciones.ranking.h)
         if (d.acciones?.pastilla !== 0)      fallos.push(`${id}: sigue habiendo pastilla "Proximamente" (${d.acciones?.pastilla})`)
         if (d.acciones?.rankingHref != null) fallos.push(`${id}: el ranking navega a ${d.acciones.rankingHref}`)
 
@@ -1733,7 +1797,7 @@ async function modoCelebracion(browser) {
   // Y las dos puertas que necesitan su propia pestaña.
   inf.melodias = await puertaMelodias(browser, fallos)
   inf.frases2c = await puertaFrases(browser, fallos)
-  inf.ranking2e = await puertaRanking(browser, fallos)
+  inf.rnk1d = await puertaRanking(browser, fallos)
   inf.salto = await puertaSalto(browser, fallos)
 
   writeFileSync(`${OUT}/cel1.json`, JSON.stringify(inf, null, 2))
@@ -1790,10 +1854,15 @@ async function modoCelebracion(browser) {
     console.log(`  ${''.padEnd(22)}`
       + ` | cascada ${(a.cascada || []).map(x => x.rotulo).join(' > ')}`)
   }
-  const rk = inf.ranking2e || {}
-  console.log(`\n-- el aviso "Proximamente" --`)
-  console.log(`  al tocar: ${rk.conAviso?.vive ? 'visible' : 'NO'} (${rk.conAviso?.posicion}) - tras 3,5 s: ${rk.trasEspera?.vive ? 'SIGUE' : 'se fue'}`
-    + ` - segundo toque: ${rk.tercerToque?.vive ? 'SIGUE' : 'lo quita'} - navegacion: ${rk.url === rk.urlFinal ? 'ninguna' : 'HUBO'}`)
+  console.log(`\n-- RNK-1d · «Ver tu nuevo ranking» --`)
+  console.log(`  alto del botón por celda (informativo; puerta ≥ 44 sólo en móvil horizontal): ${Object.entries(inf.altoRanking || {}).map(([k, v]) => `${k} ${v}`).join(' · ')}`)
+  for (const rk of Object.values(inf.rnk1d || {})) {
+    const a = rk.apagado, e = rk.encendido, v = rk.desdeVictoria, k = rk.desdeRankings
+    console.log(`  ${rk.id.padEnd(9)} apagado ${a?.disabled ? 'sí' : 'NO'} (${a?.w}×${a?.h} @${a?.x},${a?.y} op ${a?.opacidad})`
+      + ` → encendido ${e && !e.disabled ? 'sí' : 'NO'} (${e?.w}×${e?.h} @${e?.x},${e?.y} op ${e?.opacidad})`
+      + ` · tarjeta victoria ${v?.w}×${v?.h} / Rankings ${k?.w}×${k?.h} · ${v?.nombre} «${v?.maestros}» · enRoot ${v?.enRoot} · zoom #root ${v?.zoomRoot}`
+      + ` · ✕ ${rk.cerrada ? 'cierra' : 'NO'} · foco ${rk.foco ? 'vuelve' : 'NO'} · navegación ${rk.url === rk.urlFinal ? 'ninguna' : 'HUBO'}`)
+  }
   const b0 = Object.values(inf.arco)[0]?.brillo
   console.log(`\n-- el brillo de la moneda --\n  ciclo EMB-1 ${b0?.ciclo}s = periodo de la moneda ${b0?.periodo}s - desfase ${b0?.desfase}s (medio ciclo)`)
   const sl = inf.salto || {}

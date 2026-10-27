@@ -34,12 +34,18 @@
 //   rnk-escala    ninguna raíz con `data-escala`; el dialog fuera de `#root`
 //   rnk-nohay     un jugador que ya no está → toast «Jugador no encontrado»,
 //                 la tarjeta se va y la lista se vuelve a pedir (+1 llamada)
+//   rnk-fresco    RNK-1d: volver al primer plano con < 60 s desde la última
+//                 consulta no pide nada; con ≥ 60 s, UNA `ranking_top` y UNA
+//                 `ranking_mio`, sin «Cargando…», sin tocar `scrollTop` ni la
+//                 pestaña, también con la tarjeta abierta (que se queda); y
+//                 `Rankings.jsx` sin `setInterval`
 //   consola       sin errores de página
 //
 // DESVIACIÓN ANOTADA (informe 1c-ii §M): la ficha pide 400 × 317 en 412×915;
 // la fórmula sellada (`min(100%, 92u, 400px)`) y la lámina dan 379 × 317 ahí,
 // y la puerta mide contra la lámina.
 
+import { readFileSync } from 'node:fs'
 import { contextoCap, PERFIL_CAP } from '../cap/capMesa.mjs'
 import { crearBanco } from '../../src/dev/bancoImitado.js'
 import { sembradosRanking, PUNTOS_DEL_BYPASS } from '../../src/dev/sembradosRanking.js'
@@ -76,10 +82,11 @@ function bancoDe({ sembrados = sembradosRanking(), puntos = PUNTOS_DEL_BYPASS, p
 
 const TAMANOS = [[360, 640], [412, 915], [915, 412], [744, 1100], [1366, 623], [1920, 1080], [832, 384], [851, 393]]
 
-async function abrirRankings(browser, base, w, h, banco, errores) {
+async function abrirRankings(browser, base, w, h, banco, errores, antes = null) {
   const { ctx, page } = await contextoCap(browser, { w, h, dpr: 1, movil: false }, base, { billetera: { banco } })
   page.on('pageerror', (e) => errores.push(`${w}x${h} pageerror: ${e.message}`))
   page.on('console', (m) => { if (m.type() === 'error') errores.push(`${w}x${h} console: ${m.text()}`) })
+  if (antes) await antes(page)
   await page.goto(base)
   await page.waitForSelector('[data-accion="rankings"]', { timeout: 30000 })
   await page.click('[data-accion="rankings"]')
@@ -188,7 +195,7 @@ export async function runRnk(browser, { base }) {
     if (!ok) x.fallos.push(`${quien} ${valor}`)
   }
   const espera = (k, n) => { p(k).esperadas += n }
-  for (const [k, n] of Object.entries({ 'rnk-abre': 2, 'rnk-fila': 3, 'rnk-banda': 6, 'rnk-desplaza': 2, 'rnk-fin': 2, 'rnk-2col': 6, 'rnk-oro': 1, 'rnk-vino': 1, 'rnk-perfil': 3, 'rnk-propio': 2, 'rnk-uuid': 1, 'rnk-escala': 1, 'rnk-nohay': 1 })) espera(k, n)
+  for (const [k, n] of Object.entries({ 'rnk-abre': 2, 'rnk-fila': 3, 'rnk-banda': 6, 'rnk-desplaza': 2, 'rnk-fin': 2, 'rnk-2col': 6, 'rnk-oro': 1, 'rnk-vino': 1, 'rnk-perfil': 3, 'rnk-propio': 2, 'rnk-uuid': 1, 'rnk-escala': 1, 'rnk-nohay': 1, 'rnk-fresco': 4 })) espera(k, n)
 
   for (const [w, h] of TAMANOS) {
     const clave = `${w}x${h}`
@@ -349,6 +356,79 @@ export async function runRnk(browser, { base }) {
     } catch (e) {
       errores.push(`412x915 nohay: ${String(e.message).split('\n')[0]}`)
     }
+  }
+
+  // rnk-fresco (RNK-1d): el reloj y la visibilidad, fingidos SÓLO en la página
+  // del arnés. `Date.now()` lleva un salto que el arnés mueve (la pantalla
+  // guarda la última consulta con `Date.now()`), y `visibilityState` lo pone el
+  // arnés antes de lanzar `visibilitychange`, como al bloquear el teléfono.
+  {
+    const { banco, cuenta } = bancoDe()
+    const fingir = (page) => page.addInitScript(() => {
+      window.__rnkSalto = 0
+      const ahora = Date.now.bind(Date)
+      Date.now = () => ahora() + window.__rnkSalto
+      window.__rnkOculta = false
+      Object.defineProperty(Document.prototype, 'visibilityState', { configurable: true, get() { return window.__rnkOculta ? 'hidden' : 'visible' } })
+      Object.defineProperty(Document.prototype, 'hidden', { configurable: true, get() { return window.__rnkOculta } })
+      // «Cargando…» que aparezca durante un refresco: el refresco no debe pintarlo.
+      window.__rnkCargo = 0
+      new MutationObserver(() => { if (document.querySelector('.rnk-estado')) window.__rnkCargo++ })
+        .observe(document, { childList: true, subtree: true })   // aún no hay <html>: se observa el documento
+    })
+    // Se va y vuelve con el reloj `seg` segundos por delante de la carga.
+    const irYVolver = (page, seg) => page.evaluate(async (ms) => {
+      window.__rnkOculta = true
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.__rnkSalto = ms
+      window.__rnkOculta = false
+      window.__rnkCargo = 0
+      document.dispatchEvent(new Event('visibilitychange'))
+      await new Promise((ok) => setTimeout(ok, 600))
+      const lista = document.querySelector('.rnk-lista')
+      return {
+        scrollTop: lista?.scrollTop ?? null,
+        ranking: document.querySelector('main.sal')?.dataset.ranking ?? null,
+        estado: document.querySelector('main.sal')?.dataset.rnkEstado ?? null,
+        cargo: window.__rnkCargo,
+        tarjeta: !!document.querySelector('.mp-velo'),
+      }
+    }, seg * 1000)
+    const llamadas = () => `${cuenta.ranking_top ?? 0}/${cuenta.ranking_mio ?? 0}`
+    try {
+      const { ctx, page } = await abrirRankings(browser, base, 412, 915, banco, errores, fingir)
+      const s0 = await page.evaluate(() => { const l = document.querySelector('.rnk-lista'); l.scrollTop = 900; return l.scrollTop })
+      await page.waitForTimeout(150)
+      // < 60 s: nada.
+      let antes = llamadas()
+      let v = await irYVolver(page, 59)
+      anota('rnk-fresco', llamadas() === antes && v.scrollTop === s0, '412x915 59 s', `llamadas top/mio ${antes}→${llamadas()} scrollTop ${s0}→${v.scrollTop}`)
+      // ≥ 60 s: una y una, sin moverse.
+      const [t0, m0] = [cuenta.ranking_top ?? 0, cuenta.ranking_mio ?? 0]
+      v = await irYVolver(page, 61)
+      const [t1, m1] = [cuenta.ranking_top ?? 0, cuenta.ranking_mio ?? 0]
+      anota('rnk-fresco', t1 === t0 + 1 && m1 === m0 + 1 && v.scrollTop === s0 && v.ranking === 'maestros' && v.estado === 'listo' && v.cargo === 0,
+        '412x915 61 s', `top ${t0}→${t1} mio ${m0}→${m1} scrollTop ${s0}→${v.scrollTop} pestaña=${v.ranking} estado=${v.estado} cargando=${v.cargo}`)
+      // Con la tarjeta abierta: la lista de detrás se refresca y la tarjeta se queda.
+      // El clic trae la fila 3 a la vista (Playwright desplaza la lista hasta
+      // ella): con la tarjeta ya abierta, la lista vuelve a 900 y se compara
+      // contra esa cifra.
+      await page.click('.rnk-filas .rnk-fila[data-puesto="3"]')
+      await page.waitForSelector('.mp-velo[data-mp-estado="listo"]', { timeout: 5000 })
+      const s1 = await page.evaluate(() => { const l = document.querySelector('.rnk-lista'); l.scrollTop = 900; return l.scrollTop })
+      await page.waitForTimeout(150)
+      const [t2, m2] = [cuenta.ranking_top ?? 0, cuenta.ranking_mio ?? 0]
+      v = await irYVolver(page, 61 + 61)
+      const [t3, m3] = [cuenta.ranking_top ?? 0, cuenta.ranking_mio ?? 0]
+      anota('rnk-fresco', t3 === t2 + 1 && m3 === m2 + 1 && v.tarjeta && s1 > 0 && v.scrollTop === s1, '412x915 tarjeta abierta',
+        `top ${t2}→${t3} mio ${m2}→${m3} tarjeta=${v.tarjeta} scrollTop ${s1}→${v.scrollTop}`)
+      await ctx.close()
+    } catch (e) {
+      errores.push(`412x915 fresco: ${String(e.message).split('\n')[0]}`)
+    }
+    // Sin reloj mientras se ve.
+    const fuente = readFileSync(new URL('../../src/screens/Rankings.jsx', import.meta.url), 'utf8')
+    anota('rnk-fresco', !/setInterval/.test(fuente), 'Rankings.jsx', `setInterval=${/setInterval/.test(fuente)}`)
   }
 
   // Una puerta con menos medidas de las esperadas no es verde (un verde mide lo que dice).
