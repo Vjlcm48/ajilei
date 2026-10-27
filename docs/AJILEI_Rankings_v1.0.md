@@ -1,3 +1,5 @@
+> Sustituido por v1.1 — 2026-10-26
+
 # AJILEI · Rankings · Normativo v1.0
 
 **Estado:** sellado por Victor el 2026-10-24 · **Decisor:** Victor · **Rector:** Claude (chat) · **Ejecutor:** Claude Code
