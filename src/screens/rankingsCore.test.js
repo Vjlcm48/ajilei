@@ -3,7 +3,7 @@
 // dentro, fuera), el estado de la lista, la cifra con miles y «es tu fila».
 
 import { describe, it, expect } from 'vitest'
-import { PESTANAS, PESTANA_INICIAL, estadoDe, textoBanda, cifraTexto, esTu, muestraFin } from './rankingsCore'
+import { PESTANAS, PESTANA_INICIAL, estadoDe, textoBanda, cifraTexto, esTu, muestraFin, debeRefrescar, FRESCURA_MS } from './rankingsCore'
 
 const ok = (filas) => ({ ok: true, filas })
 const mioOk = (mio) => ({ ok: true, mio })
@@ -99,5 +99,26 @@ describe('RNK-1c · esTu', () => {
     expect(esTu({ username: '' }, '')).toBe(false)
     expect(esTu({ username: 'x' }, null)).toBe(false)
     expect(esTu(null, 'x')).toBe(false)
+  })
+})
+
+describe('RNK-1d · debeRefrescar (la frescura al volver al primer plano)', () => {
+  const t0 = 1_700_000_000_000
+  it('el umbral es un minuto', () => {
+    expect(FRESCURA_MS).toBe(60_000)
+  })
+  it('59 s no, 60 s sí, más sí', () => {
+    expect(debeRefrescar({ ultimaConsulta: t0, ahora: t0 + 59_000 })).toBe(false)
+    expect(debeRefrescar({ ultimaConsulta: t0, ahora: t0 + 59_999 })).toBe(false)
+    expect(debeRefrescar({ ultimaConsulta: t0, ahora: t0 + 60_000 })).toBe(true)
+    expect(debeRefrescar({ ultimaConsulta: t0, ahora: t0 + 3_600_000 })).toBe(true)
+  })
+  it('sin consulta previa, sí', () => {
+    expect(debeRefrescar({ ultimaConsulta: undefined, ahora: t0 })).toBe(true)
+    expect(debeRefrescar({ ultimaConsulta: null, ahora: t0 })).toBe(true)
+  })
+  it('el umbral se puede pasar', () => {
+    expect(debeRefrescar({ ultimaConsulta: t0, ahora: t0 + 999, umbralMs: 1000 })).toBe(false)
+    expect(debeRefrescar({ ultimaConsulta: t0, ahora: t0 + 1000, umbralMs: 1000 })).toBe(true)
   })
 })

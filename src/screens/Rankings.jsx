@@ -10,7 +10,7 @@ import { esPropio } from '../components/miniPerfilCore'
 import { IconoTrofeo } from '../components/IconosLobby'
 import { useIdioma } from '../hooks/useIdioma'
 import { inicialDe } from './salaEsperaCore'
-import { PESTANA_INICIAL, estadoDe, textoBanda, cifraTexto, esTu, muestraFin } from './rankingsCore'
+import { PESTANA_INICIAL, estadoDe, textoBanda, cifraTexto, esTu, muestraFin, debeRefrescar } from './rankingsCore'
 import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 
 // ── RNK-1c · La pantalla «Rankings» ─────────────────────────────────────────
@@ -27,6 +27,16 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 // refrescar. La respuesta se guarda con la clave de la petición que la pidió
 // (pestaña + intento): si cambia la pestaña antes de que llegue, la vieja ni
 // se pinta (la limpieza del efecto la descarta) ni se confunde con la nueva.
+//
+// ── RNK-1d · LA FRESCURA ────────────────────────────────────────────────────
+// Rector: AJILEI_RNK-1_Fase1d_v1.0.md §2.3. Además, al volver al primer plano
+// (`visibilitychange`) se vuelve a pedir la pestaña activa si su última
+// consulta tiene un minuto o más (`debeRefrescar`). Es un refresco CALLADO: la
+// respuesta entra con la clave que ya se ve, así que no pasa por «Cargando…»,
+// las filas siguen montadas (`key` = username) y el `scrollTop` de la lista no
+// se toca; si falla, se queda lo que había. Con la tarjeta abierta se refresca
+// igual la lista de detrás. El escucha vive aquí y no en `App`: la pantalla es
+// dueña de su frescura, y al desmontar se quita. Sin reloj mientras se ve.
 //
 // ── LO QUE NO HACE ──────────────────────────────────────────────────────────
 // No calcula puestos ni franjas, no reordena y no recuerda la pestaña.
@@ -100,13 +110,37 @@ export default function Rankings({
   const carcasa = useRef(null)
 
   const clave = `${pestana}:${intento}`
+  // RNK-1d · cuándo se pidió por última vez cada pestaña (`Date.now()`).
+  const ultimaConsulta = useRef({})
   useEffect(() => {
     let vigente = true
+    ultimaConsulta.current[pestana] = Date.now()
     Promise.all([api.top(pestana), api.mio(pestana)]).then(([top, mio]) => {
       if (vigente) setRespuesta({ clave, ranking: pestana, top, mio })
     })
     return () => { vigente = false }
   }, [api, pestana, clave])
+
+  // RNK-1d · la frescura al volver al primer plano (ver la cabecera). El
+  // escucha lee la pestaña y la clave de ESTE render por referencia, para no
+  // renovarse en cada cambio de pestaña.
+  const vista = useRef({ pestana, clave })
+  useEffect(() => { vista.current = { pestana, clave } })
+  useEffect(() => {
+    const alVolver = () => {
+      if (document.visibilityState !== 'visible') return
+      const { pestana: p, clave: k } = vista.current
+      const ahora = Date.now()
+      if (!debeRefrescar({ ultimaConsulta: ultimaConsulta.current[p], ahora })) return
+      ultimaConsulta.current[p] = ahora
+      Promise.all([api.top(p), api.mio(p)]).then(([top, mio]) => {
+        const nueva = { clave: k, ranking: p, top, mio }
+        if (vista.current.clave === k && estadoDe(nueva) !== 'sinred') setRespuesta(nueva)
+      })
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => document.removeEventListener('visibilitychange', alVolver)
+  }, [api])
 
   // La respuesta de OTRA petición (la pestaña de antes, el intento de antes)
   // no vale: mientras llega la nueva, «Cargando…».

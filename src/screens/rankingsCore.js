@@ -61,3 +61,19 @@ export function esTu(fila, usuario) {
   if (typeof fila?.username !== 'string' || typeof usuario !== 'string' || usuario === '') return false
   return fila.username.toLowerCase() === usuario.toLowerCase()
 }
+
+// ── RNK-1d · La frescura ────────────────────────────────────────────────────
+// Rector: AJILEI_RNK-1_Fase1d_v1.0.md §2.3. La lista se pide al entrar y al
+// cambiar de pestaña, y otra vez al volver al primer plano si la última consulta
+// de ESA pestaña tiene un minuto o más. Sin reloj mientras se ve: la lista
+// nunca se mueve sola.
+export const FRESCURA_MS = 60_000
+
+/**
+ * ¿Toca volver a pedir la pestaña al volver al primer plano?
+ * Sin consulta previa, sí; con ella, a partir de `umbralMs` (incluido).
+ */
+export function debeRefrescar({ ultimaConsulta, ahora, umbralMs = FRESCURA_MS }) {
+  if (!Number.isFinite(ultimaConsulta)) return true
+  return ahora - ultimaConsulta >= umbralMs
+}
