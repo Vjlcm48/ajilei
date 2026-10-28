@@ -1,0 +1,246 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · RNK-1 1e · El intersticial de SumaMente
+   Rector: AJILEI_RNK-1_Fase1e_v1.0.md §0 y §2.3. Autoridad visual: la lámina
+   `laminas/rnk1e/pantalla.html` (V1 B · V2 A · V3 A · «Continuar» en fila),
+   medidas del informe 1e-L §4, «Lo que la 1e debería sellar», tal cual. Lo
+   único que cambia respecto de la lámina es la proporción de la caja: la del
+   video real, 580:1280 (29/64), no 9:16.
+
+   HOJA NUEVA Y ADITIVA: todo cuelga de `.sm`, que sólo existe mientras vive
+   esta pantalla. Ni un `!important`, ni un hex salvo el negro de la caja del
+   video (#000, el de las franjas del propio video). Mide en `--u`, la unidad
+   del lobby y de la capa del video de ECO-1g (`video.css` `.vid-raiz`).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── La carcasa ────────────────────────────────────────────────────────────
+   A pantalla entera, fija: la pantalla no hereda la jaula de `#root` ni
+   desplaza. Fondo, el abisal liso: no es pantalla de lobby y no lleva rampa. */
+.sm {
+  --u: clamp(3.2px, 1vmin, 6px);
+  --m: max(16px, calc(var(--u) * 3.5));
+  --g: max(8px, calc(var(--u) * 2));
+  --linea: rgba(var(--text-primary-rgb), 0.14);
+  --cab-h: max(44px, calc(var(--u) * 9));
+  --cta-h: max(44px, calc(var(--u) * 11));
+  --play-h: max(48px, calc(var(--u) * 11));
+  --acc-w: min(100%, max(280px, calc(var(--u) * 64)));
+  /* V3 A · el video a toda la altura que quede: sin tope. */
+  --tope: 100000px;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--g);
+  margin: 0;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + var(--m))
+    calc(env(safe-area-inset-right, 0px) + var(--m))
+    calc(env(safe-area-inset-bottom, 0px) + var(--m))
+    calc(env(safe-area-inset-left, 0px) + var(--m));
+  overflow: hidden;
+  background: var(--green-abyss);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-size: calc(var(--u) * 3.3);
+  line-height: 1.3;
+  letter-spacing: normal;
+  text-align: left;
+  /* APILADA (vertical y apaisado alto): familia y «Omitir» arriba, el video
+     en medio, las acciones abajo. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: var(--cab-h) minmax(0, 1fr) auto;
+  grid-template-areas: "fam omi" "esc esc" "acc acc";
+}
+.sm *, .sm *::before, .sm *::after { box-sizing: border-box; }
+:where(.sm) button, :where(.sm) a { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+
+/* ── La línea de familia ─────────────────────────────────────────────────── */
+.sm-fam {
+  grid-area: fam;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  min-width: 0;
+  margin: 0;
+  font-size: max(12px, calc(var(--u) * 2.8));
+  font-weight: 400;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.sm-fam img {
+  flex: none;
+  width: clamp(24px, calc(var(--u) * 6), 28px);
+  height: clamp(24px, calc(var(--u) * 6), 28px);
+  border-radius: 22%;
+}
+.sm-fam b { font-weight: 600; color: var(--text-primary); letter-spacing: 0.06em; }
+
+/* ── «Omitir» y su sitio ─────────────────────────────────────────────────────
+   O1 · el sitio está siempre; el botón aparece dentro a los 5 s sin mover
+   nada (V1 B: antes, nada). Zona táctil ≥ 44 × 44. */
+.sm-omi {
+  grid-area: omi;
+  align-self: center;
+  justify-self: end;
+  min-width: 44px;
+  height: var(--cab-h);
+  display: grid;
+  place-items: center end;
+}
+.sm-omitir {
+  min-height: 44px;
+  min-width: 44px;
+  height: var(--cab-h);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--u);
+  margin: 0;
+  padding: 0 calc(var(--u) * 3) 0 calc(var(--u) * 3.6);
+  border-radius: 999px;
+  border: 1px solid var(--linea);
+  background: rgba(var(--green-abyss-rgb), 0.45);
+  color: var(--text-secondary);
+  font-size: max(13px, calc(var(--u) * 3.2));
+  cursor: pointer;
+}
+.sm-omitir svg { width: 1.1em; height: 1.1em; }
+.sm-omitir:focus-visible, .sm-play:focus-visible, .sm-cont:focus-visible, .sm-sonido:focus-visible {
+  outline: 2px solid var(--gold-brand-hi);
+  outline-offset: 3px;
+}
+
+/* ── La escena y la caja del video ───────────────────────────────────────────
+   La caja tiene la proporción del video (29/64) desde el primer fotograma
+   (O1): mientras carga, el icono; luego, el video. Nunca se recorta: la caja
+   ES el video. Apilada, la caja se asienta sobre las acciones; si manda el
+   ancho, el sobrante queda bajo la cabecera, no entre video y botón. */
+.sm-esc {
+  grid-area: esc;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: end center;
+}
+.sm-caja {
+  position: relative;
+  width: min(100cqw, 100cqh * 29 / 64, var(--tope) * 29 / 64);
+  height: min(100cqh, 100cqw * 64 / 29, var(--tope));
+  border-radius: calc(var(--u) * 2);
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 0 0 1px var(--linea);
+}
+.sm-caja video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
+}
+/* Mientras carga, la capa propia (no el `poster` nativo, que estira el icono
+   a todo el ancho): el icono al 34 % del ancho, centrado sobre el abisal. */
+.sm-carga {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--green-abyss);
+}
+.sm-carga img { width: clamp(72px, 34%, 140px); aspect-ratio: 1; border-radius: 22%; }
+.sm:not([data-suma-estado="cargando"]) .sm-carga { display: none; }
+
+/* El botón de sonido: la forma de la ✕ de ECO-1g (`.vid-x`), arriba a la
+   izquierda DENTRO del video, lejos de «Omitir» y del botón de Google Play.
+   Sólo existe si el navegador no dejó arrancar con sonido. */
+.sm-sonido {
+  position: absolute;
+  left: calc(var(--u) * 2);
+  top: calc(var(--u) * 2);
+  width: max(44px, calc(var(--u) * 9));
+  height: max(44px, calc(var(--u) * 9));
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--green-abyss-rgb), 0.62);
+  border: 1px solid var(--linea);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.sm-sonido svg { width: 56%; height: 56%; }
+
+/* ── Las acciones ─────────────────────────────────────────────────────────── */
+.sm-acc { grid-area: acc; display: grid; justify-items: center; gap: var(--g); }
+.sm-play, .sm-cont { width: var(--acc-w); }
+/* Contorno, sin oro: no es acción del juego. Desde el primer segundo (V2 A).
+   La línea pequeña va DENTRO: todo el botón es zona táctil. */
+.sm-play {
+  min-height: var(--play-h);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  padding: calc(var(--u) * 1.2) calc(var(--u) * 3);
+  border-radius: 999px;
+  border: 1px solid var(--text-secondary);
+  background: none;
+  color: var(--text-primary);
+  text-decoration: none;
+  text-align: center;
+  line-height: 1.15;
+}
+.sm-play b { font-size: max(14px, calc(var(--u) * 3.6)); font-weight: 600; }
+.sm-play small { font-size: max(11px, calc(var(--u) * 2.6)); color: var(--text-secondary); }
+/* «Continuar a Rankings»: el dorado de `.sal-cta`, el único macizo. Su sitio
+   se reserva desde el primer segundo (O1); se enciende al terminar. */
+.sm-cont-sitio { height: var(--cta-h); width: var(--acc-w); }
+.sm-cont {
+  height: var(--cta-h);
+  margin: 0;
+  padding: 0 calc(var(--u) * 4);
+  border-radius: calc(var(--cta-h) / 2);
+  border: 0;
+  background: linear-gradient(180deg, var(--gold-hover) 0%, var(--gold-brand) 55%, var(--gold-brand-deep) 100%);
+  color: var(--text-dark);
+  font-weight: 600;
+  font-size: max(15px, calc(var(--u) * 4));
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 calc(var(--u) * 1.5) calc(var(--u) * 4) rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(var(--text-primary-rgb), 0.35);
+  white-space: nowrap;
+  visibility: hidden;
+}
+.sm[data-suma-estado="fin"] .sm-cont { visibility: visible; }
+
+/* ── APAISADO BAJO (teléfono acostado, laptop con barras) ──────────────────
+   El corte de las dos columnas de Salas. El video en el centro a toda la
+   altura; familia arriba a la izquierda, «Omitir» arriba a la derecha y las
+   acciones abajo a la derecha. Nada encima ni debajo del video. */
+@media (orientation: landscape) and (max-height: 830px) {
+  .sm {
+    --vid-w: calc(min(100dvh - 2 * var(--m) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px), var(--tope)) * 29 / 64);
+    grid-template-columns: minmax(0, 1fr) var(--vid-w) minmax(0, 1fr);
+    grid-template-rows: var(--cab-h) minmax(0, 1fr);
+    grid-template-areas: "fam esc omi" ". esc acc";
+    column-gap: max(16px, calc(var(--u) * 4));
+  }
+  .sm-esc { place-items: center; }
+  .sm-fam { white-space: normal; }
+  .sm-acc { align-self: end; justify-items: start; }
+  .sm-play, .sm-cont, .sm-cont-sitio { width: min(100%, max(240px, calc(var(--u) * 64))); }
+}
+
+/* ── Los fundidos ──────────────────────────────────────────────────────────
+   Sólo con movimiento: con `prefers-reduced-motion` se quitan (la regla del
+   lobby, `lobby.css:448`). El video arranca igual, porque es el contenido. */
+@media (prefers-reduced-motion: no-preference) {
+  .sm-omitir { animation: sm-funde 200ms ease-out both; }
+  .sm[data-suma-estado="fin"] .sm-cont { animation: sm-funde 220ms ease-out both; }
+}
+@keyframes sm-funde { from { opacity: 0; } to { opacity: 1; } }

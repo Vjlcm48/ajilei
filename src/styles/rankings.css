@@ -372,3 +372,35 @@ button.rnk-vacio {
   cursor: pointer;
 }
 button.rnk-vacio:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 2px; }
+
+/* ══ 10 · RNK-1 1e · LA LÍNEA DE LA FAMILIA ════════════════════════════════
+   Rector: AJILEI_RNK-1_Fase1e_v1.0.md §2.4. Dentro del hueco de §5
+   (`.rnk-premium`, `max(64px, 17u)`), que no cambia de alto y sigue
+   invisible: lo que se enciende es la línea, no la caja. Contorno sin oro (no
+   es acción del juego) y la letra de la lista; zona táctil ≥ 44. */
+.rnk-premium { display: grid; place-items: center; }
+.rnk-premium > .rnk-familia {
+  visibility: visible;
+  min-height: 44px;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  padding: 0 calc(var(--u) * 3.5) 0 calc(var(--u) * 2);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.14);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: calc(var(--u) * 3.1);
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rnk-familia img {
+  flex: none;
+  width: clamp(24px, calc(var(--u) * 6), 28px);
+  height: clamp(24px, calc(var(--u) * 6), 28px);
+  border-radius: 22%;
+}
+.rnk-familia b { font-weight: 600; color: var(--text-primary); }
+.rnk-familia span { overflow: hidden; text-overflow: ellipsis; }
+.rnk-familia:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 2px; }

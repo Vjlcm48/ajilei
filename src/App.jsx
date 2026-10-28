@@ -15,6 +15,13 @@ import PartidaPvP from './screens/PartidaPvP'
 // RETIRAN del árbol en esta tanda (rector 1e §2.3) junto con `TableSelect`.
 import RetarIAS from './screens/RetarIAS'
 import Rankings from './screens/Rankings'
+// RNK-1 1e · el intersticial de SumaMente: una pantalla de la cascada, entre el
+// lobby y Rankings. La decisión es pura (`sumaCore`); el contador, del aparato.
+import IntersticialSumaMente from './screens/IntersticialSumaMente'
+import { decidir, diaChicago } from './lib/sumaCore'
+import { sumaContador } from './lib/sumaContador'
+import { siembraSuma } from './dev/siembraSuma'
+import { useIdioma } from './hooks/useIdioma'
 // ARN-3d §2.4 (B11) · la mesa viaja en su propio chunk y entra por `lazy`. El
 // especificador vive en `lib/cargarMesa`, el mismo que precarga el lobby; aquí
 // NO puede quedar un import estático de `GameTable` (lo vigila
@@ -126,7 +133,20 @@ import { arranqueDeSesion } from './screens/salasCore'
 // pagan la precarga. El lobby estaba solo hasta SAL-B1; ahora le acompañan las
 // tres del PvP, que llevan a una partida que todavia no existe.
 // SAL-B2 F1b · y el stub de partida PvP, que todavia no reparte nada.
-const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sala-espera', 'partida-pvp']
+// RNK-1 1e · y el intersticial de SumaMente: mientras corre su video no se
+// baja la mesa (audio + baraja + chunk) por la misma red. Rankings, que viene
+// detrás, precarga como hasta hoy.
+const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sala-espera', 'partida-pvp', 'sumamente']
+
+// ── RNK-1 1e · PREMIUM, EL HUECO ─────────────────────────────────────────────
+// Rector RNK-1 1e §0: el video de SumaMente nunca sale para Premium, y Premium
+// hoy no existe. Éste es el ÚNICO sitio de la condición: el día que exista, se
+// lee aquí (de la cuenta) y `decidir` ya sabe qué hacer con ella.
+const esPremium = false
+
+// `?suma` / `?suma=fin` (sólo en desarrollo): el contador a una entrada del
+// video, al cargar la página. En un build no hace nada.
+siembraSuma()
 
 // ECO-1c · un token por intento de sentarse (la idempotencia de `sentarse_ia`).
 function nuevoToken() {
@@ -146,6 +166,8 @@ function App() {
   // por la que `useAuth` abre la función y los `useState` del lobby se declaran
   // aunque la puerta esté a punto de devolver otra pantalla.
   const auth = useAuth()
+  // RNK-1 1e · el idioma de `t()` elige el video de SumaMente.
+  const { idioma } = useIdioma()
 
   // BIE-1 · La regla D5 del indicador, con los hooks y no detrás de un retorno.
   // `mostrar`: pintar «Cargando». `liberar`: la pantalla siguiente puede
@@ -700,6 +722,18 @@ function App() {
     entrarAMesa()
   }, [apiMesa, tomarSaldo, alSaldoInsuficiente, escucharMesa, sustituirAvisos, vaciarAvisos])
 
+  // ── RNK-1 1e · UNA ENTRADA A RANKINGS ────────────────────────────────────
+  // Rector RNK-1 1e §0 y §2.4. Sólo el botón «Rankings» del lobby pasa por
+  // aquí: es lo que cuenta como entrada (regla 1). El contador se escribe en
+  // el mismo gesto en que se decide, así que el día queda gastado cuando el
+  // intersticial APARECE (regla 4), salga luego por donde salga.
+  const entrarRankings = useCallback(() => {
+    const { n, dia } = sumaContador.leer()
+    const d = decidir({ n, ultimoDia: dia, hoy: diaChicago(), premium: esPremium })
+    sumaContador.escribir({ n: d.n, dia: d.ultimoDia })
+    setScreen(d.mostrar ? 'sumamente' : 'rankings')
+  }, [])
+
   const levantarse = useCallback((fichas) => {
     const ctl = controlRef.current
     if (ctl && !ctl.terminado) {
@@ -932,6 +966,15 @@ function App() {
     )
   }
 
+  // ── RNK-1 1e · El intersticial de SumaMente ──────────────────────────────
+  // Rector RNK-1 1e §1.4. Una pantalla, no una capa: SIN `conVideo` (no es el
+  // video de recompensa, no lleva barra) y sin `data-escala`. Al terminar
+  // —Omitir, Continuar o «atrás» pasados los 5 s— va a Rankings y no queda
+  // nada montado detrás.
+  if (screen === 'sumamente') {
+    return <IntersticialSumaMente idioma={idioma} onFin={() => setScreen('rankings')} />
+  }
+
   // ── RNK-1c · Rankings ────────────────────────────────────────────────────
   // Rector RNK-1 1c-i §2.1. Pantalla con barra: va con el marco del video y SIN
   // `data-escala` (INV-59, la escala es sólo de la mesa). Flecha y casa vuelven
@@ -964,7 +1007,7 @@ function App() {
       constancia={constancia?.uid === uidCompleto ? constancia.ficha : null}
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
-      onRankings={() => setScreen('rankings')}
+      onRankings={entrarRankings}
       onCerrarSesion={cerrarSesion}
     />,
   )

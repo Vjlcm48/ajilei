@@ -12,6 +12,8 @@ import { useIdioma } from '../hooks/useIdioma'
 import { inicialDe } from './salaEsperaCore'
 import { PESTANA_INICIAL, estadoDe, textoBanda, cifraTexto, esTu, muestraFin, debeRefrescar } from './rankingsCore'
 import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
+import { ENLACE_PLAY } from '../lib/sumaCore'
+import { iconoSumaMente64 as iconoSumaMente } from '../lib/sumaIconos'
 
 // ── RNK-1c · La pantalla «Rankings» ─────────────────────────────────────────
 // Rector: AJILEI_RNK-1_Fase1c-i_v1.0.md §2.3. Autoridad visual: la lámina
@@ -48,6 +50,12 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 // es un estado de esta pantalla, no un `screen`. Si el jugador ya no existe,
 // la tarjeta se va, el toast de la carcasa dice «Jugador no encontrado» y se
 // vuelven a pedir `top` y `mio`. Al cerrar, el foco vuelve a lo que la abrió.
+//
+// ── RNK-1 1e · LA LÍNEA DE LA FAMILIA ───────────────────────────────────────
+// Rector: AJILEI_RNK-1_Fase1e_v1.0.md §0 y §2.4 (Rankings v1.2 §6.7). Al final
+// del top 100, en las dos pestañas y para TODOS, siempre: icono · «SumaMente»
+// · «Ver en Google Play», que abre la ficha de Play en pestaña nueva. Ocupa el
+// hueco que la 1c-i dejó reservado (`.rnk-premium`), sin cambiarle el alto.
 
 // El hueco de la corona Premium (O1): caja reservada e invisible detrás del
 // nombre, para que el día que exista no mueva ninguno. Geometría de la lámina.
@@ -255,8 +263,21 @@ export default function Rankings({
             </ol>
             {/* Ajuste A (M-4): sólo con la lista llena, 100 filas exactas. */}
             {muestraFin(actual.top.filas) && <p className="rnk-fin">{t('rnk.fin')}</p>}
-            {/* El hueco de la línea Premium (1e): reservado e invisible (O1). */}
-            <div className="rnk-premium" aria-hidden="true" />
+            {/* El hueco reservado en la 1c-i (O1), con la línea de la familia (1e). */}
+            <div className="rnk-premium">
+              <a
+                className="rnk-familia"
+                data-accion="sumamente"
+                href={ENLACE_PLAY}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t('rnk.suma.linea')}
+              >
+                <img src={iconoSumaMente} alt="" draggable="false" />
+                <b>{t('rnk.suma.titulo')}</b>
+                <span>{t('rnk.suma.boton')}</span>
+              </a>
+            </div>
           </>
         )}
       </div>
