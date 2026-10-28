@@ -10,7 +10,7 @@
 //   · un archivo que toque `localStorage`/`sessionStorage` y no esté en
 //     ACCESORES (todo acceso pasa por los módulos que ya lo hacen);
 //   · una entrada de CLAVES que ya no aparezca en el código (la lista no envejece).
-// Los comentarios no cuentan. Censo de ARN-3e (2026-10-03): 12 claves; IOS-1c añade `ajilei.saldoVisto`.
+// Los comentarios no cuentan. Censo de ARN-3e (2026-10-03): 12 claves; IOS-1c añade `ajilei.saldoVisto`; RNK-1 1e, `ajilei.sumamente`.
 // Fuera de alcance: la sesión de Supabase (`sb-…-auth-token`), que la escribe
 // la biblioteca y no el código de `src/`.
 import { describe, it, expect } from 'vitest'
@@ -31,6 +31,7 @@ const CLAVES = [
   { clave: 'ajilei.recargaPorChunk', almacen: 'session', fuente: 'ARN-3d (D11) · main.jsx' },
   { clave: 'ajilei.dispositivo', almacen: 'local', fuente: 'ECO-1 Fase 1c (P-4) · dispositivo.js' },
   { clave: 'ajilei.saldoVisto', almacen: 'local', fuente: 'IOS-1 Fase 1c (S2) · saldoRecordado.js · solo para la vista, nadie juzga con ella' },
+  { clave: 'ajilei.sumamente', almacen: 'local', fuente: 'RNK-1 Fase 1e · Rankings_v1.2 §6.7.1 · sumaContador.js · el contador del video de SumaMente, en el aparato' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -45,6 +46,7 @@ const ACCESORES = [
   'src/main.jsx',                  // ajilei.recargaPorChunk (sessionStorage)
   'src/lib/dispositivo.js',        // ajilei.dispositivo (ECO-1c, P-4)
   'src/lib/saldoRecordado.js',     // ajilei.saldoVisto (IOS-1c, S2)
+  'src/lib/sumaContador.js',       // ajilei.sumamente (RNK-1 1e)
 ]
 
 const fuentes = archivos('src', (n) => /\.(jsx?)$/.test(n) && !/\.test\.jsx?$/.test(n))

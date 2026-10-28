@@ -543,6 +543,20 @@ export const TEXTOS_ES = {
   // Rector: AJILEI_RNK-1_Fase1d_v1.0.md §4. Sólo la frase que Rankings toca: el
   // resto de la pantalla de victoria pasa a `t()` con IDI-1 (K-9).
   'rnk.victoria.ver':      'Ver tu nuevo ranking',
+
+  // ── RNK-1e · SumaMente: el intersticial y la línea de la familia ─────────
+  // Rector: AJILEI_RNK-1_Fase1e_v1.0.md §4 (textos del informe 1e-L §5).
+  // `{marca}` es HEPTACREATION y no se traduce. `rnk.suma.linea` es el nombre
+  // accesible de la línea al final del top 100; lo que se VE son `titulo` y
+  // `boton` (por eso no choca con `rnk.suma.boton` en la prueba de repetidos).
+  'rnk.suma.familia':      'De la familia {marca}',
+  'rnk.suma.titulo':       'SumaMente',
+  'rnk.suma.boton':        'Ver en Google Play',
+  'rnk.suma.boton.sub':    'App para Android',
+  'rnk.suma.omitir':       'Omitir',
+  'rnk.suma.continuar':    'Continuar a Rankings',
+  'rnk.suma.sonido.aria':  'Activar el sonido',
+  'rnk.suma.linea':        'SumaMente · Ver en Google Play',
 }
 
 export default TEXTOS_ES

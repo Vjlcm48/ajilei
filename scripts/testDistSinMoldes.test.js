@@ -51,6 +51,10 @@ const PROHIBIDAS = [
   '|sin|cierra',
   'sembrarVideosCobrados',
   'envejecerBoleto',
+  // RNK-1 1e · el mando `?suma` (`src/dev/siembraSuma.js`), que pone el
+  // contador de SumaMente a una entrada del video. Su huella es el rótulo del
+  // aviso de consola, que sólo vive detrás de la puerta.
+  'molde-suma',
   // los estados de `?sal=`
   'opciones-fuera-alcance',
   'espera-fantasma',
@@ -66,9 +70,13 @@ const PROHIBIDAS = [
 // funciones de mesa de verdad (la falsa no puede ser la única que llega).
 // ECO-1d · y la constancia de verdad.
 // ECO-1g · y el video de verdad: el contador, el boleto y su cobro.
+// RNK-1 1e · y la ruta del video de SumaMente.
 const OBLIGATORIAS = [
   'mi_billetera', 'sentarse_ia', 'informar_pila', 'recoger_mesa_ia', 'marcar_ingreso',
   'mi_video', 'pedir_boleto', 'cobrar_boleto',
+  // RNK-1 1e · y el video de SumaMente de verdad (el mp4 de `public/`, no el
+  // WebM de prueba del arnés).
+  'sumamente_promo_es.mp4',
 ]
 
 let carpeta = null
