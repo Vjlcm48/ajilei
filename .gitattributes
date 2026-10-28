@@ -21,3 +21,6 @@
 *.woff2 binary
 *.ttf  binary
 *.zip  binary
+# RNK-1 1e · el video de SumaMente (public/sumamente) y el WebM de prueba del arnés
+*.mp4  binary
+*.webm binary
