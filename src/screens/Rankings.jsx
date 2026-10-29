@@ -271,6 +271,8 @@ export default function Rankings({
                 href={ENLACE_PLAY}
                 target="_blank"
                 rel="noopener noreferrer"
+                // CFG-1 1a · INV-45: abre otra app (la tienda); el toque es suyo.
+                data-sin-pantalla-completa=""
                 aria-label={t('rnk.suma.linea')}
               >
                 <img src={iconoSumaMente} alt="" draggable="false" />

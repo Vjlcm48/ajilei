@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import '../styles/salas.css'
 
 import BarraSuperior from '../components/BarraSuperior'
+import HojaConfiguracion from '../components/HojaConfiguracion'
 import { IconoCasa } from '../components/IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
 import { montoTexto } from '../config/tapetes'
@@ -21,6 +22,9 @@ import { montoTexto } from '../config/tapetes'
 
 export default function PartidaPvP({ cuenta, billetera = null, sala = null, onLobby }) {
   const { t } = useIdioma()
+  // CFG-1 1a · el ⚙ abre la hoja de configuración (antes, «Pronto»).
+  const [hojaAbierta, setHojaAbierta] = useState(false)
+  const ajustesRef = useRef(null)
   // ECO-1b · la cifra única de `useBilletera` (App); sólo la pinta la píldora.
   const saldo = billetera?.saldo ?? null
 
@@ -51,7 +55,9 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, onLo
         recordado={billetera?.recordado ?? null}
         cobrando={billetera?.pendiente === true}
         onPerfil={() => avisar('lob.toast.pronto')}
-        onAjustes={() => avisar('lob.toast.pronto')}
+        onAjustes={() => setHojaAbierta(true)}
+        ajustesRef={ajustesRef}
+        ajustesExpandido={hojaAbierta}
       />
 
       <div className="sal-cab">
@@ -87,6 +93,14 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, onLo
       <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
         {toast !== null ? t(toast) : ' '}
       </div>
+      {/* CFG-1 1a · la hoja del ⚙, la misma del lobby (`HojaConfiguracion`),
+          hija directa de `main.sal` y anclada a su relleno. */}
+      <HojaConfiguracion
+        abierta={hojaAbierta}
+        onCerrar={() => setHojaAbierta(false)}
+        ajustesRef={ajustesRef}
+        cuenta={cuenta}
+      />
     </main>
   )
 }

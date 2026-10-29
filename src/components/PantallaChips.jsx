@@ -2,6 +2,7 @@ import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'r
 import '../styles/salas.css'
 
 import BarraSuperior from './BarraSuperior'
+import HojaConfiguracion from './HojaConfiguracion'
 import CajaAccion from './CajaAccion'
 import { useDesborde } from '../hooks/useDesborde'
 import { IconoVolver, IconoCasa } from './IconosSalas'
@@ -43,6 +44,8 @@ import { useIdioma } from '../hooks/useIdioma'
 // video, los dos por el contexto del video (`hooks/useVideo.js`). `usePronto`
 // se queda sin consumidores y su `Provider` sale de aquí. El perfil y el ⚙
 // siguen diciendo «Pronto» con el aviso de esta carcasa.
+// CFG-1 1a · el ⚙ ya no: abre la hoja de configuración (`HojaConfiguracion`),
+// la misma del lobby. Sólo el perfil sigue en «Pronto» (lo abre la 1b).
 //
 // ── IOS-1 1e · LA ZONA ANCLADA ──────────────────────────────────────────────
 // Rector: AJILEI_IOS-1_Fase1e_v1.0.md (lámina `laminas/ios1d`, decisiones de
@@ -71,7 +74,7 @@ import { useIdioma } from '../hooks/useIdioma'
 // Rector: AJILEI_RNK-1_Fase1c-ii_v1.0.md §2.2. «Jugador no encontrado» sale por
 // este mismo toast (un aviso, un reloj), no por uno de la pantalla: con
 // `avisoRef`, la carcasa deja en `avisoRef.current.avisar(clave)` la misma
-// función que usan el avatar y el ⚙. Sin la prop, nada cambia.
+// función que usa el avatar (y hasta CFG-1 1a, el ⚙). Sin la prop, nada cambia.
 
 export default function PantallaChips({
   titulo,
@@ -99,6 +102,9 @@ export default function PantallaChips({
   children,
 }) {
   const { t } = useIdioma()
+  // CFG-1 1a · el ⚙ abre la hoja de configuración (antes, «Pronto»).
+  const [hojaAbierta, setHojaAbierta] = useState(false)
+  const ajustesRef = useRef(null)
   const cuerpo = useRef(null)
   useDesborde(cuerpo)
 
@@ -112,8 +118,8 @@ export default function PantallaChips({
 
   useEffect(() => () => clearTimeout(relojToast.current), [])
 
-  // Los dos accesos que quedan —el avatar y el ⚙— dicen lo mismo, así que hay
-  // UN aviso y no dos relojes. (El `+` dorado y el botón de Retar salieron de
+  // Los dos accesos que quedaban —el avatar y el ⚙— decían lo mismo, así que
+  // hay UN aviso y no dos relojes; desde CFG-1 1a el ⚙ abre la hoja. (El `+` dorado y el botón de Retar salieron de
   // aquí con ECO-1g: ver la cabecera.)
   const avisar = useCallback((claveTexto) => {
     setToast(claveTexto)
@@ -136,7 +142,9 @@ export default function PantallaChips({
         aviso={aviso}
         onAvisoFin={onAvisoFin}
         onPerfil={pronto}
-        onAjustes={pronto}
+        onAjustes={() => setHojaAbierta(true)}
+        ajustesRef={ajustesRef}
+        ajustesExpandido={hojaAbierta}
       />
 
       <div className="sal-cab">
@@ -185,6 +193,14 @@ export default function PantallaChips({
           </div>
         </section>
       </div>
+      {/* CFG-1 1a · la hoja del ⚙, la misma del lobby (`HojaConfiguracion`),
+          hija directa de `main.sal` y anclada a su relleno. */}
+      <HojaConfiguracion
+        abierta={hojaAbierta}
+        onCerrar={() => setHojaAbierta(false)}
+        ajustesRef={ajustesRef}
+        cuenta={cuenta}
+      />
     </main>
   )
 }

@@ -3,6 +3,7 @@ import '../styles/salas.css'
 import reversoUrl from '../assets/cards/reverso_carta.svg?no-inline'
 
 import BarraSuperior from '../components/BarraSuperior'
+import HojaConfiguracion from '../components/HojaConfiguracion'
 import {
   IconoVolver, IconoCasa, IconoCopiar, IconoCheck, IconoGlobo, IconoCompartir,
 } from '../components/IconosSalas'
@@ -92,6 +93,9 @@ export default function SalaEspera({
   onPartida,
 }) {
   const { t } = useIdioma()
+  // CFG-1 1a · el ⚙ abre la hoja de configuración (antes, «Pronto»).
+  const [hojaAbierta, setHojaAbierta] = useState(false)
+  const ajustesRef = useRef(null)
   const { play } = useSounds()
   const saldo = billetera?.saldo ?? null
   const uid = cuenta?.id ?? null
@@ -485,7 +489,9 @@ export default function SalaEspera({
         recordado={billetera?.recordado ?? null}
         cobrando={billetera?.pendiente === true}
         onPerfil={() => avisar('lob.toast.pronto')}
-        onAjustes={() => avisar('lob.toast.pronto')}
+        onAjustes={() => setHojaAbierta(true)}
+        ajustesRef={ajustesRef}
+        ajustesExpandido={hojaAbierta}
       />
 
       <div className="sal-cab">
@@ -668,6 +674,18 @@ export default function SalaEspera({
       <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
         {toast !== null ? t(toast.clave, toast.vars) : ' '}
       </div>
+      {/* CFG-1 1a · la hoja del ⚙, la misma del lobby. Va DESPUÉS de
+          `.sal-cuerpo`, hija directa de `main.sal`: su velo (z 6) y ella (z 7)
+          quedan por encima del cuerpo (z 1), y con él del velo y el diálogo de
+          «Cancelar», que viven DENTRO del cuerpo y no se tocan. «Cerrar
+          sesión» desde aquí sale como desde el lobby; la mesa en espera queda
+          a cargo del barrido del servidor (MES-PvP). */}
+      <HojaConfiguracion
+        abierta={hojaAbierta}
+        onCerrar={() => setHojaAbierta(false)}
+        ajustesRef={ajustesRef}
+        cuenta={cuenta}
+      />
     </main>
   )
 }

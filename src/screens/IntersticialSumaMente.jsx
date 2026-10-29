@@ -197,7 +197,8 @@ export default function IntersticialSumaMente({ idioma, onFin }) {
       </div>
 
       <div className="sm-acc">
-        <a className="sm-play" data-accion="sm-play" href={ENLACE_PLAY} target="_blank" rel="noopener noreferrer">
+        {/* CFG-1 1a · INV-45: abre la tienda; el toque no pide pantalla completa. */}
+        <a className="sm-play" data-accion="sm-play" href={ENLACE_PLAY} target="_blank" rel="noopener noreferrer" data-sin-pantalla-completa="">
           <b>{t('rnk.suma.boton')}</b>
           <small>{t('rnk.suma.boton.sub')}</small>
         </a>

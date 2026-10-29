@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import '../styles/salas.css'
 
 import BarraSuperior from '../components/BarraSuperior'
+import HojaConfiguracion from '../components/HojaConfiguracion'
 import CajaAccion from '../components/CajaAccion'
 import { cajaDeAccion } from '../components/zonaAccionCore'
 import { useDesborde } from '../hooks/useDesborde'
@@ -62,6 +63,9 @@ export default function SalaOpciones({
   onLobby,
 }) {
   const { t } = useIdioma()
+  // CFG-1 1a · el ⚙ abre la hoja de configuración (antes, «Pronto»).
+  const [hojaAbierta, setHojaAbierta] = useState(false)
+  const ajustesRef = useRef(null)
   // ECO-1b · `saldo` es lo que se pinta (o `null` mientras no se sabe);
   // `juicio` es contra qué se atenúan las mesas: sin cifra, contra nada
   // (`SIN_JUICIO`), y decide el servidor.
@@ -249,7 +253,9 @@ export default function SalaOpciones({
         recordado={billetera?.recordado ?? null}
         cobrando={billetera?.pendiente === true}
         onPerfil={() => avisar('lob.toast.pronto')}
-        onAjustes={() => avisar('lob.toast.pronto')}
+        onAjustes={() => setHojaAbierta(true)}
+        ajustesRef={ajustesRef}
+        ajustesExpandido={hojaAbierta}
       />
 
       <div className="sal-cab">
@@ -408,6 +414,14 @@ export default function SalaOpciones({
         </section>
 
       </div>
+      {/* CFG-1 1a · la hoja del ⚙, la misma del lobby (`HojaConfiguracion`),
+          hija directa de `main.sal` y anclada a su relleno. */}
+      <HojaConfiguracion
+        abierta={hojaAbierta}
+        onCerrar={() => setHojaAbierta(false)}
+        ajustesRef={ajustesRef}
+        cuenta={cuenta}
+      />
     </main>
   )
 }
