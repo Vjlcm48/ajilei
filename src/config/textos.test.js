@@ -176,6 +176,12 @@ describe('IDI-0 · diccionario es', () => {
     //     Retar: el mismo verbo para dos reintentos distintos (una recarga, una
     //     lectura), en dos pantallas. Misma razón que las dos de arriba.
     //
+    //   lob.toast.copiado = sal.espera.codigo.copiado  (CFG-1 1a)
+    //     «Copiado»: el aviso de la hoja ⚙ al copiar la dirección de soporte y
+    //     el del botón que copia el código de la sala. Dos superficies de dos
+    //     campañas; un idioma futuro puede querer «Dirección copiada» en una y
+    //     dejar la palabra suelta en la otra.
+    //
     //   sal.volver.aria = video.sin.volver  (ECO-1g)
     //     «Volver»: el nombre accesible de la flecha de las pantallas de chips y
     //     el botón del mensaje «Ahora no hay videos disponibles». Dos piezas de
@@ -194,6 +200,7 @@ describe('IDI-0 · diccionario es', () => {
       'lob.ajustes.aria = lob.cfg.titulo',
       'lob.cta.pvp = sal.opciones.titulo',
       'lob.nav.rankings = rnk.titulo',
+      'lob.toast.copiado = sal.espera.codigo.copiado',
       'sal.armar.abierta = sal.espera.tipo.abierta',
       'sal.armar.privada = sal.espera.tipo.privada',
       'sal.armar.titulo = sal.opciones.armar',

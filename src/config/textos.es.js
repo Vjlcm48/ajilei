@@ -53,6 +53,20 @@ export const TEXTOS_ES = {
   'lob.cfg.eliminar':    'Eliminar cuenta',
   'lob.acerca.sonidos':  'Sonidos y música:',
 
+  // CFG-1 1a · lo que la hoja ⚙ dice desde la 1a (rector §4). La dirección de
+  // soporte NO está aquí: es una constante (`config/soporte.js`), no un texto.
+  'lob.cfg.si':                    'Sí',
+  'lob.cfg.no':                    'No',
+  'lob.cfg.idioma.actual':         'Español',
+  'lob.cfg.sugerencia.escribir':   'Escribir correo',
+  'lob.cfg.sugerencia.copiar':     'Copiar correo',
+  'lob.cfg.sugerencia.asunto':     'Sugerencia · AJILEI {version}',
+  'lob.cfg.sugerencia.cuerpo':     'Jugador: {jugador}\nVersión: {version} · {commit}\nAparato: {aparato}\nIdioma: {idioma}\n\n',
+  'lob.toast.copiado':             'Copiado',
+  'lob.acerca.version':            'AJILEI {version} · {commit}',
+  'lob.ojito.ocultar':             'Ocultar saldo',
+  'lob.ojito.mostrar':             'Mostrar saldo',
+
   // Nombres accesibles. Van en el diccionario y no en el JSX por la misma razón
   // que los visibles: un `aria-label` es texto que un lector de pantalla LEE en
   // voz alta, así que traducirlo no es opcional. Los tres valores salen de los

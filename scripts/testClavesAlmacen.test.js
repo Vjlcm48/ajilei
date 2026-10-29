@@ -32,6 +32,7 @@ const CLAVES = [
   { clave: 'ajilei.dispositivo', almacen: 'local', fuente: 'ECO-1 Fase 1c (P-4) · dispositivo.js' },
   { clave: 'ajilei.saldoVisto', almacen: 'local', fuente: 'IOS-1 Fase 1c (S2) · saldoRecordado.js · solo para la vista, nadie juzga con ella' },
   { clave: 'ajilei.sumamente', almacen: 'local', fuente: 'RNK-1 Fase 1e · Rankings_v1.2 §6.7.1 · sumaContador.js · el contador del video de SumaMente, en el aparato' },
+  { clave: 'ajilei.saldoOculto', almacen: 'local', fuente: 'CFG-1 Fase 1a · Configuracion_v1.0 §6 · saldoOculto.js · el ojito de la píldora del lobby, en el aparato' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -47,6 +48,7 @@ const ACCESORES = [
   'src/lib/dispositivo.js',        // ajilei.dispositivo (ECO-1c, P-4)
   'src/lib/saldoRecordado.js',     // ajilei.saldoVisto (IOS-1c, S2)
   'src/lib/sumaContador.js',       // ajilei.sumamente (RNK-1 1e)
+  'src/lib/saldoOculto.js',        // ajilei.saldoOculto (CFG-1 1a)
 ]
 
 const fuentes = archivos('src', (n) => /\.(jsx?)$/.test(n) && !/\.test\.jsx?$/.test(n))
