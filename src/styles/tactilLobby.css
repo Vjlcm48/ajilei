@@ -1,0 +1,158 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   AJILEI · CFG-1 1a · tactilLobby.css · El piso de 44 fuera de la mesa
+   ────────────────────────────────────────────────────────────────────────────
+   Rector: AJILEI_CFG-1_Fase1a_v1.0.md §2.4 y §3.1. Lámina `laminas/cfg1a`,
+   `cfg1a.css` §1, §3 (V1 C) y §4, copiados SIN el prefijo de la lámina
+   (`html[data-cfg-…]`) y con la misma regla y la misma cifra.
+
+   GLOBAL, en `main.jsx` junto a las demás. ADITIVA ESTRICTA: sin
+   `!important`, sin reescribir un selector de `lobby.css` ni de `salas.css`.
+   CARGA ANTES QUE ELLAS (`main.jsx` la importa antes que `App`, y `lobby.css`
+   y `salas.css` llegan con sus pantallas), así que NO gana por orden: cada
+   regla que corrige otra la supera en especificidad, y se dice dónde.
+
+   DÓNDE VALE · el lobby (`.lobby`) y las cuatro pantallas de la carcasa
+   anclada (`.sal.es-anclada`: Retar, Salas, Armar mesa, Rankings). La Sala de
+   espera y el stub de PvP (`.sal` a secas) quedan FUERA de la pasada de 44
+   (decisión sellada, §0): la Sala de espera monta su velo y su diálogo de
+   «Cancelar» dentro de `.sal-cuerpo` y subir allí la barra los taparía; se
+   resuelve en MES-PvP.
+
+   SIN `pointer: coarse`: la zona vale también con ratón. La Fase 0 midió lo
+   mismo con y sin puntero grueso, y en escritorio los botones ya miden 44 o
+   más, así que el pseudo vale 0 y no hace nada.
+
+   Secciones: 1 · el ojito  ·  2 · la cifra tapada  ·  3 · el camino Z
+              4 · las capas  ·  5 · R-9, la casa y la flecha en 360
+   ════════════════════════════════════════════════════════════════════════════ */
+
+
+/* ══ 1 · EL OJITO ════════════════════════════════════════════════════════════
+   Sólo existe en la píldora del lobby (`BarraSuperior` lo pinta sólo con
+   `onOjito`, INV-69). Entre la moneda y la cifra, dentro del `gap` de
+   `BalanceDisplay` (V1-C). Glifo de línea medido en `em` con la cifra, como el
+   «+» (LOB-1 §1.9): crece y encoge con la píldora. Tenue, ni oro (INV-08) ni
+   crema macizo. Su zona táctil es la de §… de la 1a-ii (`::after` de 44). */
+.lobby .lob-ojo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.5em;
+  height: 1.5em;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.lobby .lob-ojo .lob-ico { width: 1.15em; height: 1.15em; }
+.lobby .lob-ojo:hover,
+.lobby .lob-ojo:focus-visible { color: var(--text-secondary); }
+
+
+/* ══ 2 · LA CIFRA, EN SU CAJA DE 4,6 ch, ABIERTA O TAPADA ═══════════════════
+   La caja de ancho fijo es la que el hueco «—» ya tenía (`lobby.css:238`,
+   ECO-1b): lo que mide «2.500» en cifras tabulares. En el lobby vale SIEMPRE,
+   abierta o tapada, para que los puntos no delaten cuántos dígitos hay
+   detrás: con 9 HC la caja mide lo mismo que con 2.500 (decisión sellada,
+   §0). Por encima de cuatro dígitos la caja crece con la cifra, abierta y
+   tapada igual (O1 manda sobre el disimulo).
+   Tapada, la cifra sigue en su sitio, invisible y fuera del árbol de
+   accesibilidad (`aria-hidden` en `.pil-tapada`), y los puntos se pintan
+   encima, centrados: mientras la píldora cuenta (aviso de saldo, celebración
+   del video), la cifra de debajo cambia y los puntos no se mueven. */
+.lobby .lob-pildora .bd-num {
+  display: inline-block;
+  min-inline-size: 4.6ch;
+  text-align: center;
+}
+.lobby .lob-pildora[data-saldo-oculto] .bd-num {
+  position: relative;
+  /* Posicionada, la cifra pinta encima del `::after` del ojito y se comía su
+     zona (MEDIDO en la lámina: 35 en vez de 44). La cifra no es tocable. */
+  pointer-events: none;
+}
+.lobby .lob-pildora[data-saldo-oculto] .pil-tapada { visibility: hidden; }
+.lobby .lob-pildora[data-saldo-oculto] .bd-num::after {
+  content: "••••";
+  /* Texto alternativo vacío: los puntos son dibujo, no algo que leer. Quien
+     no entiende la sintaxis se queda con la línea de arriba. */
+  content: "••••" / "";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+}
+
+
+/* ══ 3 · EL CAMINO Z · ZONA DE 44 SIN MOVER LO QUE SE VE ═════════════════════
+   Molde de la tarjeta de recarga (`tactil.css:94-107`) y de PAN-1 1b: un
+   `::after` transparente que crece `min(0, 50% − 22px)` por lado. Si el botón
+   ya mide 44 o más, el pseudo vale 0. Lo de dentro (el icono, la cifra) no se
+   mueve un píxel: la zona es invisible y está DETRÁS del dibujo en el orden
+   de pintura, pero delante en el de toque, porque es del mismo botón.
+   `position: relative` en los que no tenían posición; ninguno traía `top` ni
+   `left`, así que no se desplazan (comprobado: ninguna regla de la casa les
+   da desplazamiento). */
+:is(.lobby, .sal.es-anclada) :is(.lob-ajustes, .lob-perfil),
+:is(.lobby, .sal.es-anclada) .lob-pildora .lob-mas,
+.sal.es-anclada :is(.sal-volver, .sal-chip, .sal-paso, .sal-unir) {
+  position: relative;
+}
+:is(.lobby, .sal.es-anclada) :is(.lob-ajustes, .lob-perfil)::after,
+:is(.lobby, .sal.es-anclada) .lob-pildora .lob-mas::after,
+.lobby .lob-pildora .lob-ojo::after,
+.sal.es-anclada :is(.sal-volver, .sal-casa, .sal-chip, .sal-paso, .sal-unir)::after {
+  content: "";
+  position: absolute;
+  inset: min(0px, calc(50% - 22px));
+}
+/* La casa de la carcasa anclada sube a la fila de la flecha con `position:
+   static` (`salas.css:1660`, (0,4,0)). Sin posición, su `::after` se colgaba
+   de un ancestro: MEDIDO en la lámina, 216×38 de zona sobre la flecha, que se
+   quedaba sin un píxel tocable. `inset: auto` porque la casa trae `left` y
+   `bottom` de su colocación absoluta (`salas.css:686-699`): con `relative` se
+   aplicarían como desplazamiento (MEDIDO: +12,6 px a la derecha y −12,6
+   arriba, montada sobre el ⚙). `button.` sube a (0,4,1) y le gana. */
+.sal.es-anclada .sal-cab button.sal-casa { position: relative; inset: auto; }
+/* El «+» del lobby, por encima de la ficha de la constancia, que va DESPUÉS
+   en el DOM y a 2 u de la píldora: su primera pepita se comía 1,4 px del
+   borde derecho de la zona (MEDIDO en 360: 42 efectivos). `z-index` sólo
+   ordena el toque y el pseudo transparente; el «+» y la ficha no se tocan a
+   la vista. */
+.lobby .lob-pildora .lob-mas { z-index: 1; }
+
+
+/* ══ 4 · LAS CAPAS · cada fila por encima de la que viene después ═══════════
+   `lob-top`, `lob-centro`, `sal-cab` y `sal-cuerpo` comparten `z-index: 1`
+   (`lobby.css:170-172`, `salas.css:166-168`) y gana el último en el DOM: la
+   caja del centro del lobby se comía los 2–3 px de abajo de las zonas de la
+   barra (MEDIDO: 42 en vez de 44 en 360) y la del cuerpo, 4–8 px de las de la
+   casa y la flecha (MEDIDO: 36). La hoja (7), el velo (6) y los avisos siguen
+   por encima. `main.lobby` (0,2,1) y `.sal.es-anclada` (0,3,0) superan a las
+   reglas de origen, (0,2,0).
+   La Sala de espera NO entra (ver la cabecera). El mini-perfil de Rankings va
+   por portal (`MiniPerfil.jsx:109`): no le afecta. */
+main.lobby > .lob-top { z-index: 2; }
+.sal.es-anclada > .lob-top { z-index: 3; }
+.sal.es-anclada > .sal-cab { z-index: 2; }
+
+
+/* ══ 5 · R-9 · LA CASA Y LA FLECHA, HACIA ABAJO, POR DEBAJO DE 390 ═══════════
+   En 360 la barra y la fila de la flecha quedan tan juntas que sus zonas de
+   44 se pisaban 3,7 px (⚙ con casa, avatar con flecha; lámina y `cfg.solape`).
+   La zona de la casa y la de la flecha sigue midiendo 44 de alto, pero crece
+   como mucho 2 px hacia arriba y el resto hacia abajo, donde no hay nada
+   tocable hasta el cuerpo. Las cifras salen de la medida (`cfg.solape`
+   = 0 y `cfg.zona` ≥ 44 en 360×640), no del cálculo: con −2 arriba queda
+   0,6 px de aire con la zona de la barra. Desde 390 no hace falta (medido). */
+@media (max-width: 389.98px) {
+  .sal.es-anclada .sal-cab :is(.sal-volver, .sal-casa)::after {
+    top: max(-2px, min(0px, calc(50% - 22px)));
+    bottom: calc(min(0px, calc(100% - 44px)) - max(-2px, min(0px, calc(50% - 22px))));
+  }
+}

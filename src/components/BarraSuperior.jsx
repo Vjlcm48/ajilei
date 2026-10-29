@@ -4,7 +4,7 @@ import BalanceDisplay from './BalanceDisplay'
 import AvisoSaldo from './AvisoSaldo'
 import FichaConstancia from './FichaConstancia'
 import { SoundButton } from './SoundButton'
-import { IconoUsuario, IconoMas, IconoAjustes } from './IconosLobby'
+import { IconoUsuario, IconoMas, IconoAjustes, IconoOjo, IconoOjoTachado } from './IconosLobby'
 import { montoTexto } from '../config/tapetes'
 import { useIdioma } from '../hooks/useIdioma'
 import { useSounds } from '../hooks/useSounds'
@@ -87,6 +87,12 @@ export default function BarraSuperior({
   // `undefined` = esta pantalla no la lleva (sólo el lobby la pasa); `null` =
   // el lobby la lleva pero aún no se sabe (caja reservada, O1).
   constancia,
+  // CFG-1 1a · el ojito (lámina `laminas/cfg1a`, V1-C). SÓLO el lobby pasa
+  // `onOjito`; sin él no se pinta, y por construcción Retar, Salas, Armar
+  // mesa, la Sala de espera, PvP y Rankings enseñan la cifra como siempre
+  // (INV-69). `saldoOculto` sin `onOjito` no tapa nada.
+  saldoOculto = false,
+  onOjito,
 }) {
   const { t } = useIdioma()
   const { play } = useSounds()
@@ -123,6 +129,28 @@ export default function BarraSuperior({
     ? <span className="pil-puntos" aria-hidden="true"><i /><i /><i /></span>
     : conRecuerdo ? montoTexto(recordado) : sinCifra ? '—' : montoTexto(cifra)
 
+  // ── CFG-1 1a · El ojito ───────────────────────────────────────────────────
+  // Tapa la cifra SIEMPRE que esté cerrado: también mientras cuenta (el aviso
+  // de saldo y la celebración del video pasan por `numero` igual que el
+  // saldo). La cifra NO sale del DOM: se queda en su caja, invisible y fuera
+  // del árbol de accesibilidad, y los puntos se pintan encima desde
+  // `tactilLobby.css` §4. Así la caja mide lo mismo abierta y tapada (O1) y el
+  // ancho no delata cuántos dígitos hay detrás. No es oro (INV-08): es el
+  // tenue de la cifra.
+  const conOjito = typeof onOjito === 'function'
+  const tapada = conOjito && saldoOculto === true
+  const ojito = conOjito ? (
+    <SoundButton
+      className="lob-ojo"
+      data-accion="ojito"
+      aria-pressed={tapada}
+      aria-label={t(tapada ? 'lob.ojito.mostrar' : 'lob.ojito.ocultar')}
+      onClick={onOjito}
+    >
+      {tapada ? <IconoOjoTachado /> : <IconoOjo />}
+    </SoundButton>
+  ) : null
+
   return (
     <header className="lob-top">
       <SoundButton
@@ -145,6 +173,7 @@ export default function BarraSuperior({
         data-saldo-vacio={sinCifra ? '' : undefined}
         data-saldo-recordado={conRecuerdo ? '' : undefined}
         data-saldo-cobrando={enCobro ? '' : undefined}
+        data-saldo-oculto={tapada ? '' : undefined}
         aria-busy={sinCifra && estadoSaldo !== 'error' ? 'true' : undefined}
       >
         {/* ECO-1b · la cifra es la de la billetera (ver la cabecera). Sin cifra,
@@ -162,7 +191,11 @@ export default function BarraSuperior({
           ref={monedaRef}
           className={`lob-moneda${avisoVivo.vivo || brillaVideo ? ' avs-viva' : ''}${avisoVivo.brilla || brillaVideo ? ' avs-brilla' : ''}`}
         >
-          <BalanceDisplay chips={numero} size="icon" />
+          <BalanceDisplay
+            chips={tapada ? <span className="pil-tapada" aria-hidden="true">{numero}</span> : numero}
+            size="icon"
+            junto={ojito}
+          />
         </span>
         <SoundButton
           className="lob-mas"

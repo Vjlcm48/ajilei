@@ -254,6 +254,12 @@
      llevan CUATRO de las cinco entradas: Reacciones, Tapetes, Saldo y Mano
      actual. Se encienden en MOV-1b. */
   .util-item.is-disabled { opacity: 0.45; cursor: default; }
+  /* CFG-1 1a · el sonido apagado. `UtilitiesMenu` ya ponía `is-off` y ninguna
+     hoja le daba regla (Fase 0 B-1): se atenúa el ICONO, no la fila —la
+     entrada sigue viva, no es `is-disabled`—. Es el mismo estado que la
+     pastilla «No» de la hoja ⚙ (INV-68); la piel de escritorio lleva la suya
+     en `hojaConfiguracion.css` §6. */
+  .util-item-sound.is-off .util-ico { opacity: 0.5; }
 
   /* "Mano actual" cierra el panel separada del grupo: filete del sistema + aire.
      A diferencia de escritorio NO se le devuelve `opacity: 1` a la fila, y es

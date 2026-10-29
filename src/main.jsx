@@ -18,6 +18,10 @@ import './styles/tapetes.css'
 // El sitio en esta lista es DOCUMENTACIÓN, no mecanismo: la hoja gana por
 // especificidad y no por orden de carga (ver su encabezado).
 import './styles/menuMovil.css'
+// CFG-1 1a · el piso táctil de 44 fuera de la mesa (lobby y `.sal`) y el
+// ojito de la píldora. Global porque cruza siete pantallas que no comparten
+// árbol; gana por especificidad, no por orden de carga (ver su cabecera).
+import './styles/tactilLobby.css'
 import App from './App.jsx'
 import { SoundProvider } from './context/SoundContext.jsx'
 import EsperaDiferida from './components/EsperaDiferida'

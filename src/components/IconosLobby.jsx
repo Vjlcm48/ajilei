@@ -135,3 +135,27 @@ export function IconoPersonas({ className }) {
     </svg>
   )
 }
+
+// CFG-1 1a · El ojito de la píldora del lobby (lámina `laminas/cfg1a`, V1-C).
+// Dos dibujos y no uno con una raya superpuesta: el tachado lleva el contorno
+// partido donde lo cruza la diagonal, que es como se lee «oculto» a 15 px.
+// Abierto = la cifra se ve (tocar la tapa); tachado = tapada (tocar la enseña).
+export function IconoOjo({ className }) {
+  return (
+    <svg {...COMUN} className={clase('ojo', className)}>
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+export function IconoOjoTachado({ className }) {
+  return (
+    <svg {...COMUN} className={clase('ojo-no', className)}>
+      <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19" />
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+      <path d="M17.94 17.94A9.9 9.9 0 0 1 12 20c-6.4 0-10-8-10-8a17.8 17.8 0 0 1 4.06-5.94" />
+      <path d="M2 2l20 20" />
+    </svg>
+  )
+}

@@ -24,15 +24,17 @@ import { SoundButton } from '../components/SoundButton'
 // escrito el marcado. `BalanceDisplay`, `montoTexto`, `IconoMas` e
 // `IconoAjustes` se fueron con él y por eso ya no se importan aquí.
 import BarraSuperior from '../components/BarraSuperior'
+// CFG-1 1a · la hoja del ⚙ se fue a su componente: la montan también las seis
+// pantallas de `.sal`. Con ella se fueron los créditos y `enmascararCorreo`.
+import HojaConfiguracion from '../components/HojaConfiguracion'
 import {
-  IconoUsuario, IconoTrofeo, IconoTienda, IconoLibro, IconoPersonas,
+  IconoTrofeo, IconoTienda, IconoLibro, IconoPersonas,
 } from '../components/IconosLobby'
 import ChipToken from '../components/ChipToken'
-import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { useIdioma } from '../hooks/useIdioma'
-import { enmascararCorreo, atributosHoja } from '../hooks/lobbyCore'
 import { useSounds, precargarSonidos, SONIDOS_LOBBY } from '../hooks/useSounds'
 import { precargarMesa } from '../lib/cargarMesa'
+import { saldoOculto as ojitoGuardado } from '../lib/saldoOculto'
 
 // ── El isotipo del lobby ────────────────────────────────────────────────────
 // `?no-inline` por el mismo motivo que `ChipToken` y `Wordmark`: el nombre del
@@ -71,17 +73,25 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // Vivas: el CTA (→ `NivelSelect`), el ⚙ (abre la hoja), «Cerrar sesión» y
 // «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
+// CFG-1 1a · en la hoja ya sólo dicen «Pronto» Idioma y Eliminar cuenta, y lo
+// dicen con el aviso de la hoja (`HojaConfiguracion`), no con éste.
 
 export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onRankings, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
   const [hojaAbierta, setHojaAbierta] = useState(false)
-  const [acercaAbierto, setAcercaAbierto] = useState(false)
   const [toastVivo, setToastVivo] = useState(false)
+  // CFG-1 1a · el ojito. Se lee UNA vez al montar (dato de arranque, como el
+  // idioma) y se escribe al tocarlo: recargar la página lo deja como estaba.
+  const [saldoOculto, setSaldoOculto] = useState(() => ojitoGuardado.leer())
+  const alternarOjito = () => {
+    const nuevo = !saldoOculto
+    ojitoGuardado.guardar(nuevo)
+    setSaldoOculto(nuevo)
+  }
 
   const ajustesRef = useRef(null)
-  const tituloHojaRef = useRef(null)
   // GT-HIG · TODO reloj lleva handle y se cancela. El censo de FRZ-1 §1.3
   // encontró nueve `setTimeout` sueltos; ninguno nuevo se suma a esa lista.
   const relojToast = useRef(null)
@@ -113,26 +123,8 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
   // El reloj del toast, con su cancelación en el desmontaje.
   useEffect(() => () => clearTimeout(relojToast.current), [])
 
-  // ── Foco de la hoja ───────────────────────────────────────────────────────
-  // Al abrir, el foco entra en el título (que por eso lleva `tabIndex={-1}`);
-  // al cerrar, vuelve al ⚙ que la abrió. Sin lo segundo, cerrar con `Escape`
-  // deja el foco en el <body> y la siguiente tabulación empieza por la esquina
-  // superior de la página — el jugador de teclado pierde su sitio.
-  useEffect(() => {
-    if (hojaAbierta) tituloHojaRef.current?.focus()
-    else if (document.body.classList.contains('lobby-hoja-abierta')) ajustesRef.current?.focus()
-    document.body.classList.toggle('lobby-hoja-abierta', hojaAbierta)
-  }, [hojaAbierta])
-
-  // `Escape` cierra la hoja. Se suscribe sólo mientras está abierta: un oyente
-  // global permanente para una tecla que sólo significa algo en un estado es
-  // trabajo que el navegador hace en cada pulsación de todo el lobby.
-  useEffect(() => {
-    if (!hojaAbierta) return
-    const alPulsar = (e) => { if (e.key === 'Escape') setHojaAbierta(false) }
-    document.addEventListener('keydown', alPulsar)
-    return () => document.removeEventListener('keydown', alPulsar)
-  }, [hojaAbierta])
+  // El foco de la hoja (entra en el título, vuelve al ⚙), `Escape` y la clase
+  // `lobby-hoja-abierta` del <body> viven ahora en `HojaConfiguracion`.
 
   const pronto = () => {
     setToastVivo(true)
@@ -150,18 +142,9 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
     onJugarIA?.()
   }
 
-  const cerrarSesion = () => {
-    setHojaAbierta(false)
-    onCerrarSesion?.()
-  }
-
-  // O1 · el bloque de cuenta RESERVA SU CAJA aunque no haya cuenta. Con el
-  // bypass de desarrollo `cuenta` llega con `username` de mentira y correo
-  // vacío; sin sesión no se llega aquí. En cualquier caso el nombre y el correo
-  // ocupan su sitio y sólo se apagan con `visibility`, para que el lobby mida lo
-  // mismo en los dos casos y las capturas del arnés sean comparables.
+  // O1 · el nombre RESERVA SU CAJA aunque no haya cuenta (bypass): se apaga
+  // con `visibility` y el lobby mide lo mismo con cuenta y sin ella.
   const usuario = cuenta?.username ?? ''
-  const correo = enmascararCorreo(cuenta?.correo)
 
   return (
     <main className="lobby">
@@ -202,6 +185,10 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
         onAjustes={() => setHojaAbierta(true)}
         ajustesRef={ajustesRef}
         ajustesExpandido={hojaAbierta}
+        // CFG-1 1a · el ojito: SÓLO aquí (INV-69). Ninguna otra pantalla pasa
+        // `onOjito`, y sin él la barra no lo pinta.
+        saldoOculto={saldoOculto}
+        onOjito={alternarOjito}
       />
 
       {/* ── Centro ─────────────────────────────────────────────────────── */}
@@ -281,91 +268,15 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
       </nav>
 
       {/* ── Hoja de configuración ──────────────────────────────────────── */}
-      {/* El velo NO es un botón y por eso no anuncia nada: cerrar tocando fuera
-          es un atajo de puntero, y el camino accesible equivalente —`Escape` y
-          el propio foco atrapado en la hoja— ya existe. */}
-      <div
-        className={`lob-velo${hojaAbierta ? ' is-on' : ''}`}
-        onClick={() => setHojaAbierta(false)}
-        aria-hidden="true"
+      {/* CFG-1 1a · el componente de todas las pantallas. Va DENTRO de
+          `main.lobby`, como antes: la hoja se ancla al relleno del lienzo. */}
+      <HojaConfiguracion
+        abierta={hojaAbierta}
+        onCerrar={() => setHojaAbierta(false)}
+        ajustesRef={ajustesRef}
+        cuenta={cuenta}
+        onCerrarSesion={onCerrarSesion}
       />
-      <aside
-        className={`lob-hoja${hojaAbierta ? ' is-on' : ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="lob-hoja-t"
-        // La hoja existe SIEMPRE en el DOM —se mueve con `transform`, que es lo
-        // que le da su transición— así que fuera de su estado abierto se retira
-        // del árbol de accesibilidad y del orden de tabulación. Sin esto, un
-        // jugador de teclado tabularía a través de siete controles invisibles.
-        // `atributosHoja` (lobbyCore) dice cuáles, y por qué `inert` es `true`.
-        {...atributosHoja(hojaAbierta)}
-      >
-        <h2 id="lob-hoja-t" className="lob-hoja-t" tabIndex={-1} ref={tituloHojaRef}>
-          {t('lob.cfg.titulo')}
-        </h2>
-
-        <div className="lob-hoja-cuenta">
-          <span className="lob-avatar" aria-hidden="true"><IconoUsuario /></span>
-          <span>
-            <b className={usuario ? '' : 'lob-hueco'}>{usuario || ' '}</b>
-            <br />
-            <span className={`lob-hoja-correo${correo ? '' : ' lob-hueco'}`}>{correo || ' '}</span>
-          </span>
-        </div>
-
-        <SoundButton className="lob-fila" data-accion="cfg-sonido" onClick={pronto}>
-          <span>{t('lob.cfg.sonido')}</span><span className="lob-pastilla">{t('lob.toast.pronto')}</span>
-        </SoundButton>
-        <SoundButton className="lob-fila" data-accion="cfg-idioma" onClick={pronto}>
-          <span>{t('lob.cfg.idioma')}</span><span className="lob-pastilla">{t('lob.toast.pronto')}</span>
-        </SoundButton>
-        <SoundButton className="lob-fila" data-accion="cfg-sugerencias" onClick={pronto}>
-          <span>{t('lob.cfg.sugerencias')}</span><span className="lob-pastilla">{t('lob.toast.pronto')}</span>
-        </SoundButton>
-
-        <SoundButton className="lob-fila" data-accion="cerrar-sesion" onClick={cerrarSesion}>
-          <span>{t('lob.cfg.salir')}</span>
-        </SoundButton>
-
-        <SoundButton
-          className="lob-fila"
-          data-accion="acerca"
-          aria-expanded={acercaAbierto}
-          aria-controls="lob-acerca"
-          onClick={() => setAcercaAbierto(v => !v)}
-        >
-          <span>{t('lob.cfg.acerca')}</span>
-          <span className="lob-chev" aria-hidden="true">›</span>
-        </SoundButton>
-
-        {/* ── Los créditos, con la licencia dentro ───────────────────────
-            El CC BY de los emoji NO es adorno ni cortesía: la licencia lo exige
-            y un comentario en código no la cumple (lección de la lámina GNU,
-            Diseno_Landscape §10.3; DSK-U2c la puso al pie de la Bienvenida). La
-            Bienvenida sale del recorrido con esta tanda, así que el crédito se
-            muda AQUÍ — visible, a un toque, y desde el día uno. */}
-        <div className="lob-acerca" id="lob-acerca" hidden={!acercaAbierto}>
-          <p>by HEPTACREATION</p>
-          <p>
-            {CREDITOS_EMOJI.etiqueta}{' '}
-            <a href={CREDITOS_EMOJI.url} target="_blank" rel="noopener noreferrer">
-              {CREDITOS_EMOJI.obra}
-            </a>
-            {' '}· {CREDITOS_EMOJI.licencia}
-          </p>
-          <p>
-            {t('lob.acerca.sonidos')}{' '}
-            {AUTORES_PIXABAY.join(', ')} — {LICENCIA_PIXABAY}.
-          </p>
-        </div>
-
-        <SoundButton className="lob-fila lob-fila-peligro" data-accion="eliminar-cuenta" onClick={pronto}>
-          {/* CUENTA-DEL: Edge Function con clave de servicio; borrado de perfil,
-              registros y auth; grace period por decidir. */}
-          <span>{t('lob.cfg.eliminar')}</span><span className="lob-pastilla">{t('lob.toast.pronto')}</span>
-        </SoundButton>
-      </aside>
 
       {/* Un solo toast para los diez avisos. `role="status"` + `aria-live` lo
           anuncia sin robar el foco; la caja se reserva siempre y sólo se apaga

@@ -511,16 +511,9 @@ body.lobby-activa #root {
 /* ARN-3d §2.2 (B10) · aquí vivían las tres reglas del acceso «Jugar contra
    jugadores» de antes de AJF-1: sin consumidor desde que ese botón viste
    `.lob-cta-jugadores` (§3.1), y retiradas en esta tanda. */
-/* La pastilla «Próximamente» / «Pronto». Un solo estilo para las cinco. Viva en
-   la hoja ⚙ y en el toast. */
-.lobby .lob-pastilla {
-  font-size: 0.78em;
-  color: var(--text-muted);
-  border: 1px solid var(--lob-linea);
-  border-radius: 999px;
-  padding: 0.12em 0.7em;
-  white-space: nowrap;
-}
+/* CFG-1 1a · la pastilla «Pronto» (y ahora «Sí» / «No») se mudó con la hoja
+   del ⚙ a `hojaConfiguracion.css` §1: sólo la usa la hoja, y la hoja ya no es
+   sólo del lobby. */
 
 
 /* ══ 6 · BARRA INFERIOR ════════════════════════════════════════════════════ */
@@ -557,165 +550,13 @@ body.lobby-activa #root {
 
 
 /* ══ 7 · HOJA DE CONFIGURACIÓN ═════════════════════════════════════════════
-   UNA sola conducta en todos los viewports (ficha v1.2 §1.9c): la hoja nace del
-   engranaje y se ancla a él. El `@media (min-width: 900px)` que partía la pieza
-   en dos colocaciones se retiró en la v1.4.
+   CFG-1 1a · se mudó entera a `hojaConfiguracion.css`, con el componente
+   `HojaConfiguracion.jsx`: el ⚙ abre LA MISMA hoja en el lobby y en las seis
+   pantallas de `.sal`. Mismas clases (`lob-velo`, `lob-hoja`, `lob-fila`…),
+   mismo cuerpo de regla y misma especificidad, con el alcance ampliado a
+   `:is(.lobby, .sal)`. Lo que cambió va dicho allí: filas a 44 visibles,
+   cabecera fija y cuerpo desplazable, y el anclaje al relleno de la pantalla.
    ═══════════════════════════════════════════════════════════════════════════ */
-.lobby .lob-velo {
-  position: fixed;
-  inset: 0;
-  z-index: 6;
-  /* La lámina pide `rgba(9,23,14,.6)`: el `--green-abyss` al 60 %. Ese alfa no
-     es ninguna de las dos tintas de zona que la casa tenía (.45 y .30), así que
-     hasta A1 el velo iba con `--surface-area` y quedaba un punto más claro.
-     Victor autorizó el token que faltaba (A1 §2b) y ahora el velo es el de la
-     lámina, escrito desde `theme.css` y sin un solo hex aquí. */
-  background: rgba(var(--green-abyss-rgb), 0.6);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease, visibility 0s 0.2s;
-}
-.lobby .lob-velo.is-on { opacity: 1; visibility: visible; transition-delay: 0s; }
-
-/* ── UNA SOLA CONDUCTA EN TODOS LOS VIEWPORTS ────────────────────────────────
-   La v1.3 tenía dos: hoja inferior en móvil, flotante en escritorio. La v1.4 las
-   funde en una — la hoja NACE DEL ENGRANAJE y cae hacia abajo, en los seis
-   viewports—, y el cambio no es cosmético: dos colocaciones son dos geometrías
-   que hay que medir por separado, y una de ellas (la de abajo) no explicaba de
-   dónde salía el panel. Con `transform-origin: top right` bajo el ⚙, el gesto
-   dice quién lo abrió.
-
-   EL ANCLAJE ES ARITMÉTICA, NO UN NÚMERO: el borde superior cae a la altura del
-   ⚙ más 1,5 u de aire, y el ⚙ mide `--ico-caja`. Si mañana cambia `--ico`, la
-   hoja lo sigue sola. El borde derecho comparte exactamente el relleno del
-   lienzo, así que queda a plomo con el botón — es lo que mide `lob.6`.        */
-.lobby .lob-hoja {
-  /* ── `absolute` Y NO `fixed`, Y ES UNA CORRECCIÓN MEDIDA ──────────────────
-     La lámina v1.4 escribe `position: fixed` con `right: pad`. Eso ancla la
-     hoja al VIEWPORT, mientras que el ⚙ vive dentro del lienzo, que lleva
-     `max-width: 213u` y `margin: 0 auto`. En cuanto la ventana es más ancha que
-     el lienzo, los dos bordes dejan de coincidir — MEDIDO por `lob.6`:
-     6,66px de desvío a 844×390, 44 a 1366×768 y **321 a 1920×937**, o sea la
-     hoja saliendo de un engranaje que está a un palmo de distancia.
-
-     Con `absolute`, el bloque contenedor pasa a ser `.lobby` —que ya es
-     `position: relative`— y las dos fórmulas de la lámina se vuelven exactas sin
-     cambiar un número: el borde derecho de un absoluto con `right: X` cae en
-     `padding-box.right − X`, y el ⚙ cae en ese mismo punto por ser el último
-     elemento de una barra que ocupa la caja de contenido. Δ medido: 0px en los
-     seis viewports. La lámina describía bien la intención; su `fixed` no la
-     cumplía fuera de un móvil.
-
-     El velo SÍ se queda `fixed`: tiene que oscurecer la ventana entera, no el
-     lienzo. */
-  position: absolute;
-  z-index: 7;
-  top: calc(
-    env(safe-area-inset-top, 0px) + var(--lob-pad) + var(--ico-caja) + var(--u) * 1.5
-  );
-  right: calc(env(safe-area-inset-right, 0px) + var(--lob-pad));
-  width: min(calc(100% - 2 * var(--lob-pad)), calc(var(--u) * 76));
-  background: var(--surface-modal);
-  border: 1px solid var(--lob-linea);
-  border-radius: calc(var(--u) * 3);
-  padding: calc(var(--u) * 3) calc(var(--u) * 4);
-  transform-origin: top right;
-  transform: translateY(-6px) scale(0.96);
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 0.18s ease,
-    visibility 0s 0.2s;
-  /* Techo y desplazamiento interno: en un teléfono acostado de 360px de alto la
-     hoja lleva siete filas y NO cabe. Recortarla como hace el lienzo dejaría
-     «Eliminar cuenta» fuera de alcance; aquí el desplazamiento sí es correcto,
-     porque un panel es una lista y una lista se recorre. */
-  max-height: calc(100dvh - var(--u) * 20);
-  overflow: auto;
-  text-align: left;
-}
-.lobby .lob-hoja.is-on {
-  transform: translateY(0) scale(1);
-  opacity: 1;
-  visibility: visible;
-  transition-delay: 0s;
-}
-
-.lobby .lob-hoja-t {
-  font-size: calc(var(--u) * 3.6);
-  font-weight: 500;
-  color: var(--text-primary);
-  letter-spacing: normal;
-  margin: 0 0 calc(var(--u) * 2.5);
-  line-height: 1.2;
-}
-/* Recibe el foco al abrir (`tabIndex={-1}`) y por eso necesita anillo propio:
-   sin él, quien navega con teclado no vería dónde ha aterrizado. */
-.lobby .lob-hoja-t:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 4px; }
-
-.lobby .lob-hoja-cuenta {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--u) * 2);
-  padding-bottom: calc(var(--u) * 2.5);
-  margin-bottom: calc(var(--u) * 1.5);
-  border-bottom: 1px solid var(--lob-linea);
-  font-size: calc(var(--u) * 3.3);
-  color: var(--text-secondary);
-}
-.lobby .lob-hoja-cuenta b { font-weight: 500; color: var(--text-primary); }
-.lobby .lob-hoja-correo { font-size: 0.85em; }
-
-.lobby .lob-fila {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: calc(var(--u) * 2);
-  background: none;
-  border: 0;
-  color: var(--text-primary);
-  font: inherit;
-  cursor: pointer;
-  font-size: calc(var(--u) * 3.4);
-  /* 2,4·u de relleno vertical sobre 3,4·u de texto deja la fila por encima de
-     los 44px de objetivo táctil en todo el rango de `--u`. */
-  padding: calc(var(--u) * 2.4) 0;
-  text-align: left;
-}
-.lobby .lob-chev {
-  color: var(--text-muted);
-  font-size: 1.3em;
-  transition: transform 0.18s ease;
-}
-.lobby .lob-fila[aria-expanded="true"] .lob-chev { transform: rotate(90deg); }
-
-.lobby .lob-acerca {
-  font-size: calc(var(--u) * 2.6);
-  font-weight: 400;
-  color: var(--text-muted);
-  line-height: 1.45;
-  padding: 0 0 calc(var(--u) * 2) var(--u);
-}
-.lobby .lob-acerca p + p { margin-top: calc(var(--u) * 1.2); }
-.lobby .lob-acerca a { color: inherit; text-decoration: underline; }
-.lobby .lob-acerca a:hover,
-.lobby .lob-acerca a:focus-visible { color: var(--text-secondary); }
-
-/* La única fila roja de la app fuera de la mesa. `--loss-red` y no un rojo
-   nuevo: la app ya tiene su rojo de pérdida y éste es del mismo peso. */
-.lobby .lob-fila-peligro {
-  color: var(--loss-red);
-  margin-top: calc(var(--u) * 1.5);
-  border-top: 1px solid var(--lob-linea);
-}
-
-/* NO HAY BLOQUE `@media (min-width: 900px)` PARA LA HOJA. Lo hubo hasta la v1.3
-   —flotante en escritorio, inferior en móvil— y la v1.4 lo suprime: la
-   colocación es una sola y ya la resuelve el anclaje de arriba, que es fórmula
-   sobre `--ico-caja` y `--lob-pad` y por tanto vale igual a 360 que a 1920. Un
-   media query aquí volvería a partir en dos una geometría que acaba de unirse. */
 
 
 /* ══ 8 · TOAST «PRONTO» ════════════════════════════════════════════════════
@@ -819,8 +660,7 @@ body.lobby-activa #root {
     filter: drop-shadow(0 0 calc(var(--u) * 2) rgba(var(--gold-brand-rgb), 0.35));
   }
   .lobby .lob-cta-ia { transition: none; }
-  .lobby .lob-hoja,
-  .lobby .lob-velo,
+  /* La hoja y su velo: `hojaConfiguracion.css` (CFG-1 1a). */
   .lobby .lob-toast { transition: none; }
 }
 
