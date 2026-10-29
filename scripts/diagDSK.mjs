@@ -11,7 +11,7 @@
 //   d3     → matriz de 4 viewports: bbox de mesa/óvalo/paneles/mazos/abanico/botones + overflow
 //   bug    → reproduce la revelación finalista y mide el reflow del panel ganador
 //   shots  → capturas de los 4 viewports (+ la del bug si 'bug' corre antes)
-//   humo   → d1d2 + d3 + bug + shots + gate + lob + retar + rnk + suma (~5 min). Es el modo
+//   humo   → d1d2 + d3 + bug + shots + gate + lob + retar + rnk + suma + cfg (~6 min). Es el modo
 //            por defecto. ARN-3e retiró `all`: tardaba ~43 min, 40 de `apu`, y
 //            no era «todo»; `apu` se corre por su nombre.
 //   gate [tag] → DSK-G1: matriz matchMedia del gate + capturas WAITING (diff)
@@ -43,6 +43,11 @@
 //            filas, la cascada en los dos sentidos, el CTA que nombra las tres
 //            cifras, el gris por saldo con `?apu=saldo:<n>`, el contador de
 //            «Otra…» y la geometría. Capturas en `capturas-retar/`.
+//   cfg    → CFG-1 1a: la hoja del ⚙ y el piso de 44 fuera de la mesa, en 360×640,
+//            412×915, 915×412, 1366×768 y 1920×1080. Diez puertas con nombre
+//            (cfg.zona, cfg.solape, cfg.ojito, cfg.hoja, cfg.ancla, cfg.toast,
+//            cfg.sonido, cfg.version, cfg.inv45, cfg.sinojito) y la consola.
+//            Contra el bundle real y el banco imitado. Ver `scripts/cfg/cfg.mjs`.
 //   apu    → APU-1 1e-ii/1f: la mesa con dinero de verdad, en SIETE viewports
 //            (los tres de móvil de la familia de `lob`/`retar`/`diagSAL` y los
 //            cuatro de escritorio). Siete puntos en todos: la marca ALL-IN del
@@ -333,6 +338,7 @@ import { runWebkit } from './ios/webkit.mjs'
 import { runTab, VARAS_TAB } from './tab/tab.mjs'
 import { runRnk } from './rnk/rnk.mjs'
 import { runSuma } from './suma/suma.mjs'
+import { runCfg } from './cfg/cfg.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -428,7 +434,8 @@ const VC_RETRASO_ROCE_MS = (() => {
 // TAB-1 1e · y `tab`: la escala de la mesa, contra el bundle real.
 // RNK-1c-ii · y `rnk`: la pantalla Rankings y el mini-perfil, contra el banco imitado.
 // RNK-1 1e · y `suma`: el intersticial de SumaMente y la línea de la familia.
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk', 'suma']
+// CFG-1 1a · y `cfg`: la hoja del ⚙, el ojito y los tocables de 44 fuera de la mesa.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk', 'suma', 'cfg']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -991,6 +998,19 @@ const LOB_BARRA = `(() => {
   const lobby = document.querySelector('main.lobby');
   const nombre = top ? top.querySelector('.lob-nombre') : null;
   const cs = nombre ? getComputedStyle(nombre) : null;
+  // CFG-1 1a · las zonas táctiles de 44 (el camino Z, \`tactilLobby.css\`) son
+  // un \`::after\` transparente que sobresale de su botón: el del ⚙ asoma 6 px
+  // por la derecha de la barra, dentro del relleno del lienzo, y entra en el
+  // \`scrollWidth\`. No es desborde: no se ve ni desplaza nada (el lobby y la
+  // página siguen en 0). Mientras se mide, se apagan; lo visible se mide igual
+  // que antes. Las mide \`diagDSK cfg\`.
+  const sinZonas = document.createElement('style');
+  sinZonas.textContent = '.lob-top :is(.lob-ajustes, .lob-perfil, .lob-mas, .lob-ojo)::after { display: none !important; }';
+  document.head.appendChild(sinZonas);
+  const barraDesborda = top ? top.scrollWidth - top.clientWidth : null;
+  const lobbyDesborda = lobby ? lobby.scrollWidth - lobby.clientWidth : null;
+  const paginaDesborda = document.documentElement.scrollWidth - innerWidth;
+  sinZonas.remove();
   return {
     nombre: nombre ? nombre.textContent : null,
     barra: caja(top),
@@ -999,9 +1019,9 @@ const LOB_BARRA = `(() => {
     pildora: caja(top && top.querySelector('.lob-pildora')),
     ficha: caja(top && top.querySelector('[data-accion="constancia"]')),
     engranaje: caja(top && top.querySelector('[data-accion="ajustes"]')),
-    barraDesborda: top ? top.scrollWidth - top.clientWidth : null,
-    lobbyDesborda: lobby ? lobby.scrollWidth - lobby.clientWidth : null,
-    paginaDesborda: document.documentElement.scrollWidth - innerWidth,
+    barraDesborda,
+    lobbyDesborda,
+    paginaDesborda,
     ancho: innerWidth,
     nombreRecortado: nombre ? nombre.scrollWidth > nombre.clientWidth : null,
     elipsis: cs ? (cs.textOverflow === 'ellipsis' && cs.overflowX === 'hidden' && cs.whiteSpace === 'nowrap') : null,
@@ -15340,6 +15360,14 @@ try {
   // línea de la familia. Entra en `humo`: el mismo preview que `lob` y `rnk`.
   if (MODE === 'suma' || MODE === 'humo') {
     report.suma = await runSuma(browser, { base: BASE_PROD })
+  }
+  // CFG-1 1a · `cfg`: la hoja del ⚙ en el lobby, Retar y Rankings (anclaje,
+  // filas, cabecera fija, versión, sugerencia, «Copiado», sonido con el ⋮ de la
+  // mesa), el ojito de la píldora y las zonas de 44 del lobby, Retar y Salas,
+  // con sus solapes. Diez puertas (`scripts/cfg/cfg.mjs`). Entra en `humo`:
+  // el mismo preview que `lob`, `rnk` y `suma`.
+  if (MODE === 'cfg' || MODE === 'humo') {
+    report.cfg = await runCfg(browser, { base: BASE_PROD })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)
