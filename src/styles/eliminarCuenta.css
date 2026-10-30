@@ -1,0 +1,208 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · CFG-1 1c · La ventana «Eliminar cuenta»
+   Rector: AJILEI_CFG-1_Fase1c_v1.0.md §2.1, con el Ajuste A de STOP-B1 (la
+   letra escala como la de la hoja ⚙). La importa `components/EliminarCuenta.jsx`.
+
+   SE VALE SOLA, como el mini-perfil: vive en `body` (portal) y fuera de
+   `#root` no hereda nada de la pantalla. Trae su propio `--u`, el MISMO de la
+   carcasa (`lobby.css`, `salas.css`: clamp(3.2px, 1vmin, 6px)), y mide la
+   letra con los factores de la hoja (`hojaConfiguracion.css`): título 3,6,
+   filas y botones 3,4, la cuenta 3,3, lo menudo 3,1. Así la ventana se lee
+   del mismo tamaño que la hoja de la que sale, en el teléfono y en 1920.
+
+   Ancho: 88 u (la hoja mide 76; con su letra, los dos botones lado a lado
+   piden 88 en 1920, medido) con un suelo de 420 px; nunca más que la vista
+   menos el aire del velo. Cabe sin desplazarse en 360×640 y 915×412; si algún
+   día no cabe, la tarjeta se desplaza por dentro, nunca la página. Los toques
+   no bajan de 44 px.
+
+   SIN ORO: es una acción destructiva. El botón de borrar lleva el rojo de
+   `lob-fila-peligro` (`--loss-red`) relleno con texto crema; el error, el
+   `--lose-red` de la puerta (el `--loss-red` sobre este verde no se lee como
+   texto); el foco, anillo crema.
+
+   NI UN HEX: tokens de `theme.css` o `rgba(var(--…-rgb), α)`. Sin `!important`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Por encima de la hoja (z 7) y de su toast (z 8), al nivel del mini-perfil. */
+.elc-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.elc-tarjeta {
+  --u: clamp(3.2px, 1vmin, 6px);
+  position: relative;
+  box-sizing: border-box;
+  width: min(100%, max(420px, calc(var(--u) * 88)));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--u) * 4) calc(var(--u) * 4.5) calc(var(--u) * 3);
+  background: var(--surface-modal);
+  color: var(--text-primary);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.18);
+  border-radius: calc(var(--u) * 3);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-base);
+  font-size: calc(var(--u) * 3.3);
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-align: left;
+  container: elc / inline-size;
+}
+.elc-tarjeta * { box-sizing: border-box; }
+/* Recibe el foco al enviar (el botón pulsado se apaga): sin anillo, es la
+   ventana entera. */
+.elc-tarjeta:focus { outline: none; }
+
+/* La ✕, 44 × 44 en la esquina (la del mini-perfil). */
+.elc-cerrar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.elc-cerrar svg { width: 22px; height: 22px; }
+.elc-cerrar:disabled { opacity: 0.4; cursor: default; }
+
+.elc-titulo {
+  margin: 0 40px calc(var(--u) * 2.5) 0;
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.elc-aviso { color: var(--text-secondary); }
+.elc-aviso p { margin: 0; }
+.elc-aviso p + p { margin-top: calc(var(--u) * 1); }
+.elc-aviso .elc-fuerte { color: var(--text-primary); font-weight: 600; }
+
+.elc-form { margin: calc(var(--u) * 3.5) 0 0; }
+
+.elc-instruccion {
+  display: block;
+  margin: 0 0 calc(var(--u) * 1.5);
+  font-size: calc(var(--u) * 3.1);
+  color: var(--text-secondary);
+}
+
+/* Nunca menos de 16 px de letra: con menos, Safari de iPhone acerca la página
+   al enfocar el campo. */
+.elc-campo {
+  display: block;
+  width: 100%;
+  height: max(44px, calc(var(--u) * 8));
+  padding: 0 calc(var(--u) * 3);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.28);
+  border-radius: calc(var(--u) * 2);
+  background: rgba(var(--green-abyss-rgb), 0.6);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: max(16px, calc(var(--u) * 3.4));
+  letter-spacing: 0.08em;
+}
+.elc-campo:focus {
+  outline: none;
+  border-color: rgba(var(--text-primary-rgb), 0.7);
+  box-shadow: 0 0 0 3px rgba(var(--text-primary-rgb), 0.12);
+}
+.elc-tarjeta[data-elc-estado="error"] .elc-campo { border-color: rgba(var(--loss-red-rgb), 0.75); }
+
+/* Dos columnas mientras cada una quepa «Eliminar mi cuenta»: 8,9 em de texto
+   (medido) y 1,6 de relleno = 10,5 em de la letra del botón. Si no caben, una
+   debajo de la otra, «Cancelar» primero. */
+.elc-botones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5em), 1fr));
+  gap: calc(var(--u) * 2.5);
+  margin-top: calc(var(--u) * 3.5);
+  font-size: calc(var(--u) * 3.4);
+}
+.elc-btn {
+  min-height: max(44px, calc(var(--u) * 8));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  padding: 0 0.8em;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.elc-cancelar {
+  border: 1px solid rgba(var(--text-primary-rgb), 0.28);
+  background: none;
+  color: var(--text-primary);
+}
+.elc-cancelar:hover { border-color: rgba(var(--text-primary-rgb), 0.5); }
+.elc-borrar {
+  border: 1px solid var(--loss-red);
+  background: var(--loss-red);
+  color: var(--text-primary);
+}
+.elc-btn:disabled { opacity: 0.4; cursor: default; }
+/* Enviando, el de borrar no es «apagado»: está trabajando. */
+.elc-tarjeta[data-elc-estado="enviando"] .elc-borrar { opacity: 0.8; }
+.elc-btn:focus-visible,
+.elc-cerrar:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+/* Los puntos vivos del «Cargando» de BIE-1 (`cargando.css`), en el color del
+   botón: el molde es el latido, no el oro. */
+.elc-puntos { display: inline-flex; gap: 0.32em; }
+.elc-punto {
+  width: 0.32em;
+  height: 0.32em;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.25;
+  animation: elc-late 1.2s ease-in-out infinite;
+}
+.elc-punto:nth-child(2) { animation-delay: 0.2s; }
+.elc-punto:nth-child(3) { animation-delay: 0.4s; }
+@keyframes elc-late {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30%           { opacity: 1;    transform: translateY(-0.18em); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .elc-punto { animation: none; opacity: 0.7; }
+}
+
+/* O1 · reserva su alto siempre; sólo se enciende. Reserva DOS líneas cuando el
+   error no cabe en una: la frase mide 20,9 em de la letra de la tarjeta
+   (medido), así que por debajo de 23 em de contenido (un 10 % de aire) se
+   parte. Sin esto la tarjeta crecía al fallar (19,6 px en 360×640, medido en
+   la 1c-i). */
+.elc-error {
+  min-height: 1.4em;
+  margin: calc(var(--u) * 2.5) 0 0;
+  font-size: calc(var(--u) * 3.1);
+  color: var(--lose-red);
+  visibility: hidden;
+}
+@container elc (width < 23em) {
+  .elc-error { min-height: 2.8em; }
+}
+.elc-error.is-on { visibility: visible; }

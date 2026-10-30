@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import '../styles/hojaConfiguracion.css'
 
 import { SoundButton } from './SoundButton'
+import EliminarCuenta from './EliminarCuenta'
 import { IconoUsuario } from './IconosLobby'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { CORREO_SOPORTE } from '../config/soporte'
@@ -55,6 +56,10 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
   const [acercaAbierto, setAcercaAbierto] = useState(false)
   const [sugAbierta, setSugAbierta] = useState(false)
   const [toast, setToast] = useState(null)
+  // CFG-1 1c · la ventana «Eliminar cuenta» (`EliminarCuenta`, por portal).
+  const [eliminarAbierta, setEliminarAbierta] = useState(false)
+  const filaEliminarRef = useRef(null)
+  const volverAFilaEliminar = useRef(false)
 
   const tituloRef = useRef(null)
   const acercaRef = useRef(null)
@@ -73,12 +78,27 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
   // subido ni un velo que no existe.
   useEffect(() => () => document.body.classList.remove('lobby-hoja-abierta'), [])
 
+  // Con la ventana de eliminar encima, `Escape` es suyo: cierra la ventana y
+  // la hoja se queda.
   useEffect(() => {
-    if (!abierta) return
+    if (!abierta || eliminarAbierta) return
     const alPulsar = (e) => { if (e.key === 'Escape') onCerrar?.() }
     document.addEventListener('keydown', alPulsar)
     return () => document.removeEventListener('keydown', alPulsar)
-  }, [abierta, onCerrar])
+  }, [abierta, eliminarAbierta, onCerrar])
+
+  // Al cerrarse la ventana el foco vuelve a la fila que la abrió. Aquí y no en
+  // el manejador: hace falta que `#root` haya dejado de ser `inert`, y eso lo
+  // quita la ventana al desmontarse, antes de este efecto.
+  useEffect(() => {
+    if (eliminarAbierta || !volverAFilaEliminar.current) return
+    volverAFilaEliminar.current = false
+    filaEliminarRef.current?.focus()
+  }, [eliminarAbierta])
+  const cerrarEliminar = () => {
+    volverAFilaEliminar.current = true
+    setEliminarAbierta(false)
+  }
 
   // R-3 de la lámina · al desplegar, el panel entra en la vista. En el
   // apaisado bajo (915×412) la hoja se desplaza y lo desplegado quedaba
@@ -86,10 +106,10 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
   useEffect(() => { if (acercaAbierto) acercaRef.current?.scrollIntoView({ block: 'nearest' }) }, [acercaAbierto])
   useEffect(() => { if (sugAbierta) sugRef.current?.scrollIntoView({ block: 'nearest' }) }, [sugAbierta])
 
-  const avisar = (clave) => {
+  const avisar = (clave, ms = 1200) => {
     setToast(clave)
     clearTimeout(relojToast.current)
-    relojToast.current = setTimeout(() => setToast(null), 1200)
+    relojToast.current = setTimeout(() => setToast(null), ms)
   }
   const pronto = () => avisar('lob.toast.pronto')
 
@@ -241,12 +261,31 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
             </p>
           </div>
 
-          <SoundButton className="lob-fila lob-fila-peligro" data-accion="eliminar-cuenta" onClick={pronto}>
-            {/* CUENTA-DEL: es la 1c de CFG-1. */}
-            <span>{t('lob.cfg.eliminar')}</span><span className="lob-pastilla">{t('lob.toast.pronto')}</span>
+          {/* CFG-1 1c · abre la ventana; sin `eliminarCuenta` en la cuenta
+              (nadie la monta así hoy) se queda en «Pronto». */}
+          <SoundButton
+            ref={filaEliminarRef}
+            className="lob-fila lob-fila-peligro"
+            data-accion="eliminar-cuenta"
+            aria-haspopup="dialog"
+            onClick={cuenta?.eliminarCuenta ? () => setEliminarAbierta(true) : pronto}
+          >
+            <span>{t('lob.cfg.eliminar')}</span>
+            {!cuenta?.eliminarCuenta && <span className="lob-pastilla">{t('lob.toast.pronto')}</span>}
           </SoundButton>
         </div>
       </aside>
+
+      {eliminarAbierta && (
+        <EliminarCuenta
+          onCerrar={cerrarEliminar}
+          onEliminar={cuenta?.eliminarCuenta}
+          onMesaAbierta={() => {
+            cerrarEliminar()
+            avisar('lob.eliminar.mesa_abierta', 2600)
+          }}
+        />
+      )}
 
       {/* El aviso de la hoja. Caja reservada siempre y `visibility` (O1). */}
       <div className={`cfg-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite" data-accion="cfg-toast">

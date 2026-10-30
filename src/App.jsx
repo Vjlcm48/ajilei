@@ -34,7 +34,9 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta } from './dev/billeteraFalsa'
+import { cuentaApi } from './lib/cuentaApi'
+import { limpiarAparato } from './lib/limpiarAparato'
 import { rankingApi } from './lib/rankingApi'
 // ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
 // mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
@@ -286,6 +288,25 @@ function App() {
   useEffect(() => {
     if (auth.estado === SIN_SESION) saldoRecordado.borrar()
   }, [auth.estado])
+
+  // ── CFG-1 1c · ELIMINAR LA CUENTA ────────────────────────────────────────
+  // La Edge Function (`lib/cuentaApi`) o, con el bypass, el banco imitado. Al
+  // `ok`, el aparato queda limpio (todas las claves `ajilei.*` y
+  // `sessionStorage`) y se cierra la sesión, que ya no vale en el servidor:
+  // `signOut` sólo limpia el aparato. Los demás motivos los dice la ventana.
+  //
+  // El 401 (`sin_sesion`) sale IGUAL que el ok (Ajuste A de STOP-B1): la
+  // sesión no vale en el servidor, casi siempre porque un borrado que tardó
+  // más que el tope ya se llevó la cuenta. Quedarse dentro sería un reintento
+  // sin fin.
+  const [apiCuenta] = useState(() => simulacionCuenta() ?? cuentaApi)
+  const eliminarCuenta = useCallback(async () => {
+    const r = await apiCuenta.eliminar()
+    if (!r.ok && r.motivo !== 'sin_sesion') return r
+    limpiarAparato()
+    await cerrarSesion()
+    return { ok: true }
+  }, [apiCuenta, cerrarSesion])
   const { tomar: tomarSaldo, esperar: esperarSaldo, soltar: soltarSaldo, refrescar: releerSaldo, alSaldoInsuficiente } = billetera
 
   // ── ECO-1c · LA MESA CONTRA LAS IAS, EN EL SERVIDOR ──────────────────────
@@ -816,6 +837,8 @@ function App() {
     correo: auth.correo ?? '',
     cambiarNombre: auth.cambiarNombre,
     cerrarSesion,
+    // CFG-1 1c · la fila «Eliminar cuenta» de la hoja ⚙, en las siete pantallas.
+    eliminarCuenta,
   }
 
   // ── LOB-1 · `cuentaLobby` se retira ────────────────────────────────────────
