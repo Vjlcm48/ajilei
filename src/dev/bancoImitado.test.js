@@ -853,3 +853,36 @@ describe('RNK-1b · las cifras del libro de puntos, en espejo', () => {
     expect(sql).toMatch(/limit 100;/)
   })
 })
+
+// ── CFG-1 1c · la Edge Function `eliminar_cuenta`, imitada ─────────────────
+// La guarda es la de `partida_abierta_de` (migración de la 1c-ii): una mesa
+// IA abierta o una sala; sin nada, se borra y la sesión deja de valer.
+describe('CFG-1 1c · banco imitado · eliminar_cuenta', () => {
+  it('sin mesa ni sala → 200 ok; después, 401 sin_sesion', () => {
+    const { b } = banco()
+    expect(b.eliminarCuenta()).toEqual({ status: 200, cuerpo: { ok: true } })
+    expect(b.eliminarCuenta()).toEqual({ status: 401, cuerpo: { motivo: 'sin_sesion' } })
+  })
+  it('con una mesa IA abierta → 409 mesa_abierta; cerrada la mesa, se borra', () => {
+    const { b, ll } = banco()
+    const r = sentar(ll, 'basico', 2, 50, 500, T(1))
+    expect(r.codigo).toBe('ok')
+    expect(b.eliminarCuenta()).toEqual({ status: 409, cuerpo: { motivo: 'mesa_abierta' } })
+    expect(b.cuenta.borrada).toBe(false)
+    expect(ll('salir_ia', { p_mesa: r.mesa_id, p_fichas: 500, p_seq: 1 }).codigo).toBe('ok')
+    expect(b.eliminarCuenta().status).toBe(200)
+  })
+  it('con una sala (esperando o activa) → 409', () => {
+    const { b } = banco()
+    b.cuenta.sala = true
+    expect(b.eliminarCuenta().status).toBe(409)
+  })
+  it('el mando del bypass manda: forzar mesa → 409; forzar ok → 200 con mesa abierta', () => {
+    const { b, ll } = banco()
+    b.cuenta.forzar = 'mesa'
+    expect(b.eliminarCuenta().status).toBe(409)
+    sentar(ll, 'basico', 2, 50, 500, T(2))
+    b.cuenta.forzar = 'ok'
+    expect(b.eliminarCuenta().status).toBe(200)
+  })
+})

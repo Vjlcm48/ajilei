@@ -32,7 +32,7 @@ const CLAVES = [
   { clave: 'ajilei.dispositivo', almacen: 'local', fuente: 'ECO-1 Fase 1c (P-4) · dispositivo.js' },
   { clave: 'ajilei.saldoVisto', almacen: 'local', fuente: 'IOS-1 Fase 1c (S2) · saldoRecordado.js · solo para la vista, nadie juzga con ella' },
   { clave: 'ajilei.sumamente', almacen: 'local', fuente: 'RNK-1 Fase 1e · Rankings_v1.2 §6.7.1 · sumaContador.js · el contador del video de SumaMente, en el aparato' },
-  { clave: 'ajilei.saldoOculto', almacen: 'local', fuente: 'CFG-1 Fase 1a · Configuracion_v1.0 §6 · saldoOculto.js · el ojito de la píldora del lobby, en el aparato' },
+  { clave: 'ajilei.saldoOculto', almacen: 'local', fuente: 'CFG-1 Fase 1a · Configuracion_v1.1 §6 · saldoOculto.js · el ojito de la píldora del lobby, en el aparato' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -49,6 +49,7 @@ const ACCESORES = [
   'src/lib/saldoRecordado.js',     // ajilei.saldoVisto (IOS-1c, S2)
   'src/lib/sumaContador.js',       // ajilei.sumamente (RNK-1 1e)
   'src/lib/saldoOculto.js',        // ajilei.saldoOculto (CFG-1 1a)
+  'src/lib/limpiarAparato.js',     // CFG-1 1c: borra TODAS las ajilei.* y vacía sessionStorage al eliminar la cuenta (no escribe ninguna)
 ]
 
 const fuentes = archivos('src', (n) => /\.(jsx?)$/.test(n) && !/\.test\.jsx?$/.test(n))
@@ -83,6 +84,8 @@ describe('ARN-3e · el almacenamiento del navegador, censado', () => {
 
   it('la única clave de sesión vive donde dice el censo', () => {
     const conSesion = Object.entries(textos).filter(([, t]) => /\bsessionStorage\b/.test(t)).map(([a]) => a)
-    expect(conSesion).toEqual(['src/main.jsx'])
+    // CFG-1 1c · `limpiarAparato` nombra `sessionStorage` sólo para vaciarlo
+    // al eliminar la cuenta: no escribe ninguna clave.
+    expect(conSesion).toEqual(['src/lib/limpiarAparato.js', 'src/main.jsx'])
   })
 })

@@ -274,9 +274,14 @@ function App() {
   // sesión, por el botón o porque la sesión acabó de verdad (SIN_SESION: sólo
   // un error no reintentable lleva ahí, nunca una red caída).
   const cerrarSesionDeAuth = auth.cerrarSesion
-  const cerrarSesion = useCallback(() => {
+  // CFG-1 1c · O-2 de la 1a: al cerrar sesión `screen` vuelve al lobby, o al
+  // volver a entrar se aterrizaba en la pantalla de la que se salió (Retar,
+  // Rankings…). Después del `signOut` y no antes: antes, el lobby asomaría
+  // mientras la salida viaja; después, la Portada ya tapa el cambio.
+  const cerrarSesion = useCallback(async () => {
     saldoRecordado.borrar()
-    return cerrarSesionDeAuth()
+    await cerrarSesionDeAuth()
+    setScreen('lobby')
   }, [cerrarSesionDeAuth])
   useEffect(() => {
     if (auth.estado === SIN_SESION) saldoRecordado.borrar()

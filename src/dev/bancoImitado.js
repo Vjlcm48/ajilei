@@ -607,6 +607,23 @@ export function crearBanco({
     llamar(nombre, params = {}) {
       return RPC[nombre]?.(params ?? {}) ?? null
     },
+    // ── CFG-1 1c · la Edge Function `eliminar_cuenta` ──────────────────────
+    // No es una RPC: contesta `{ status, cuerpo }`, lo que la función manda por
+    // HTTP. La guarda es la de `partida_abierta_de`: una mesa IA abierta (la de
+    // este banco) o una sala, esperando o activa (el banco no tiene salas: la
+    // marca `cuenta.sala`). Borrada la cuenta, la sesión ya no vale (401).
+    // `cuenta.forzar` es el mando `?cfg=borrar-mesa` / `?cfg=borrar-ok` del
+    // bypass: 'mesa' o 'ok' contestan eso sin mirar nada.
+    cuenta: { borrada: false, sala: false, forzar: null, llamadas: 0 },
+    eliminarCuenta() {
+      const c = this.cuenta
+      c.llamadas += 1
+      if (c.borrada) return { status: 401, cuerpo: { motivo: 'sin_sesion' } }
+      const ocupada = c.forzar === 'mesa' || (c.forzar !== 'ok' && (abierta() !== null || c.sala))
+      if (ocupada) return { status: 409, cuerpo: { motivo: 'mesa_abierta' } }
+      c.borrada = true
+      return { status: 200, cuerpo: { ok: true } }
+    },
     // ── Lo que el guion hace por fuera de las funciones, y C6 ──────────────
     /** Otro dispositivo se sienta con la misma cuenta: la abierta se cierra
      *  como `reemplazada` y se cobra, como hace `sentarse_ia` (C6). */

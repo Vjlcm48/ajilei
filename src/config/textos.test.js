@@ -191,6 +191,11 @@ describe('IDI-0 · diccionario es', () => {
     //   lob.nav.rankings = rnk.titulo  (RNK-1c)
     //     La pantalla se llama como el botón de la barra que la abre, igual que
     //     `lob.cta.pvp = sal.opciones.titulo`: le dice al jugador que llegó.
+    //
+    //   lob.eliminar.cerrar = rnk.perfil.cerrar  (CFG-1 1c)
+    //     «Cerrar»: el nombre accesible de la ✕ de la ventana «Eliminar cuenta»
+    //     y de la del mini-perfil. Dos ventanas de dos campañas; un idioma
+    //     futuro puede querer «Cerrar sin eliminar» en la primera.
     expect(repetidos.sort()).toEqual([
       'ia.recarga.opcion.medio = ia.retar.entrada.medio',
       'ia.recarga.opcion.piso = ia.retar.entrada.piso',
@@ -199,6 +204,7 @@ describe('IDI-0 · diccionario es', () => {
       'ia.retar.jugadores = sal.armar.jugadores',
       'lob.ajustes.aria = lob.cfg.titulo',
       'lob.cta.pvp = sal.opciones.titulo',
+      'lob.eliminar.cerrar = rnk.perfil.cerrar',
       'lob.nav.rankings = rnk.titulo',
       'lob.toast.copiado = sal.espera.codigo.copiado',
       'sal.armar.abierta = sal.espera.tipo.abierta',

@@ -67,6 +67,22 @@ export const TEXTOS_ES = {
   'lob.ojito.ocultar':             'Ocultar saldo',
   'lob.ojito.mostrar':             'Mostrar saldo',
 
+  // CFG-1 1c · la ventana «Eliminar cuenta» (rector §2.1). La palabra que se
+  // escribe es un texto más: otro idioma pedirá la suya, y el campo compara
+  // contra ella. El aviso de la mesa abierta va en el toast de la hoja.
+  'lob.eliminar.titulo':           'Eliminar tu cuenta',
+  'lob.eliminar.aviso.saldo':      'Perderás tu saldo, tus puntos y tus compras.',
+  'lob.eliminar.aviso.deshacer':   'No se puede deshacer.',
+  'lob.eliminar.aviso.correo':     'Si vuelves a registrarte con este correo, empezarás de cero y sin bono.',
+  'lob.eliminar.palabra':          'ELIMINAR',
+  'lob.eliminar.instruccion':      'Escribe {palabra} para confirmar.',
+  'lob.eliminar.cancelar':         'Cancelar',
+  'lob.eliminar.confirmar':        'Eliminar mi cuenta',
+  'lob.eliminar.enviando':         'Eliminando',
+  'lob.eliminar.error':            'No se pudo eliminar la cuenta. Inténtalo de nuevo.',
+  'lob.eliminar.cerrar':           'Cerrar',
+  'lob.eliminar.mesa_abierta':     'Cierra o abandona tu mesa primero',
+
   // Nombres accesibles. Van en el diccionario y no en el JSX por la misma razón
   // que los visibles: un `aria-label` es texto que un lector de pantalla LEE en
   // voz alta, así que traducirlo no es opcional. Los tres valores salen de los

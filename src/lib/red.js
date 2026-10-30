@@ -39,7 +39,28 @@ export const TOPE_RED_MS = 8000
 export const TOPE_ESPERA_MS = TOPE_RED_MS + 2000
 
 /**
- * Un `fetch` que se cancela solo pasado `ms`.
+ * CFG-1 1c · UNA PETICIÓN PUEDE PEDIR OTRO TOPE con esta cabecera (en ms).
+ * Hace falta porque `functions.invoke` no deja pasar opciones propias hasta el
+ * `fetch`, sólo cabeceras: borrar una cuenta (`eliminar_cuenta`) espera 20 s,
+ * no 8. La cabecera es del cliente y NUNCA sale: `fetchConTope` la quita antes
+ * de mandar la petición (así tampoco pide permiso de CORS).
+ */
+export const CABECERA_TOPE = 'x-ajilei-tope-ms'
+
+/** Las opciones sin la cabecera del tope, y el tope que valga. */
+function topePedido(opciones, ms) {
+  const crudas = opciones.headers
+  if (!crudas) return { opciones, tope: ms }
+  const h = new Headers(crudas)
+  if (!h.has(CABECERA_TOPE)) return { opciones, tope: ms }
+  const pedido = Number(h.get(CABECERA_TOPE))
+  h.delete(CABECERA_TOPE)
+  return { opciones: { ...opciones, headers: h }, tope: Number.isFinite(pedido) && pedido > 0 ? pedido : ms }
+}
+
+/**
+ * Un `fetch` que se cancela solo pasado `ms` (o el tope que pida la petición
+ * con `CABECERA_TOPE`).
  * Respeta la señal que ya traiga la petición: si quien llama cancela antes,
  * se cancela igual que sin el tope.
  *
@@ -48,13 +69,14 @@ export const TOPE_ESPERA_MS = TOPE_RED_MS + 2000
  * @param {object} [reloj]  `setTimeout`/`clearTimeout` (las pruebas dan uno falso)
  */
 export function fetchConTope(fetchBase, ms = TOPE_RED_MS, reloj = globalThis) {
-  return (entrada, opciones = {}) => {
+  return (entrada, opcionesPedidas = {}) => {
+    const { opciones, tope } = topePedido(opcionesPedidas, ms)
     const control = new AbortController()
     const previa = opciones.signal
     if (previa?.aborted) return fetchBase(entrada, opciones)
     const alCancelar = () => control.abort(previa.reason)
     previa?.addEventListener('abort', alCancelar, { once: true })
-    const id = reloj.setTimeout(() => control.abort(new DOMException('IOS-1c: tope de red', 'AbortError')), ms)
+    const id = reloj.setTimeout(() => control.abort(new DOMException('IOS-1c: tope de red', 'AbortError')), tope)
     let llamada
     try {
       llamada = Promise.resolve(fetchBase(entrada, { ...opciones, signal: control.signal }))

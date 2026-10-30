@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { TOPE_RED_MS, fetchConTope, conTope } from './red'
+import { TOPE_RED_MS, fetchConTope, conTope, CABECERA_TOPE } from './red'
 
 // ── IOS-1c · el tope de red (S5, S7) ────────────────────────────────────────
 
@@ -69,6 +69,33 @@ describe('IOS-1c · fetchConTope', () => {
   it('un fetch que lanza al llamarlo llega como promesa rechazada', async () => {
     const f = () => { throw new TypeError('sin red') }
     await expect(fetchConTope(f, 8000)('u')).rejects.toThrow('sin red')
+  })
+
+  // CFG-1 1c · eliminar la cuenta espera 20 s, no 8.
+  it('la cabecera de tope pide otro tope y no sale en la petición', async () => {
+    vi.useFakeTimers()
+    const { f, llamadas } = fetchColgado()
+    const p = fetchConTope(f, 8000)('u', { method: 'POST', headers: { [CABECERA_TOPE]: '20000', Authorization: 'Bearer t' } })
+    const resultado = p.then(() => 'contestó', (e) => e.name)
+    const h = llamadas[0].opciones.headers
+    expect(h.has(CABECERA_TOPE)).toBe(false)
+    expect(h.get('authorization')).toBe('Bearer t')
+    let ya = false
+    resultado.then(() => { ya = true })
+    await vi.advanceTimersByTimeAsync(19999)
+    expect(ya).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(await resultado).toBe('AbortError')
+  })
+
+  it('una cabecera de tope que no es un número positivo deja el de siempre (y tampoco sale)', async () => {
+    vi.useFakeTimers()
+    const { f, llamadas } = fetchColgado()
+    const p = fetchConTope(f, 8000)('u', { headers: new Headers({ [CABECERA_TOPE]: 'mucho' }) })
+    const resultado = p.then(() => 'contestó', (e) => e.name)
+    expect(llamadas[0].opciones.headers.has(CABECERA_TOPE)).toBe(false)
+    await vi.advanceTimersByTimeAsync(8000)
+    expect(await resultado).toBe('AbortError')
   })
 })
 

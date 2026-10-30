@@ -139,6 +139,14 @@ export function useAuth() {
   const [falloPerfil, setFalloPerfil] = useState({ uid: null, n: 0 })
   const [intentoPerfil, setIntentoPerfil] = useState(0)
 
+  // CFG-1 1c · LA SALIDA DEL BYPASS. Con el bypass el estado estaba clavado en
+  // COMPLETO y «Cerrar sesión» no hacía nada, así que ni el borrado de la
+  // cuenta ni O-2 (volver a entrar aterriza en el lobby) se podían ver en 5173.
+  // Ahora cerrar sesión deja el bypass en SIN_SESION (la Portada) y el
+  // formulario vuelve a entrar con cualquier correo y código, SIN RED. Fuera de
+  // desarrollo `AUTH_BYPASS` es `false` y esto no hace nada.
+  const [fueraDelBypass, setFueraDelBypass] = useState(false)
+
   // ── Efecto A · la sesión. NO consulta nada ────────────────────────────────
   // El callback de `onAuthStateChange` corre CON EL CERROJO DE AUTH TOMADO: una
   // llamada al SDK desde dentro (un `from(...).select()`, que internamente pide
@@ -247,7 +255,7 @@ export function useAuth() {
   // durante un fotograma.
   const perfilSinRed = uid != null && falloPerfil.uid === uid
   const estado = AUTH_BYPASS
-    ? COMPLETO
+    ? (fueraDelBypass ? SIN_SESION : COMPLETO)
     : sesion === undefined ? (sinRed ? SIN_RED : CARGANDO)
     : sesion === null ? SIN_SESION
     : perfil === undefined ? (perfilSinRed ? SIN_RED : CARGANDO)
@@ -281,6 +289,7 @@ export function useAuth() {
   // y «Entrando…» vuelven con un mensaje y el botón disponible. Lo que conteste
   // tarde se aplica igual (un `verifyOtp` que acaba entrando emite SIGNED_IN).
   const enviarCodigo = useCallback(async (correo) => {
+    if (AUTH_BYPASS) return { ok: true }
     const r = await conTope(supabase.auth.signInWithOtp({
       email: correo,
       options: { shouldCreateUser: true },
@@ -299,6 +308,8 @@ export function useAuth() {
   // lo recoge. Una escritura de estado desde este manejador sería una segunda
   // fuente de verdad compitiendo con la suscripción.
   const verificarCodigo = useCallback(async (correo, codigo) => {
+    // El bypass no tiene SDK que emita SIGNED_IN: vuelve a entrar aquí.
+    if (AUTH_BYPASS) { setFueraDelBypass(false); return { ok: true } }
     const r = await conTope(supabase.auth.verifyOtp({ email: correo, token: codigo, type: 'email' }), TOPE_ESPERA_MS, TOPE)
     if (r === TOPE) return { ok: false, mensaje: MENSAJE_RED }
     const { error } = r
@@ -361,10 +372,10 @@ export function useAuth() {
     return { ok: true }
   }, [uid])
 
-  // Con bypass no hay sesión que cerrar y el estado está clavado en COMPLETO, así
-  // que llamar al SDK sólo serviría para tocar el almacenamiento sin efecto.
+  // Con bypass no hay sesión que cerrar: llamar al SDK sólo tocaría el
+  // almacenamiento sin efecto. CFG-1 1c · lo que hace es ir a la Portada.
   const cerrarSesion = useCallback(async () => {
-    if (AUTH_BYPASS) return
+    if (AUTH_BYPASS) { setFueraDelBypass(true); return }
     await supabase.auth.signOut()
   }, [])
 

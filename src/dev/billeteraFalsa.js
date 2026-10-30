@@ -44,6 +44,7 @@ import { crearMesaIAApi } from '../lib/mesaIAApi'
 import { crearConstanciaApi } from '../lib/constanciaApi'
 import { crearVideoApi } from '../lib/videoApi'
 import { crearRankingApi } from '../lib/rankingApi'
+import { crearCuentaApi } from '../lib/cuentaApi'
 import { crearBanco, VIDEO_MINIMO_S_SQL } from './bancoImitado'
 import { sembradosRanking, PUNTOS_DEL_BYPASS } from './sembradosRanking'
 import { siembraAPU, entradaSembradaAPU, videoSembradoAPU } from './siembraAPU'
@@ -140,6 +141,47 @@ export function simulacionRanking() {
   const b = bancoDelBypass()
   if (!b) return null
   return crearRankingApi(b)
+}
+
+// ── CFG-1 1c · eliminar la cuenta contra el banco imitado ──────────────────
+// El mando `?cfg=` (sólo aquí, detrás de la misma puerta doble):
+//   ?cfg=borrar-mesa   → la función contesta 409 mesa_abierta
+//   ?cfg=borrar-ok     → contesta 200 aunque haya una mesa abierta
+//   ?cfg=borrar-error  → contesta 500 (el error de la ventana)
+//   ?cfg=borrar-401    → contesta 401 (la cuenta ya no está): sale como el ok
+// Sin mando, lo que diga el banco: 409 con una mesa IA abierta, 200 si no.
+// La respuesta tarda `CUENTA_TARDA_MS` para que el estado «enviando» se vea.
+export const CFG_PARAM = 'cfg'
+const CUENTA_TARDA_MS = 900
+
+function mandoCfg() {
+  try { return new URLSearchParams(window.location.search).get(CFG_PARAM) } catch { return null }
+}
+
+/** Un cliente con la forma de `supabase.functions` (functions-js 2.112.4). */
+export function clienteFuncionesDe(b, { tarda = 0, mando = null } = {}) {
+  return {
+    functions: {
+      async invoke(nombre) {
+        if (tarda > 0) await new Promise((ok) => setTimeout(ok, tarda))
+        const { status, cuerpo } = mando === 'borrar-error' ? { status: 500, cuerpo: { motivo: 'servidor' } }
+          : nombre === 'eliminar_cuenta' ? b.eliminarCuenta() : { status: 404, cuerpo: {} }
+        if (status >= 200 && status < 300) return { data: cuerpo, error: null }
+        return { data: null, error: { name: 'FunctionsHttpError', context: { status, json: async () => cuerpo } } }
+      },
+    },
+  }
+}
+
+/** La API de la cuenta contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionCuenta() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  const mando = mandoCfg()
+  b.cuenta.forzar = mando === 'borrar-mesa' ? 'mesa' : mando === 'borrar-ok' ? 'ok' : null
+  if (mando === 'borrar-401') b.cuenta.borrada = true
+  return crearCuentaApi(clienteFuncionesDe(b, { tarda: CUENTA_TARDA_MS, mando }))
 }
 
 /** Para las pruebas: un banco nuevo en la siguiente llamada. */
