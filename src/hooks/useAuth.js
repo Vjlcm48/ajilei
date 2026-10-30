@@ -3,6 +3,7 @@ import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { TOPE_ESPERA_MS, conTope } from '../lib/red'
 import { ESPERAS_RED_MS } from '../lib/controlMesaIA'
+import { perfilApi, traducirPerfilPropio, fechaDelServidor, fechaDelFreno } from '../lib/perfilApi'
 
 // ── SUP-2b · La puerta: fuente única del estado de sesión ────────────────────
 // Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.1 y §1.2, con la
@@ -87,7 +88,10 @@ export const AUTH_BYPASS = Boolean(import.meta.env.DEV && import.meta.env.VITE_A
 
 // El perfil ficticio del bypass. ID fijo y con forma de UUID para que nada que
 // lo reciba tenga que saber que es de mentira; jamás viaja a la red.
-const PERFIL_DEV = { id: '00000000-0000-4000-8000-000000000000', username: 'DevLocal' }
+// CFG-1 1b · con lugar vacío; si el bypass trae el banco imitado (`App` pasa
+// `simulacionPerfil()`), lo que cuenta es lo que el banco diga, y el bypass
+// cambia de nombre y de lugar como una cuenta de verdad.
+const PERFIL_DEV = { id: '00000000-0000-4000-8000-000000000000', username: 'DevLocal', pais: null, estado: null }
 
 // ── La regla del username, y por qué está DUPLICADA aquí a propósito ────────
 // La autoridad es la base (SUP-2a: CHECK de formato, índice único sobre
@@ -115,7 +119,17 @@ export function traducirErrorUsername(error) {
   }
 }
 
-export function useAuth() {
+// ── CFG-1 1b · el perfil por su capa, y lo que se añade ─────────────────────
+// Rector: AJILEI_CFG-1_Fase1b_v1.0.md §2.3 (R-6). El perfil se lee y se
+// escribe por `perfilApi` (`lib/perfilApi.js`), que en el bypass es el banco
+// imitado. El perfil trae `pais` y `estado` (validados contra las listas), y
+// junto a él viaja `proximoCambio`: desde cuándo puede volver a cambiar de
+// nombre (`Date`), `null` si ya puede, `undefined` mientras no se sabe. La
+// fecha la da el servidor (`mi_proximo_cambio`, §0-13); el cliente no suma.
+// Nacen `cambiarLugar` y `comprobarNombre` (`nombre_libre`, §0-9), y
+// `cambiarNombre` traduce el freno (AJ030): devuelve `bloqueadoHasta` con la
+// fecha del `hint`.
+export function useAuth({ api = perfilApi } = {}) {
   // `undefined` = todavía no se sabe · `null` = no hay · objeto = lo hay.
   // Los tres valores son distintos y los tres significan algo: colapsar
   // "no se sabe" con "no hay" es exactamente el parpadeo que CARGANDO evita.
@@ -196,6 +210,9 @@ export function useAuth() {
   }, [intentoSesion])
 
   const uid = sesion?.user?.id ?? null
+  // CFG-1 1b · el dueño del perfil: la sesión, o en el bypass el uuid de
+  // `PERFIL_DEV` (que sólo viaja al banco imitado, nunca a la red).
+  const uidPerfil = AUTH_BYPASS ? (fueraDelBypass ? null : PERFIL_DEV.id) : uid
 
   // ── Efecto B · el perfil, UNA consulta por arranque o cambio de sesión ────
   // Se dispara por `uid` y no por el objeto de sesión: la sesión se reemplaza
@@ -214,39 +231,54 @@ export function useAuth() {
   // declarado» de SUP-2b), y con el tope de red eso habría mandado al Bautizo a
   // jugadores con nombre por una red lenta. Pasado el tope sin respuesta,
   // también SIN_RED; si contesta tarde, se aplica.
+  // CFG-1 1b · por `api.leer` y para `uidPerfil`: en el bypass lee del banco
+  // imitado (y si no lo hay, el fallo no cambia nada: el estado del bypass es
+  // COMPLETO y el perfil cae a `PERFIL_DEV`).
   useEffect(() => {
-    if (AUTH_BYPASS) return
-    if (!uid) return                          // sin sesión no hay perfil que consultar
+    if (!uidPerfil) return                    // sin sesión no hay perfil que consultar
     let vivo = true
     let reintento = null
     const tope = setTimeout(() => {
-      if (vivo) setFalloPerfil((f) => (f.uid === uid ? f : { uid, n: 0 }))
+      if (vivo) setFalloPerfil((f) => (f.uid === uidPerfil ? f : { uid: uidPerfil, n: 0 }))
     }, TOPE_ESPERA_MS)
-    supabase
-      .from('profiles')
-      .select('id, username')
-      .eq('id', uid)
-      .maybeSingle()
+    api.leer(uidPerfil)
       .then(({ data, error }) => {
         clearTimeout(tope)
         if (!vivo) return
         if (error) {
           console.warn('SUP-2b: no se pudo leer el perfil —', error.message)
-          setFalloPerfil((f) => ({ uid, n: f.uid === uid ? f.n + 1 : 1 }))
+          setFalloPerfil((f) => ({ uid: uidPerfil, n: f.uid === uidPerfil ? f.n + 1 : 1 }))
           reintento = setTimeout(() => { if (vivo) setIntentoPerfil((i) => i + 1) }, esperaDeReintento(intentoPerfil + 1))
           return
         }
         setFalloPerfil({ uid: null, n: 0 })
-        setCargaPerfil({ uid, perfil: data ?? null })
+        setCargaPerfil({ uid: uidPerfil, perfil: data ? traducirPerfilPropio(data) : null })
       })
     return () => { vivo = false; clearTimeout(tope); clearTimeout(reintento) }
-  }, [uid, intentoPerfil])
+  }, [api, uidPerfil, intentoPerfil])
 
   // ¿Lo que hay en memoria es de ESTA sesión? Se deriva comparando dueños, que
   // es lo que evita tener que vaciar el estado desde el efecto. Mientras no
   // coincidan, el perfil "todavía no se sabe" y el estado de abajo dice CARGANDO.
-  const perfilResuelto = uid != null && cargaPerfil.uid === uid
+  const perfilResuelto = uidPerfil != null && cargaPerfil.uid === uidPerfil
   const perfil = perfilResuelto ? cargaPerfil.perfil : undefined
+
+  // ── CFG-1 1b · el freno: desde cuándo puede cambiar de nombre ─────────────
+  // Con su dueño, como el perfil. Se pregunta al tener perfil y después de
+  // cada cambio de nombre (`vuelta`); si no contesta, se queda sin saber
+  // (`undefined`) y quien decide es el `update`, que trae la fecha si frena.
+  const [freno, setFreno] = useState({ uid: null, hasta: undefined, vuelta: 0 })
+  const tienePerfil = perfil != null
+  useEffect(() => {
+    if (!uidPerfil || !tienePerfil) return
+    let vivo = true
+    api.proximoCambio().then(({ data, error }) => {
+      if (!vivo || error) return
+      setFreno((f) => ({ ...f, uid: uidPerfil, hasta: fechaDelServidor(data) }))
+    }, () => {})
+    return () => { vivo = false }
+  }, [api, uidPerfil, tienePerfil, freno.vuelta])
+  const proximoCambio = freno.uid === uidPerfil ? freno.hasta : undefined
 
   // ── El estado DERIVADO, jamás sincronizado con un efecto ─────────────────
   // Molde de useUtilitiesMenu y useTapetes: `open`/`abierto` se derivan de su
@@ -276,7 +308,7 @@ export function useAuth() {
     window.location.reload()
   }, [])
 
-  const perfilVivo = AUTH_BYPASS ? PERFIL_DEV : (perfil ?? null)
+  const perfilVivo = AUTH_BYPASS ? (perfil ?? PERFIL_DEV) : (perfil ?? null)
 
   // ── Acciones ─────────────────────────────────────────────────────────────
   // Todas devuelven `{ ok, mensaje }` y NINGUNA lanza: quien las llama es un
@@ -330,19 +362,15 @@ export function useAuth() {
     // (23505, «ya está tomado»): ante un fallo de red o un 23505 se relee el
     // perfil, y si ya es suyo, está hecho.
     const trabajo = (async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert({ id: uid, username })
-        .select('id, username')
-        .single()
+      const { data, error } = await api.crear(uid, username)
       if (!error) {
-        setCargaPerfil({ uid, perfil: data })
+        setCargaPerfil({ uid, perfil: traducirPerfilPropio(data) })
         return { ok: true }
       }
       if (esFalloDeRed(error) || error.code === '23505') {
-        const leido = await supabase.from('profiles').select('id, username').eq('id', uid).maybeSingle()
+        const leido = await api.leer(uid)
         if (leido.data) {
-          setCargaPerfil({ uid, perfil: leido.data })
+          setCargaPerfil({ uid, perfil: traducirPerfilPropio(leido.data) })
           return { ok: true }
         }
         if (esFalloDeRed(error)) return { ok: false, mensaje: MENSAJE_RED }
@@ -351,26 +379,52 @@ export function useAuth() {
     })()
     const r = await conTope(trabajo, TOPE_ESPERA_MS, TOPE)
     return r === TOPE ? { ok: false, mensaje: MENSAJE_RED } : r
-  }, [uid])
+  }, [api, uid])
 
   // Mismo camino y misma traducción que el bautizo: el UPDATE pasa por el mismo
   // CHECK, el mismo disparador y el mismo índice único (§1.5).
+  // CFG-1 1b · y por el freno: AJ030 vuelve con `bloqueadoHasta` (la fecha del
+  // `hint`), que el Bautizo enseña en su estado bloqueado. Con el bypass lo
+  // contesta el banco imitado. Termina en el tope, como el alta (S7).
   const cambiarNombre = useCallback(async (username) => {
-    // Con bypass el perfil es de mentira y el `uid` no existe: sin esta rama el
-    // mensaje sería "la sesión expiró", que es falso y manda a buscar un problema
-    // donde no lo hay. Decírselo por su nombre cuesta una línea.
-    if (AUTH_BYPASS) return { ok: false, mensaje: 'Bypass de desarrollo: no hay cuenta real que renombrar' }
-    if (!uid) return { ok: false, mensaje: 'La sesión expiró — vuelve a entrar' }
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ username })
-      .eq('id', uid)
-      .select('id, username')
-      .single()
-    if (error) return { ok: false, mensaje: traducirErrorUsername(error) }
-    setCargaPerfil({ uid, perfil: data })
+    if (!uidPerfil) return { ok: false, mensaje: 'La sesión expiró — vuelve a entrar' }
+    const r = await conTope(api.actualizar(uidPerfil, { username }), TOPE_ESPERA_MS, TOPE)
+    if (r === TOPE) return { ok: false, mensaje: MENSAJE_RED }
+    const { data, error } = r
+    if (error) {
+      const hasta = fechaDelFreno(error)
+      if (hasta) {
+        setFreno((f) => ({ ...f, uid: uidPerfil, hasta }))
+        return { ok: false, bloqueadoHasta: hasta }
+      }
+      if (esFalloDeRed(error)) return { ok: false, mensaje: MENSAJE_RED }
+      return { ok: false, mensaje: traducirErrorUsername(error) }
+    }
+    setCargaPerfil({ uid: uidPerfil, perfil: traducirPerfilPropio(data) })
+    setFreno((f) => ({ uid: null, hasta: undefined, vuelta: f.vuelta + 1 }))
     return { ok: true }
-  }, [uid])
+  }, [api, uidPerfil])
+
+  // CFG-1 1b · ¿está libre? (`nombre_libre`, §0-9). `libre: null` si no se
+  // pudo saber: el editor enseña el aviso de 30 días igual y la base decide.
+  const comprobarNombre = useCallback(async (username) => {
+    const r = await conTope(api.nombreLibre(username), TOPE_ESPERA_MS, TOPE)
+    if (r === TOPE || r.error) return { libre: null }
+    return { libre: r.data === true }
+  }, [api])
+
+  // CFG-1 1b · el lugar se guarda solo, al elegir (§0-1). Sin Venezuela el
+  // estado va nulo EN EL MISMO update: si no, el CHECK lo rechaza (nota del
+  // rector al STOP-B1).
+  const cambiarLugar = useCallback(async (pais, estado = null) => {
+    if (!uidPerfil) return { ok: false, mensaje: 'La sesión expiró — vuelve a entrar' }
+    const campos = { pais: pais ?? null, estado: pais === 'VE' ? (estado ?? null) : null }
+    const r = await conTope(api.actualizar(uidPerfil, campos), TOPE_ESPERA_MS, TOPE)
+    if (r === TOPE || esFalloDeRed(r.error)) return { ok: false, mensaje: MENSAJE_RED }
+    if (r.error) return { ok: false, mensaje: 'No se pudo guardar — inténtalo de nuevo' }
+    setCargaPerfil({ uid: uidPerfil, perfil: traducirPerfilPropio(r.data) })
+    return { ok: true }
+  }, [api, uidPerfil])
 
   // Con bypass no hay sesión que cerrar: llamar al SDK sólo tocaría el
   // almacenamiento sin efecto. CFG-1 1c · lo que hace es ir a la Portada.
@@ -380,7 +434,7 @@ export function useAuth() {
   }, [])
 
   return {
-    estado, perfil: perfilVivo, correo: sesion?.user?.email ?? null,
-    enviarCodigo, verificarCodigo, crearPerfil, cambiarNombre, cerrarSesion, reintentar,
+    estado, perfil: perfilVivo, correo: sesion?.user?.email ?? null, proximoCambio,
+    enviarCodigo, verificarCodigo, crearPerfil, cambiarNombre, comprobarNombre, cambiarLugar, cerrarSesion, reintentar,
   }
 }

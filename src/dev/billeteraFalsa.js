@@ -45,6 +45,7 @@ import { crearConstanciaApi } from '../lib/constanciaApi'
 import { crearVideoApi } from '../lib/videoApi'
 import { crearRankingApi } from '../lib/rankingApi'
 import { crearCuentaApi } from '../lib/cuentaApi'
+import { crearPerfilApi } from '../lib/perfilApi'
 import { crearBanco, VIDEO_MINIMO_S_SQL } from './bancoImitado'
 import { sembradosRanking, PUNTOS_DEL_BYPASS } from './sembradosRanking'
 import { siembraAPU, entradaSembradaAPU, videoSembradoAPU } from './siembraAPU'
@@ -182,6 +183,47 @@ export function simulacionCuenta() {
   b.cuenta.forzar = mando === 'borrar-mesa' ? 'mesa' : mando === 'borrar-ok' ? 'ok' : null
   if (mando === 'borrar-401') b.cuenta.borrada = true
   return crearCuentaApi(clienteFuncionesDe(b, { tarda: CUENTA_TARDA_MS, mando }))
+}
+
+// ── CFG-1 1b · el perfil propio contra el banco imitado ────────────────────
+// Rector: AJILEI_CFG-1_Fase1b_v1.0.md §2.10 (R-5). Un cliente con la forma de
+// lo que `perfilApi` usa de Supabase (`from('profiles')…` y `rpc`), así que el
+// bypass cambia de nombre y de lugar por la capa real. Los mandos `?cfg=`:
+//   ?cfg=nombre-libre      → `nombre_libre` dice sí y el cambio pasa (si la forma vale)
+//   ?cfg=nombre-ocupado    → dice no, y el cambio contesta 23505
+//   ?cfg=nombre-vedado     → dice no, y el cambio contesta P0001
+//   ?cfg=nombre-bloqueado  → el último cambio fue hace 2 días: el freno, con su fecha
+// Sin mando, lo que diga el banco: los nombres de los sembrados están
+// ocupados y los vedados de su muestra, vedados. Cada respuesta (menos la
+// lectura) tarda `PERFIL_TARDA_MS`, para que «Guardando…» se vea.
+const PERFIL_TARDA_MS = 450
+const FRENO_DEMO_MS = 2 * 24 * 3600 * 1000
+
+/** Un cliente con la forma de `supabase` para `perfilApi`: `from('profiles')` y `rpc`. */
+export function clientePerfilDe(b, { tarda = 0 } = {}) {
+  const espera = (v) => (tarda > 0 ? new Promise((ok) => setTimeout(() => ok(v), tarda)) : Promise.resolve(v))
+  const fin = (r) => ({ maybeSingle: () => espera(r), single: () => espera(r) })
+  return {
+    from: () => ({
+      // La lectura no espera: el bypass nace con su nombre, como antes.
+      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve(b.leerPerfil()) }) }),
+      update: (campos) => ({ eq: () => ({ select: () => fin(b.actualizarPerfil(campos)) }) }),
+      insert: () => ({ select: () => fin({ data: null, error: { code: '23505', message: 'el bypass ya tiene perfil' } }) }),
+    }),
+    rpc: (nombre, params) => b.rpc(nombre, params).then(espera),
+  }
+}
+
+/** La API del perfil contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionPerfil() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  const mando = mandoCfg()
+  if (mando === 'nombre-bloqueado') b.nombreCambiadoHace(FRENO_DEMO_MS)
+  const fuerza = { 'nombre-libre': 'libre', 'nombre-ocupado': 'ocupado', 'nombre-vedado': 'vedado' }[mando] ?? null
+  b.forzarNombre(fuerza)
+  return crearPerfilApi(clientePerfilDe(b, { tarda: PERFIL_TARDA_MS }))
 }
 
 /** Para las pruebas: un banco nuevo en la siguiente llamada. */

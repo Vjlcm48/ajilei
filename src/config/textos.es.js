@@ -587,6 +587,39 @@ export const TEXTOS_ES = {
   'rnk.suma.continuar':    'Continuar a Rankings',
   'rnk.suma.sonido.aria':  'Activar el sonido',
   'rnk.suma.linea':        'SumaMente · Ver en Google Play',
+
+  // ── CFG-1 1b · El perfil editable ────────────────────────────────────────
+  // Rector: AJILEI_CFG-1_Fase1b_v1.0.md §2.9 (R-14 del informe 1b-L). Los
+  // nombres de país NO están aquí: vienen de CLDR (`config/paises.js`). Lo
+  // que dice el Bautizo en modo edición sobre el freno también es `perfil.*`:
+  // el resto del Bautizo sigue fuera del diccionario (IDI-1).
+  'perfil.titulo':               'Perfil',
+  'perfil.fila.avatar':          'Avatar',
+  'perfil.fila.nombre':          'Nombre de usuario',
+  'perfil.fila.lugar':           'De dónde eres',
+  'perfil.fila.correo':          'Correo',
+  'perfil.sin_elegir':           'Sin elegir',
+  'perfil.proximo':              'Próximo cambio: {fecha}',
+  'perfil.avatar.pronto':        'Avatares en la tienda',
+  'perfil.lugar.buscar':         'Busca tu país',
+  'perfil.lugar.borrar':         'Borrar la búsqueda',
+  'perfil.lugar.paises':         'Países',
+  'perfil.lugar.nada':           'Prefiero no decirlo',
+  'perfil.lugar.diaspora':       'Donde más estamos',
+  'perfil.lugar.todos':          'Todos los países',
+  'perfil.lugar.vacio':          'No encontramos ese país',
+  'perfil.lugar.estado':         '{pais} · ¿de qué estado?',
+  'perfil.lugar.estados':        'Estados de {pais}',
+  'perfil.lugar.sin_estado':     'Sin estado',
+  'perfil.guardado':             'Guardado',
+  'perfil.listo':                'Listo: ahora eres {nombre}',
+  'perfil.error':                'No se pudo guardar. Inténtalo de nuevo.',
+  'perfil.nombre.aviso.titulo':  '¿Cambiar tu nombre a {nombre}?',
+  'perfil.nombre.aviso.texto':   'Después de este cambio no podrás cambiar tu nombre durante 30 días.',
+  'perfil.nombre.aviso.cambiar': 'Cambiar',
+  'perfil.nombre.cancelar':      'Cancelar',
+  'perfil.nombre.cerrar':        'Cerrar',
+  'perfil.nombre.bloqueado':     'Podrás cambiarlo de nuevo el {fecha}.',
 }
 
 export default TEXTOS_ES

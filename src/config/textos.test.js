@@ -92,7 +92,10 @@ describe('IDI-0 · diccionario es', () => {
     //
     // RNK-1c es la séptima: `rnk.*` es la pantalla «Rankings» (y, con la 1c-ii
     // y la 1e, su mini-perfil y la tarjeta de SumaMente).
-    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.']
+    //
+    // CFG-1 1b es la octava: `perfil.*` es la pantalla de perfil (y lo que el
+    // Bautizo en modo edición dice del freno).
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
@@ -196,6 +199,21 @@ describe('IDI-0 · diccionario es', () => {
     //     «Cerrar»: el nombre accesible de la ✕ de la ventana «Eliminar cuenta»
     //     y de la del mini-perfil. Dos ventanas de dos campañas; un idioma
     //     futuro puede querer «Cerrar sin eliminar» en la primera.
+    //
+    //   lob.eliminar.cancelar = perfil.nombre.cancelar  (CFG-1 1b)
+    //   lob.eliminar.cerrar = perfil.nombre.cerrar      (CFG-1 1b)
+    //     «Cancelar» y «Cerrar» del Bautizo en modo edición y de la ventana de
+    //     los 30 días, y los de «Eliminar cuenta». Dos ventanas de dos fases;
+    //     la de eliminar puede querer «Cerrar sin eliminar» sin tocar ésta.
+    //
+    //   lob.perfil.aria = perfil.titulo  (CFG-1 1b)
+    //     «Perfil»: el nombre accesible del botón de la barra y el título de la
+    //     pantalla que abre (como `lob.nav.rankings = rnk.titulo`).
+    //
+    //   perfil.fila.correo = rnk.perfil.correo  (CFG-1 1b)
+    //     «Correo»: la fila del perfil y la línea del mini-perfil propio. Dos
+    //     superficies; la fila puede querer «Correo electrónico» cuando la 1d
+    //     la encienda.
     expect(repetidos.sort()).toEqual([
       'ia.recarga.opcion.medio = ia.retar.entrada.medio',
       'ia.recarga.opcion.piso = ia.retar.entrada.piso',
@@ -204,9 +222,13 @@ describe('IDI-0 · diccionario es', () => {
       'ia.retar.jugadores = sal.armar.jugadores',
       'lob.ajustes.aria = lob.cfg.titulo',
       'lob.cta.pvp = sal.opciones.titulo',
+      'lob.eliminar.cancelar = perfil.nombre.cancelar',
+      'lob.eliminar.cerrar = perfil.nombre.cerrar',
       'lob.eliminar.cerrar = rnk.perfil.cerrar',
       'lob.nav.rankings = rnk.titulo',
+      'lob.perfil.aria = perfil.titulo',
       'lob.toast.copiado = sal.espera.codigo.copiado',
+      'perfil.fila.correo = rnk.perfil.correo',
       'sal.armar.abierta = sal.espera.tipo.abierta',
       'sal.armar.privada = sal.espera.tipo.privada',
       'sal.armar.titulo = sal.opciones.armar',

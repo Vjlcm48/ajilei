@@ -33,7 +33,7 @@ describe('RNK-1c · rankingApi contra el banco imitado', () => {
       expect(r.ok).toBe(true)
       expect(r.filas).toHaveLength(100)
       const delBanco = b.llamar('ranking_top', { p_ranking: ranking })
-      expect(r.filas).toEqual(delBanco.map((f) => ({ puesto: f.puesto, username: f.username, cifra: f.cifra, esTu: f.es_tu })))
+      expect(r.filas).toEqual(delBanco.map((f) => ({ puesto: f.puesto, username: f.username, cifra: f.cifra, esTu: f.es_tu, pais: f.pais, estado: f.estado })))
       expect(r.filas.map((f) => f.puesto)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1))
     }
   })
@@ -42,7 +42,7 @@ describe('RNK-1c · rankingApi contra el banco imitado', () => {
     const b = crearBanco({ usuario: 'test1976' })
     b.sumarPuntos('test1976', 3)
     const r = await crearRankingApi(b).top('maestros')
-    expect(r).toEqual({ ok: true, filas: [{ puesto: 1, username: 'test1976', cifra: 3, esTu: true }] })
+    expect(r).toEqual({ ok: true, filas: [{ puesto: 1, username: 'test1976', cifra: 3, esTu: true, pais: null, estado: null }] })
   })
 
   it('mio: null sin puntos en Maestros; en Fortunas siempre hay fila', async () => {
@@ -93,7 +93,7 @@ describe('RNK-1c · «hay fila» se decide por el contenido', () => {
     expect(traducirFilaTop({ puesto: 1.5, username: 'x', cifra: 1 })).toBe(null)
     expect(traducirFilaTop({ puesto: 1, username: null, cifra: 1 })).toBe(null)
     expect(traducirFilaTop({ puesto: '3', username: 'x', cifra: '48700', es_tu: false }))
-      .toEqual({ puesto: 3, username: 'x', cifra: 48700, esTu: false })
+      .toEqual({ puesto: 3, username: 'x', cifra: 48700, esTu: false, pais: null, estado: null })
   })
 
   it('mio: [] o una fila de nulos = sin fila', () => {
@@ -121,7 +121,7 @@ describe('RNK-1c · los sembrados del bypass', () => {
     expect(m).toEqual(expect.objectContaining({ puesto: 7, total: 130 }))
     expect(f.total).toBe(140)
     const top = b.llamar('ranking_top', { p_ranking: 'maestros' })
-    expect(top[6]).toEqual({ puesto: 7, username: 'DevLocal', cifra: PUNTOS_DEL_BYPASS, es_tu: true })
+    expect(top[6]).toEqual(expect.objectContaining({ puesto: 7, username: 'DevLocal', cifra: PUNTOS_DEL_BYPASS, es_tu: true }))
     expect(b.llamar('ranking_top', { p_ranking: 'fortunas' })[0].username).toBe('ElCatire88')
   })
 })
@@ -151,9 +151,9 @@ describe('RNK-1c-ii · rankingApi.perfil', () => {
     const b = bancoDelBypass()
     const api = crearRankingApi(b)
     const r = await api.perfil('bachaquero_ve')
-    expect(r).toEqual({ ok: true, perfil: { username: 'Bachaquero_VE', puestoMaestros: 1, puntos: 96, puestoFortunas: expect.any(Number), saldo: expect.any(Number) } })
+    expect(r).toEqual({ ok: true, perfil: { username: 'Bachaquero_VE', puestoMaestros: 1, puntos: 96, puestoFortunas: expect.any(Number), saldo: expect.any(Number), pais: 'VE', estado: null } })
     expect(JSON.stringify(r)).not.toMatch(UUID)
-    expect(Object.keys(r.perfil).sort()).toEqual(['puestoFortunas', 'puestoMaestros', 'puntos', 'saldo', 'username'])
+    expect(Object.keys(r.perfil).sort()).toEqual(['estado', 'pais', 'puestoFortunas', 'puestoMaestros', 'puntos', 'saldo', 'username'])
   })
 
   it('contra el banco: sin puntos → puesto y puntos de Maestros nulos; la cuenta del bypass en el 7', async () => {
@@ -167,10 +167,17 @@ describe('RNK-1c-ii · rankingApi.perfil', () => {
     expect(await api.perfil('Inventado_99')).toEqual({ ok: true, perfil: null })
   })
 
+  it('CFG-1 1b · el lugar llega validado: fuera de la lista, sin lugar', () => {
+    expect(traducirFilaTop({ puesto: 1, username: 'x', cifra: 1, pais: 'VE', estado: 'ZUL' })).toMatchObject({ pais: 'VE', estado: 'ZUL' })
+    expect(traducirFilaTop({ puesto: 1, username: 'x', cifra: 1, pais: 'ES', estado: 'ZUL' })).toMatchObject({ pais: 'ES', estado: null })
+    expect(traducirFilaTop({ puesto: 1, username: 'x', cifra: 1, pais: 'XK', estado: null })).toMatchObject({ pais: null, estado: null })
+    expect(traducirPerfil([{ username: 'x', pais: 'VE', estado: 'ESQ' }])).toMatchObject({ pais: 'VE', estado: null })
+  })
+
   it('la fila del servidor con campos de más (uuid, correo) no los deja pasar', () => {
     const p = traducirPerfil([{ username: 'test1976', puesto_maestros: '1', puntos: '3', puesto_fortunas: 1, saldo: '5000',
       id: '0ca90000-0000-4000-8000-00000000ca91', email: 'x@y.z' }])
-    expect(p).toEqual({ username: 'test1976', puestoMaestros: 1, puntos: 3, puestoFortunas: 1, saldo: 5000 })
+    expect(p).toEqual({ username: 'test1976', puestoMaestros: 1, puntos: 3, puestoFortunas: 1, saldo: 5000, pais: null, estado: null })
   })
 
   const casos = {

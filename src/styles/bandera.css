@@ -1,0 +1,30 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · CFG-1 1b · La bandera (`components/Bandera.jsx`)
+   Rector: AJILEI_CFG-1_Fase1b_v1.0.md §0-3 (V7-A). Es el §1 de la hoja de la
+   lámina (`laminas/cfg1b/cfg1b.css`), en su propio archivo: la bandera sale
+   en el perfil, en el mini-perfil, en Rankings y en la hoja ⚙, y la importa
+   el componente, no una pantalla. Sin `!important` ni un hex.
+
+   Una sola caja para los dos dibujos (la bandera rectangular 3:2 y el isotipo
+   de «sin país»): el alto lo pone `--band-h` en cada sitio y el ancho sale de
+   la forma. El isotipo ocupa la MISMA caja (O1: elegir país no mueve el texto
+   de al lado) y va en tenue. El filete de 1 px separa del fondo los blancos y
+   los amarillos (España, Venezuela, Mónaco). Esquinas apenas redondeadas.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.cfg-band {
+  display: inline-block;
+  flex: none;
+  height: var(--band-h, 1em);
+  width: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  vertical-align: middle;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(var(--text-primary-rgb), 0.16);
+}
+.cfg-band.es-iso {
+  object-fit: contain;
+  opacity: 0.38;
+  border-radius: 0;
+  box-shadow: none;
+}

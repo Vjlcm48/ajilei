@@ -23,6 +23,9 @@
 // `informar_pila` con `p_fin_mano` y `p_fin_ajilei`, el libro de puntos, el
 // total por jugador y las tres lecturas del ranking (`ranking_top`,
 // `ranking_mio`, `mini_perfil`), contra unos cuantos jugadores sembrados.
+// CFG-1 1b le suma la `20261030013000_cfg1b_perfil.sql`: el perfil propio
+// (`pais`, `estado`, el freno de 30 días del nombre), `nombre_libre`,
+// `mi_proximo_cambio` y el lugar en `ranking_top` y `mini_perfil`.
 // `rpc(nombre, params)` devuelve `{ data, error }` con la forma
 // de PostgREST: el compuesto `mesa_ia_resultado` llega como objeto con las
 // claves en snake_case, y `mi_mesa_ia` y las lecturas del ranking como lista.
@@ -53,6 +56,29 @@ export const LIMITES_SQL = Object.freeze({
   pedir_boleto: 10, cobrar_boleto: 20,
 })
 export const BONO_CONSTANCIA_SQL = 500
+// CFG-1 1b · el freno del nombre (`freno_nombre_hasta`: 30 días en UTC, que no
+// tiene cambio de hora, así que son 30 × 24 h exactas), la forma del CHECK de
+// SUP-2a, los códigos de estado de la lista sellada y una MUESTRA de los
+// vedados (los de la casa y alguno más): el banco no es la autoridad de la
+// lista, y el SQL no la duplica (`username_vedado`).
+export const FRENO_NOMBRE_MS_SQL = 30 * 24 * 3600 * 1000
+export const FORMA_USERNAME_SQL = /^[A-Za-z0-9_]{6,15}$/
+export const ESTADOS_VE_SQL = Object.freeze([
+  'AMA', 'ANZ', 'APU', 'ARA', 'BAR', 'BOL', 'CAR', 'COJ', 'DEL', 'DC',
+  'FAL', 'GUA', 'LGU', 'LAR', 'MER', 'MIR', 'MON', 'NES', 'POR', 'SUC',
+  'TAC', 'TRU', 'YAR', 'ZUL'])
+const VEDADOS_MUESTRA = ['admin', 'moderador', 'soporte', 'ajilei', 'heptacoin', 'sistema', 'oficial', 'pendejo', 'mierda', 'puta']
+/** `normalizar_username` de SUP-2a: minúsculas, 0→o 1→i 3→e 4→a 5→s 7→t, sin `_`. */
+export function normalizarUsernameSQL(txt) {
+  const mapa = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't' }
+  return String(txt).toLowerCase().replace(/[013457_]/g, (c) => mapa[c] ?? '')
+}
+const vedado = (txt) => {
+  const n = normalizarUsernameSQL(txt)
+  return VEDADOS_MUESTRA.some((w) => n.includes(w))
+}
+// El `hint` del freno: el ISO de `to_char(…, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`, sin milisegundos.
+const isoSegundos = (ms) => new Date(Math.floor(ms / 1000) * 1000).toISOString().replace('.000Z', 'Z')
 export const CICLO_CONSTANCIA_SQL = 3
 // ECO-1g · `video_premio_hc()`, `video_tope_dia()`, `video_minimo_s()` y
 // `video_vida_boleto()` (10 minutos, aquí en ms).
@@ -152,7 +178,9 @@ export function crearBanco({
     // RNK-1b
     puntos: [],                // `libro_puntos` de la cuenta: { origen, nivel, sentados, puntos_base, ajilei, extra, mesa_id, mano, creado_en }
     total: null,               // `puntos_totales` de la cuenta: { puntos, manos, ajileis, actualizado_en }, o ninguna
-    otros: [],                 // los demás jugadores: { username, saldo, saldoEn, total }
+    otros: [],                 // los demás jugadores: { username, saldo, saldoEn, total, pais, estado }
+    // CFG-1 1b · la fila propia de `profiles` (el nombre es `usuario`)
+    perfil: { id: '00000000-0000-4000-8000-000000000000', pais: null, estado: null, cambiadoEn: null, forzar: null },
   }
 
   // ── El libro (1a): una línea por cambio, clave única ─────────────────────
@@ -375,9 +403,9 @@ export function crearBanco({
   // ── RNK-1a · las tres lecturas del ranking ───────────────────────────────
   // Los demás jugadores (las cuentas fabricadas del guion): saldo y, si tiene
   // puntos, su total, cada uno con su fecha.
-  function sembrar({ username, puntos = null, saldo = 0, puntosEn = ahora(), saldoEn = ahora(), manos, ajileis = 0 }) {
+  function sembrar({ username, puntos = null, saldo = 0, puntosEn = ahora(), saldoEn = ahora(), manos, ajileis = 0, pais = null, estado = null }) {
     b.otros.push({
-      username, saldo, saldoEn,
+      username, saldo, saldoEn, pais, estado,
       total: puntos ? { puntos, manos: manos ?? puntos, ajileis, actualizado_en: puntosEn } : null,
     })
   }
@@ -385,6 +413,7 @@ export function crearBanco({
     sembrar({
       username: j.username, puntos: j.puntos, saldo: j.saldo ?? 0,
       puntosEn: nace - (j.puntosHace ?? 0), saldoEn: nace - (j.saldoHace ?? 0),
+      pais: j.pais ?? null, estado: j.estado ?? null,
     })
   }
 
@@ -400,11 +429,11 @@ export function crearBanco({
     let filas
     if (ranking === 'maestros') {
       filas = b.otros.filter((o) => o.total)
-        .map((o) => ({ username: o.username, cifra: o.total.puntos, fecha: o.total.actualizado_en, yo: false }))
-      if (b.total) filas.push({ username: usuario, cifra: b.total.puntos, fecha: b.total.actualizado_en, yo: true })
+        .map((o) => ({ username: o.username, cifra: o.total.puntos, fecha: o.total.actualizado_en, yo: false, pais: o.pais, estado: o.estado }))
+      if (b.total) filas.push({ username: usuario, cifra: b.total.puntos, fecha: b.total.actualizado_en, yo: true, pais: b.perfil.pais, estado: b.perfil.estado })
     } else if (ranking === 'fortunas') {
-      filas = b.otros.map((o) => ({ username: o.username, cifra: o.saldo, fecha: o.saldoEn, yo: false }))
-      filas.push({ username: usuario, cifra: b.saldo, fecha: b.saldoEn, yo: true })
+      filas = b.otros.map((o) => ({ username: o.username, cifra: o.saldo, fecha: o.saldoEn, yo: false, pais: o.pais, estado: o.estado }))
+      filas.push({ username: usuario, cifra: b.saldo, fecha: b.saldoEn, yo: true, pais: b.perfil.pais, estado: b.perfil.estado })
     } else {
       return null
     }
@@ -415,7 +444,9 @@ export function crearBanco({
   function rankingTop({ p_ranking = null } = {}) {
     const filas = filasRanking(p_ranking)
     if (!filas) return []
-    return filas.slice(0, 100).map((f, i) => ({ puesto: i + 1, username: f.username, cifra: f.cifra, es_tu: f.yo }))
+    return filas.slice(0, 100).map((f, i) => ({
+      puesto: i + 1, username: f.username, cifra: f.cifra, es_tu: f.yo, pais: f.pais, estado: f.estado,
+    }))
   }
 
   // `ranking_mio`: en Maestros sin puntos, CERO filas («Gana tu primera mano
@@ -432,10 +463,10 @@ export function crearBanco({
   function miniPerfil({ p_username = null } = {}) {
     if (p_username === null || p_username === undefined) return []
     const buscado = String(p_username).toLowerCase()
-    const nombre = buscado === usuario.toLowerCase()
-      ? usuario
-      : b.otros.find((o) => o.username.toLowerCase() === buscado)?.username
+    const otro = b.otros.find((o) => o.username.toLowerCase() === buscado)
+    const nombre = buscado === usuario.toLowerCase() ? usuario : otro?.username
     if (!nombre) return []
+    const { pais, estado } = nombre === usuario ? b.perfil : otro
     const lugar = (ranking) => {
       const filas = filasRanking(ranking)
       const i = filas.findIndex((f) => f.username === nombre)
@@ -443,7 +474,56 @@ export function crearBanco({
     }
     const m = lugar('maestros')
     const f = lugar('fortunas')
-    return [{ username: nombre, puesto_maestros: m.puesto, puntos: m.cifra, puesto_fortunas: f.puesto, saldo: f.cifra }]
+    return [{ username: nombre, puesto_maestros: m.puesto, puntos: m.cifra, puesto_fortunas: f.puesto, saldo: f.cifra, pais, estado }]
+  }
+
+  // ── CFG-1 1b · el perfil propio ──────────────────────────────────────────
+  // `nombre_libre`: la forma, los vedados (la muestra) y que no lo tenga OTRO;
+  // el propio con otras mayúsculas cuenta como libre. `forzar` es el mando
+  // `?cfg=nombre-ocupado|vedado|libre` del bypass: contesta eso sin mirar.
+  const deOtro = (nombre) => b.otros.some((o) => o.username.toLowerCase() === String(nombre).toLowerCase())
+  function nombreLibre({ p = null } = {}) {
+    if (b.perfil.forzar === 'ocupado' || b.perfil.forzar === 'vedado') return false
+    if (typeof p !== 'string' || !FORMA_USERNAME_SQL.test(p)) return false
+    if (b.perfil.forzar === 'libre') return true
+    return !vedado(p) && !deOtro(p)
+  }
+  const frenoHasta = () => (b.perfil.cambiadoEn === null ? null : b.perfil.cambiadoEn + FRENO_NOMBRE_MS_SQL)
+  // `mi_proximo_cambio`: el instante ISO, o nulo si ya puede.
+  function miProximoCambio() {
+    const h = frenoHasta()
+    return h !== null && ahora() < h ? iso(h) : null
+  }
+  const errorSQL = (code, message, hint = null) => ({ code, message, details: null, hint })
+  const filaPerfil = () => ({ id: b.perfil.id, username: usuario, pais: b.perfil.pais, estado: b.perfil.estado })
+  // El `update` de `profiles` con las tres columnas del `grant`, en el orden
+  // del SQL: el freno (`profiles_freno_…` va antes que el portero), los
+  // vedados (el portero, solo si el nombre cambia), los CHECK y el índice
+  // único. Contesta como PostgREST, `{ data, error }`.
+  function actualizarPerfil(campos = {}) {
+    const nuevo = { username: usuario, pais: b.perfil.pais, estado: b.perfil.estado, ...campos }
+    const cambiaNombre = String(nuevo.username).toLowerCase() !== usuario.toLowerCase()
+    if (cambiaNombre) {
+      const h = frenoHasta()
+      if (h !== null && ahora() < h) return { data: null, error: errorSQL('AJ030', 'nombre_frenado', isoSegundos(h)) }
+    }
+    if (nuevo.username !== usuario && (b.perfil.forzar === 'vedado' || (b.perfil.forzar !== 'libre' && vedado(nuevo.username)))) {
+      return { data: null, error: errorSQL('P0001', 'AJILEI: el nombre no esta disponible') }
+    }
+    if (typeof nuevo.username !== 'string' || !FORMA_USERNAME_SQL.test(nuevo.username)) {
+      return { data: null, error: errorSQL('23514', 'profiles_username_formato_chk') }
+    }
+    if (nuevo.pais !== null && !/^[A-Z]{2}$/.test(nuevo.pais)) return { data: null, error: errorSQL('23514', 'profiles_pais_formato_chk') }
+    if (nuevo.estado !== null && nuevo.pais !== 'VE') return { data: null, error: errorSQL('23514', 'profiles_estado_solo_ve_chk') }
+    if (nuevo.estado !== null && !ESTADOS_VE_SQL.includes(nuevo.estado)) return { data: null, error: errorSQL('23514', 'profiles_estado_lista_chk') }
+    if (cambiaNombre && (b.perfil.forzar === 'ocupado' || (b.perfil.forzar !== 'libre' && deOtro(nuevo.username)))) {
+      return { data: null, error: errorSQL('23505', 'profiles_username_lower_uniq') }
+    }
+    if (cambiaNombre) b.perfil.cambiadoEn = ahora()
+    usuario = nuevo.username
+    b.perfil.pais = nuevo.pais
+    b.perfil.estado = nuevo.estado
+    return { data: filaPerfil(), error: null }
   }
 
   function salir({ p_mesa, p_fichas, p_seq }) {
@@ -593,6 +673,8 @@ export function crearBanco({
     ranking_top: rankingTop,
     ranking_mio: rankingMio,
     mini_perfil: miniPerfil,
+    nombre_libre: nombreLibre,
+    mi_proximo_cambio: miProximoCambio,
   }
 
   return {
@@ -607,6 +689,16 @@ export function crearBanco({
     llamar(nombre, params = {}) {
       return RPC[nombre]?.(params ?? {}) ?? null
     },
+    // ── CFG-1 1b · `profiles` del jugador de la sesión ─────────────────────
+    /** `select … from profiles where id = …`: la fila propia. */
+    leerPerfil() { return { data: filaPerfil(), error: null } },
+    /** `update profiles set … where id = …`, como PostgREST: `{ data, error }`. */
+    actualizarPerfil(campos) { return actualizarPerfil(campos) },
+    /** Lo que el guion hace con `cfg1b_mover`: el último cambio fue hace `ms`. */
+    nombreCambiadoHace(ms) { b.perfil.cambiadoEn = ahora() - ms },
+    /** Mando del bypass: `nombre_libre` y el `update` contestan 'ocupado', 'vedado' o 'libre' (null = lo que diga el banco). */
+    forzarNombre(que) { b.perfil.forzar = que },
+    get perfil() { return { ...filaPerfil(), nombre_cambiado_en: b.perfil.cambiadoEn === null ? null : iso(b.perfil.cambiadoEn) } },
     // ── CFG-1 1c · la Edge Function `eliminar_cuenta` ──────────────────────
     // No es una RPC: contesta `{ status, cuerpo }`, lo que la función manda por
     // HTTP. La guarda es la de `partida_abierta_de`: una mesa IA abierta (la de

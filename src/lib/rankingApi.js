@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { conTope, TOPE_ESPERA_MS } from './red'
+import { lugarValido } from './lugarCore'
 
 // ── RNK-1c · La puerta del cliente a los rankings ───────────────────────────
 // Rector: AJILEI_RNK-1_Fase1c-i_v1.0.md §2.4. Molde de `mesaIAApi.js`:
@@ -36,13 +37,17 @@ const entero = (v) => {
   return Number.isInteger(n) ? n : null
 }
 
-/** Una fila de `ranking_top` → `{ puesto, username, cifra, esTu }`, o `null`. */
+// CFG-1 1b · `ranking_top` y `mini_perfil` traen `pais` y `estado` (migración
+// `20261030013000_cfg1b_perfil.sql`). Se copian validados contra las listas
+// (`lugarValido`, INV-74): lo que no está en ellas se lee como «sin lugar».
+
+/** Una fila de `ranking_top` → `{ puesto, username, cifra, esTu, pais, estado }`, o `null`. */
 export function traducirFilaTop(f) {
   if (!f || typeof f !== 'object' || typeof f.username !== 'string') return null
   const puesto = entero(f.puesto)
   const cifra = num(f.cifra)
   if (puesto === null || cifra === null) return null
-  return { puesto, username: f.username, cifra, esTu: f.es_tu === true }
+  return { puesto, username: f.username, cifra, esTu: f.es_tu === true, ...lugarValido(f.pais, f.estado) }
 }
 
 /** La respuesta de `ranking_mio` → `{ puesto, total, franja, cifra }`, o `null` (sin fila). */
@@ -74,6 +79,7 @@ export function traducirPerfil(data) {
     puntos: num(f.puntos),
     puestoFortunas: entero(f.puesto_fortunas),
     saldo: num(f.saldo),
+    ...lugarValido(f.pais, f.estado),
   }
 }
 

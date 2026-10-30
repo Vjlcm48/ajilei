@@ -7,7 +7,9 @@ import {
   LIMITES_SQL, BONO_CONSTANCIA_SQL, CICLO_CONSTANCIA_SQL, sumarDias,
   VIDEO_PREMIO_SQL, VIDEO_TOPE_SQL, VIDEO_MINIMO_S_SQL, VIDEO_VIDA_MS_SQL, videoReinicioSQL, diaChicagoSQL,
   PUNTOS_RETO_SQL, EXTRA_AJILEI_SQL, TOPE_MANOS_MINUTO_SQL, franjaSQL,
+  FRENO_NOMBRE_MS_SQL, ESTADOS_VE_SQL, normalizarUsernameSQL,
 } from './bancoImitado'
+import { ESTADOS_VE } from '../config/estados'
 import { NIVELES } from '../config/niveles'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
 import { CICLO_CONSTANCIA } from '../hooks/constanciaCore'
@@ -764,7 +766,8 @@ describe('RNK-1b · banco imitado · las lecturas del ranking (guion de la 1a)',
     expect(top.map((f) => [f.puesto, f.username, f.cifra, f.es_tu])).toEqual([
       [1, 'rnk_a_verif', 10, true], [2, 'rnk_d_verif', 5, false], [3, 'rnk_b_verif', 5, false], [4, 'rnk_e_verif', 1, false],
     ])
-    for (const f of top) expect(Object.keys(f).sort()).toEqual(['cifra', 'es_tu', 'puesto', 'username'])
+    // CFG-1 1b · con el lugar (`pais`, `estado`): seis columnas, ninguna uuid.
+    for (const f of top) expect(Object.keys(f).sort()).toEqual(['cifra', 'es_tu', 'estado', 'pais', 'puesto', 'username'])
   })
 
   it('B13 · ranking_mio maestros de A: puesto 1 de 4, franja 25 %, cifra 10', () => {
@@ -784,7 +787,7 @@ describe('RNK-1b · banco imitado · las lecturas del ranking (guion de la 1a)',
 
   it('B15 · mini_perfil: sin mayúsculas; nadie → cero filas; sin puntos → nulos; nunca un uuid', () => {
     expect(ll('mini_perfil', { p_username: 'RNK_D_VERIF' })).toEqual([
-      { username: 'rnk_d_verif', puesto_maestros: 2, puntos: 5, puesto_fortunas: expect.any(Number), saldo: 2500 },
+      { username: 'rnk_d_verif', puesto_maestros: 2, puntos: 5, puesto_fortunas: expect.any(Number), saldo: 2500, pais: null, estado: null },
     ])
     expect(ll('mini_perfil', { p_username: 'nadie' })).toEqual([])
     expect(ll('mini_perfil', { p_username: 'rnk_c_verif' })[0]).toMatchObject({ puesto_maestros: null, puntos: null, saldo: 2500 })
@@ -884,5 +887,108 @@ describe('CFG-1 1c · banco imitado · eliminar_cuenta', () => {
     sentar(ll, 'basico', 2, 50, 500, T(2))
     b.cuenta.forzar = 'ok'
     expect(b.eliminarCuenta().status).toBe(200)
+  })
+})
+
+// ── CFG-1 1b · el perfil propio y el freno, imitados ───────────────────────
+// Los casos del guion `supabase/pruebas/cfg1b_verificacion.sql` (B1–B11), con
+// el reloj del banco en lugar de `cfg1b_mover`.
+describe('CFG-1 1b · banco imitado · el freno del nombre (guion B1–B9)', () => {
+  const reloj = { t: 1_000_000_000_000 }
+  const b = crearBanco({ ahora: () => reloj.t, usuario: 'cfgb_a_verif', sembrados: [{ username: 'cfgb_b_verif', saldo: 10 }] })
+  const ll = (n, p) => b.llamar(n, p)
+  const DIA = 24 * 3600 * 1000
+
+  it('B1 · el primer cambio pasa y escribe la fecha', () => {
+    expect(b.perfil.nombre_cambiado_en).toBeNull()
+    const r = b.actualizarPerfil({ username: 'cfgb_a_nuevo' })
+    expect(r.error).toBeNull()
+    expect(r.data).toMatchObject({ username: 'cfgb_a_nuevo', pais: null, estado: null })
+    expect(b.perfil.nombre_cambiado_en).toBe(new Date(reloj.t).toISOString())
+    expect(b.usuario).toBe('cfgb_a_nuevo')
+  })
+  it('B2 · a los 10 días: AJ030 nombre_frenado, con la fecha en el hint; mi_proximo_cambio la misma', () => {
+    b.nombreCambiadoHace(10 * DIA)
+    const hasta = reloj.t + 20 * DIA
+    const r = b.actualizarPerfil({ username: 'cfgb_a_otro1' })
+    expect(r.error).toMatchObject({ code: 'AJ030', message: 'nombre_frenado' })
+    expect(new Date(r.error.hint).getTime()).toBe(Math.floor(hasta / 1000) * 1000)
+    expect(r.error.hint).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/)
+    expect(ll('mi_proximo_cambio')).toBe(new Date(hasta).toISOString())
+    expect(b.usuario).toBe('cfgb_a_nuevo')
+  })
+  it('B3 · solo mayúsculas dentro del freno: pasa sin mover la fecha', () => {
+    const antes = b.perfil.nombre_cambiado_en
+    expect(b.actualizarPerfil({ username: 'CfgB_A_Nuevo' }).error).toBeNull()
+    expect(b.perfil.nombre_cambiado_en).toBe(antes)
+  })
+  it('B5 · a los 31 días el cambio pasa y el freno vuelve a empezar', () => {
+    b.nombreCambiadoHace(31 * DIA)
+    expect(ll('mi_proximo_cambio')).toBeNull()
+    expect(b.actualizarPerfil({ username: 'cfgb_a_final' }).error).toBeNull()
+    expect(ll('mi_proximo_cambio')).toBe(new Date(reloj.t + FRENO_NOMBRE_MS_SQL).toISOString())
+  })
+  it('B6 · nombre_libre', () => {
+    reloj.t += 31 * DIA
+    expect(ll('nombre_libre', { p: 'cfgb_libre_x1' })).toBe(true)
+    expect(ll('nombre_libre', { p: 'CFGB_B_VERIF' })).toBe(false)
+    expect(ll('nombre_libre', { p: 'admin_cfgb1' })).toBe(false)
+    expect(ll('nombre_libre', { p: 'cfg b' })).toBe(false)
+    expect(ll('nombre_libre', { p: 'CFGB_A_FINAL' })).toBe(true)
+    expect(ll('nombre_libre', { p: null })).toBe(false)
+  })
+  it('ocupado y vedado: 23505 y P0001, y no gastan el freno', () => {
+    expect(b.actualizarPerfil({ username: 'CFGB_B_VERIF' }).error.code).toBe('23505')
+    expect(b.actualizarPerfil({ username: 'Ajilei_Oficial' }).error.code).toBe('P0001')
+    expect(b.actualizarPerfil({ username: 'cfg b' }).error.code).toBe('23514')
+    expect(ll('mi_proximo_cambio')).toBeNull()
+  })
+  it('B7 · lugar: los cuatro inválidos dan 23514; los válidos pasan', () => {
+    expect(b.actualizarPerfil({ pais: 've', estado: null }).error.code).toBe('23514')
+    expect(b.actualizarPerfil({ pais: 'ES', estado: 'ZUL' }).error.code).toBe('23514')
+    expect(b.actualizarPerfil({ pais: 'VE', estado: 'ESQ' }).error.code).toBe('23514')
+    expect(b.actualizarPerfil({ pais: null, estado: 'ZUL' }).error.code).toBe('23514')
+    expect(b.actualizarPerfil({ pais: 'VE', estado: 'LGU' }).error).toBeNull()
+    // Al dejar Venezuela con el estado puesto, el CHECK lo rechaza: `cambiarLugar` manda estado = null.
+    expect(b.actualizarPerfil({ pais: 'ES' }).error.code).toBe('23514')
+    expect(b.actualizarPerfil({ pais: 'ES', estado: null }).error).toBeNull()
+    expect(b.actualizarPerfil({ pais: null, estado: null }).error).toBeNull()
+  })
+  it('B10 · mini_perfil y ranking_top traen el lugar', () => {
+    b.actualizarPerfil({ pais: 'VE', estado: 'ZUL' })
+    expect(ll('mini_perfil', { p_username: 'CFGB_A_FINAL' })[0]).toMatchObject({ pais: 'VE', estado: 'ZUL' })
+    expect(ll('mini_perfil', { p_username: 'cfgb_b_verif' })[0]).toMatchObject({ pais: null, estado: null })
+    expect(ll('ranking_top', { p_ranking: 'fortunas' }).find((f) => f.es_tu)).toMatchObject({ username: 'cfgb_a_final', pais: 'VE', estado: 'ZUL' })
+  })
+  it('el mando: forzar ocupado o vedado hace que nombre_libre diga no y el update falle', () => {
+    b.forzarNombre('ocupado')
+    expect(ll('nombre_libre', { p: 'cfgb_libre_x1' })).toBe(false)
+    expect(b.actualizarPerfil({ username: 'cfgb_libre_x1' }).error.code).toBe('23505')
+    b.forzarNombre('vedado')
+    expect(b.actualizarPerfil({ username: 'cfgb_libre_x1' }).error.code).toBe('P0001')
+    b.forzarNombre(null)
+  })
+})
+
+describe('CFG-1 1b · el freno y la lista, en espejo', () => {
+  const dir = join(process.cwd(), 'supabase', 'migrations')
+  const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.includes('cfg1b_perfil'))), 'utf8')
+
+  it('30 días en UTC: SQL = modelo', () => {
+    expect(sql).toMatch(/\(\(p_desde at time zone 'UTC'\) \+ interval '30 days'\) at time zone 'UTC'/)
+    expect(FRENO_NOMBRE_MS_SQL).toBe(30 * 86_400_000)
+    expect(sql).toMatch(/errcode = 'AJ030'/)
+  })
+  it('los 24 estados: SQL = modelo = config/estados.js', () => {
+    const lista = /profiles_estado_lista_chk\s+check \(estado is null or estado in \(([^)]*)\)\)/.exec(sql)[1]
+    const delSql = [...lista.matchAll(/'([A-Z]+)'/g)].map((m) => m[1])
+    expect(delSql).toEqual([...ESTADOS_VE_SQL])
+    expect(ESTADOS_VE.map((e) => e.c)).toEqual([...ESTADOS_VE_SQL])
+  })
+  it('normalizar_username: el mismo mapa que SUP-2a', () => {
+    const sup2a = readFileSync(join(dir, '0001_sup2a_identidad.sql'), 'utf8')
+    expect(sup2a).toMatch(/translate\(lower\(txt\), '013457_', 'oieast'\)/)
+    expect(normalizarUsernameSQL('p_3_n_d_3_j_0')).toBe('pendejo')
+    expect(normalizarUsernameSQL('Panita7')).toBe('panitat')
   })
 })

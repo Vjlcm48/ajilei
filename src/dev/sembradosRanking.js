@@ -46,6 +46,18 @@ const FORMA = [[96, 1], [74, 1], [58, 1], [41, 1], [27, 1], [18, 1], [10, 5], [9
   [7, 12], [6, 22], [5, 32], [4, 3], [3, 9], [2, 12], [1, 14]]
 const SIN_PUNTOS = 10
 
+// CFG-1 1b · el lugar de cada sembrado (R-5), con el reparto de la lámina
+// `laminas/cfg1b/app.jsx`: casi todos de Venezuela o de la diáspora, alguno
+// sin país, y los nombres largos con estado (para ver el «…» de la fila).
+const REPARTO = [['VE', 'ZUL'], ['VE', null], ['CO', null], ['US', null], [null, null], ['ES', null], ['VE', 'DC'],
+  ['PA', null], ['CL', null], ['VE', 'LAR'], ['AR', null], ['PE', null], ['MX', null], ['VE', 'CAR'], ['EC', null], ['CW', null], ['AW', null], ['PR', null]]
+function lugarDe(username) {
+  let h = 0
+  for (const ch of username) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  const [pais, estado] = REPARTO[h % REPARTO.length]
+  return { pais, estado }
+}
+
 // El azar de la lámina (mulberry32), para que las cifras salgan iguales cada vez.
 function azarCon(semilla) {
   let s = semilla
@@ -75,6 +87,6 @@ export function sembradosRanking() {
     else if (f.puntos === null) saldo = ceros++ < 2 ? 0 : 2500
     else saldo = Math.min(12950, Math.round((900 + f.puntos * 95 + Math.floor(azar() * 7200)) / 50) * 50)
     // Fechas distintas para que los empates los decida la fecha (Ajuste A).
-    return Object.freeze({ ...f, puntosHace: (k + 1) * 6e5, saldo, saldoHace: (k + 1) * 6e5 })
+    return Object.freeze({ ...f, puntosHace: (k + 1) * 6e5, saldo, saldoHace: (k + 1) * 6e5, ...lugarDe(f.username) })
   }))
 }
