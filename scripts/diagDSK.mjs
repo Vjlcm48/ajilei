@@ -44,9 +44,11 @@
 //            cifras, el gris por saldo con `?apu=saldo:<n>`, el contador de
 //            «Otra…» y la geometría. Capturas en `capturas-retar/`.
 //   cfg    → CFG-1 1a: la hoja del ⚙ y el piso de 44 fuera de la mesa, en 360×640,
-//            412×915, 915×412, 1366×768 y 1920×1080. Diez puertas con nombre
+//            412×915, 915×412, 1366×768 y 1920×1080. Catorce puertas con nombre
 //            (cfg.zona, cfg.solape, cfg.ojito, cfg.hoja, cfg.ancla, cfg.toast,
-//            cfg.sonido, cfg.version, cfg.inv45, cfg.sinojito) y la consola.
+//            cfg.sonido, cfg.version, cfg.inv45, cfg.sinojito; CFG-1 1c:
+//            cfg.eliminar.ventana, cfg.eliminar.mesa, cfg.eliminar.ok,
+//            cfg.salir.reinicia) y la consola.
 //            Contra el bundle real y el banco imitado. Ver `scripts/cfg/cfg.mjs`.
 //   apu    → APU-1 1e-ii/1f: la mesa con dinero de verdad, en SIETE viewports
 //            (los tres de móvil de la familia de `lob`/`retar`/`diagSAL` y los
