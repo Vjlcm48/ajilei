@@ -1379,6 +1379,10 @@ async function puertaFrases(browser, fallos) {
 const RNK_VER = t('rnk.victoria.ver')
 // La propia de la lámina (informe 1c-ii), donde la hay; en las demás manda la
 // comparación con la de Rankings.
+// CFG-1 1b · desde Rankings la tarjeta propia lleva «Editar» (la puerta del
+// perfil) y desde la victoria no (D-14: dentro de la mesa no se va al
+// perfil). La lámina se compara con la de Rankings tal cual; la de la
+// victoria, con la de Rankings con «Editar» escondido.
 const RNK_PROPIA_H = { '412x915': 468.3, '915x412': 277.5 }
 const RNK_CELDAS = [[412, 915], [915, 412], [1366, 768]]
 
@@ -1398,6 +1402,7 @@ const TARJETA_MP = () => {
     padreBody: velo?.parentElement === document.body,
     maestros: t.querySelector('[data-mp-linea="maestros"] .mp-linea')?.textContent ?? null,
     zoomRoot: getComputedStyle(root).zoom,
+    editar: !!t.querySelector('.mp-editar'),
   }
 }
 
@@ -1429,6 +1434,8 @@ async function puertaRanking(browser, fallos) {
       await page.waitForSelector('.mp-velo[data-mp-estado="listo"]', { timeout: 5000 })
       await page.waitForTimeout(150)
       r.desdeRankings = await page.evaluate(TARJETA_MP)
+      await page.evaluate(() => { const e = document.querySelector('.mp-editar'); if (e) e.style.display = 'none' })
+      r.desdeRankingsSinEditar = await page.evaluate(TARJETA_MP)
 
       // 2 · la victoria con `salir_ia` retenido.
       await alaVictoria(page, 5, '', {
@@ -1472,7 +1479,7 @@ async function puertaRanking(browser, fallos) {
     } catch (e) { fallos.push(`ranking ${id}: ${String(e.message).split('\n')[0]}`) }
     await ctx.close()
 
-    const a = r.apagado, e = r.encendido, v = r.desdeVictoria, k = r.desdeRankings
+    const a = r.apagado, e = r.encendido, v = r.desdeVictoria, k = r.desdeRankingsSinEditar, kl = r.desdeRankings
     if (!a) { fallos.push(`ranking ${id}: no hay .cel-ranking antes de saldoFinal`); continue }
     if (a.disabled !== true) fallos.push(`ranking ${id}: antes de saldoFinal el botón NO está apagado`)
     if (a.texto !== RNK_VER) fallos.push(`ranking ${id}: el botón dice «${a.texto}» y no «${RNK_VER}»`)
@@ -1494,7 +1501,9 @@ async function puertaRanking(browser, fallos) {
       else if (Math.abs(v.w - k.w) > 0.5 || Math.abs(v.h - k.h) > 0.5) {
         fallos.push(`ranking ${id}: la tarjeta mide ${v.w}×${v.h} desde la victoria y ${k.w}×${k.h} desde Rankings (zoom de #root ${v.zoomRoot})`)
       }
-      if (id in RNK_PROPIA_H && Math.abs(v.h - RNK_PROPIA_H[id]) > 2) fallos.push(`ranking ${id}: la tarjeta mide ${v.h} de alto y la lámina ${RNK_PROPIA_H[id]}`)
+      if (v.editar) fallos.push(`ranking ${id}: la tarjeta de la victoria tiene «Editar» (D-14: no lo lleva)`)
+      if (!kl?.editar) fallos.push(`ranking ${id}: la tarjeta propia desde Rankings no tiene «Editar»`)
+      if (id in RNK_PROPIA_H && kl && Math.abs(kl.h - RNK_PROPIA_H[id]) > 2) fallos.push(`ranking ${id}: la tarjeta de Rankings mide ${kl.h} de alto y la lámina ${RNK_PROPIA_H[id]}`)
     }
     if (!r.cerrada) fallos.push(`ranking ${id}: ✕ no cerró la tarjeta`)
     if (!r.foco) fallos.push(`ranking ${id}: al cerrar, el foco no volvió a .cel-ranking`)

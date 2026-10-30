@@ -39,6 +39,11 @@
 //                 `ranking_mio`, sin «Cargando…», sin tocar `scrollTop` ni la
 //                 pestaña, también con la tarjeta abierta (que se queda); y
 //                 `Rankings.jsx` sin `setInterval`
+//   rnk-bandera   CFG-1 1b: cada fila de la vista lleva la bandera de su
+//                 jugador (o el isotipo sin país), cargada, con el lugar en una
+//                 segunda línea que no hace crecer la fila; la banda, la de la
+//                 cuenta; la tarjeta de la fila 3, la pastilla llena con la
+//                 bandera y el texto del lugar
 //   consola       sin errores de página
 //
 // DESVIACIÓN ANOTADA (informe 1c-ii §M): la ficha pide 400 × 317 en 412×915;
@@ -49,11 +54,44 @@ import { readFileSync } from 'node:fs'
 import { contextoCap, PERFIL_CAP } from '../cap/capMesa.mjs'
 import { crearBanco } from '../../src/dev/bancoImitado.js'
 import { sembradosRanking, PUNTOS_DEL_BYPASS } from '../../src/dev/sembradosRanking.js'
+import { PAISES } from '../../src/config/paises.js'
+import { ESTADOS_VE } from '../../src/config/estados.js'
 
 const YO = PERFIL_CAP.username
 const CORREO = 'cap@example.invalid'   // el de la sesión simulada de `contextoCap`
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-/i
 const TOL = 0.5
+
+// CFG-1 1b · el lugar que DEBE salir para cada jugador: el de los sembrados
+// (el banco los da en `ranking_top`) con el texto de `textoLugar`, rehecho aquí
+// con las dos listas porque `lugarCore.js` importa sin extensión.
+const NOMBRE_PAIS = new Map(PAISES.map((p) => [p.c, p.n]))
+const NOMBRE_ESTADO = new Map(ESTADOS_VE.map((e) => [e.c, e.n]))
+const textoLugar = (pais, estado) => {
+  const p = NOMBRE_PAIS.get(pais)
+  if (!p) return ''
+  const e = pais === 'VE' ? NOMBRE_ESTADO.get(estado) : null
+  return e ? `${p} · ${e}` : p
+}
+const LUGAR_ESPERADO = new Map(sembradosRanking().map((j) => [j.username, { pais: j.pais ?? null, texto: textoLugar(j.pais, j.estado) }]))
+LUGAR_ESPERADO.set(YO, { pais: null, texto: '' })
+
+// Las filas que se ven, con su lugar pintado.
+const LUGARES = () => [...document.querySelectorAll('.rnk-filas .rnk-fila, .rnk-tu .rnk-fila')].filter((f) => {
+  const r = f.getBoundingClientRect()
+  return r.height > 0 && r.bottom > 0 && r.top < innerHeight
+}).map((f) => {
+  const b = f.querySelector('.rnk-nom b'), l = f.querySelector('.rnk-lugar'), img = l?.querySelector('img.cfg-band')
+  return {
+    nombre: b?.textContent ?? null,
+    pais: img?.dataset.pais ?? null,
+    iso: !!img?.classList.contains('es-iso'),
+    cargada: !!img && img.complete && img.naturalWidth > 0,
+    texto: l?.querySelector('.rnk-lugar-t')?.textContent ?? '',
+    debajo: !!l && l.getBoundingClientRect().top >= b.getBoundingClientRect().bottom - 1,
+    h: Math.round(f.getBoundingClientRect().height * 100) / 100,
+  }
+})
 
 // La lámina §4 (informe 1-L): la banda por `--u` y el mini-perfil por tamaño.
 const BANDA = { '360x640': 78.9, '412x915': 82, '915x412': 82, '744x1100': 93.5, '1366x623': 93.5, '1920x1080': 93.5 }
@@ -195,7 +233,7 @@ export async function runRnk(browser, { base }) {
     if (!ok) x.fallos.push(`${quien} ${valor}`)
   }
   const espera = (k, n) => { p(k).esperadas += n }
-  for (const [k, n] of Object.entries({ 'rnk-abre': 2, 'rnk-fila': 3, 'rnk-banda': 6, 'rnk-desplaza': 2, 'rnk-fin': 2, 'rnk-2col': 6, 'rnk-oro': 1, 'rnk-vino': 1, 'rnk-perfil': 3, 'rnk-propio': 2, 'rnk-uuid': 1, 'rnk-escala': 1, 'rnk-nohay': 1, 'rnk-fresco': 4 })) espera(k, n)
+  for (const [k, n] of Object.entries({ 'rnk-abre': 2, 'rnk-fila': 3, 'rnk-banda': 6, 'rnk-desplaza': 2, 'rnk-fin': 2, 'rnk-2col': 6, 'rnk-oro': 1, 'rnk-vino': 1, 'rnk-perfil': 3, 'rnk-propio': 2, 'rnk-uuid': 1, 'rnk-escala': 1, 'rnk-nohay': 1, 'rnk-fresco': 4, 'rnk-bandera': 5 })) espera(k, n)
 
   for (const [w, h] of TAMANOS) {
     const clave = `${w}x${h}`
@@ -212,6 +250,15 @@ export async function runRnk(browser, { base }) {
       const m = await page.evaluate(MEDIR)
       if (clave === '360x640' || clave === '1920x1080') anota('rnk-abre', m.ranking === 'maestros', clave, `ranking=${m.ranking}`)
       if (['360x640', '412x915', '1920x1080'].includes(clave)) {
+        // CFG-1 1b · rnk-bandera en la fila (espera a que carguen las de la vista).
+        await page.waitForFunction(() => [...document.querySelectorAll('.rnk-lugar img.cfg-band')].every((i) => i.complete), null, { timeout: 5000 }).catch(() => {})
+        const lugares = await page.evaluate(LUGARES)
+        const malas = lugares.filter((x) => {
+          const e = LUGAR_ESPERADO.get(x.nombre)
+          return !e || x.pais !== e.pais || x.texto !== e.texto || x.iso !== (e.pais === null) || !x.cargada || !x.debajo || Math.abs(x.h - 56) > TOL
+        })
+        anota('rnk-bandera', lugares.length > 5 && malas.length === 0 && lugares.some((x) => x.texto.includes(' · ')) && lugares.some((x) => x.iso),
+          `${clave} filas`, `filas=${lugares.length} malas=${JSON.stringify(malas.slice(0, 3))}`)
         anota('rnk-fila', Math.abs(m.filaH - 56) <= TOL && Math.abs(m.av - 34.72) <= TOL && m.filas <= 100 && m.filas > 0,
           clave, `fila=${m.filaH?.toFixed(2)} av=${m.av?.toFixed(2)} filas=${m.filas}`)
       }
@@ -240,6 +287,15 @@ export async function runRnk(browser, { base }) {
         const t = await abrirTarjeta(page, fila3)
         const esp = PERFIL[clave]
         const medidaOk = Math.abs(t.w - esp.w) <= 2 && Math.abs(t.h - esp.h) <= 2
+        // CFG-1 1b · rnk-bandera en la tarjeta: la pastilla llena con su lugar.
+        const tl = await page.evaluate(() => {
+          const p = document.querySelector('.mp-tarjeta .mp-pais'), img = p?.querySelector('img.cfg-band')
+          return { llena: !!p?.classList.contains('es-lleno'), pais: img?.dataset.pais ?? null, iso: !!img?.classList.contains('es-iso'), cargada: !!img && img.complete && img.naturalWidth > 0,
+            texto: p?.querySelector('.mp-pais-t')?.textContent ?? '', h: p ? Math.round(p.getBoundingClientRect().height * 100) / 100 : null }
+        })
+        const e3 = LUGAR_ESPERADO.get(nombre3)
+        anota('rnk-bandera', tl.llena && tl.pais === e3.pais && tl.texto === e3.texto && tl.iso === (e3.pais === null) && (tl.cargada || tl.iso) && Math.abs(tl.h - 28) <= TOL,
+          `${clave} tarjeta`, JSON.stringify({ ...tl, esperado: e3 }))
         await page.click('.mp-cerrar')
         const x = { cerrada: !(await page.$('.mp-velo')), foco: await focoEn(page) }
         await abrirTarjeta(page, fila3)
@@ -264,7 +320,8 @@ export async function runRnk(browser, { base }) {
 
           // rnk-propio: la banda.
           const pr = await abrirTarjeta(page, '.rnk-tu .rnk-fila')
-          anota('rnk-propio', Math.abs(pr.h - PROPIO_H) <= 2 && pr.solo && pr.editarApagado === true && pr.correo === CORREO && pr.nombre === YO && !UUID.test(pr.html),
+          // CFG-1 1b · «Editar» ya lleva al perfil: encendido (antes, apagado con «Pronto»).
+          anota('rnk-propio', Math.abs(pr.h - PROPIO_H) <= 2 && pr.solo && pr.editarApagado === false && pr.correo === CORREO && pr.nombre === YO && !UUID.test(pr.html),
             `${clave} banda`, `h=${pr.h.toFixed(1)} solo=${pr.solo} editar=${pr.editarApagado} correo=${pr.correo} nombre=${pr.nombre}`)
           await page.keyboard.press('Escape')
 

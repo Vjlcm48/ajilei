@@ -40,6 +40,21 @@
 //   cfg.eliminar.ventana · cfg.eliminar.mesa · cfg.eliminar.ok ·
 //   cfg.salir.reinicia   CFG-1 1c: la ventana «Eliminar cuenta», sus dos
 //                respuestas y O-2 (ver la sección «CFG-1 1c» de abajo)
+//   CFG-1 1b (ver la sección «CFG-1 1b» de abajo):
+//     cfg.zona y cfg.solape miden además Rankings y la pantalla de perfil (las
+//                filas, el editor del nombre, la ventana de los 30 días y el
+//                selector), y Rankings y el perfil con un nombre de 15 «M» en
+//                360, 412 y 915 (los roces de §0-14 no vuelven)
+//   cfg.perfil   las tres puertas (la barra desde el lobby, Retar y Salas; la
+//                cabecera de la hoja ⚙ desde el lobby y Rankings; «Editar» del
+//                mini-perfil propio) llevan al perfil, y la flecha vuelve a su
+//                origen; la casa va al lobby; el ajeno no tiene «Editar»
+//   cfg.freno    con el banco imitado: ocupado y vedado sin ventana; solo
+//                mayúsculas sin ventana y sin freno; libre con ventana, y
+//                después el freno con su fecha y sin viaje; el servidor frena
+//                aunque el cliente no lo supiera; el lugar se guarda solo
+//                (Venezuela → estado, otro país sin estado, «Prefiero no
+//                decirlo») y se ve en el perfil y en la hoja ⚙
 //   consola      sin errores de página
 
 import { readFileSync } from 'node:fs'
@@ -68,7 +83,11 @@ const MESAS = [[1, 4, 200, 3], [2, 2, 100, 1], [3, 5, 200, 1]].map(([n, jugadore
 }))
 
 // ── La medida, en la página. Autocontenida: Playwright la serializa. ────────
-const MEDIR = () => {
+// CFG-1 1b · `dentro`: sólo los tocables de esa capa (el velo del Bautizo, la
+// ventana de los 30 días), porque lo de debajo está tapado a propósito. Y sólo
+// lo que está en la vista: en una lista que desplaza por dentro (el selector
+// de país), las opciones enteras dentro de la lista.
+const MEDIR = ({ dentro = null } = {}) => {
   const $$ = (s) => [...document.querySelectorAll(s)]
   const r2 = (x) => Math.round(x * 100) / 100
   const caja = (r) => ({ l: r.left, t: r.top, r: r.right, b: r.bottom })
@@ -97,10 +116,18 @@ const MEDIR = () => {
     const barre = (dx, dy) => { let x = cx, y = cy, n = 0; while (n < 600 && suyo(x + dx, y + dy)) { x += dx; y += dy; n++ } return [x, y] }
     return [barre(1, 0)[0] - barre(-1, 0)[0] + 1, barre(0, 1)[1] - barre(0, -1)[1] + 1]
   }
+  const capa = dentro ? document.querySelector(dentro) : null
   const visible = (el) => {
     const r = el.getBoundingClientRect()
     if (r.width < 1 || r.height < 1) return false
     if (el.closest('[hidden], [inert]')) return false
+    if (dentro && !(capa && capa.contains(el))) return false
+    if (r.bottom <= 0 || r.top >= innerHeight) return false
+    const lista = el.closest('.sal-desplaza')
+    if (lista) {
+      const rl = lista.getBoundingClientRect()
+      if (r.top < rl.top - 0.5 || r.bottom > rl.bottom + 0.5) return false
+    }
     const cs = getComputedStyle(el)
     return cs.visibility !== 'hidden' && cs.display !== 'none'
   }
@@ -114,6 +141,14 @@ const MEDIR = () => {
     ['chip', '.sal-chip'],
     ['±', '.sal-paso'],
     ['Unirme', '.sal-unir'],
+    // CFG-1 1b · la pantalla de perfil y su editor.
+    ['fila', '.pf-fila'],
+    ['opción', '.pf-op'],
+    ['buscador', '#pf-buscar'],
+    ['borrar', '[data-accion="pf-borrar"]'],
+    ['confirmar', '.bautizo-card .puerta-btn'],
+    ['cancelar', '[data-accion="bautizo-cancelar"]'],
+    ['ventana', '.cfn-tarjeta .elc-btn'],
   ]
   const VECINOS = [['cifra', '.lob-pildora .bd-num'], ['nombre', '.lob-top .lob-nombre'], ['título', '.sal-cab h1']]
   const ts = []
@@ -188,11 +223,11 @@ const CIFRA = () => {
 
 const esperarQuieta = (page) => page.waitForTimeout(450)
 
-async function abrirLobby(browser, base, celda, errores, { billetera = null, antes = null } = {}) {
+async function abrirLobby(browser, base, celda, errores, { billetera = null, antes = null, perfil = PERFIL_CAP } = {}) {
   // El banco lleva los sembrados del ranking (como `rnk`): con la lista llena
   // Rankings pinta su línea de SumaMente, que es uno de los portadores de INV-45.
-  const conBanco = billetera ?? { banco: crearBanco({ usuario: PERFIL_CAP.username, sembrados: sembradosRanking(), saldo: 5000 }) }
-  const { ctx, page } = await contextoCap(browser, { w: celda.w, h: celda.h, dpr: celda.movil ? 2 : 1, movil: celda.movil }, base, { billetera: conBanco })
+  const conBanco = billetera ?? { banco: crearBanco({ usuario: perfil.username, sembrados: sembradosRanking(), saldo: 5000 }) }
+  const { ctx, page } = await contextoCap(browser, { w: celda.w, h: celda.h, dpr: celda.movil ? 2 : 1, movil: celda.movil }, base, { billetera: conBanco, perfil })
   const id = `${celda.w}x${celda.h}`
   page.on('pageerror', (e) => errores.push(`${id} pageerror: ${e.message}`))
   page.on('console', (m) => { if (m.type() === 'error') errores.push(`${id} console: ${m.text()}`) })
@@ -475,6 +510,330 @@ async function eliminarCuenta(browser, base, errores, anota) {
   }
 }
 
+// ── CFG-1 1b · El perfil (rector AJILEI_CFG-1_Fase1b_v1.0.md §3.6, R-17) ────
+// La medida es la de siempre (`MEDIR`), en cinco estados de la pantalla: las
+// filas, el editor del nombre (sólo su velo: lo de debajo está tapado), la
+// ventana de los 30 días (sólo ella), el selector y el selector buscando.
+const DEBEN_1B = {
+  rankings: ['⚙', 'avatar', '«+»', 'casa', 'flecha', 'chip'],
+  perfil: ['⚙', 'avatar', '«+»', 'casa', 'flecha', 'fila'],
+  'perfil.editor': ['confirmar', 'cancelar'],
+  'perfil.ventana': ['ventana'],
+  'perfil.selector': ['⚙', 'avatar', '«+»', 'casa', 'flecha', 'buscador', 'opción'],
+  'perfil.buscando': ['casa', 'flecha', 'buscador', 'borrar', 'opción'],
+}
+
+function anotaZonas(anota, id, nombre, m, deben) {
+  const cortos = m.tocables.filter((x) => Math.min(...x.zona) < ZONA_GEO || !x.efectiva || Math.min(...x.efectiva) < ZONA_EFECTIVA)
+  const tipos = new Set(m.tocables.map((x) => x.tipo))
+  const faltan = (deben ?? []).filter((d) => !tipos.has(d))
+  anota('zona', !cortos.length && !faltan.length, { celda: id, pantalla: nombre, cortos: cortos.map((x) => [x.n, x.zona, x.efectiva]), faltan })
+  // El «×» del buscador vive DENTRO del campo, en el relleno derecho que el
+  // campo le reserva (R-18): ese cruce es el diseño, no un roce. Su zona propia
+  // sí se mide (≥ 44, efectiva incluida).
+  const solapes = m.solapes.filter((x) => !(x.a === 'buscador' && x.b === 'borrar'))
+  anota('solape', solapes.length === 0, { celda: id, pantalla: nombre, solapes })
+}
+
+// Del lobby al perfil y por sus cinco estados; vuelve al lobby por la casa.
+async function medirPerfil(page, { nombreNuevo = 'Jugador_Nuevo' } = {}) {
+  await page.click('.lob-top [data-accion="perfil"]')
+  await page.waitForSelector('.pf-cab')
+  await esperarQuieta(page)
+  const perfil = await page.evaluate(MEDIR)
+  await page.click('[data-accion="pf-fila-nombre"]')
+  await page.waitForSelector('.bautizo-card.is-edicion')
+  await page.waitForTimeout(650)   // la entrada de la tarjeta (`panel-enter`, 0,55 s)
+  const editor = await page.evaluate(MEDIR, { dentro: '.bautizo-overlay' })
+  await page.fill('#bautizo-nombre', nombreNuevo)
+  await page.press('#bautizo-nombre', 'Enter')
+  await page.waitForSelector('.cfn-tarjeta')
+  await page.waitForTimeout(150)
+  const ventana = await page.evaluate(MEDIR, { dentro: '.cfn-velo' })
+  await page.click('[data-accion="cfn-cancelar"]')
+  await page.click('[data-accion="bautizo-cancelar"]')
+  await page.waitForSelector('.bautizo-card', { state: 'detached' })
+  await page.click('[data-accion="pf-fila-pais"]')
+  await page.waitForSelector('#pf-buscar')
+  await esperarQuieta(page)
+  const selector = await page.evaluate(MEDIR)
+  await page.fill('#pf-buscar', 'ven')
+  await page.waitForSelector('[data-accion="pf-borrar"]')
+  await page.waitForTimeout(150)
+  const buscando = await page.evaluate(MEDIR)
+  await page.click('[data-accion="casa"]')
+  await page.waitForSelector('main.lobby')
+  await esperarQuieta(page)
+  return { perfil, 'perfil.editor': editor, 'perfil.ventana': ventana, 'perfil.selector': selector, 'perfil.buscando': buscando }
+}
+
+// `profiles` contra el banco imitado: GET la fila propia, PATCH el `update`
+// con sus errores de PostgREST (código, mensaje y `hint`). `contextoCap`
+// contesta siempre la fila fija; esta ruta va encima (la última gana).
+async function rutaPerfil(ctx, banco, perfil = PERFIL_CAP) {
+  const viajes = { patch: 0 }
+  await ctx.route(/\/rest\/v1\/profiles/, async (ruta) => {
+    const r = ruta.request()
+    const objeto = (r.headers().accept || '').includes('vnd.pgrst.object')
+    const fila = (d) => ({ ...d, id: perfil.id })
+    if (r.method() === 'PATCH') {
+      viajes.patch += 1
+      let campos = {}
+      try { campos = r.postDataJSON() } catch { campos = {} }
+      const { data, error } = banco.actualizarPerfil(campos)
+      if (error) {
+        return ruta.fulfill({ status: error.code === '23505' ? 409 : 400, contentType: 'application/json', body: JSON.stringify(error) })
+      }
+      return ruta.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(objeto ? fila(data) : [fila(data)]) })
+    }
+    const { data } = banco.leerPerfil()
+    return ruta.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(objeto ? fila(data) : [fila(data)]) })
+  })
+  return viajes
+}
+
+const ESTADO_PERFIL = () => ({
+  titulo: document.querySelector('main.sal .sal-cab h1')?.textContent ?? null,
+  perfil: !!document.querySelector('.pf-cab'),
+  lobby: !!document.querySelector('main.lobby'),
+  hoja: !!document.querySelector('.lob-hoja.is-on'),
+  tarjeta: !!document.querySelector('.mp-tarjeta'),
+  unir: !!document.querySelector('.sal-unir'),
+  reto: !!document.querySelector('[data-accion="reto"]'),
+  ranking: document.querySelector('main.sal')?.dataset.ranking ?? null,
+})
+
+const AVISO = () => document.querySelector('[data-accion="aviso-nombre"]')?.textContent ?? ''
+
+async function perfilDe1b(browser, base, errores, anota) {
+  // ── cfg.zona / cfg.solape · 15 «M» en la barra, en Rankings y en el perfil
+  const ANCHO = { id: PERFIL_CAP.id, username: 'MMMMMMMMMMMMMMM' }
+  for (const celda of [CELDAS[0], CELDAS[1], CELDAS[2]]) {
+    const id = `${celda.w}x${celda.h}·15M`
+    let ctx = null
+    try {
+      ;({ ctx } = await abrirLobby(browser, base, celda, errores, { perfil: ANCHO }))
+      const page = ctx.pages()[0]
+      await page.click('[data-accion="rankings"]')
+      await page.waitForSelector('main.sal[data-ranking][data-rnk-estado="listo"]', { timeout: 15000 })
+      await esperarQuieta(page)
+      anotaZonas(anota, id, 'rankings', await page.evaluate(MEDIR), DEBEN_1B.rankings)
+      await page.click('[data-accion="casa"]')
+      await page.waitForSelector('main.lobby')
+      await esperarQuieta(page)
+      for (const [nombre, m] of Object.entries(await medirPerfil(page))) anotaZonas(anota, id, nombre, m, DEBEN_1B[nombre])
+    } catch (e) {
+      anota('zona', false, { celda: id, error: String(e?.message ?? e).split('\n')[0] })
+    } finally { await ctx?.close().catch(() => {}) }
+  }
+
+  // ── cfg.perfil · las tres puertas y la vuelta ─────────────────────────────
+  for (const celda of [CELDAS[1], CELDAS[3]]) {
+    const id = `${celda.w}x${celda.h}`
+    let ctx = null
+    let paso = ''
+    try {
+      ;({ ctx } = await abrirLobby(browser, base, celda, errores))
+      const page = ctx.pages()[0]
+      const estado = () => page.evaluate(ESTADO_PERFIL)
+      const alPerfil = async () => { paso += ' perfil'; await page.waitForSelector('.pf-cab'); await page.waitForTimeout(200); return estado() }
+      const volver = async (sel) => { paso += ` volver→${sel}`; await page.click('[data-accion="volver"]'); await page.waitForSelector(sel, { timeout: 10000 }); await esperarQuieta(page); return estado() }
+      const casa = async () => { await page.click('[data-accion="casa"]'); await page.waitForSelector('main.lobby'); await esperarQuieta(page) }
+
+      // La barra, desde el lobby, Retar y Salas.
+      await page.click('.lob-top [data-accion="perfil"]')
+      const a1 = await alPerfil(); const v1 = await volver('main.lobby')
+      anota('perfil', a1.perfil && a1.titulo === 'Perfil' && v1.lobby, { celda: id, puerta: 'barra desde el lobby', llega: a1, vuelve: v1 })
+      await irRetar(page)
+      await page.click('.lob-top [data-accion="perfil"]')
+      const a2 = await alPerfil(); const v2 = await volver('[data-accion="reto"]')
+      anota('perfil', a2.perfil && v2.reto && !v2.perfil, { celda: id, puerta: 'barra desde Retar', llega: a2, vuelve: v2 })
+      await casa()
+      await page.click('[data-accion="jugar-pvp"]')
+      await page.waitForSelector('main.sal .sal-unir', { timeout: 15000 })
+      await page.click('.lob-top [data-accion="perfil"]')
+      const a3 = await alPerfil(); const v3 = await volver('main.sal .sal-unir')
+      anota('perfil', a3.perfil && v3.unir && !v3.perfil, { celda: id, puerta: 'barra desde Salas', llega: a3, vuelve: v3 })
+      await casa()
+
+      // La cabecera de la hoja ⚙, desde el lobby y desde Rankings.
+      await abrirHoja(page)
+      const boton = await page.$eval('[data-accion="cfg-perfil"]', (e) => ({ tag: e.tagName, h: e.getBoundingClientRect().height, chev: !!e.querySelector('.cfg-chev') }))
+      await page.click('[data-accion="cfg-perfil"]')
+      const a4 = await alPerfil(); const v4 = await volver('main.lobby')
+      anota('perfil', boton.tag === 'BUTTON' && boton.h >= 44 - 0.01 && boton.chev && a4.perfil && !a4.hoja && v4.lobby && !v4.hoja,
+        { celda: id, puerta: 'cabecera de la hoja desde el lobby', boton, llega: a4, vuelve: v4 })
+      await page.click('[data-accion="rankings"]')
+      await page.waitForSelector('main.sal[data-ranking][data-rnk-estado="listo"]', { timeout: 15000 })
+      await abrirHoja(page)
+      await page.click('[data-accion="cfg-perfil"]')
+      const a5 = await alPerfil(); const v5 = await volver('main.sal[data-ranking][data-rnk-estado="listo"]')
+      anota('perfil', a5.perfil && !a5.hoja && v5.ranking === 'maestros', { celda: id, puerta: 'cabecera de la hoja desde Rankings', llega: a5, vuelve: v5 })
+
+      // «Editar» del mini-perfil propio; el ajeno no lo tiene.
+      await page.click('.rnk-filas .rnk-fila[data-puesto="3"]')
+      await page.waitForSelector('.mp-velo[data-mp-estado="listo"]')
+      const ajeno = await page.evaluate(() => document.querySelectorAll('.mp-editar').length)
+      await page.keyboard.press('Escape')
+      // La cuenta del arnés no tiene puntos: la banda es «Gana tu primera mano…», que también abre la tuya.
+      await page.click('.rnk-tu .rnk-fila, .rnk-tu [data-accion="rnk-tu-abre"]')
+      await page.waitForSelector('.mp-velo[data-mp-estado="listo"]')
+      const editar = await page.$eval('.mp-editar', (e) => ({ encendido: !e.disabled, pronto: !!e.querySelector('span'), h: e.getBoundingClientRect().height }))
+      await page.click('[data-accion="mp-editar"]')
+      const a6 = await alPerfil(); const v6 = await volver('main.sal[data-ranking][data-rnk-estado="listo"]')
+      anota('perfil', ajeno === 0 && editar.encendido && !editar.pronto && editar.h >= 44 - 0.01 && a6.perfil && !a6.tarjeta && v6.ranking === 'maestros' && !v6.tarjeta,
+        { celda: id, puerta: '«Editar» del mini-perfil propio', ajeno, editar, llega: a6, vuelve: v6 })
+
+      // La casa del perfil va al lobby, venga de donde venga.
+      await page.click('.lob-top [data-accion="perfil"]')
+      await alPerfil()
+      await casa()
+      anota('perfil', (await estado()).lobby, { celda: id, puerta: 'casa del perfil (desde Rankings)' })
+    } catch (e) {
+      anota('perfil', false, { celda: id, paso, error: String(e?.message ?? e).split('\n').slice(0, 3).join(' | ') })
+    } finally { await ctx?.close().catch(() => {}) }
+  }
+
+  // ── cfg.freno · el nombre y el lugar contra el banco imitado ──────────────
+  for (const celda of [CELDAS[0], CELDAS[3]]) {
+    const id = `${celda.w}x${celda.h}`
+    let ctx = null
+    const propios = []
+    try {
+      const banco = bancoCfg()
+      let viajes = null
+      // Los 409 (ocupado) y 400 (vedado, el freno) son las respuestas pedidas:
+      // Chromium las apunta en la consola, no son fallos de la página.
+      ;({ ctx } = await abrirLobby(browser, base, celda, propios, {
+        billetera: { banco },
+        antes: async (c) => { viajes = await rutaPerfil(c, banco) },
+      }))
+      const page = ctx.pages()[0]
+      await page.click('.lob-top [data-accion="perfil"]')
+      await page.waitForSelector('.pf-cab')
+      const abrirEditor = async () => {
+        await page.click('[data-accion="pf-fila-nombre"]')
+        await page.waitForSelector('.bautizo-card.is-edicion')
+        await page.waitForTimeout(200)
+      }
+      const probar = async (nombre, espera) => {
+        await page.fill('#bautizo-nombre', nombre)
+        await page.press('#bautizo-nombre', 'Enter')
+        await page.waitForFunction(espera, null, { timeout: 5000 })
+        await page.waitForTimeout(150)
+        return { ventana: !!(await page.$('.cfn-tarjeta')), aviso: await page.evaluate(AVISO), editor: !!(await page.$('.bautizo-card')) }
+      }
+
+      // Ocupado y vedado: sin ventana, con su texto, y el freno sin gastar.
+      await abrirEditor()
+      const ocupado = await probar('ElCatire88', () => /tomado/.test(document.querySelector('[data-accion="aviso-nombre"]')?.textContent ?? ''))
+      const vedado = await probar('Ajilei_Oficial', () => /permitido/.test(document.querySelector('[data-accion="aviso-nombre"]')?.textContent ?? ''))
+      anota('freno', !ocupado.ventana && !vedado.ventana && ocupado.editor && vedado.editor && banco.perfil.nombre_cambiado_en === null && banco.usuario === PERFIL_CAP.username,
+        { celda: id, caso: 'ocupado y vedado: sin ventana', ocupado, vedado, cambiado: banco.perfil.nombre_cambiado_en })
+
+      // Solo mayúsculas: sin ventana y sin freno.
+      const mayus = PERFIL_CAP.username.toLowerCase()
+      await page.fill('#bautizo-nombre', mayus)
+      await page.press('#bautizo-nombre', 'Enter')
+      await page.waitForSelector('.bautizo-card', { state: 'detached', timeout: 5000 })
+      const trasMayus = await page.evaluate(() => ({ fila: document.querySelector('[data-accion="pf-fila-nombre"]')?.textContent ?? '', toast: document.querySelector('.sal-toast.is-on')?.textContent ?? null }))
+      anota('freno', banco.usuario === mayus && banco.perfil.nombre_cambiado_en === null && !/Próximo cambio/.test(trasMayus.fila),
+        { celda: id, caso: 'solo mayúsculas: sin ventana y sin freno', usuario: banco.usuario, cambiado: banco.perfil.nombre_cambiado_en, ...trasMayus })
+
+      // Libre: la ventana; «Cambiar» guarda y pone el freno con su fecha.
+      await abrirEditor()
+      const libre = await probar('Jugador_Nuevo', () => !!document.querySelector('.cfn-tarjeta'))
+      const antes = viajes.patch
+      await page.click('[data-accion="cfn-cambiar"]')
+      await page.waitForSelector('.bautizo-card', { state: 'detached', timeout: 5000 })
+      await page.waitForFunction(() => /Próximo cambio/.test(document.querySelector('[data-accion="pf-fila-nombre"]')?.textContent ?? ''), null, { timeout: 5000 })
+      const hasta = new Date(Date.parse(banco.perfil.nombre_cambiado_en) + 30 * 86400000)
+      const fecha = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' }).format(hasta)
+      const tras = await page.evaluate(() => ({ fila: document.querySelector('[data-accion="pf-fila-nombre"]')?.textContent ?? '', toast: document.querySelector('.sal-toast.is-on')?.textContent ?? null, barra: document.querySelector('.lob-top .lob-nombre')?.textContent ?? null }))
+      anota('freno', libre.ventana && viajes.patch === antes + 1 && banco.usuario === 'Jugador_Nuevo' && tras.fila.includes(`Próximo cambio: ${fecha}`)
+        && tras.toast === 'Listo: ahora eres Jugador_Nuevo' && tras.barra === 'Jugador_Nuevo',
+        { celda: id, caso: 'libre: ventana, cambio y fecha', ventana: libre.ventana, patch: viajes.patch - antes, fecha, ...tras })
+
+      // Con el freno puesto: el editor quieto, la fecha, «Cerrar»; ni un viaje.
+      await abrirEditor()
+      const quieto = await page.evaluate(() => ({
+        campo: document.querySelector('#bautizo-nombre')?.disabled, confirmar: document.querySelector('.bautizo-card .puerta-btn')?.disabled,
+        aviso: document.querySelector('[data-accion="aviso-nombre"]')?.textContent ?? '', boton: document.querySelector('[data-accion="bautizo-cancelar"]')?.textContent ?? '',
+      }))
+      const p0 = viajes.patch
+      await page.press('#bautizo-nombre', 'Enter').catch(() => {})
+      await page.waitForTimeout(300)
+      anota('freno', quieto.campo && quieto.confirmar && quieto.aviso === `Podrás cambiarlo de nuevo el ${fecha}.` && quieto.boton === 'Cerrar' && viajes.patch === p0,
+        { celda: id, caso: 'bloqueado: quieto, fecha y sin viaje', ...quieto, viajes: viajes.patch - p0 })
+      await page.click('[data-accion="bautizo-cancelar"]')
+      await page.waitForSelector('.bautizo-card', { state: 'detached' })
+
+      // El lugar: Venezuela → estados con «Sin estado» marcado → Zulia; España; «Prefiero no decirlo».
+      await page.click('[data-accion="pf-fila-pais"]')
+      await page.waitForSelector('#pf-buscar')
+      await page.click('[data-accion="pf-op"][data-pais="VE"]')
+      await page.waitForSelector('[data-accion="pf-op-sinestado"]')
+      const sinEstado = await page.$eval('[data-accion="pf-op-sinestado"]', (e) => e.getAttribute('aria-selected'))
+      const tras1 = { ...banco.perfil }
+      await page.click('[data-accion="pf-op-estado"]:has-text("Zulia")')
+      await page.waitForSelector('.pf-cab')
+      await page.waitForTimeout(150)
+      const cab = await page.evaluate(() => ({ texto: document.querySelector('.pf-lugar')?.textContent ?? '', pais: document.querySelector('.pf-lugar img')?.dataset.pais ?? null, toast: document.querySelector('.sal-toast.is-on')?.textContent ?? null }))
+      await abrirHoja(page)
+      const hoja = await page.evaluate(() => { const i = document.querySelector('.lob-hoja-cuenta img.cfg-band'); return { pais: i?.dataset.pais ?? null, texto: !!document.querySelector('.lob-hoja-cuenta .pf-lugar, .lob-hoja-cuenta .rnk-lugar-t') } })
+      await cerrarHoja(page)
+      const ve = { pais: banco.perfil.pais, estado: banco.perfil.estado }
+      await page.click('[data-accion="pf-fila-pais"]')
+      await page.waitForSelector('#pf-buscar')
+      await page.fill('#pf-buscar', 'espana')
+      await page.click('[data-accion="pf-op"][data-pais="ES"]')
+      await page.waitForSelector('.pf-cab')
+      const es = { pais: banco.perfil.pais, estado: banco.perfil.estado }
+      await page.click('[data-accion="pf-fila-pais"]')
+      await page.waitForSelector('#pf-buscar')
+      await page.click('[data-accion="pf-op-nada"]')
+      await page.waitForSelector('.pf-cab')
+      await page.waitForTimeout(150)
+      const nada = { pais: banco.perfil.pais, estado: banco.perfil.estado, iso: await page.$eval('.pf-lugar img', (i) => i.classList.contains('es-iso')) }
+      anota('freno', sinEstado === 'true' && tras1.pais === 'VE' && tras1.estado === null && ve.pais === 'VE' && ve.estado === 'ZUL'
+        && cab.texto === 'Venezuela · Zulia' && cab.pais === 'VE' && cab.toast === 'Guardado' && hoja.pais === 'VE' && !hoja.texto
+        && es.pais === 'ES' && es.estado === null && nada.pais === null && nada.estado === null && nada.iso,
+        { celda: id, caso: 'el lugar se guarda solo', sinEstado, alElegirVenezuela: tras1.pais + '/' + tras1.estado, ve, cab, hoja, es, nada })
+    } catch (e) {
+      anota('freno', false, { celda: id, error: String(e?.message ?? e).split('\n')[0] })
+    } finally { await ctx?.close().catch(() => {}) }
+
+    // El servidor frena aunque el cliente no lo supiera (otro aparato cambió el nombre).
+    ctx = null
+    try {
+      const banco = bancoCfg()
+      ;({ ctx } = await abrirLobby(browser, base, celda, propios, { billetera: { banco }, antes: async (c) => { await rutaPerfil(c, banco) } }))
+      const page = ctx.pages()[0]
+      await page.click('.lob-top [data-accion="perfil"]')
+      await page.waitForSelector('.pf-cab')
+      await page.waitForTimeout(300)
+      banco.nombreCambiadoHace(2 * 86400000)
+      await page.click('[data-accion="pf-fila-nombre"]')
+      await page.waitForSelector('.bautizo-card.is-edicion')
+      const libreAntes = await page.$eval('#bautizo-nombre', (e) => !e.disabled)
+      await page.fill('#bautizo-nombre', 'Jugador_Otro')
+      await page.press('#bautizo-nombre', 'Enter')
+      await page.waitForSelector('.cfn-tarjeta')
+      await page.click('[data-accion="cfn-cambiar"]')
+      // No basta con `disabled`: mientras dice «Guardando…» el campo también lo está.
+      await page.waitForFunction(() => /Podrás/.test(document.querySelector('[data-accion="aviso-nombre"]')?.textContent ?? ''), null, { timeout: 5000 })
+      const hasta = new Date(Math.floor((Date.parse(banco.perfil.nombre_cambiado_en) + 30 * 86400000) / 1000) * 1000)
+      const fecha = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' }).format(hasta)
+      const r = await page.evaluate(() => ({ aviso: document.querySelector('[data-accion="aviso-nombre"]')?.textContent ?? '', campo: document.querySelector('#bautizo-nombre')?.value, boton: document.querySelector('[data-accion="bautizo-cancelar"]')?.textContent ?? '' }))
+      anota('freno', libreAntes && r.aviso === `Podrás cambiarlo de nuevo el ${fecha}.` && r.campo === PERFIL_CAP.username && r.boton === 'Cerrar' && banco.usuario === PERFIL_CAP.username,
+        { celda: id, caso: 'AJ030 del servidor: el editor pasa a bloqueado con la fecha del hint', libreAntes, fecha, ...r })
+    } catch (e) {
+      anota('freno', false, { celda: id, caso: 'AJ030', error: String(e?.message ?? e).split('\n')[0] })
+    } finally { await ctx?.close().catch(() => {}) }
+    errores.push(...propios.filter((e) => !/the server responded with a status of (400|409)/.test(e)))
+  }
+}
+
 export async function runCfg(browser, { base }) {
   const t0 = Date.now()
   const errores = []
@@ -482,8 +841,9 @@ export async function runCfg(browser, { base }) {
   const puertas = {
     zona: [], solape: [], ojito: [], hoja: [], ancla: [], toast: [], sonido: [], version: [], inv45: [], sinojito: [],
     'eliminar.ventana': [], 'eliminar.mesa': [], 'eliminar.ok': [], 'salir.reinicia': [],
+    perfil: [], freno: [],
   }
-  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia']
+  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia', 'perfil', 'freno']
   const anota = (p, ok, detalle) => { puertas[p].push({ ok: ok === true, ...detalle }); return ok === true }
 
   for (const celda of CELDAS) {
@@ -591,16 +951,21 @@ export async function runCfg(browser, { base }) {
       await page.waitForSelector('main.lobby'); await esperarQuieta(page)
       await page.click('[data-accion="ojito"]'); await page.waitForTimeout(150)
       anota('inv45', rnkInv45.length === 1 && rnkInv45[0], { celda: id, rankings: rnkInv45 })
+
+      // ── 5b · CFG-1 1b · La pantalla de perfil ───────────────────────────
+      const pf = await medirPerfil(page)
+      c.pantallas.perfil = pf
       anota('ojito', !rnk.ojito && rnkCifra && !rnkCifra.tapada && /\d/.test(rnkCifra.texto), { celda: id, que: 'Rankings: sin ojito y la cifra a la vista con el ojito cerrado', ojito: rnk.ojito, cifra: rnkCifra?.texto })
 
       // ── Las puertas de zona, solape, ancla y sinojito de la celda ───────
-      for (const [nombre, m] of [['lobby', lobby], ['retar', retar], ['salas', salas]]) {
-        const cortos = m.tocables.filter((x) => Math.min(...x.zona) < ZONA_GEO || !x.efectiva || Math.min(...x.efectiva) < ZONA_EFECTIVA)
-        const tipos = new Set(m.tocables.map((x) => x.tipo))
-        const deben = nombre === 'lobby' ? ['⚙', 'avatar', '«+»', 'ojito'] : nombre === 'retar' ? ['⚙', 'avatar', '«+»', 'casa', 'flecha', 'chip', '±'] : ['⚙', 'avatar', '«+»', 'casa', 'flecha', 'Unirme']
-        const faltan = deben.filter((d) => !tipos.has(d))
-        anota('zona', !cortos.length && !faltan.length, { celda: id, pantalla: nombre, cortos: cortos.map((x) => [x.n, x.zona, x.efectiva]), faltan })
-        anota('solape', m.solapes.length === 0, { celda: id, pantalla: nombre, solapes: m.solapes })
+      const DEBEN = {
+        lobby: ['⚙', 'avatar', '«+»', 'ojito'],
+        retar: ['⚙', 'avatar', '«+»', 'casa', 'flecha', 'chip', '±'],
+        salas: ['⚙', 'avatar', '«+»', 'casa', 'flecha', 'Unirme'],
+        ...DEBEN_1B,
+      }
+      for (const [nombre, m] of [['lobby', lobby], ['retar', retar], ['salas', salas], ['rankings', rnk], ...Object.entries(pf)]) {
+        anotaZonas(anota, id, nombre, m, DEBEN[nombre])
       }
       for (const [nombre, m] of [['retar', retar], ['salas', salas], ['rankings', rnk]]) {
         anota('sinojito', m.ojito === false, { celda: id, pantalla: nombre })
@@ -715,6 +1080,9 @@ export async function runCfg(browser, { base }) {
 
   // ── 9 · CFG-1 1c · Eliminar cuenta y O-2 ──────────────────────────────────
   await eliminarCuenta(browser, base, errores, anota)
+
+  // ── 10 · CFG-1 1b · 15 «M», las tres puertas y el freno ──────────────────
+  await perfilDe1b(browser, base, errores, anota)
 
   const resumen = Object.fromEntries(Object.entries(puertas).map(([k, v]) => [`cfg.${k}`, v.length > 0 && pasa(v.map((x) => x.ok))]))
   resumen.consola = errores.length === 0
