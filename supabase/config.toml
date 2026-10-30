@@ -28,3 +28,9 @@
 # viajan.
 
 project_id = "ajilei"
+
+# CFG-1 1c · La Edge Function `eliminar_cuenta` verifica el token ella misma
+# (`GET /auth/v1/user`): la puerta del gateway no sirve con las llaves nuevas
+# del proyecto (sb_publishable_ / sb_secret_), como ya midió la sonda de MOT-1.
+[functions.eliminar_cuenta]
+verify_jwt = false

@@ -18,6 +18,7 @@ export const GUIONES_VIGENTES = Object.freeze([
   Object.freeze({ archivo: 'eco1d_verificacion.sql', filas: 23, migracion: '20261009105658_eco1d_constancia_limites_valvula.sql' }),
   Object.freeze({ archivo: 'eco1g_verificacion.sql', filas: 21, migracion: '20261012230807_eco1g_video.sql' }),
   Object.freeze({ archivo: 'rnk1a_verificacion.sql', filas: 37, migracion: '20261024191731_rnk1a_libro_puntos.sql' }),
+  Object.freeze({ archivo: 'cfg1c_verificacion.sql', filas: 14, migracion: '20261030001500_cfg1c_eliminar_cuenta.sql' }),
 ])
 
 /**
