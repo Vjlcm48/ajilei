@@ -183,6 +183,7 @@ begin
     v_d := v_d || format('las cuatro del cliente=%s · alguna interna al cliente=%s', ok1, ok2);
 
     -- ── A10 · INV-67: ni uuid ni correo en lo que devuelven ──────────────
+    -- CFG-1 1b: 13 → 17 columnas (pais y estado en ranking_top y mini_perfil).
     select count(*) into n1
       from pg_proc f join pg_namespace s on s.oid = f.pronamespace,
            unnest(f.proallargtypes, f.proargmodes, f.proargnames) as a(tipo, modo, nombre)
@@ -194,8 +195,8 @@ begin
            unnest(f.proallargtypes, f.proargmodes) as a(tipo, modo)
      where s.nspname = 'public' and f.proname in ('ranking_top', 'ranking_mio', 'mini_perfil') and a.modo = 't';
     v_o := v_o || 10; v_p := v_p || 'A10 · INV-67: ninguna columna de las tres es un uuid ni un correo'::text;
-    v_r := v_r || case when n1 = 0 and n2 = 13 then 'PASA' else 'FALLA' end;
-    v_d := v_d || format('columnas devueltas=%s de 13 · con uuid o correo=%s', n2, n1);
+    v_r := v_r || case when n1 = 0 and n2 = 17 then 'PASA' else 'FALLA' end;
+    v_d := v_d || format('columnas devueltas=%s de 17 · con uuid o correo=%s', n2, n1);
 
     -- ── A11 · security definer y search_path vacío ───────────────────────
     select count(*) into n1 from pg_proc f join pg_namespace s on s.oid = f.pronamespace
