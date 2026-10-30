@@ -156,3 +156,35 @@ main.lobby > .lob-top { z-index: 2; }
     bottom: calc(min(0px, calc(100% - 44px)) - max(-2px, min(0px, calc(50% - 22px))));
   }
 }
+
+
+/* ══ 6 · CFG-1 1b · LOS ROCES DE RANKINGS (§0-14) ═════════════════════════════
+   Medidos en la app real (lámina 1b-L §6; `cfg.solape` con 15 «M» en `.sal`).
+   Mismo camino Z: las zonas siguen midiendo 44 y no se mueve nada a la vista.
+   (b) Con un nombre ancho la píldora se arrima al ⚙ y la zona del «+» pisaba
+       la del ⚙ (7,73 px en 360, 4,80 en 390, 2,64 en 412). En `.sal` la zona
+       del ⚙ ya no crece hacia la izquierda (crece el doble hacia la derecha,
+       hacia el borde de la pantalla, donde no hay nada) y la del «+» se corre
+       2 px a la izquierda, sobre su propia píldora. En el lobby no roza (la
+       ficha de la constancia aparta la píldora) y no cambia.
+   (a) ⚙ con casa en 915×412 (1,11 px en la lámina) ya no aparece en la app:
+       `cfg.solape` lo vigila en Rankings desde la 1b. */
+.sal.es-anclada > .lob-top .lob-ajustes::after {
+  left: 0;
+  right: calc(2 * min(0px, calc(50% - 22px)));
+}
+.sal.es-anclada .lob-pildora .lob-mas::after {
+  left: calc(min(0px, calc(50% - 22px)) - 2px);
+  right: calc(min(0px, calc(50% - 22px)) + 2px);
+}
+/* (c) En Rankings, bajo 390, las pestañas empiezan justo debajo de la fila de
+   la flecha: entre la zona de la barra y las pestañas quedan 44,75 px, y con
+   los −2 de §5 la casa y la flecha pisaban 0,89 px la primera pestaña. Aquí
+   suben −3,25 (medido en 360: 0,39 px de aire con la barra y 0,36 con las
+   pestañas). */
+@media (max-width: 389.98px) {
+  .sal.es-anclada[data-ranking] .sal-cab :is(.sal-volver, .sal-casa)::after {
+    top: -3.25px;
+    bottom: calc(min(0px, calc(100% - 44px)) + 3.25px);
+  }
+}

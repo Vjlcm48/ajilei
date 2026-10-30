@@ -139,6 +139,32 @@
 :is(.lobby, .sal) .lob-hoja-cuenta b { font-weight: 500; color: var(--text-primary); }
 :is(.lobby, .sal) .lob-hoja-correo { font-size: 0.85em; }
 
+/* CFG-1 1b · la cabecera, puerta del perfil (V6 de la lámina 1b-L, §5). Un
+   `<button>` con la cara del bloque de la 1a: mismo filete, misma letra, 44
+   como mínimo, y «›» al final. El filete inferior la separa de «Sonido», así
+   que su zona no pisa la fila (lo midió la lámina). */
+:is(.lobby, .sal) button.lob-hoja-cuenta.cfg-tocable {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0 calc(var(--u) * 2.5);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--cfg-linea);
+  border-radius: calc(var(--u) * 1.6) calc(var(--u) * 1.6) 0 0;
+  font: inherit;
+  font-size: calc(var(--u) * 3.3);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+:is(.lobby, .sal) .lob-hoja-cuenta.cfg-tocable:hover { background: rgba(var(--text-primary-rgb), 0.04); }
+:is(.lobby, .sal) .lob-hoja-cuenta.cfg-tocable:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 2px; }
+:is(.lobby, .sal) .lob-hoja-cuenta > span:not(.lob-avatar, .lob-chev) { min-width: 0; flex: 1 1 auto; }
+:is(.lobby, .sal) .lob-hoja-cuenta > .cfg-chev { margin-left: auto; flex: none; }
+/* La bandera detrás del nombre, del alto de la letra y sin texto (§0-11). */
+:is(.lobby, .sal) .lob-hoja-cuenta { --band-h: max(12px, 0.95em); }
+:is(.lobby, .sal) .lob-hoja-cuenta b + .cfg-band { margin-left: 0.45em; vertical-align: -0.1em; }
+
 /* El cuerpo: lo único que se desplaza. La barra de desplazamiento al borde de
    la hoja y no dentro del texto: el cuerpo se sale 4 u por cada lado y las
    devuelve en relleno. */

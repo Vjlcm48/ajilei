@@ -34,7 +34,9 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil } from './dev/billeteraFalsa'
+import { perfilApi } from './lib/perfilApi'
+import Perfil from './screens/Perfil'
 import { cuentaApi } from './lib/cuentaApi'
 import { limpiarAparato } from './lib/limpiarAparato'
 import { rankingApi } from './lib/rankingApi'
@@ -167,7 +169,10 @@ function App() {
   // llamada tiene que ser el mismo en los cuatro estados de sesión. Es la razón
   // por la que `useAuth` abre la función y los `useState` del lobby se declaran
   // aunque la puerta esté a punto de devolver otra pantalla.
-  const auth = useAuth()
+  // CFG-1 1b · el perfil se lee y se escribe por su capa: la del banco
+  // imitado con el bypass (que entiende los mandos `?cfg=nombre-…`) o la real.
+  const [apiPerfil] = useState(() => simulacionPerfil() ?? perfilApi)
+  const auth = useAuth({ api: apiPerfil })
   // RNK-1 1e · el idioma de `t()` elige el video de SumaMente.
   const { idioma } = useIdioma()
 
@@ -300,6 +305,17 @@ function App() {
   // más que el tope ya se llevó la cuenta. Quedarse dentro sería un reintento
   // sin fin.
   const [apiCuenta] = useState(() => simulacionCuenta() ?? cuentaApi)
+
+  // ── CFG-1 1b · LA PANTALLA DE PERFIL Y DE DÓNDE SE VINO ───────────────────
+  // Rector CFG-1 1b §2.5 (R-9). La flecha del perfil vuelve a la pantalla que
+  // lo abrió (`desdePerfil`); la casa, al lobby. Desde el propio perfil, el
+  // avatar de la barra no hace nada (ya se está ahí).
+  const [desdePerfil, setDesdePerfil] = useState('lobby')
+  const abrirPerfil = useCallback(() => {
+    if (screen === 'perfil') return
+    setDesdePerfil(screen)
+    setScreen('perfil')
+  }, [screen])
   const eliminarCuenta = useCallback(async () => {
     const r = await apiCuenta.eliminar()
     if (!r.ok && r.motivo !== 'sin_sesion') return r
@@ -831,14 +847,26 @@ function App() {
   //
   // Es un campo más en el mismo paquete: `GameTable`, que recibe este objeto, no
   // se entera.
+  //
+  // CFG-1 1b · Entran el lugar (`pais`, `estado`), el freno (`proximoCambio`),
+  // las dos acciones nuevas y `abrirPerfil`: las tres puertas del perfil (la
+  // barra, la cabecera de la hoja ⚙ y «Editar» del mini-perfil propio) lo
+  // llaman sin saber de `screen`. Desde la mesa no hay puerta: `GameTable` no
+  // lo usa.
   const cuenta = {
     id: auth.perfil?.id ?? null,
     username: auth.perfil?.username ?? '',
     correo: auth.correo ?? '',
+    pais: auth.perfil?.pais ?? null,
+    estado: auth.perfil?.estado ?? null,
+    proximoCambio: auth.proximoCambio,
     cambiarNombre: auth.cambiarNombre,
+    comprobarNombre: auth.comprobarNombre,
+    cambiarLugar: auth.cambiarLugar,
     cerrarSesion,
     // CFG-1 1c · la fila «Eliminar cuenta» de la hoja ⚙, en las siete pantallas.
     eliminarCuenta,
+    abrirPerfil,
   }
 
   // ── LOB-1 · `cuentaLobby` se retira ────────────────────────────────────────
@@ -1001,6 +1029,21 @@ function App() {
   // nada montado detrás.
   if (screen === 'sumamente') {
     return <IntersticialSumaMente idioma={idioma} onFin={() => setScreen('rankings')} />
+  }
+
+  // ── CFG-1 1b · El perfil ─────────────────────────────────────────────────
+  // Pantalla con barra: con el marco del video, como Rankings.
+  if (screen === 'perfil') {
+    return conVideo(
+      <Perfil
+        cuenta={cuenta}
+        billetera={billetera}
+        aviso={avisoSaldo}
+        onAvisoFin={finAviso}
+        onVolver={() => setScreen(desdePerfil)}
+        onLobby={() => setScreen('lobby')}
+      />,
+    )
   }
 
   // ── RNK-1c · Rankings ────────────────────────────────────────────────────

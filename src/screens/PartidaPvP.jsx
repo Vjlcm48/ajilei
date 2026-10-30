@@ -54,7 +54,7 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, onLo
         estadoSaldo={billetera?.estado}
         recordado={billetera?.recordado ?? null}
         cobrando={billetera?.pendiente === true}
-        onPerfil={() => avisar('lob.toast.pronto')}
+        onPerfil={cuenta?.abrirPerfil ?? (() => avisar('lob.toast.pronto'))}
         onAjustes={() => setHojaAbierta(true)}
         ajustesRef={ajustesRef}
         ajustesExpandido={hojaAbierta}

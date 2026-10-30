@@ -2845,6 +2845,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         <Bautizo
           modo="edicion"
           actual={cuenta.username}
+          // CFG-1 1b · el freno de 30 días y `nombre_libre`, como en el perfil.
+          bloqueadoHasta={cuenta.proximoCambio instanceof Date ? cuenta.proximoCambio : null}
+          onComprobar={cuenta.comprobarNombre}
           onConfirmar={cuenta.cambiarNombre}
           onCancelar={() => setEditandoNombre(false)}
         />

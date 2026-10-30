@@ -113,6 +113,19 @@
   color: var(--text-muted);
 }
 .mp-pais i { width: 18px; height: 12px; border: 1px dashed rgba(var(--text-primary-rgb), 0.35); border-radius: 2px; }
+/* CFG-1 1b · llena (lámina 1b-L, §6): la misma caja, el filete liso, la
+   bandera de 14 y el texto que cede con «…». Sin país, solo el isotipo en
+   tenue y sin filete. */
+.mp-pais.es-lleno {
+  --band-h: 14px;
+  box-sizing: border-box;
+  max-width: 100%;
+  border-style: solid;
+  border-color: rgba(var(--text-primary-rgb), 0.14);
+  color: var(--text-secondary);
+}
+.mp-pais.es-lleno.es-sin { border-color: transparent; }
+.mp-pais-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Sus rankings ───────────────────────────────────────────────────────── */
 .mp-sep { height: 1px; margin: 14px 0; border: 0; background: rgba(var(--gold-brand-rgb), 0.18); }
@@ -165,6 +178,10 @@
   font-size: 15px;
   cursor: default;
 }
+/* CFG-1 1b · encendido (con `onEditar`): con el color de un botón. */
+.mp-editar:not(:disabled) { color: var(--text-primary); border-color: rgba(var(--text-primary-rgb), 0.32); cursor: pointer; }
+.mp-editar:not(:disabled):hover { background: rgba(var(--text-primary-rgb), 0.05); }
+.mp-editar:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 2px; }
 .mp-editar span {
   padding: 2px 8px;
   border: 1px solid rgba(var(--text-primary-rgb), 0.25);

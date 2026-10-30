@@ -4,6 +4,8 @@ import '../styles/miniPerfil.css'
 
 import { useIdioma } from '../hooks/useIdioma'
 import { lineasDe, estadoPerfil } from './miniPerfilCore'
+import Bandera from './Bandera'
+import { textoLugar } from '../lib/lugarCore'
 import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 
 // ── RNK-1c-ii · El mini-perfil ──────────────────────────────────────────────
@@ -32,6 +34,16 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 //
 // Se cierra con la ✕, tocando el velo o con `Escape`. El foco entra en la ✕ al
 // abrir; devolverlo a la fila que la abrió es de quien la abrió.
+//
+// CFG-1 1b · EL LUGAR. La pastilla «País y estado» (rayada, el hueco de
+// RNK-1) se llena cuando contesta `mini_perfil`: filete liso, la bandera y el
+// texto, que cede con «…»; sin país, solo el isotipo en tenue y sin filete.
+// Misma caja de 28 de alto (O1): mientras carga sigue el hueco rayado.
+//
+// CFG-1 1b · «EDITAR» ES UNA PUERTA DEL PERFIL (R-10). En la tarjeta propia,
+// con `onEditar` el botón se enciende (sin «Pronto») y lleva al perfil; sin
+// él no se pinta: la victoria (`GameTable`) no lo pasa, porque desde dentro de
+// la mesa no se va al perfil.
 
 // Los huecos de la frase que llevan otra cara: el puesto en oro y el saldo con
 // su moneda delante (lámina). El texto entero sigue saliendo de `t()`.
@@ -71,7 +83,7 @@ function Corona() {
   )
 }
 
-export default function MiniPerfil({ username, inicial, propio = false, correo = '', onCerrar, onNoHay, api }) {
+export default function MiniPerfil({ username, inicial, propio = false, correo = '', onCerrar, onNoHay, onEditar, api }) {
   const { t } = useIdioma()
   const idNombre = useId()
   const cerrar = useRef(null)
@@ -105,6 +117,7 @@ export default function MiniPerfil({ username, inicial, propio = false, correo =
   // El nombre lo pone el servidor cuando contesta (las mayúsculas de verdad);
   // hasta entonces, el de la fila.
   const nombre = estado === 'listo' ? respuesta.perfil.username : username
+  const lugar = estado === 'listo' ? textoLugar(respuesta.perfil.pais, respuesta.perfil.estado) : ''
 
   return createPortal(
     <div
@@ -136,7 +149,14 @@ export default function MiniPerfil({ username, inicial, propio = false, correo =
             <Corona />
           </div>
           {/* País y estado: hueco hasta que haya datos. */}
-          <div className="mp-pais"><i aria-hidden="true" />{t('rnk.perfil.pais')}</div>
+          {estado === 'listo' ? (
+            <div className={`mp-pais es-lleno${lugar ? '' : ' es-sin'}`} data-accion="mp-lugar">
+              <Bandera pais={respuesta.perfil.pais} />
+              {lugar ? <span className="mp-pais-t">{lugar}</span> : null}
+            </div>
+          ) : (
+            <div className="mp-pais"><i aria-hidden="true" />{t('rnk.perfil.pais')}</div>
+          )}
         </div>
 
         <div className="mp-datos">
@@ -158,10 +178,11 @@ export default function MiniPerfil({ username, inicial, propio = false, correo =
                 <span>{correo || ' '}</span>
                 <span className="mp-solo">{t('rnk.perfil.solo_tu')}</span>
               </div>
-              <button type="button" className="mp-editar" data-accion="mp-editar" disabled>
-                {t('rnk.perfil.editar')}
-                <span>{t('lob.toast.pronto')}</span>
-              </button>
+              {onEditar && (
+                <button type="button" className="mp-editar" data-accion="mp-editar" onClick={onEditar}>
+                  {t('rnk.perfil.editar')}
+                </button>
+              )}
             </>
           )}
         </div>

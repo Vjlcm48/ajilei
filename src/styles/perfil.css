@@ -1,0 +1,266 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · CFG-1 1b · La pantalla de perfil (`screens/Perfil.jsx`)
+   Rector: AJILEI_CFG-1_Fase1b_v1.0.md §2.5–§2.8. Es el §2–§3 de la hoja de la
+   lámina (`laminas/cfg1b/cfg1b.css`), con lo de V1-A y V3-A (lo elegido por
+   Victor, §0-1 y §0-2); lo de V1-B y V3-B no se copia. La bandera (§1) vive
+   en `bandera.css` y la ventana de los 30 días (§4), en `bautizo.css`.
+
+   ADITIVA: la importa `Perfil.jsx` DESPUÉS de `PantallaChips`, o sea, después
+   de `salas.css`, y los empates de especificidad los gana esta hoja. Sin
+   `!important` ni un hex (tokens de `theme.css` o `rgba(var(--…-rgb), α)`).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 1 · LA CARCASA (`.sal-cuerpo.es-perfil`) ═══════════════════════════════
+   La carcasa es `.sal.es-anclada` (barra, ⚙, flecha y casa de siempre). El
+   cuerpo arranca arriba y no reparte aire: `margin: 0` gana a los `auto` de
+   salas.css §16 con la misma especificidad, por orden. La zona anclada se
+   queda sin botón (`cta={null}`): solo el toast. */
+.sal.es-anclada .sal-cuerpo.es-perfil {
+  row-gap: calc(var(--u) * 3.5);
+  padding-top: calc(var(--u) * 3);
+}
+.sal.es-anclada .sal-cuerpo.es-perfil > :nth-child(n) { margin: 0; align-self: stretch; grid-area: auto; }
+.sal.es-anclada .sal-cuerpo.es-perfil > .sal-accion { margin-top: auto; }
+
+/* La cabecera: el círculo grande (la caja de AVA-1), el nombre y el lugar. */
+.pf-cab {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 1.6);
+  min-width: 0;
+  text-align: center;
+}
+.pf-av {
+  --av: 40px;
+  width: var(--av);
+  height: var(--av);
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--green-bright) 0%, var(--green-deep) 100%);
+  border: 2px solid var(--text-secondary);
+  font-size: calc(var(--av) * 0.44);
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.pf-av-grande { --av: max(72px, calc(var(--u) * 17)); }
+.pf-av-mini { --av: max(26px, calc(var(--u) * 6.4)); border-width: 1.5px; }
+.pf-nom {
+  max-width: 100%;
+  font-size: max(19px, calc(var(--u) * 4.6));
+  font-weight: 600;
+}
+.pf-lugar {
+  --band-h: max(18px, calc(var(--u) * 4.2));
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.6);
+  max-width: 100%;
+  min-height: var(--band-h);
+  font-size: max(14px, calc(var(--u) * 3.3));
+  color: var(--text-secondary);
+}
+.pf-trunca { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-tenue { color: var(--text-muted); }
+
+/* V1-A · las filas, las de la hoja ⚙ (`.lob-fila`: 44 visibles, 3,4 u) con
+   filete entre ellas. Etiqueta fija a la izquierda; el valor cede con «…». */
+.pf-filas { border-top: 1px solid var(--linea); }
+.sal .lob-fila.pf-fila {
+  --band-h: max(14px, 0.95em);
+  border-bottom: 1px solid var(--linea);
+  padding-inline: calc(var(--u) * 1);
+}
+.pf-fila-l { flex: none; }
+.pf-valor {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.4);
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.92em;
+}
+.pf-valor-2 { flex-direction: column; align-items: flex-end; gap: 0; }
+.pf-valor-2 small { font-size: 0.82em; color: var(--text-muted); white-space: nowrap; }
+
+/* V4 · el avatar. La rejilla es la de AVA-1: celdas de 64 px como mínimo
+   (16 u), que se repiten lo que quepa. La primera es la de hoy, marcada con
+   el contorno de oro de los chips (contorno, no macizo: INV-08); las demás
+   son huecos. */
+.pf-sec { min-width: 0; }
+.pf-sec-avatar { padding-top: calc(var(--u) * 2); }
+.pf-avatares { display: grid; gap: calc(var(--u) * 2.4); }
+.pf-av-rejilla {
+  --celda: max(64px, calc(var(--u) * 16));
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--celda), 1fr));
+  gap: calc(var(--u) * 2.4);
+}
+.pf-av-celda {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  container-type: inline-size;
+}
+.pf-av-celda .pf-av { width: 82%; height: auto; aspect-ratio: 1; font-size: 36cqi; }
+.pf-av-celda.is-elegida { cursor: default; }
+.pf-av-celda.is-elegida .pf-av { box-shadow: 0 0 0 3px rgba(var(--green-abyss-rgb), 1), 0 0 0 5px rgba(var(--gold-brand-rgb), 0.85); }
+.pf-av-marca {
+  position: absolute;
+  right: 4%;
+  bottom: 4%;
+  width: 28cqi;
+  height: 28cqi;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-modal);
+  border: 1.5px solid rgba(var(--gold-brand-rgb), 0.85);
+  font-size: 16cqi;
+  color: var(--text-primary);
+}
+.pf-av-celda.is-hueco .pf-av { background: none; border: 1.5px dashed rgba(var(--text-primary-rgb), 0.22); }
+.pf-av-pronto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 2);
+  margin: 0;
+  font-size: max(13px, calc(var(--u) * 3.1));
+  color: var(--text-muted);
+}
+
+/* V3-A · elegir país y estado. Lista que desplaza por dentro (salas.css §17);
+   el buscador se queda quieto encima. Fila de 44 visibles; la elegida lleva
+   el contorno de oro de los chips y un ✓ crema: sin oro macizo. */
+.sal.es-anclada .sal-cuerpo.es-perfil.es-lista {
+  width: min(var(--col), calc(var(--u) * 110));
+  display: flex;
+  flex-direction: column;
+  row-gap: calc(var(--u) * 2);
+  /* 4 u y no 3: por debajo de 390 la zona de la flecha y la de la casa
+     crecen hacia abajo (R-9 de la 1a) y con 3 u pisaban 1,89 px el buscador. */
+  padding-top: calc(var(--u) * 4);
+}
+.pf-buscar { flex: none; position: relative; }
+.pf-campo {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: max(44px, calc(var(--u) * 9.5));
+  padding: 0 calc(var(--u) * 3);
+  border: 1px solid rgba(var(--text-primary-rgb), 0.28);
+  border-radius: calc(var(--u) * 2);
+  background: rgba(var(--green-abyss-rgb), 0.6);
+  color: var(--text-primary);
+  font: inherit;
+  /* Nunca menos de 16: Safari del iPhone acerca la página con menos (1c). */
+  font-size: max(16px, calc(var(--u) * 3.4));
+}
+.pf-campo::placeholder { color: var(--text-muted); }
+.pf-campo:focus { outline: none; border-color: rgba(var(--text-primary-rgb), 0.7); box-shadow: 0 0 0 3px rgba(var(--text-primary-rgb), 0.12); }
+/* R-18 · el «×» nativo fuera (en Chrome mide 9 px) y uno propio de 44, que
+   solo sale con algo escrito. El campo deja su sitio a la derecha. */
+.pf-campo[type="search"] { -webkit-appearance: none; appearance: none; padding-right: 48px; }
+.pf-campo[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+.pf-borrar {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.pf-borrar svg { width: 18px; height: 18px; }
+.pf-borrar:hover { color: var(--text-primary); }
+.pf-borrar:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: -4px; border-radius: calc(var(--u) * 2); }
+
+.pf-lista {
+  --band-h: max(16px, calc(var(--u) * 3.6));
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--linea);
+  scrollbar-color: rgba(var(--text-primary-rgb), 0.25) transparent;
+}
+.pf-lista > * { flex: none; }
+.pf-op {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2.4);
+  padding: calc(var(--u) * 1) calc(var(--u) * 2);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(var(--text-primary-rgb), 0.07);
+  border-radius: 0;
+  color: inherit;
+  font: inherit;
+  font-size: max(15px, calc(var(--u) * 3.4));
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+.pf-op:hover { background: rgba(var(--text-primary-rgb), 0.04); }
+.pf-op:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: -2px; }
+.pf-op.is-elegida {
+  background: rgba(var(--text-primary-rgb), 0.05);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--gold-brand-rgb), 0.75);
+  border-radius: calc(var(--u) * 1.6);
+}
+/* Guardando: la opción tocada se queda marcada y las demás no responden. */
+.pf-lista[aria-busy="true"] .pf-op { cursor: progress; }
+.pf-lista[aria-busy="true"] .pf-op:not(.is-elegida) { opacity: 0.6; }
+.pf-op-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-op-marca { margin-left: auto; flex: none; min-width: 1em; color: var(--text-primary); font-weight: 600; }
+.pf-grupo {
+  margin: calc(var(--u) * 3) calc(var(--u) * 2) calc(var(--u) * 1);
+  font-size: max(11px, calc(var(--u) * 2.9));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.pf-vacio { margin: 0; padding: calc(var(--u) * 6) calc(var(--u) * 2); text-align: center; color: var(--text-secondary); font-size: max(14px, calc(var(--u) * 3.3)); }
+.pf-paso {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  margin: 0;
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 2);
+  font-size: max(14px, calc(var(--u) * 3.3));
+  color: var(--text-secondary);
+}
+
+/* ══ 2 · EL PERFIL ACOSTADO Y EN ESCRITORIO BAJO ════════════════════════════
+   En la banda de las dos columnas de salas.css (≥ 900 × ≤ 830, incluye
+   915×412 y 1366×768) la cabecera va a la izquierda y las filas a la derecha,
+   como el mini-perfil acostado. Las reglas de salas.css colocan por
+   `:nth-child` con (0,5,0): éstas tienen la misma y van después. Debajo de
+   520 de alto el cuerpo desplaza ENTERO (salas.css §16). */
+@media (orientation: landscape) and (min-width: 900px) and (max-height: 830px) {
+  .sal.es-anclada .sal-cuerpo.es-perfil:not(.es-lista) {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    grid-template-rows: auto auto 1fr auto;
+    align-content: start;
+  }
+  .sal.es-anclada .sal-cuerpo.es-perfil > .pf-cab { grid-area: 1 / 1 / 4 / 2; align-self: center; }
+  .sal.es-anclada .sal-cuerpo.es-perfil > .pf-filas { grid-area: 1 / 2 / 4 / 3; align-self: start; }
+  .sal.es-anclada .sal-cuerpo.es-perfil > .pf-sec-avatar { grid-area: 1 / 1 / 4 / 3; }
+  .sal.es-anclada .sal-cuerpo.es-perfil > .sal-accion { grid-area: 4 / 2; }
+}

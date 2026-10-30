@@ -6,6 +6,8 @@ import PantallaChips from '../components/PantallaChips'
 import '../styles/rankings.css'
 import FilaChips from '../components/FilaChips'
 import MiniPerfil from '../components/MiniPerfil'
+import Bandera from '../components/Bandera'
+import { textoLugar } from '../lib/lugarCore'
 import { esPropio } from '../components/miniPerfilCore'
 import { IconoTrofeo } from '../components/IconosLobby'
 import { useIdioma } from '../hooks/useIdioma'
@@ -72,7 +74,20 @@ function Moneda() {
   return <img className="rnk-moneda" src={heptacoinUrl} alt="" draggable="false" />
 }
 
-function Fila({ puesto, username, cifra, fortunas, yo, onJugador, t }) {
+// CFG-1 1b · la fila de dos líneas (§0-4): primera, el nombre (· tú) y la
+// corona; segunda, la bandera y el lugar en tenue, que cede con «…». Sin país,
+// el isotipo en tenue y nada más (INV-74). La fila sigue midiendo lo mismo.
+function Lugar({ pais, estado }) {
+  const texto = textoLugar(pais, estado)
+  return (
+    <span className="rnk-lugar">
+      <Bandera pais={pais} />
+      {texto ? <span className="rnk-lugar-t">{texto}</span> : null}
+    </span>
+  )
+}
+
+function Fila({ puesto, username, cifra, fortunas, yo, pais = null, estado = null, onJugador, t }) {
   const podio = puesto <= 3
   return (
     <button
@@ -90,6 +105,7 @@ function Fila({ puesto, username, cifra, fortunas, yo, onJugador, t }) {
         <b>{username}</b>
         {yo && <span className="rnk-yo">{t('rnk.tu.yo')}</span>}
         <Corona />
+        <Lugar pais={pais} estado={estado} />
       </span>
       <span className="rnk-cifra">
         {fortunas && <Moneda />}
@@ -203,7 +219,10 @@ export default function Rankings({
             <strong>{banda && mio ? t(banda.clave, banda.vars) : ' '}</strong>
           </div>
           {mio ? (
-            <Fila puesto={mio.puesto} username={usuario} cifra={mio.cifra} fortunas={fortunas} yo onJugador={onJugador} t={t} />
+            <Fila
+              puesto={mio.puesto} username={usuario} cifra={mio.cifra} fortunas={fortunas} yo
+              pais={cuenta?.pais ?? null} estado={cuenta?.estado ?? null} onJugador={onJugador} t={t}
+            />
           ) : banda ? (
             // Sin puntos todavía, la banda también abre tu tarjeta (§0).
             <button type="button" className="rnk-vacio" data-accion="rnk-tu-abre" onClick={(e) => onJugador(usuario, e.currentTarget)}>
@@ -255,6 +274,8 @@ export default function Rankings({
                     cifra={f.cifra}
                     fortunas={fortunas}
                     yo={f.esTu || esTu(f, usuario)}
+                    pais={f.pais}
+                    estado={f.estado}
                     onJugador={onJugador}
                     t={t}
                   />
@@ -294,6 +315,7 @@ export default function Rankings({
           correo={perfil.propio ? (cuenta?.correo ?? '') : ''}
           onCerrar={cerrarPerfil}
           onNoHay={noHay}
+          onEditar={perfil.propio && cuenta?.abrirPerfil ? cuenta.abrirPerfil : undefined}
         />
       )}
     </PantallaChips>

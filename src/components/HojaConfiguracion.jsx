@@ -4,6 +4,7 @@ import '../styles/hojaConfiguracion.css'
 import { SoundButton } from './SoundButton'
 import EliminarCuenta from './EliminarCuenta'
 import { IconoUsuario } from './IconosLobby'
+import Bandera from './Bandera'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { CORREO_SOPORTE } from '../config/soporte'
 import { VERSION, COMMIT } from '../config/version'
@@ -47,6 +48,12 @@ import { copiarTexto } from '../lib/copiarTexto'
 // (`tabIndex={-1}`); al cerrar, vuelve al ⚙ que la abrió (`ajustesRef`), o
 // la siguiente tabulación empezaría por la esquina de la página. `Escape`
 // cierra, y sólo se escucha mientras está abierta.
+//
+// ── CFG-1 1b · LA CABECERA ES UNA PUERTA DEL PERFIL ─────────────────────────
+// Rector: AJILEI_CFG-1_Fase1b_v1.0.md §2.7 (R-10, V6 de la lámina). Con
+// `cuenta.abrirPerfil` la cabecera es un `<button>` con «›» al final, de 44
+// como mínimo: cierra la hoja y abre el perfil. Sin él (nadie la monta así
+// hoy) sigue siendo el bloque quieto de la 1a.
 
 export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuenta, onCerrarSesion }) {
   const { t, idioma } = useIdioma()
@@ -165,14 +172,29 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
           {t('lob.cfg.titulo')}
         </h2>
 
-        <div className="lob-hoja-cuenta">
-          <span className="lob-avatar" aria-hidden="true"><IconoUsuario /></span>
-          <span>
-            <b className={usuario ? '' : 'lob-hueco'}>{usuario || ' '}</b>
-            <br />
-            <span className={`lob-hoja-correo${correo ? '' : ' lob-hueco'}`}>{correo || ' '}</span>
-          </span>
-        </div>
+        {(() => {
+          const abre = typeof cuenta?.abrirPerfil === 'function'
+          const Cabecera = abre ? 'button' : 'div'
+          const puerta = abre ? {
+            type: 'button',
+            'data-accion': 'cfg-perfil',
+            onClick: () => { play('buttonClick'); onCerrar?.(); cuenta.abrirPerfil() },
+          } : {}
+          return (
+            <Cabecera className={`lob-hoja-cuenta${abre ? ' cfg-tocable' : ''}`} {...puerta}>
+              <span className="lob-avatar" aria-hidden="true"><IconoUsuario /></span>
+              <span>
+                <b className={usuario ? '' : 'lob-hueco'}>{usuario || ' '}</b>
+                {/* CFG-1 1b · la bandera SIN texto (§0-11): una línea más pasaría la
+                    hoja de su tope en 360×640 con «Acerca de» abierto. */}
+                {usuario && <Bandera pais={cuenta?.pais ?? null} />}
+                <br />
+                <span className={`lob-hoja-correo${correo ? '' : ' lob-hueco'}`}>{correo || ' '}</span>
+              </span>
+              {abre && <span className="lob-chev cfg-chev" aria-hidden="true">›</span>}
+            </Cabecera>
+          )
+        })()}
 
         {/* Lo que se desplaza: la lista, no la cabecera (V2 de la lámina). */}
         <div className="cfg-hoja-cuerpo">

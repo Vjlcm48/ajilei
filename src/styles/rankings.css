@@ -167,7 +167,35 @@
   text-transform: uppercase;
   color: var(--text-primary);
 }
-.rnk-nom { display: flex; align-items: center; gap: calc(var(--u) * 1.2); min-width: 0; }
+/* CFG-1 1b · la fila de dos líneas (§0-4, fila 2 de la lámina 1b-L, §7).
+   Rejilla y no `flex-wrap`: con `flex-wrap` el «· tú» se iba a una línea
+   propia y la fila de 15 letras pasaba a tres (lámina, 1.ª corrida). Línea 1:
+   nombre (cede con «…») · «tú» · corona. Línea 2: el lugar. La fila no crece. */
+.rnk-fila { --band-h: max(12px, 0.88em); }
+.rnk-nom {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) auto auto 1fr;
+  align-items: center;
+  justify-items: start;
+  column-gap: calc(var(--u) * 1.2);
+  row-gap: 1px;
+  min-width: 0;
+}
+/* El nombre ocupa su pista (si no, `start` lo deja a su ancho natural y no
+   cede con «…»). */
+.rnk-nom > b { justify-self: stretch; }
+.rnk-lugar {
+  --band-h: max(11px, 0.8em);
+  grid-column: 1 / -1;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  min-width: 0;
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+.rnk-lugar-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rnk-nom b {
   font-weight: 500;
   min-width: 0;

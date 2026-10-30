@@ -41,3 +41,54 @@
   .bautizo-titulo { font-size: 1.2rem; margin-bottom: 16px; }
   .bautizo-card.is-edicion { padding: 24px 20px 20px; }
 }
+
+/* ── CFG-1 1b · El modo edición, con el freno (R-7, ficha §0-12) ─────────────
+   SOLO bajo `.is-edicion` y `.bautizo-overlay`: la puerta de entrada no cambia.
+   · Opaca: sobre la pantalla de perfil la de siempre (`--surface-panel`, 0,75)
+     dejaba leer lo de detrás (lámina 1b-L, V2).
+   · En el teléfono, arriba: con el teclado de Chrome por defecto (la vista no
+     encoge, `resizes-visual`) la tarjeta centrada quedaba con «Confirmar»
+     debajo del teclado en 360×640. Arriba, campo y botón quedan a la vista.
+   · «Cancelar» y «Cerrar» con zona de 44 (camino Z): la caja visible no
+     cambia y un ::after transparente crece lo que le falte, centrado.
+     `min(0px, 50% − 22px)` no crece nada en un botón de 44 o más. */
+.bautizo-card.is-edicion { background: var(--surface-modal); }
+
+@media (max-width: 680px), (max-height: 520px) {
+  .puerta-overlay.bautizo-overlay { align-items: flex-start; }
+}
+/* En el teléfono, «Ese nombre no está permitido — prueba otro» y «Podrás
+   cambiarlo de nuevo el 28 de noviembre.» van a dos líneas (360×640): la
+   ranura las reserva siempre y el botón no salta 11 px al aparecer (O1). */
+@media (max-width: 680px) {
+  .bautizo-card.is-edicion .puerta-aviso { min-height: calc(2 * 1.35em); }
+}
+
+/* El ancho, fijo: el envoltorio de la tarjeta es un hijo de la fila flexible
+   del velo y encogía al contenido, así que la tarjeta cambiaba de ancho con
+   el largo del aviso (313 → 370 px en 412×915, medido en la 1b). O1: lo que
+   dice la ranura no mueve la tarjeta. La tarjeta pasa a `border-box` para que
+   su relleno no la saque de la pantalla, y el tope es el ancho total que ya
+   tenía en escritorio: 420 de contenido + 2 × 30 de relleno + 2 de borde. */
+.puerta-overlay.bautizo-overlay > div { width: min(100%, 482px); }
+.puerta-overlay.bautizo-overlay .bautizo-card.is-edicion { box-sizing: border-box; max-width: none; }
+
+.bautizo-card.is-edicion .puerta-link { position: relative; }
+.bautizo-card.is-edicion .puerta-link::after {
+  content: '';
+  position: absolute;
+  top: min(0px, calc(50% - 22px));
+  bottom: min(0px, calc(50% - 22px));
+  left: min(0px, calc(50% - 22px));
+  right: min(0px, calc(50% - 22px));
+}
+
+/* La ventana de los 30 días (familia de «Eliminar cuenta», sin rojo), encima
+   del velo de la tarjeta (`.puerta-overlay`, z 900). */
+.elc-velo.cfn-velo { z-index: 1000; }
+.cfn-titulo b { font-weight: 700; overflow-wrap: anywhere; }
+.cfn-cambiar {
+  border: 1px solid rgba(var(--text-primary-rgb), 0.6);
+  background: rgba(var(--text-primary-rgb), 0.14);
+  color: var(--text-primary);
+}

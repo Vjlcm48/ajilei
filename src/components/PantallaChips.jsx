@@ -75,6 +75,12 @@ import { useIdioma } from '../hooks/useIdioma'
 // este mismo toast (un aviso, un reloj), no por uno de la pantalla: con
 // `avisoRef`, la carcasa deja en `avisoRef.current.avisar(clave)` la misma
 // función que usa el avatar (y hasta CFG-1 1a, el ⚙). Sin la prop, nada cambia.
+//
+// ── CFG-1 1b · EL AVATAR ABRE EL PERFIL ─────────────────────────────────────
+// Rector: AJILEI_CFG-1_Fase1b_v1.0.md §2.7 (R-10). Con `cuenta.abrirPerfil`
+// (lo pone `App`) el avatar de la barra lleva al perfil; sin él, «Pronto».
+// `avisar(clave, vars)` acepta las variables del texto («Listo: ahora eres
+// {nombre}», de la pantalla de perfil).
 
 export default function PantallaChips({
   titulo,
@@ -121,8 +127,8 @@ export default function PantallaChips({
   // Los dos accesos que quedaban —el avatar y el ⚙— decían lo mismo, así que
   // hay UN aviso y no dos relojes; desde CFG-1 1a el ⚙ abre la hoja. (El `+` dorado y el botón de Retar salieron de
   // aquí con ECO-1g: ver la cabecera.)
-  const avisar = useCallback((claveTexto) => {
-    setToast(claveTexto)
+  const avisar = useCallback((claveTexto, vars) => {
+    setToast({ clave: claveTexto, vars })
     clearTimeout(relojToast.current)
     relojToast.current = setTimeout(() => setToast(null), 2600)
   }, [])
@@ -141,7 +147,7 @@ export default function PantallaChips({
         cobrando={cobrando}
         aviso={aviso}
         onAvisoFin={onAvisoFin}
-        onPerfil={pronto}
+        onPerfil={cuenta?.abrirPerfil ?? pronto}
         onAjustes={() => setHojaAbierta(true)}
         ajustesRef={ajustesRef}
         ajustesExpandido={hojaAbierta}
@@ -189,7 +195,7 @@ export default function PantallaChips({
             </button>
           )}
           <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
-            {toast !== null ? t(toast) : ' '}
+            {toast !== null ? t(toast.clave, toast.vars) : ' '}
           </div>
         </section>
       </div>
