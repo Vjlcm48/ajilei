@@ -20,7 +20,7 @@ En la casa se le llama «menú de configuraciones». Este documento dice qué ha
 ## 1. El ⚙ y el ⋮
 
 - **El ⚙** es el botón de la barra superior. Abre la hoja de configuración (`src/components/HojaConfiguracion.jsx`). Está en el lobby y en las seis pantallas de `.sal`: Retar, Armar mesa, Rankings, Salas, Sala de espera y PvP.
-- **El ⋮** es «el menú de la mesa» (`src/components/UtilitiesMenu.jsx`). Solo existe dentro de la mesa. Se rige por `AJILEI_Menu_Utilidades_v1.5.md`.
+- **El ⋮** es «el menú de la mesa» (`src/components/UtilitiesMenu.jsx`). Solo existe dentro de la mesa. Se rige por `AJILEI_Menu_Utilidades_v1.6.md` (desde CFG-1 1e: Sonido, Reacciones, Tapetes, Partida rápida y Mano actual de pago).
 - Son dos menús distintos y no se confunden (contradicción e, §10). Lo único que comparten es el estado del sonido (§3).
 
 ## 2. Lo que hay en la hoja tras la 1b
@@ -150,14 +150,14 @@ Las filas miden 44 px de alto como mínimo (§7). «Pronto» sale con el aviso d
 ## 9. Lo que viene
 
 - **1d**: el correo de la cuenta.
-- **1e**: el ⋮ adelgaza; salen «Saldo» y, cuando el ⚙ los tenga, «Tapetes».
+- **1e** (hecha): el ⋮ adelgaza; salen «Cuenta» y «Saldo», entra «Partida rápida» y Mano actual se paga (`AJILEI_Menu_Utilidades_v1.6.md`). «Tapetes» sale en la 1f.
 - **1f**: los tapetes en el ⚙.
 
 ## 10. Las contradicciones de la Fase 0 y qué gana
 
 | | Contradicción | Gana |
 |---|---|---|
-| a | Dónde vive el ojito | Rankings §11 / Tienda §10: solo en la píldora del lobby. La entrada «Saldo» del ⋮ sale en la 1e |
+| a | Dónde vive el ojito | Rankings §11 / Tienda §10: solo en la píldora del lobby. La entrada «Saldo» del ⋮ salió en la 1e |
 | b | Los tapetes, en el ⋮ o en el ⚙ | Tienda §7: Tapetes sale del ⋮ en la 1e, cuando el ⚙ los tenga (1f) |
 | c | Con qué se compran los cosméticos | La Tienda: con HC |
 | d | Lo «comprado» guardado en el aparato | Tienda §7: no se reconoce |
@@ -222,7 +222,7 @@ Las filas miden 44 px de alto como mínimo (§7). «Pronto» sale con el aviso d
 - Lo mide `cfg.perfil` (412×915 y 1366×768): la barra desde el lobby, Retar y Salas; la cabecera desde el lobby y desde Rankings; «Editar» desde Rankings (y el ajeno sin «Editar»); la flecha vuelve a cada origen y la casa, al lobby.
 
 ### 12.3 El nombre y su freno de 30 días
-- **El editor es el Bautizo real en modo edición** (`src/screens/Bautizo.jsx`), el mismo que abre «Cambiar nombre» desde el ⋮ de la mesa, así que las dos entradas tienen las mismas reglas. **La puerta de entrada** (el Bautizo de la cuenta nueva) no cambia ni de aspecto ni de comportamiento (comparada byte a byte en la 1b-ii).
+- **El editor es el Bautizo real en modo edición** (`src/screens/Bautizo.jsx`), el mismo que abría «Cambiar nombre» desde el ⋮ de la mesa hasta la 1e (que retiró «Cuenta» del ⋮), así que el nombre tiene unas solas reglas. **La puerta de entrada** (el Bautizo de la cuenta nueva) no cambia ni de aspecto ni de comportamiento (comparada byte a byte en la 1b-ii).
 - **El freno vive en el servidor** (INV-72). Un nombre de verdad nuevo se puede poner una vez cada 30 días; la fecha la da el servidor y el cliente solo la formatea en la zona del aparato («28 de noviembre», `Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' })`).
 - **El orden al confirmar:**
   1. Solo cambian mayúsculas («devlocal» → «DevLocal»): se guarda sin ventana y **no gasta el freno**.

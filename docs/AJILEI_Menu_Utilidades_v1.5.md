@@ -1,5 +1,7 @@
 # AJILEI — Menú de Utilidades v1.5
 
+> **Sustituido** por `AJILEI_Menu_Utilidades_v1.6.md` (CFG-1 1e, 2026-10-30): salen «Cuenta» y «Saldo», entra «Partida rápida» y Mano actual se paga. Se conserva como historial.
+
 **Estado:** Revisión de especificación. Sustituye a `AJILEI_Menu_Utilidades_v1.4.md`, que queda como historial.
 **Fecha:** 2026-08-23
 **Base de código:** HEAD `4b42496` (MOV-1b-f). Documento **posterior a la implementación**: recoge lo que la campaña **MOV** ya selló y midió, tanda por tanda, desde `630ee6a`.
