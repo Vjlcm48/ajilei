@@ -55,6 +55,9 @@
 //                aunque el cliente no lo supiera; el lugar se guarda solo
 //                (Venezuela → estado, otro país sin estado, «Prefiero no
 //                decirlo») y se ve en el perfil y en la hoja ⚙
+//   CFG-1 1e (en `menu1e.mjs`): cfg.menu, cfg.consulta y cfg.rapida, el ⋮ de
+//                la mesa — las entradas que quedan, Mano actual de pago con el
+//                banco imitado y Partida rápida con sus duraciones medidas
 //   consola      sin errores de página
 
 import { readFileSync } from 'node:fs'
@@ -62,6 +65,7 @@ import { contextoCap, PERFIL_CAP } from '../cap/capMesa.mjs'
 import { sembradosRanking } from '../../src/dev/sembradosRanking.js'
 import { crearBanco, sumarDias } from '../../src/dev/bancoImitado.js'
 import { recorrerRuta } from '../rutaMesa.mjs'
+import { mesa1e } from './menu1e.mjs'
 
 const VERSION = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version
 const CELDAS = [
@@ -834,7 +838,9 @@ async function perfilDe1b(browser, base, errores, anota) {
   }
 }
 
-export async function runCfg(browser, { base }) {
+// `baseDev`: el servidor de desarrollo con bypass (en `humo`, el suyo; con `cfg`
+// a solas, el auxiliar). Sólo lo usa el caso «contra humanos» de cfg.menu.
+export async function runCfg(browser, { base, baseDev = null }) {
   const t0 = Date.now()
   const errores = []
   const celdas = []
@@ -842,8 +848,9 @@ export async function runCfg(browser, { base }) {
     zona: [], solape: [], ojito: [], hoja: [], ancla: [], toast: [], sonido: [], version: [], inv45: [], sinojito: [],
     'eliminar.ventana': [], 'eliminar.mesa': [], 'eliminar.ok': [], 'salir.reinicia': [],
     perfil: [], freno: [],
+    menu: [], consulta: [], rapida: [],
   }
-  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia', 'perfil', 'freno']
+  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia', 'perfil', 'freno', 'menu', 'consulta', 'rapida']
   const anota = (p, ok, detalle) => { puertas[p].push({ ok: ok === true, ...detalle }); return ok === true }
 
   for (const celda of CELDAS) {
@@ -1083,6 +1090,9 @@ export async function runCfg(browser, { base }) {
 
   // ── 10 · CFG-1 1b · 15 «M», las tres puertas y el freno ──────────────────
   await perfilDe1b(browser, base, errores, anota)
+
+  // ── 11 · CFG-1 1e · el ⋮ de la mesa: entradas, Mano actual y Partida rápida ─
+  await mesa1e(browser, { base, baseDev }, errores, anota)
 
   const resumen = Object.fromEntries(Object.entries(puertas).map(([k, v]) => [`cfg.${k}`, v.length > 0 && pasa(v.map((x) => x.ok))]))
   resumen.consola = errores.length === 0

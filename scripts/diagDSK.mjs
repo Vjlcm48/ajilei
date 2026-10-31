@@ -315,8 +315,11 @@ const PW_VERSION = JSON.parse(
 // estas cifras se repite aquí: si una se mueve en src/, la puerta se mueve con
 // ella. Los tres módulos son autocontenidos (sin imports propios), así que
 // `node` los carga tal cual — sin pasar por el resolvedor de Vite.
+// CFG-1 1e · la clave `ajilei.consultas` se retira: el contador vive en el
+// servidor (INV-75). Con el bypass, el «servidor» es el banco imitado de la
+// página (`window.__ajileiBancoImitado`), y es ahí donde el arnés siembra y lee.
 import {
-  CONSULTAS_KEY as U3_KEY, CONSULTAS_GRATIS,
+  CONSULTAS_GRATIS, precioConsulta,
   CONSULTA_POPUP_MS, BADGE_POPUP_MS,
 } from '../src/config/consultas.js'
 import { VALUE_NAMES, getCardPoints, createDeck, shuffleDeck } from '../src/engine/deck.js'
@@ -7004,12 +7007,17 @@ const U1_ITEM_MIN = 44
 //   · `vivasOk` del móvil  4 → 5 vivas (bloque de escritorio del modo)
 // Contabilidad: viejo 5 entradas · nuevo 6 entradas · movedor SUP-2b.
 // El recableado no relaja nada: sigue sellando la lista COMPLETA y su orden.
-const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Tapetes', 'Cuenta', 'Saldo', 'Mano actual']
-// …y su variante de MÓVIL HORIZONTAL, donde "Cuenta" no monta (el corredor
-// izquierdo no da para seis filas sin taparle el saldo al jugador — el porqué
-// medido vive en config/menuEntradas.js). Se deriva de la lista de arriba en vez
-// de escribirse a mano: así no puede quedarse atrás cuando la otra se mueva.
-const U1_ENTRADAS_H = U1_ENTRADAS.filter(t => t !== 'Cuenta')
+// ── CFG-1 1e · recableado del metro (regla ARN-1) ────────────────────────
+// Salen "Cuenta" y "Saldo"; entra "Partida rápida" en el sitio de "Saldo"
+// (contra las IAS, que es la única mesa que hay). El panel queda en cinco
+// filas en TODAS las pieles: la variante horizontal deja de ser otra lista.
+//   · U1_ENTRADAS          6 → 5 leyendas
+//   · MOVMENU_PANEL.h      288 → 244 (= hHorizontal)
+//   · `idsOk`              la lista de IDs pierde CUENTA y SALDO y gana RAPIDA
+//   · `vivasOk` del móvil  Cuenta → Partida rápida
+// Contabilidad: viejo 6 entradas · nuevo 5 entradas · movedor CFG-1 1e.
+const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Tapetes', 'Partida rápida', 'Mano actual']
+const U1_ENTRADAS_H = U1_ENTRADAS
 const entradasSelladas = (vp) => (vp.w > vp.h && vp.h <= 600 ? U1_ENTRADAS_H : U1_ENTRADAS)
 
 async function u1Install(page) {
@@ -7224,7 +7232,9 @@ async function runU1(browser) {
     const press = await page.evaluate((base) => ({
       popup: window.__u1Popup(),
       menuOpen: window.__u1Open(),          // ← el invariante sellado
-      ls: localStorage.getItem('ajilei.consultas'),
+      // CFG-1 1e · las gratis según el «servidor» (el banco imitado del bypass):
+      // la clave `ajilei.consultas` del aparato se retiró.
+      ls: (() => { const b = window.__ajileiBancoImitado?.banco; return b ? String(20 - (b.consultas?.usadas ?? 0)) : null })(),
       badgeTxt: document.querySelector('.util-badge').textContent.trim(),
       dAnchors: window.__u1Diff(base, window.__u1Snap()),
       scr: window.__u1Scroll(),
@@ -7404,10 +7414,11 @@ async function runU1(browser) {
       tooltips: titles.length === U1_ENTRADAS.length &&
         titles.every(t => t && t.trim()) &&
         titles.join('|') === U1_ENTRADAS.join('|'),
-      // Contador: clave creada con las 20 gratis y badge que la pinta.
+      // Contador: las 20 gratis del servidor y el badge que las pinta.
       contador: press.ls === '20' && press.badgeTxt === '20',
       // El popup abre por press, dice lo que debe y pinta sobre el panel.
-      popupAbre: press.popup != null && press.popup.txt === 'Tienes 20 consultas gratis' &&
+      // CFG-1 1e · dice la etiqueta de la entrada («Mano actual · 20 gratis»).
+      popupAbre: press.popup != null && press.popup.txt === 'Mano actual · 20 gratis' &&
         press.popup.z > panelZ && press.popup.rect.x >= 0 && press.popup.rect.right <= vp.w,
       // INVARIANTE SELLADO · presionar el badge NO es ejecutar.
       badgeNoCierra: press.menuOpen === true && menuTrasAuto === true && trasClicDentro.menu === true,
@@ -7443,6 +7454,10 @@ async function runU1(browser) {
     await gotoMesa(page, n); await u1Install(page); await installHitProbe(page)
     const coarse = await page.evaluate(() => window.matchMedia('(pointer: coarse)').matches)
     await u1OpenMenu(page)
+    // CFG-1 1e · la cifra del badge llega de `mi_consulta()` (el servidor; con
+    // el bypass, el banco imitado tarda 250 ms): sin cifra no hay badge. Se
+    // espera a que llegue, como haría el jugador.
+    await page.waitForSelector('.util-badge', { timeout: 5000 }).catch(() => {})
     const boxes = await page.evaluate(() => {
       const acc = []
       const push = (name, el, min) => { if (!el) return; const hb = window.__hitBox(el); acc.push({ name, min, visual: `${hb.visualW}×${hb.visualH}`, w: hb.w, h: hb.h, occluded: !!hb.occluded }) }
@@ -7569,7 +7584,8 @@ const MOVMENU_TAP = 44
 // tanda—, porque el corredor izquierdo sólo tiene 245,72px libres en 640×360
 // antes del bloque de saldo del humano. Dos cifras, no una relajación: cada
 // orientación se sella contra la suya.
-const MOVMENU_PANEL = { w: 64, h: 288, hHorizontal: 244 }
+// CFG-1 1e · cinco filas en las dos orientaciones: 244 y 244.
+const MOVMENU_PANEL = { w: 64, h: 244, hHorizontal: 244 }
 const altoSellado = (vp) => (vp.w > vp.h && vp.h <= 600 ? MOVMENU_PANEL.hHorizontal : MOVMENU_PANEL.h)
 const MOVMENU_MARGIN = 8
 const MOVMENU_ITEM = { w: 62, h: 44 }
@@ -7839,9 +7855,8 @@ async function runMenuMovil(browser) {
       // lista de IDs se filtra por la misma piel que la de leyendas, para que las
       // dos no puedan discrepar.
       const IDS_SELLADOS = [
-        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.CUENTA,
-        ENTRADA.SALDO, ENTRADA.MANO,
-      ].filter(id => id !== ENTRADA.CUENTA || entradasSelladas(vp).includes('Cuenta'))
+        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.RAPIDA, ENTRADA.MANO,
+      ]
       c.idsOk = JSON.stringify(abierto.entradas.map(e => e.id)) === JSON.stringify(IDS_SELLADOS)
       c.badgeOk = abierto.badge === 0
       c.guard = abierto.guard
@@ -7899,7 +7914,7 @@ async function runMenuMovil(browser) {
       // ── MOV-1b-a · Aviso de "Mano actual" ─────────────────────────────────
       // Se abre desde su entrada, que CIERRA AL EJECUTAR: cuando el aviso se
       // pinta el panel ya se desmontó, así que se ancla al ⋮ y no a él.
-      const saldoAntes = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
+      const saldoAntes = await gratisDelBanco(page)
       await u1OpenMenu(page)
       await page.click('.util-item-mano .util-ico-slot')
       await page.waitForSelector('.u3-popup', { timeout: 4000 }).catch(() => {})
@@ -7928,7 +7943,7 @@ async function runMenuMovil(browser) {
         await page.mouse.move(5, 5)
         await page.screenshot({ path: MOVMENU_OUT + '/mov1b-mano-mesa' + n + '-' + tag + '.png' })
       }
-      const saldoTras = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
+      const saldoTras = await gratisDelBanco(page)
       // Segunda consulta de la MISMA mano: es gratis por diseño (v1.1 §3.4), así
       // que el saldo no puede volver a bajar. Es la mitad del sello que un
       // "cobra una" ingenuo dejaría pasar.
@@ -7937,26 +7952,13 @@ async function runMenuMovil(browser) {
       await u1OpenMenu(page)
       await page.click('.util-item-mano .util-ico-slot')
       await page.waitForTimeout(250)
-      const saldoRepetida = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
+      const saldoRepetida = await gratisDelBanco(page)
       await page.waitForSelector('.u3-popup', { state: 'detached', timeout: CONSULTA_POPUP_MS + 2000 }).catch(() => {})
-      // Persistencia end-to-end (recarga → volver a la mesa) en UNA celda y no
-      // en las dieciséis: es una propiedad del almacenamiento, no de la
-      // geometría, así que repetirla sixteen veces cuesta ~80s y no mide nada
-      // nuevo. Se declara aquí para que la cobertura no se lea de más.
-      let persistencia = null
-      if (n === 5 && tag === '360x640') {
-        await page.reload()
-        await volverALaMesa(page, n)
-        // La recarga se lleva por delante las sondas inyectadas: hay que volver
-        // a montarlas o lo que sigue mide sobre un `window` pelado.
-        await u1Install(page)
-        await installHitProbe(page)
-        await page.evaluate(MOVMENU_SONDA)
-        await clickIf(page, 'button:has-text("Iniciar mano")')
-        await page.waitForSelector('.action-buttons button', { timeout: 20000 }).catch(() => {})
-        await page.mouse.move(5, 5)
-        persistencia = Number(await page.evaluate(k => localStorage.getItem(k), U3_KEY))
-      }
+      // CFG-1 1e · la persistencia tras recargar era una propiedad del
+      // `localStorage` del aparato. El contador vive ahora en el servidor
+      // (INV-75) y con el bypass el banco imitado nace con cada carga de
+      // página: esa propiedad la sella el guion cfg1e (B2, B10), no esta celda.
+      const persistencia = null
       c.consultas = {
         antes: saldoAntes, tras: saldoTras, repetida: saldoRepetida,
         gratis: CONSULTAS_GRATIS, persistencia,
@@ -8422,10 +8424,12 @@ async function runMenuMovil(browser) {
         // Las cifras selladas son las de MOV-0 0.1, que son las de u1.
         triggerOk: !!m.trigger && Math.abs(m.trigger.w - U1_TRIGGER.w) <= U1_TOL &&
           Math.abs(m.trigger.h - U1_TRIGGER.h) <= U1_TOL,
-        panelOk: !!ex && ex.n === 6 &&
+        // CFG-1 1e · las filas salen de la lista sellada (5), no de un 6 escrito
+        // a mano: es el mismo recableado de U1_ENTRADAS.
+        panelOk: !!ex && ex.n === U1_ENTRADAS.length &&
           Math.abs(ex.got.w - MOVMENU_PANEL.w) <= U1_TOL &&
           // Bloque de ESCRITORIO dentro del modo móvil: ahí no hay tope y el
-          // panel mide sus seis filas enteras.
+          // panel mide sus filas enteras.
           Math.abs(ex.got.h - MOVMENU_PANEL.h) <= U1_TOL,
         itemsOk: !!ex && ex.itemH.every(h => Math.abs(h - MOVMENU_ITEM.h) <= U1_TOL) &&
           ex.itemW.every(w => Math.abs(w - MOVMENU_ITEM.w) <= U1_TOL),
@@ -8434,7 +8438,7 @@ async function runMenuMovil(browser) {
         // entradas vivas siguen vivas. Es la mitad que más fácil se rompería sin
         // que nadie lo note, porque el puerto no la mira nunca.
         badgeOk: m.badge === 1,
-        vivasOk: JSON.stringify(m.vivas) === JSON.stringify(['Sonido', 'Reacciones', 'Tapetes', 'Cuenta', 'Mano actual']),
+        vivasOk: JSON.stringify(m.vivas) === JSON.stringify(['Sonido', 'Reacciones', 'Tapetes', 'Partida rápida', 'Mano actual']),
       }
       escritorio.passed = gate === true && escritorio.triggerOk && escritorio.panelOk &&
         escritorio.itemsOk && escritorio.titlesOk && escritorio.badgeOk && escritorio.vivasOk &&
@@ -9357,14 +9361,23 @@ async function u3Install(page) {
   }, U3_ANCHORS)
 }
 
-// Siembra el saldo ANTES de que la app arranque. Se usa la clave de la fuente
-// única (config/consultas.js), nunca un literal repetido aquí.
+// Siembra las gratis que quedan ANTES de sentarse. CFG-1 1e · el contador ya no
+// vive en el aparato: con el bypass lo lleva el banco imitado de la página, y la
+// mesa lo lee (`mi_consulta`) al montarse, así que se siembra en el lobby, entre
+// la carga y la ruta. Las cifras salen de la fuente única (config/consultas.js).
 async function u3Sembrar(page, n, saldo) {
-  await page.addInitScript(({ k, v }) => {
-    try { window.localStorage.setItem(k, String(v)) } catch { /* storage denegado */ }
-  }, { k: U3_KEY, v: saldo })
-  await gotoMesa(page, n)
+  await page.goto(BASE)
+  await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+  await page.evaluate((g) => window.__ajileiBancoImitado.banco.gastarConsultas(g), CONSULTAS_GRATIS - saldo)
+  RUTA_USADA = await recorrerRuta(page, n, ARNES_NIVEL, ARNES_STAKE_IDX, ARNES_ENTRADA)
+  await page.mouse.move(5, 5)
 }
+
+// Las gratis que quedan según el banco imitado del bypass (el «servidor»).
+const gratisDelBanco = (page) => page.evaluate((tope) => {
+  const b = window.__ajileiBancoImitado?.banco
+  return b ? tope - (b.consultas?.usadas ?? 0) : null
+}, CONSULTAS_GRATIS)
 
 // Lleva la mano hasta el turno vivo del humano (BET_1): es donde la consulta
 // tiene sentido y donde la entrada debe estar habilitada.
@@ -9401,6 +9414,8 @@ const u3Badge = (page) => page.evaluate(() => {
   const b = document.querySelector('.util-badge')
   return b ? Number(b.textContent.trim()) : null
 })
+const u3Libro = (page) => page.evaluate(() =>
+  (window.__ajileiBancoImitado?.banco.libro ?? []).filter((l) => l.tipo === 'consulta').length)
 
 // Presiona la entrada "Mano actual" y espera su popup. Devuelve null si la
 // entrada está inerte (que es una respuesta válida, no un fallo del arnés).
@@ -9654,7 +9669,10 @@ async function runU3(browser) {
     await page.close()
   }
 
-  // ── P4 · N=0 · popup de agotadas y Δcontador=0 ────────────────────────────
+  // ── P4 · N=0 · CFG-1 1e: la confirmación del primer cobro y Δ=0 ──────────
+  // Sin gratis ya no hay popup de «agotadas»: la mano se paga (INV-75). La
+  // primera vez de la sesión la entrada pregunta; «Cancelar» no escribe nada:
+  // ni ventana, ni cobro, y el badge sigue diciendo el precio.
   const agotadas = []
   for (const n of U3_TABLES) {
     if (tblFilter && n !== tblFilter) continue
@@ -9666,23 +9684,28 @@ async function runU3(browser) {
       await u3TurnoVivo(page)
       await u3AbrirMenu(page)
       r.antes = await u3Badge(page)
-      // La entrada sigue HABILITADA con saldo 0: quien no tiene gratis merece
-      // que se lo digan, no un botón muerto sin explicación.
-      const abrio = await u3Consultar(page)
-      const datos = await u3PopupDatos(page)
-      await page.mouse.click(4, 384)
-      await u3Espera(page, 120)
+      // La entrada sigue HABILITADA sin gratis: lo que se le debe al jugador es
+      // el precio antes de cobrar, no un botón muerto.
+      await page.click('.util-item-mano .util-ico-slot')
+      await page.waitForSelector('.cmc-tarjeta', { timeout: 3000 }).catch(() => {})
+      const pregunta = await page.evaluate(() => ({
+        confirmacion: document.querySelector('.cmc-tarjeta')?.textContent ?? null,
+        ventana: !!document.querySelector('.u3-popup'),
+      }))
+      await page.click('[data-accion="cmc-cancelar"]').catch(() => {})
+      await u3Espera(page, 200)
       await u3AbrirMenu(page)
       r.despues = await u3Badge(page)
-      const almacen = await page.evaluate(k => Number(window.localStorage.getItem(k)), U3_KEY)
+      const libro = await u3Libro(page)
       await u3CerrarMenu(page)
-      r.datos = datos; r.almacen = almacen
-      r.p4 = abrio && !!datos && datos.agotadas === true && datos.palo === null &&
-        r.antes === 0 && r.despues === 0 && almacen === 0
+      r.datos = pregunta; r.almacen = libro
+      const precio = precioConsulta(ARNES_NIVEL)
+      r.p4 = !!pregunta.confirmacion && pregunta.confirmacion.includes(`${precio} HC`) && !pregunta.ventana &&
+        r.antes === precio && r.despues === precio && libro === 0
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
     r.ok = !!r.p4
     agotadas.push(r)
-    console.log(`u3·agotadas m${n} · ${r.ok ? 'OK' : 'FALLA'} badge=${r.antes}→${r.despues} storage=${r.almacen} popup=${JSON.stringify(r.datos)}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`u3·agotadas m${n} · ${r.ok ? 'OK' : 'FALLA'} badge=${r.antes}→${r.despues} libro=${r.almacen} pregunta=${JSON.stringify(r.datos)}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
@@ -15239,7 +15262,8 @@ try {
   // su build (INV-43), en `--puerto-aux=N` o 5173.
   // ECO-1g · `video` también: sus tres mandos (`?apu=video:`) sólo existen en
   // desarrollo con bypass, y los comprueba su punto auxiliar.
-  if (!EXTERNO && (MODE === 'saldo' || MODE === 'mesaia' || MODE === 'video')) {
+  // CFG-1 1e · y `cfg`: el caso «contra humanos» de cfg.menu (`?cfg=mesa-humanos`).
+  if (!EXTERNO && (MODE === 'saldo' || MODE === 'mesaia' || MODE === 'video' || MODE === 'cfg')) {
     await servidorArnes({ tipo: 'dev', puerto: OPC.puertoAux || 5173, bypass: true })
   }
   if (!EXTERNO && (MODE === 'luz' || MODE === 'rev')) {
@@ -15369,7 +15393,7 @@ try {
   // con sus solapes. Diez puertas (`scripts/cfg/cfg.mjs`). Entra en `humo`:
   // el mismo preview que `lob`, `rnk` y `suma`.
   if (MODE === 'cfg' || MODE === 'humo') {
-    report.cfg = await runCfg(browser, { base: BASE_PROD })
+    report.cfg = await runCfg(browser, { base: BASE_PROD, baseDev: MODE === 'humo' ? BASE : BASE_SALDO_DEV })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)
