@@ -34,12 +34,13 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil, simulacionConsulta, mesaContraHumanosDev } from './dev/billeteraFalsa'
 import { perfilApi } from './lib/perfilApi'
 import Perfil from './screens/Perfil'
 import { cuentaApi } from './lib/cuentaApi'
 import { limpiarAparato } from './lib/limpiarAparato'
 import { rankingApi } from './lib/rankingApi'
+import { consultaApi } from './lib/consultaApi'
 // ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
 // mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
 // que siembran los moldes de humano en desarrollo (P-6).
@@ -339,6 +340,9 @@ function App() {
   // RNK-1c · los rankings, por el MISMO interruptor: el banco imitado del
   // bypass (con sus jugadores sembrados) o la API real.
   const [apiRanking] = useState(() => simulacionRanking() ?? rankingApi)
+  // CFG-1 1e · Mano actual de pago, por el MISMO interruptor (con los mandos
+  // `?cfg=consulta-…` del bypass) o la API real.
+  const [apiConsulta] = useState(() => simulacionConsulta() ?? consultaApi)
   const [controlMesa, setControlMesa] = useState(null)
   const controlRef = useRef(null)
   // Sentarse: `null`, `{ fase: 'enviando' }` o `{ fase: 'error', codigo }`. El
@@ -994,10 +998,17 @@ function App() {
         numPlayers={mesa.jugadores}
         nivel={mesa.reto}
         entrada={mesa.entrada}
-        cuenta={cuenta}
+        // CFG-1 1e · sólo lo que la mesa pinta (el mini-perfil propio de la
+        // victoria): el Bautizo en edición ya no monta desde la mesa.
+        cuenta={{ username: cuenta.username, correo: cuenta.correo }}
         saldo={billetera.saldo ?? 0}
         control={controlMesa}
         apiRanking={apiRanking}
+        apiConsulta={apiConsulta}
+        onSaldo={tomarSaldo}
+        // CFG-1 1e · esta mesa es contra las IAS (INV-70). `?cfg=mesa-humanos`
+        // (sólo con el bypass) la monta como lo hará MES-PvP, para el arnés.
+        contraIAS={!mesaContraHumanosDev()}
         onLeave={levantarse}
       />
     )

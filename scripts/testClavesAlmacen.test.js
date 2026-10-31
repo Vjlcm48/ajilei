@@ -11,6 +11,8 @@
 //     ACCESORES (todo acceso pasa por los módulos que ya lo hacen);
 //   · una entrada de CLAVES que ya no aparezca en el código (la lista no envejece).
 // Los comentarios no cuentan. Censo de ARN-3e (2026-10-03): 12 claves; IOS-1c añade `ajilei.saldoVisto`; RNK-1 1e, `ajilei.sumamente`.
+// CFG-1 1e retira `ajilei.consultas` (el contador de Mano actual vive en el servidor, INV-75) y
+// añade `ajilei.partidaRapida` (local) y `ajilei.consultaConfirmada` (sesión): 17 claves, 14 accesores.
 // Fuera de alcance: la sesión de Supabase (`sb-…-auth-token`), que la escribe
 // la biblioteca y no el código de `src/`.
 import { describe, it, expect } from 'vitest'
@@ -21,7 +23,6 @@ const CLAVES = [
   { clave: 'ajilei.idioma', almacen: 'local', fuente: 'IDI-0 (LOB1_Fase1) · textos.js' },
   { clave: 'ajilei.nivel', almacen: 'local', fuente: 'APU-1_Reglas_v1.0 · LOB1_Fase0:302 · hoy solo LEGADO: retarCore la absorbe y la borra' },
   { clave: 'ajilei.retoConfig', almacen: 'local', fuente: 'APU-1 Fase 1e · retarCore.js' },
-  { clave: 'ajilei.consultas', almacen: 'local', fuente: 'Menu_Utilidades_v1.1–v1.4 · consultas.js' },
   { clave: 'ajilei.tapete', almacen: 'local', fuente: 'Tapetes_v1.0:52-53 · LOB1_Fase0:302' },
   { clave: 'ajilei.tapetes.comprados', almacen: 'local', fuente: 'Tapetes_v1.0:52-53 · LOB1_Fase0:302' },
   { clave: 'ajilei.fraseVictoria', almacen: 'local', fuente: 'LOB1_Fase0:302 · frasesVictoria.js' },
@@ -33,6 +34,8 @@ const CLAVES = [
   { clave: 'ajilei.saldoVisto', almacen: 'local', fuente: 'IOS-1 Fase 1c (S2) · saldoRecordado.js · solo para la vista, nadie juzga con ella' },
   { clave: 'ajilei.sumamente', almacen: 'local', fuente: 'RNK-1 Fase 1e · Rankings_v1.2 §6.7.1 · sumaContador.js · el contador del video de SumaMente, en el aparato' },
   { clave: 'ajilei.saldoOculto', almacen: 'local', fuente: 'CFG-1 Fase 1a · Configuracion_v1.1 §6 · saldoOculto.js · el ojito de la píldora del lobby, en el aparato' },
+  { clave: 'ajilei.partidaRapida', almacen: 'local', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §2 · partidaRapida.js · el ritmo de la mesa contra las IAS, en el aparato (INV-70)' },
+  { clave: 'ajilei.consultaConfirmada', almacen: 'session', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §3 · consultaConfirmada.js · el primer cobro de Mano actual ya se confirmó en esta sesión' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -43,12 +46,13 @@ const ACCESORES = [
   'src/context/SoundContext.jsx',  // ajilei.sound
   'src/hooks/useIdioma.js',        // ajilei.idioma
   'src/hooks/useTapetes.js',       // ajilei.tapete, ajilei.tapetes.comprados
-  'src/hooks/useUtilitiesMenu.js', // ajilei.consultas
   'src/main.jsx',                  // ajilei.recargaPorChunk (sessionStorage)
   'src/lib/dispositivo.js',        // ajilei.dispositivo (ECO-1c, P-4)
   'src/lib/saldoRecordado.js',     // ajilei.saldoVisto (IOS-1c, S2)
   'src/lib/sumaContador.js',       // ajilei.sumamente (RNK-1 1e)
   'src/lib/saldoOculto.js',        // ajilei.saldoOculto (CFG-1 1a)
+  'src/lib/partidaRapida.js',      // ajilei.partidaRapida (CFG-1 1e)
+  'src/lib/consultaConfirmada.js', // ajilei.consultaConfirmada (CFG-1 1e, sessionStorage)
   'src/lib/limpiarAparato.js',     // CFG-1 1c: borra TODAS las ajilei.* y vacía sessionStorage al eliminar la cuenta (no escribe ninguna)
 ]
 
@@ -86,6 +90,7 @@ describe('ARN-3e · el almacenamiento del navegador, censado', () => {
     const conSesion = Object.entries(textos).filter(([, t]) => /\bsessionStorage\b/.test(t)).map(([a]) => a)
     // CFG-1 1c · `limpiarAparato` nombra `sessionStorage` sólo para vaciarlo
     // al eliminar la cuenta: no escribe ninguna clave.
-    expect(conSesion).toEqual(['src/lib/limpiarAparato.js', 'src/main.jsx'])
+    // CFG-1 1e · `consultaConfirmada` guarda una sola clave de sesión.
+    expect(conSesion).toEqual(['src/lib/consultaConfirmada.js', 'src/lib/limpiarAparato.js', 'src/main.jsx'])
   })
 })

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { CONSULTAS_KEY, CONSULTAS_GRATIS } from '../config/consultas'
 import { aPropios, escalaActual } from '../lib/escala'
+import { altoPanel } from '../config/menuEntradas'
 
 // ── DSK-U1 · Estado y protocolo de cierre del menú de utilidades ─────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda 2026-08-04).
@@ -22,14 +22,16 @@ const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 // y `--dsk-u1-sep-gap` en ambas hojas. Aquí se declara porque el ancla se calcula
 // ANTES de que el panel exista: no hay caja que medir todavía.
 //
-// SUP-2b · la cuenta pasa de 5 filas a 6 con la entrada "Cuenta":
-//   6 × 44 (filas) + 6 (filete que separa "Mano actual") + 8 + 8 (relleno)
-//   + 1 + 1 (bordes) = 288
-// Ninguna de las dos hojas declara este alto —sólo el ancho—, así que la sexta
-// fila se pinta sola y `gameTable.css`, que es protegido, no se abre. Lo único
-// que había que mover es este espejo, porque de él sale la pinza vertical del
-// móvil horizontal: con 244 el panel se habría creído 44px más corto de lo que
-// mide y su pie se habría metido en la fila de juego.
+// SUP-2b · la cuenta pasó de 5 filas a 6 con la entrada "Cuenta" (288).
+// CFG-1 1e · salen "Cuenta" y "Saldo" y entra "Partida rápida", que sólo monta
+// contra las IAS (`presentesDe`, config/menuEntradas.js). El alto es función de
+// las filas que montan:
+//   filas × 44 + 6 (filete que separa "Mano actual") + 8 + 8 (relleno)
+//   + 1 + 1 (bordes)  →  5 filas = 244 · 4 filas = 200
+// Ninguna de las dos hojas declara este alto —sólo el ancho—, así que las filas
+// se pintan solas y `gameTable.css`, que es protegido, no se abre. Lo único que
+// hay que mover es este espejo, porque de él sale la pinza vertical: con un alto
+// de menos el pie del panel se metería en la fila de juego.
 //
 // POR QUÉ LA PINZA VIVE EN UNA CADENA CSS Y NO EN ARITMÉTICA DE JS.
 // El área segura sólo se conoce desde CSS (`env(safe-area-inset-*)`); JS no
@@ -43,7 +45,9 @@ const PANEL_GAP = 6   // aire entre el pie del disparador y el techo del panel
 // no toca su geometría; la celda 1920×1080 de la Fase 2 lo prueba en lugar de
 // suponerlo. `clamp(a,b,c)` es `max(a, min(b,c))`: si el viewport bajara de
 // 260px el panel quedaría clavado arriba y desbordaría, caso borde aceptado.
-const PANEL_H = 288
+// La fórmula vive en config/menuEntradas.js (`altoPanel`), junto a las filas:
+// así el arnés la importa con `node` sin pasar por React.
+
 const PANEL_MARGIN = 8   // aire mínimo a los filos del área segura
 
 // ── MOV-1a-c · La rama de colocación es por ORIENTACIÓN, nunca por ancho ─────
@@ -84,18 +88,13 @@ const topeInferior = (alto, f = 1) => (f === 1
 const topMin = (f = 1) => (f === 1
   ? TOP_MIN
   : `calc(${PANEL_MARGIN}px + env(safe-area-inset-top, 0px) / ${f})`)
-const TOP_MAX = topeInferior(PANEL_H)
 
-// ── SUP-2b · El alto en MÓVIL HORIZONTAL es OTRO ───────────────────────
-// Allí el panel no mide 288 sino 244, porque la entrada "Cuenta" NO MONTA en esa
-// piel: el corredor izquierdo sólo deja 245,72px libres en la celda peor
-// (640×360) antes del bloque de saldo del humano, y seis filas son 288. El
-// porqué completo, con las dos medidas y con la alternativa descartada, vive en
-// `PRESENTES_MOVIL_HORIZONTAL` (config/menuEntradas.js).
-// La cifra se espeja aquí —y no se deriva— por la misma razón que `PANEL_H`: la
-// pinza se calcula ANTES de que el panel exista.
-const PANEL_H_HORIZONTAL = 244
-const TOP_MAX_HORIZONTAL = topeInferior(PANEL_H_HORIZONTAL)
+// ── SUP-2b · El alto en MÓVIL HORIZONTAL era OTRO ──────────────────────
+// Allí el panel medía 244 y no 288, porque "Cuenta" no montaba en esa piel: el
+// corredor izquierdo sólo deja 245,72px libres en la celda peor (640×360)
+// antes del bloque de saldo del humano. CFG-1 1e · con "Cuenta" fuera el alto es
+// el mismo en todas las pieles (`altoPanel(filas)`), y cinco filas siguen
+// cabiendo en ese corredor.
 
 // ── MOV-1b-a · D6 · Satélites del ⋮ ──────────────────────────────────────────
 // El aviso de "Mano actual" y el panel de Tapetes (y en MOV-1b-c el selector de
@@ -180,48 +179,22 @@ export function anclaSatelite(rectVisual, alto) {
 //     mide 196,94 porque el aviso de la mano cabe en un renglón menos. Su
 //     contenido es fijo salvo el propio nombre, y el nombre no puede pasar de 15
 //     caracteres (CHECK de SUP-2a), así que no hay peor caso que no esté dentro.
+//     CFG-1 1e · el panel de Cuenta sale con su entrada: su alto se retira.
 export const ALTO_AVISO_MANO = 105
 export const ALTO_TAPETES = { v: 271, h: 162 }
 export const ALTO_SELECTOR_REACCIONES = 186
-export const ALTO_CUENTA = 220
 
-// ── Contador de consultas de "Mano actual" (v1.1 §3.4 y §3.6) ───────────────
-// Infraestructura, no lógica: la clave se crea con las 20 gratis y se lee para
-// pintar el badge. El CONSUMO llega en su propio ciclo — aquí nadie decrementa.
-// Contador GLOBAL único (acumulable entre escenarios, mesas y dificultades), en
-// localStorage mientras no haya login; con login migra al ledger de Supabase.
-// Se inicializa al montar el panel, no al arrancar la app: es el primer momento
-// en que la función existe, y así móvil —donde el menú no se monta— no estrena
-// una clave que nunca va a leer.
-// DSK-U3 · la clave y las 20 gratis se mudan a config/consultas.js: el arnés
-// necesita leerlas de la MISMA fuente que la app para sembrar el saldo y para
-// derivar sus expectativas (molde de config/reacciones.js en U2).
-
-export function readConsultas() {
-  try {
-    const raw = window.localStorage.getItem(CONSULTAS_KEY)
-    const n = Number(raw)
-    if (raw !== null && Number.isInteger(n) && n >= 0) return n
-    window.localStorage.setItem(CONSULTAS_KEY, String(CONSULTAS_GRATIS))
-    return CONSULTAS_GRATIS
-  } catch {
-    return CONSULTAS_GRATIS   // storage denegado: la cifra se muestra igual
-  }
-}
-
-// DSK-U3 · el consumo ya vive (useConsultas). Se escribe SÓLO al cobrar, nunca
-// al leer: si el storage está denegado la sesión sigue contando en memoria y la
-// cifra mostrada no miente — simplemente no sobrevive al cierre del navegador.
-export function writeConsultas(n) {
-  try {
-    window.localStorage.setItem(CONSULTAS_KEY, String(n))
-  } catch { /* storage denegado: el contador vive sólo en memoria */ }
-}
+// ── Contador de consultas de "Mano actual" ──────────────────────────────────
+// Vivía aquí, en `localStorage` (`ajilei.consultas`), desde U1. CFG-1 1e lo
+// muda al servidor (`consultar_mano`, INV-75): la clave del aparato se retira y
+// el contador llega a `useConsultas` por `mi_consulta()`.
 
 // `enabled` es el gate de escritorio: si el viewport deja de cumplirlo, el menú
 // deja de estar abierto — el disparador desaparece y un panel huérfano no debe
 // sobrevivirle.
-export function useUtilitiesMenu(enabled = true) {
+// CFG-1 1e · `filas` es lo que monta el panel (`filasDelPanel`): de ahí sale su
+// alto, y con él la pinza.
+export function useUtilitiesMenu(enabled = true, filas = 5) {
   const [stored, setAnchor] = useState(null)   // null = cerrado
   const triggerRef = useRef(null)
   // El gate se DERIVA, no se sincroniza con un efecto: fuera de escritorio el
@@ -258,7 +231,8 @@ export function useUtilitiesMenu(enabled = true) {
       const r = aPropios(el.getBoundingClientRect(), f)
       // `left` sigue siendo un número; `top` sale ya como longitud CSS con la
       // pinza dentro — ver la nota de arriba.
-      const pinza = (px, tope = f === 1 ? TOP_MAX : topeInferior(PANEL_H, f)) => `clamp(${topMin(f)}, ${px}px, ${tope})`
+      const alto = altoPanel(filas)
+      const pinza = (px, tope = topeInferior(alto, f)) => `clamp(${topMin(f)}, ${px}px, ${tope})`
 
       // MOV-1a-c · D4.1 · en MÓVIL HORIZONTAL el panel no cuelga del
       // disparador: se aparta a la izquierda de la columna de acción. Abajo no
@@ -288,16 +262,16 @@ export function useUtilitiesMenu(enabled = true) {
           // tanda la confirmó: el bloque de saldo va de x 12 a 92,77, o sea que
           // invade el corredor donde vive el panel, y con seis filas éste le
           // habría tapado 514,17px² a 812×375 y 709,04 a 640×360. Por eso en
-          // esta piel "Cuenta" no monta y el panel se queda en 244 —y por eso
-          // la pinza de aquí usa ese alto y no el de escritorio.
-          return { left: Math.max(izq, PANEL_MARGIN), top: pinza(PANEL_MARGIN, f === 1 ? TOP_MAX_HORIZONTAL : topeInferior(PANEL_H_HORIZONTAL, f)) }
+          // esta piel "Cuenta" no montaba y el panel se quedaba en 244. Desde
+          // CFG-1 1e "Cuenta" ya no existe y el alto es el de todas las pieles.
+          return { left: Math.max(izq, PANEL_MARGIN), top: pinza(PANEL_MARGIN) }
         }
         // Sin obstáculos (GAME_OVER y pantallas terminales) no hay nada que
         // esquivar: vale la colocación de siempre.
       }
       return { left: r.right - PANEL_W, top: pinza(r.bottom + PANEL_GAP) }
     })
-  }, [])
+  }, [filas])
 
   // Cierre por clic fuera y por Esc. El listener de puntero es NO BLOQUEANTE
   // (molde del toggle de ficha H4 en GameTable: nada de overlay). Un overlay se

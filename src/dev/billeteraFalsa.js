@@ -46,6 +46,7 @@ import { crearVideoApi } from '../lib/videoApi'
 import { crearRankingApi } from '../lib/rankingApi'
 import { crearCuentaApi } from '../lib/cuentaApi'
 import { crearPerfilApi } from '../lib/perfilApi'
+import { crearConsultaApi } from '../lib/consultaApi'
 import { crearBanco, VIDEO_MINIMO_S_SQL } from './bancoImitado'
 import { sembradosRanking, PUNTOS_DEL_BYPASS } from './sembradosRanking'
 import { siembraAPU, entradaSembradaAPU, videoSembradoAPU } from './siembraAPU'
@@ -104,7 +105,9 @@ export function simulacionMesaIA() {
   if (!b) return null
   // `?apu=bolsillo:<n>`: tras la PRIMERA mesa abierta, la billetera queda en n
   // (un ajuste del banco, como `ajuste_admin`), y la respuesta lo dice.
-  const bolsillo = siembraAPU()?.bolsillo ?? null
+  // CFG-1 1e · `?cfg=consulta-sin-saldo` es lo mismo con 50: sentado, no le
+  // alcanza para pagar una mano de Mano actual (100 en Básico).
+  const bolsillo = siembraAPU()?.bolsillo ?? (mandoCfg() === 'consulta-sin-saldo' ? CONSULTA_SIN_SALDO : null)
   if (bolsillo === null) return crearMesaIAApi(b)
   let hecho = false
   return crearMesaIAApi({
@@ -224,6 +227,37 @@ export function simulacionPerfil() {
   const fuerza = { 'nombre-libre': 'libre', 'nombre-ocupado': 'ocupado', 'nombre-vedado': 'vedado' }[mando] ?? null
   b.forzarNombre(fuerza)
   return crearPerfilApi(clientePerfilDe(b, { tarda: PERFIL_TARDA_MS }))
+}
+
+// ── CFG-1 1e · Mano actual de pago contra el banco imitado ─────────────────
+// Rector: AJILEI_CFG-1_Fase1e_v1.0.md §2.4. Los mandos `?cfg=`:
+//   ?cfg=consulta-gratis     → quedan 3 gratis
+//   ?cfg=consulta-pago       → 0 gratis y saldo de sobra: la primera consulta cobra
+//   ?cfg=consulta-sin-saldo  → 0 gratis y, ya sentado, 50 HC: «No te alcanza»
+// Sin mando, las 20 del banco recién nacido. Cada consulta tarda
+// `CONSULTA_TARDA_MS`, para que la espera del servidor exista también aquí.
+//   ?cfg=mesa-humanos        → la mesa se monta como contra humanos (sin
+//                              «Partida rápida»), como la montará MES-PvP.
+const CONSULTA_TARDA_MS = 250
+const CONSULTA_SIN_SALDO = 50
+const GASTADAS_POR_MANDO = { 'consulta-gratis': 17, 'consulta-pago': 20, 'consulta-sin-saldo': 20 }
+
+/** La API de Mano actual contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionConsulta() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  const gastadas = GASTADAS_POR_MANDO[mandoCfg()]
+  if (gastadas !== undefined) b.gastarConsultas(gastadas)
+  const espera = (v) => new Promise((ok) => setTimeout(() => ok(v), CONSULTA_TARDA_MS))
+  return crearConsultaApi({ rpc: (nombre, params) => b.rpc(nombre, params).then(espera) })
+}
+
+/** `?cfg=mesa-humanos` con el bypass: la mesa sin «Partida rápida». Fuera de desarrollo, `false`. */
+export function mesaContraHumanosDev() {
+  if (!import.meta.env.DEV) return false
+  if (!import.meta.env.VITE_AUTH_BYPASS) return false
+  return mandoCfg() === 'mesa-humanos'
 }
 
 /** Para las pruebas: un banco nuevo en la siguiente llamada. */

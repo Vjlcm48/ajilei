@@ -8,7 +8,9 @@ import {
   VIDEO_PREMIO_SQL, VIDEO_TOPE_SQL, VIDEO_MINIMO_S_SQL, VIDEO_VIDA_MS_SQL, videoReinicioSQL, diaChicagoSQL,
   PUNTOS_RETO_SQL, EXTRA_AJILEI_SQL, TOPE_MANOS_MINUTO_SQL, franjaSQL,
   FRENO_NOMBRE_MS_SQL, ESTADOS_VE_SQL, normalizarUsernameSQL,
+  CONSULTAS_GRATIS_SQL, PRECIOS_CONSULTA_SQL, LIMITE_CONSULTA_SQL,
 } from './bancoImitado'
+import { CONSULTAS_GRATIS, PRECIOS_CONSULTA } from '../config/consultas'
 import { ESTADOS_VE } from '../config/estados'
 import { NIVELES } from '../config/niveles'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
@@ -990,5 +992,125 @@ describe('CFG-1 1b · el freno y la lista, en espejo', () => {
     expect(sup2a).toMatch(/translate\(lower\(txt\), '013457_', 'oieast'\)/)
     expect(normalizarUsernameSQL('p_3_n_d_3_j_0')).toBe('pendejo')
     expect(normalizarUsernameSQL('Panita7')).toBe('panitat')
+  })
+})
+
+// ── CFG-1 1e · Mano actual de pago: el recorrido del guion cfg1e ────────────
+// Las filas B2–B13 de `supabase/pruebas/cfg1e_verificacion.sql`, con las
+// mismas cifras y el mismo orden: la mano es la unidad (P-1 del STOP-E1).
+describe('CFG-1 1e · banco imitado · consultar_mano y mi_consulta (guion B2–B13)', () => {
+  const sentado = (reto, apuesta, saldo = 7500) => {
+    const r = banco({ saldo })
+    const s = sentar(r.ll, reto, 2, apuesta, apuesta * PISO_SQL, T(reto))
+    return { ...r, mesa: s.mesa_id, cons: (mano, mesa = s.mesa_id) => r.ll('consultar_mano', { p_mesa: mesa, p_mano: mano }) }
+  }
+
+  it('B2 · veinte gratis en veinte manos, de 19 a 0, sin tocar el saldo ni el libro', () => {
+    const { b, cons, reloj } = sentado('basico', 50)
+    const s0 = b.saldo
+    const serie = []
+    for (let i = 1; i <= 20; i++) {
+      const r = cons(i)
+      expect(r.resultado).toBe('gratis')
+      expect(r.precio).toBe(100)
+      serie.push(r.gratis_restantes)
+      reloj.t += 1000
+    }
+    expect(serie).toEqual([19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+    expect(b.saldo).toBe(s0)
+    expect(b.libro.filter((l) => l.tipo === 'consulta')).toEqual([])
+  })
+
+  it('B3 · repetir una mano en gratis: la primera gasta, las otras dicen repetida', () => {
+    const { b, cons, ll, mesa } = sentado('basico', 50)
+    expect(cons(1)).toMatchObject({ resultado: 'gratis', gratis_restantes: 19 })
+    expect(cons(1)).toMatchObject({ resultado: 'repetida', gratis_restantes: 19 })
+    expect(cons(1)).toMatchObject({ resultado: 'repetida', gratis_restantes: 19 })
+    expect(ll('mi_consulta')).toEqual({ gratis_restantes: 19, ultima_mesa: mesa, ultima_mano: 1 })
+    expect(b.libro.filter((l) => l.tipo === 'consulta')).toEqual([])
+  })
+
+  it('B4–B7 · sin gratis: cobra una vez por mano; repetir no cobra; volver a una pagada tampoco', () => {
+    const { b, cons, mesa } = sentado('basico', 50)
+    b.gastarConsultas(20)
+    const s0 = b.saldo
+    expect(cons(21)).toEqual({ resultado: 'cobrada', precio: 100, gratis_restantes: 0, saldo: s0 - 100 })
+    expect(cons(21).resultado).toBe('repetida')
+    expect(cons(22)).toMatchObject({ resultado: 'cobrada', saldo: s0 - 200 })
+    expect(cons(21)).toMatchObject({ resultado: 'pagada', saldo: s0 - 200 })
+    const libro = b.libro.filter((l) => l.tipo === 'consulta')
+    expect(libro.map((l) => [l.monto, l.clave])).toEqual([[-100, `consulta:${mesa}:21`], [-100, `consulta:${mesa}:22`]])
+    expect(b.consultas).toEqual({ usadas: 20, ultimaMesa: mesa, ultimaMano: 22 })
+  })
+
+  it('B8 · el precio sale de la mesa: Avanzado 200 y Pro 300', () => {
+    for (const [reto, apuesta, precio] of [['avanzado', 100, 200], ['pro', 200, 300]]) {
+      const { b, cons } = sentado(reto, apuesta)
+      b.gastarConsultas(20)
+      expect(cons(1)).toMatchObject({ resultado: 'cobrada', precio })
+    }
+  })
+
+  it('B9 · sin saldo para pagar: saldo_insuficiente, nada escrito', () => {
+    const { b, cons } = sentado('basico', 50, 550)
+    b.gastarConsultas(20)
+    expect(b.saldo).toBe(50)
+    expect(cons(1)).toEqual({ resultado: 'saldo_insuficiente', precio: 100, gratis_restantes: 0, saldo: 50 })
+    expect(cons(1).resultado).toBe('saldo_insuficiente')
+    expect(b.libro.filter((l) => l.tipo === 'consulta')).toEqual([])
+    expect(b.consultas.ultimaMesa).toBe(null)
+  })
+
+  it('B10 · mi_consulta: sin fila, 20 y sin última mano', () => {
+    const { ll } = banco()
+    expect(ll('mi_consulta')).toEqual({ gratis_restantes: 20, ultima_mesa: null, ultima_mano: null })
+  })
+
+  it('B12 · mesa ajena, inexistente o cerrada → mesa_invalida; mano 0 o nula → argumento_invalido; sin gastar', () => {
+    const { b, cons, ll, mesa } = sentado('basico', 50)
+    expect(cons(5, 'mesa-de-otro').resultado).toBe('mesa_invalida')
+    expect(cons(0).resultado).toBe('argumento_invalido')
+    expect(cons(null).resultado).toBe('argumento_invalido')
+    expect(cons(5, null).resultado).toBe('argumento_invalido')
+    ll('salir_ia', { p_mesa: mesa, p_fichas: 0, p_seq: 1 })
+    expect(cons(5).resultado).toBe('mesa_invalida')
+    expect(b.consultas).toBe(null)
+  })
+
+  it('B13 · treinta en un minuto pasan; la 31.ª, límite, sin cobrar', () => {
+    const { b, cons } = sentado('pro', 200)
+    b.gastarConsultas(20)
+    expect(cons(1).resultado).toBe('cobrada')
+    b.envejecerIntentos(120_000)
+    for (let i = 0; i < 30; i++) expect(cons(1).resultado).toBe('repetida')
+    const s = b.saldo
+    expect(cons(2)).toEqual({ resultado: 'limite', precio: 0, gratis_restantes: 0, saldo: s })
+    expect(b.libro.filter((l) => l.tipo === 'consulta')).toHaveLength(1)
+  })
+})
+
+describe('CFG-1 1e · las cifras de Mano actual, en espejo', () => {
+  const dir = join(process.cwd(), 'supabase', 'migrations')
+  const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.includes('cfg1e_mano_actual'))), 'utf8')
+
+  it('las 20 gratis: SQL = modelo = config/consultas.js', () => {
+    expect(sql).toMatch(/function public\.consultas_gratis\(\)[\s\S]*?\$fn\$ select 20 \$fn\$;/)
+    expect(sql).toMatch(/check \(gratis_usadas between 0 and 20\)/)
+    expect(CONSULTAS_GRATIS_SQL).toBe(20)
+    expect(CONSULTAS_GRATIS).toBe(CONSULTAS_GRATIS_SQL)
+  })
+  it('los precios: SQL = modelo = config/consultas.js', () => {
+    const cuerpo = /function public\.precio_consulta\(p_nivel text\)[\s\S]*?\$fn\$;/.exec(sql)[0]
+    const delSql = Object.fromEntries([...cuerpo.matchAll(/when '([a-z]+)'\s+then return (\d+);/g)].map((m) => [m[1], Number(m[2])]))
+    expect(delSql).toEqual({ ...PRECIOS_CONSULTA_SQL })
+    expect({ ...PRECIOS_CONSULTA }).toEqual({ ...PRECIOS_CONSULTA_SQL })
+  })
+  it('el límite por minuto: SQL = modelo', () => {
+    const tope = Number(/contar_intento_dinero\('consultar_mano', (\d+)\)/.exec(sql)[1])
+    expect(tope).toBe(LIMITE_CONSULTA_SQL)
+  })
+  it('los nombres de las columnas que el cliente lee: SQL = lib/consultaApi', () => {
+    expect(sql).toMatch(/resultado\s+text,\s+precio\s+integer,\s+gratis_restantes integer,\s+saldo\s+bigint/)
+    expect(sql).toMatch(/gratis_restantes integer,\s+ultima_mesa\s+uuid,\s+ultima_mano\s+integer/)
   })
 })

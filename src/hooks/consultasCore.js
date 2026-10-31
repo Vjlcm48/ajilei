@@ -1,11 +1,11 @@
 import { PHASES } from '../engine/gameEngine'
 
 // ── DSK-U3 · Núcleo puro de "Mano actual" ────────────────────────────────────
-// Documento rector: docs/AJILEI_Menu_Utilidades_v1.3.md §2.
-// Sin React, sin DOM, sin localStorage: sólo las cuatro semánticas selladas
-// —consulta-por-mano, disponibilidad, N=0 y qué popup toca— expresadas como
-// funciones puras para que Vitest las selle. El hook (useConsultas) se limita a
-// sostener el estado, persistir y calcular el valor; toda decisión vive aquí.
+// Documento rector: docs/AJILEI_Menu_Utilidades_v1.6.md §3 (antes v1.3 §2).
+// Sin React, sin DOM, sin almacén: la disponibilidad, el desglose y, desde
+// CFG-1 1e, qué hacer al tocar y qué pintar con la respuesta del servidor,
+// expresados como funciones puras para que Vitest las selle. El hook
+// (useConsultas) se limita a sostener el estado y a llamar; toda decisión vive aquí.
 
 // Fases en las que la consulta tiene sentido: aquellas en las que hay una mano
 // repartida Y una decisión viva del humano. Las de reparto (DEAL_2/DEAL_3) son
@@ -29,34 +29,92 @@ export function hayManoConsultable(phase, handCount, numCartas) {
   )
 }
 
-export function estadoInicial(saldo) {
-  return { saldo, manoConsultada: null }
+// ── CFG-1 1e · Mano actual de pago: lo que decide el cliente ────────────────
+// Rector: AJILEI_CFG-1_Fase1e_v1.0.md §2.3 y el STOP-E1 (P-1). El servidor
+// (`consultar_mano`, INV-75) gasta la gratis o cobra; el cliente sólo decide
+// CUÁNDO llamar y QUÉ pintar con lo que vuelve. La mano es la unidad: la
+// primera consulta de una mano gasta una gratis o se paga, y las siguientes de
+// esa misma mano no gastan nada.
+//
+// El estado (`estadoConsultas`):
+//   gratis  las gratis que quedan según el servidor (`null` mientras no lo dijo);
+//   precio  el precio de una mano en ESTA mesa (espejo de `precio_consulta`,
+//           corregido por la primera respuesta);
+//   ultima  la última mano consultada `{ mesa, mano, pagada }`, o `null`.
+//
+// La mano es el par (mesa, número de mano del marcador) que dice el cliente
+// hasta MOT-1 (hueco declarado de INV-75).
+
+export function estadoConsultas({ precio = null } = {}) {
+  return { gratis: null, precio, ultima: null }
 }
 
-// Decide qué ocurre al presionar la entrada. Devuelve el estado siguiente y el
-// desenlace; no toca nada del mundo.
-//
-//   'repetida' — misma mano ya consultada: GRATIS y con valor recalculado (las
-//                cartas cambian con el descarte, así que la respuesta puede ser
-//                distinta aunque no se cobre).
-//   'nueva'    — primera consulta de esta mano: cobra exactamente 1.
-//   'agotadas' — sin saldo y sin derecho adquirido sobre esta mano.
-//
-// El orden de las guardas NO es intercambiable: 'repetida' va PRIMERO. Quien
-// consulta con su última gratis queda en saldo 0 dentro de la misma mano, y
-// aun así debe poder volver a mirar — ya pagó por esa mano.
-export function pedirConsulta(estado, handCount) {
-  if (estado.manoConsultada !== null && estado.manoConsultada === handCount) {
-    return { estado, cobro: 0, resultado: 'repetida' }
+const esLaUltima = (estado, mesa, mano) =>
+  estado.ultima !== null && estado.ultima.mesa === mesa && estado.ultima.mano === mano
+
+/** Lo que `mi_consulta()` dice al entrar a la mesa. Una última mano de OTRA mesa no cuenta. */
+export function conMiConsulta(estado, r, mesa) {
+  if (!r || !Number.isInteger(r.gratis_restantes)) return estado
+  const ultima = r.ultima_mesa && r.ultima_mesa === mesa && Number.isInteger(r.ultima_mano)
+    ? { mesa, mano: r.ultima_mano, pagada: false }
+    : estado.ultima
+  return { ...estado, gratis: r.gratis_restantes, ultima }
+}
+
+// Qué hacer al tocar la entrada:
+//   'sin_mesa'  no hay mesa del servidor o mano: no se llama (aviso de error);
+//   'repetida'  es la última mano consultada: se abre la ventana SIN llamar;
+//   'llamar'    quedan gratis, o ya se confirmó un cobro en esta sesión;
+//   'sin_saldo' va a cobrar y la billetera que la mesa conoce no alcanza: el
+//               aviso, sin preguntar ni llamar (el servidor diría lo mismo);
+//   'confirmar' va a cobrar y es el primer cobro de la sesión (o no se sabe
+//               todavía si quedan gratis): primero la ventana de confirmación.
+export function decidirConsulta(estado, { mesa, mano, confirmada, saldo = null }) {
+  if (!mesa || !Number.isInteger(mano) || mano < 1) return 'sin_mesa'
+  if (esLaUltima(estado, mesa, mano)) return 'repetida'
+  if (Number.isInteger(estado.gratis) && estado.gratis > 0) return 'llamar'
+  if (estado.gratis === 0 && Number.isInteger(estado.precio) && Number.isFinite(saldo) && saldo < estado.precio) return 'sin_saldo'
+  return confirmada ? 'llamar' : 'confirmar'
+}
+
+/**
+ * La respuesta de `consultar_mano` → el estado siguiente y lo que se pinta:
+ * `{ tipo: 'valor', pagada }` (la ventana con el desglose) o
+ * `{ tipo: 'aviso', clave, vars }` (una línea, sin ventana).
+ */
+export function responderConsulta(estado, { mesa, mano }, r) {
+  const resultado = r?.resultado
+  if (typeof resultado !== 'string') {
+    return { estado, popup: { tipo: 'aviso', clave: 'ia.mesa.consulta.error', vars: {} } }
   }
-  if (estado.saldo <= 0) {
-    return { estado, cobro: 0, resultado: 'agotadas' }
+  const precio = Number.isInteger(r.precio) && r.precio > 0 ? r.precio : estado.precio
+  const gratis = Number.isInteger(r.gratis_restantes) ? r.gratis_restantes : estado.gratis
+  const base = { ...estado, precio, gratis }
+  const marcar = (pagada) => ({
+    estado: { ...base, ultima: { mesa, mano, pagada } },
+    popup: { tipo: 'valor', pagada },
+  })
+  if (resultado === 'gratis') return marcar(false)
+  if (resultado === 'cobrada' || resultado === 'pagada') return marcar(true)
+  // La última del servidor (p. ej. consultada desde otro aparato): se respeta
+  // lo que se sepa aquí de ella.
+  if (resultado === 'repetida') return marcar(esLaUltima(estado, mesa, mano) ? estado.ultima.pagada : false)
+  if (resultado === 'saldo_insuficiente') {
+    return { estado: base, popup: { tipo: 'aviso', clave: 'ia.mesa.consulta.sin_saldo', vars: { hc: precio ?? '' } } }
   }
-  return {
-    estado: { saldo: estado.saldo - 1, manoConsultada: handCount },
-    cobro: 1,
-    resultado: 'nueva',
-  }
+  return { estado: base, popup: { tipo: 'aviso', clave: 'ia.mesa.consulta.error', vars: {} } }
+}
+
+/**
+ * Lo que la entrada dice de sí misma en la mano en curso:
+ * `{ tipo: 'pagada' }`, `{ tipo: 'gratis', n }`, `{ tipo: 'precio', precio }` o
+ * `null` (todavía no se sabe).
+ */
+export function etiquetaConsulta(estado, mesa, mano) {
+  if (esLaUltima(estado, mesa, mano) && estado.ultima.pagada) return { tipo: 'pagada' }
+  if (Number.isInteger(estado.gratis) && estado.gratis > 0) return { tipo: 'gratis', n: estado.gratis }
+  if (estado.gratis === 0 && Number.isInteger(estado.precio)) return { tipo: 'precio', precio: estado.precio }
+  return null
 }
 
 // Reparto del resultado de getBestSuitScore en las dos filas del popup, sin

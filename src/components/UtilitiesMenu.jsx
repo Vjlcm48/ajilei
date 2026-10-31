@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import '../styles/utilidadesMesa.css'
 import { useSoundContext } from '../context/SoundContext'
-import ChipToken from './ChipToken'
 import { GodeteIcon } from './TapetesPanel'
 import { BADGE_POPUP_MS } from '../config/consultas'
 import { ENTRADA, VIVAS_ESCRITORIO } from '../config/menuEntradas'
 import { aPropios, escalaActual } from '../lib/escala'
+import { useIdioma } from '../hooks/useIdioma'
 
 // ── DSK-U1 / U1b · Menú de utilidades (SOLO gate de escritorio) ─────────────
 // Documento rector: docs/AJILEI_Menu_Utilidades_v1.1.md (+ enmienda y apéndices).
@@ -24,9 +25,10 @@ import { aPropios, escalaActual } from '../lib/escala'
 // Silueta de carta con "?" — icono propio de "Mano actual". Proporción del
 // sistema: los assets son 1055×1491 (ratio 0,7076); 22×31 es su simplificación
 // entera más cercana (0,7097), la misma familia de proporción que --card-w/h.
-// Trazo en currentColor → hereda --text-primary de la entrada: el ÚNICO oro
-// sólido del panel es la ficha de Saldo (glifo de moneda ya establecido en la
-// app) y el único acento dorado nuevo es el filete del badge. Single-gold intacto.
+// Trazo en currentColor → hereda --text-primary de la entrada: el único acento
+// dorado del panel es el filete del badge (y, desde CFG-1 1e, el de su hermana,
+// la pastilla de Partida rápida). La ficha de Saldo, que era su único oro
+// sólido, salió en CFG-1 1e. Single-gold intacto.
 function CardQueryIcon() {
   return (
     <svg
@@ -47,30 +49,35 @@ function CardQueryIcon() {
   )
 }
 
-// SUP-2b · Silueta de jugador — icono propio de "Cuenta". Mismo molde que
-// CardQueryIcon (U1b) y GodeteIcon (EMB-2): SVG en línea, monocromo, trazo en
-// `currentColor` para heredar --text-primary de la entrada, sin un solo relleno
-// de color. Se descartó el emoji 👤: los dos emoji que quedan en el panel (🔊 y
-// 💬) son de las entradas que ya los tenían, y la costumbre desde U1b es que
-// todo icono NUEVO sea SVG de la casa. Single-gold intacto — el único oro sólido
-// del panel sigue siendo la ficha de Saldo.
-function CuentaIcon() {
+// CFG-1 1e · Doble punta de avance — icono propio de "Partida rápida". Mismo
+// molde que CardQueryIcon y GodeteIcon: SVG en línea, monocromo, trazo en
+// `currentColor`. Apagada lleva `is-off`, como el sonido (INV-68): el icono se
+// atenúa y la pastilla dice «No».
+function RapidaIcon() {
   return (
     <svg
-      className="util-ico util-ico-cuenta"
+      className="util-ico util-ico-rapida"
       viewBox="0 0 24 24"
       aria-hidden="true"
       focusable="false"
     >
-      <circle cx="12" cy="8" r="3.9" fill="none" stroke="currentColor" strokeWidth="1.75" />
-      {/* Hombros abiertos y no un óvalo cerrado: cerrado se lee como ficha, que
-          es justo el glifo que ya ocupa Saldo dos filas más abajo. */}
       <path
-        d="M4.6 20.4c0-3.9 3.3-6.4 7.4-6.4s7.4 2.5 7.4 6.4"
-        fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"
+        d="M3.5 6.5 11 12l-7.5 5.5zM12.5 6.5 20 12l-7.5 5.5z"
+        fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round"
       />
     </svg>
   )
+}
+
+// CFG-1 1e · Lo que la entrada "Mano actual" dice de sí misma
+// (`etiquetaConsulta`, consultasCore): el texto largo para el nombre accesible y
+// el popup del badge, y la parte corta para la pastilla —la cifra de gratis, el
+// precio de la mano o ✓ si ya está pagada—.
+function textoMano(etiqueta, t) {
+  if (!etiqueta) return { largo: t('ia.mesa.menu.mano'), corto: null, precio: false }
+  if (etiqueta.tipo === 'pagada') return { largo: t('ia.mesa.menu.mano.pagada'), corto: '✓', precio: false }
+  if (etiqueta.tipo === 'precio') return { largo: t('ia.mesa.menu.mano.precio', { hc: etiqueta.precio }), corto: String(etiqueta.precio), precio: true }
+  return { largo: t('ia.mesa.menu.mano.gratis', { n: etiqueta.n }), corto: String(etiqueta.n), precio: false }
 }
 
 // Disparador — hereda la clase .mute-button para conservar borde, radio, color y
@@ -92,25 +99,17 @@ export function UtilitiesTrigger({ open, onToggle, registerTrigger }) {
   )
 }
 
-// Entradas inertes: presentes, visibles y sin respuesta al clic — el estado de
-// no habilitados que la v1.1 §6 hereda de la v1.0 §3.
-// DSK-U2 · "Mensajes" SALE de aquí: pasa a ser Reacciones, entrada viva. Queda
-// sola "Saldo", que reutiliza el ChipToken del cornerChip (el glifo de moneda
-// de la app ya existe y es SVG dorado plano — inventar otro rompería el
-// lenguaje).
-const INERTES = [
-  { key: ENTRADA.SALDO, title: 'Saldo', ico: <span className="util-ico util-ico-chip" aria-hidden="true"><ChipToken size="compact" /></span> },
-]
-
 // El gris de una entrada NO se puede resolver desde la hoja: en esta casa
 // significa el atributo `disabled` de verdad —más `aria-disabled`—, y eso no se
 // declara en CSS. Un `pointer-events: none` pintaría igual y le mentiría al
 // lector de pantalla, que anunciaría entradas accionables que no hacen nada.
 export function UtilitiesPanel({
   anchor, onClose, onReacciones, reaccionesBloqueadas,
-  consultas, manoDisponible, onManoActual, onTapetes, onCuenta,
+  etiquetaMano = null, manoDisponible, onManoActual, onTapetes,
+  rapida = false, onRapida,
   vivas = VIVAS_ESCRITORIO, presentes = null,
 }) {
+  const { t } = useIdioma()
   const viva = (id) => vivas.includes(id)
   // SUP-2b · el segundo eje del panel: quién MONTA, distinto de quién está viva.
   // `null` = todas, que es el caso de siempre y el valor por defecto —así
@@ -120,7 +119,8 @@ export function UtilitiesPanel({
   // DSK-U3 · el saldo de consultas SUBE a useConsultas. Ya no puede vivir en un
   // useState local: el consumo lo mueve desde fuera y el popup del valor se
   // pinta cuando este panel ya se ha desmontado (cierra al ejecutar). Un solo
-  // estado, dos consumidores — molde U1.
+  // estado, dos consumidores — molde U1. CFG-1 1e · llega ya como etiqueta.
+  const mano = textoMano(etiquetaMano, t)
   const [popup, setPopup] = useState(null)   // null = cerrado; {top,right} = abierto
   const badgeRef = useRef(null)
   const popupTimer = useRef(null)
@@ -224,48 +224,32 @@ export function UtilitiesPanel({
           <GodeteIcon />
         </button>
 
-        {/* SUP-2b · Cuenta · CUARTA entrada viva. Va aquí, cerrando el grupo de
-            las vivas y por delante de la inerte, porque el orden del panel
-            agrupa por estado (vivas → inertes → premium) y no por antigüedad —
-            la misma razón por la que Tapetes se puso delante de Saldo en EMB-2.
-            Cierra al ejecutar, como sus tres hermanas (v1.1 §1.3.1): el panel de
-            cuenta toma el relevo y no tiene sentido sostener dos superficies del
-            mismo menú a la vez. */}
-        {/* NO MONTA en móvil horizontal, y es la primera entrada del panel que
-            deja de montar en una piel. Se QUITA del árbol en vez de ocultarse
-            con CSS —misma doctrina que el ⋮ en la pantalla de victoria (CEL-2e):
-            es la única forma de que tampoco sea enfocable con el teclado, y
-            además es lo único que le devuelve al panel sus 244 de alto—. El
-            porqué medido vive en la lista, en config/menuEntradas.js. */}
-        {presente(ENTRADA.CUENTA) && (
+        {/* CFG-1 1e · Partida rápida · ocupa el sitio de la Saldo inerte, que
+            sale con "Cuenta" (§0-1: el perfil tiene sus tres puertas desde la
+            1b; el ojito del lobby relevó al interruptor de saldo, INV-69). Es
+            un interruptor como el sonido —cierra al ejecutar, `is-off`
+            apagada— y SOLO MONTA contra las IAS (`presentes`, INV-70): contra
+            humanos el ritmo lo decide el anfitrión. La pastilla dice Sí/No en
+            las dos pieles; el `title` sigue diciendo sólo el nombre (U1b). */}
+        {presente(ENTRADA.RAPIDA) && (
           <button
             type="button"
-            role="menuitem"
-            className={`util-item util-item-cuenta${viva(ENTRADA.CUENTA) ? '' : ' is-disabled'}`}
-            data-entrada={ENTRADA.CUENTA}
-            onClick={() => { onClose(); onCuenta() }}
-            disabled={!viva(ENTRADA.CUENTA)}
-            aria-disabled={viva(ENTRADA.CUENTA) ? undefined : 'true'}
-            title="Cuenta"
+            role="menuitemcheckbox"
+            aria-checked={rapida}
+            aria-label={t('ia.mesa.menu.rapida.estado', { estado: t(rapida ? 'lob.cfg.si' : 'lob.cfg.no') })}
+            className={`util-item util-item-rapida${rapida ? '' : ' is-off'}${viva(ENTRADA.RAPIDA) ? '' : ' is-disabled'}`}
+            data-entrada={ENTRADA.RAPIDA}
+            data-rapida={rapida ? 'si' : 'no'}
+            onClick={() => { onRapida?.(); onClose() }}
+            disabled={!viva(ENTRADA.RAPIDA)}
+            title={t('ia.mesa.menu.rapida')}
           >
-            <CuentaIcon />
+            <RapidaIcon />
+            <span className={`util-estado${rapida ? ' es-si' : ''}`} aria-hidden="true">
+              {t(rapida ? 'lob.cfg.si' : 'lob.cfg.no')}
+            </span>
           </button>
         )}
-
-        {INERTES.map(e => (
-          <button
-            key={e.key}
-            type="button"
-            role="menuitem"
-            className="util-item is-disabled"
-            data-entrada={e.key}
-            title={e.title}
-            disabled
-            aria-disabled="true"
-          >
-            {e.ico}
-          </button>
-        ))}
 
         {/* "Mano actual" · última y separada por el filete del sistema: es la
             entrada premium y no pertenece al grupo de las tres.
@@ -291,11 +275,14 @@ export function UtilitiesPanel({
             en ninguna de las dos hojas —sólo el ancho lo está—, así que la fila
             se pinta sola y `gameTable.css` no se abre; lo que sí se actualiza es
             el espejo `PANEL_H` de useUtilitiesMenu.js, que es de donde sale la
-            pinza vertical del móvil horizontal. */}
+            pinza vertical del móvil horizontal.
+            CFG-1 1e · salen "Cuenta" y "Saldo" y entra "Partida rápida": cinco
+            filas contra las IAS (64×244) y cuatro sin ella (200), en las dos
+            pieles. En móvil la cifra ya no espera al aviso: va en la pastilla. */}
         <div
           className={`util-item util-item-mano${manoDisponible && viva(ENTRADA.MANO) ? '' : ' is-disabled'}`}
           data-entrada={ENTRADA.MANO}
-          title="Mano actual"
+          title={t('ia.mesa.menu.mano')}
         >
           {/* El rol de menú vive en el ICONO, no en el contenedor: un control
               vivo —el badge— no puede colgar de un subárbol `aria-disabled`.
@@ -311,23 +298,35 @@ export function UtilitiesPanel({
             type="button"
             className="util-ico-slot"
             role="menuitem"
-            aria-label="Mano actual"
+            aria-label={mano.largo}
             aria-disabled={manoDisponible && viva(ENTRADA.MANO) ? undefined : 'true'}
             disabled={!manoDisponible || !viva(ENTRADA.MANO)}
             onClick={() => { onClose(); onManoActual() }}
           >
             <CardQueryIcon />
           </button>
-          {viva(ENTRADA.CONTADOR) && (
+          {/* CFG-1 1e · el badge dice la cifra de gratis, el precio de la mano
+              (más menudo: tres cifras en el mismo disco de 18) o ✓ con la mano
+              pagada. En escritorio sigue siendo el control de U1b con su
+              popup; en móvil, donde ese popup se saldría (v1.5 §7.1), la misma
+              cifra va en una pastilla que no se toca. Sin cifra todavía (el
+              servidor no contestó), no hay pastilla. */}
+          {mano.corto !== null && viva(ENTRADA.CONTADOR) && (
             <button
               ref={badgeRef}
               type="button"
-              className="util-badge"
+              className={`util-badge${mano.precio ? ' es-precio' : ''}`}
+              data-estado={etiquetaMano?.tipo}
               onClick={pressBadge}
-              aria-label={`${consultas} consultas gratis`}
+              aria-label={mano.largo}
             >
-              {consultas}
+              {mano.corto}
             </button>
+          )}
+          {mano.corto !== null && !viva(ENTRADA.CONTADOR) && (
+            <span className={`util-estado util-estado-mano${mano.precio ? ' es-precio' : ''}`} data-estado={etiquetaMano?.tipo} aria-hidden="true">
+              {mano.corto}
+            </span>
           )}
         </div>
       </div>
@@ -338,7 +337,7 @@ export function UtilitiesPanel({
           role="status"
           style={{ right: `${popup.right}px`, top: `${popup.top}px` }}
         >
-          Tienes {consultas} consultas gratis
+          {mano.largo}
         </div>
       )}
     </>

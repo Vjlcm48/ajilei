@@ -69,7 +69,13 @@
    La ventana móvil tiene su propia piel (menuMovil.css), pero el recorrido no
    se copia allí: es pintura sobre `.u3-popup`, y `.u3-popup` es la misma clase
    en las dos ramas. Copiarlo sería una tercera piel que mantener a mano.       */
-.u3-popup::before {
+/* ── CFG-1 1e · SÓLO CON LA MANO PAGADA ───────────────────────────────────────
+   Desde que Mano actual se paga (INV-75), el recorrido deja de ser la piel de
+   toda ventana y pasa a decir «esta mano está pagada» (aprobado en agosto de
+   2026, ficha 1e §0-4). La ventana lo pide con `data-pagada`
+   (`ManoActual.jsx`); con una consulta gratis, o con el aviso de una línea, el
+   filete queda quieto. Mismo pseudo, mismo oro, Δ=0 de layout. */
+.u3-popup[data-pagada]::before {
   /* Constantes declaradas, jamás números mágicos. El ciclo es provisional:
      3 s por vuelta contra los 4 s de vida del popup (CONSULTA_POPUP_MS) —
      una vuelta y un tercio, que es lo que hace falta para leerlo como
@@ -124,7 +130,7 @@
    sitio a un anillo parejo, que es lo que "borde dorado" quiere decir cuando
    nada se mueve. */
 @media (prefers-reduced-motion: reduce) {
-  .u3-popup::before {
+  .u3-popup[data-pagada]::before {
     animation: none;
     background: rgba(var(--gold-brand-rgb), 0.85);
   }

@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   FASES_CONSULTABLES,
   hayManoConsultable,
-  estadoInicial,
-  pedirConsulta,
   desglosarPalos,
+  estadoConsultas,
+  conMiConsulta,
+  decidirConsulta,
+  responderConsulta,
+  etiquetaConsulta,
 } from '../src/hooks/consultasCore.js'
 import { PHASES } from '../src/engine/gameEngine.js'
 import { getBestSuitScore } from '../src/engine/handEvaluator.js'
@@ -49,67 +52,104 @@ describe('U3 · disponibilidad de la entrada', () => {
   })
 })
 
-describe('U3 · consulta por mano', () => {
-  it('la primera consulta de una mano cobra exactamente 1', () => {
-    const r = pedirConsulta(estadoInicial(20), 1)
-    expect(r.resultado).toBe('nueva')
-    expect(r.cobro).toBe(1)
-    expect(r.estado.saldo).toBe(19)
-    expect(r.estado.manoConsultada).toBe(1)
+// ── CFG-1 1e · Mano actual de pago: lo que decide el cliente ────────────────
+// El servidor gasta y cobra (INV-75; lo sella el guion cfg1e y el banco
+// imitado en espejo). Aquí se sella lo que el cliente decide con lo que vuelve:
+// cuándo llamar, cuándo preguntar, qué pintar.
+const M = 'mesa-1'
+
+describe('CFG-1 1e · qué hacer al tocar', () => {
+  it('sin mesa del servidor o sin mano no se llama', () => {
+    const e = estadoConsultas({ precio: 100 })
+    expect(decidirConsulta(e, { mesa: null, mano: 1, confirmada: true })).toBe('sin_mesa')
+    expect(decidirConsulta(e, { mesa: M, mano: 0, confirmada: true })).toBe('sin_mesa')
   })
 
-  it('re-presionar la MISMA mano es gratis y no mueve el contador', () => {
-    const primera = pedirConsulta(estadoInicial(20), 1)
-    const segunda = pedirConsulta(primera.estado, 1)
-    expect(segunda.resultado).toBe('repetida')
-    expect(segunda.cobro).toBe(0)
-    expect(segunda.estado.saldo).toBe(19)
-    const tercera = pedirConsulta(segunda.estado, 1)
-    expect(tercera.estado.saldo).toBe(19)
+  it('con gratis se llama sin preguntar, aunque la sesión no haya confirmado nada', () => {
+    const e = conMiConsulta(estadoConsultas({ precio: 100 }), { gratis_restantes: 3, ultima_mesa: null, ultima_mano: null }, M)
+    expect(decidirConsulta(e, { mesa: M, mano: 1, confirmada: false })).toBe('llamar')
   })
 
-  it('una mano NUEVA vuelve a cobrar', () => {
-    let e = estadoInicial(20)
-    e = pedirConsulta(e, 1).estado
-    e = pedirConsulta(e, 1).estado     // gratis
-    const nueva = pedirConsulta(e, 2)
-    expect(nueva.resultado).toBe('nueva')
-    expect(nueva.cobro).toBe(1)
-    expect(nueva.estado.saldo).toBe(18)
-    expect(nueva.estado.manoConsultada).toBe(2)
+  it('sin gratis: el primer cobro de la sesión pregunta; confirmado, ya no', () => {
+    const e = conMiConsulta(estadoConsultas({ precio: 100 }), { gratis_restantes: 0, ultima_mesa: null, ultima_mano: null }, M)
+    expect(decidirConsulta(e, { mesa: M, mano: 1, confirmada: false })).toBe('confirmar')
+    expect(decidirConsulta(e, { mesa: M, mano: 1, confirmada: true })).toBe('llamar')
   })
 
-  it('no se puede consumir dos veces la misma mano volviendo a la anterior', () => {
-    // La identidad es el número de mano del marcador, que sólo crece: una vez
-    // pasada la mano 1, su derecho adquirido se pierde y volver a ella cobraría.
-    // Se documenta el comportamiento, no se pretende que ocurra en la app.
-    let e = estadoInicial(20)
-    e = pedirConsulta(e, 1).estado
-    e = pedirConsulta(e, 2).estado
-    expect(e.saldo).toBe(18)
-    expect(pedirConsulta(e, 1).cobro).toBe(1)
+  it('sin gratis y sin saldo para el precio: el aviso, sin preguntar ni llamar', () => {
+    const e = conMiConsulta(estadoConsultas({ precio: 100 }), { gratis_restantes: 0, ultima_mesa: null, ultima_mano: null }, M)
+    expect(decidirConsulta(e, { mesa: M, mano: 1, confirmada: false, saldo: 50 })).toBe('sin_saldo')
+    expect(decidirConsulta(e, { mesa: M, mano: 1, confirmada: true, saldo: 50 })).toBe('sin_saldo')
+    expect(decidirConsulta(e, { mesa: M, mano: 1, confirmada: true, saldo: 100 })).toBe('llamar')
+    // Con gratis, el saldo no importa.
+    expect(decidirConsulta({ ...e, gratis: 2 }, { mesa: M, mano: 1, confirmada: false, saldo: 0 })).toBe('llamar')
+  })
+
+  it('sin saber todavía si quedan gratis, se pregunta (el lado seguro)', () => {
+    const e = estadoConsultas({ precio: 100 })
+    expect(decidirConsulta(e, { mesa: M, mano: 1, confirmada: false })).toBe('confirmar')
+  })
+
+  it('la última mano consultada no se vuelve a pedir: ni gasta ni cobra', () => {
+    let e = conMiConsulta(estadoConsultas({ precio: 100 }), { gratis_restantes: 1, ultima_mesa: null, ultima_mano: null }, M)
+    e = responderConsulta(e, { mesa: M, mano: 4 }, { resultado: 'gratis', precio: 100, gratis_restantes: 0, saldo: 900 }).estado
+    // Quien gastó su ÚLTIMA gratis conserva el derecho sobre esa mano (P-1).
+    expect(decidirConsulta(e, { mesa: M, mano: 4, confirmada: false })).toBe('repetida')
+    expect(decidirConsulta(e, { mesa: M, mano: 5, confirmada: false })).toBe('confirmar')
+  })
+
+  it('una última mano de OTRA mesa no cuenta', () => {
+    const e = conMiConsulta(estadoConsultas(), { gratis_restantes: 5, ultima_mesa: 'otra', ultima_mano: 4 }, M)
+    expect(e.ultima).toBe(null)
+    expect(e.gratis).toBe(5)
   })
 })
 
-describe('U3 · saldo agotado (N=0)', () => {
-  it('a saldo 0 no cobra, no baja de cero y anuncia agotadas', () => {
-    const r = pedirConsulta(estadoInicial(0), 7)
-    expect(r.resultado).toBe('agotadas')
-    expect(r.cobro).toBe(0)
-    expect(r.estado.saldo).toBe(0)
-    expect(r.estado.manoConsultada).toBe(null)
+describe('CFG-1 1e · qué pintar con la respuesta', () => {
+  const base = () => conMiConsulta(estadoConsultas({ precio: 100 }), { gratis_restantes: 3, ultima_mesa: null, ultima_mano: null }, M)
+
+  it('gratis: la ventana sin recorrido y el contador al día', () => {
+    const r = responderConsulta(base(), { mesa: M, mano: 1 }, { resultado: 'gratis', precio: 100, gratis_restantes: 2, saldo: 900 })
+    expect(r.popup).toEqual({ tipo: 'valor', pagada: false })
+    expect(r.estado.gratis).toBe(2)
+    expect(r.estado.ultima).toEqual({ mesa: M, mano: 1, pagada: false })
   })
 
-  it('quien gastó su ÚLTIMA gratis conserva el derecho sobre esa mano', () => {
-    // El orden de las guardas importa: 'repetida' va antes que 'agotadas'.
-    const ultima = pedirConsulta(estadoInicial(1), 4)
-    expect(ultima.resultado).toBe('nueva')
-    expect(ultima.estado.saldo).toBe(0)
-    const rep = pedirConsulta(ultima.estado, 4)
-    expect(rep.resultado).toBe('repetida')
-    expect(rep.estado.saldo).toBe(0)
-    // pero la mano siguiente ya no tiene con qué
-    expect(pedirConsulta(ultima.estado, 5).resultado).toBe('agotadas')
+  it('cobrada y pagada: la ventana con el recorrido dorado', () => {
+    for (const resultado of ['cobrada', 'pagada']) {
+      const r = responderConsulta(base(), { mesa: M, mano: 2 }, { resultado, precio: 200, gratis_restantes: 0, saldo: 700 })
+      expect(r.popup).toEqual({ tipo: 'valor', pagada: true })
+      expect(r.estado.ultima.pagada).toBe(true)
+      expect(r.estado.precio).toBe(200)
+    }
+  })
+
+  it('saldo insuficiente: un aviso con el precio, sin ventana ni última mano', () => {
+    const r = responderConsulta(base(), { mesa: M, mano: 2 }, { resultado: 'saldo_insuficiente', precio: 100, gratis_restantes: 0, saldo: 50 })
+    expect(r.popup).toEqual({ tipo: 'aviso', clave: 'ia.mesa.consulta.sin_saldo', vars: { hc: 100 } })
+    expect(r.estado.ultima).toBe(null)
+  })
+
+  it('sin respuesta, sin sesión, mesa inválida o límite: «No se pudo consultar»', () => {
+    for (const r of [null, { resultado: 'sin_sesion' }, { resultado: 'mesa_invalida', precio: 0 }, { resultado: 'limite', precio: 0 }]) {
+      expect(responderConsulta(base(), { mesa: M, mano: 2 }, r).popup.clave).toBe('ia.mesa.consulta.error')
+    }
+  })
+})
+
+describe('CFG-1 1e · lo que dice la entrada', () => {
+  it('N gratis, luego el precio, y «pagada» sólo en la mano pagada', () => {
+    let e = conMiConsulta(estadoConsultas({ precio: 100 }), { gratis_restantes: 13, ultima_mesa: null, ultima_mano: null }, M)
+    expect(etiquetaConsulta(e, M, 1)).toEqual({ tipo: 'gratis', n: 13 })
+    e = { ...e, gratis: 0 }
+    expect(etiquetaConsulta(e, M, 1)).toEqual({ tipo: 'precio', precio: 100 })
+    e = responderConsulta(e, { mesa: M, mano: 1 }, { resultado: 'cobrada', precio: 100, gratis_restantes: 0, saldo: 900 }).estado
+    expect(etiquetaConsulta(e, M, 1)).toEqual({ tipo: 'pagada' })
+    expect(etiquetaConsulta(e, M, 2)).toEqual({ tipo: 'precio', precio: 100 })
+  })
+
+  it('antes de que el servidor conteste no dice cifra', () => {
+    expect(etiquetaConsulta(estadoConsultas({ precio: 100 }), M, 1)).toBe(null)
   })
 })
 

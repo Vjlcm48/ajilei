@@ -1,5 +1,7 @@
+import { useIdioma } from '../hooks/useIdioma'
+
 // ── DSK-U3 · Popup del valor de "Mano actual" ────────────────────────────────
-// Documento rector: docs/AJILEI_Menu_Utilidades_v1.3.md §3.
+// Documento rector: docs/AJILEI_Menu_Utilidades_v1.6.md §3 (antes v1.3 §3).
 // Superficie PROPIA y hermana del área, por la misma razón que el selector de
 // reacciones: la entrada CIERRA AL EJECUTAR, así que el panel ya no existe
 // cuando esto se pinta. Se ancla al ⋮ (no al panel muerto) por su borde
@@ -13,27 +15,43 @@
 // viva — que es exactamente la diferencia que se consume. Ni duplica ni
 // contradice: no coexisten, porque la entrada queda inerte en fase de pago.
 
-export function ManoActualPopup({ popup, saldo }) {
+// CFG-1 1e · DOS FORMAS. `valor`: la ventana con el desglose y, en su última
+// línea, el contador de gratis o que la mano está pagada. `aviso`: una línea,
+// sin desglose («No te alcanza: 100 HC», «No se pudo consultar»). Con la mano
+// pagada la ventana lleva `data-pagada`, y SÓLO entonces el recorrido dorado de
+// EMB-1 rodea su borde (`embellecimiento.css`).
+
+function pieDe(popup, t) {
+  if (popup.pagada) return t('ia.mesa.consulta.pie.pagada')
+  const n = popup.gratis
+  if (!Number.isInteger(n)) return null
+  if (n === 0) return t('ia.mesa.consulta.pie.ninguna')
+  return n === 1 ? t('ia.mesa.consulta.pie.queda1') : t('ia.mesa.consulta.pie.quedan', { n })
+}
+
+export function ManoActualPopup({ popup }) {
+  const { t } = useIdioma()
   if (!popup) return null
 
   // MOV-1b-a · `top` llega como longitud CSS (la pinza de D6 con el área
   // segura dentro); `right` sigue siendo número.
   const estilo = { right: `${popup.anchor.right}px`, top: popup.anchor.top }
 
-  if (popup.tipo === 'agotadas') {
+  if (popup.tipo === 'aviso') {
     return (
-      <div className="u3-popup u3-popup-agotadas" role="status" style={estilo}>
-        <p className="u3-titulo">Se acabaron tus consultas gratis</p>
-        <p className="u3-resto">Pronto podrás pagarlas con Heptacoins.</p>
+      <div className="u3-popup u3-popup-aviso" role="status" style={estilo} data-aviso={popup.clave}>
+        <p className="u3-titulo">{t(popup.clave, popup.vars)}</p>
       </div>
     )
   }
 
+  const pagada = popup.pagada ? '' : undefined
+  const pie = pieDe(popup, t)
   const d = popup.desglose
   if (!d) {
     return (
-      <div className="u3-popup" role="status" style={estilo}>
-        <p className="u3-titulo">Aún no tienes cartas que contar</p>
+      <div className="u3-popup" role="status" style={estilo} data-pagada={pagada}>
+        <p className="u3-titulo">{t('ia.mesa.consulta.vacia')}</p>
       </div>
     )
   }
@@ -43,6 +61,7 @@ export function ManoActualPopup({ popup, saldo }) {
       className="u3-popup"
       role="status"
       style={estilo}
+      data-pagada={pagada}
       /* Afordancia de arnés, deliberada. El modo u3 verifica el valor CRUZANDO
          contra un recálculo independiente (cartas leídas del DOM + la misma
          fuente única corrida en Node), no leyendo prosa con expresiones
@@ -53,6 +72,7 @@ export function ManoActualPopup({ popup, saldo }) {
       data-pts={d.pts}
       data-bonif={d.bonifComodin}
       data-resto={d.resto.map(r => `${r.palo}:${r.pts}`).join(',')}
+      data-gratis={Number.isInteger(popup.gratis) ? popup.gratis : undefined}
     >
       {/* Valor RELATIVO según las reglas vivas de la mano, jamás el nominal
           impreso en la carta (v1.1 §3.1). Sale entero de getBestSuitScore. */}
@@ -71,9 +91,7 @@ export function ManoActualPopup({ popup, saldo }) {
       {d.bonifComodin > 0 && (
         <p className="u3-nota">Incluye el comodín (+{d.bonifComodin})</p>
       )}
-      <p className="u3-saldo">
-        {saldo === 1 ? 'Te queda 1 consulta gratis' : `Te quedan ${saldo} consultas gratis`}
-      </p>
+      {pie && <p className="u3-saldo">{pie}</p>}
     </div>
   )
 }

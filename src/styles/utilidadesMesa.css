@@ -1,0 +1,86 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · CFG-1 1e · El ⋮ de la mesa: Partida rápida, las pastillas y la
+   confirmación del primer cobro de Mano actual
+   Rector: AJILEI_CFG-1_Fase1e_v1.0.md §2. Lo importan `UtilitiesMenu.jsx` y
+   `ConfirmarConsulta.jsx`.
+
+   SIN PUERTA DE PIEL, a propósito. Las dos pieles del panel viven en
+   `gameTable.css` (escritorio, protegido) y en `menuMovil.css` (móvil), con
+   tres bloques copiados a mano (v1.5 §7.3). Lo de aquí es NUEVO y es igual en
+   las dos, así que va una vez y sin media query: no es una cuarta copia.
+
+   Todo es fuera de flujo (`position: absolute` sobre una fila que ya es
+   `relative` en las dos pieles) o color: el panel mide lo mismo con pastilla y
+   sin ella (O1). Un solo oro: el filete y la cifra en --gold-brand, el mismo
+   lenguaje que el badge de U1b (INV-08). Ni un hex, sin `!important`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── La pastilla de estado ──────────────────────────────────────────────────
+   Hermana del badge del contador: la misma caja (18 de alto, en la esquina de
+   arriba a la derecha de su fila, 4 y 3 de aire), el mismo filete y la misma
+   cifra. A diferencia del badge NO SE TOCA: es una lectura (`pointer-events:
+   none`), así que no roba toques a la entrada que la lleva. La lleva
+   «Partida rápida» (Sí/No) en las dos pieles, y «Mano actual» en móvil, donde
+   el badge no monta (v1.5 §7.1). */
+.util-estado {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.55);
+  border-radius: 9px;
+  background: var(--surface-modal);
+  color: var(--gold-brand);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* El precio son tres cifras en el disco de 18: más menudas, como en el badge. */
+.util-estado.es-precio,
+.util-badge.es-precio {
+  font-size: 8px;
+  letter-spacing: -0.02em;
+}
+
+/* ── Partida rápida ─────────────────────────────────────────────────────────
+   Icono de 18, como los glifos de texto de la fila (`--dsk-u1-ico-w`), para
+   que la pastilla no lo pise: el icono acaba en x 40 y la pastilla empieza en
+   41 en la fila de 62. Apagada, el icono se atenúa como el del sonido
+   (INV-68) y la pastilla pasa al crema tenue: «No» no es un acento. */
+.util-ico-rapida {
+  width: 18px;
+  height: 18px;
+  display: block;
+  color: var(--text-primary);
+}
+.util-item-rapida.is-off .util-ico { opacity: 0.5; }
+.util-item-rapida.is-off .util-estado {
+  border-color: rgba(var(--text-primary-rgb), 0.28);
+  color: var(--text-secondary);
+}
+
+/* ── La confirmación del primer cobro ───────────────────────────────────────
+   La tarjeta y el velo son los de «Eliminar cuenta» (`eliminarCuenta.css`):
+   esto sólo pone el texto y el botón de consultar, SIN EL ROJO de borrar. El
+   botón lleva el filete del oro de la casa sobre una veladura del mismo oro,
+   como la fila viva del panel al pasar por encima. */
+.cmc-texto {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.cmc-consultar {
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.55);
+  background: rgba(var(--gold-brand-rgb), 0.14);
+  color: var(--text-primary);
+}
+.cmc-consultar:hover { border-color: var(--gold-brand); }

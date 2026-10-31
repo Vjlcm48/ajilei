@@ -210,11 +210,19 @@ describe('IDI-0 · diccionario es', () => {
     //     «Perfil»: el nombre accesible del botón de la barra y el título de la
     //     pantalla que abre (como `lob.nav.rankings = rnk.titulo`).
     //
+    //   ia.mesa.consulta.cancelar = lob.eliminar.cancelar  (CFG-1 1e)
+    //   ia.mesa.consulta.cerrar = lob.eliminar.cerrar      (CFG-1 1e)
+    //     «Cancelar» y «Cerrar» de la ventana que confirma el primer cobro de
+    //     Mano actual, de la familia de «Eliminar cuenta». Dos ventanas de dos
+    //     fases: la de la mesa puede querer «No, gracias» sin tocar la otra.
+    //
     //   perfil.fila.correo = rnk.perfil.correo  (CFG-1 1b)
     //     «Correo»: la fila del perfil y la línea del mini-perfil propio. Dos
     //     superficies; la fila puede querer «Correo electrónico» cuando la 1d
     //     la encienda.
     expect(repetidos.sort()).toEqual([
+      'ia.mesa.consulta.cancelar = lob.eliminar.cancelar',
+      'ia.mesa.consulta.cerrar = lob.eliminar.cerrar',
       'ia.recarga.opcion.medio = ia.retar.entrada.medio',
       'ia.recarga.opcion.piso = ia.retar.entrada.piso',
       'ia.recarga.reintentar = ia.retar.saldo.reintentar',

@@ -374,6 +374,34 @@ export const TEXTOS_ES = {
   // la diferencia entre estar en all-in y estar retirado.
   'ia.mesa.humano.allin':      'Estás all-in — tus cartas siguen jugando.',
 
+  // ── CFG-1 1e · EL ⋮ DE LA MESA ───────────────────────────────
+  // El panel es de solo iconos: estas cadenas son el `title` y el nombre
+  // accesible de cada entrada, y la pastilla dice la parte corta (Sí/No, la
+  // cifra). «Sí» y «No» son los de la hoja ⚙ (`lob.cfg.si`, `lob.cfg.no`):
+  // el mismo interruptor que el sonido (INV-68).
+  'ia.mesa.menu.rapida':        'Partida rápida',
+  'ia.mesa.menu.rapida.estado': 'Partida rápida · {estado}',
+  'ia.mesa.menu.mano':          'Mano actual',
+  'ia.mesa.menu.mano.gratis':   'Mano actual · {n} gratis',
+  'ia.mesa.menu.mano.precio':   'Mano actual · {hc} HC',
+  'ia.mesa.menu.mano.pagada':   'Mano actual · pagada',
+
+  // ── CFG-1 1e · MANO ACTUAL DE PAGO ───────────────────────────
+  // La última línea de la ventana dice el contador o que la mano está pagada;
+  // el aviso de una línea sale sin ventana. La confirmación es la del primer
+  // cobro de la sesión (familia de «Eliminar cuenta», sin el rojo).
+  'ia.mesa.consulta.vacia':          'Aún no tienes cartas que contar',
+  'ia.mesa.consulta.pie.quedan':     'Te quedan {n} consultas gratis',
+  'ia.mesa.consulta.pie.queda1':     'Te queda 1 consulta gratis',
+  'ia.mesa.consulta.pie.ninguna':    'Ya no te quedan consultas gratis',
+  'ia.mesa.consulta.pie.pagada':     'Mano pagada: vuelve a mirarla gratis',
+  'ia.mesa.consulta.sin_saldo':      'No te alcanza: {hc} HC',
+  'ia.mesa.consulta.error':          'No se pudo consultar',
+  'ia.mesa.consulta.confirmar.texto': 'Consultar tu mano cuesta {hc} HC. Las demás consultas de esta mano son gratis.',
+  'ia.mesa.consulta.confirmar.ok':    'Consultar',
+  'ia.mesa.consulta.cancelar':        'Cancelar',
+  'ia.mesa.consulta.cerrar':          'Cerrar',
+
   // ── 1e-ii · LA RECARGA (§5) ──────────────────────────────────
   // Tres formas de la misma pregunta, y el subtítulo es lo único que las
   // distingue de verdad: la voluntaria informa, la automática avisa y la

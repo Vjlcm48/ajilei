@@ -56,6 +56,13 @@ export const LIMITES_SQL = Object.freeze({
   pedir_boleto: 10, cobrar_boleto: 20,
 })
 export const BONO_CONSTANCIA_SQL = 500
+// CFG-1 1e · Mano actual de pago: `consultas_gratis()`, `precio_consulta(text)`
+// y el tope por minuto de `consultar_mano` (va literal en la llamada a
+// `contar_intento_dinero`, no en `limite_dinero`: por eso no está en
+// LIMITES_SQL). El espejo los lee de `20261030193000_cfg1e_mano_actual.sql`.
+export const CONSULTAS_GRATIS_SQL = 20
+export const PRECIOS_CONSULTA_SQL = Object.freeze({ basico: 100, avanzado: 200, pro: 300, humanos: 500 })
+export const LIMITE_CONSULTA_SQL = 30
 // CFG-1 1b · el freno del nombre (`freno_nombre_hasta`: 30 días en UTC, que no
 // tiene cambio de hora, así que son 30 × 24 h exactas), la forma del CHECK de
 // SUP-2a, los códigos de estado de la lista sellada y una MUESTRA de los
@@ -181,6 +188,8 @@ export function crearBanco({
     otros: [],                 // los demás jugadores: { username, saldo, saldoEn, total, pais, estado }
     // CFG-1 1b · la fila propia de `profiles` (el nombre es `usuario`)
     perfil: { id: '00000000-0000-4000-8000-000000000000', pais: null, estado: null, cambiadoEn: null, forzar: null },
+    // CFG-1 1e · la fila de `consultas`, o ninguna (nace en la primera consulta)
+    consultas: null,           // { usadas, ultimaMesa, ultimaMano }
   }
 
   // ── El libro (1a): una línea por cambio, clave única ─────────────────────
@@ -221,7 +230,7 @@ export function crearBanco({
     b.intentos.push({ funcion, en: t })
     if ((b.forzados[funcion] ?? 0) > 0) { b.forzados[funcion]--; return false }
     if (!limites) return true
-    const tope = LIMITES_SQL[funcion]
+    const tope = funcion === 'consultar_mano' ? LIMITE_CONSULTA_SQL : LIMITES_SQL[funcion]
     if (tope === undefined) return false
     return b.intentos.filter((x) => x.funcion === funcion && x.en > t - 60_000).length <= tope
   }
@@ -494,6 +503,47 @@ export function crearBanco({
     const h = frenoHasta()
     return h !== null && ahora() < h ? iso(h) : null
   }
+  // ── CFG-1 1e · Mano actual de pago (`consultar_mano`, `mi_consulta`) ──────
+  // El orden del SQL: límite, argumentos, la mesa abierta (de ella el precio),
+  // la última mano consultada ('repetida', sin tocar nada), una gratis, y el
+  // cobro con la clave de la mano (una mano anterior ya cobrada: 'pagada').
+  // El banco siempre tiene sesión: 'sin_sesion' no se da aquí.
+  const gratisQuedan = () => Math.max(CONSULTAS_GRATIS_SQL - (b.consultas?.usadas ?? 0), 0)
+  const filaConsulta = (resultado, precio) => ({
+    resultado, precio, gratis_restantes: gratisQuedan(), saldo: b.saldo,
+  })
+  function consultarMano({ p_mesa = null, p_mano = null } = {}) {
+    if (!cabe('consultar_mano')) return filaConsulta('limite', 0)
+    if (!p_mesa || !Number.isInteger(p_mano) || p_mano < 1) return filaConsulta('argumento_invalido', 0)
+    const m = b.mesas.get(p_mesa)
+    if (!m || m.estado !== 'abierta') return filaConsulta('mesa_invalida', 0)
+    const precio = PRECIOS_CONSULTA_SQL[m.reto]
+    b.consultas ??= { usadas: 0, ultimaMesa: null, ultimaMano: null }
+    const c = b.consultas
+    if (c.ultimaMesa === p_mesa && c.ultimaMano === p_mano) return filaConsulta('repetida', precio)
+    if (c.usadas < CONSULTAS_GRATIS_SQL) {
+      c.usadas += 1
+      c.ultimaMesa = p_mesa
+      c.ultimaMano = p_mano
+      return filaConsulta('gratis', precio)
+    }
+    const r = aplicar('consulta', -precio, `consulta:${p_mesa}:${p_mano}`, p_mesa)
+    if (r.motivo === 'aplicado') {
+      c.ultimaMesa = p_mesa
+      c.ultimaMano = p_mano
+      return filaConsulta('cobrada', precio)
+    }
+    if (r.motivo === 'repetido') return filaConsulta('pagada', precio)
+    return filaConsulta(r.motivo, precio)
+  }
+  function miConsulta() {
+    return {
+      gratis_restantes: gratisQuedan(),
+      ultima_mesa: b.consultas?.ultimaMesa ?? null,
+      ultima_mano: b.consultas?.ultimaMano ?? null,
+    }
+  }
+
   const errorSQL = (code, message, hint = null) => ({ code, message, details: null, hint })
   const filaPerfil = () => ({ id: b.perfil.id, username: usuario, pais: b.perfil.pais, estado: b.perfil.estado })
   // El `update` de `profiles` con las tres columnas del `grant`, en el orden
@@ -675,6 +725,8 @@ export function crearBanco({
     mini_perfil: miniPerfil,
     nombre_libre: nombreLibre,
     mi_proximo_cambio: miProximoCambio,
+    consultar_mano: consultarMano,
+    mi_consulta: miConsulta,
   }
 
   return {
@@ -699,6 +751,14 @@ export function crearBanco({
     /** Mando del bypass: `nombre_libre` y el `update` contestan 'ocupado', 'vedado' o 'libre' (null = lo que diga el banco). */
     forzarNombre(que) { b.perfil.forzar = que },
     get perfil() { return { ...filaPerfil(), nombre_cambiado_en: b.perfil.cambiadoEn === null ? null : iso(b.perfil.cambiadoEn) } },
+    // ── CFG-1 1e · Mano actual ─────────────────────────────────────────────
+    /** Lo que el dueño de la tabla escribe en `consultas.gratis_usadas` (el guion, B8): `n` gratis gastadas. */
+    gastarConsultas(n) {
+      if (!Number.isInteger(n) || n < 0 || n > CONSULTAS_GRATIS_SQL) return false
+      b.consultas = { usadas: n, ultimaMesa: b.consultas?.ultimaMesa ?? null, ultimaMano: b.consultas?.ultimaMano ?? null }
+      return true
+    },
+    get consultas() { return b.consultas ? { ...b.consultas } : null },
     // ── CFG-1 1c · la Edge Function `eliminar_cuenta` ──────────────────────
     // No es una RPC: contesta `{ status, cuerpo }`, lo que la función manda por
     // HTTP. La guarda es la de `partida_abierta_de`: una mesa IA abierta (la de

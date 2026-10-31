@@ -8,8 +8,7 @@ import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { ManoActualPopup } from './ManoActual'
 import { TapetesPanel } from './TapetesPanel'
-import { CuentaPanel } from './CuentaPanel'
-import Bautizo from '../screens/Bautizo'
+import ConfirmarConsulta from './ConfirmarConsulta'
 import { CelebracionMesa, PulsoNombre, AjileiOverlay, PantallaVictoria } from './Celebracion'
 import MiniPerfil from './MiniPerfil'
 import { inicialDe } from '../screens/salaEsperaCore'
@@ -39,7 +38,7 @@ import { finDeMano, TOPE_RECARGA_MS } from '../hooks/mesaIACore'
 import { jugadoresVsIA } from '../engine/entrada'
 import {
   useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
-  ALTO_SELECTOR_REACCIONES, ALTO_CUENTA,
+  ALTO_SELECTOR_REACCIONES,
 } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
@@ -48,8 +47,9 @@ import { useCongelado } from '../hooks/useCongelado'
 import { useEscalaMesa } from '../hooks/useEscalaMesa'
 import { aPropios, escalaActual } from '../lib/escala'
 import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
-import { hayManoConsultable, desglosarPalos } from '../hooks/consultasCore'
-import { VIVAS_ESCRITORIO, VIVAS_MOVIL, PRESENTES_MOVIL_HORIZONTAL } from '../config/menuEntradas'
+import { hayManoConsultable, desglosarPalos, etiquetaConsulta } from '../hooks/consultasCore'
+import { VIVAS_ESCRITORIO, VIVAS_MOVIL, presentesDe, filasDelPanel } from '../config/menuEntradas'
+import { partidaRapida, factorDeMano } from '../lib/partidaRapida'
 import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
@@ -283,7 +283,11 @@ function ShuffleDeck() {
 }
 
 // ── FlyingCard ────────────────────────────────────────────────────────────────
-function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) {
+// CFG-1 1e · el vuelo de una carta del reparto, en s. «Partida rápida» lo
+// multiplica por 0,5 (`factorManoRef`); el del descarte (0,75, `fast`) no se toca.
+const VUELO_REPARTO_S = 0.595
+
+function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, onDone }) {
   const [moved, setMoved] = useState(false)
 
   useEffect(() => {
@@ -318,7 +322,13 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = 0.595, onDone }) 
 // local de la 1b. Sin `control` la mesa juega como antes, sin servidor.
 // RNK-1d · `apiRanking` es la MISMA de `App` (el banco imitado del bypass o la
 // real): la usa sólo el mini-perfil propio que abre la victoria.
-export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null }) {
+// CFG-1 1e · `contraIAS`: la mesa es contra las IAS. Solo entonces monta
+// «Partida rápida» (INV-70); `false` por defecto, para que MES-PvP no la herede
+// sin decidirlo. `apiConsulta`: `lib/consultaApi` (o su gemela del bypass), la
+// puerta de Mano actual de pago (INV-75). `cuenta` ya sólo trae el nombre y el
+// correo del mini-perfil propio: el Bautizo en edición no monta desde la mesa.
+// `onSaldo`: el saldo que contesta `consultar_mano`, para la billetera de App.
+export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null, contraIAS = false, apiConsulta = null, onSaldo = null }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -571,18 +581,22 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // envoltorio y la entrada Sonido, no lo que hay detrás (eso es MOV-1b).
   // El cierre por `resize` que el hook ya traía cubre el cambio de orientación
   // sin una línea nueva: girar el teléfono cierra el panel.
-  const utilMenu = useUtilitiesMenu()
-  // SUP-2b · Cuenta. Dos estados locales y ningún hook nuevo: el panel es un
-  // satélite sin memoria (sólo su ancla) y el modal de cambiar nombre es un
-  // booleano. Se queda aquí y no sube a un hook de la familia porque no hay nada
-  // que decidir —ni persistencia, ni gate, ni enfriamiento—: crear un
-  // `useCuenta` para dos `useState` sería ceremonia, no arquitectura.
-  const [cuentaAncla, setCuentaAncla] = useState(null)
-  const [editandoNombre, setEditandoNombre] = useState(false)
-  // El setter va en las dependencias aunque React garantice que es estable: el
-  // compilador de React infiere la lista real y con `[]` marca la memoización
-  // como no preservable, que en este repo es un error de lint y no un aviso.
-  const cerrarCuenta = useCallback(() => setCuentaAncla(null), [setCuentaAncla])
+  // CFG-1 1e · el alto del panel sale de las filas que montan (5 contra las
+  // IAS, 4 sin «Partida rápida»): de ahí sale la pinza.
+  const utilMenu = useUtilitiesMenu(true, filasDelPanel(contraIAS))
+  // SUP-2b dejaba aquí el panel de Cuenta y el Bautizo en edición. CFG-1 1e los
+  // retira de la mesa: el perfil tiene sus tres puertas desde la 1b (P-1).
+  //
+  // CFG-1 1e · «Partida rápida» (INV-70). `rapida` es lo que enseña el ⋮ y se
+  // recuerda en el aparato; `factorManoRef` es lo que usa la mano EN CURSO, y
+  // sólo lo escribe `commitNewHand`: cambiarla a mitad de mano no toca esa mano.
+  const [rapida, setRapida] = useState(() => partidaRapida.leer())
+  const factorManoRef = useRef(1)
+  const alternarRapida = () => {
+    const encendida = !rapida
+    partidaRapida.guardar(encendida)
+    setRapida(encendida)
+  }
   // DSK-U2 · circuito de reacciones.
   // MOV-1b-c · sin gate: Reacciones se enciende en móvil con la MISMA lógica
   // —una burbuja a la vez, enfriamiento de 5s inmune a la ✕, veto durante la
@@ -594,7 +608,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // MOV-1b-a · sin gate: "Mano actual" se enciende en móvil con el MISMO saldo
   // y la MISMA clave que en escritorio — un solo contador de 20 consultas, una
   // por mano. No hay dos economías.
-  const consultas = useConsultas()
+  // CFG-1 1e · el contador y el cobro viven en el servidor (INV-75): la mano es
+  // (mesa del servidor, «Mano #N»), y el precio sale del nivel de la mesa.
+  const mesaServidor = control?.mesaId ?? null
+  const consultas = useConsultas({ api: apiConsulta, mesaId: mesaServidor, nivel, saldo, onSaldo })
   // EMB-2 · Tapetes. Mismo gate y mismo molde de hermandad: el hook se llama
   // SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
   // escritorio no hay panel, no hay atributo y el fieltro es el verde de
@@ -802,6 +819,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       // destino = slot (sr).
       w: sr.width, h: sr.height,
       dealSeat: seat, dealCardIndex: cardIndex,
+      // CFG-1 1e · la duración del vuelo, con el factor de ESTA mano (×0,5 con
+      // «Partida rápida»). Va en la carta al crearla: la que ya vuela no cambia.
+      dur: VUELO_REPARTO_S * factorManoRef.current,
     }])
   }
 
@@ -815,14 +835,18 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           setDeal3FaceUp(prev => new Set(prev).add(i))
           if (comodinActive && isComodin(game.players[0].cards[i])) play('comodin')
         }
-        const t0 = setTimeout(() => revealDeal3(2), 300)
-        const t1 = setTimeout(() => revealDeal3(3), 600)
-        const t2 = setTimeout(() => revealDeal3(4), 900)
+        // CFG-1 1e · las esperas del segundo reparto, con el factor de ESTA
+        // mano (×0,5 con «Partida rápida»). El volteo en sí (0,30 s) vive en
+        // `gameTable.css`, protegido, y no cambia.
+        const k = factorManoRef.current
+        const t0 = setTimeout(() => revealDeal3(2), 300 * k)
+        const t1 = setTimeout(() => revealDeal3(3), 600 * k)
+        const t2 = setTimeout(() => revealDeal3(4), 900 * k)
         const t3 = setTimeout(() => {
           setDeal3FaceUp(new Set())
           setDealStep(0)
           setGame(prev => advanceFromDeal(prev))
-        }, 2000)
+        }, 2000 * k)
         return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
       }
       const t = setTimeout(() => {
@@ -1885,6 +1909,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // al vencer estamos a oscuras, el disparo se DIFIERE. La duración del barajado
   // no se toca: la baraja sigue durando sus 1950 ms.
   function commitNewHand(next) {
+    // CFG-1 1e · «Partida rápida» se lee UNA vez por mano, aquí, del aparato
+    // (no del estado del ⋮, que puede ir por delante), y queda congelada en el
+    // ref para toda la mano. El barajado de abajo no la mira: sus 1950 ms van
+    // sincronizados con `gameTable.css` (protegido) y no cambian.
+    factorManoRef.current = factorDeMano(contraIAS, partidaRapida.leer())
     setGame(next)            // cobro del ante visible (saldos descontados, pozo armado)
     setIsShuffling(true)     // baraja sobre el estado ya cobrado
     clearTimeout(barajaTimerRef.current)
@@ -2762,7 +2791,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           fromX={fc.fromX} fromY={fc.fromY}
           toX={fc.toX}     toY={fc.toY}
           w={fc.w}         h={fc.h}
-          duration={fc.fast ? 0.75 : 0.595}
+          duration={fc.fast ? 0.75 : (fc.dur ?? VUELO_REPARTO_S)}
           onDone={() => {
             setFlyingCards(prev => prev.filter(c => c.id !== fc.id))
             if (fc.isDiscardIn) markRefilled(fc.seat, fc.slotIdx)
@@ -2803,55 +2832,19 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           isDesktopTable ? null : anclaSatelite(utilMenu.triggerRect(), ALTO_SELECTOR_REACCIONES),
         )}
         reaccionesBloqueadas={reacciones.bloqueado || vcViva}
-        consultas={consultas.saldo}
+        etiquetaMano={etiquetaConsulta(consultas.estado, mesaServidor, game.handCount)}
         manoDisponible={manoDisponible}
         onManoActual={pedirManoActual}
         onTapetes={() => tapetes.abrir(anclaSatelite(utilMenu.triggerRect(), ALTO_TAPETES))}
-        onCuenta={() => setCuentaAncla(anclaSatelite(utilMenu.triggerRect(), ALTO_CUENTA))}
+        rapida={rapida}
+        onRapida={alternarRapida}
         vivas={isDesktopTable ? VIVAS_ESCRITORIO : VIVAS_MOVIL}
         // El CSS no puede elegir QUÉ componente monta React —la doctrina que
         // abre este archivo en su hook de orientación—, así que la ausencia de
-        // "Cuenta" en móvil horizontal se decide aquí, con la MISMA media query
-        // que usa el bloque landscape de las hojas. `undefined` = montan todas.
-        presentes={isLandscapeTable ? PRESENTES_MOVIL_HORIZONTAL : undefined}
+        // «Partida rápida» contra humanos se decide aquí (CFG-1 1e, INV-70).
+        // `null` = montan todas.
+        presentes={presentesDe(contraIAS)}
       />
-
-      {/* SUP-2b · panel de Cuenta. Vive AQUÍ por la misma razón que sus tres
-          hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se
-          pinta el panel de utilidades ya se desmontó con su ancla. Overlay puro,
-          Δ=0, y el juego sigue corriendo detrás. Monta en las dos pieles —su
-          colocación la pone D6 y su piel es una hoja global, molde de tapetes.css.
-          `cuenta` llega SIEMPRE, también con el bypass —ahí el nombre es
-          "DevLocal" y las dos acciones responden que no hay cuenta real—: una
-          entrada viva en el menú que no abriera nada sería el menu mintiéndole al
-          jugador. La guarda se conserva para que el componente no dependa de que
-          nadie se olvide de pasar la prop. */}
-      {cuenta && (
-        <CuentaPanel
-          ancla={cuentaAncla}
-          username={cuenta.username}
-          onCerrar={cerrarCuenta}
-          onCambiarNombre={() => { cerrarCuenta(); setEditandoNombre(true) }}
-          onCerrarSesion={() => { cerrarCuenta(); cuenta.cerrarSesion() }}
-          avisoMano
-        />
-      )}
-
-      {/* El Bautizo en modo edición (§1.5): la MISMA pantalla, el mismo campo y
-          la misma traducción de los tres códigos de SUP-2a, vestida de modal
-          sobre la mesa. A diferencia del panel que lo abre, esto SÍ es modal:
-          pide un dato y espera. */}
-      {cuenta && editandoNombre && (
-        <Bautizo
-          modo="edicion"
-          actual={cuenta.username}
-          // CFG-1 1b · el freno de 30 días y `nombre_libre`, como en el perfil.
-          bloqueadoHasta={cuenta.proximoCambio instanceof Date ? cuenta.proximoCambio : null}
-          onComprobar={cuenta.comprobarNombre}
-          onConfirmar={cuenta.cambiarNombre}
-          onCancelar={() => setEditandoNombre(false)}
-        />
-      )}
 
       {/* EMB-2 · panel de tapetes. Vive AQUÍ por la misma razón que sus
           hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se
@@ -2879,7 +2872,18 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           panel ya se desmontó con su ancla. Overlay puro, Δ=0. */}
       {/* MOV-1b-a · monta en las dos pieles. Su piel móvil son las diez reglas
           copiadas en menuMovil.css; su colocación, D6. */}
-      <ManoActualPopup popup={consultas.popup} saldo={consultas.saldo} />
+      <ManoActualPopup popup={consultas.popup} />
+
+      {/* CFG-1 1e · la confirmación del primer cobro de la sesión (§0-4). Va
+          por portal a `body`, como «Eliminar cuenta»: fuera de la escala de la
+          mesa y con `#root` inerte mientras pregunta. */}
+      {consultas.confirmacion && (
+        <ConfirmarConsulta
+          precio={consultas.confirmacion.precio}
+          onConsultar={consultas.confirmar}
+          onCancelar={consultas.cancelar}
+        />
+      )}
 
       {/* DSK-U2 · selector de reacciones y burbuja. Viven AQUÍ por la misma
           razón que el panel de utilidades: hermanos del área y vecinos de las
