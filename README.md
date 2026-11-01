@@ -78,4 +78,6 @@ Code comments and internal documentation are written in Spanish.
 ## Author
 
 **Victor La Cruz** · Joliet, IL
+
+
 Also the creator of [SumaMente](https://play.google.com/store/apps/details?id=com.heptacreation.sumamente), a mental math training app published on Google Play.
