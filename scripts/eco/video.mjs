@@ -19,7 +19,9 @@
 //   video.2  la ✕ → «Salir»: ni saldo ni contador cambian y no se llama al
 //            cobro; mientras la confirmación está abierta el reloj no corre;
 //            → «Seguir viendo»: completa y cobra
-//   video.3  el «+» → la hoja → el video, desde el lobby; el «Pronto» ya no sale
+//   video.3  el «+» → la tienda en Monedas → el video, desde el lobby; la
+//            tienda sigue en Monedas al acabar (TIE-1 1a: la hoja «Conseguir
+//            monedas» se retiró y su sitio es el estante)
 //   video.4  no hay video (la red caída al pedir): el mensaje T7, sin abrir la
 //            capa, y nada cambia
 //   video.5  el octavo: fila y botón de Retar apagados con «Vuelven en…»,
@@ -28,8 +30,9 @@
 //            movimiento y el mismo boleto; «Guardando tu premio…» sin ✕ durante
 //            la primera tanda; tras ella, la ✕ y «Salir» abandonan sin contar
 //   video.7  pedir con un boleto vivo: el viejo, anulado (S1)
-//   video.8  la hoja del «+» con el nombre de 15 «W» y el contador de Retar, en
-//            las siete vistas. El contador se mide con el nombre corriente: con
+//   video.8  el estante Monedas (filas de 44 dentro de la vista) con el nombre
+//            de 15 «W» y el contador de Retar, en las siete vistas. La forma de
+//            la tienda la mide `diagDSK tienda`. El contador se mide con el nombre corriente: con
 //            el de 15 «W» la barra de las pantallas de salas desborda por su
 //            cuenta (el arreglo de la 1d es sólo del lobby), y eso se INFORMA
 //            aparte, sin teñir esta vara
@@ -119,18 +122,24 @@ const muestras = (page) => page.evaluate(() => window.__muestras ?? [])
 const pildora = async (page) => (await page.textContent('.lob-pildora .bd-num'))?.trim()
 const texto = async (page, sel) => (await page.textContent(sel).catch(() => null))?.trim() ?? null
 
-// El «+» → la hoja, con el contador ya contestado por `mi_video`.
-async function abrirHoja(page) {
+// TIE-1 1a · el «+» → la tienda en el estante Monedas (desde la tienda misma,
+// la vuelve a montar en Monedas), con el contador ya contestado por `mi_video`.
+const PEDIR = '[data-accion="tie-monedas"] [data-accion="video-pedir"]'
+async function abrirMonedas(page) {
   await page.click('.lob-pildora [data-accion="tienda"]')
-  await page.waitForSelector('[data-accion="hoja-monedas"]')
-  await page.waitForFunction(() => /\d/.test(document.querySelector('[data-accion="hoja-monedas"] [data-accion="video-quedan"]')?.textContent ?? ''), null, { timeout: 10000 })
+  await page.waitForSelector('[data-tienda="monedas"] [data-accion="tie-monedas"]')
+  await page.waitForFunction(() => /\d/.test(document.querySelector('[data-accion="tie-monedas"] [data-accion="video-quedan"]')?.textContent ?? ''), null, { timeout: 10000 })
 }
-const leerHoja = (page) => page.evaluate(() => {
-  const h = document.querySelector('[data-accion="hoja-monedas"]')
+async function alLobby(page) {
+  await page.click('[data-accion="casa"]')
+  await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+}
+const leerMonedas = (page) => page.evaluate(() => {
+  const h = document.querySelector('[data-accion="tie-monedas"]')
   if (!h) return null
   const fila = h.querySelector('[data-accion="video-pedir"]')
   return {
-    titulo: h.querySelector('.vid-hoja-t')?.textContent?.trim(),
+    estante: document.querySelector('[data-tienda]')?.dataset.tienda ?? null,
     video: fila?.querySelector('b')?.textContent?.trim(),
     contador: fila?.querySelector('[data-accion="video-quedan"]')?.textContent?.trim(),
     premio: fila?.querySelector('.vid-fila-premio')?.textContent?.trim(),
@@ -236,8 +245,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     const { ctx, page } = await contexto(browser, base, b, errores)
     try {
       await abrir(page, base)
-      await abrirHoja(page)
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(page)
+      await page.click(PEDIR)
       await capaCorriendo(page)
       await page.waitForTimeout(4000)
       await page.click('[data-accion="video-cerrar"]')
@@ -254,15 +263,15 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
       await page.click('[data-accion="video-salir"]')
       await page.waitForSelector('[data-accion="video"]', { state: 'detached' })
       await page.waitForTimeout(600)
-      await abrirHoja(page)
+      await abrirMonedas(page)
       const trasSalir = {
-        pildora: await pildora(page), hoja: (await leerHoja(page)).contador, saldo: b.banco.saldo, libro: movs(b.banco).length,
+        pildora: await pildora(page), hoja: (await leerMonedas(page)).contador, saldo: b.banco.saldo, libro: movs(b.banco).length,
         cobros: llamadasDe(b, 'cobrar_boleto').length, cel: await page.locator('[data-accion="video-celebracion"]').count(),
         boletos: b.banco.boletos.length, vivos: vivos(b.banco).length,
       }
       const viejo = b.banco.boletos[0]?.id
       // Otra vez: el pedido anula el boleto que quedó vivo (S1, video.7).
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await page.click(PEDIR)
       await capaCorriendo(page)
       const trasPedir = {
         boletos: b.banco.boletos.length,
@@ -304,7 +313,7 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     } finally { await ctx.close() }
   }
 
-  // ── video.3 · el «+» → la hoja → el video, desde el lobby ─────────────────
+  // ── video.3 · el «+» → la tienda en Monedas → el video, desde el lobby ────
   const r3 = async () => {
     const b = { saldo: 2500 }
     const { ctx, page } = await contexto(browser, base, b, errores)
@@ -314,26 +323,26 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
         const m = document.querySelector('.lob-pildora [data-accion="tienda"]')
         return { aria: m?.getAttribute('aria-label'), popup: m?.getAttribute('aria-haspopup') }
       })
-      await abrirHoja(page)
-      const hoja = await leerHoja(page)
+      await abrirMonedas(page)
+      const hoja = await leerMonedas(page)
       await page.waitForTimeout(350)
-      await page.screenshot({ path: `${out}/video3-hoja.png` })
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await page.screenshot({ path: `${out}/video3-monedas.png` })
+      await page.click(PEDIR)
       await capaCorriendo(page)
-      const hojaCerrada = (await page.locator('[data-accion="hoja-monedas"]').count()) === 0
+      const sigueEnMonedas = (await page.locator('[data-tienda="monedas"] [data-accion="tie-monedas"]').count()) === 1
       const cel = await celebracion(page)
       await page.screenshot({ path: `${out}/video3-fin.png` })
       await page.waitForTimeout(300)
       const fila = leerMuestras(await muestras(page))
-      await abrirHoja(page)
-      const despues = await leerHoja(page)
+      await abrirMonedas(page)
+      const despues = await leerMonedas(page)
       puntos['video.3'] = {
-        mas, hoja, hojaCerrada, cel, fila, despues, saldo: b.banco.saldo, libro: movs(b.banco).length,
-        ok: mas.aria === 'Conseguir monedas' && mas.popup === 'dialog'
-          && hoja.titulo === 'Conseguir monedas' && hoja.video === 'Ver un video' && hoja.contador === 'Te quedan 8 de 8 hoy'
+        mas, hoja, sigueEnMonedas, cel, fila, despues, saldo: b.banco.saldo, libro: movs(b.banco).length,
+        ok: mas.aria === 'Conseguir monedas' && mas.popup === null
+          && hoja.estante === 'monedas' && hoja.video === 'Ver un video' && hoja.contador === 'Te quedan 8 de 8 hoy'
           && hoja.premio === `+${montoTexto(PREMIO)} HC` && !hoja.apagada
           && hoja.paquetes === 'Paquetes de monedas' && hoja.pastilla === 'Pronto'
-          && hojaCerrada && !fila.toast
+          && sigueEnMonedas && !fila.toast
           && cel.premio === `+${montoTexto(PREMIO)} HC` && cel.contador === 'Te quedan 7 de 8 hoy'
           && b.banco.saldo === 3000 && movs(b.banco).length === 1 && !fila.baja && fila.primera === 2500 && fila.ultima === 3000
           && despues.contador === 'Te quedan 7 de 8 hoy',
@@ -349,13 +358,13 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     const { ctx, page } = await contexto(browser, base, b, errores)
     try {
       await abrir(page, base)
-      await abrirHoja(page)
-      const antes = await leerHoja(page)
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(page)
+      const antes = await leerMonedas(page)
+      await page.click(PEDIR)
       await capaCorriendo(page)
       const cel = await celebracion(page)
-      await abrirHoja(page)
-      const hoja = await leerHoja(page)
+      await abrirMonedas(page)
+      const hoja = await leerMonedas(page)
       // Lo que falta hasta la medianoche de Chicago, con el reloj del BANCO.
       const ahora = Date.now()
       const esperado = [0, -60000, 60000].map((d) => {
@@ -363,14 +372,13 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
         return h > 0 ? `Vuelven en ${h} h ${m} min` : `Vuelven en ${m} min`
       })
       await page.waitForTimeout(350)
-      await page.screenshot({ path: `${out}/video5-hoja.png` })
+      await page.screenshot({ path: `${out}/video5-monedas.png` })
       // La fila apagada no pide nada.
       const pedidos = llamadasDe(b, 'pedir_boleto').length
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]', { force: true }).catch(() => {})
+      await page.click(PEDIR, { force: true }).catch(() => {})
       await page.waitForTimeout(400)
       const pedidosTras = llamadasDe(b, 'pedir_boleto').length
-      await page.keyboard.press('Escape')
-      await page.waitForSelector('[data-accion="hoja-monedas"]', { state: 'detached' })
+      await alLobby(page)
       // En Retar, con un reto que no alcanza (Pro, con 800): el botón apagado
       // con el mismo texto en la misma caja.
       await irARetar(page)
@@ -404,8 +412,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     const { ctx, page } = await contexto(browser, base, b, errores)
     try {
       await abrir(page, base)
-      await abrirHoja(page)
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(page)
+      await page.click(PEDIR)
       await capaCorriendo(page)
       await page.waitForSelector('[data-accion="video"][data-fase="cobrando"]', { timeout: 100000 })
       const cobro = await leerCobro(page)
@@ -431,8 +439,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     const { ctx, page } = await contexto(browser, base, b, errores)
     try {
       await abrir(page, base)
-      await abrirHoja(page)
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(page)
+      await page.click(PEDIR)
       await capaCorriendo(page)
       banco.forzarLimite('cobrar_boleto', 2)
       await page.waitForSelector('[data-accion="video"][data-fase="cobrando"]', { timeout: 100000 })
@@ -458,8 +466,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     const { ctx, page } = await contexto(browser, base, b, errores)
     try {
       await abrir(page, base)
-      await abrirHoja(page)
-      await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(page)
+      await page.click(PEDIR)
       await capaCorriendo(page)
       banco.forzarLimite('cobrar_boleto', 999)
       await page.waitForSelector('[data-accion="video"][data-fase="cobrando"]', { timeout: 100000 })
@@ -484,8 +492,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
       // Ya no se reintenta más: en 17 s (más que la espera de 15) no sale otra llamada.
       await page.waitForTimeout(17000)
       banco.forzarLimite('cobrar_boleto', 0)
-      await abrirHoja(page)
-      const hoja = await leerHoja(page)
+      await abrirMonedas(page)
+      const hoja = await leerMonedas(page)
       const ll = llamadasDe(b, 'cobrar_boleto')
       return {
         aMedias, tardoX, conX, dialogo, alSalir, llamadasFin: ll.length, hoja: hoja.contador,
@@ -521,8 +529,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     const b = { saldo: 2500, cortes: { pedir_boleto: { veces: 1, modo: 'antes' } } }
     const { ctx, page } = await contexto(browser, base, b, errores)
     await abrir(page, base)
-    await abrirHoja(page)
-    await page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+    await abrirMonedas(page)
+    await page.click(PEDIR)
     await page.waitForSelector('[data-accion="video-sin"]', { timeout: 10000 })
     const sin = await page.evaluate(() => {
       const s = document.querySelector('[data-accion="video-sin"]')
@@ -536,10 +544,9 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     await page.screenshot({ path: `${out}/video4-sin.png` })
     await page.click('[data-accion="video-volver"]')
     await page.waitForSelector('[data-accion="video-sin"]', { state: 'detached' })
-    await abrirHoja(page)
-    const hoja = await leerHoja(page)
+    await abrirMonedas(page)
+    const hoja = await leerMonedas(page)
     // Desde Retar pasa lo mismo, sobre Retar.
-    await page.keyboard.press('Escape')
     b.saldo = 300
     b.cortes.pedir_boleto = { veces: 1, modo: 'antes' }
     await abrir(page, base)
@@ -564,7 +571,7 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
     await ctx.close()
   } catch (e) { fallo('video.4')(e) }
 
-  // ── video.8 · la hoja con el nombre de 15 «W» y el contador de Retar, en las siete vistas ──
+  // ── video.8 · el estante Monedas con el nombre de 15 «W» y el contador de Retar, en las siete vistas ──
   try {
     const celdas = []
     for (const vista of VISTAS) {
@@ -574,34 +581,29 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
       const perfil = { id: PERFIL_CAP.id, username: NOMBRE_ANCHO }
       const { ctx, page } = await contexto(browser, base, b, errores, { vista, perfil })
       await abrir(page, base)
-      await abrirHoja(page)
+      const nombre = await texto(page, 'main.lobby .lob-nombre')
+      await abrirMonedas(page)
       await page.waitForTimeout(300)
       const hoja = await page.evaluate(() => {
         const caja = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height } }
         const pisa = (a, c) => !!(a && c) && a.l < c.r - 0.5 && a.r > c.l + 0.5 && a.t < c.b - 0.5 && a.b > c.t + 0.5
-        const h = caja(document.querySelector('[data-accion="hoja-monedas"]'))
-        const p = caja(document.querySelector('.lob-pildora'))
         const de = document.documentElement
-        const filas = [...document.querySelectorAll('[data-accion="hoja-monedas"] .vid-fila')].map(caja)
+        const p = caja(document.querySelector('.lob-pildora'))
+        const filas = [...document.querySelectorAll('[data-accion="tie-monedas"] .vid-fila')].map(caja)
         return {
           vw: de.clientWidth, vh: de.clientHeight,
-          nombre: document.querySelector('.lob-nombre')?.textContent?.trim(),
-          hoja: h, pildora: p,
-          bajoPildora: h && p ? +(h.t - p.b).toFixed(1) : null,
-          dentro: !!h && h.l >= 15.5 && h.r <= de.clientWidth - 15.5 && h.t >= 0 && h.b <= de.clientHeight + 0.5,
-          pisaPildora: pisa(h, p),
-          pisaFicha: pisa(h, caja(document.querySelector('[data-accion="constancia"]'))),
-          pisaEngranaje: pisa(h, caja(document.querySelector('[data-accion="ajustes"]'))),
+          estante: caja(document.querySelector('[data-accion="tie-monedas"]')), pildora: p,
+          pisaPildora: filas.some((f) => pisa(f, p)),
           filaMin: Math.min(...filas.map((f) => f.h)),
-          filasDentro: filas.every((f) => f.l >= h.l - 0.5 && f.r <= h.r + 0.5),
+          filasDentro: filas.length === 2 && filas.every((f) => f.l >= -0.5 && f.r <= de.clientWidth + 0.5 && f.t >= 0 && f.b <= de.clientHeight + 0.5),
           desbordaX: de.scrollWidth > de.clientWidth,
           corchetes: document.querySelector('.vid-raiz')?.innerText.includes('⟦') ?? true,
-          contador: document.querySelector('[data-accion="hoja-monedas"] [data-accion="video-quedan"]')?.textContent?.trim(),
+          contador: document.querySelector('[data-accion="tie-monedas"] [data-accion="video-quedan"]')?.textContent?.trim(),
         }
       })
-      await page.screenshot({ path: `${out}/video8-hoja-${vista.id}.png` })
-      await page.keyboard.press('Escape')
-      await page.waitForSelector('[data-accion="hoja-monedas"]', { state: 'detached' })
+      hoja.nombre = nombre
+      await page.screenshot({ path: `${out}/video8-monedas-${vista.id}.png` })
+      await alLobby(page)
 
       // El contador de Retar: con videos y, en la MISMA caja, con el tope (O1).
       const medirRetar = () => page.evaluate(() => {
@@ -646,8 +648,7 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
       const tope = await medirRetar()
       const c = {
         vp: vista.id, hoja, retar: { con, tope }, barraAncha,
-        okHoja: hoja.nombre === NOMBRE_ANCHO && hoja.dentro && Math.abs(hoja.bajoPildora - 9) <= 1
-          && !hoja.pisaPildora && !hoja.pisaFicha && !hoja.pisaEngranaje
+        okHoja: hoja.nombre === NOMBRE_ANCHO && !hoja.pisaPildora
           && hoja.filaMin >= 44 && hoja.filasDentro && !hoja.desbordaX && !hoja.corchetes && hoja.contador === 'Te quedan 8 de 8 hoy',
         okRetar: con.texto === 'Te quedan 8 de 8 hoy' && con.rotulo === `Ver un video · +${montoTexto(PREMIO)} HC` && !con.apagado
           && con.boton.h >= 40 && con.contador.h > 0 && con.dentroX && !con.desbordaX && !con.corchetes
@@ -692,8 +693,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
       })
       // corto · 3 s a la vista, y el banco del bypass acorta su mínimo.
       const corto = await nueva('saldo:2500,video:3000')
-      await abrirHoja(corto.page)
-      await corto.page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(corto.page)
+      await corto.page.click(PEDIR)
       await capaCorriendo(corto.page)
       const t0 = Date.now()
       const celCorto = await celebracion(corto.page, 15000)
@@ -702,8 +703,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
       await corto.ctx.close()
       // sin · el reproductor contesta «no hay video».
       const sin = await nueva('saldo:2500,video:sin')
-      await abrirHoja(sin.page)
-      await sin.page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(sin.page)
+      await sin.page.click(PEDIR)
       await sin.page.waitForSelector('[data-accion="video-sin"]', { timeout: 10000 })
       const capaSin = await sin.page.locator('[data-accion="video"]').count()
       await sin.page.click('[data-accion="video-volver"]')
@@ -711,8 +712,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
       await sin.ctx.close()
       // cierra · se cierra solo antes de tiempo.
       const cierra = await nueva('saldo:2500,video:cierra')
-      await abrirHoja(cierra.page)
-      await cierra.page.click('[data-accion="hoja-monedas"] [data-accion="video-pedir"]')
+      await abrirMonedas(cierra.page)
+      await cierra.page.click(PEDIR)
       await cierra.page.waitForSelector('[data-accion="video"]', { timeout: 10000 })
       await cierra.page.waitForSelector('[data-accion="video"]', { state: 'detached', timeout: 8000 })
       await cierra.page.waitForTimeout(600)

@@ -23,9 +23,14 @@
 //                tapada mientras cuenta (el aviso de la constancia): los puntos
 //                no se mueven; `ajilei.saldoOculto` sobrevive a recargar; en
 //                Rankings no hay ojito y la cifra se ve
-//   cfg.hoja     360×640 con «Acerca de» abierto: la hoja termina ≤ 584 y no se
-//                desplaza; filas ≥ 44; cabecera fija (cuerpo desplazable)
-//                salvo en el apaisado bajo, donde se desplaza la hoja entera
+//   cfg.hoja     los tres principios (TIE-1 1a, O-1): la hoja cabe en su techo
+//                (100dvh − 20 u), plegada y con «Acerca de» abierto; filas
+//                ≥ 44; y lo desplegado entra en la vista aunque el cuerpo
+//                desplace. Cabecera fija (cuerpo desplazable) salvo en el
+//                apaisado bajo, donde se desplaza la hoja entera. Hasta TIE-1
+//                1a exigía además terminar ≤ 584 sin desplazar en 360×640 (el
+//                fondo de la lámina de CFG-1); la fila «Tapetes» (V6) lo pasa
+//                y el rector dio la razón a la fila
 //   cfg.ancla    borde derecho hoja − ⚙ = 0 y el mismo hueco ⚙→hoja que el
 //                lobby, en el lobby, Retar y Rankings (1366×768 y 915×412)
 //   cfg.toast    «Copiado» sale y queda por encima del velo
@@ -37,6 +42,16 @@
 //                el enlace de SumaMente en Rankings llevan
 //                `data-sin-pantalla-completa` (el del intersticial, en el código)
 //   cfg.sinojito sin la prop, la barra no pinta el ojito (Retar, Salas, Rankings)
+//   TIE-1 1a:
+//     cfg.tapetes  la fila «Tapetes» de la hoja, entre Sonido e Idioma: el disco
+//                de 20 px dentro de la fila; «Verde clásico» sin inventario y
+//                «Negro grafito · claro» (con el disco en grafito claro) con el
+//                inventario del banco sembrado; tocarla cierra la hoja y abre
+//                la tienda en Tapetes. Sus 44 los mide `cfg.hoja` (todas las
+//                filas), con la hoja dentro de su techo
+//     cfg.ojito  INV-69 redactado de nuevo: el ojito tapa la cifra también en
+//                la tienda (la píldora tapada y con su ojito). Que la ventana
+//                de compra enseñe el saldo siempre lo mide `diagDSK tienda`
 //   cfg.eliminar.ventana · cfg.eliminar.mesa · cfg.eliminar.ok ·
 //   cfg.salir.reinicia   CFG-1 1c: la ventana «Eliminar cuenta», sus dos
 //                respuestas y O-2 (ver la sección «CFG-1 1c» de abajo)
@@ -76,7 +91,6 @@ const CELDAS = [
   { w: 1920, h: 1080, movil: false },
 ]
 const ANCLA_CELDAS = ['1366x768', '915x412']
-const TECHO_HOJA_360 = 584
 const ZONA_GEO = 43.5
 const ZONA_EFECTIVA = 43
 
@@ -207,6 +221,37 @@ const MEDIR_HOJA = () => {
     // Qué se desplaza cuando no cabe: el cuerpo (cabecera fija) o la hoja entera.
     desplazable: getComputedStyle(cuerpo).overflowY === 'auto' && cs.overflowY === 'hidden' ? 'cuerpo' : (cs.overflowY === 'auto' ? 'hoja' : cs.overflowY),
     filas: [...hoja.querySelectorAll('.lob-fila')].map((f) => [f.dataset.accion, r2(f.getBoundingClientRect().height)]),
+    // TIE-1 1a (O-1) · los tres principios de `cfg.hoja`: el techo que la hoja
+    // se da (`max-height`, 100dvh − 20 u), y lo desplegado frente a la zona
+    // visible de lo que se desplaza (el cuerpo, o la hoja en el apaisado bajo).
+    techo: r2(parseFloat(cs.maxHeight)),
+    cabe: rh.height <= parseFloat(cs.maxHeight) + 0.5 && rh.top >= -0.5 && rh.bottom <= innerHeight + 0.5,
+    desplegado: (() => {
+      const d = hoja.querySelector('.lob-acerca:not([hidden]), .cfg-sug:not([hidden])')
+      if (!d) return null
+      const sc = getComputedStyle(cuerpo).overflowY === 'auto' && cs.overflowY !== 'auto' ? cuerpo : hoja
+      const v = sc.getBoundingClientRect(), r = d.getBoundingClientRect()
+      // Entero a la vista; o, si es más alto que lo visible, empezando en ella.
+      const entra = r.top >= v.top - 0.5 && (r.bottom <= v.bottom + 0.5 || r.height >= v.height - 0.5)
+      return { top: r2(r.top), fondo: r2(r.bottom), visible: [r2(v.top), r2(v.bottom)], entra }
+    })(),
+  }
+}
+
+// TIE-1 1a · la fila «Tapetes» de la hoja: lo que dice, su disco y su «›».
+const FILA_TAPETES = () => {
+  const r2 = (x) => Math.round(x * 100) / 100
+  const f = document.querySelector('.lob-hoja.is-on [data-accion="cfg-tapetes"]')
+  if (!f) return null
+  const d = f.querySelector('.vit-disco')
+  const rf = f.getBoundingClientRect(), rd = d?.getBoundingClientRect()
+  return {
+    alto: r2(rf.height),
+    valor: f.querySelector('[data-accion="cfg-tapetes-valor"]')?.textContent ?? null,
+    disco: rd ? [r2(rd.width), r2(rd.height)] : [],
+    discoDentro: !!rd && rd.left >= rf.left && rd.right <= rf.right && rd.top >= rf.top && rd.bottom <= rf.bottom,
+    attr: d?.dataset.tapete ?? null, tono: d?.dataset.tapeteTono ?? null,
+    chev: !!f.querySelector('.lob-chev'),
   }
 }
 
@@ -845,7 +890,7 @@ export async function runCfg(browser, { base, baseDev = null }) {
   const errores = []
   const celdas = []
   const puertas = {
-    zona: [], solape: [], ojito: [], hoja: [], ancla: [], toast: [], sonido: [], version: [], inv45: [], sinojito: [],
+    zona: [], solape: [], ojito: [], hoja: [], ancla: [], toast: [], sonido: [], version: [], inv45: [], sinojito: [], tapetes: [],
     'eliminar.ventana': [], 'eliminar.mesa': [], 'eliminar.ok': [], 'salir.reinicia': [],
     perfil: [], freno: [],
     menu: [], consulta: [], rapida: [],
@@ -879,6 +924,12 @@ export async function runCfg(browser, { base, baseDev = null }) {
       // ── 2 · La hoja en el lobby ─────────────────────────────────────────
       await abrirHoja(page)
       const hojaLobby = await page.evaluate(MEDIR_HOJA)
+      const filaTap = await page.evaluate(FILA_TAPETES)
+      const orden = hojaLobby.filas.map(([a]) => a)
+      anota('tapetes', filaTap && orden.indexOf('cfg-tapetes') === orden.indexOf('cfg-sonido') + 1 && orden.indexOf('cfg-idioma') === orden.indexOf('cfg-tapetes') + 1
+        && filaTap.valor === 'Verde clásico' && filaTap.disco.join() === '20,20' && filaTap.discoDentro && filaTap.chev
+        && filaTap.attr === null && filaTap.tono === null,
+        { celda: id, que: 'entre Sonido e Idioma, «Verde clásico», disco de 20', orden, ...filaTap })
       await page.click('[data-accion="acerca"]'); await page.waitForTimeout(300)
       const hojaAcerca = await page.evaluate(MEDIR_HOJA)
       const version = await page.evaluate(() => document.querySelector('.lob-acerca .cfg-version')?.textContent ?? '')
@@ -914,8 +965,12 @@ export async function runCfg(browser, { base, baseDev = null }) {
       const bajo = celda.h <= 520
       const esperado = bajo ? 'hoja' : 'cuerpo'
       anota('hoja', filas44 && hojaLobby.desplazable === esperado
-        && (id !== '360x640' || (hojaAcerca.fondo <= TECHO_HOJA_360 && !hojaAcerca.hojaDesplaza && !hojaAcerca.cuerpoDesplaza)),
-        { celda: id, plegada: hojaLobby.alto, acerca: hojaAcerca.alto, fondoAcerca: hojaAcerca.fondo, desplazable: hojaLobby.desplazable, esperado, filas: hojaLobby.filas, botones })
+        // TIE-1 1a (O-1, rector): sin el 584 literal de la lámina de CFG-1. La
+        // hoja cabe en su techo, plegada y con «Acerca de» abierto, y lo
+        // desplegado entra en la vista aunque el cuerpo desplace.
+        && hojaLobby.cabe && hojaAcerca.cabe && hojaAcerca.desplegado?.entra === true,
+        { celda: id, plegada: hojaLobby.alto, acerca: hojaAcerca.alto, techo: hojaAcerca.techo, fondoAcerca: hojaAcerca.fondo, desplegado: hojaAcerca.desplegado,
+          cuerpoDesplaza: hojaAcerca.cuerpoDesplaza, hojaDesplaza: hojaAcerca.hojaDesplaza, desplazable: hojaLobby.desplazable, esperado, filas: hojaLobby.filas, botones })
       anota('version', versionPrimera && new RegExp(`^AJILEI ${VERSION.replace(/\./g, '\\.')} · ([0-9a-f]{7}|local)$`).test(version), { celda: id, version, primera: versionPrimera })
       anota('inv45', inv45.length >= 3 && inv45.every(([, si]) => si), { celda: id, lobby: inv45 })
       anota('toast', toast.on && toast.texto === 'Copiado' && toast.encima && toast.velo, { celda: id, ...toast, copiado })
@@ -944,6 +999,16 @@ export async function runCfg(browser, { base, baseDev = null }) {
 
       // ── 5 · Rankings, con el ojito cerrado en el aparato ────────────────
       await page.click('[data-accion="ojito"]'); await page.waitForTimeout(150)
+      // TIE-1 1a · INV-69: la tienda lo obedece (la píldora tapada, con ojito).
+      await page.click('.lob-nav-tienda')
+      await page.waitForSelector('[data-tienda="tapetes"]', { timeout: 15000 })
+      await esperarQuieta(page)
+      const tieCifra = await page.evaluate(CIFRA)
+      const tieOjito = await page.evaluate(() => !!document.querySelector('.lob-pildora [data-accion="ojito"]'))
+      anota('ojito', tieCifra?.tapada === true && tieCifra.puntos && tieCifra.digitosOcultos && tieOjito,
+        { celda: id, que: 'Tienda: la cifra tapada con el ojito cerrado (INV-69)', cifra: tieCifra, ojito: tieOjito })
+      await page.click('[data-accion="casa"]')
+      await page.waitForSelector('main.lobby'); await esperarQuieta(page)
       await page.click('[data-accion="rankings"]')
       await page.waitForSelector('main.sal[data-ranking][data-rnk-estado="listo"]', { timeout: 15000 })
       await esperarQuieta(page)
@@ -1041,6 +1106,35 @@ export async function runCfg(browser, { base, baseDev = null }) {
       anota('ojito', contando && quietos && siempreTapada, { celda: '412x915', que: 'tapada mientras cuenta (aviso de la constancia, 5.000 → 5.500)', textos: textos.slice(0, 4).concat(textos.length > 4 ? ['…', textos.at(-1)] : []), cajas: [...new Set(conCifra.map((m) => `${m.x}/${m.w}`))], siempreTapada })
     } catch (e) {
       anota('ojito', false, { celda: '412x915', que: 'cuenta', error: String(e?.message ?? e).split('\n')[0] })
+    } finally { await ctx?.close().catch(() => {}) }
+  }
+
+  // ── 6b · TIE-1 1a · la fila «Tapetes» con inventario, y su puerta ────────
+  for (const celda of [CELDAS[0], CELDAS[3]]) {
+    const id = `${celda.w}x${celda.h}`
+    let ctx = null
+    try {
+      const banco = crearBanco({ usuario: PERFIL_CAP.username, saldo: 5000 })
+      banco.sembrarInventario([{ articulo: 'grafito', tono: 'claro', en_uso: true }, { articulo: 'azul', tono: 'actual' }])
+      ;({ ctx } = await abrirLobby(browser, base, celda, errores, { billetera: { banco } }))
+      const page = ctx.pages()[0]
+      await abrirHoja(page)
+      // El canal contesta al entrar la cuenta: la fila pasa de la copia al servidor.
+      await page.waitForFunction(() => document.querySelector('[data-accion="cfg-tapetes-valor"]')?.textContent === 'Negro grafito · claro', null, { timeout: 8000 }).catch(() => {})
+      const fila = await page.evaluate(FILA_TAPETES)
+      await page.click('[data-accion="cfg-tapetes"]')
+      await page.waitForSelector('[data-tienda="tapetes"]', { timeout: 15000 })
+      await esperarQuieta(page)
+      const llega = await page.evaluate(() => ({
+        tienda: document.querySelector('[data-tienda]')?.dataset.tienda ?? null,
+        hoja: !!document.querySelector('.lob-hoja.is-on'),
+        enUso: document.querySelector('[data-tap="grafito"] [data-accion="tie-enuso"]') !== null,
+      }))
+      anota('tapetes', fila?.valor === 'Negro grafito · claro' && fila.attr === 'grafito' && fila.tono === 'claro'
+        && llega.tienda === 'tapetes' && !llega.hoja && llega.enUso,
+        { celda: id, que: 'con inventario: «Negro grafito · claro» → la tienda en Tapetes', fila, llega })
+    } catch (e) {
+      anota('tapetes', false, { celda: id, que: 'con inventario', error: String(e?.message ?? e).split('\n')[0] })
     } finally { await ctx?.close().catch(() => {}) }
   }
 

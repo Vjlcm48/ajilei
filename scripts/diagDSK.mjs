@@ -50,6 +50,12 @@
 //            cfg.eliminar.ventana, cfg.eliminar.mesa, cfg.eliminar.ok,
 //            cfg.salir.reinicia) y la consola.
 //            Contra el bundle real y el banco imitado. Ver `scripts/cfg/cfg.mjs`.
+//   tienda → TIE-1 1a: la tienda (estantes, lista, vitrina, ventana de compra)
+//            en seis tamaños, la puerta vitrina ↔ mesa (9 valores × 11 casos),
+//            los cuatro estados de la ventana, «No te alcanza», el ojito y lo
+//            comprado (tie.zona, tie.solape, tie.estantes, tie.puerta,
+//            tie.ventana, tie.falta, tie.ojito, tie.inventario) y la consola.
+//            Contra el bundle real y el banco imitado. Ver `scripts/tie/tienda.mjs`.
 //   apu    → APU-1 1e-ii/1f: la mesa con dinero de verdad, en SIETE viewports
 //            (los tres de móvil de la familia de `lob`/`retar`/`diagSAL` y los
 //            cuatro de escritorio). Siete puntos en todos: la marca ALL-IN del
@@ -344,6 +350,7 @@ import { runTab, VARAS_TAB } from './tab/tab.mjs'
 import { runRnk } from './rnk/rnk.mjs'
 import { runSuma } from './suma/suma.mjs'
 import { runCfg } from './cfg/cfg.mjs'
+import { runTienda } from './tie/tienda.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -365,7 +372,9 @@ import { ENTRADA, VIVAS_MOVIL } from '../src/config/menuEntradas.js'
 // siembra el storage con la clave real y recorre los ids de contrato, así que
 // añadir un sexto tapete no exige tocar el arnés.
 import {
-  TAPETES, TAPETE_POR_DEFECTO, TAPETE_KEY, TAPETES_COMPRADOS_KEY, montoTexto,
+  // TIE-1 1a · lo «comprado» ya no vive en el aparato: entran la clave del tono
+  // y los tonos, y sale la de los comprados.
+  TAPETES, TAPETE_POR_DEFECTO, TAPETE_KEY, TAPETE_TONO_KEY, TONOS, TONO_POR_DEFECTO, conTonos, montoTexto,
 } from '../src/config/tapetes.js'
 // MOV-1b-c · las frases, los tiempos y las rutas de emoji del modo `menu-movil`
 // salen de la MISMA fuente que la app, igual que en `u2`. `runU2` las importa
@@ -440,7 +449,8 @@ const VC_RETRASO_ROCE_MS = (() => {
 // RNK-1c-ii · y `rnk`: la pantalla Rankings y el mini-perfil, contra el banco imitado.
 // RNK-1 1e · y `suma`: el intersticial de SumaMente y la línea de la familia.
 // CFG-1 1a · y `cfg`: la hoja del ⚙, el ojito y los tocables de 44 fuera de la mesa.
-const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk', 'suma', 'cfg']
+// TIE-1 1a · y `tienda`: la tienda, la vitrina y la ventana de compra.
+const MODOS_PREVIEW = ['lob', 'msg', 'saldo', 'mesaia', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk', 'suma', 'cfg', 'tienda']
 const BASE_PROD = MODOS_PREVIEW.includes(process.argv[2])
   ? (EXTERNO ? (process.env.AJILEI_BASE || 'http://localhost:4173') : `http://localhost:${OPC.puerto || 4173}`)
   : (EXTERNO ? (process.env.AJILEI_BASE_PROD || 'http://localhost:4173') : `http://localhost:${OPC.puertoAux || 4173}`)
@@ -7016,7 +7026,14 @@ const U1_ITEM_MIN = 44
 //   · `idsOk`              la lista de IDs pierde CUENTA y SALDO y gana RAPIDA
 //   · `vivasOk` del móvil  Cuenta → Partida rápida
 // Contabilidad: viejo 6 entradas · nuevo 5 entradas · movedor CFG-1 1e.
-const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Tapetes', 'Partida rápida', 'Mano actual']
+// ── TIE-1 1a · recableado del metro (regla ARN-1) ────────────────────────
+// Sale "Tapetes": se compra y se elige en la tienda (menú v1.7).
+//   · U1_ENTRADAS          5 → 4 leyendas
+//   · MOVMENU_PANEL.h      244 → 200 (las dos orientaciones)
+//   · `idsOk`              la lista de IDs pierde TAPETES (sale de menuEntradas)
+//   · la celda «Tapetes» de menu-movil sella ahora su AUSENCIA (sinTapetes)
+// Contabilidad: viejo 5 entradas · nuevo 4 entradas · movedor TIE-1 1a.
+const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Partida rápida', 'Mano actual']
 const U1_ENTRADAS_H = U1_ENTRADAS
 const entradasSelladas = (vp) => (vp.w > vp.h && vp.h <= 600 ? U1_ENTRADAS_H : U1_ENTRADAS)
 
@@ -7585,7 +7602,8 @@ const MOVMENU_TAP = 44
 // antes del bloque de saldo del humano. Dos cifras, no una relajación: cada
 // orientación se sella contra la suya.
 // CFG-1 1e · cinco filas en las dos orientaciones: 244 y 244.
-const MOVMENU_PANEL = { w: 64, h: 244, hHorizontal: 244 }
+// TIE-1 1a · cuatro (sale Tapetes): 200 y 200.
+const MOVMENU_PANEL = { w: 64, h: 200, hHorizontal: 200 }
 const altoSellado = (vp) => (vp.w > vp.h && vp.h <= 600 ? MOVMENU_PANEL.hHorizontal : MOVMENU_PANEL.h)
 const MOVMENU_MARGIN = 8
 const MOVMENU_ITEM = { w: 62, h: 44 }
@@ -7621,13 +7639,8 @@ const MOVMENU_INFO = ['.opp-panel', '.ai-zone', '.center-zone', '.table-header',
 // MÁS `disabled` de verdad, no un `pointer-events: none` que pintaría igual y le
 // mentiría al lector de pantalla.
 const MOVMENU_OUT = process.env.MOV1A_OUT || OUT_DIR
-// El tapete que se presiona para probar que elegir un fieltro PINTA. Se toma el
-// primero que no sea el de por defecto, del catálogo vivo: no se cablea un id.
-const MOVMENU_TAPETE = TAPETES.map(t => t.id).find(id => id !== TAPETE_POR_DEFECTO)
-// Estándar táctil de las fichas del panel de tapetes. En vertical es MEDIDA que
-// se reporta (decisión de Victor: si no llega, se dice, no se corrige); en la
-// disposición en fila del horizontal es PUERTA, porque esa fila la estrena esta
-// tanda y estrenar algo por debajo del estándar sería crear la deuda a mano.
+// Estándar táctil de las filas del selector de reacciones. (Nació para las
+// fichas del panel de tapetes del ⋮, que se retiró en TIE-1 1a.)
 const MOVMENU_FICHA_MIN = 44
 // MOV-1b-c · geometría SELLADA de la lista de reacciones (lámina aprobada por
 // Victor). Las dos cajas se declaran porque son cosas distintas y confundirlas
@@ -7855,7 +7868,7 @@ async function runMenuMovil(browser) {
       // lista de IDs se filtra por la misma piel que la de leyendas, para que las
       // dos no puedan discrepar.
       const IDS_SELLADOS = [
-        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.RAPIDA, ENTRADA.MANO,
+        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.MANO,
       ]
       c.idsOk = JSON.stringify(abierto.entradas.map(e => e.id)) === JSON.stringify(IDS_SELLADOS)
       c.badgeOk = abierto.badge === 0
@@ -7970,62 +7983,18 @@ async function runMenuMovil(browser) {
         saldoRepetida === saldoTras && c.avisoAutocierra &&
         (persistencia === null || persistencia === saldoTras)
 
-      // ── MOV-1b-a · Tapetes ────────────────────────────────────────────────
-      const tapeteAntes = await page.evaluate(() => document.body.dataset.tapete ?? null)
+      // ── TIE-1 1a · Tapetes ya no está en el ⋮ ──────────────────────────────
+      // Se compra y se elige en la tienda, y la mesa lo pinta (INV-77; lo mide
+      // `diagDSK tapetes`). Lo que esta celda sella es la ausencia: ni la fila
+      // ni su panel. Que el ⋮ tenga sus cuatro entradas lo dice `entradas`,
+      // que lee `config/menuEntradas`.
       await u1OpenMenu(page)
-      await page.click('.util-item-tapetes')
-      await page.waitForSelector('.tapetes-panel', { timeout: 4000 }).catch(() => {})
-      c.tapetes = await page.evaluate(({ G, TOL }) => {
-        const p2 = document.querySelector('.tapetes-panel')
-        if (!p2) return { existe: false }
-        const r = p2.getBoundingClientRect()
-        const t = document.querySelector('.utilities-trigger').getBoundingClientRect()
-        const horizontal = matchMedia('(orientation: landscape) and (max-height: 600px)').matches
-        const esperadoRight = horizontal ? t.left - 6 : t.right
-        return {
-          existe: true, horizontal,
-          caja: window.__u1R('.tapetes-panel'),
-          cols: getComputedStyle(p2).getPropertyValue('--tap-cols').trim(),
-          filas: [...p2.querySelectorAll('.tap-swatch')].length,
-          dRight: Math.round(Math.abs(r.right - esperadoRight) * 100) / 100,
-          dentro: r.left >= -TOL && r.top >= -TOL &&
-                  r.right <= innerWidth + TOL && r.bottom <= innerHeight + TOL,
-          solape: window.__movSolape('.tapetes-panel', G),
-          sobreDisparador: window.__movSolape('.tapetes-panel', ['.utilities-trigger']),
-          panelCerrado: !document.querySelector('.utilities-panel'),
-          // Hit REAL de cada ficha, por `elementFromPoint`.
-          fichas: [...p2.querySelectorAll('.tap-swatch')].map(e => {
-            const hb = window.__hitBox(e)
-            return { id: e.dataset.tap, w: hb.w, h: hb.h, visual: [hb.visualW, hb.visualH] }
-          }),
-        }
-      }, { G: MOVMENU_GUARD, TOL: U1_TOL })
-      if (retrato) {
-        await page.mouse.move(5, 5)
-        await page.screenshot({ path: MOVMENU_OUT + '/mov1b-tapetes-mesa' + n + '-' + tag + '.png' })
-      }
-      // Elegir un fieltro NO comprado: la mesa es el probador, así que el tapete
-      // se aplica en el acto (y el diálogo de compra se pinta encima).
-      await page.click('.tap-swatch[data-tap="' + MOVMENU_TAPETE + '"]').catch(() => {})
-      await page.waitForTimeout(220)
-      const tapeteTras = await page.evaluate(() => document.body.dataset.tapete ?? null)
-      // Tap FUERA: cierra y REVIERTE la previa (no se compró nada).
-      await page.touchscreen.tap(Math.round(vp.w / 2), Math.round(vp.h - 12))
-      await page.waitForTimeout(220)
-      const tapeteCerrado = await page.evaluate(() => ({
-        attr: document.body.dataset.tapete ?? null,
-        abierto: !!document.querySelector('.tapetes-panel'),
+      c.sinTapetes = await page.evaluate(() => ({
+        fila: !!document.querySelector('.util-item-tapetes'),
+        panel: !!document.querySelector('.tapetes-panel'),
       }))
-      c.tapete = { antes: tapeteAntes, tras: tapeteTras, cerrado: tapeteCerrado, probado: MOVMENU_TAPETE }
-      c.tapetesOk = c.tapetes.existe && c.tapetes.panelCerrado &&
-        c.tapetes.dRight <= U1_TOL && c.tapetes.dentro &&
-        c.tapetes.solape.length === 0 && c.tapetes.sobreDisparador.length === 0 &&
-        c.tapetes.filas === TAPETES.length &&
-        tapeteTras === MOVMENU_TAPETE && tapeteCerrado.attr === tapeteAntes &&
-        tapeteCerrado.abierto === false
-      // El hit de las fichas: PUERTA sólo en la fila que estrena el horizontal.
-      c.fichasMin = Math.min(...c.tapetes.fichas.map(f => Math.min(f.w, f.h)))
-      c.fichasOk = c.tapetes.horizontal ? c.fichasMin >= MOVMENU_FICHA_MIN : true
+      await page.keyboard.press('Escape'); await page.waitForTimeout(100)
+      c.tapetesOk = !c.sinTapetes.fila && !c.sinTapetes.panel
 
       // ── MOV-1b-c · Selector de reacciones ─────────────────────────────────
       await u1OpenMenu(page)
@@ -8298,7 +8267,7 @@ async function runMenuMovil(browser) {
         apilamiento: c.zOk, fueraDeFlujo: c.flujoOk,
         cierreTapFuera: c.cierraTapFuera, cierreEsc: c.cierraEsc, sonido: c.sonidoOk,
         avisoMano: c.avisoOk, contadorConsultas: c.consultasOk,
-        tapetes: c.tapetesOk, hitFichas: c.fichasOk,
+        sinTapetes: c.tapetesOk,
         selectorReacciones: c.selectorOk, burbuja: c.burbujaOk, relojesYassets: c.relojesOk,
       }
       c.puertas = puertas
@@ -8438,7 +8407,8 @@ async function runMenuMovil(browser) {
         // entradas vivas siguen vivas. Es la mitad que más fácil se rompería sin
         // que nadie lo note, porque el puerto no la mira nunca.
         badgeOk: m.badge === 1,
-        vivasOk: JSON.stringify(m.vivas) === JSON.stringify(['Sonido', 'Reacciones', 'Tapetes', 'Partida rápida', 'Mano actual']),
+        // TIE-1 1a · la lista ya no se escribe a mano: es la de U1_ENTRADAS (sin Tapetes).
+        vivasOk: JSON.stringify(m.vivas) === JSON.stringify(U1_ENTRADAS),
       }
       escritorio.passed = gate === true && escritorio.triggerOk && escritorio.panelOk &&
         escritorio.itemsOk && escritorio.titlesOk && escritorio.badgeOk && escritorio.vivasOk &&
@@ -11349,11 +11319,11 @@ async function msgBarre(page, b, momento) {
   }
 }
 const MSG_BARRIDO_VISTAS = [
-  { id: 'ruta-360x640',    vp: { w: 360,  h: 640 },  n: 5, movil: true,  tapetes: true },
+  { id: 'ruta-360x640',    vp: { w: 360,  h: 640 },  n: 5, movil: true,  tienda: true },
   { id: 'ruta-740x360',    vp: { w: 740,  h: 360 },  n: 5, movil: true },
   { id: 'hueco5-800x1200', vp: { w: 800,  h: 1200 }, n: 5, movil: false },
   { id: 'hueco2-800x1200', vp: { w: 800,  h: 1200 }, n: 2, movil: false },
-  { id: 'tapetes-1920x937', vp: { w: 1920, h: 937 }, n: 5, movil: false, tapetes: true },
+  { id: 'tienda-1920x937', vp: { w: 1920, h: 937 }, n: 5, movil: false, tienda: true },
 ]
 
 async function runMSG(browser) {
@@ -11490,8 +11460,10 @@ async function runMSG(browser) {
 
   // ── P5 · ARN-3c · D4 · Barrido «Heptacoins» en lo que P2 no pisa ─────────
   // La ruta (lobby y las cuatro filas), la mesa en la zona hueco 800×1200 con
-  // una mano jugada, y el diálogo de compra de tapetes («¿Comprar Tricolor por
-  // 50.000 Heptacoins?»), que es donde hoy vive la palabra en ese panel.
+  // una mano jugada, y la compra de un tapete. TIE-1 1a · el diálogo del panel
+  // del ⋮ («¿Comprar Tricolor por 50.000 Heptacoins?») se retiró con el panel:
+  // la compra vive en la tienda (lobby → Tienda → Negro grafito → su ventana,
+  // o la vitrina con «No te alcanza» si el saldo no llega), y se barre ahí.
   for (const [i, v] of MSG_BARRIDO_VISTAS.entries()) {
     if (tblFilter && v.n !== tblFilter) continue
     const page = await msgAbre(browser, v.vp, v.movil, 10 + i)
@@ -11499,16 +11471,23 @@ async function runMSG(browser) {
     try {
       await msgAMesa(page, v.n, (pg, paso) => msgBarre(pg, barrido, `ruta:${paso}`))
       await msgBarre(page, barrido, 'mesa')
-      if (v.tapetes) {
-        await page.click('.utilities-trigger')
-        await page.waitForSelector('.util-item-tapetes', { timeout: 4000 })
-        await page.click('.util-item-tapetes')
-        await page.waitForSelector('.tap-swatch[data-tap="tricolor"]', { timeout: 4000 })
-        await page.click('.tap-swatch[data-tap="tricolor"]')
-        await page.waitForSelector('.tap-dialogo', { timeout: 4000 })
-        await page.waitForTimeout(250)
-        await msgBarre(page, barrido, 'tapetes:dialogo')
-        await page.click('.tap-btn-no').catch(() => {})
+      if (v.tienda) {
+        await page.goto(BASE_PROD, { waitUntil: 'networkidle' })
+        await page.click('.lob-nav-tienda')
+        await page.waitForSelector('[data-tienda="tapetes"][data-tie-cargado]', { timeout: 8000 })
+        await msgBarre(page, barrido, 'tienda:tapetes')
+        await page.click('[data-tap="grafito"] [data-accion="tie-art"]')
+        await page.waitForSelector('[data-tienda="vitrina"]', { timeout: 4000 })
+        const cta = page.locator('.sal-accion [data-accion="cta"]:not([disabled])')
+        if (await cta.count()) {
+          await cta.click()
+          await page.waitForSelector('[data-accion="tie-ventana"][data-estado="confirmar"]', { timeout: 4000 })
+          await page.waitForTimeout(250)
+          await msgBarre(page, barrido, 'tienda:ventana')
+          await page.click('[data-accion="tie-compra-no"]').catch(() => {})
+        } else {
+          await msgBarre(page, barrido, 'tienda:vitrina')
+        }
       } else {
         await msgJuegaUnaMano(page, true, barrido)
       }
@@ -11712,27 +11691,42 @@ async function runMSG(browser) {
 //
 // Tres puertas por combinación:
 //   (a) Δ=0 GEOMÉTRICO — y medido de la forma fuerte: el tapete se cambia EN
-//       VIVO dentro de la MISMA página, con el mismo estado de juego y el mismo
-//       panel abierto, así que entre las dos medidas no cambia absolutamente
-//       nada salvo el atributo. Un Δ=0 entre dos cargas distintas habría medido
-//       también el reparto; éste no puede.
+//       VIVO dentro de la MISMA página, con el mismo estado de juego, así que
+//       entre las dos medidas no cambia absolutamente nada salvo el atributo.
+//       Un Δ=0 entre dos cargas distintas habría medido también el reparto;
+//       éste no puede.
 //   (b) CONTRATO DE COLOR — v1.1, recableado en VIS-1c. Ver el bloque de
 //       constantes de abajo: cinco puertas relacionales sobre tokens VIVOS, sin
 //       un solo hex sellado dentro del arnés.
 //   (c) CAPTURA PNG a capturas-dsk/ para la grilla del checkpoint.
 //
+// TIE-1 1a · RECABLEADO (regla «quien mueve la ruta, recablea el metro»). El
+// panel del ⋮ se retiró: se compra en la tienda y el tapete en uso lo dice el
+// servidor. Cambia:
+//   · El tapete se cambia en vivo escribiendo en `<body>` los atributos que
+//     calcula `atributosTapete` —la MISMA función con la que la mesa los pone
+//     (`useTapeteEnMesa`)—, y no pulsando el panel. Que la mesa ponga lo que
+//     dice el canal lo prueba (2).
+//   · Los casos son once: verde, tricolor y los TRES TONOS de grafito, azul y
+//     vinotinto (los 9 valores: 8 tokens y `--luz-k`).
+//   · La puerta (4) «swatch = base», que medía el disco del panel, pasa a
+//     «vitrina = mesa» (INV-77): la `.vit` de la tienda con los mismos
+//     atributos lee los mismos nueve valores que la mesa viva.
+//
 // Y tres pruebas que no son por combinación:
-//   · El FLUJO DE COMPRA completo (previa · «No» revierte · cerrar el panel
-//     revierte · «Sí» registra y no cobra · persiste tras recarga).
-//   · La celda MÓVIL con `tricolor` sembrado en localStorage → el fieltro lo
-//     PINTA. Hasta MOV-1b-a esta puerta era la negativa del sello móvil
-//     (exigía verde); al encenderse Tapetes en móvil se dio la vuelta, porque
-//     lo que antes probaba el sello ahora probaría un fallo.
-//   · Las capturas del peor caso llevan transitorios presentes (badge TURNO), y
-//     el tricolor añade la ZONA DE RIESGO #1 recortada: las fichas doradas
-//     sobre la banda amarilla, arriba, donde viven los oponentes.
+//   · (2) LA MESA LEE EL SERVIDOR: en frío, verde; `?tie=comprado` la pinta en
+//     grafito oscuro; una copia del aparato sin respaldo no manda; una compra
+//     en la tienda la pinta; al abandonar la mesa el atributo se va.
+//   · (3) La celda MÓVIL con el tapete del servidor → el fieltro lo PINTA.
+//   · (4) Las capturas del peor caso llevan transitorios presentes (badge
+//     TURNO), y el tricolor añade la ZONA DE RIESGO #1 recortada: las fichas
+//     doradas sobre la banda amarilla, arriba, donde viven los oponentes.
 
-const TAP_VARIANTES = TAPETES.map(t => t.id).filter(id => id !== TAPETE_POR_DEFECTO)
+// Los casos que no son el verde: cada tapete de pago, y los que tienen tonos,
+// en sus tres. Del catálogo vivo: un sexto tapete entra solo.
+const TAP_CASOS = TAPETES.filter(t => t.id !== TAPETE_POR_DEFECTO)
+  .flatMap(t => conTonos(t.id) ? TONOS.map(tono => ({ id: t.id, tono })) : [{ id: t.id, tono: null }])
+const tapCaso = (id, tono) => tono ? id + '/' + tono : id
 const TAP_MESAS = [5, 2]                                    // los DOS caminos de render
 const TAP_VPS = [{ w: 1920, h: 937 }, { w: 1024, h: 768 }]  // la ancha y la más estrecha del gate
 // Fuera del gate, por sus dos vías: portrait y landscape móvil.
@@ -11754,9 +11748,9 @@ const TAP_MOVIL = [{ w: 360, h: 640 }, { w: 740, h: 360 }]
 //       fijan cuánta mesa se ve a través de la zona.
 //   (3) FAMILIA DE MATIZ · las cinco paradas dentro de ±8° del matiz del base.
 //       Un tapete es UN color en cinco profundidades, no cinco colores.
-//   (4) SWATCH = BASE · el disco del menú ⋮ computa el `--green-base` de su
-//       tapete. Desde v1.1 lo lee por token (`--tap-swatch-<id>`), así que esta
-//       puerta es la que prueba que la fuente única de color no se rompió.
+//   (4) VITRINA = MESA · TIE-1 1a (antes «swatch = base», del disco del panel
+//       del ⋮, retirado): la `.vit` de la tienda lee los MISMOS nueve valores
+//       que la mesa. Es la puerta que prueba que la fuente única no se rompió.
 //   (5) DEFAULT = RAÍZ · con el verde puesto, los tokens de `body` son los de
 //       `:root`. El verde no existe como regla; esto lo prueba en vez de
 //       compararlo contra una copia.
@@ -11872,6 +11866,7 @@ const tapLeeTokens = (page) => page.evaluate((TOKENS) => {
     tokens: out,
     raiz,
     attr: document.body.dataset.tapete ?? null,
+    tono: document.body.dataset.tapeteTono ?? null,
     pintado: {
       bodyBG: cs.backgroundColor,
       mesaBG: de('.game-table', 'backgroundColor'),
@@ -11881,17 +11876,26 @@ const tapLeeTokens = (page) => page.evaluate((TOKENS) => {
   }
 }, [...TAP_TOKENS, '--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'])
 
-// El disco del menú ⋮ de un tapete concreto. Se lee el `background` COMPUTADO,
-// no el atributo `style`: desde v1.1 el JSX escribe `var(--tap-swatch-<id>)` y
-// lo que interesa es en qué color resuelve, que es lo que ve el jugador.
-const tapLeeDisco = (page, id) => page.evaluate((x) => {
-  const sw = document.querySelector('.tap-swatch[data-tap="' + x + '"]')
-  if (!sw) return null
-  const d = sw.querySelector('.tap-disco')
-  if (!d) return null
-  const c = getComputedStyle(d)
-  return { styleAttr: d.getAttribute('style'), bgColor: c.backgroundColor, bgImage: c.backgroundImage }
-}, id)
+// La puerta vitrina ↔ mesa en la mesa VIVA: una `.vit` (con su `.vit-fondo`)
+// fuera de flujo, con los atributos que lleve `<body>`, frente a `body` (los
+// ocho tokens) y a la `.game-table-screen` real (`--luz-k`). Se monta y se
+// retira en el mismo `evaluate`, DESPUÉS de medir las anclas. Molde:
+// `scripts/tie/tienda.mjs` (PUERTA) y `laminas/tie1a/medir.js`.
+const tapLeePuerta = (page) => page.evaluate((TOKENS) => {
+  const b = document.body
+  const mesa = document.querySelector('.game-table-screen')
+  if (!mesa) return null
+  const vit = document.createElement('div'); vit.className = 'vit'; vit.style.display = 'none'
+  const fondo = document.createElement('div'); fondo.className = 'vit-fondo'; vit.append(fondo)
+  if (b.dataset.tapete) vit.dataset.tapete = b.dataset.tapete
+  if (b.dataset.tapeteTono) vit.dataset.tapeteTono = b.dataset.tapeteTono
+  b.append(vit)
+  const a = TOKENS.map(t => getComputedStyle(b).getPropertyValue(t).trim()).concat(getComputedStyle(mesa).getPropertyValue('--luz-k').trim())
+  const v = TOKENS.map(t => getComputedStyle(vit).getPropertyValue(t).trim()).concat(getComputedStyle(fondo).getPropertyValue('--luz-k').trim())
+  vit.remove()
+  const distintos = a.map((x, i) => (x === v[i] && x !== '' ? null : [i < TOKENS.length ? TOKENS[i] : '--luz-k', x, v[i]])).filter(Boolean)
+  return { iguales: distintos.length === 0, luzK: a[TOKENS.length], distintos }
+}, TAP_TOKENS)
 
 const tapMideAnclas = (page) => page.evaluate((SELS) => {
   const r = {}
@@ -11921,20 +11925,13 @@ function tapDelta(a, b) {
   return { max: round(max), peor, faltan, n: claves.size }
 }
 
-// Siembra el storage por la VÍA REAL de activación (las claves de
-// config/tapetes.js), antes de la primera navegación.
-const tapSiembra = (page, activo, comprados) => page.addInitScript(([k, v, kc, vc]) => {
-  if (v) localStorage.setItem(k, v)
-  if (vc) localStorage.setItem(kc, vc)
-}, [TAPETE_KEY, activo, TAPETES_COMPRADOS_KEY, comprados])
-
-const TAP_TODOS = TAPETES.map(t => t.id).join(',')
-
-const tapAbrePanel = async (page) => {
-  await page.click('.utilities-trigger'); await page.waitForTimeout(120)
-  await page.click('.util-item-tapetes'); await page.waitForTimeout(200)
-  return page.evaluate(() => !!document.querySelector('.tapetes-panel'))
-}
+// Pone en `<body>` los atributos de un tapete (`atributosTapete`: `null` = sin
+// atributo), como hace `useTapeteEnMesa` con lo que dice el canal.
+const tapPon = (page, { tapete, tono }) => page.evaluate(([t, n]) => {
+  const b = document.body
+  if (t) b.dataset.tapete = t; else delete b.dataset.tapete
+  if (n) b.dataset.tapeteTono = n; else delete b.dataset.tapeteTono
+}, [tapete, tono])
 
 // Espera a que haya un badge TURNO VISIBLE: es la señal POSITIVA de fase de
 // apuesta (lección ARN-2 — en escritorio el slot se reserva por visibility, así
@@ -12029,96 +12026,68 @@ function tapJuzgaBanda(vivo, id) {
   return { paradas, tintas, familia, cambia, bandas, ok }
 }
 
-// (4) SWATCH = BASE. El disco tiene que computar el `--green-base` del tapete
-// que representa. El tricolor no tiene tono medio: se exige que su degradado
-// CONTENGA sus tres tintas, que es la versión honesta de la misma promesa.
-function tapJuzgaDisco(disco, vivo, id) {
-  if (!disco) return { ok: false, motivo: 'sin disco' }
-  if (id === 'tricolor') {
-    const tintas = ['--tap-tri-amarillo', '--tap-tri-azul', '--tap-tri-rojo'].map(t => {
-      const c = tapParseColor(vivo.tokens[t])
-      return { t, hex: vivo.tokens[t],
-        presente: !!c && disco.bgImage.includes('rgb(' + c.rgb.join(', ') + ')') }
-    })
-    return { grad: disco.bgImage, styleAttr: disco.styleAttr, tintas, ok: tintas.every(x => x.presente) }
-  }
-  const b = tapParseColor(vivo.tokens['--green-base'])
-  const d = tapParseColor(disco.bgColor)
-  const dCanal = (b && d) ? Math.max(...[0, 1, 2].map(i => Math.abs(b.rgb[i] - d.rgb[i]))) : null
-  return {
-    bg: disco.bgColor, base: vivo.tokens['--green-base'], styleAttr: disco.styleAttr, dCanal,
-    ok: dCanal !== null && dCanal <= TAP_TOL_CANAL,
-  }
+// (4) VITRINA = MESA · TIE-1 1a (INV-77). Sustituye a «swatch = base», que
+// medía el disco del panel del ⋮ (retirado). La `.vit` de la tienda, con los
+// mismos atributos que `<body>`, tiene que leer los MISMOS nueve valores: los
+// ocho tokens (en `.vit` y en `body`) y `--luz-k` (en su `.vit-fondo` y en la
+// `.game-table-screen` viva). Sin constantes de color: igualdad de cadenas.
+function tapJuzgaPuerta(p) {
+  if (!p) return { ok: false, motivo: 'sin lectura' }
+  return { ...p, ok: p.iguales === true }
 }
 
-// Una línea por tapete con lo MEDIDO. El modo no dice sólo si pasa: dice contra
+// Una línea por caso con lo MEDIDO. El modo no dice sólo si pasa: dice contra
 // qué pasó, para que un verde se pueda leer y no sólo creer.
-// `ok` se pasa desde fuera porque el verde no lo calcula igual que sus cuatro
+// `ok` se pasa desde fuera porque el verde no lo calcula igual que sus
 // hermanos: su guardia contra el falso verde no es `cambia` —el verde ES la
 // raíz— sino `verdeEsRaiz`, que se mide en la celda y no aquí.
-function tapLinea(id, banda, disco, ok) {
+function tapLinea(caso, banda, puerta, ok) {
   const L = banda.paradas.map(p => p.l).join(' < ')
   const fam = banda.familia.omitida
     ? 'H ruido (S ' + banda.familia.sBase + '%)'
     : 'H ' + banda.familia.hBase + ' ±' + Math.max(...banda.familia.ds.map(d => d.dH)) +
       ' · S ' + banda.familia.sBase + '%'
-  const sw = id === 'tricolor'
-    ? 'disco grad ' + (disco.ok ? 'con sus 3 tintas' : 'INCOMPLETO')
-    : 'disco ' + disco.bg + (disco.ok ? '' : ' ≠ base ' + disco.base)
-  return '     ' + id.padEnd(10) + ' L ' + L +
+  const pv = 'vitrina ' + (puerta.ok ? '= mesa' : '≠ mesa ' + JSON.stringify(puerta.distintos)) + ' (luz-k ' + puerta.luzK + ')'
+  return '     ' + caso.padEnd(17) + ' L ' + L +
     ' · ' + fam +
     ' · base ' + banda.paradas[3].hex +
     ' → ' + banda.tintas[0].valor +
-    ' · ' + sw + ' · ' + (ok ? 'ok' : 'FALLA')
+    ' · ' + pv + ' · ' + (ok ? 'ok' : 'FALLA')
 }
 
 async function runTapetes(browser) {
-  // ARN-3b · D7 · nombre y precio del diálogo de compra, por la misma función
-  // que usa el panel para pintarlo. Dinámico: `tapetesCore` importa sin
+  // TIE-1 1a · los atributos de `<body>`, por la MISMA función que usa la mesa
+  // (`useTapeteEnMesa`) y la vitrina. Dinámico: `tapetesCore` importa sin
   // extensión y el gancho de `_resolveExt` solo alcanza a lo que se carga
   // después de registrarlo.
-  const { textoCompra } = await import('../src/hooks/tapetesCore.js')
+  const { atributosTapete } = await import('../src/hooks/tapetesCore.js')
+  const pon = (page, id, tono) => tapPon(page, atributosTapete(id, tono))
   const celdas = []
   const capturas = []
 
-  // ── (1) Δ=0 + banda · el tapete se cambia EN VIVO, misma página ────────────
+  // ── (1) Δ=0 + banda + vitrina = mesa · el tapete se cambia EN VIVO ─────────
   for (const n of TAP_MESAS) {
     for (const vp of TAP_VPS) {
       const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
-      await tapSiembra(page, TAPETE_POR_DEFECTO, TAP_TODOS)   // todo comprado: el press aplica directo
-      await gotoMesa(page, n)
+      await gotoMesa(page, n)          // bypass sin mando: inventario vacío, verde
       await page.waitForTimeout(300)
       await page.mouse.move(5, 5)
-      // El panel NO BLOQUEA NI PAUSA EL JUEGO (v1.0 §4), y eso empieza por no
-      // ocupar una celda del flujo: se miden las anclas con el panel CERRADO y
-      // se vuelven a medir con él abierto. Molde `fueraDeFlujo` de u1.
-      const anclasCerrado = await tapMideAnclas(page)
-      const panelAbre = await tapAbrePanel(page)
 
       const base = await tapLeeTokens(page)
       const anclasBase = await tapMideAnclas(page)
-      const dAbrir = tapDelta(anclasCerrado, anclasBase)
-      // Y cabe entero en el viewport, anclado al ⋮ como sus hermanos.
-      const panelRect = await page.evaluate(() => {
-        const e = document.querySelector('.tapetes-panel')
-        if (!e) return null
-        const b = e.getBoundingClientRect()
-        return { x: b.x, y: b.y, w: b.width, h: b.height, right: b.right, bottom: b.bottom }
-      })
       // (5) DEFAULT = RAÍZ. Con el verde puesto, los ocho tokens de `body` son
       // los de `:root`: el verde NO existe como regla, es la ausencia de
-      // variante. Antes esto se comprobaba contra una copia de theme.css dentro
-      // del arnés; ahora se comprueba contra el propio `:root` vivo, así que
-      // sobrevive a cualquier recalibración de Victor.
-      const verdeEsRaiz = TAP_TOKENS.every(t => base.tokens[t] === base.raiz[t])
-      // Y el verde también pasa el contrato de color, como los otros cuatro.
+      // variante. Se comprueba contra el propio `:root` vivo, así que sobrevive
+      // a cualquier recalibración de Victor.
+      const verdeEsRaiz = base.attr === null && base.tono === null &&
+        TAP_TOKENS.every(t => base.tokens[t] === base.raiz[t])
+      // Y el verde también pasa el contrato de color, como sus hermanos.
       const bandaVerde = tapJuzgaBanda(base, TAPETE_POR_DEFECTO)
-      const discoVerde = tapJuzgaDisco(
-        await tapLeeDisco(page, TAPETE_POR_DEFECTO), base, TAPETE_POR_DEFECTO)
+      const puertaVerde = tapJuzgaPuerta(await tapLeePuerta(page))
       // `cambia` sólo aplica a las variantes: el verde ES la raíz por
       // definición, así que su guardia contra el falso verde es `verdeEsRaiz`.
       const verdeOk = bandaVerde.paradas.every(p => p.ok) &&
-        bandaVerde.tintas.every(t => t.ok) && bandaVerde.familia.ok && discoVerde.ok
+        bandaVerde.tintas.every(t => t.ok) && bandaVerde.familia.ok && puertaVerde.ok
 
       const cte = TAP_CONSTANTES[n](vp)
       const leeCte = () => page.evaluate(s => {
@@ -12128,254 +12097,202 @@ async function runTapetes(browser) {
       const cteVerde = await leeCte()
 
       const variantes = []
-      for (const id of TAP_VARIANTES) {
-        await page.click('.tap-swatch[data-tap="' + id + '"]')
-        await page.waitForTimeout(220)
+      for (const { id, tono } of TAP_CASOS) {
+        const esperado = atributosTapete(id, tono)
+        await pon(page, id, tono)
+        await page.waitForTimeout(120)
         const vivo = await tapLeeTokens(page)
         const d = tapDelta(anclasBase, await tapMideAnclas(page))
         const banda = tapJuzgaBanda(vivo, id)
-        const disco = tapJuzgaDisco(await tapLeeDisco(page, id), vivo, id)
+        const puerta = tapJuzgaPuerta(await tapLeePuerta(page))
         const cteVivo = await leeCte()
         variantes.push({
-          id, attr: vivo.attr, delta: d, banda, disco, pintado: vivo.pintado,
+          caso: tapCaso(id, tono), id, tono, attr: vivo.attr, attrTono: vivo.tono, delta: d, banda, puerta, pintado: vivo.pintado,
           cte: { sel: cte.sel, esperado: cte.esperado, medido: cteVivo },
           cteOk: cteVivo === cte.esperado,
           delta0: d.max === 0 && d.faltan.length === 0,
-          aplicado: vivo.attr === id,
+          aplicado: vivo.attr === esperado.tapete && vivo.tono === esperado.tono,
           bandaOk: banda.ok,
-          discoOk: disco.ok,
+          puertaOk: puerta.ok,
         })
       }
+      // Los tres tonos de un mismo tapete NO pueden pintar igual: si el bloque
+      // de un tono no llegara, el caso caería en el «actual» y todo lo demás
+      // pasaría midiendo el tono equivocado.
+      const tonosDistintos = TAPETES.filter(t => conTonos(t.id)).every(t => {
+        const bases = variantes.filter(v => v.id === t.id).map(v => v.banda.paradas[3].hex + '|' + v.puerta.luzK)
+        return bases.length === TONOS.length && new Set(bases).size === TONOS.length
+      })
       // Vuelta al verde: el default tiene que restituirse EXACTO.
-      await page.click('.tap-swatch[data-tap="' + TAPETE_POR_DEFECTO + '"]')
-      await page.waitForTimeout(220)
+      await pon(page, TAPETE_POR_DEFECTO, null)
+      await page.waitForTimeout(120)
       const vuelta = await tapLeeTokens(page)
       const dVuelta = tapDelta(anclasBase, await tapMideAnclas(page))
-      const verdeVuelve = vuelta.attr === TAPETE_POR_DEFECTO &&
-        TAP_PARADAS.every(t => vuelta.tokens[t] === base.tokens[t]) &&
+      const verdeVuelve = vuelta.attr === null && vuelta.tono === null &&
+        TAP_TOKENS.every(t => vuelta.tokens[t] === base.tokens[t]) &&
         dVuelta.max === 0 && dVuelta.faltan.length === 0
 
       const checks = {
-        panelAbre,
-        panelFueraDeFlujo: dAbrir.max === 0 && dAbrir.faltan.length === 0,
-        panelEncaja: panelRect != null && panelRect.x >= 0 && panelRect.y >= 0 &&
-          panelRect.right <= vp.w && panelRect.bottom <= vp.h,
         verdeEsRaiz,
         verdeOk,
-        // La constante del camino, en verde y con cada tapete puesto (§4a).
+        // La constante del camino, en verde y con cada caso puesto (§4a).
         constanteCamino: cteVerde === cte.esperado && variantes.every(v => v.cteOk),
         delta0: variantes.every(v => v.delta0),
         aplicado: variantes.every(v => v.aplicado),
         banda: variantes.every(v => v.bandaOk),
-        disco: variantes.every(v => v.discoOk),
+        vitrinaIgualMesa: variantes.every(v => v.puertaOk),
+        tonosDistintos,
         verdeVuelve,
       }
       const passed = Object.values(checks).every(v => v === true)
-      celdas.push({ mesa: n, vp, panelRect, dAbrir, verde: { banda: bandaVerde, disco: discoVerde, esRaiz: verdeEsRaiz }, variantes, vuelta: { attr: vuelta.attr, delta: dVuelta }, checks, passed })
-      console.log('T' + n + ' ' + vp.w + 'x' + vp.h + ' · panel ' + (panelRect && round(panelRect.w)) + '×' +
-        (panelRect && round(panelRect.h)) + ' Δabrir=' + dAbrir.max +
+      celdas.push({ mesa: n, vp, verde: { banda: bandaVerde, puerta: puertaVerde, esRaiz: verdeEsRaiz }, variantes, vuelta: { attr: vuelta.attr, delta: dVuelta }, checks, passed })
+      console.log('T' + n + ' ' + vp.w + 'x' + vp.h +
         ' · ' + cte.sel + ' ' + cteVerde + '/' + cte.esperado +
         ' · Δ ' + variantes.map(v => v.delta.max).join('/') +
-        ' (' + variantes.length + ' tapetes, ' + (variantes[0] && variantes[0].delta.n) + ' anclas) · contrato ' +
-        (variantes.filter(v => v.bandaOk && v.discoOk).length + (verdeOk ? 1 : 0)) + '/' + (variantes.length + 1) +
+        ' (' + variantes.length + ' casos, ' + (variantes[0] && variantes[0].delta.n) + ' anclas) · contrato ' +
+        (variantes.filter(v => v.bandaOk && v.puertaOk).length + (verdeOk ? 1 : 0)) + '/' + (variantes.length + 1) +
         ' · vuelta ' + verdeVuelve + ' · ' +
         (passed ? 'OK' : 'FAIL [' + Object.entries(checks).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'))
-      // Lo MEDIDO, tapete por tapete. Un verde tiene que poder leerse.
-      console.log(tapLinea(TAPETE_POR_DEFECTO, bandaVerde, discoVerde, verdeOk && verdeEsRaiz) +
+      // Lo MEDIDO, caso por caso. Un verde tiene que poder leerse.
+      console.log(tapLinea(TAPETE_POR_DEFECTO, bandaVerde, puertaVerde, verdeOk && verdeEsRaiz) +
         (verdeEsRaiz ? ' · = :root' : ' · ≠ :root ¡FALLA!'))
-      for (const v of variantes) console.log(tapLinea(v.id, v.banda, v.disco, v.bandaOk && v.discoOk))
+      for (const v of variantes) console.log(tapLinea(v.caso, v.banda, v.puerta, v.bandaOk && v.puertaOk))
       await page.close()
     }
   }
 
-  // ── (2) Flujo de compra · previa, «No», Esc, «Sí» y persistencia ───────────
-  const compra = []
+  // ── (2) La mesa pinta lo que dice el servidor (INV-76, INV-77) ─────────────
+  // Sustituye al flujo de compra del panel del ⋮ (retirado en TIE-1 1a): la
+  // compra se mide en `diagDSK tienda`. Aquí, que la MESA lea el canal:
+  //   frío       sin inventario, la mesa sale en verde y sin atributos;
+  //   servidor   `?tie=comprado` (grafito oscuro en uso): la mesa lo pinta y la
+  //              copia del aparato lo guarda;
+  //   copia      una copia del aparato que el servidor no respalda (azul claro,
+  //              sin inventario) no manda: al contestar, verde;
+  //   tienda     comprar «Negro grafito · claro» en la tienda → la mesa lo pinta;
+  //              al abandonar la mesa el atributo se va, y el lobby nunca lo ve.
+  const lee = (page) => page.evaluate(([k, kt]) => ({
+    attr: document.body.dataset.tapete ?? null,
+    tono: document.body.dataset.tapeteTono ?? null,
+    mesa: !!document.querySelector('.game-table'),
+    ls: localStorage.getItem(k), lst: localStorage.getItem(kt),
+  }), [TAPETE_KEY, TAPETE_TONO_KEY])
+  const esperaAttr = (page, t, n) => page.waitForFunction(([t, n]) =>
+    (document.body.dataset.tapete ?? null) === t && (document.body.dataset.tapeteTono ?? null) === n,
+    [t, n], { timeout: 8000 }).then(() => true, () => false)
+  const servidor = []
   for (const n of TAP_MESAS) {
     const vp = TAP_VPS[0]
+    const c = { mesa: n }
     const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
-    await gotoMesa(page, n)          // arranque en FRÍO: nada sembrado en disco
-    await page.waitForTimeout(250)
-    await page.mouse.move(5, 5)
-    await tapAbrePanel(page)
+    try {
+      await gotoMesa(page, n)
+      await page.waitForTimeout(1500)       // el canal ya contestó (700 ms del mando)
+      c.frio = await lee(page)
 
-    const frio = await page.evaluate(([k, kc]) => ({
-      attr: document.body.dataset.tapete ?? null,
-      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
-      estados: [...document.querySelectorAll('.tap-swatch')].map(s => s.dataset.estado),
-      precios: [...document.querySelectorAll('.tap-precio')].map(e => e.textContent.trim()),
-    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
+      await page.goto(BASE + '/?tie=comprado')
+      await volverALaMesa(page, n)
+      c.llegaServidor = await esperaAttr(page, 'grafito', 'oscuro')
+      c.servidor = await lee(page)
 
-    // Previa: se aplica al instante y el diálogo se pinta encima.
-    await page.click('.tap-swatch[data-tap="tricolor"]'); await page.waitForTimeout(220)
-    const previa = await page.evaluate(([k, kc]) => ({
-      attr: document.body.dataset.tapete ?? null,
-      dialogo: !!document.querySelector('.tap-dialogo'),
-      txt: document.querySelector('.tap-dialogo-txt') ? document.querySelector('.tap-dialogo-txt').textContent.trim() : null,
-      // ARN-3b · D7 · el nombre va en su <strong>: se lee por estructura.
-      nombre: document.querySelector('.tap-dialogo-txt strong')?.textContent.trim() ?? null,
-      activoPanel: document.querySelector('.tapetes-panel').dataset.activo,
-      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
-    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
+      await page.addInitScript(([k, kt]) => {
+        if (sessionStorage.getItem('tap.copia')) return
+        sessionStorage.setItem('tap.copia', '1')
+        localStorage.setItem(k, 'azul'); localStorage.setItem(kt, 'claro')
+      }, [TAPETE_KEY, TAPETE_TONO_KEY])
+      await page.goto(BASE + '/?tie=vacia')
+      await page.waitForTimeout(1500)
+      await volverALaMesa(page, n)
+      c.llegaCopia = await esperaAttr(page, null, null)
+      c.copia = await lee(page)
 
-    // «No» revierte al activo y no deja rastro en disco.
-    await page.click('.tap-btn-no'); await page.waitForTimeout(220)
-    const trasNo = await page.evaluate(([k, kc]) => ({
-      attr: document.body.dataset.tapete ?? null,
-      dialogo: !!document.querySelector('.tap-dialogo'),
-      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
-    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
-
-    // Cerrar el PANEL con la previa viva también revierte.
-    await page.click('.tap-swatch[data-tap="azul"]'); await page.waitForTimeout(180)
-    const previaAzul = await page.evaluate(() => document.body.dataset.tapete ?? null)
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200)
-    const trasEsc = await page.evaluate(() => ({
-      attr: document.body.dataset.tapete ?? null,
-      panel: !!document.querySelector('.tapetes-panel'),
-    }))
-
-    // Saldo ANTES de comprar: la compra no cobra (v1.0 §5) y hay que probarlo.
-    const saldoAntes = await page.evaluate(() =>
-      document.querySelector('.player-bar-right .bd-num')
-        ? document.querySelector('.player-bar-right .bd-num').textContent.trim() : null)
-
-    // «Sí» registra propiedad y deja el tapete puesto.
-    await tapAbrePanel(page)
-    await page.click('.tap-swatch[data-tap="tricolor"]'); await page.waitForTimeout(180)
-    await page.click('.tap-btn-si'); await page.waitForTimeout(250)
-    const trasSi = await page.evaluate(([k, kc]) => ({
-      attr: document.body.dataset.tapete ?? null,
-      dialogo: !!document.querySelector('.tap-dialogo'),
-      ls: localStorage.getItem(k), lsc: localStorage.getItem(kc),
-      estado: document.querySelector('.tap-swatch[data-tap="tricolor"]').dataset.estado,
-      saldo: document.querySelector('.player-bar-right .bd-num')
-        ? document.querySelector('.player-bar-right .bd-num').textContent.trim() : null,
-    }), [TAPETE_KEY, TAPETES_COMPRADOS_KEY])
-
-    // El atributo VIVE MIENTRAS VIVE LA MESA: al abandonarla se retira y el
-    // lobby vuelve a su verde. Es la contrapartida obligatoria de haber sacado
-    // el efecto del árbol de React — sin esta puerta, una fuga al lobby sería
-    // invisible hasta que alguien la viera con los ojos.
-    await page.click('.btn-leave'); await page.waitForTimeout(200)
-    await page.click('.leave-modal button:has-text("Abandonar mesa")')
-    await page.waitForTimeout(300)
-    const trasSalir = await page.evaluate(([k]) => ({
-      attr: document.body.dataset.tapete ?? null,
-      mesa: !!document.querySelector('.game-table'),
-      ls: localStorage.getItem(k),
-    }), [TAPETE_KEY])
-
-    // Persistencia: recargar y volver a entrar por la ruta canónica.
-    await page.reload()
-    const enLobby = await page.evaluate(() => document.body.dataset.tapete ?? null)
-    await volverALaMesa(page, n)
-    await page.waitForTimeout(250)
-    await page.mouse.move(5, 5)
-    await tapAbrePanel(page)
-    const trasRecarga = await page.evaluate(() => {
-      const sw = document.querySelector('.tap-swatch[data-tap="tricolor"]')
-      return {
-        attr: document.body.dataset.tapete ?? null,
-        estado: sw.dataset.estado,
-        precioTricolor: !!sw.querySelector('.tap-precio'),
-        chip: sw.querySelector('.tap-chip') ? sw.querySelector('.tap-chip').textContent.trim() : null,
-      }
-    })
-
-    const c = {
-      frioVerde: frio.attr === TAPETE_POR_DEFECTO && frio.ls === null && frio.lsc === null,
-      estadosFrio: frio.estados[0] === 'activo' && frio.estados.slice(1).every(e => e === 'no-comprado'),
-      // Copy y montos SALEN de la fuente única: si alguien los escribiera a
-      // mano en el JSX, esta puerta es la que discrepa.
-      // ARN-3b · D7 (H-3) · y el ARNÉS también los lee de ahí, sin literales:
-      // comparaba contra «N fichas» escrito a mano y el producto dice solo el
-      // número desde REN-1b (e4f8f6f). La baldosa es `montoTexto(precio)`.
-      preciosDeLaFuente: frio.precios.length === TAP_VARIANTES.length &&
-        TAP_VARIANTES.every(id => frio.precios.includes(montoTexto(textoCompra(id).precio))),
-      previaAplica: previa.attr === 'tricolor' && previa.dialogo === true &&
-        previa.activoPanel === TAPETE_POR_DEFECTO,
-      previaNoPersiste: previa.ls === null && previa.lsc === null,
-      // D7 · nombre y monto, de `textoCompra` (la misma función que pinta el
-      // diálogo): el nombre en su <strong> y el monto formateado en la frase.
-      // El marco de la frase («¿Comprar … por … Heptacoins?») no tiene fuente
-      // única —vive escrito en TapetesPanel.jsx:115— y por eso no se compara
-      // aquí contra ningún literal (hallazgo de ARN-3b, no se arregla).
-      dialogoDiceLoQueDebe: previa.nombre === textoCompra('tricolor').nombre &&
-        (previa.txt ?? '').includes(montoTexto(textoCompra('tricolor').precio)),
-      noRevierte: trasNo.attr === TAPETE_POR_DEFECTO && trasNo.dialogo === false &&
-        trasNo.ls === null && trasNo.lsc === null,
-      cerrarPanelRevierte: previaAzul === 'azul' && trasEsc.attr === TAPETE_POR_DEFECTO &&
-        trasEsc.panel === false,
-      siRegistra: trasSi.attr === 'tricolor' && trasSi.dialogo === false &&
-        trasSi.ls === 'tricolor' && trasSi.lsc === 'verde,tricolor' &&
-        trasSi.estado === 'activo',
-      // Sin descuento de saldo — la economía nace en Supabase (v1.0 §5).
-      sinCobro: saldoAntes !== null && trasSi.saldo === saldoAntes,
-      // El lobby jamás ve el atributo: ni al abandonar la mesa ni tras recargar.
-      // La PROPIEDAD, en cambio, sobrevive — es lo único que debe sobrevivir.
-      salirLimpia: trasSalir.attr === null && trasSalir.mesa === false &&
-        trasSalir.ls === 'tricolor' && enLobby === null,
-      persiste: trasRecarga.attr === 'tricolor' && trasRecarga.estado === 'activo' &&
-        trasRecarga.precioTricolor === false && trasRecarga.chip === 'Puesto',
-    }
-    const passed = Object.values(c).every(v => v === true)
-    compra.push({ mesa: n, frio, previa, trasNo, previaAzul, trasEsc, saldoAntes, trasSi, trasSalir, enLobby, trasRecarga, checks: c, passed })
-    console.log('T' + n + ' compra · frío ' + frio.attr + '/' + frio.estados.join(',') +
-      ' · previa ' + previa.attr + ' · No→' + trasNo.attr + ' · Esc→' + trasEsc.attr +
-      ' · Sí→' + trasSi.attr + ' ls "' + trasSi.lsc + '" saldo ' + saldoAntes + '→' + trasSi.saldo +
-      ' · salir→' + trasSalir.attr + ' lobby→' + enLobby +
-      ' · recarga ' + trasRecarga.attr + '/' + trasRecarga.estado + ' · ' +
-      (passed ? 'OK' : 'FAIL [' + Object.entries(c).filter(([, v]) => v === false).map(([k]) => k).join(',') + ']'))
+      // La compra, en la tienda de verdad (la ventana, `comprar_articulo`), con
+      // un banco nuevo: el lobby recién cargado, sin inventario y con 31.400.
+      await page.goto(BASE + '/?tie=vacia')
+      await page.waitForSelector('main.lobby .lob-nav-tienda', { timeout: 15000 })
+      await page.click('.lob-nav-tienda')
+      await page.waitForSelector('[data-tienda="tapetes"][data-tie-cargado]', { timeout: 8000 })
+      await page.click('[data-tap="grafito"] [data-accion="tie-art"]')
+      await page.waitForSelector('[data-tienda="vitrina"]')
+      await page.click('[data-accion="tie-tono-claro"]')
+      await page.click('.sal-accion [data-accion="cta"]')
+      await page.waitForSelector('[data-accion="tie-ventana"][data-estado="confirmar"]')
+      await page.click('[data-accion="tie-compra-si"]')
+      await page.waitForSelector('[data-accion="tie-listo"]', { timeout: 15000 })
+      c.enTienda = await lee(page)
+      await page.click('[data-accion="casa"]')
+      await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
+      c.enLobby = await lee(page)
+      await volverALaMesa(page, n)
+      c.llegaCompra = await esperaAttr(page, 'grafito', 'claro')
+      c.compra = await lee(page)
+      c.puerta = tapJuzgaPuerta(await tapLeePuerta(page))
+      await page.click('.btn-leave'); await page.waitForTimeout(200)
+      await page.click('.leave-modal button:has-text("Abandonar mesa")')
+      await page.waitForTimeout(300)
+      c.trasSalir = await lee(page)
+    } catch (e) { c.error = String(e && e.message || e).split('\n')[0] }
     await page.close()
+    c.checks = {
+      frioVerde: c.frio?.attr === null && c.frio?.tono === null && c.frio?.mesa === true,
+      pintaElServidor: c.llegaServidor === true && c.servidor?.ls === 'grafito' && c.servidor?.lst === 'oscuro',
+      copiaNoManda: c.llegaCopia === true && c.copia?.ls === TAPETE_POR_DEFECTO && c.copia?.lst === null,
+      // Fuera de la mesa, ni la tienda ni el lobby llevan el atributo.
+      fueraDeLaMesaSinAtributo: c.enTienda?.attr === null && c.enLobby?.attr === null,
+      pintaLaCompra: c.llegaCompra === true && c.compra?.ls === 'grafito' && c.compra?.lst === 'claro' && c.puerta?.ok === true,
+      salirLimpia: c.trasSalir?.attr === null && c.trasSalir?.tono === null && c.trasSalir?.mesa === false,
+    }
+    c.passed = !c.error && Object.values(c.checks).every(v => v === true)
+    servidor.push(c)
+    console.log('T' + n + ' servidor · frío ' + c.frio?.attr + ' · ?tie=comprado → ' + c.servidor?.attr + '/' + c.servidor?.tono +
+      ' · copia azul/claro sin respaldo → ' + c.copia?.attr + ' · compra en la tienda → ' + c.compra?.attr + '/' + c.compra?.tono +
+      ' · salir → ' + c.trasSalir?.attr + ' · ' +
+      (c.passed ? 'OK' : 'FAIL [' + Object.entries(c.checks).filter(([, v]) => v !== true).map(([k]) => k).join(',') + ']' + (c.error ? ' · ' + c.error : '')))
   }
 
-  // ── (3) Prueba NEGATIVA del gate · móvil con tricolor sembrado ─────────────
+  // ── (3) Móvil · la mesa pinta el tapete del servidor ───────────────────────
+  // MOV-1b-a dio la vuelta a esta puerta (antes exigía verde); TIE-1 1a la
+  // siembra por el servidor (`?tie=comprado`) y no por el aparato, que ya no
+  // decide qué está comprado.
   const movil = []
   for (const vp of TAP_MOVIL) {
     const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
-    await tapSiembra(page, 'tricolor', TAP_TODOS)
-    await gotoMesa(page, 5)
-    await page.waitForTimeout(300)
+    await page.goto(BASE + '/?tie=comprado')
+    await volverALaMesa(page, 5)
+    const llega = await esperaAttr(page, 'grafito', 'oscuro')
     const t = await tapLeeTokens(page)
-    const ls = await page.evaluate(k => localStorage.getItem(k), TAPETE_KEY)
-    // VIS-1c: "renderiza verde" se prueba contra `:root` vivo, no contra una
-    // copia sellada de theme.css. Un solo verde en todo el producto significa
-    // exactamente esto: fuera del gate, `body` no redefine nada.
-    // ── MOV-1b-a · RECABLEADO (regla ARN-1) ────────────────────────────────
-    // Esta puerta exigía lo contrario: que en móvil el fieltro saliera VERDE
-    // aunque el storage trajera un tricolor. Era correcta mientras Tapetes
-    // fuera función de escritorio, y medía el segundo cinturón —el bloque
-    // gateado de tapetes.css—. MOV-1b-a enciende Tapetes en móvil con
-    // autorización de Victor y desanida ese bloque, así que el verde de antes
-    // pasa a significar "el jugador eligió un tapete y no lo ve": el fallo, no
-    // el sello. La puerta se da la vuelta en la MISMA tanda que mueve la ruta.
+    const puerta = tapJuzgaPuerta(await tapLeePuerta(page))
     const esRaiz = TAP_TOKENS.every(p => t.tokens[p] === t.raiz[p])
-    const ok = ls === 'tricolor' && t.attr === 'tricolor' && !esRaiz
-    movil.push({ vp, ls, attr: t.attr, tokens: t.tokens, raiz: t.raiz, esRaiz, ok })
-    console.log('MÓVIL ' + vp.w + 'x' + vp.h + ' · storage "' + ls + '" · attr ' + t.attr +
-      ' · base ' + t.tokens['--green-base'] + ' · ' + (ok ? 'OK (pinta el tapete)' : 'FAIL'))
+    const ok = llega && t.attr === 'grafito' && t.tono === 'oscuro' && !esRaiz && puerta.ok && puerta.luzK === '1.15'
+    movil.push({ vp, attr: t.attr, tono: t.tono, tokens: t.tokens, raiz: t.raiz, esRaiz, puerta, ok })
+    console.log('MÓVIL ' + vp.w + 'x' + vp.h + ' · attr ' + t.attr + '/' + t.tono +
+      ' · base ' + t.tokens['--green-base'] + ' · luz-k ' + puerta.luzK + ' · ' + (ok ? 'OK (pinta el tapete)' : 'FAIL'))
     await page.close()
   }
 
   // ── (4) Capturas · la grilla del checkpoint, con transitorios ──────────────
+  // Una página por mesa y viewport: con el badge TURNO a la vista, los once
+  // casos se ponen en vivo y se fotografían (el Δ=0 de (1) dice que no se
+  // movió nada entre una y otra).
   for (const n of TAP_MESAS) {
     for (const vp of TAP_VPS) {
-      for (const t of TAPETES) {
-        const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
-        await tapSiembra(page, t.id, TAP_TODOS)
-        await gotoMesa(page, n)
-        await clickIf(page, 'button:has-text("Iniciar mano")')
+      const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+      await gotoMesa(page, n)
+      await clickIf(page, 'button:has-text("Iniciar mano")')
+      for (const { id, tono } of [{ id: TAPETE_POR_DEFECTO, tono: null }, ...TAP_CASOS]) {
+        await pon(page, id, tono)
         const turno = await tapEsperaTurno(page)
         await page.mouse.move(5, 5)
         await page.waitForTimeout(250)
-        const path = OUT_DIR + '/tapete_' + t.id + '_t' + n + '_' + vp.w + 'x' + vp.h + '.png'
+        const nombre = tono && tono !== TONO_POR_DEFECTO ? id + '_' + tono : id
+        const path = OUT_DIR + '/tapete_' + nombre + '_t' + n + '_' + vp.w + 'x' + vp.h + '.png'
         await page.screenshot({ path })
-        capturas.push({ tapete: t.id, mesa: n, vp: vp.w + 'x' + vp.h, turno, path })
+        capturas.push({ tapete: id, tono, mesa: n, vp: vp.w + 'x' + vp.h, turno, path })
         // ZONA DE RIESGO #1 · el tercio superior de la mesa, que es donde vive
         // la banda amarilla (plena hasta el 8%, en transición hasta el 40%) y
         // donde viven los oponentes con sus fichas doradas. El recorte se
         // DERIVA de la caja viva de `.game-table`, nunca de píxeles cableados.
-        if (t.id === 'tricolor') {
+        if (id === 'tricolor') {
           const caja = await page.evaluate(() => {
             const b = document.querySelector('.game-table').getBoundingClientRect()
             return { x: Math.max(0, b.x), y: Math.max(0, b.y), width: b.width, height: b.height * 0.35 }
@@ -12384,30 +12301,31 @@ async function runTapetes(browser) {
           await page.screenshot({ path: pr, clip: caja })
           capturas.push({ tapete: 'tricolor', zona: 'riesgo1', mesa: n, vp: vp.w + 'x' + vp.h, turno, path: pr })
         }
-        await page.close()
       }
+      await page.close()
     }
   }
   console.log('CAPTURAS ' + capturas.length + ' · con transitorio (TURNO) ' +
     capturas.filter(c => c.turno).length + '/' + capturas.length)
 
-  const passed = celdas.every(c => c.passed) && compra.every(c => c.passed) &&
+  const passed = celdas.every(c => c.passed) && servidor.every(c => c.passed) &&
     movil.every(m => m.ok) && capturas.every(c => c.turno === true)
   console.log('\n── TAPETES: ' + celdas.filter(c => c.passed).length + '/' + celdas.length +
-    ' celdas · compra ' + compra.filter(c => c.passed).length + '/' + compra.length +
+    ' celdas · servidor ' + servidor.filter(c => c.passed).length + '/' + servidor.length +
     ' · móvil ' + movil.filter(m => m.ok).length + '/' + movil.length +
     ' · ' + capturas.length + ' capturas · ' + (passed ? 'VERDE' : 'ROJO'))
   // El JSON se autoetiqueta con el CONTRATO, no con una tabla de colores: es lo
   // que hay que poder leer dentro de seis meses para saber qué probó esta
-  // corrida. Los colores medidos ya viven, tapete por tapete, dentro de celdas.
+  // corrida. Los colores medidos ya viven, caso por caso, dentro de celdas.
   const contrato = {
-    version: 'v1.1 (VIS-1c)',
+    version: 'v1.2 (TIE-1 1a)',
     puertas: ['escalera monótona L', 'superficies derivadas rgb+alfa',
-              'familia de matiz ±' + TAP_TOL_H + '°', 'swatch = base', 'default = :root'],
+              'familia de matiz ±' + TAP_TOL_H + '°', 'vitrina = mesa (9 valores)', 'default = :root'],
+    casos: TAP_CASOS.map(c => tapCaso(c.id, c.tono)),
     tolCanal: TAP_TOL_CANAL, tolH: TAP_TOL_H, sMinMatiz: TAP_S_MIN_MATIZ,
     tintas: TAP_TINTAS, tokens: TAP_TOKENS,
   }
-  return { celdas, compra, movil, capturas, contrato, passed }
+  return { celdas, servidor, movil, capturas, contrato, passed }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -12958,10 +12876,12 @@ async function luzCelda(browser, n, clave, tapete = null) {
   const ctx = await browser.newContext({ viewport: { width: t.w, height: t.h }, deviceScaleFactor: 2,
     ...(t.movil ? { hasTouch: true, isMobile: true } : {}) })
   const page = await ctx.newPage()
-  if (tapete) await tapSiembra(page, tapete, TAP_TODOS)
   const c = { id, mesa: n, tamano: clave, tapete: tapete || 'verde', viewport: { w: t.w, h: t.h } }
   try {
     c.ruta = await irALaMesa(page, BASE, n, 'basico', 0)
+    // TIE-1 1a · la copia del aparato ya no decide el tapete (lo dice el
+    // servidor): se pone en vivo, como en `runTapetes`.
+    if (tapete) await tapPon(page, { tapete, tono: null })
     await luzSembrar(page)
     c.alcance = await luzLlevarAlDescarte(page)
     await page.mouse.move(2, 2)
@@ -15394,6 +15314,14 @@ try {
   // el mismo preview que `lob`, `rnk` y `suma`.
   if (MODE === 'cfg' || MODE === 'humo') {
     report.cfg = await runCfg(browser, { base: BASE_PROD, baseDev: MODE === 'humo' ? BASE : BASE_SALDO_DEV })
+  }
+  // TIE-1 1a · `tienda`: los estantes, la lista, la vitrina y la ventana de
+  // compra en los seis tamaños (zonas de 44 y solapes), la puerta vitrina ↔
+  // mesa con los 9 valores en los 11 casos (INV-77), los cuatro estados de la
+  // ventana, «No te alcanza», el ojito y lo comprado, contra el banco imitado
+  // (`scripts/tie/tienda.mjs`). Entra en `humo`: el mismo preview que `cfg`.
+  if (MODE === 'tienda' || MODE === 'humo') {
+    report.tienda = await runTienda(browser, { base: BASE_PROD })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

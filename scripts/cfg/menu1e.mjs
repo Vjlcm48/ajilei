@@ -7,11 +7,13 @@
 // Sólo el caso «contra humanos» necesita el servidor de desarrollo con bypass
 // (`?cfg=mesa-humanos`): la mesa del bundle es siempre contra las IAS.
 //
-//   cfg.menu     contra las IAS: Sonido, Reacciones, Tapetes, Partida rápida y
-//                Mano actual (sin Cuenta ni Saldo), 64 × altoPanel(5) = 244, en
-//                escritorio, móvil vertical y móvil acostado; «Partida rápida ·
-//                No» y «Mano actual · 20 gratis» con el banco recién nacido.
-//                Contra humanos (dev): sin Partida rápida, 64 × 200.
+//   cfg.menu     contra las IAS: Sonido, Reacciones, Partida rápida y Mano
+//                actual (sin Cuenta ni Saldo; TIE-1 1a: sin Tapetes), 64 ×
+//                altoPanel(filasDelPanel(true)) = 200, en escritorio, móvil
+//                vertical y móvil acostado; «Partida rápida · No» y «Mano actual
+//                · 20 gratis» con el banco recién nacido. Contra humanos (dev):
+//                sin Partida rápida, 64 × 156. Las cifras salen de
+//                `menuEntradas.js`: quitar o poner una entrada no toca el metro.
 //   cfg.consulta con quedan 3: 3 → 2 → 1 en tres manos (la pastilla y el pie de
 //                la ventana), repetir la mano no gasta, sin recorrido dorado;
 //                sin gratis: el primer cobro pregunta, «Consultar» cobra 100 una
@@ -29,7 +31,7 @@
 import { contextoCap, PERFIL_CAP } from '../cap/capMesa.mjs'
 import { crearBanco, PRECIOS_CONSULTA_SQL } from '../../src/dev/bancoImitado.js'
 import { recorrerRuta, esperarMesa } from '../rutaMesa.mjs'
-import { ENTRADAS_PANEL, presentesDe, altoPanel } from '../../src/config/menuEntradas.js'
+import { ENTRADAS_PANEL, presentesDe, altoPanel, filasDelPanel } from '../../src/config/menuEntradas.js'
 import { jugarMano, siguienteMano as pulsarSiguiente, nuevoJuego } from '../arnes/autojuego.mjs'
 
 const ESCRITORIO = { w: 1366, h: 768, movil: false }
@@ -162,7 +164,7 @@ async function puertaMenu(browser, { base, baseDev }, errores, anota) {
       await mesaEnBet1(page)
       await abrirMenu(page)
       const p = await page.evaluate(LEER_PANEL)
-      const alto = altoPanel(5)
+      const alto = altoPanel(filasDelPanel(true))
       anota('menu', JSON.stringify(p.ids) === JSON.stringify(ENTRADAS_PANEL)
         && !p.ids.includes('cuenta') && !p.ids.includes('saldo')
         && Math.abs(p.caja[0] - 64) <= 0.5 && Math.abs(p.caja[1] - alto) <= 0.5
@@ -189,8 +191,8 @@ async function puertaMenu(browser, { base, baseDev }, errores, anota) {
     await abrirMenu(page)
     const p = await page.evaluate(LEER_PANEL)
     const esperados = presentesDe(false)
-    anota('menu', JSON.stringify(p.ids) === JSON.stringify(esperados) && Math.abs(p.caja[1] - altoPanel(4)) <= 0.5,
-      { celda: idDe(ESCRITORIO), que: 'contra humanos (dev, ?cfg=mesa-humanos)', ids: p.ids, caja: p.caja, esperado: [64, altoPanel(4)] })
+    anota('menu', JSON.stringify(p.ids) === JSON.stringify(esperados) && Math.abs(p.caja[1] - altoPanel(filasDelPanel(false))) <= 0.5,
+      { celda: idDe(ESCRITORIO), que: 'contra humanos (dev, ?cfg=mesa-humanos)', ids: p.ids, caja: p.caja, esperado: [64, altoPanel(filasDelPanel(false))] })
   } catch (e) {
     anota('menu', false, { que: 'contra humanos', error: String(e?.message ?? e).split('\n')[0] })
   } finally { await ctx?.close().catch(() => {}) }
