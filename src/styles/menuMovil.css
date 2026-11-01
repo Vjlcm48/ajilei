@@ -331,23 +331,9 @@
   }
   .u3-popup-agotadas .u3-resto { color: var(--text-muted); }
 
-  /* ── Tapetes ───────────────────────────────────────────────────────────────
-     La piel entera del panel es GLOBAL desde MOV-1b-a (tapetes.css se desanidó
-     al encender la función en móvil), así que en vertical no hace falta ni una
-     regla: el panel de 250×271 cabe en 375×812 y en 360×640, y la pinza de D6
-     lo confirma. Lo único propio de móvil es la disposición HORIZONTAL. */
+  /* TIE-1 1a · el panel de Tapetes sale del ⋮ con su entrada: su disposición
+     en fila del horizontal (`.tapetes-panel { --tap-cols: 5 }`) se retira. */
   @media (orientation: landscape) and (max-height: 600px) {
-    /* DISPOSICIÓN EN FILA (autorizada por Victor). En horizontal la banda libre
-       bajo el techo derivado son ~191px a 640×360 y ~203px a 812×375, y el
-       panel en rejilla 3×2 mide 271: no cabe por 80px. En FILA de cinco mide
-       ~153 de alto y entra con 38px de sobra en la celda peor.
-       ES UN SOLO TOKEN Y NINGUNA CAJA NUEVA: `--tap-cols` ya gobierna la
-       rejilla Y el ancho del panel, que es `calc()` derivado de él
-       (tapetes.css). Las cinco fichas conservan tamaño, hit y previsualización
-       —no se toca ni una— y el ancho pasa a 5×72 + 4×6 + 22 = 406, holgado bajo
-       el tope de `innerWidth − 16` (624 en la celda más estrecha).
-       El título se queda encima: es lo que deja la fila más baja. */
-    .tapetes-panel { --tap-cols: 5; }
 
     /* ── SUP-2b · EL PANEL NO CRECE EN HORIZONTAL ─────────────────────
        Y no hace falta ni una regla para conseguirlo: la entrada "Cuenta" NO

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/utilidadesMesa.css'
 import { useSoundContext } from '../context/SoundContext'
-import { GodeteIcon } from './TapetesPanel'
 import { BADGE_POPUP_MS } from '../config/consultas'
 import { ENTRADA, VIVAS_ESCRITORIO } from '../config/menuEntradas'
 import { aPropios, escalaActual } from '../lib/escala'
@@ -105,7 +104,7 @@ export function UtilitiesTrigger({ open, onToggle, registerTrigger }) {
 // lector de pantalla, que anunciaría entradas accionables que no hacen nada.
 export function UtilitiesPanel({
   anchor, onClose, onReacciones, reaccionesBloqueadas,
-  etiquetaMano = null, manoDisponible, onManoActual, onTapetes,
+  etiquetaMano = null, manoDisponible, onManoActual,
   rapida = false, onRapida,
   vivas = VIVAS_ESCRITORIO, presentes = null,
 }) {
@@ -203,25 +202,6 @@ export function UtilitiesPanel({
           title={viva(ENTRADA.REACCIONES) && reaccionesBloqueadas ? 'Reacciones (espera un momento)' : 'Reacciones'}
         >
           <span className="util-ico" aria-hidden="true">💬</span>
-        </button>
-
-        {/* EMB-2 · Tapetes · tercera entrada VIVA. Va AQUÍ, cerrando el grupo
-            de las vivas y por delante de la inerte, porque el orden del panel
-            agrupa por estado (vivas → inertes → premium) y no por antigüedad.
-            Cierra al ejecutar, como sus hermanas (v1.1 §1.3.1): el panel de
-            tapetes toma el relevo y no tiene sentido sostener dos superficies
-            del mismo menú a la vez. */}
-        <button
-          type="button"
-          role="menuitem"
-          className={`util-item util-item-tapetes${viva(ENTRADA.TAPETES) ? '' : ' is-disabled'}`}
-          data-entrada={ENTRADA.TAPETES}
-          onClick={() => { onClose(); onTapetes() }}
-          disabled={!viva(ENTRADA.TAPETES)}
-          aria-disabled={viva(ENTRADA.TAPETES) ? undefined : 'true'}
-          title="Tapetes"
-        >
-          <GodeteIcon />
         </button>
 
         {/* CFG-1 1e · Partida rápida · ocupa el sitio de la Saldo inerte, que

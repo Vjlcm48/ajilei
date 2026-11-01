@@ -2,12 +2,14 @@ import { createContext, useContext } from 'react'
 
 // ── ECO-1g · El video de recompensa, al alcance de las pantallas con barra ──
 //
-// `MarcoVideo` monta UNA vez las capas del video (la hoja «Conseguir monedas»,
-// la capa, el mensaje de «no hay video», la celebración) y deja aquí lo que las
-// pantallas necesitan para pedirlo y pintarlo:
+// `MarcoVideo` monta UNA vez las capas del video (la capa, el mensaje de «no
+// hay video», la celebración) y deja aquí lo que las pantallas necesitan para
+// pedirlo y pintarlo:
 //
-//   abrirHoja()   el «+» dorado de la píldora (`BarraSuperior`)
-//   pedir()       el botón del bloque de saldo de Retar y la fila de la hoja
+//   abrirMonedas() el «+» dorado de la píldora (`BarraSuperior`): la tienda en
+//                 el estante Monedas (TIE-1 1a; antes, la hoja «Conseguir
+//                 monedas», retirada). `null` si `App` no la pasa.
+//   pedir()       el botón del bloque de saldo de Retar y la fila del estante Monedas
 //   mirar()       pregunta al servidor cuántos quedan hoy (`mi_video`)
 //   premio        lo que paga un video: lo dice el servidor
 //   contador      «Te quedan N de 8 hoy» · «Vuelven en 5 h 12 min» · `null`

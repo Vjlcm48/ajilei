@@ -222,6 +222,24 @@
   white-space: nowrap;
 }
 
+/* TIE-1 1a · Tapetes (V6) · el rótulo con el tapete en uso debajo, el disco
+   (`.vit-disco`, vitrina.css) y el «›». Lámina `laminas/tie1a`, tie1a.css §4. */
+:is(.lobby, .sal) .tie-cfg-fila { justify-content: flex-start; }
+:is(.lobby, .sal) .tie-cfg-txt {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.2;
+}
+:is(.lobby, .sal) .tie-cfg-txt small {
+  color: var(--text-secondary);
+  font-size: 0.8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 :is(.lobby, .sal) .lob-acerca {
   font-size: calc(var(--u) * 2.6);
   font-weight: 400;

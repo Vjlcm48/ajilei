@@ -1,0 +1,233 @@
+/* ── TIE-1 1a · La tienda ──────────────────────────────────────────────────────
+   Rector: AJILEI_TIE-1_Fase1a_v1.0.md §3.4; lámina `laminas/tie1a` (§2 de su
+   hoja), con las variantes que selló Victor: V2-B (cinco estantes), V3-A
+   (filas), V4-A con muestras redondas, V5-A (ventana centrada).
+
+   Hoja ADITIVA sobre la carcasa `.sal` (salas.css): sin `!important`, colores
+   sólo por token, y el oro sólo de contorno o de tinta (INV-08) salvo el botón
+   «Sí, comprar», que es el dorado de toda acción principal. Toda zona táctil
+   mide 44 o más (INV-07): estantes, filas, «Usar», muestras, enlace y botones.
+   La vitrina es de vitrina.css. */
+
+/* ── El cuerpo ─────────────────────────────────────────────────────────────── */
+/* Aire bajo la cabecera (D-2 de la lámina): las zonas de 44 de la flecha y la
+   casa bajan 6,3 px por debajo de su caja y, en 360×640, pisaban la fila de
+   estantes. */
+.sal-cuerpo.es-tienda { row-gap: calc(var(--u) * 2.4); padding-top: max(12px, calc(var(--u) * 3.4)); }
+.sal.es-anclada .sal-cuerpo.es-tienda > :first-child { margin-top: 0; }
+.sal.es-anclada .sal-cuerpo.es-tienda > :not(.sal-accion) { margin-bottom: 0; }
+.sal.es-anclada .sal-cuerpo.es-tienda > .sal-accion { margin-top: auto; }
+/* En los estantes (sin artículo abierto) la zona anclada no tiene botón: sólo
+   guarda la línea del toast. Pegada al pie, su franja (≈ 6 px) se comía el
+   toque de la fila que pasa por debajo (MEDIDO en 915×412, `tie.zona`). */
+.sal.es-anclada .sal-cuerpo.es-tienda:not(.es-vitrina) > .sal-accion { pointer-events: none; }
+
+/* ── V2-B · los cinco estantes ─────────────────────────────────────────────── */
+/* Pestañas con `aria-pressed` y el contorno de oro de todos los chips. En
+   teléfono, fila desplazable con máscara a la derecha; la activa se trae a la
+   vista (Tienda.jsx). Donde caben, las cinco sin desplazar ni máscara. */
+.tie-estantes {
+  gap: calc(var(--u) * 1.6);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: calc(var(--u) * 2);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--u) * 6), transparent);
+          mask-image: linear-gradient(90deg, #000 calc(100% - var(--u) * 6), transparent);
+}
+.tie-estantes::-webkit-scrollbar { display: none; }
+.tie-estantes .sal-chip {
+  flex: none;
+  scroll-snap-align: start;
+  min-height: 44px;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 1.2);
+  padding: 0 calc(var(--u) * 3.2);
+  white-space: nowrap;
+}
+.tie-estante.is-pronto { color: var(--text-muted); cursor: default; }
+.tie-estante .tie-pronto { font-size: 0.72em; padding: 0.1em 0.6em; }
+@media (min-width: 760px) {
+  .tie-estantes { flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+}
+
+/* ── El estante Monedas: las filas de la hoja de antes (video.css) ─────────── */
+/* Fuera de `.vid-raiz` las filas no tienen su filete ni su letra: se les da el
+   de la carcasa (los dos valen lo mismo, `--text-primary` al 0,14). */
+.tie-monedas { display: grid; --vid-linea: var(--linea); }
+.tie-monedas .vid-fila { font: inherit; color: inherit; }
+.tie-monedas .vid-fila:last-child { border-bottom: 1px solid var(--linea); }
+
+/* ── V3-A · la lista de tapetes ────────────────────────────────────────────── */
+.tie-lista { display: grid; }
+.tie-art {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  border-top: 1px solid var(--linea);
+  min-height: max(56px, calc(var(--u) * 14));
+}
+.tie-art:last-child { border-bottom: 1px solid var(--linea); }
+.tie-art-abre {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: calc(var(--u) * 2.6);
+  min-height: 44px;
+  align-self: stretch;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tie-art-txt { display: grid; gap: 0.1em; min-width: 0; }
+.tie-art-txt b { font-weight: 500; font-size: calc(var(--u) * 3.6); }
+.tie-art-txt small { color: var(--text-secondary); font-size: calc(var(--u) * 2.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tie-pastilla {
+  display: flex;
+  width: calc(var(--u) * 13);
+  height: calc(var(--u) * 8.5);
+  min-width: 44px;
+  min-height: 28px;
+  border-radius: calc(var(--u) * 1.6);
+  overflow: hidden;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.25);
+}
+.tie-franja { flex: 1; }
+.tie-enuso { color: var(--gold-brand); font-weight: 600; white-space: nowrap; font-size: calc(var(--u) * 3.3); }
+.tie-precio { display: inline-flex; align-items: center; gap: 0.35em; white-space: nowrap; font-weight: 600; font-size: calc(var(--u) * 3.3); color: var(--text-primary); }
+.tie-precio .chip-token { width: 1.1em; height: 1.1em; }
+.tie-usar.sal-chip { min-height: 44px; height: auto; padding: 0 calc(var(--u) * 3.6); }
+.tie-comprado { color: var(--text-secondary); }
+
+/* ── V4-A · la vista del artículo ──────────────────────────────────────────── */
+/* El alto manda: la miniatura no puede empujar la acción fuera de la ventana,
+   así que su ancho se limita por el alto útil. */
+.tie-vitrina { display: grid; justify-items: center; gap: calc(var(--u) * 2.4); }
+.tie-vitrina > .vit {
+  width: min(100%, calc((100dvh - var(--u) * 78) * 1.6));
+  min-width: min(100%, 200px);
+}
+.tie-tonos { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; gap: calc(var(--u) * 4); }
+.tie-tono {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 1);
+  min-width: 44px;
+  min-height: 44px;
+  padding: calc(var(--u) * 0.6) calc(var(--u) * 1);
+  background: none;
+  border: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: calc(var(--u) * 3);
+  cursor: pointer;
+}
+.tie-tono.is-on { color: var(--text-primary); }
+.tie-tono .tie-tono-disco {
+  width: calc(var(--u) * 9);
+  height: calc(var(--u) * 9);
+  min-width: 30px;
+  min-height: 30px;
+  box-shadow: 0 0 0 1px rgba(var(--gold-brand-rgb), 0.25);
+}
+.tie-tono.is-on .tie-tono-disco { box-shadow: 0 0 0 2px var(--green-abyss), 0 0 0 4px var(--gold-brand); }
+.tie-ficha {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(var(--u) * 1.4) calc(var(--u) * 3);
+  color: var(--text-secondary);
+  font-size: calc(var(--u) * 3.2);
+}
+.tie-enuso-pie { margin: 0; text-align: center; min-height: var(--cta-h); display: grid; place-items: center; }
+.tie-enlace {
+  min-height: 44px;
+  background: none;
+  border: 0;
+  color: var(--gold-hover);
+  font: inherit;
+  font-size: calc(var(--u) * 3.2);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  justify-self: center;
+}
+.tie-listo {
+  justify-self: center;
+  padding: calc(var(--u) * 1.6) calc(var(--u) * 4);
+  border-radius: 999px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  background: var(--surface-modal);
+  color: var(--text-primary);
+  font-size: calc(var(--u) * 3.2);
+}
+
+/* ── Horizontal ────────────────────────────────────────────────────────────── */
+/* La banda B de salas.css §16 (≥ 900 × ≤ 830) parte el cuerpo en dos columnas
+   de 196 u; la tienda está fuera de esa rejilla (D-3) y vuelve a la columna de
+   110 u de siempre, cabecera incluida. */
+@media (orientation: landscape) and (min-width: 900px) and (max-height: 830px) {
+  .sal.es-anclada:has(> .sal-cuerpo.es-tienda) { --col: min(100%, calc(var(--u) * 110)); }
+}
+/* Teléfono acostado: la vitrina a la izquierda, tonos y ficha a la derecha. */
+@media (orientation: landscape) and (max-height: 600px) {
+  .sal.es-anclada:has(> .sal-cuerpo.es-vitrina) { --col: min(100%, calc(var(--u) * 180)); }
+  .tie-vitrina {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    align-content: center;
+    column-gap: calc(var(--u) * 5);
+  }
+  .tie-vitrina > .vit { grid-column: 1; grid-row: 1 / span 2; width: calc((100dvh - var(--u) * 46) * 1.6); }
+  .tie-vitrina > .tie-tonos, .tie-vitrina > .tie-ficha { grid-column: 2; }
+}
+
+/* ── V5-A · la ventana de compra ───────────────────────────────────────────── */
+/* Molde de la de «Eliminar cuenta»: velo, tarjeta de cromo (`--surface-modal`),
+   título, cifras y dos botones de 48. Va en `<body>` (portal): fuera de `.sal`,
+   así que trae su `--u`. */
+.tie-ven-raiz { --u: clamp(3.2px, 1vmin, 6px); position: fixed; inset: 0; z-index: 950; font-family: var(--font-base); color: var(--text-primary); }
+.tie-ven-velo { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.58); }
+.tie-ven {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(calc(100vw - 32px), 380px);
+  box-sizing: border-box;
+  padding: 22px 20px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--text-primary-rgb), 0.14);
+  background: var(--surface-modal);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.tie-ven-t { margin: 0 0 14px; font-size: 20px; font-weight: 500; line-height: 1.25; color: var(--text-primary); outline: none; }
+.tie-ven-t b { color: var(--text-primary); font-weight: 700; }
+.tie-ven-cifras { margin: 0; display: grid; gap: 8px; font-size: 15px; }
+.tie-ven-cifras > div { display: flex; justify-content: space-between; gap: 12px; }
+.tie-ven-cifras dt { color: var(--text-secondary); }
+.tie-ven-cifras dd { margin: 0; display: inline-flex; align-items: center; gap: 0.35em; font-variant-numeric: tabular-nums; }
+.tie-ven-cifras .chip-token { width: 1.1em; height: 1.1em; }
+.tie-ven-queda { border-top: 1px solid rgba(var(--text-primary-rgb), 0.14); padding-top: 8px; font-weight: 700; }
+.tie-ven-error { margin: 10px 0 0; min-height: 1.3em; font-size: 13.5px; color: var(--lose-red); visibility: hidden; }
+.tie-ven-error.is-on { visibility: visible; }
+.tie-ven-btns { margin-top: 12px; display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.tie-ven-btn { height: 48px; border-radius: 24px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
+.tie-ven-no { background: none; color: var(--text-primary); border: 1px solid rgba(var(--text-primary-rgb), 0.3); }
+.tie-ven-si {
+  border: 0;
+  color: var(--text-dark);
+  background: linear-gradient(180deg, var(--gold-hover) 0%, var(--gold-brand) 55%, var(--gold-brand-deep) 100%);
+}
+.tie-ven-btn[disabled] { opacity: 0.55; cursor: default; }
+.tie-ven-si[aria-busy="true"] { opacity: 0.8; }

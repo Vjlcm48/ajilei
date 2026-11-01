@@ -95,6 +95,10 @@ export default function PantallaChips({
   // ECO-1c · el aviso de saldo (lámina `laminas/eco1c`), para la píldora.
   aviso = null,
   onAvisoFin,
+  // TIE-1 1a · el ojito: sólo la tienda lo pasa (INV-69, redactado en la 1a).
+  // Sin `onOjito` la barra no lo pinta y la cifra se ve, como siempre.
+  saldoOculto = false,
+  onOjito,
   onVolver,
   onLobby,
   cta,
@@ -147,6 +151,8 @@ export default function PantallaChips({
         cobrando={cobrando}
         aviso={aviso}
         onAvisoFin={onAvisoFin}
+        saldoOculto={saldoOculto}
+        onOjito={onOjito}
         onPerfil={cuenta?.abrirPerfil ?? pronto}
         onAjustes={() => setHojaAbierta(true)}
         ajustesRef={ajustesRef}

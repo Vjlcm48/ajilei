@@ -155,7 +155,7 @@
    porque un gris a la L del verde lee como cemento y no como fieltro.
    El H de estas paradas es RUIDO DE CUANTIZACIÓN (a S≈7% y 8 bits, un solo
    nivel de rgb mueve el matiz decenas de grados): el dato que manda es S. */
-body[data-tapete="grafito"] {
+:is(body, .vit)[data-tapete="grafito"] {
   --green-abyss:   #0d0d0f;   /* S  7,1%  L  5,5% */
   --green-darkest: #0f1012;   /* S  9,1%  L  6,5% */
   --green-deep:    #202224;   /* S  5,9%  L 13,3% */
@@ -174,7 +174,7 @@ body[data-tapete="grafito"] {
    algo más oscuro (la luminancia relativa del azul es menor a igual L de
    HSL): eso es física del color, no una desviación — la profundidad TONAL,
    que es lo que v1.0 §2 pide heredar, es la misma.                         */
-body[data-tapete="azul"] {
+:is(body, .vit)[data-tapete="azul"] {
   --green-abyss:   #090f17;   /* H 214,3  S 43,8%  L  6,3% */
   --green-darkest: #0b121c;   /* H 215,3  S 43,6%  L  7,6% */
   --green-deep:    #152539;   /* H 213,3  S 46,2%  L 15,3% */
@@ -193,7 +193,7 @@ body[data-tapete="azul"] {
    un burdeos apagado lee como marrón, y este tapete tiene referente. La
    referencia sellada por Victor es la camiseta local 2026 de la selección
    (burdeos intenso con detalles en oro).                                   */
-body[data-tapete="vinotinto"] {
+:is(body, .vit)[data-tapete="vinotinto"] {
   --green-abyss:   #1b080d;   /* H 344,2  S 54,3%  L  6,9% */
   --green-darkest: #210910;   /* H 342,5  S 57,1%  L  8,2% */
   --green-deep:    #470f1e;   /* H 343,9  S 65,1%  L 16,9% */
@@ -223,7 +223,7 @@ body[data-tapete="vinotinto"] {
    vista: la frase (1) describía una relación con la familia AZUL que ya no se
    sostiene numéricamente, porque el azul bajó a k = 0,78 y éste no. Se deja
    escrita tal cual, como registro de lo que estas cifras QUERÍAN decir.     */
-body[data-tapete="tricolor"] {
+:is(body, .vit)[data-tapete="tricolor"] {
   --green-abyss:   #0c131c;   /* H 214  S 42,5%  L  7,8% */
   --green-darkest: #0f1722;   /* H 214  S 39,9%  L  9,6% */
   --green-deep:    #1e2f46;   /* H 214  S 40,8%  L 19,6% */
@@ -285,7 +285,8 @@ body[data-tapete="tricolor"] .game-table {
    El vacío de los lados —lo que `body` pinta más allá de los 1126px de
    `#root`— NO necesita regla: resuelve `var(--green-abyss)`, que arriba ya es
    el azul abisal de esta familia. */
-body[data-tapete="tricolor"] .game-table-screen {
+body[data-tapete="tricolor"] .game-table-screen,
+.vit[data-tapete="tricolor"] .vit-fondo {
   background:
     var(--filigrana),
     radial-gradient(circle at center,
@@ -300,180 +301,94 @@ body[data-tapete="tricolor"] .game-table-screen {
       var(--tap-tri-rojo)     100%);
 }
 
+
+/* ════════════════════════════════════════════════════════════════════════════
+   1b · TIE-1 1a · LOS TONOS, Y LA VITRINA LEE LO MISMO QUE LA MESA
+
+   Cada bloque de §1 se declara en `:is(body, .vit)`: en `body` lo pone la mesa
+   (`useTapeteEnMesa`) y en `.vit` la vitrina de la tienda (`Vitrina.jsx`). Es
+   UN bloque para las dos, así que la vitrina no puede mentir: Δ = 0 por
+   construcción, y el arnés lo mide (`diagDSK tienda`, INV-77).
+
+   Los tonos claro y oscuro de grafito, azul y vinotinto: cada parada del tono
+   actual con H y S intactos y la L de HSL × 1,24 (claro) o × 0,80 (oscuro);
+   `--surface-game` es su base al 0,88 y las dos tintas de zona su abismo al
+   0,45 / 0,30, los alfas de hoy. El oro no cambia. Valores de la lámina 1a-L
+   (`laminas/tie1a/tonos.css`, generados por `tonos.mjs`), sellados por Victor
+   el 2026-10-31 y copiados TAL CUAL: si uno se retoca, se retoca aquí.
+   El tono 'actual' no lleva atributo (es §1), y el verde y el tricolor no
+   tienen tonos: un `data-tapete-tono` sobre ellos no encuentra regla.
+
+   El noveno valor es `--luz-k` (luz.css §0): la luz de LUZ-1 baja en el claro
+   y sube en el oscuro. Se declara sobre `.game-table-screen` —que fija el 1 de
+   siempre— y sobre la `.vit`, de donde lo hereda su fondo.
+   ════════════════════════════════════════════════════════════════════════════ */
+:is(body, .vit)[data-tapete="grafito"][data-tapete-tono="claro"] {
+  --green-abyss: #101013;
+  --green-darkest: #131416;
+  --green-deep: #282a2d;
+  --green-base: #323539;
+  --green-bright: #404449;
+  --surface-game: rgba(50, 53, 57, 0.88);
+  --surface-area: rgba(16, 16, 19, 0.45);
+  --surface-area-light: rgba(16, 16, 19, 0.30);
+}
+:is(body, .vit)[data-tapete="grafito"][data-tapete-tono="oscuro"] {
+  --green-abyss: #0a0a0c;
+  --green-darkest: #0c0d0e;
+  --green-deep: #1a1b1d;
+  --green-base: #202225;
+  --green-bright: #2a2c2f;
+  --surface-game: rgba(32, 34, 37, 0.88);
+  --surface-area: rgba(10, 10, 12, 0.45);
+  --surface-area-light: rgba(10, 10, 12, 0.30);
+}
+:is(body, .vit)[data-tapete="azul"][data-tapete-tono="claro"] {
+  --green-abyss: #0b131d;
+  --green-darkest: #0e1623;
+  --green-deep: #1a2e47;
+  --green-base: #213a59;
+  --green-bright: #2b4a72;
+  --surface-game: rgba(33, 58, 89, 0.88);
+  --surface-area: rgba(11, 19, 29, 0.45);
+  --surface-area-light: rgba(11, 19, 29, 0.30);
+}
+:is(body, .vit)[data-tapete="azul"][data-tapete-tono="oscuro"] {
+  --green-abyss: #070c12;
+  --green-darkest: #090e16;
+  --green-deep: #111e2e;
+  --green-base: #16263a;
+  --green-bright: #1c304a;
+  --surface-game: rgba(22, 38, 58, 0.88);
+  --surface-area: rgba(7, 12, 18, 0.45);
+  --surface-area-light: rgba(7, 12, 18, 0.30);
+}
+:is(body, .vit)[data-tapete="vinotinto"][data-tapete-tono="claro"] {
+  --green-abyss: #210a10;
+  --green-darkest: #290b14;
+  --green-deep: #581325;
+  --green-base: #70192f;
+  --green-bright: #8f1f3d;
+  --surface-game: rgba(112, 25, 47, 0.88);
+  --surface-area: rgba(33, 10, 16, 0.45);
+  --surface-area-light: rgba(33, 10, 16, 0.30);
+}
+:is(body, .vit)[data-tapete="vinotinto"][data-tapete-tono="oscuro"] {
+  --green-abyss: #16060a;
+  --green-darkest: #1a070d;
+  --green-deep: #390c18;
+  --green-base: #48101e;
+  --green-bright: #5c1427;
+  --surface-game: rgba(72, 16, 30, 0.88);
+  --surface-area: rgba(22, 6, 10, 0.45);
+  --surface-area-light: rgba(22, 6, 10, 0.30);
+}
+:is(body, .vit)[data-tapete-tono="claro"] :is(.game-table-screen, .vit-mesa), .vit[data-tapete-tono="claro"] { --luz-k: 0.85; }
+:is(body, .vit)[data-tapete-tono="oscuro"] :is(.game-table-screen, .vit-mesa), .vit[data-tapete-tono="oscuro"] { --luz-k: 1.15; }
+
 /* ═════════════════════════════════════════════════════════════════════════
-   2 · LA ENTRADA DEL ⋮ Y EL PANEL
+   2 · LA ENTRADA DEL ⋮ Y EL PANEL — RETIRADOS EN TIE-1 1a
+   El tapete se elige en la tienda (`screens/Tienda.jsx`, `tienda.css`); la
+   entrada del ⋮, su godete y el panel salen con `TapetesPanel`. Los discos de
+   §0 se quedan: son el color de cada tapete en una sola cifra.
    ═════════════════════════════════════════════════════════════════════════ */
-
-/* El godete hereda toda la caja de `.util-item` y `.util-ico` (gameTable.css,
-   intacto): la fila nueva no cuesta ni una línea allí. Sólo hay que darle su
-   alto, y se toma del token de su hermano — el icono propio de Mano Actual —
-   para que las dos siluetas SVG del panel midan lo mismo. */
-.util-ico-godete {
-  height: var(--dsk-u1-card-h);
-  width: auto;
-  display: block;
-  color: var(--text-primary);
-}
-
-/* Panel · misma familia visual que `.utilities-panel` y `.u3-popup`
-   (superficie de sistema, filete de oro único, una sombra) porque nace del
-   mismo menú. Un peldaño por encima del panel de utilidades, igual que sus
-   hermanos. `fixed` y fuera de flujo estricto: Δ=0 de layout por
-   construcción, y el juego sigue corriendo detrás (v1.0 §4). */
-.tapetes-panel {
-  --tap-cols: 3;          /* molde de --dsk-u2-cols: la rejilla de U2 */
-  --tap-gap: 6px;
-  --tap-tile-w: 72px;     /* ≥ 40px de estándar táctil de campaña, con holgura */
-  --tap-disco: 44px;
-  /* Ancho DERIVADO de la rejilla, no cableado: recompactar el panel no exige
-     recalcular nada a mano (lección U1b). */
-  --tap-panel-w: calc(var(--tap-cols) * var(--tap-tile-w)
-                  + (var(--tap-cols) - 1) * var(--tap-gap) + 22px);
-
-  position: fixed;
-  z-index: calc(var(--dsk-u1-panel-z) + 1);
-  box-sizing: border-box;
-  width: var(--tap-panel-w);
-  padding: 10px;
-  background: var(--surface-modal);
-  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
-  border-radius: 8px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  color: var(--text-primary);
-  font-family: var(--font-base);
-}
-
-.tap-titulo {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-.tap-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--tap-cols), var(--tap-tile-w));
-  gap: var(--tap-gap);
-  justify-content: center;
-}
-
-/* Baldosa: disco arriba, nombre debajo (v1.0 §4). La reserva de dos líneas de
-   nombre es fija para que la rejilla no dé un salto cuando el copy cambie —
-   y va a cambiar: los nombres son provisionales. */
-.tap-swatch {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: var(--tap-tile-w);
-  padding: 6px 2px 5px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: inherit;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
-}
-.tap-swatch:hover { background: rgba(var(--gold-brand-rgb), 0.10); }
-
-/* El disco es el color real del tapete. VIS-1b: el `background` lo pone el
-   JSX, pero ya no con un hex de catálogo sino con `var(--tap-swatch-<id>)`,
-   declarado arriba en §0. Aquí sólo su caja y su filete — sin tocar. */
-.tap-disco {
-  width: var(--tap-disco);
-  height: var(--tap-disco);
-  border-radius: 50%;
-  border: 1px solid rgba(var(--gold-brand-rgb), 0.30);
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.45);
-  flex-shrink: 0;
-}
-
-.tap-nombre {
-  font-size: 11px;
-  line-height: 1.2;
-  text-align: center;
-  min-height: 26.4px;   /* dos líneas a 11px · reserva, no recorte */
-}
-
-/* Tres estados (v1.0 §4). El ACTIVO se resalta con el molde del chip "Tu
-   último" de NivelSelect: fondo dorado ⇒ texto oscuro, sin excepciones
-   (doctrina §45). Es el único oro sólido nuevo, y es un chip de estado —
-   el mismo papel que ya cumple en el lobby. */
-.tap-swatch.is-activo {
-  background: rgba(var(--gold-brand-rgb), 0.12);
-  border-color: rgba(var(--gold-brand-rgb), 0.45);
-}
-.tap-chip {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  border-radius: 999px;
-  padding: 1px 7px;
-  white-space: nowrap;
-  background: var(--gold-brand);
-  color: var(--text-dark);
-}
-/* COMPRADO · marca discreta y sin precio. Deliberadamente en texto tenue y no
-   en oro: la propiedad es un hecho consumado, no una llamada a la acción. */
-.tap-marca {
-  font-size: 11px;
-  line-height: 1;
-  padding: 2px 0;
-  color: var(--text-muted);
-}
-/* NO COMPRADO · la etiqueta de precio es la única llamada del panel. */
-.tap-precio {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-  color: var(--gold-dim);
-}
-
-/* Diálogo de compra · se pinta DENTRO del panel, bajo la rejilla, porque la
-   vista previa ya está aplicada en la mesa y el jugador tiene que poder
-   verla: un modal centrado la habría tapado justo cuando importa. Separado
-   por el filete del sistema, como "Mano actual" del grupo en el panel. */
-.tap-dialogo {
-  margin-top: 9px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(var(--gold-brand-rgb), 0.18);
-}
-.tap-dialogo-txt {
-  margin: 0 0 8px;
-  font-size: 12px;
-  line-height: 1.35;
-  text-align: center;
-}
-.tap-dialogo-txt strong { font-weight: 700; }
-.tap-dialogo-acciones {
-  display: flex;
-  gap: 8px;
-}
-/* 40px de alto = estándar táctil de esta campaña (no WCAG), el mismo que
-   rige el disparador del ⋮. */
-.tap-btn {
-  flex: 1;
-  box-sizing: border-box;
-  min-height: 40px;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
-  background: transparent;
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-.tap-btn-si {
-  background: var(--gold-brand);
-  color: var(--text-dark);
-  border-color: var(--gold-brand);
-}
-.tap-btn-si:hover { background: var(--gold-hover); border-color: var(--gold-hover); }
-.tap-btn-no:hover { background: rgba(var(--gold-brand-rgb), 0.10); }

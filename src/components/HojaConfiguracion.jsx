@@ -5,6 +5,10 @@ import { SoundButton } from './SoundButton'
 import EliminarCuenta from './EliminarCuenta'
 import { IconoUsuario } from './IconosLobby'
 import Bandera from './Bandera'
+import Vitrina from './Vitrina'
+import { tapetePorId } from '../config/tapetes'
+import { useTapetes } from '../hooks/useTapetes'
+import { enUsoFila } from '../hooks/tiendaCore'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { CORREO_SOPORTE } from '../config/soporte'
 import { VERSION, COMMIT } from '../config/version'
@@ -54,6 +58,11 @@ import { copiarTexto } from '../lib/copiarTexto'
 // `cuenta.abrirPerfil` la cabecera es un `<button>` con «›» al final, de 44
 // como mínimo: cierra la hoja y abre el perfil. Sin él (nadie la monta así
 // hoy) sigue siendo el bloque quieto de la 1a.
+//
+// ── TIE-1 1a · LA FILA «TAPETES» ES UNA PUERTA DE LA TIENDA ─────────────────
+// Rector: AJILEI_TIE-1_Fase1a_v1.0.md §4 (V6 de la lámina). Entre Sonido e
+// Idioma; `cuenta.tapetes` es el canal (lo que está en uso) y
+// `cuenta.abrirTapetes` la puerta (cierra la hoja y abre la tienda en Tapetes).
 
 export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuenta, onCerrarSesion }) {
   const { t, idioma } = useIdioma()
@@ -133,6 +142,8 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
 
   // O1 · el bloque de cuenta RESERVA SU CAJA aunque no haya cuenta (bypass):
   // nombre y correo se apagan con `visibility` y el alto no cambia.
+  const enUso = enUsoFila(useTapetes(cuenta?.tapetes ?? null))
+
   const usuario = cuenta?.username ?? ''
   const correo = enmascararCorreo(cuenta?.correo)
 
@@ -204,6 +215,27 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
           <SoundButton className="lob-fila" data-accion="cfg-sonido" aria-pressed={soundEnabled} onClick={alternarSonido}>
             <span>{t('lob.cfg.sonido')}</span>
             <span className={`lob-pastilla${soundEnabled ? ' cfg-si' : ''}`}>{t(soundEnabled ? 'lob.cfg.si' : 'lob.cfg.no')}</span>
+          </SoundButton>
+
+          {/* TIE-1 1a · Tapetes (V6), entre Sonido e Idioma: el tapete y el
+              tono en uso según el canal (`cuenta.tapetes`), con el disco
+              pintado por la misma `.vit` que la mesa (INV-77). Abre la tienda
+              en Tapetes; sin la puerta (nadie la monta así hoy), «Pronto». */}
+          <SoundButton
+            className="lob-fila tie-cfg-fila"
+            data-accion="cfg-tapetes"
+            onClick={cuenta?.abrirTapetes ? () => { onCerrar?.(); cuenta.abrirTapetes() } : pronto}
+          >
+            <span className="tie-cfg-txt">
+              <span>{t('tie.estante.tapetes')}</span>
+              <small data-accion="cfg-tapetes-valor">
+                {enUso.tono === null
+                  ? tapetePorId(enUso.id).nombre
+                  : t('tie.cfg.valor', { nombre: tapetePorId(enUso.id).nombre, tono: t(`tie.tono.${enUso.tono}`).toLowerCase() })}
+              </small>
+            </span>
+            <Vitrina tapete={enUso.id} tono={enUso.tono} tamano="disco" />
+            <span className="lob-chev" aria-hidden="true">›</span>
           </SoundButton>
 
           <SoundButton className="lob-fila" data-accion="cfg-idioma" onClick={pronto}>

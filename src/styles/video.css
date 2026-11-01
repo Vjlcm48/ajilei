@@ -100,33 +100,10 @@
   background: rgba(var(--green-abyss-rgb), 0.78);
 }
 
-/* ══ LA HOJA «CONSEGUIR MONEDAS» ══════════════════════════════════════
-   La misma superficie que la hoja ⚙ del lobby (`.lob-hoja`): fondo de modal,
-   filete, radio de 3 u. Cuelga de la píldora (la coloca el JS). */
-.vid-hoja {
-  position: fixed;
-  z-index: 910;
-  width: min(calc(100vw - 2 * var(--vid-margen)), calc(var(--u) * 76));
-  max-height: calc(100dvh - var(--u) * 20);
-  overflow: auto;
-  background: var(--surface-modal);
-  border: 1px solid var(--vid-linea);
-  border-radius: calc(var(--u) * 3);
-  padding: calc(var(--u) * 3) calc(var(--u) * 4) calc(var(--u) * 2);
-  box-shadow: 0 0.6em 1.8em rgba(0, 0, 0, 0.45);
-  animation: vid-hoja-entra 200ms ease-out both;
-  transform-origin: top center;
-}
-.vid-hoja-t {
-  margin: 0 0 calc(var(--u) * 1.5);
-  font-size: calc(var(--u) * 3.6);
-  font-weight: 500;
-  line-height: 1.2;
-  color: var(--text-primary);
-  outline: none;
-}
-.vid-hoja-t:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 4px; }
-
+/* ══ LAS FILAS DE «CONSEGUIR MONEDAS» ══════════════════════════════════
+   TIE-1 1a · la hoja que colgaba de la píldora (`.vid-hoja`) se retira con
+   `HojaMonedas`: el «+» abre la tienda en el estante Monedas, que pinta estas
+   mismas filas (`tienda.css` les da su filete fuera de `.vid-raiz`). */
 .vid-fila {
   width: 100%;
   min-height: max(44px, calc(var(--u) * 12));
@@ -441,12 +418,11 @@
 /* ── Movimiento ───────────────────────────────────────────────────────────── */
 @keyframes vid-funde { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vid-sale { from { opacity: 1; } to { opacity: 0; } }
-@keyframes vid-hoja-entra { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes vid-consejo-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes vid-cel-entra { from { opacity: 0; transform: scale(0.86); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .vid-velo, .vid-capa, .vid-pausa, .vid-velo-int, .vid-hoja, .vid-consejo, .vid-cel-tarjeta, .vid-guardando { animation: none; }
+  .vid-velo, .vid-capa, .vid-pausa, .vid-velo-int, .vid-consejo, .vid-cel-tarjeta, .vid-guardando { animation: none; }
   .vid-cel.is-sale .vid-cel-tarjeta { animation: none; opacity: 0; }
   .vid-barra > span { transition: none; }
 }

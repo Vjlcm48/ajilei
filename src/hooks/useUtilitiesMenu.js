@@ -162,10 +162,9 @@ export function anclaSatelite(rectVisual, alto) {
 //   · Aviso de "Mano actual": 104,42 medido en las 16 celdas (desglose completo
 //     de los cuatro palos + nota del comodín + saldo). La variante "agotadas"
 //     mide 59,73 y le sobra sitio.
-//   · Tapetes: 270,98 en rejilla 3×2 (vertical) y 161,59 en la fila de cinco
-//     del horizontal. Los dos MEDIDOS sobre el panel vivo, no estimados: el
-//     cálculo a mano daba 153 para la fila y se quedaba 8,59 corto, que es
-//     exactamente el error que un techo derivado no perdona.
+//   · Tapetes: 270,98 / 161,59, MEDIDOS sobre el panel vivo (el cálculo a mano
+//     daba 153 para la fila y se quedaba 8,59 corto). TIE-1 1a · el panel sale
+//     con su entrada del ⋮: su alto se retira.
 //   · Selector de reacciones: 186 EXACTO en las dos orientaciones, y es el
 //     único de los tres que no depende del contenido — la lista muestra cuatro
 //     filas de 44 con separación 2 y relleno 2 (4·44 + 3·2 + 2·2 = 186) y las
@@ -181,7 +180,6 @@ export function anclaSatelite(rectVisual, alto) {
 //     caracteres (CHECK de SUP-2a), así que no hay peor caso que no esté dentro.
 //     CFG-1 1e · el panel de Cuenta sale con su entrada: su alto se retira.
 export const ALTO_AVISO_MANO = 105
-export const ALTO_TAPETES = { v: 271, h: 162 }
 export const ALTO_SELECTOR_REACCIONES = 186
 
 // ── Contador de consultas de "Mano actual" ──────────────────────────────────

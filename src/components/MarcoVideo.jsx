@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import '../styles/video.css'
 
-import HojaMonedas from './HojaMonedas'
 import CapaVideo from './CapaVideo'
 import GuardandoVideo from './GuardandoVideo'
 import SinVideo from './SinVideo'
@@ -18,7 +17,7 @@ import { AJILEI_CONFIG } from '../config/ajileiConfig'
 // el plan aprobado del STOP-1 §3. `App` es una cascada de `return`, así que
 // envuelve con ESTE marco cada pantalla que lleva `BarraSuperior` (el lobby,
 // Retar, y las cuatro de salas). La forma del árbol es la misma en todas, y por
-// eso el marco —y con él la hoja, la capa y la celebración— NO se desmonta al
+// eso el marco —y con él la capa y la celebración— NO se desmonta al
 // pasar de una a otra. La mesa no se envuelve (G3: en la mesa no hay video).
 //
 // QUÉ HACE: se suscribe al canal (`lib/controlVideo`) y a la costura
@@ -31,10 +30,15 @@ import { AJILEI_CONFIG } from '../config/ajileiConfig'
 //
 // P-4 (rector) · si una sala arranca con un video abierto, la capa sigue
 // encima. Queda anotado en el registro para MES-PvP.
+//
+// TIE-1 1a · LA HOJA «CONSEGUIR MONEDAS» SE VA. El «+» abre la tienda en el
+// estante Monedas (`onMonedas`, lo pone `App`), que pinta las mismas dos filas
+// y pide el video por este mismo contexto: un solo camino al video. La tienda
+// va envuelta en este marco como las demás pantallas con barra.
 
 const ESPEJO = AJILEI_CONFIG.economy
 
-export default function MarcoVideo({ control, avisoEnCurso = false, children }) {
+export default function MarcoVideo({ control, avisoEnCurso = false, onMonedas, children }) {
   const { t } = useIdioma()
   const foto = useSyncExternalStore(control.suscribir, control.leer)
   const sesion = useSyncExternalStore(control.reproductor.suscribir, control.reproductor.leer)
@@ -72,7 +76,7 @@ export default function MarcoVideo({ control, avisoEnCurso = false, children }) 
   const brilla = cel !== null && pintura?.id === cel.id && pintura.brilla === true
 
   const valor = useMemo(() => ({
-    abrirHoja: control.abrirHoja,
+    abrirMonedas: onMonedas ?? null,
     pedir: control.pedir,
     mirar: control.mirar,
     premio,
@@ -80,22 +84,13 @@ export default function MarcoVideo({ control, avisoEnCurso = false, children }) 
     apagado,
     ocupado,
     pildora: cifra === null ? null : { cifra, brilla },
-  }), [control, premio, contador, apagado, ocupado, cifra, brilla])
+  }), [control, onMonedas, premio, contador, apagado, ocupado, cifra, brilla])
 
   return (
     <VideoContext.Provider value={valor}>
       {children}
       {createPortal(
         <div className="vid-raiz">
-          {foto.hoja && (
-            <HojaMonedas
-              contador={contador}
-              apagada={apagado}
-              premio={premio}
-              onCerrar={control.cerrarHoja}
-              onVideo={control.pedir}
-            />
-          )}
           {sesion && <CapaVideo key={sesion.id} reproductor={control.reproductor} sesion={sesion} premio={premio} />}
           {foto.fase === FASES_CONTROL.COBRANDO && (
             <GuardandoVideo premio={premio} salible={foto.salible} onSalir={control.salirDelCobro} />

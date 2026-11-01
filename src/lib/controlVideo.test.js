@@ -87,12 +87,12 @@ describe('ECO-1g · controlVideo', () => {
 
   it('el recorrido entero: pedir → ver → cobrar → celebrar; el saldo es el que devuelve el cobro', async () => {
     const m = montaje()
-    m.ctl.abrirHoja()
+    m.ctl.mirar()
     await vaciar()
-    expect(m.ctl.leer()).toMatchObject({ hoja: true, fase: null, estado: { quedan: 8, tope: 8, premio: 500 } })
+    expect(m.ctl.leer()).toMatchObject({ fase: null, estado: { quedan: 8, tope: 8, premio: 500 } })
 
     m.ctl.pedir()
-    expect(m.ctl.leer()).toMatchObject({ hoja: false, fase: FASES_CONTROL.PIDIENDO })
+    expect(m.ctl.leer()).toMatchObject({ fase: FASES_CONTROL.PIDIENDO })
     expect(m.precargas).toHaveLength(1)          // el sonido del cobro se pide ya, 40 s antes
     await vaciar()
     expect(m.ctl.leer().fase).toBe(FASES_CONTROL.VIENDO)
@@ -351,14 +351,6 @@ describe('ECO-1g · controlVideo', () => {
     expect(m.ctl.leer().fase).toBeNull()
   })
 
-  it('con la hoja o un video abiertos no se abre otra cosa encima', async () => {
-    const m = montaje()
-    m.ctl.pedir()
-    await vaciar()
-    m.ctl.abrirHoja()
-    expect(m.ctl.leer().hoja).toBe(false)
-  })
-
   it('otra cuenta no hereda nada: ni el contador, ni el video, ni el cobro en curso', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const m = montaje({ cobrados: 8 })
@@ -366,13 +358,13 @@ describe('ECO-1g · controlVideo', () => {
     await vaciar()
     expect(m.ctl.leer().estado.quedan).toBe(0)
     m.ctl.cuenta(null)
-    expect(m.ctl.leer()).toEqual({ estado: null, hoja: false, fase: null, salible: false, cel: null, en: 0 })
+    expect(m.ctl.leer()).toEqual({ estado: null, fase: null, salible: false, cel: null, en: 0 })
     // Sin cuenta no se mira ni se pide.
     const antes = m.red.llamadas.length
-    m.ctl.mirar(); m.ctl.pedir(); m.ctl.abrirHoja()
+    m.ctl.mirar(); m.ctl.pedir()
     await vaciar()
     expect(m.red.llamadas).toHaveLength(antes)
-    expect(m.ctl.leer().hoja).toBe(false)
+    expect(m.ctl.leer().fase).toBeNull()
 
     // A mitad de un video, la sesión se cierra: la capa se va y nada se cobra.
     const v = montaje()
@@ -402,9 +394,6 @@ describe('ECO-1g · controlVideo', () => {
   it('al desmontarse el marco se recoge lo que sólo era pintura; el video y el cobro, no', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const m = montaje()
-    m.ctl.abrirHoja()
-    m.ctl.recoger()
-    expect(m.ctl.leer().hoja).toBe(false)
     m.ctl.pedir()
     await vaciar()
     m.ctl.recoger()
@@ -427,7 +416,7 @@ describe('ECO-1g · controlVideo', () => {
   it('la foto lleva el instante en que se tomó', async () => {
     const m = montaje()
     m.hora.t += 5000
-    m.ctl.abrirHoja()
+    m.ctl.pedir()
     expect(m.ctl.leer().en).toBe(m.hora.t)
   })
 
@@ -437,14 +426,15 @@ describe('ECO-1g · controlVideo', () => {
     const soltar = m.ctl.suscribir(() => { avisos += 1 })
     const f0 = m.ctl.leer()
     expect(m.ctl.leer()).toBe(f0)
-    m.ctl.abrirHoja()
+    m.ctl.pedir()
     expect(avisos).toBe(1)
     expect(m.ctl.leer()).not.toBe(f0)
-    m.ctl.cerrarHoja()
-    m.ctl.cerrarHoja()                            // ya cerrada: ni avisa
-    expect(avisos).toBe(2)
+    m.ctl.finCelebracion()                        // no hay celebración: ni avisa
+    m.ctl.cerrarSin()                             // no hay mensaje: ni avisa
+    expect(avisos).toBe(1)
     soltar()
-    m.ctl.abrirHoja()
-    expect(avisos).toBe(2)
+    await vaciar()                                // el video sale a la vista, sin oyente
+    expect(m.ctl.leer().fase).toBe(FASES_CONTROL.VIENDO)
+    expect(avisos).toBe(1)
   })
 })

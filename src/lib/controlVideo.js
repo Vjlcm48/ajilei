@@ -39,7 +39,11 @@ export const FASES_CONTROL = Object.freeze({
 // La foto que leen las piezas que pintan. `en` es el instante (reloj local) en
 // que se tomó: «Vuelven en…» se resta contra él y no contra un reloj leído en
 // el render.
-const FOTO_VACIA = Object.freeze({ estado: null, hoja: false, fase: null, salible: false, cel: null, en: 0 })
+//
+// TIE-1 1a · sale `hoja`: la hoja «Conseguir monedas» del «+» se retiró (el «+»
+// abre la tienda en el estante Monedas, que llama a `mirar` al montarse), y con
+// ella `abrirHoja` y `cerrarHoja`.
+const FOTO_VACIA = Object.freeze({ estado: null, fase: null, salible: false, cel: null, en: 0 })
 
 /**
  * @param {object} o
@@ -88,8 +92,8 @@ export function crearControlVideo({
   }
 
   // ── `mi_video`: lo que pinta el contador ──────────────────────────────────
-  // Se pregunta cuando hace falta (al abrir la hoja, al salir el bloque de
-  // Retar), no al arrancar: sin límite y sin efectos.
+  // Se pregunta cuando hace falta (al abrir el estante Monedas de la tienda, al
+  // salir el bloque de Retar), no al arrancar: sin límite y sin efectos.
   function mirar() {
     if (mirando || cuenta === null) return
     mirando = true
@@ -133,7 +137,7 @@ export function crearControlVideo({
   async function pedir() {
     if (cuenta === null || ocupadoEn(foto) || sinVideosHoy(foto.estado)) return
     const g = generacion
-    fija({ hoja: false, fase: FASES_CONTROL.PIDIENDO })
+    fija({ fase: FASES_CONTROL.PIDIENDO })
     precargar()
     const r = await api.pedir()
     if (g !== generacion) return
@@ -186,13 +190,7 @@ export function crearControlVideo({
     },
 
     mirar,
-    abrirHoja() {
-      if (cuenta === null || ocupadoEn(foto)) return
-      fija({ hoja: true })
-      mirar()
-    },
-    cerrarHoja() { if (foto.hoja) fija({ hoja: false }) },
-    /** La única entrada, para los dos sitios (Retar y la hoja del «+»). */
+    /** La única entrada, para los dos sitios (Retar y el estante Monedas). */
     pedir,
     /** «Volver» del mensaje de «no hay video». */
     cerrarSin() { if (foto.fase === FASES_CONTROL.SIN) liberar() },
@@ -212,8 +210,8 @@ export function crearControlVideo({
      *  un video a la vista o un cobro en curso no se tocan. */
     recoger() {
       const sin = foto.fase === FASES_CONTROL.SIN
-      if (!foto.hoja && !foto.cel && !sin) return
-      fija({ hoja: false, cel: null, ...(sin ? { fase: null, salible: false } : {}) })
+      if (!foto.cel && !sin) return
+      fija({ cel: null, ...(sin ? { fase: null, salible: false } : {}) })
     },
   }
 }

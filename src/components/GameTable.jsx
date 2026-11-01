@@ -7,7 +7,6 @@ import { SoundButton } from './SoundButton'
 import { UtilitiesTrigger, UtilitiesPanel } from './UtilitiesMenu'
 import { ReaccionesSelector, ReaccionBurbuja } from './Reacciones'
 import { ManoActualPopup } from './ManoActual'
-import { TapetesPanel } from './TapetesPanel'
 import ConfirmarConsulta from './ConfirmarConsulta'
 import { CelebracionMesa, PulsoNombre, AjileiOverlay, PantallaVictoria } from './Celebracion'
 import MiniPerfil from './MiniPerfil'
@@ -37,12 +36,12 @@ import { t } from '../config/textos'
 import { finDeMano, TOPE_RECARGA_MS } from '../hooks/mesaIACore'
 import { jugadoresVsIA } from '../engine/entrada'
 import {
-  useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO, ALTO_TAPETES,
+  useUtilitiesMenu, anclaSatelite, ALTO_AVISO_MANO,
   ALTO_SELECTOR_REACCIONES,
 } from '../hooks/useUtilitiesMenu'
 import { useReacciones } from '../hooks/useReacciones'
 import { useConsultas } from '../hooks/useConsultas'
-import { useTapetes } from '../hooks/useTapetes'
+import { useTapeteEnMesa } from '../hooks/useTapetes'
 import { useCongelado } from '../hooks/useCongelado'
 import { useEscalaMesa } from '../hooks/useEscalaMesa'
 import { aPropios, escalaActual } from '../lib/escala'
@@ -328,7 +327,9 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, 
 // puerta de Mano actual de pago (INV-75). `cuenta` ya sólo trae el nombre y el
 // correo del mini-perfil propio: el Bautizo en edición no monta desde la mesa.
 // `onSaldo`: el saldo que contesta `consultar_mano`, para la billetera de App.
-export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null, contraIAS = false, apiConsulta = null, onSaldo = null }) {
+// TIE-1 1a · `tapetes`: el canal de los tapetes de App (`lib/controlTapetes`);
+// la mesa pone en `<body>` el tapete y el tono en uso. Sin él, el verde.
+export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null, contraIAS = false, apiConsulta = null, onSaldo = null, tapetes = null }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -620,7 +621,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // MOV-1b-a · sin gate: Tapetes se enciende en móvil. El segundo cinturón que
   // lo sostenía —el bloque gateado de tapetes.css— también se abrió; un sello
   // que sobrevive a su motivo deja al jugador elegir un tapete y no ver nada.
-  const tapetes = useTapetes()
+  // TIE-1 1a · la mesa ya no elige ni compra: el tapete y su tono los dice el
+  // servidor por el canal de `App` (`lib/controlTapetes`, INV-76), con la copia
+  // del aparato mientras contesta, y aquí sólo se ponen en `<body>`. La entrada
+  // «Tapetes» del ⋮ y su panel se retiran: se elige en la tienda.
+  useTapeteEnMesa(tapetes)
   const manoDisponible = hayManoConsultable(phase, game.handCount, human.cards.length)
   // El popup se ancla al ⋮ (el panel ya no existe: cierra al ejecutar) por su
   // borde DERECHO, molde del popup del contador. Se mide en el press, nunca en
@@ -2835,7 +2840,6 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         etiquetaMano={etiquetaConsulta(consultas.estado, mesaServidor, game.handCount)}
         manoDisponible={manoDisponible}
         onManoActual={pedirManoActual}
-        onTapetes={() => tapetes.abrir(anclaSatelite(utilMenu.triggerRect(), ALTO_TAPETES))}
         rapida={rapida}
         onRapida={alternarRapida}
         vivas={isDesktopTable ? VIVAS_ESCRITORIO : VIVAS_MOVIL}
@@ -2845,27 +2849,6 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         // `null` = montan todas.
         presentes={presentesDe(contraIAS)}
       />
-
-      {/* EMB-2 · panel de tapetes. Vive AQUÍ por la misma razón que sus
-          hermanos: la entrada del ⋮ cierra al ejecutar, así que cuando esto se
-          pinta el panel de utilidades ya se desmontó con su ancla. Overlay
-          puro, Δ=0, y el juego sigue corriendo detrás. */}
-      {/* MOV-1b-a · monta en las dos pieles. Su colocación la pone D6 y su piel
-          es global desde esta tanda (tapetes.css se desanidó); lo único propio
-          de móvil es la disposición en FILA del horizontal, un token en
-          menuMovil.css. */}
-      {(
-        <TapetesPanel
-          ancla={tapetes.ancla}
-          activo={tapetes.activo}
-          comprados={tapetes.comprados}
-          previa={tapetes.previa}
-          dialogo={tapetes.dialogo}
-          onPresionar={tapetes.presionar}
-          onConfirmar={tapetes.confirmar}
-          onRevertir={tapetes.revertir}
-        />
-      )}
 
       {/* DSK-U3 · popup del valor de "Mano actual". Vive AQUÍ y no dentro del
           panel porque la entrada cierra al ejecutar: cuando esto se pinta, el

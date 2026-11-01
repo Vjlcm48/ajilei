@@ -1709,10 +1709,15 @@ body.sal-activa #root {
      Salas:      izq. la ventanilla de mesas (1,25 fr: con la mitad justa
                  cortaba «200 HC por m…») · der. el código y la zona.
    Fuera de la banda, una columna (A). El teléfono acostado (915×412) cae
-   dentro: es la decisión 7. */
+   dentro: es la decisión 7.
+   TIE-1 1a (D-3 de la lámina) · la tienda NO entra: es una columna (estantes,
+   lista, vitrina) y la rejilla mandaba la vitrina a la derecha. Se la saca con
+   `:not(:where(.es-tienda))`, que no suma especificidad (sigue en 0,3,0), y en
+   la lista de «las demás» (`:not(.es-retar, .es-armar, .es-tienda)`, 0,1,0
+   dentro del `:not` como antes). Su columna, en tienda.css. */
 @media (orientation: landscape) and (min-width: 900px) and (max-height: 830px) {
   .sal.es-anclada { --col: min(100%, calc(var(--u) * 196)); }
-  .sal.es-anclada .sal-cuerpo {
+  .sal.es-anclada .sal-cuerpo:not(:where(.es-tienda)) {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto 1fr auto;
@@ -1720,8 +1725,8 @@ body.sal-activa #root {
     row-gap: calc(var(--u) * 2.4);
     align-content: stretch;
   }
-  .sal.es-anclada .sal-cuerpo > * { margin: 0; }
-  .sal.es-anclada .sal-cuerpo > .sal-accion { grid-area: 4 / 2; align-self: end; }
+  .sal.es-anclada .sal-cuerpo:not(:where(.es-tienda)) > * { margin: 0; }
+  .sal.es-anclada .sal-cuerpo:not(:where(.es-tienda)) > .sal-accion { grid-area: 4 / 2; align-self: end; }
 
   .sal.es-anclada .sal-cuerpo.es-retar > :nth-child(1) { grid-area: 1 / 1; }
   .sal.es-anclada .sal-cuerpo.es-retar > :nth-child(2) { grid-area: 2 / 1; }
@@ -1732,9 +1737,9 @@ body.sal-activa #root {
   .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(2) { grid-area: 2 / 1; }
   .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(3) { grid-area: 1 / 2 / 3 / 3; }
 
-  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
-  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) > :nth-child(1) { grid-area: 1 / 2; }
-  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar) > :nth-child(2) { grid-area: 1 / 1 / 5 / 2; align-self: center; }
+  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar, .es-tienda) { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar, .es-tienda) > :nth-child(1) { grid-area: 1 / 2; }
+  .sal.es-anclada .sal-cuerpo:not(.es-retar, .es-armar, .es-tienda) > :nth-child(2) { grid-area: 1 / 1 / 5 / 2; align-self: center; }
 }
 
 /* ══ 17 · RNK-1c · LA LISTA QUE DESPLAZA POR DENTRO ══════════════════════════

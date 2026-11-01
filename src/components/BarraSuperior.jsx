@@ -201,8 +201,7 @@ export default function BarraSuperior({
           className="lob-mas"
           data-accion="tienda"
           aria-label={t('video.hoja.titulo')}
-          aria-haspopup="dialog"
-          onClick={video?.abrirHoja}
+          onClick={video?.abrirMonedas ?? undefined}
         >
           <IconoMas />
         </SoundButton>

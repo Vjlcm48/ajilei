@@ -32,13 +32,28 @@
    regresiones de contraste. Los REFLEJOS del óvalo no escalan (son SVG en data
    URI, fuera del alcance de las custom properties) — límite documentado en la
    adenda del Sistema de Diseño. Las FICHAS tampoco: su filtro va horneado, como
-   lo trae la ficha (§5.3), para poder retirarlo solo. */
-.game-table-screen {
-  --luz-k: 1;
+   lo trae la ficha (§5.3), para poder retirarlo solo.
 
+   TIE-1 1a · LA VITRINA DE LA TIENDA ES LA MISMA LUZ. Los tokens de abajo se
+   declaran también en `.vit .vit-fondo` (`Vitrina.jsx`), con el foco a escala
+   de la miniatura (9cqw). `--luz-k` NO va en ese bloque: el fondo lo hereda de
+   la `.vit`, que es donde el tono lo pone (tapetes.css §1b: 0,85 en claro, 1,15
+   en oscuro), igual que en la mesa lo pone sobre `.game-table-screen`. Las
+   variantes por bloque de medios (P, L, D) son sólo de la mesa: la vitrina
+   tiene un tamaño propio y se queda con la base. */
+.game-table-screen,
+.vit {
+  --luz-k: 1;
+}
+.game-table-screen {
   /* A · radio de cada foco (varía por bloque, ver abajo) */
   --luz-foco: 80px;
-
+}
+.vit .vit-fondo {
+  --luz-foco: 9cqw;
+}
+.game-table-screen,
+.vit .vit-fondo {
   /* A · las seis capas, en una pieza: la usan la regla general y la del
      tricolor (§6), que necesita anteponerlas a sus propias bandas. */
   --luz-capa-a:
@@ -136,7 +151,8 @@
    primero las seis capas de A y después las dos capas de imagen del tricolor,
    copiadas literales de tapetes.css:268-278. Su shorthand no declara color de
    fondo (queda `transparent`), así que las capas componen sin reescribir nada. */
-body[data-tapete="tricolor"] .game-table-screen .game-table {
+body[data-tapete="tricolor"] .game-table-screen .game-table,
+.vit[data-tapete="tricolor"] .vit-mesa {
   background-image:
     var(--luz-capa-a),
     radial-gradient(ellipse at center,
@@ -164,6 +180,14 @@ body[data-tapete="tricolor"] .game-table-screen .game-table {
     inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10),
     var(--luz-riel);
 }
+/* TIE-1 1a · el óvalo de la vitrina: las mismas dos sombras con el difuminado a
+   escala (44 px de la mesa ≈ 5cqw de la miniatura) y el riel detrás. */
+.vit .vit-ovalo {
+  box-shadow:
+    inset 0 0 5cqw rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10),
+    var(--luz-riel);
+}
 
 /* Los cuatro reflejos: dos SVG 1:1 con `background-size: auto 100%` ocupan un
    cuadrado del alto del óvalo en cada extremo, que es el círculo de la curva.
@@ -171,7 +195,8 @@ body[data-tapete="tricolor"] .game-table-screen .game-table {
    `.oval-right` de la mesa 2 en L NO entra: es un rectángulo de radio 14
    (GT:4133) y el cálculo por cuadrados no le corresponde; lleva sólo el riel. */
 .game-table-screen .center-zone,
-.game-table-screen .table-two .felt-oval.oval-left {
+.game-table-screen .table-two .felt-oval.oval-left,
+.vit .vit-ovalo {
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='a'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.32'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.11'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='b'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.16'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.056'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cellipse cx='16.8' cy='16.8' rx='11' ry='2.2' fill='url(%23a)' transform='rotate(-45 16.8 16.8)'/%3E%3Cellipse cx='16.8' cy='83.2' rx='11' ry='2.2' fill='url(%23b)' transform='rotate(45 16.8 83.2)'/%3E%3C/svg%3E"),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='a'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.32'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.11'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='b'%3E%3Cstop offset='0' stop-color='%23ffeecd' stop-opacity='.16'/%3E%3Cstop offset='.55' stop-color='%23ffeecd' stop-opacity='.056'/%3E%3Cstop offset='1' stop-color='%23ffeecd' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cellipse cx='83.2' cy='16.8' rx='11' ry='2.2' fill='url(%23a)' transform='rotate(45 83.2 16.8)'/%3E%3Cellipse cx='83.2' cy='83.2' rx='11' ry='2.2' fill='url(%23b)' transform='rotate(-45 83.2 83.2)'/%3E%3C/svg%3E"),
@@ -200,8 +225,16 @@ body[data-tapete="tricolor"] .game-table-screen .game-table {
    `:where` la exclusión no suma especificidad. `.flying-card` y
    `.shuffle-fan-card` no llevan `.playing-card` (GameTable.jsx:258/277): el
    `:not` es inocuo y se queda como seguro. La transición `box-shadow .18s`
-   (PC:9) no se toca. */
-.game-table-screen :where(.playing-card:not(.flying-card, .shuffle-fan-card, .card-winner, .card-empty)) {
+   (PC:9) no se toca.
+
+   TIE-1 1a · YA NO SE GANA POR ORDEN. La vitrina de la tienda importa esta hoja
+   (`Vitrina.jsx`), y la tienda y la fila «Tapetes» del ⚙ la meten en el CSS
+   principal: ahora carga ANTES que playingCard.css (que llega con la mesa), y
+   el empate en 0,1,0 lo perdía la luz (`diagDSK luz`, p5 carta y dorso).
+   `:not(html)` suma sólo un tipo: 0,1,1. Gana a la base (0,1,0) y sigue
+   perdiendo con el hover (0,2,0) y el `!important` de la seleccionada, cargue
+   en el orden que cargue; ganadora y vacía siguen excluidas. */
+.game-table-screen :where(.playing-card:not(.flying-card, .shuffle-fan-card, .card-winner, .card-empty)):not(html) {
   box-shadow: var(--luz-contacto);
 }
 

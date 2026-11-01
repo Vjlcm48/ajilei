@@ -19,7 +19,8 @@
 export const ENTRADA = {
   SONIDO: 'sonido',
   REACCIONES: 'reacciones',
-  TAPETES: 'tapetes',
+  // TIE-1 1a · 'tapetes' sale: el tapete se elige en la tienda (y su puerta es
+  // la fila «Tapetes» del ⚙). Su ID queda RETIRADO, como 'saldo' y 'cuenta'.
   MANO: 'mano',
   // CFG-1 1e · «Partida rápida», el ritmo de la mesa contra las IAS (INV-70).
   // ID NUEVO en el sitio de 'saldo'. Salen 'saldo' (la Heptacoin inerte, P-14)
@@ -36,10 +37,10 @@ export const ENTRADA = {
 // Escritorio: todo vivo. Es también el valor por defecto del panel, así que la
 // rama de escritorio no pasa la prop.
 // CFG-1 1e · Saldo era la única inerte desde la v1.0 §3; con ella y con Cuenta
-// fuera, el panel queda en cinco filas: Sonido, Reacciones, Tapetes, Partida
-// rápida y Mano actual.
+// fuera, el panel quedó en cinco filas; TIE-1 1a saca Tapetes y quedan cuatro:
+// Sonido, Reacciones, Partida rápida y Mano actual.
 export const VIVAS_ESCRITORIO = [
-  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.RAPIDA,
+  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA,
   ENTRADA.MANO, ENTRADA.CONTADOR,
 ]
 
@@ -54,7 +55,7 @@ export const VIVAS_ESCRITORIO = [
 // desplazamiento (242×186, lámina aprobada por Victor), que es la misma rejilla
 // gobernada por `--dsk-u2-cols` con una sola columna.
 export const VIVAS_MOVIL = [
-  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.RAPIDA, ENTRADA.MANO,
+  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.MANO,
 ]
 
 // ── Qué entradas MONTAN ─────────────────────────────────────────────────────
@@ -71,8 +72,9 @@ export const VIVAS_MOVIL = [
 // victoria (CEL-2e)—, y el panel mide una fila menos.
 //
 // `null` en el consumidor significa "todas".
+// TIE-1 1a · sin Tapetes: cuatro contra las IAS, tres contra humanos.
 export const ENTRADAS_PANEL = Object.freeze([
-  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.TAPETES, ENTRADA.RAPIDA, ENTRADA.MANO,
+  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.MANO,
 ])
 
 /** Las entradas que montan: todas contra las IAS (`null`), sin «Partida rápida» contra humanos. */
@@ -80,10 +82,10 @@ export const presentesDe = (contraIAS) => (contraIAS ? null : ENTRADAS_PANEL.fil
 
 /**
  * El alto del panel: filas × 44 + 6 (el filete que separa "Mano actual") +
- * 8 + 8 (relleno) + 1 + 1 (bordes). 5 filas = 244 · 4 filas = 200. Es el espejo
+ * 8 + 8 (relleno) + 1 + 1 (bordes). 4 filas = 200 · 3 filas = 156. Es el espejo
  * de la pinza (`useUtilitiesMenu`) y la cifra que sella el arnés.
  */
 export const altoPanel = (filas) => filas * 44 + 24
 
-/** Cuántas filas tiene el panel: 5 contra las IAS, 4 contra humanos. */
+/** Cuántas filas tiene el panel: 4 contra las IAS, 3 contra humanos (TIE-1 1a). */
 export const filasDelPanel = (contraIAS) => (presentesDe(contraIAS) ?? ENTRADAS_PANEL).length

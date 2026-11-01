@@ -22,6 +22,12 @@
    mismo con y sin puntero grueso, y en escritorio los botones ya miden 44 o
    más, así que el pseudo vale 0 y no hace nada.
 
+   TIE-1 1a · EL OJITO TAMBIÉN EN LA TIENDA (INV-69 de la 1a). §1, §2 y su
+   zona de §3 valen para `:is(.lobby, :where(.sal[data-tienda]))`: la tienda es
+   la única `.sal` con `data-tienda` en su raíz, y el `:where` deja la
+   especificidad en la de `.lobby` (0,1,0), así que en el lobby no cambia nada.
+   Retar, Salas y Rankings no pintan el ojito ni encajan la cifra.
+
    Secciones: 1 · el ojito  ·  2 · la cifra tapada  ·  3 · el camino Z
               4 · las capas  ·  5 · R-9, la casa y la flecha en 360
    ════════════════════════════════════════════════════════════════════════════ */
@@ -33,7 +39,7 @@
    `BalanceDisplay` (V1-C). Glifo de línea medido en `em` con la cifra, como el
    «+» (LOB-1 §1.9): crece y encoge con la píldora. Tenue, ni oro (INV-08) ni
    crema macizo. Su zona táctil es la de §… de la 1a-ii (`::after` de 44). */
-.lobby .lob-ojo {
+:is(.lobby, :where(.sal[data-tienda])) .lob-ojo {
   position: relative;
   display: grid;
   place-items: center;
@@ -47,9 +53,9 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.lobby .lob-ojo .lob-ico { width: 1.15em; height: 1.15em; }
-.lobby .lob-ojo:hover,
-.lobby .lob-ojo:focus-visible { color: var(--text-secondary); }
+:is(.lobby, :where(.sal[data-tienda])) .lob-ojo .lob-ico { width: 1.15em; height: 1.15em; }
+:is(.lobby, :where(.sal[data-tienda])) .lob-ojo:hover,
+:is(.lobby, :where(.sal[data-tienda])) .lob-ojo:focus-visible { color: var(--text-secondary); }
 
 
 /* ══ 2 · LA CIFRA, EN SU CAJA DE 4,6 ch, ABIERTA O TAPADA ═══════════════════
@@ -63,19 +69,19 @@
    accesibilidad (`aria-hidden` en `.pil-tapada`), y los puntos se pintan
    encima, centrados: mientras la píldora cuenta (aviso de saldo, celebración
    del video), la cifra de debajo cambia y los puntos no se mueven. */
-.lobby .lob-pildora .bd-num {
+:is(.lobby, :where(.sal[data-tienda])) .lob-pildora .bd-num {
   display: inline-block;
   min-inline-size: 4.6ch;
   text-align: center;
 }
-.lobby .lob-pildora[data-saldo-oculto] .bd-num {
+:is(.lobby, :where(.sal[data-tienda])) .lob-pildora[data-saldo-oculto] .bd-num {
   position: relative;
   /* Posicionada, la cifra pinta encima del `::after` del ojito y se comía su
      zona (MEDIDO en la lámina: 35 en vez de 44). La cifra no es tocable. */
   pointer-events: none;
 }
-.lobby .lob-pildora[data-saldo-oculto] .pil-tapada { visibility: hidden; }
-.lobby .lob-pildora[data-saldo-oculto] .bd-num::after {
+:is(.lobby, :where(.sal[data-tienda])) .lob-pildora[data-saldo-oculto] .pil-tapada { visibility: hidden; }
+:is(.lobby, :where(.sal[data-tienda])) .lob-pildora[data-saldo-oculto] .bd-num::after {
   content: "••••";
   /* Texto alternativo vacío: los puntos son dibujo, no algo que leer. Quien
      no entiende la sintaxis se queda con la línea de arriba. */
@@ -105,7 +111,7 @@
 }
 :is(.lobby, .sal.es-anclada) :is(.lob-ajustes, .lob-perfil)::after,
 :is(.lobby, .sal.es-anclada) .lob-pildora .lob-mas::after,
-.lobby .lob-pildora .lob-ojo::after,
+:is(.lobby, :where(.sal[data-tienda])) .lob-pildora .lob-ojo::after,
 .sal.es-anclada :is(.sal-volver, .sal-casa, .sal-chip, .sal-paso, .sal-unir)::after {
   content: "";
   position: absolute;

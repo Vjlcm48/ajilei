@@ -85,18 +85,20 @@ describe('CFG-1 1e · consultaApi', () => {
 
 describe('CFG-1 1e · las entradas del ⋮', () => {
   it('salen Cuenta y Saldo; entra Partida rápida; los IDs retirados no vuelven', () => {
-    expect(ENTRADAS_PANEL).toEqual(['sonido', 'reacciones', 'tapetes', 'rapida', 'mano'])
+    // TIE-1 1a · sale también Tapetes: el tapete se elige en la tienda.
+    expect(ENTRADAS_PANEL).toEqual(['sonido', 'reacciones', 'rapida', 'mano'])
     expect(Object.values(ENTRADA)).not.toContain('saldo')
     expect(Object.values(ENTRADA)).not.toContain('cuenta')
+    expect(Object.values(ENTRADA)).not.toContain('tapetes')
     expect(VIVAS_ESCRITORIO).toContain(ENTRADA.RAPIDA)
     expect(VIVAS_MOVIL).toContain(ENTRADA.RAPIDA)
   })
   it('Partida rápida sólo monta contra las IAS, y el panel mide sus filas', () => {
     expect(presentesDe(true)).toBe(null)
-    expect(presentesDe(false)).toEqual(['sonido', 'reacciones', 'tapetes', 'mano'])
-    expect(filasDelPanel(true)).toBe(5)
-    expect(filasDelPanel(false)).toBe(4)
-    expect(altoPanel(5)).toBe(244)
+    expect(presentesDe(false)).toEqual(['sonido', 'reacciones', 'mano'])
+    expect(filasDelPanel(true)).toBe(4)
+    expect(filasDelPanel(false)).toBe(3)
     expect(altoPanel(4)).toBe(200)
+    expect(altoPanel(3)).toBe(156)
   })
 })

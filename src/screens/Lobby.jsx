@@ -70,13 +70,13 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // una cascada de `if`, sin router—.
 //
 // ── VIVAS Y NO VIVAS ────────────────────────────────────────────────────────
-// Vivas: el CTA (→ `NivelSelect`), el ⚙ (abre la hoja), «Cerrar sesión» y
-// «Acerca de». Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
+// Vivas: el CTA (→ `NivelSelect`), el ⚙ (abre la hoja), «Cerrar sesión»,
+// «Acerca de», Rankings y, desde TIE-1 1a, la Tienda. Todo lo demás avisa «Pronto» con el mismo toast. Un botón que no
 // hace nada Y no lo dice es peor que no tenerlo; el toast es la promesa mínima.
 // CFG-1 1a · en la hoja ya sólo dicen «Pronto» Idioma y Eliminar cuenta, y lo
 // dicen con el aviso de la hoja (`HojaConfiguracion`), no con éste.
 
-export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onRankings, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onRankings, onTienda, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -252,14 +252,14 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
 
       {/* ── Barra inferior ─────────────────────────────────────────────── */}
       <nav className="lob-nav" aria-label={t('lob.cfg.titulo')}>
-        {/* RNK-1c · Rankings ya lleva a su pantalla; Tienda y «Cómo se juega»
-            siguen diciendo «Pronto». */}
+        {/* RNK-1c · Rankings ya lleva a su pantalla. TIE-1 1a · la Tienda,
+            también (en Tapetes, V1-A); «Cómo se juega» sigue diciendo «Pronto». */}
         <SoundButton className="lob-nav-btn" data-accion="rankings" onClick={() => onRankings?.()}>
           <IconoTrofeo /><span>{t('lob.nav.rankings')}</span>
         </SoundButton>
         {/* La Tienda al centro es el ÚNICO oro sólido de la barra: regla del oro
             único. El color lo pone `lobby.css`; el icono es `currentColor`. */}
-        <SoundButton className="lob-nav-btn lob-nav-tienda" data-accion="tienda" onClick={pronto}>
+        <SoundButton className="lob-nav-btn lob-nav-tienda" data-accion="tienda" onClick={onTienda ?? pronto}>
           <IconoTienda /><span>{t('lob.nav.tienda')}</span>
         </SoundButton>
         <SoundButton className="lob-nav-btn" data-accion="reglas" onClick={pronto}>

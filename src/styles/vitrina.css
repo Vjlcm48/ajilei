@@ -1,0 +1,125 @@
+/* ── TIE-1 1a · La vitrina ─────────────────────────────────────────────────────
+   Rector: AJILEI_TIE-1_Fase1a_v1.0.md §3.3 (lámina 1a-L, V4-A, D-5 y D-6).
+
+   La mesa entera en miniatura: las tres superficies de la mesa —el fondo de
+   `.game-table-screen`, la mesa de `.game-table` y el óvalo de `.center-zone`—
+   con LOS MISMOS TOKENS, en `cqw` para que sea la mesa a escala y no una mesa
+   con otra proporción. No importa nada de gameTable.css (protegido) ni de
+   GameTable: lo que asegura que no mienta no es esta hoja, es que los tokens
+   del tapete y del tono se declaren UNA vez para `body` y para `.vit`
+   (tapetes.css §1 y §1b) y que la luz de LUZ-1 sea la de luz.css (§0, §2 y §3,
+   que también nombran a la vitrina). Aquí sólo hay cajas y a qué token mira
+   cada una. La sombra interior de mesa y óvalo vive en gameTable.css y no
+   escala: la de aquí es su copia a escala (aceptado en la lámina).
+
+   El CONTENEDOR de las `cqw` es `.vit` y no `.vit-fondo`: un elemento no se
+   consulta a sí mismo, y las `cqw` del propio fondo caían a la ventana.
+
+   Tres tamaños (`tamano` de Vitrina.jsx):
+     grande   la mesa entera (la vista del artículo)
+     muestra  sólo el fieltro, rectangular (las franjas de la lista)
+     disco    sólo el fieltro, redondo (el selector de tono y la fila del ⚙)
+   Nada de lo de dentro se toca: cartas, fichas y pozo son adorno quieto. */
+
+.vit { display: block; container-type: inline-size; line-height: 1.2; }
+
+/* ── La mesa entera ────────────────────────────────────────────────────────── */
+.vit .vit-fondo {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3.2cqw 3.6cqw;
+  border-radius: 2.6cqw;
+  overflow: hidden;
+  background:
+    var(--filigrana),
+    radial-gradient(circle at center, var(--green-base) 0%, var(--green-deep) 55%, var(--green-darkest) 100%);
+}
+.vit-mesa {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: max(1px, 0.25cqw) solid rgba(var(--gold-brand-rgb), 0.45);
+  border-radius: 4.2cqw;
+  background-color: var(--surface-game);
+  background-image: var(--luz-capa-a);
+  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 0 8cqw rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(var(--gold-brand-rgb), 0.10),
+    0 2.8cqw 8cqw rgba(0, 0, 0, 0.45);
+}
+/* Los asientos: cuatro IAS y el jugador, como huecos vacíos. */
+.vit-asiento {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.2);
+  border-radius: 2cqw;
+  background: var(--surface-area-light);
+}
+.vit-asiento-n1 { left: 22%; top: 5%;  width: 22%; height: 21%; }
+.vit-asiento-n2 { right: 22%; top: 5%; width: 22%; height: 21%; }
+.vit-asiento-o  { left: 2.5%; top: 31%; width: 15%; height: 38%; }
+.vit-asiento-e  { right: 2.5%; top: 31%; width: 15%; height: 38%; }
+.vit-asiento-s  { left: 30%; bottom: 5%; width: 40%; height: 22%; }
+.vit-ovalo {
+  position: absolute;
+  inset: 31% 20.5%;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  background-color: var(--green-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.2cqw;
+  padding: 0 4cqw;
+}
+.vit-cartas { display: flex; gap: 0.9cqw; height: 66%; }
+.vit-carta {
+  height: 100%;
+  aspect-ratio: 320 / 452;
+  border-radius: 0.6cqw;
+  box-shadow: var(--luz-contacto);
+}
+.vit-pozo {
+  display: grid;
+  justify-items: center;
+  gap: 0.4cqw;
+  padding: 0.9cqw 1.6cqw;
+  border-radius: 1.6cqw;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  background: var(--surface-area);
+  box-shadow: var(--luz-contacto);
+  font-family: var(--font-base);
+}
+.vit-pozo-l { font-size: 1.25cqw; letter-spacing: 0.25cqw; text-transform: uppercase; color: var(--text-muted); }
+.vit-pozo-v { display: inline-flex; align-items: center; gap: 0.5cqw; font-size: 2.4cqw; font-weight: 700; color: var(--text-primary); }
+.vit .chip-token { width: 2.6cqw; height: 2.6cqw; }
+.vit-fichas { display: inline-flex; align-items: flex-end; }
+.vit-fichas .chip-token { width: 3.2cqw; height: 3.2cqw; filter: var(--luz-ficha); }
+.vit-fichas .chip-token + .chip-token { margin-left: -1.8cqw; }
+.vit-fichas .chip-token:nth-child(2) { transform: translateY(-0.5cqw); }
+
+/* ── Sólo el fieltro: la muestra y el disco ────────────────────────────────── */
+/* El degradado del óvalo de la mesa (gameTable.css, el radial de la piel), con
+   los tokens heredados; el tricolor, sus bandas (tapetes.css §1). */
+.vit-muestra,
+.vit-disco {
+  background: radial-gradient(ellipse at center, var(--green-bright) 0%, var(--green-base) 48%, var(--green-deep) 100%);
+}
+:is(.vit-muestra, .vit-disco)[data-tapete="tricolor"] {
+  background: linear-gradient(to bottom,
+    var(--tap-tri-amarillo) 0%, var(--tap-tri-amarillo) var(--tap-tri-p1),
+    var(--tap-tri-azul) var(--tap-tri-p2), var(--tap-tri-azul) var(--tap-tri-p3),
+    var(--tap-tri-rojo) var(--tap-tri-p4), var(--tap-tri-rojo) 100%);
+}
+.vit-disco {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(var(--gold-brand-rgb), 0.45);
+}

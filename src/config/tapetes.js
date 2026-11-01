@@ -37,6 +37,7 @@ export const TAPETES = [
     descripcion: 'El de siempre',
     precio: 0,
     swatch: '--tap-swatch-verde',
+    tonos: false,
   },
   {
     id: 'grafito',
@@ -44,6 +45,7 @@ export const TAPETES = [
     descripcion: 'Sobrio y neutro',
     precio: 10000,
     swatch: '--tap-swatch-grafito',
+    tonos: true,
   },
   {
     id: 'azul',
@@ -51,6 +53,7 @@ export const TAPETES = [
     descripcion: 'Frío y hondo',
     precio: 15000,
     swatch: '--tap-swatch-azul',
+    tonos: true,
   },
   {
     id: 'vinotinto',
@@ -58,6 +61,7 @@ export const TAPETES = [
     descripcion: 'Cálido y criollo',
     precio: 25000,
     swatch: '--tap-swatch-vinotinto',
+    tonos: true,
   },
   {
     id: 'tricolor',
@@ -67,6 +71,7 @@ export const TAPETES = [
     // Las tres bandas del tapete, en su orden y sus tonos exactos. El degradado
     // vive ahora en `tapetes.css` §0, como los otros cuatro.
     swatch: '--tap-swatch-tricolor',
+    tonos: false,
   },
 ]
 
@@ -85,7 +90,20 @@ export const TAPETE_POR_DEFECTO = 'verde'
 // crece. Meterlas en un mismo blob obligaría a reescribir la propiedad cada vez
 // que el jugador cambia de tapete — más superficie para perderla.
 export const TAPETE_KEY = 'ajilei.tapete'
-export const TAPETES_COMPRADOS_KEY = 'ajilei.tapetes.comprados'
+// TIE-1 1a · el tono del tapete en uso, copia del servidor como `ajilei.tapete`.
+export const TAPETE_TONO_KEY = 'ajilei.tapete.tono'
+// TIE-1 1a · LEGADO. Hasta la 1a la propiedad vivía aquí, en el aparato, y se
+// «compraba» sin cobrar. Ya no se lee: lo comprado es lo que diga
+// `mi_inventario` (INV-76). La clave sólo se nombra para borrarla al arrancar.
+export const TAPETES_COMPRADOS_LEGADO = 'ajilei.tapetes.comprados'
+
+// ── TIE-1 1a · Los tonos ────────────────────────────────────────────────────
+// Tres por tapete de pago con `tonos: true` (grafito, azul, vinotinto); el verde
+// y el tricolor no tienen. 'actual' es el de siempre y no lleva atributo: los
+// otros dos se pintan con `data-tapete-tono` (tapetes.css §1b). Espejo del
+// servidor: `articulo_con_tonos` en `20261031150000_tie1a_inventario.sql`.
+export const TONOS = ['claro', 'actual', 'oscuro']
+export const TONO_POR_DEFECTO = 'actual'
 
 export function tapetePorId(id) {
   return TAPETES.find(t => t.id === id) ?? null
@@ -95,6 +113,11 @@ export function tapetePorId(id) {
 // arranque (v1.0 §1). No se compra, no se pierde y no se pinta con precio.
 export function esGratuito(id) {
   return (tapetePorId(id)?.precio ?? 0) === 0
+}
+
+/** ¿El tapete tiene los tres tonos? */
+export function conTonos(id) {
+  return tapetePorId(id)?.tonos === true
 }
 
 // Formato de monto de la casa: "10.000". No había formateador de saldo en el

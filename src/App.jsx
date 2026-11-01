@@ -15,6 +15,7 @@ import PartidaPvP from './screens/PartidaPvP'
 // RETIRAN del árbol en esta tanda (rector 1e §2.3) junto con `TableSelect`.
 import RetarIAS from './screens/RetarIAS'
 import Rankings from './screens/Rankings'
+import Tienda from './screens/Tienda'
 // RNK-1 1e · el intersticial de SumaMente: una pantalla de la cascada, entre el
 // lobby y Rankings. La decisión es pura (`sumaCore`); el contador, del aparato.
 import IntersticialSumaMente from './screens/IntersticialSumaMente'
@@ -34,13 +35,16 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil, simulacionConsulta, mesaContraHumanosDev } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil, simulacionConsulta, simulacionTienda, mesaContraHumanosDev } from './dev/billeteraFalsa'
 import { perfilApi } from './lib/perfilApi'
 import Perfil from './screens/Perfil'
 import { cuentaApi } from './lib/cuentaApi'
 import { limpiarAparato } from './lib/limpiarAparato'
 import { rankingApi } from './lib/rankingApi'
 import { consultaApi } from './lib/consultaApi'
+import { tiendaApi } from './lib/tiendaApi'
+import { crearControlTapetes } from './lib/controlTapetes'
+import { crearAlmacenTapetes } from './hooks/useTapetes'
 // ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
 // mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
 // que siembran los moldes de humano en desarrollo (P-6).
@@ -317,6 +321,16 @@ function App() {
     setDesdePerfil(screen)
     setScreen('perfil')
   }, [screen])
+  // ── TIE-1 1a · LA TIENDA Y DE DÓNDE SE VINO ──────────────────────────────
+  // Rector TIE-1 1a §3.4. Molde del perfil: la flecha vuelve a la pantalla que
+  // la abrió, la casa al lobby. Se abre en un estante (`'monedas'` desde el
+  // «+», `'tapetes'` desde la barra del lobby y la fila del ⚙). Pedirla estando
+  // en ella cambia de estante: `n` es la llave que la vuelve a montar.
+  const [tienda, setTienda] = useState({ estante: 'tapetes', desde: 'lobby', n: 0 })
+  const abrirTienda = useCallback((estante) => {
+    setTienda((x) => ({ estante, desde: screen === 'tienda' ? x.desde : screen, n: x.n + 1 }))
+    setScreen('tienda')
+  }, [screen])
   const eliminarCuenta = useCallback(async () => {
     const r = await apiCuenta.eliminar()
     if (!r.ok && r.motivo !== 'sin_sesion') return r
@@ -343,6 +357,15 @@ function App() {
   // CFG-1 1e · Mano actual de pago, por el MISMO interruptor (con los mandos
   // `?cfg=consulta-…` del bypass) o la API real.
   const [apiConsulta] = useState(() => simulacionConsulta() ?? consultaApi)
+  // TIE-1 1a · el canal de los tapetes (`lib/controlTapetes`), UNO por carga de
+  // página como el del video: lo leen la tienda, la fila del ⚙ y la mesa, y
+  // los tres tienen que decir lo mismo. La API es la del banco imitado (con los
+  // mandos `?tie=` del bypass) o la real; la copia del aparato pinta la mesa
+  // antes de que conteste el servidor.
+  const [tapetes] = useState(() => crearControlTapetes({
+    api: simulacionTienda() ?? tiendaApi,
+    almacen: crearAlmacenTapetes(),
+  }))
   const [controlMesa, setControlMesa] = useState(null)
   const controlRef = useRef(null)
   // Sentarse: `null`, `{ fase: 'enviando' }` o `{ fase: 'error', codigo }`. El
@@ -515,6 +538,9 @@ function App() {
     })
   }, [video, tomarSaldo, uidCompleto, marcar])
   useEffect(() => { video.cuenta(uidCompleto) }, [video, uidCompleto])
+  // TIE-1 1a · al entrar con sesión, el inventario del servidor (INV-76). Otra
+  // cuenta en la misma carga de página relee el suyo.
+  useEffect(() => { if (uidCompleto) tapetes.refrescar() }, [tapetes, uidCompleto])
 
   const arranqueMesa = useRef(null)
   useEffect(() => {
@@ -871,6 +897,10 @@ function App() {
     // CFG-1 1c · la fila «Eliminar cuenta» de la hoja ⚙, en las siete pantallas.
     eliminarCuenta,
     abrirPerfil,
+    // TIE-1 1a · la fila «Tapetes» de la hoja ⚙: el canal (lo que está en uso)
+    // y su puerta, la tienda en Tapetes.
+    tapetes,
+    abrirTapetes: () => abrirTienda('tapetes'),
   }
 
   // ── LOB-1 · `cuentaLobby` se retira ────────────────────────────────────────
@@ -893,7 +923,7 @@ function App() {
   // `avisoEnCurso`: la celebración del video espera a que la fila de avisos de
   // saldo quede vacía; nunca los dos a la vez sobre la píldora.
   const conVideo = (pantalla) => (
-    <MarcoVideo control={video} avisoEnCurso={filaAvisos.length > 0}>{pantalla}</MarcoVideo>
+    <MarcoVideo control={video} avisoEnCurso={filaAvisos.length > 0} onMonedas={() => abrirTienda('monedas')}>{pantalla}</MarcoVideo>
   )
 
   // ── SAL-B1 · Las tres pantallas del PvP ───────────────────────────────────
@@ -1005,6 +1035,7 @@ function App() {
         control={controlMesa}
         apiRanking={apiRanking}
         apiConsulta={apiConsulta}
+        tapetes={tapetes}
         onSaldo={tomarSaldo}
         // CFG-1 1e · esta mesa es contra las IAS (INV-70). `?cfg=mesa-humanos`
         // (sólo con el bypass) la monta como lo hará MES-PvP, para el arnés.
@@ -1075,9 +1106,28 @@ function App() {
     )
   }
 
+  // ── TIE-1 1a · La tienda ─────────────────────────────────────────────────
+  // Pantalla con barra: con el marco del video (el estante Monedas pide el
+  // video por su contexto).
+  if (screen === 'tienda') {
+    return conVideo(
+      <Tienda
+        key={tienda.n}
+        cuenta={cuenta}
+        billetera={billetera}
+        aviso={avisoSaldo}
+        onAvisoFin={finAviso}
+        control={tapetes}
+        estanteInicial={tienda.estante}
+        onVolver={() => setScreen(tienda.desde === 'tienda' ? 'lobby' : tienda.desde)}
+        onLobby={() => setScreen('lobby')}
+      />,
+    )
+  }
+
   // La caída de la cascada sigue siendo el destino de `COMPLETO`. CUATRO props
-  // desde SAL-B1 —entra `onJugarPvP`; ECO-1b cambia `saldo` por `billetera`— y
-  // ninguna más: el lobby sigue sin conocer
+  // desde SAL-B1 —entra `onJugarPvP`; ECO-1b cambia `saldo` por `billetera`;
+  // TIE-1 1a, `onTienda`, la Tienda de la barra inferior—: el lobby sigue sin conocer
   // `screen`, ni Supabase, ni la mesa. Lo unico que sabe es que su segundo CTA
   // ahora lleva a alguna parte.
   return conVideo(
@@ -1090,6 +1140,7 @@ function App() {
       onJugarIA={() => setScreen('retar-ias')}
       onJugarPvP={() => setScreen('sala-opciones')}
       onRankings={entrarRankings}
+      onTienda={() => abrirTienda('tapetes')}
       onCerrarSesion={cerrarSesion}
     />,
   )
