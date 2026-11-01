@@ -26,6 +26,9 @@
 // CFG-1 1b le suma la `20261030013000_cfg1b_perfil.sql`: el perfil propio
 // (`pais`, `estado`, el freno de 30 días del nombre), `nombre_libre`,
 // `mi_proximo_cambio` y el lugar en `ranking_top` y `mini_perfil`.
+// TIE-1 1a le suma la `20261031150000_tie1a_inventario.sql`: la tabla
+// `inventario` de la cuenta y `comprar_articulo`, `usar_articulo`,
+// `elegir_tono` y `mi_inventario`, con el catálogo cerrado en SQL.
 // `rpc(nombre, params)` devuelve `{ data, error }` con la forma
 // de PostgREST: el compuesto `mesa_ia_resultado` llega como objeto con las
 // claves en snake_case, y `mi_mesa_ia` y las lecturas del ranking como lista.
@@ -63,6 +66,18 @@ export const BONO_CONSTANCIA_SQL = 500
 export const CONSULTAS_GRATIS_SQL = 20
 export const PRECIOS_CONSULTA_SQL = Object.freeze({ basico: 100, avanzado: 200, pro: 300, humanos: 500 })
 export const LIMITE_CONSULTA_SQL = 30
+// TIE-1 1a · el catálogo de la tienda (`inventario_tipo_valido`,
+// `precio_articulo`, `articulo_con_tonos`, `articulo_gratis`) y el tope por
+// minuto de `comprar_articulo`, literal en su llamada como el de la 1e. El
+// espejo los lee de `20261031150000_tie1a_inventario.sql`.
+export const TIPOS_INVENTARIO_SQL = Object.freeze(['tapete'])
+export const PRECIOS_ARTICULO_SQL = Object.freeze({
+  tapete: Object.freeze({ grafito: 10000, azul: 15000, vinotinto: 25000, tricolor: 50000 }),
+})
+export const CON_TONOS_SQL = Object.freeze({ tapete: Object.freeze(['grafito', 'azul', 'vinotinto']) })
+export const GRATIS_SQL = Object.freeze({ tapete: 'verde' })
+export const TONOS_SQL = Object.freeze(['claro', 'actual', 'oscuro'])
+export const LIMITE_COMPRA_SQL = 30
 // CFG-1 1b · el freno del nombre (`freno_nombre_hasta`: 30 días en UTC, que no
 // tiene cambio de hora, así que son 30 × 24 h exactas), la forma del CHECK de
 // SUP-2a, los códigos de estado de la lista sellada y una MUESTRA de los
@@ -190,6 +205,8 @@ export function crearBanco({
     perfil: { id: '00000000-0000-4000-8000-000000000000', pais: null, estado: null, cambiadoEn: null, forzar: null },
     // CFG-1 1e · la fila de `consultas`, o ninguna (nace en la primera consulta)
     consultas: null,           // { usadas, ultimaMesa, ultimaMano }
+    // TIE-1 1a · las filas de `inventario` de la cuenta (el gratis no tiene)
+    inventario: [],            // { tipo, articulo, tono, en_uso, adquirido_en }
   }
 
   // ── El libro (1a): una línea por cambio, clave única ─────────────────────
@@ -230,7 +247,8 @@ export function crearBanco({
     b.intentos.push({ funcion, en: t })
     if ((b.forzados[funcion] ?? 0) > 0) { b.forzados[funcion]--; return false }
     if (!limites) return true
-    const tope = funcion === 'consultar_mano' ? LIMITE_CONSULTA_SQL : LIMITES_SQL[funcion]
+    const tope = funcion === 'consultar_mano' ? LIMITE_CONSULTA_SQL
+      : funcion === 'comprar_articulo' ? LIMITE_COMPRA_SQL : LIMITES_SQL[funcion]
     if (tope === undefined) return false
     return b.intentos.filter((x) => x.funcion === funcion && x.en > t - 60_000).length <= tope
   }
@@ -708,6 +726,70 @@ export function crearBanco({
     return respuestaCobro('ok', VIDEO_PREMIO_SQL)
   }
 
+  // ── TIE-1 1a · la tienda (`comprar_articulo`, `usar_articulo`, `elegir_tono`,
+  // `mi_inventario`) ────────────────────────────────────────────────────────
+  // En el orden del SQL: límite (sólo la compra), tipo, artículo, tono, ya
+  // comprado, cobro y fila. Una sola cuenta: sin `sin_sesion`. La clave del
+  // libro lleva al jugador (D-1 del STOP-A1) y 'repetido' sin fila se repara
+  // sin cobrar (A-1).
+  const precioArticulo = (tipo, articulo) => PRECIOS_ARTICULO_SQL[tipo]?.[articulo] ?? null
+  const conTonosArt = (tipo, articulo) => CON_TONOS_SQL[tipo]?.includes(articulo) ?? false
+  const gratisArt = (tipo, articulo) => articulo !== null && GRATIS_SQL[tipo] === articulo
+  const filaInv = (tipo, articulo) => b.inventario.find((f) => f.tipo === tipo && f.articulo === articulo) ?? null
+  const apagarTipo = (tipo, salvo = null) => {
+    for (const f of b.inventario) if (f.tipo === tipo && f.articulo !== salvo) f.en_uso = false
+  }
+
+  function comprarArticulo({ p_tipo = null, p_articulo = null, p_tono = null } = {}) {
+    if (!cabe('comprar_articulo')) return 'limite'
+    if (!TIPOS_INVENTARIO_SQL.includes(p_tipo)) return 'tipo_invalido'
+    const precio = precioArticulo(p_tipo, p_articulo)
+    if (precio === null) return 'no_existe'
+    let tono = null
+    if (conTonosArt(p_tipo, p_articulo)) {
+      tono = p_tono ?? 'actual'
+      if (!TONOS_SQL.includes(tono)) return 'tono_invalido'
+    } else if (p_tono !== null) {
+      return 'sin_tono'
+    }
+    if (filaInv(p_tipo, p_articulo)) return 'ya_comprado'
+    const r = aplicar('compra', -precio, `compra:${b.perfil.id}:${p_tipo}:${p_articulo}`, `${p_tipo}:${p_articulo}`)
+    if (r.motivo === 'saldo_insuficiente') return 'sin_saldo'
+    if (r.motivo !== 'aplicado' && r.motivo !== 'repetido') return r.motivo
+    apagarTipo(p_tipo)
+    b.inventario.push({ tipo: p_tipo, articulo: p_articulo, tono, en_uso: true, adquirido_en: iso(ahora()) })
+    return 'ok'
+  }
+
+  function usarArticulo({ p_tipo = null, p_articulo = null } = {}) {
+    if (!TIPOS_INVENTARIO_SQL.includes(p_tipo)) return 'tipo_invalido'
+    const gratis = gratisArt(p_tipo, p_articulo)
+    if (!gratis && precioArticulo(p_tipo, p_articulo) === null) return 'no_existe'
+    if (!gratis && !filaInv(p_tipo, p_articulo)) return 'no_comprado'
+    apagarTipo(p_tipo, p_articulo)
+    const f = filaInv(p_tipo, p_articulo)
+    if (f) f.en_uso = true
+    return 'ok'
+  }
+
+  function elegirTono({ p_tipo = null, p_articulo = null, p_tono = null } = {}) {
+    if (!TIPOS_INVENTARIO_SQL.includes(p_tipo)) return 'tipo_invalido'
+    if (!gratisArt(p_tipo, p_articulo) && precioArticulo(p_tipo, p_articulo) === null) return 'no_existe'
+    if (!conTonosArt(p_tipo, p_articulo)) return 'sin_tono'
+    if (!TONOS_SQL.includes(p_tono)) return 'tono_invalido'
+    const f = filaInv(p_tipo, p_articulo)
+    if (!f) return 'no_comprado'
+    f.tono = p_tono
+    return 'ok'
+  }
+
+  function miInventario({ p_tipo = null } = {}) {
+    return b.inventario
+      .filter((f) => p_tipo === null || f.tipo === p_tipo)
+      .sort((x, y) => x.tipo.localeCompare(y.tipo) || x.adquirido_en.localeCompare(y.adquirido_en) || x.articulo.localeCompare(y.articulo))
+      .map((f) => ({ jugador_id: b.perfil.id, ...f }))
+  }
+
   const RPC = {
     mi_billetera: () => b.saldo,
     marcar_ingreso: marcarIngreso,
@@ -727,6 +809,10 @@ export function crearBanco({
     mi_proximo_cambio: miProximoCambio,
     consultar_mano: consultarMano,
     mi_consulta: miConsulta,
+    comprar_articulo: comprarArticulo,
+    usar_articulo: usarArticulo,
+    elegir_tono: elegirTono,
+    mi_inventario: miInventario,
   }
 
   return {
@@ -759,6 +845,15 @@ export function crearBanco({
       return true
     },
     get consultas() { return b.consultas ? { ...b.consultas } : null },
+    // ── TIE-1 1a · la tienda ───────────────────────────────────────────────
+    get inventario() { return b.inventario.map((f) => ({ ...f })) },
+    /** Lo que el dueño de la tabla inserta a mano (y los mandos `?tie=`): las
+     *  filas `{ tipo, articulo, tono, en_uso }`, sin cobrar. */
+    sembrarInventario(filas) {
+      b.inventario = filas.map((f, i) => ({ tipo: 'tapete', tono: null, en_uso: false, ...f, adquirido_en: iso(nace + i * 1000) }))
+    },
+    /** Lo que el guion hace con `delete from inventario` (B3b): la fila se va, el libro se queda. */
+    borrarFilaInventario(tipo, articulo) { b.inventario = b.inventario.filter((f) => !(f.tipo === tipo && f.articulo === articulo)) },
     // ── CFG-1 1c · la Edge Function `eliminar_cuenta` ──────────────────────
     // No es una RPC: contesta `{ status, cuerpo }`, lo que la función manda por
     // HTTP. La guarda es la de `partida_abierta_de`: una mesa IA abierta (la de

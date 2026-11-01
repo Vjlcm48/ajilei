@@ -648,6 +648,40 @@ export const TEXTOS_ES = {
   'perfil.nombre.cancelar':      'Cancelar',
   'perfil.nombre.cerrar':        'Cerrar',
   'perfil.nombre.bloqueado':     'Podrás cambiarlo de nuevo el {fecha}.',
+
+  // ── TIE-1 1a · La tienda ─────────────────────────────────────────────────
+  // Lámina `laminas/tie1a` §8. Lo que ya existía se reutiliza: «Pronto»
+  // (`lob.toast.pronto`), «Tienda» (`lob.nav.tienda`, también el título de la
+  // pantalla), el estante Monedas (`video.hoja.*`) y el enlace de «No te
+  // alcanza» (`video.hoja.titulo`). El «No» de la ventana es el de la de
+  // «Eliminar cuenta», su molde (`lob.cfg.no`). La fila del ⚙ se llama como su estante
+  // (`tie.estante.tapetes`). Los nombres y descripciones de los tapetes son
+  // los de `config/tapetes.js`.
+  'tie.estante.monedas':    'Monedas',
+  'tie.estante.tapetes':    'Tapetes',
+  'tie.estante.reversos':   'Reversos',
+  'tie.estante.avatares':   'Avatares',
+  'tie.estante.premium':    'Premium',
+  'tie.gratis':             'Gratis',
+  'tie.en_uso':             'En uso',
+  'tie.comprado':           'Comprado',
+  'tie.usar':               'Usar',
+  'tie.comprar':            'Comprar · {precio} HC',
+  'tie.tono':               'Tono',
+  'tie.tono.claro':         'Claro',
+  'tie.tono.actual':        'Medio',
+  'tie.tono.oscuro':        'Oscuro',
+  'tie.compra.titulo':      '¿Comprar {nombre}?',
+  'tie.compra.precio':      'Precio',
+  'tie.compra.saldo':       'Tu saldo',
+  'tie.compra.queda':       'Te quedarán',
+  'tie.compra.si':          'Sí, comprar',
+  'tie.compra.comprando':   'Comprando…',
+  'tie.compra.error':       'No se pudo comprar. Tu saldo no cambió.',
+  'tie.falta':              'No te alcanza: faltan {n} HC',
+  'tie.listo':              '¡Listo! {nombre} es tu tapete',
+  'tie.cambio.error':       'No se pudo cambiar. Inténtalo de nuevo.',
+  'tie.cfg.valor':          '{nombre} · {tono}',
 }
 
 export default TEXTOS_ES

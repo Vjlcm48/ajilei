@@ -95,7 +95,10 @@ describe('IDI-0 · diccionario es', () => {
     //
     // CFG-1 1b es la octava: `perfil.*` es la pantalla de perfil (y lo que el
     // Bautizo en modo edición dice del freno).
-    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.']
+    //
+    // TIE-1 1a es la novena: `tie.*` es la tienda (estantes, vitrina, ventana
+    // de compra) y la fila «Tapetes» del ⚙.
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.', 'tie.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }

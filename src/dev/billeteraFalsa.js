@@ -47,6 +47,8 @@ import { crearRankingApi } from '../lib/rankingApi'
 import { crearCuentaApi } from '../lib/cuentaApi'
 import { crearPerfilApi } from '../lib/perfilApi'
 import { crearConsultaApi } from '../lib/consultaApi'
+import { crearTiendaApi } from '../lib/tiendaApi'
+import { saldoOculto } from '../lib/saldoOculto'
 import { crearBanco, VIDEO_MINIMO_S_SQL } from './bancoImitado'
 import { sembradosRanking, PUNTOS_DEL_BYPASS } from './sembradosRanking'
 import { siembraAPU, entradaSembradaAPU, videoSembradoAPU } from './siembraAPU'
@@ -69,7 +71,7 @@ export function bancoDelBypass() {
     // en la misma proporción (35 de cada 40), o el cliente esperaría el resto.
     const corto = videoSembradoAPU()?.duracionMs ?? null
     banco = crearBanco({
-      saldo: siembraAPU()?.saldo ?? 5000,
+      saldo: siembraAPU()?.saldo ?? saldoMandoTie() ?? 5000,
       entradaDeMolde: entradaSembradaAPU(100) !== null,
       videoMinimoS: corto === null ? VIDEO_MINIMO_S_SQL
         : Math.min(VIDEO_MINIMO_S_SQL, Math.floor((corto / AJILEI_CONFIG.economy.video.duracionMs) * VIDEO_MINIMO_S_SQL)),
@@ -258,6 +260,51 @@ export function mesaContraHumanosDev() {
   if (!import.meta.env.DEV) return false
   if (!import.meta.env.VITE_AUTH_BYPASS) return false
   return mandoCfg() === 'mesa-humanos'
+}
+
+// ── TIE-1 1a · la tienda contra el banco imitado ───────────────────────────
+// Rector: AJILEI_TIE-1_Fase1a_v1.0.md §3.5. Los mandos `?tie=`:
+//   ?tie=vacia      → nada comprado, saldo 31.400
+//   ?tie=comprado   → grafito oscuro en uso y azul (actual) comprado, 31.400
+//   ?tie=sin-saldo  → nada comprado, saldo 4.000: «No te alcanza»
+//   ?tie=error      → la compra contesta error del servidor (la ventana en `error`)
+//   ?tie=ojito      → el saldo tapado (el ojito guardado en el aparato)
+// Sin mando, el banco recién nacido (5.000, nada comprado). Cada llamada tarda
+// `TIENDA_TARDA_MS`, para que «Comprando…» se vea.
+export const TIE_PARAM = 'tie'
+const TIENDA_TARDA_MS = 700
+const SALDO_TIE = 31400
+const SALDO_TIE_SIN = 4000
+
+function mandoTie() {
+  try { return new URLSearchParams(window.location.search).get(TIE_PARAM) } catch { return null }
+}
+
+function saldoMandoTie() {
+  const m = mandoTie()
+  if (m === null) return null
+  return m === 'sin-saldo' ? SALDO_TIE_SIN : SALDO_TIE
+}
+
+/** La API de la tienda contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionTienda() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  const mando = mandoTie()
+  if (mando === 'comprado') {
+    b.sembrarInventario([
+      { articulo: 'grafito', tono: 'oscuro', en_uso: true },
+      { articulo: 'azul', tono: 'actual' },
+    ])
+  }
+  if (mando === 'ojito') saldoOculto.guardar(true)
+  const espera = (v) => new Promise((ok) => setTimeout(() => ok(v), TIENDA_TARDA_MS))
+  return crearTiendaApi({
+    rpc: (nombre, params) => (mando === 'error' && nombre === 'comprar_articulo'
+      ? espera({ data: null, error: { code: 'XX000', message: 'mando ?tie=error' } })
+      : b.rpc(nombre, params).then(espera)),
+  })
 }
 
 /** Para las pruebas: un banco nuevo en la siguiente llamada. */
