@@ -54,12 +54,12 @@ describe('ECO-1e · la lista de guiones es el contrato', () => {
 
 describe('ECO-1e · clasificarGuiones', () => {
   it('un guion nuevo sin declarar sale en sinDeclarar', () => {
-    const r = clasificarGuiones(['eco1a_verificacion.sql', 'eco1d_verificacion.sql', 'eco1g_verificacion.sql', 'rnk1a_verificacion.sql', 'cfg1c_verificacion.sql', 'cfg1b_verificacion.sql', 'cfg1e_verificacion.sql', 'eco1c_verificacion.sql', 'eco9z_verificacion.sql'])
+    const r = clasificarGuiones(['eco1a_verificacion.sql', 'eco1d_verificacion.sql', 'eco1g_verificacion.sql', 'rnk1a_verificacion.sql', 'cfg1c_verificacion.sql', 'cfg1b_verificacion.sql', 'cfg1e_verificacion.sql', 'tie1a_verificacion.sql', 'eco1c_verificacion.sql', 'eco9z_verificacion.sql'])
     expect(r.sinDeclarar).toEqual(['eco9z_verificacion.sql'])
     expect(r.faltan).toEqual([])
   })
   it('un vigente que falta sale en faltan', () => {
-    expect(clasificarGuiones(['eco1a_verificacion.sql']).faltan).toEqual(['eco1d_verificacion.sql', 'eco1g_verificacion.sql', 'rnk1a_verificacion.sql', 'cfg1c_verificacion.sql', 'cfg1b_verificacion.sql', 'cfg1e_verificacion.sql'])
+    expect(clasificarGuiones(['eco1a_verificacion.sql']).faltan).toEqual(['eco1d_verificacion.sql', 'eco1g_verificacion.sql', 'rnk1a_verificacion.sql', 'cfg1c_verificacion.sql', 'cfg1b_verificacion.sql', 'cfg1e_verificacion.sql', 'tie1a_verificacion.sql'])
   })
 })
 
