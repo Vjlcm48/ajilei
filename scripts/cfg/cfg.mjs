@@ -73,6 +73,8 @@
 //   CFG-1 1e (en `menu1e.mjs`): cfg.menu, cfg.consulta y cfg.rapida, el ⋮ de
 //                la mesa — las entradas que quedan, Mano actual de pago con el
 //                banco imitado y Partida rápida con sus duraciones medidas
+//   CFG-1 1d (en `correo1d.mjs`): cfg.correo, el cambio de correo — la fila, el
+//                editor, los errores, los códigos, hecho y los mandos del bypass
 //   consola      sin errores de página
 
 import { readFileSync } from 'node:fs'
@@ -81,6 +83,7 @@ import { sembradosRanking } from '../../src/dev/sembradosRanking.js'
 import { crearBanco, sumarDias } from '../../src/dev/bancoImitado.js'
 import { recorrerRuta } from '../rutaMesa.mjs'
 import { mesa1e } from './menu1e.mjs'
+import { correo1d } from './correo1d.mjs'
 
 const VERSION = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version
 const CELDAS = [
@@ -167,6 +170,9 @@ const MEDIR = ({ dentro = null } = {}) => {
     ['confirmar', '.bautizo-card .puerta-btn'],
     ['cancelar', '[data-accion="bautizo-cancelar"]'],
     ['ventana', '.cfn-tarjeta .elc-btn'],
+    // CFG-1 1d · la tarjeta del cambio de correo.
+    ['campo', '.cor-card input'],
+    ['enlace', '.cor-card .puerta-link'],
   ]
   const VECINOS = [['cifra', '.lob-pildora .bd-num'], ['nombre', '.lob-top .lob-nombre'], ['título', '.sal-cab h1']]
   const ts = []
@@ -894,8 +900,9 @@ export async function runCfg(browser, { base, baseDev = null }) {
     'eliminar.ventana': [], 'eliminar.mesa': [], 'eliminar.ok': [], 'salir.reinicia': [],
     perfil: [], freno: [],
     menu: [], consulta: [], rapida: [],
+    correo: [],
   }
-  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia', 'perfil', 'freno', 'menu', 'consulta', 'rapida']
+  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia', 'perfil', 'freno', 'menu', 'consulta', 'rapida', 'correo']
   const anota = (p, ok, detalle) => { puertas[p].push({ ok: ok === true, ...detalle }); return ok === true }
 
   for (const celda of CELDAS) {
@@ -1187,6 +1194,12 @@ export async function runCfg(browser, { base, baseDev = null }) {
 
   // ── 11 · CFG-1 1e · el ⋮ de la mesa: entradas, Mano actual y Partida rápida ─
   await mesa1e(browser, { base, baseDev }, errores, anota)
+
+  // ── 12 · CFG-1 1d · el cambio de correo ───────────────────────────────────
+  await correo1d(browser, { base, baseDev }, errores, anota, {
+    abrirLobby, MEDIR, esperarQuieta, perfil: PERFIL_CAP,
+    bancoCon: (correo) => crearBanco({ usuario: PERFIL_CAP.username, sembrados: sembradosRanking(), saldo: 5000, correo }),
+  })
 
   const resumen = Object.fromEntries(Object.entries(puertas).map(([k, v]) => [`cfg.${k}`, v.length > 0 && pasa(v.map((x) => x.ok))]))
   resumen.consola = errores.length === 0

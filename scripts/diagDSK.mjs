@@ -48,7 +48,7 @@
 //            (cfg.zona, cfg.solape, cfg.ojito, cfg.hoja, cfg.ancla, cfg.toast,
 //            cfg.sonido, cfg.version, cfg.inv45, cfg.sinojito; CFG-1 1c:
 //            cfg.eliminar.ventana, cfg.eliminar.mesa, cfg.eliminar.ok,
-//            cfg.salir.reinicia) y la consola.
+//            cfg.salir.reinicia; CFG-1 1d: cfg.correo) y la consola.
 //            Contra el bundle real y el banco imitado. Ver `scripts/cfg/cfg.mjs`.
 //   tienda → TIE-1 1a: la tienda (estantes, lista, vitrina, ventana de compra)
 //            en seis tamaños, la puerta vitrina ↔ mesa (9 valores × 11 casos),
