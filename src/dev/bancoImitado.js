@@ -84,6 +84,13 @@ export const LIMITE_COMPRA_SQL = 30
 // vedados (los de la casa y alguno más): el banco no es la autoridad de la
 // lista, y el SQL no la duplica (`username_vedado`).
 export const FRENO_NOMBRE_MS_SQL = 30 * 24 * 3600 * 1000
+// CFG-1 1d · lo que el panel de Auth tiene puesto (leído por Victor, STOP-0), y
+// los códigos y correos del simulacro. El espejo con `correoCore` va en las pruebas.
+export const OTP_EXP_S_PANEL = 600
+export const INTERVALO_ENVIO_S_PANEL = 60
+export const CODIGO_ACTUAL_IMITADO = '111111'
+export const CODIGO_NUEVO_IMITADO = '222222'
+export const CORREOS_OCUPADOS_IMITADOS = Object.freeze(['test1976@gmail.com'])
 export const FORMA_USERNAME_SQL = /^[A-Za-z0-9_]{6,15}$/
 export const ESTADOS_VE_SQL = Object.freeze([
   'AMA', 'ANZ', 'APU', 'ARA', 'BAR', 'BOL', 'CAR', 'COJ', 'DEL', 'DC',
@@ -179,6 +186,7 @@ const esEntero = (n) => Number.isInteger(n)
 export function crearBanco({
   saldo = 5000, ahora = () => Date.now(), entradaDeMolde = false, limites = true,
   videoMinimoS = VIDEO_MINIMO_S_SQL, usuario = 'test1976', sembrados = [],
+  correo = 'devlocal@ajilei.test',
 } = {}) {
   const nace = ahora()
   const b = {
@@ -201,6 +209,8 @@ export function crearBanco({
     puntos: [],                // `libro_puntos` de la cuenta: { origen, nivel, sentados, puntos_base, ajilei, extra, mesa_id, mano, creado_en }
     total: null,               // `puntos_totales` de la cuenta: { puntos, manos, ajileis, actualizado_en }, o ninguna
     otros: [],                 // los demás jugadores: { username, saldo, saldoEn, total, pais, estado }
+    // CFG-1 1d · la fila propia de `auth.users` en lo que toca al correo
+    correoAuth: { email: correo, nuevo: null, enviadoEn: null, confirmados: 0, codigos: {}, forzar: null },
     // CFG-1 1b · la fila propia de `profiles` (el nombre es `usuario`)
     perfil: { id: '00000000-0000-4000-8000-000000000000', pais: null, estado: null, cambiadoEn: null, forzar: null },
     // CFG-1 1e · la fila de `consultas`, o ninguna (nace en la primera consulta)
@@ -594,6 +604,74 @@ export function crearBanco({
     return { data: filaPerfil(), error: null }
   }
 
+  // ── CFG-1 1d · el cambio de correo ───────────────────────────────────────
+  // GoTrue v2.197.0 leído función a función (sonda de la 1d, S-1…S-5), con
+  // «Secure email change» encendido: `sendEmailChange`, `emailChangeVerify` y
+  // `Resend`. Contesta como la API de Auth, `{ status, cuerpo }`: el arnés lo
+  // pone en una ruta y el bypass lo pasa a la forma del SDK.
+  // Los códigos son fijos para poder teclearlos en el bypass.
+  const c = b.correoAuth
+  const noCorreo = (status, code, message) => ({ status, cuerpo: { code, message } })
+  const usuarioAuth = () => ({
+    id: b.perfil.id, aud: 'authenticated', role: 'authenticated', email: c.email,
+    ...(c.nuevo ? { new_email: c.nuevo, email_change_sent_at: iso(c.enviadoEn) } : {}),
+    app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z',
+  })
+  function correoEnviar() {
+    c.codigos = { [c.email]: CODIGO_ACTUAL_IMITADO, [c.nuevo]: CODIGO_NUEVO_IMITADO }
+    c.confirmados = 0
+    c.enviadoEn = ahora()
+  }
+  const correoFrenado = () => {
+    if (c.forzar === 'limite') return noCorreo(429, 'over_email_send_rate_limit', 'email rate limit exceeded')
+    const falta = c.enviadoEn === null ? 0 : c.enviadoEn + INTERVALO_ENVIO_S_PANEL * 1000 - ahora()
+    return falta > 0 ? noCorreo(429, 'over_email_send_rate_limit', `For security purposes, you can only request this after ${Math.ceil(falta / 1000)} seconds.`) : null
+  }
+  // `PUT /auth/v1/user { email }`
+  function correoPedir(email) {
+    const nuevo = String(email ?? '').toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevo)) return noCorreo(400, 'validation_failed', 'Unable to validate email address: invalid format')
+    if (nuevo === c.email) return { status: 200, cuerpo: usuarioAuth() }
+    if (c.forzar === 'en_uso' || CORREOS_OCUPADOS_IMITADOS.includes(nuevo)) return noCorreo(422, 'email_exists', 'A user with this email address has already been registered')
+    const freno = correoFrenado()
+    if (freno) return freno
+    c.nuevo = nuevo
+    correoEnviar()
+    return { status: 200, cuerpo: usuarioAuth() }
+  }
+  // `POST /auth/v1/verify { type: 'email_change', email, token }`
+  function correoVerificar(email, token) {
+    const invalido = noCorreo(403, 'otp_expired', 'Token has expired or is invalid')
+    if (c.forzar === 'codigo_mal' || !c.nuevo) return invalido
+    if (ahora() >= c.enviadoEn + OTP_EXP_S_PANEL * 1000) return invalido
+    const dir = String(email ?? '').toLowerCase()
+    if (c.codigos[dir] === undefined || c.codigos[dir] !== token) return invalido
+    delete c.codigos[dir]
+    c.confirmados += 1
+    if (c.confirmados === 1) {
+      return { status: 200, cuerpo: { msg: 'Confirmation link accepted. Please proceed to confirm link sent to the other email', code: '200' } }
+    }
+    c.email = c.nuevo
+    c.nuevo = null
+    c.enviadoEn = null
+    c.confirmados = 0
+    c.codigos = {}
+    const exp = Math.floor(ahora() / 1000) + 3600
+    return { status: 200, cuerpo: {
+      access_token: `e30.${btoa(JSON.stringify({ sub: b.perfil.id, email: c.email, exp }))}.imitado`,
+      token_type: 'bearer', expires_in: 3600, expires_at: exp, refresh_token: 'imitado-refresh', user: usuarioAuth(),
+    } }
+  }
+  // `POST /auth/v1/resend { type: 'email_change', email }`. Con el correo nuevo
+  // no encuentra a nadie y contesta 200 sin mandar nada: la trampa de la sonda.
+  function correoReenviar(email) {
+    if (String(email ?? '').toLowerCase() !== c.email || !c.nuevo) return { status: 200, cuerpo: {} }
+    const freno = correoFrenado()
+    if (freno) return freno
+    correoEnviar()
+    return { status: 200, cuerpo: {} }
+  }
+
   function salir({ p_mesa, p_fichas, p_seq }) {
     if (!cabe('salir_ia')) return respuesta('limite')
     if ([p_mesa, p_fichas, p_seq].some((v) => v === null || v === undefined) || p_fichas < 0) {
@@ -837,6 +915,18 @@ export function crearBanco({
     /** Mando del bypass: `nombre_libre` y el `update` contestan 'ocupado', 'vedado' o 'libre' (null = lo que diga el banco). */
     forzarNombre(que) { b.perfil.forzar = que },
     get perfil() { return { ...filaPerfil(), nombre_cambiado_en: b.perfil.cambiadoEn === null ? null : iso(b.perfil.cambiadoEn) } },
+    // ── CFG-1 1d · el cambio de correo ─────────────────────────────────────
+    correoUsuario: usuarioAuth,
+    correoPedir,
+    correoVerificar,
+    correoReenviar,
+    /** Mando del bypass y del arnés: 'en_uso', 'codigo_mal' o 'limite' (null = lo que diga el banco). */
+    forzarCorreo(que) { c.forzar = que },
+    /** Mando: un cambio ya pedido hace `ms`. */
+    sembrarCambioCorreo(nuevo, ms = 0) { c.nuevo = nuevo; correoEnviar(); c.enviadoEn = ahora() - ms },
+    /** Lo que pasa el reloj: el envío se hizo hace `ms` más. */
+    envejecerCambioCorreo(ms) { if (c.enviadoEn !== null) c.enviadoEn -= ms },
+    get correoAuth() { return { ...c, codigos: { ...c.codigos } } },
     // ── CFG-1 1e · Mano actual ─────────────────────────────────────────────
     /** Lo que el dueño de la tabla escribe en `consultas.gratis_usadas` (el guion, B8): `n` gratis gastadas. */
     gastarConsultas(n) {

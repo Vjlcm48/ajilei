@@ -46,6 +46,7 @@ import { crearVideoApi } from '../lib/videoApi'
 import { crearRankingApi } from '../lib/rankingApi'
 import { crearCuentaApi } from '../lib/cuentaApi'
 import { crearPerfilApi } from '../lib/perfilApi'
+import { crearCorreoApi } from '../lib/correoApi'
 import { crearConsultaApi } from '../lib/consultaApi'
 import { crearTiendaApi } from '../lib/tiendaApi'
 import { saldoOculto } from '../lib/saldoOculto'
@@ -229,6 +230,61 @@ export function simulacionPerfil() {
   const fuerza = { 'nombre-libre': 'libre', 'nombre-ocupado': 'ocupado', 'nombre-vedado': 'vedado' }[mando] ?? null
   b.forzarNombre(fuerza)
   return crearPerfilApi(clientePerfilDe(b, { tarda: PERFIL_TARDA_MS }))
+}
+
+// ── CFG-1 1d · el cambio de correo contra el banco imitado ─────────────────
+// Rector: AJILEI_CFG-1_Fase1d_v1.0.md §4. Un cliente con la forma de lo que
+// `correoApi` usa de `supabase.auth`, así que el bypass pasa por la capa real.
+// Los códigos del simulacro: 111111 el del actual y 222222 el del nuevo. Los
+// mandos `?cfg=`:
+//   ?cfg=correo-normal     → sin nada pendiente, y el cambio pasa
+//   ?cfg=correo-pendiente  → un cambio pedido hace 20 s
+//   ?cfg=correo-en-uso     → pedir contesta 422 email_exists
+//   ?cfg=correo-codigo-mal → todo código contesta 403 otp_expired
+//   ?cfg=correo-limite     → pedir y reenviar contestan 429
+// Sin mando, lo que diga el banco. Cada respuesta (menos las lecturas) tarda
+// `CORREO_TARDA_MS`, para que «Enviando…» y «Comprobando…» se vean.
+const CORREO_TARDA_MS = 450
+
+/** Un cliente con la forma de `supabase` para `correoApi`: `auth`, como el SDK 2.112.4. */
+export function clienteCorreoDe(b, { tarda = 0 } = {}) {
+  const espera = () => (tarda > 0 ? new Promise((ok) => setTimeout(ok, tarda)) : Promise.resolve())
+  const error = ({ status, cuerpo }) => ({ name: 'AuthApiError', status, code: cuerpo.code, message: cuerpo.message })
+  return {
+    auth: {
+      getUser: async () => ({ data: { user: b.correoUsuario() }, error: null }),
+      getSession: async () => ({ data: { session: { user: b.correoUsuario() } }, error: null }),
+      async updateUser({ email }) {
+        await espera()
+        const r = b.correoPedir(email)
+        return r.status === 200 ? { data: { user: r.cuerpo }, error: null } : { data: { user: null }, error: error(r) }
+      },
+      async verifyOtp({ email, token }) {
+        await espera()
+        const r = b.correoVerificar(email, token)
+        if (r.status !== 200) return { data: { user: null, session: null }, error: error(r) }
+        return r.cuerpo.access_token
+          ? { data: { user: r.cuerpo.user, session: r.cuerpo }, error: null }
+          : { data: { user: null, session: null }, error: null }
+      },
+      async resend({ email }) {
+        await espera()
+        const r = b.correoReenviar(email)
+        return { data: { user: null, session: null }, error: r.status === 200 ? null : error(r) }
+      },
+    },
+  }
+}
+
+/** La API del correo contra el banco imitado, o `null` fuera de desarrollo con bypass. */
+export function simulacionCorreo() {
+  if (!import.meta.env.DEV) return null
+  const b = bancoDelBypass()
+  if (!b) return null
+  const mando = mandoCfg()
+  if (mando === 'correo-pendiente') b.sembrarCambioCorreo('nuevo.correo@gmail.com', 20_000)
+  b.forzarCorreo({ 'correo-en-uso': 'en_uso', 'correo-codigo-mal': 'codigo_mal', 'correo-limite': 'limite' }[mando] ?? null)
+  return crearCorreoApi(clienteCorreoDe(b, { tarda: CORREO_TARDA_MS }))
 }
 
 // ── CFG-1 1e · Mano actual de pago contra el banco imitado ─────────────────

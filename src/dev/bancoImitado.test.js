@@ -9,7 +9,9 @@ import {
   PUNTOS_RETO_SQL, EXTRA_AJILEI_SQL, TOPE_MANOS_MINUTO_SQL, franjaSQL,
   FRENO_NOMBRE_MS_SQL, ESTADOS_VE_SQL, normalizarUsernameSQL,
   CONSULTAS_GRATIS_SQL, PRECIOS_CONSULTA_SQL, LIMITE_CONSULTA_SQL,
+  OTP_EXP_S_PANEL, INTERVALO_ENVIO_S_PANEL, CODIGO_ACTUAL_IMITADO, CODIGO_NUEVO_IMITADO,
 } from './bancoImitado'
+import { OTP_EXP_S, INTERVALO_ENVIO_S } from '../lib/correoCore'
 import { CONSULTAS_GRATIS, PRECIOS_CONSULTA } from '../config/consultas'
 import { ESTADOS_VE } from '../config/estados'
 import { NIVELES } from '../config/niveles'
@@ -1112,5 +1114,95 @@ describe('CFG-1 1e · las cifras de Mano actual, en espejo', () => {
   it('los nombres de las columnas que el cliente lee: SQL = lib/consultaApi', () => {
     expect(sql).toMatch(/resultado\s+text,\s+precio\s+integer,\s+gratis_restantes integer,\s+saldo\s+bigint/)
     expect(sql).toMatch(/gratis_restantes integer,\s+ultima_mesa\s+uuid,\s+ultima_mano\s+integer/)
+  })
+})
+
+describe('CFG-1 1d · banco imitado · el cambio de correo (GoTrue v2.197.0)', () => {
+  const ACTUAL = 'a@ajilei.test'
+  const NUEVO = 'n@ajilei.test'
+  const montar = () => {
+    let t = Date.parse('2026-11-01T12:00:00Z')
+    const b = crearBanco({ correo: ACTUAL, ahora: () => t })
+    return { b, pasa: (ms) => { t += ms } }
+  }
+
+  it('las cifras del panel, en espejo con el núcleo', () => {
+    expect(OTP_EXP_S_PANEL).toBe(OTP_EXP_S)
+    expect(INTERVALO_ENVIO_S_PANEL).toBe(INTERVALO_ENVIO_S)
+  })
+  it('pedir: 400, 200 sin efecto, 422 y el envío', () => {
+    const { b } = montar()
+    expect(b.correoPedir('nada').cuerpo.code).toBe('validation_failed')
+    const mismo = b.correoPedir(ACTUAL.toUpperCase())
+    expect(mismo.status).toBe(200)
+    expect(mismo.cuerpo.new_email).toBeUndefined()
+    expect(b.correoPedir('test1976@gmail.com').status).toBe(422)
+    const r = b.correoPedir(NUEVO)
+    expect(r.cuerpo.new_email).toBe(NUEVO)
+    expect(r.cuerpo.email).toBe(ACTUAL)
+    expect(r.cuerpo.email_change_sent_at).toBeTypeOf('string')
+  })
+  it('60 s entre envíos, también para otra dirección', () => {
+    const { b, pasa } = montar()
+    b.correoPedir(NUEVO)
+    pasa(59_000)
+    const r = b.correoPedir('otra@ajilei.test')
+    expect(r.status).toBe(429)
+    expect(r.cuerpo.code).toBe('over_email_send_rate_limit')
+    pasa(1_000)
+    expect(b.correoPedir('otra@ajilei.test').cuerpo.new_email).toBe('otra@ajilei.test')
+  })
+  it('cada código vale solo con su correo; el primero no da sesión y el segundo sí', () => {
+    const { b } = montar()
+    b.correoPedir(NUEVO)
+    expect(b.correoVerificar(ACTUAL, CODIGO_NUEVO_IMITADO).cuerpo.code).toBe('otp_expired')
+    const uno = b.correoVerificar(NUEVO, CODIGO_NUEVO_IMITADO)
+    expect(uno.status).toBe(200)
+    expect(uno.cuerpo.access_token).toBeUndefined()
+    expect(uno.cuerpo.code).toBe('200')
+    expect(b.correoUsuario().email).toBe(ACTUAL)
+    const dos = b.correoVerificar(ACTUAL, CODIGO_ACTUAL_IMITADO)
+    expect(dos.cuerpo.access_token).toBeTypeOf('string')
+    expect(dos.cuerpo.user.email).toBe(NUEVO)
+    expect(dos.cuerpo.user.new_email).toBeUndefined()
+  })
+  it('un código usado no vale otra vez', () => {
+    const { b } = montar()
+    b.correoPedir(NUEVO)
+    b.correoVerificar(ACTUAL, CODIGO_ACTUAL_IMITADO)
+    expect(b.correoVerificar(ACTUAL, CODIGO_ACTUAL_IMITADO).status).toBe(403)
+    expect(b.correoAuth.confirmados).toBe(1)
+  })
+  it('a los 10 minutos los códigos mueren, pero `new_email` sigue', () => {
+    const { b, pasa } = montar()
+    b.correoPedir(NUEVO)
+    pasa(600_000)
+    expect(b.correoVerificar(ACTUAL, CODIGO_ACTUAL_IMITADO).cuerpo.code).toBe('otp_expired')
+    expect(b.correoUsuario().new_email).toBe(NUEVO)
+  })
+  it('reenviar: con el correo nuevo no manda nada; con el actual empieza de cero', () => {
+    const { b, pasa } = montar()
+    b.correoPedir(NUEVO)
+    b.correoVerificar(ACTUAL, CODIGO_ACTUAL_IMITADO)
+    pasa(60_000)
+    const antes = b.correoAuth.enviadoEn
+    expect(b.correoReenviar(NUEVO)).toEqual({ status: 200, cuerpo: {} })
+    expect(b.correoAuth.enviadoEn).toBe(antes)
+    expect(b.correoAuth.confirmados).toBe(1)
+    expect(b.correoReenviar(ACTUAL).status).toBe(200)
+    expect(b.correoAuth.enviadoEn).toBeGreaterThan(antes)
+    expect(b.correoAuth.confirmados).toBe(0)
+  })
+  it('los mandos', () => {
+    const { b } = montar()
+    b.forzarCorreo('en_uso')
+    expect(b.correoPedir(NUEVO).status).toBe(422)
+    b.forzarCorreo('limite')
+    expect(b.correoPedir(NUEVO).status).toBe(429)
+    b.forzarCorreo(null)
+    b.sembrarCambioCorreo(NUEVO, 20_000)
+    expect(b.correoUsuario().new_email).toBe(NUEVO)
+    b.forzarCorreo('codigo_mal')
+    expect(b.correoVerificar(ACTUAL, CODIGO_ACTUAL_IMITADO).status).toBe(403)
   })
 })
