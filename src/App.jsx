@@ -35,10 +35,11 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil, simulacionConsulta, simulacionTienda, mesaContraHumanosDev } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil, simulacionCorreo, simulacionConsulta, simulacionTienda, mesaContraHumanosDev } from './dev/billeteraFalsa'
 import { perfilApi } from './lib/perfilApi'
 import Perfil from './screens/Perfil'
 import { cuentaApi } from './lib/cuentaApi'
+import { correoApi } from './lib/correoApi'
 import { limpiarAparato } from './lib/limpiarAparato'
 import { rankingApi } from './lib/rankingApi'
 import { consultaApi } from './lib/consultaApi'
@@ -310,6 +311,8 @@ function App() {
   // más que el tope ya se llevó la cuenta. Quedarse dentro sería un reintento
   // sin fin.
   const [apiCuenta] = useState(() => simulacionCuenta() ?? cuentaApi)
+  // CFG-1 1d · el cambio de correo, con el mismo reparto.
+  const [apiCorreo] = useState(() => simulacionCorreo() ?? correoApi)
 
   // ── CFG-1 1b · LA PANTALLA DE PERFIL Y DE DÓNDE SE VINO ───────────────────
   // Rector CFG-1 1b §2.5 (R-9). La flecha del perfil vuelve a la pantalla que
@@ -887,6 +890,7 @@ function App() {
     id: auth.perfil?.id ?? null,
     username: auth.perfil?.username ?? '',
     correo: auth.correo ?? '',
+    correoApi: apiCorreo,
     pais: auth.perfil?.pais ?? null,
     estado: auth.perfil?.estado ?? null,
     proximoCambio: auth.proximoCambio,

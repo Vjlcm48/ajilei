@@ -5,8 +5,10 @@ import '../styles/perfil.css'
 
 import Bautizo from './Bautizo'
 import Bandera from '../components/Bandera'
+import CambiarCorreo from '../components/CambiarCorreo'
 import { SoundButton } from '../components/SoundButton'
 import { useIdioma } from '../hooks/useIdioma'
+import { useCambioCorreo } from '../hooks/useCambioCorreo'
 import { enmascararCorreo } from '../hooks/lobbyCore'
 import { inicialDe } from './salaEsperaCore'
 import { PAISES } from '../config/paises'
@@ -34,6 +36,10 @@ import { fechaCorta } from '../lib/perfilApi'
 //
 // SIN PAÍS («Prefiero no decirlo», §0-10) el país queda vacío y se ve el
 // isotipo de AJILEI en tenue.
+//
+// CFG-1 1d · EL CORREO. La fila lo enseña enmascarado (Decisión 2 del STOP-0) y
+// abre `CambiarCorreo`, donde va completo. Entre pedir el cambio y confirmarlo
+// dice «Pendiente» con la dirección nueva, hasta que el código vence.
 
 function Chev() { return <span className="lob-chev" aria-hidden="true">›</span> }
 
@@ -189,9 +195,9 @@ function Cabecera({ cuenta }) {
 }
 
 // ── V1-A · filas que abren su editor ───────────────────────────────────────
-function Filas({ cuenta, abrir, avisar, t }) {
+function Filas({ cuenta, correoPropio, pendiente, abrir, t }) {
   const lugar = textoLugar(cuenta.pais, cuenta.estado)
-  const correo = enmascararCorreo(cuenta.correo)
+  const correo = enmascararCorreo(correoPropio)
   const hasta = cuenta.proximoCambio instanceof Date ? cuenta.proximoCambio : null
   return (
     <div className="pf-filas">
@@ -216,18 +222,25 @@ function Filas({ cuenta, abrir, avisar, t }) {
         </span>
         <Chev />
       </SoundButton>
-      {/* El correo enmascarado y «Pronto» (§0-5): la 1d la enciende. Sin
-          correo (el bypass) la fila reserva su caja (O1). */}
-      <SoundButton className="lob-fila pf-fila" data-accion="pf-fila-correo" onClick={() => avisar('lob.toast.pronto')}>
+      {/* El correo enmascarado (§0-5, Decisión 2 de la 1d). Sin correo, la
+          fila reserva su caja (O1). */}
+      <SoundButton className="lob-fila pf-fila" data-accion="pf-fila-correo" onClick={() => abrir('correo')}>
         <span className="pf-fila-l">{t('perfil.fila.correo')}</span>
-        <span className="pf-valor"><span className="pf-trunca">{correo || ' '}</span></span>
-        <span className="lob-pastilla">{t('lob.toast.pronto')}</span>
+        {pendiente ? (
+          <span className="pf-valor pf-valor-2">
+            <span className="pf-trunca">{t('perfil.correo.pendiente', { correo: enmascararCorreo(pendiente.nuevo) })}</span>
+            <small>{t('perfil.correo.pendiente_2')}</small>
+          </span>
+        ) : (
+          <span className="pf-valor"><span className="pf-trunca">{correo || ' '}</span></span>
+        )}
+        <Chev />
       </SoundButton>
     </div>
   )
 }
 
-const TITULO = { inicio: 'perfil.titulo', nombre: 'perfil.titulo', avatar: 'perfil.fila.avatar', pais: 'perfil.fila.lugar', estado: 'perfil.fila.lugar' }
+const TITULO = { inicio: 'perfil.titulo', nombre: 'perfil.titulo', correo: 'perfil.titulo', avatar: 'perfil.fila.avatar', pais: 'perfil.fila.lugar', estado: 'perfil.fila.lugar' }
 
 export default function Perfil({ cuenta, billetera, aviso, onAvisoFin, onVolver, onLobby }) {
   const { t } = useIdioma()
@@ -240,8 +253,9 @@ export default function Perfil({ cuenta, billetera, aviso, onAvisoFin, onVolver,
   const [guardando, setGuardando] = useState(undefined)
   const toast = useRef(null)
   const avisar = (clave, vars) => toast.current?.avisar(clave, vars)
+  const cambioCorreo = useCambioCorreo(cuenta.correoApi, cuenta.correo)
 
-  const abrir = (s) => { setBusqueda(''); setDesdePais(false); setSub(s) }
+  const abrir =(s) => { setBusqueda(''); setDesdePais(false); setSub(s) }
   const volver = () => {
     if (sub === 'estado' && desdePais) return abrir('pais')
     if (sub !== 'inicio') return abrir('inicio')
@@ -300,7 +314,7 @@ export default function Perfil({ cuenta, billetera, aviso, onAvisoFin, onVolver,
       avisoRef={toast}
     >
       {!lista && sub !== 'avatar' && <Cabecera cuenta={cuenta} />}
-      {!lista && sub !== 'avatar' && <Filas cuenta={cuenta} abrir={abrir} avisar={avisar} t={t} />}
+      {!lista && sub !== 'avatar' && <Filas cuenta={cuenta} correoPropio={cambioCorreo.correo} pendiente={cambioCorreo.pendiente} abrir={abrir} t={t} />}
       {sub === 'avatar' && (
         <section className="pf-sec pf-sec-avatar">
           <Avatares inicial={inicialDe(cuenta.username)} t={t} />
@@ -322,6 +336,21 @@ export default function Perfil({ cuenta, billetera, aviso, onAvisoFin, onVolver,
           onComprobar={cuenta.comprobarNombre}
           onConfirmar={confirmarNombre}
           onCancelar={() => abrir('inicio')}
+        />,
+        document.body,
+      )}
+      {sub === 'correo' && createPortal(
+        <CambiarCorreo
+          api={cuenta.correoApi}
+          actual={cambioCorreo.correo}
+          pendiente={cambioCorreo.pendiente}
+          onPedido={cambioCorreo.alPedir}
+          onCompletado={(correo) => {
+            cambioCorreo.alCompletar(correo)
+            abrir('inicio')
+            avisar('perfil.correo.listo', { correo })
+          }}
+          onCerrar={() => abrir('inicio')}
         />,
         document.body,
       )}

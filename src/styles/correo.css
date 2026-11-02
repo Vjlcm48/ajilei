@@ -1,0 +1,71 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · CFG-1 1d · La tarjeta del cambio de correo (`CambiarCorreo.jsx`)
+   Rector: AJILEI_CFG-1_Fase1d_v1.0.md §3. Es la §2 de la hoja de la lámina
+   (`laminas/cfg1d/cfg1d.css`), sellada en STOP-L. El molde es el Bautizo en
+   edición (`puerta.css`, `bautizo.css`); aquí solo lo suyo.
+
+   ADITIVA: todo cuelga de `.cor-*`. Sin `!important` ni hex.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cor-card .bautizo-etiqueta { margin-bottom: 4px; }
+
+/* El correo actual: solo lectura y COMPLETO (Decisión 2 del STOP-0), sin caja
+   de campo para que no parezca editable. */
+.cor-actual {
+  margin: 0 0 14px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* Cada código dice a qué dirección llegó. */
+.cor-dos { display: grid; gap: 6px; }
+.cor-dir {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+/* INV-07: el campo no baja de 44 aunque la letra y el relleno den menos. */
+.cor-card .puerta-campo-codigo {
+  min-height: 44px;
+  padding-block: 6px;
+  font-size: 1.35rem;
+  letter-spacing: 0.38em;
+  text-indent: 0.38em;
+}
+
+/* O1: el rótulo con la cuenta y el rótulo sin ella ocupan lo mismo, y la cifra
+   no baila. */
+.cor-reenviar { min-width: 7.6em; font-variant-numeric: tabular-nums; }
+.cor-links { column-gap: 14px; flex-wrap: nowrap; }
+.cor-links .puerta-link { white-space: nowrap; }
+
+/* Si la vista encoge con el teclado, lo que no quepa se alcanza desplazando. */
+.puerta-overlay.cor-overlay { overflow-y: auto; }
+
+/* El teléfono: con el teclado abierto en 360×640 quedan 380 px de alto, y
+   «Confirmar» tiene que caber con dos direcciones de dos líneas (V6). */
+@media (max-width: 680px) {
+  .puerta-overlay.cor-overlay { padding: 6px 12px; }
+  .cor-overlay .bautizo-card.is-edicion { padding: 14px 18px 12px; }
+  .cor-overlay .bautizo-titulo { margin-bottom: 8px; }
+  .cor-links { margin-top: 12px; }
+}
+
+/* Acostado: los dos códigos lado a lado, y la tarjeta más ancha para que cada
+   dirección quepa entera. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .puerta-overlay.cor-overlay { padding: 10px 24px; }
+  .puerta-overlay.bautizo-overlay.cor-overlay > div { width: min(100%, 660px); }
+  .cor-overlay .bautizo-card.is-edicion { padding: 14px 24px 12px; }
+  .cor-overlay .bautizo-titulo { margin-bottom: 8px; font-size: 1.1rem; }
+  .cor-dos { grid-template-columns: 1fr 1fr; gap: 16px; }
+  /* 11 y no menos: la zona de 44 de los enlaces crece 10,5 hacia arriba. */
+  .cor-links { margin-top: 11px; }
+}

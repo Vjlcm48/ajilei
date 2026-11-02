@@ -87,6 +87,11 @@
 .pf-valor-2 { flex-direction: column; align-items: flex-end; gap: 0; }
 .pf-valor-2 small { font-size: 0.82em; color: var(--text-muted); white-space: nowrap; }
 
+/* CFG-1 1d · V5: el aviso lleva una dirección entera. El toast se ancla en el
+   50 % y su ancho automático se queda en la mitad de la vista: partía «Listo…»
+   en cuatro líneas. Solo en el perfil, para no mover los de otras pantallas. */
+.sal[data-perfil] .sal-toast { width: max-content; overflow-wrap: anywhere; }
+
 /* V4 · el avatar. La rejilla es la de AVA-1: celdas de 64 px como mínimo
    (16 u), que se repiten lo que quepa. La primera es la de hoy, marcada con
    el contorno de oro de los chips (contorno, no macizo: INV-08); las demás
