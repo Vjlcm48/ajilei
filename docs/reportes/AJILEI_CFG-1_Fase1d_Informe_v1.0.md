@@ -350,7 +350,7 @@ La consulta se corrió en los cuatro momentos:
 
 **Lo pedido:** decir, solo leyendo, si el freno cuenta desde el Bautizo por diseño (1b) o por descuido, con la línea que lo causa. No se ha cambiado nada.
 
-**Respuesta: ninguna de las dos, según el código. El servidor hace lo contrario: el Bautizo no pone el freno.** Por tanto **no hay una línea que lo cause, y lo visto queda sin explicar**. Lo más probable es que esa cuenta recibiera un cambio de nombre real, pero no puedo afirmarlo sin mirarlo.
+**Cerrada: es el comportamiento correcto (INV-72).** Victor confirma que en la Prueba C cambió el nombre desde el perfil (`crroecambio1` → `borrame1d`). El freno se puso por ese cambio y no por el Bautizo, que no pone ninguno. No se toca código.
 
 **Lo que dice el código:**
 
@@ -377,41 +377,6 @@ La consulta se corrió en los cuatro momentos:
 | Solo mayúsculas | nula | nada |
 | Un nombre de verdad nuevo | hoy | hoy + 30 días |
 
-**Las explicaciones que quedan,** de más a menos probable:
-1. **La cuenta sí cambió de nombre** por la pantalla de perfil, y es fácil no darle importancia en medio de la prueba. Solo Victor puede decirlo.
-2. **La base real difiere de la migración.** Es improbable (B9 pasó allí), pero se puede mirar.
+**La línea que lo causó:** `…cfg1b_perfil.sql:159`, al guardar `borrame1d` desde el perfil. De ahí sale «Próximo cambio: 2 de diciembre».
 
-`borrame1d` ya no existe, así que **no se puede comprobar con esa cuenta.** Para zanjarlo:
-- Crear otra desechable, bautizarla y abrir el perfil **sin tocar el nombre**. Si dice «Próximo cambio», es un defecto real y hay que parar.
-- Correr esta consulta. Solo lee, no tiene huecos y no enseña correos ni uuids (probada en PGlite). La primera fila debe decir «sí». Una cuenta con muy poco tiempo entre crearla y cambiarla, sin que nadie la renombrara, apuntaría a la explicación 2.
-
-```sql
--- CFG-1 · El freno en la base real. SOLO LEE: no cambia nada y no tiene huecos.
--- ¿La función desplegada deja nula la fecha en el alta? ¿Hay cuentas con la fecha
--- pegada a su creación? No enseña correos ni uuids.
-select 1 as o, 'la función del freno deja nula la fecha en el alta' as que,
-       case when pg_catalog.pg_get_functiondef('public.profiles_freno_nombre()'::regprocedure)
-                 like '%new.nombre_cambiado_en := null%' then 'sí' else 'NO' end as valor
-union all
-select 2, 'disparadores de fila en profiles',
-       coalesce((select string_agg(t.tgname::text || ' (' || t.tgenabled::text || ')', ', ' order by t.tgname::text)
-                   from pg_catalog.pg_trigger t
-                  where t.tgrelid = 'public.profiles'::regclass and not t.tgisinternal), 'ninguno')
-union all
-select 3, 'cuentas', count(*)::text from public.profiles
-union all
-select 4, 'cuentas con fecha de cambio de nombre', count(*)::text
-  from public.profiles where nombre_cambiado_en is not null
-union all
-select 10 + row_number() over (order by p.created_at desc)::int,
-       'con fecha: ' || p.username,
-       format('creada %s · cambiada %s · %s tras crearla',
-              to_char(p.created_at, 'YYYY-MM-DD HH24:MI:SS'),
-              to_char(p.nombre_cambiado_en, 'YYYY-MM-DD HH24:MI:SS'),
-              date_trunc('second', p.nombre_cambiado_en - p.created_at))
-  from public.profiles p
- where p.nombre_cambiado_en is not null
-order by o;
-```
-
-**El rector decide.** Si lo que se quiere es otra regla, como contar desde el Bautizo, sería una decisión nueva y una migración: hoy no existe.
+**Una consecuencia para §6:** la cuenta se bautizó `crroecambio1` y pasó a llamarse `borrame1d` durante la prueba.
