@@ -781,6 +781,29 @@ if (hacer('2.4')) {
     resultados.bloques['2.4'][c.etiqueta] = { cajaCorreo, cajaCodigo, salto, paso1, paso2, conAviso, maximo, reserva, declarada }
     await ctx.close()
   }
+
+  // ── 2.4e · ARN-4 B7 · el código pegado entra entero (INV-80) ──────────────
+  // Se pega de verdad, portapapeles y Ctrl+V: `fill` se salta el `maxLength`, que
+  // es justo lo que cortaba «123 456» antes de que llegara al filtro de dígitos.
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const page = await ctx.newPage()
+  await page.route('**/auth/v1/otp**', route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }))
+  await page.goto(URL_LAMINA, { waitUntil: 'networkidle' })
+  await page.fill('#entrada-correo', 'victor@ejemplo.com')
+  await page.evaluate(`document.querySelector('.pue-tarjeta form').requestSubmit()`)
+  await page.waitForSelector('#entrada-codigo', { timeout: 8000 })
+  for (const pegado of ['123 456', '123-456']) {
+    await page.fill('#entrada-codigo', '')
+    await page.evaluate(`navigator.clipboard.writeText(${JSON.stringify(pegado)})`)
+    await page.focus('#entrada-codigo')
+    await page.keyboard.press('Control+V')
+    await page.waitForTimeout(100)
+    const valor = await page.inputValue('#entrada-codigo')
+    anota(`2.4e pegar «${pegado}»`, valor === '123456', `el campo queda en «${valor}» (debe ser «123456»)`)
+  }
+  await ctx.close()
 }
 
 // ════════════════════════════════════════════════════════════════════════════

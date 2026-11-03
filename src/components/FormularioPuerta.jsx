@@ -150,7 +150,6 @@ export default function FormularioPuerta({ onEnviarCodigo, onVerificar, lema = L
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            maxLength={6}
             placeholder="······"
             value={codigo}
             // Se filtra a dígitos en la ENTRADA y no al enviar: así el campo
