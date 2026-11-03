@@ -49,6 +49,9 @@ const SUELTOS_DSK = Object.freeze({
 /** Modos de `diagPUE` en `completo`. `todo` lleva dentro lo que no entra por su nombre. */
 const SUELTOS_PUE = Object.freeze({ todo: 25, cap: 15, voz2: 15, mesa: 15 })
 
+// ARN-4 A10a · la Portada bajo su tinta. Solo mide: informa lo que quede bajo 4,5.
+const PUE_CONTRASTE = diag('diagPUE', 'pue.contraste', 'contraste', 10)
+
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
   diag('diagSAL', 'sal', 'sal', 15),
@@ -83,7 +86,7 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
   commit: [...BASE, HUMO],
-  completo: [...BASE, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), ...OTRAS],
+  completo: [...BASE, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]

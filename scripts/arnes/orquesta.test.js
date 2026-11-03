@@ -86,6 +86,13 @@ describe('A4 · --solo', () => {
     expect(desconocidos).toEqual([])
     expect(varas[1].args).toEqual(['scripts/diagPUE.mjs', '1.8', '--sin-build'])
   })
+  it('`pue.contraste` (A10a) se pide por su nombre, y está en `completo`', () => {
+    const { varas, desconocidos } = varasDeSolo(['pue.contraste'], opciones)
+    expect(desconocidos).toEqual([])
+    expect(ids(varas)).toEqual(['build', 'pue.contraste'])
+    expect(varas[1].args).toEqual(['scripts/diagPUE.mjs', 'contraste', '--sin-build'])
+    expect(ids(completo)).toContain('pue.contraste')
+  })
   it('un grupo se abre en sus partes', () => {
     expect(ids(varasDeSolo(['tab'], opciones).varas)).toEqual(['build', 'tab.frase', 'tab.resto'])
     expect(ids(varasDeSolo(['apu'], opciones).varas)).toHaveLength(10)

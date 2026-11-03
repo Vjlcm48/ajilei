@@ -42,8 +42,9 @@ import {
 } from './arnes/comun.mjs'
 // ARN-3c-ii · D9 · la mediana de 3 de `dis` (lo puro).
 import { mayoriaDePuertas } from './arnes/varas.mjs'
-// ARN-4 A5 · repetir ante un rojo de foto.
+// ARN-4 A5 · repetir ante un rojo de foto. A10a · `contraste`.
 import { conRepeticion } from './arnes/repetir.mjs'
+import { PISO_WCAG, QUIETA_CSS, TEXTOS, asentar, fijar, peorFondo, tintaConRepeticion } from './arnes/tinta.mjs'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
   VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
@@ -188,7 +189,7 @@ const hacer = (id) => modo === 'todo' || modo === id
 const hacerSolo = (id) => modo === id
 
 // ARN-3a · D5 · un modo que no existe no medía nada y salía «TODO VERDE».
-const MODOS_PUE = ['todo', 'puerta', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '2.4', '2.5', 'mon', 'dis', 'bie', 'cap', 'voz2', 'mesa']
+const MODOS_PUE = ['todo', 'puerta', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '2.4', '2.5', 'mon', 'dis', 'bie', 'cap', 'voz2', 'mesa', 'contraste']
 if (!MODOS_PUE.includes(modo)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${modo}». Los modos son: ${MODOS_PUE.join(', ')}`))
 }
@@ -212,6 +213,80 @@ try {
   await fallarInstrumento(e)
 }
 const browser = NAV.browser
+
+// ════════════════════════════════════════════════════════════════════════════
+// contraste · ARN-4 A10a · el texto de la Portada, bajo su tinta. SOLO MIDE
+// ════════════════════════════════════════════════════════════════════════════
+// Rector: AJILEI_ARN-4_Tanda4b_v1.0.md §5. Lo que queda bajo 4,5 se informa y no sale
+// rojo: el color de la Portada lo decide Victor con sus ojos. Rojo es solo no haber
+// medido. Exentos, como en INV-79, los textos apagados por opacidad (grupo < 0,9) y
+// los que Victor declare en `PUE_DECISIONES`.
+// Va por las cinco escenas, porque la frase y el fondo cambian con cada una; el rotor
+// se detiene con el `focusin` de la tarjeta, el que usa cuando alguien escribe.
+if (hacerSolo('contraste')) {
+  const VISTAS = [
+    { id: '412x915', w: 412, h: 915, dpr: 2, movil: true },
+    { id: '360x640', w: 360, h: 640, dpr: 2, movil: true },
+    { id: '915x412', w: 915, h: 412, dpr: 2, movil: true },
+    { id: '1920x1080', w: 1920, h: 1080, dpr: 1, movil: false },
+  ]
+  // Las decisiones de Victor en el STOP-V de la 4b: dos suben a 4,5 o más en la 4c,
+  // con sus ojos en el S25, y una queda exenta por escrito.
+  const PUE_DECISIONES = {
+    'pue-cta-vacuna': 'pendiente 4c',
+    'pue-lema-categoria': 'pendiente 4c',
+    'entrada-proximamente': 'exenta: aviso apagado a propósito de una función que aún no existe (INV-79)',
+  }
+  const decisionDe = (clase) => Object.entries(PUE_DECISIONES).find(([k]) => clase.split(/\s+/).includes(k))?.[1] ?? 'bajo el piso, sin decidir: se informa'
+  const lecturaDe = (x, clase) => x.filas.find((f) => f.clase.split(/\s+/).includes(clase))?.contraste ?? 'no visible'
+  console.log(`\n── pue.contraste · la Portada bajo su tinta, piso ${PISO_WCAG} · solo mide ──`)
+  const informe = []
+  for (const v of VISTAS) {
+    const ctx = await browser.newContext({ viewport: { width: v.w, height: v.h }, deviceScaleFactor: v.dpr, ...(v.movil ? { isMobile: true, hasTouch: true } : {}) })
+    const page = await ctx.newPage()
+    const filas = new Map()
+    let apagados = 0
+    try {
+      await page.goto(URL_LAMINA, { waitUntil: 'networkidle' })
+      await page.addStyleTag({ content: QUIETA_CSS })
+      const rotor = (evento) => page.evaluate((e) => document.querySelector('.pue-tarjeta').dispatchEvent(new FocusEvent(e, { bubbles: true })), evento)
+      for (let i = 0; i < NOMBRES_ESC.length; i++) {
+        await esperarEscena(page, i)
+        await rotor('focusin')
+        await page.waitForSelector('.pue-frase:not(.pue-oculta)', { timeout: 5000 }).catch(() => {})
+        await asentar(page, fijar)
+        const textos = await page.evaluate(TEXTOS)
+        const { valor } = await tintaConRepeticion(page, v.dpr, `pue.contraste ${v.id} ${NOMBRES_ESC[i]}`,
+          (fotos) => textos.map((t) => ({ t, m: peorFondo(fotos, t) })),
+          (ms) => ms.every(({ t, m }) => t.op < 0.9 || m?.contraste == null || m.contraste >= PISO_WCAG), fijar)
+        for (const { t, m } of valor) {
+          if (t.op < 0.9) { apagados++; continue }
+          if (m?.contraste == null) continue
+          const clave = `${t.clase}|${t.txt}`
+          const previa = filas.get(clave)
+          if (!previa || m.contraste < previa.contraste) filas.set(clave, { clase: t.clase, txt: t.txt, contraste: m.contraste, fondo: m.fondo, escena: NOMBRES_ESC[i] })
+        }
+        await rotor('focusout')
+      }
+    } catch (e) {
+      anota(`pue.contraste ${v.id}`, false, `ERROR ${String(e.message).split('\n')[0]}`)
+    } finally { await ctx.close() }
+    const lista = [...filas.values()].sort((a, b) => a.contraste - b.contraste)
+    const bajo = lista.filter((f) => f.contraste < PISO_WCAG)
+    informe.push({ vista: v.id, medidos: lista.length, apagados, bajo: bajo.map((f) => ({ ...f, decision: decisionDe(f.clase) })), filas: lista })
+    if (lista.length) anota(`pue.contraste ${v.id}`, true, `${lista.length} textos medidos · ${apagados} lecturas apagadas, exentas · ${bajo.length} bajo ${PISO_WCAG}`)
+    else anota(`pue.contraste ${v.id}`, false, 'ningún texto medido')
+    for (const f of bajo) console.log(`  ·     · ${decisionDe(f.clase)} · ${v.id} · ${f.contraste} sobre ${f.fondo} · .${f.clase || '(sin clase)'} «${f.txt}» (${f.escena})`)
+  }
+  // Lo decidido se mide siempre: un texto que deja de verse no es un aprobado.
+  for (const clase of Object.keys(PUE_DECISIONES)) {
+    anota(`pue.contraste .${clase}`, informe.some((x) => lecturaDe(x, clase) !== 'no visible'),
+      `${PUE_DECISIONES[clase]} · ${informe.map((x) => `${x.vista} ${lecturaDe(x, clase)}`).join(' · ')}`)
+  }
+  resultados.bloques.contraste = informe
+  writeFileSync(`${SALIDA}/contraste.json`, JSON.stringify({ edge: browser.version(), piso: PISO_WCAG, vistas: informe }, null, 2))
+  console.log(`  JSON: ${SALIDA}/contraste.json`)
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // puerta · El visitante anónimo LLEGA a la portada
