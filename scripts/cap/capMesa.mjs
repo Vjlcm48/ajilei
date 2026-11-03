@@ -28,6 +28,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { recorrerRuta } from '../rutaMesa.mjs'
 import { respuestaRpc, crearBanco, SALDO_ARNES } from '../arnes/nucleo.mjs'
+import { sembrarAzar } from '../arnes/siembra.mjs'
 
 // ── Constantes selladas ─────────────────────────────────────────────────────
 
@@ -96,17 +97,8 @@ export function hostSupabase() {
 
 export const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
 
-// Corre en la página ANTES que la app: siembra el azar y deja la sesión.
-const INICIO = ({ semilla, clave, sesion }) => {
-  let a = semilla
-  window.__capTiradas = 0
-  Math.random = () => {
-    window.__capTiradas++
-    a |= 0; a = a + 0x6D2B79F5 | 0
-    let t = Math.imul(a ^ a >>> 15, 1 | a)
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
-    return ((t ^ t >>> 14) >>> 0) / 4294967296
-  }
+// Corre en la página ANTES que la app, tras la siembra: deja la sesión.
+const INICIO = ({ clave, sesion }) => {
   try { localStorage.setItem(clave, JSON.stringify(sesion)) } catch { /* sin almacén no hay sesión: la puerta cap.escena lo cantará */ }
 }
 
@@ -186,7 +178,8 @@ export async function contextoCap(browser, vista, base, { semilla = SEMILLA_CAP,
     ? { ...sesion, expires_in: 3600, expires_at: ahora - 120,
         access_token: 'cap.' + Buffer.from(JSON.stringify({ sub: user.id, exp: ahora - 120 })).toString('base64url') + '.cap' }
     : sesion
-  await ctx.addInitScript(INICIO, { semilla, clave: `sb-${ref}-auth-token`, sesion: guardada })
+  await sembrarAzar(ctx, semilla)
+  await ctx.addInitScript(INICIO, { clave: `sb-${ref}-auth-token`, sesion: guardada })
 
   // ARN-3c · D6 · el terreno común (`aislarNavegador`) ya desvía los sockets no
   // locales al nacer el contexto, y un socket desviado NO dispara
@@ -334,7 +327,7 @@ export const leerMesaCap = (page) => page.evaluate(() => {
     cronos,
     texto: t(document.querySelector('.game-table')),
     turno: [...document.querySelectorAll('[data-accion="apostar"], [data-accion="pasar"], [data-accion="igualar"]')].some((b) => !b.disabled),
-    tiradas: window.__capTiradas ?? null,
+    tiradas: window.__azarTiradas ?? null,
   }
 })
 
