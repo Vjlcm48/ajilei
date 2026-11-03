@@ -98,7 +98,7 @@ import {
 import { salasApi, esMesa } from './lib/salasApi'
 // El unico punto por donde algo simulado puede entrar. En produccion devuelve
 // `null` en su primera linea y el minificador se lleva el archivo entero.
-import { simulacionSalas } from './dev/salasFixtures'
+import { apiSinMesa, simulacionSalas } from './dev/salasFixtures'
 // A2 §6.1 · la decision de «¿este uid ya arranco?» es pura y vive en salasCore
 // para poder probarse sin jsdom: aqui solo se le pasa el ref y el uid.
 import { arranqueDeSesion } from './screens/salasCore'
@@ -202,7 +202,12 @@ function App() {
   // La API de salas entra en las tres pantallas por parametro. Es el UNICO
   // punto de inyeccion: ninguna pantalla importa `salasApi` por su cuenta, y por
   // eso no hay un segundo camino por el que algo simulado pueda colarse.
-  const api = simulacion?.api ?? salasApi
+  //
+  // ARN-4 C6 · con el bypass y sin `?sal=`, `mi_sala` no va a la base: el uuid de
+  // `PERFIL_DEV` no existe allí y daba un 401 en cada arranque. `simulacion` sigue
+  // siendo `null`, que es lo que el arranque de abajo mira para no quedarse quieto.
+  const [apiDelBypass] = useState(() => apiSinMesa())
+  const api = simulacion?.api ?? apiDelBypass ?? salasApi
 
   // ── §5.2 · La invitacion, leida en el PRIMER render ───────────────────────
   // Se MIRA en el inicializador perezoso —`leer()`, que no gasta— y no se
@@ -1129,11 +1134,9 @@ function App() {
     )
   }
 
-  // La caída de la cascada sigue siendo el destino de `COMPLETO`. CUATRO props
-  // desde SAL-B1 —entra `onJugarPvP`; ECO-1b cambia `saldo` por `billetera`;
-  // TIE-1 1a, `onTienda`, la Tienda de la barra inferior—: el lobby sigue sin conocer
-  // `screen`, ni Supabase, ni la mesa. Lo unico que sabe es que su segundo CTA
-  // ahora lleva a alguna parte.
+  // La caída de la cascada sigue siendo el destino de `COMPLETO`. Las props son
+  // las de la cuenta, la billetera, los avisos y a dónde lleva cada botón: el lobby
+  // sigue sin conocer `screen`, ni Supabase, ni la mesa.
   return conVideo(
     <Lobby
       cuenta={cuenta}

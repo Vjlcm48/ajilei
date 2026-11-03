@@ -114,6 +114,21 @@ export function simulacionSalas() {
   }
 }
 
+/**
+ * ARN-4 C6 · La API de salas del bypass sin `?sal=`: la misma capa real sobre el
+ * cliente falso, sin mesa y sin mesas abiertas. Misma puerta doble que
+ * `simulacionSalas`, y aparte de ella: esto no es una simulación pedida, y `App`
+ * usa `simulacion` para saber si la hay.
+ *
+ * @returns {object|null}
+ */
+export function apiSinMesa() {
+  if (!import.meta.env.DEV) return null
+  if (!import.meta.env.VITE_AUTH_BYPASS) return null
+
+  return crearSalasApi(clienteDe('sin-mesa', datosDe('sin-mesa')))
+}
+
 // ── Qué código trae cada estado ─────────────────────────────────────────────
 // `LHQH` es literal: el código con el que el Motorola mostró `.HQH`. La `L` es
 // además una letra ESTRECHA, así que si se esconde ella se esconde cualquiera.
