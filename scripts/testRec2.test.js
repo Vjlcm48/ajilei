@@ -263,7 +263,7 @@ describe('REC-2 · D-7 · ninguna ruta de la tarjeta llega a monto 0', () => {
   })
 
   it('no queda ningún `?? 0` junto a un monto', () => {
-    const lineas = src.split('\n').filter((l) => /monto/.test(l) && /\?\?\s*0\b/.test(l))
+    const lineas = src.split(/\r?\n/).filter((l) => /monto/.test(l) && /\?\?\s*0\b/.test(l))
     expect(lineas).toEqual([])
   })
 

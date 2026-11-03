@@ -37,7 +37,7 @@ const MODOS = {
 // Las filas de la tabla cuya cabecera es exactamente `cabecera`, hasta la
 // primera línea que no es de tabla. Sin cabecera, ninguna fila.
 function tabla(cabecera) {
-  const lineas = doc.split('\n')
+  const lineas = doc.split(/\r?\n/)
   const i = lineas.indexOf(cabecera)
   if (i < 0) return []
   const n = cabecera.split('|').length
