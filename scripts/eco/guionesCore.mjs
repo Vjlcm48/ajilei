@@ -22,6 +22,7 @@ export const GUIONES_VIGENTES = Object.freeze([
   Object.freeze({ archivo: 'cfg1b_verificacion.sql', filas: 18, migracion: '20261030013000_cfg1b_perfil.sql' }),
   Object.freeze({ archivo: 'cfg1e_verificacion.sql', filas: 19, migracion: '20261030193000_cfg1e_mano_actual.sql' }),
   Object.freeze({ archivo: 'tie1a_verificacion.sql', filas: 23, migracion: '20261031150000_tie1a_inventario.sql' }),
+  Object.freeze({ archivo: 'arn4c_verificacion.sql', filas: 7, migracion: '20261103150000_arn4c_profiles_columnas.sql' }),
 ])
 
 /**
