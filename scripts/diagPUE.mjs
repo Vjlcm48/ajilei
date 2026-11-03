@@ -42,6 +42,8 @@ import {
 } from './arnes/comun.mjs'
 // ARN-3c-ii · D9 · la mediana de 3 de `dis` (lo puro).
 import { mayoriaDePuertas } from './arnes/varas.mjs'
+// ARN-4 A5 · repetir ante un rojo de foto.
+import { conRepeticion } from './arnes/repetir.mjs'
 import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import {
   VISTAS_CAP, SEMILLA_CAP, MANO_CAP, POZO_CAP, SALDO_CAP, MESA_CAP, CRONO_CAP, RECETA_CAP, FASE_RESPIRACION_MS,
@@ -1950,8 +1952,16 @@ if (hacerSolo('cap')) {
   const cap = {}
   const pct = (x) => `${(x * 100).toFixed(3)} %`
   for (const [vista, v] of Object.entries(VISTAS_CAP)) {
-    const ps = [await pasadaCap(browser, vista, URL_LAMINA), await pasadaCap(browser, vista, URL_LAMINA)]
     const et = `${vista} ${v.w}×${v.h}@${v.dpr}`
+    // ARN-4 A5 · va la primera: una pareja repetida es la que pasa por las puertas
+    // de contenido, y la que se guarda.
+    let ps
+    const est = await conRepeticion(`cap.estable ${et}`, async () => {
+      ps = [await pasadaCap(browser, vista, URL_LAMINA), await pasadaCap(browser, vista, URL_LAMINA)]
+      return compararPng(lienzo, ps[0].png, ps[1].png)
+    }, equivalentes)
+    const cmp = est.valor
+    const estable = est.dentro
     const ambas = (f) => ps.every(f)
     const igualo = (p) => p.lectura.rivales.filter((r) => /Igualó/.test(r)).length
     anota(`cap.escena ${et}`, ambas((p) => p.etapa === 2 && /A las 3 — Tú abre\./.test(p.lectura.mensaje)),
@@ -1972,12 +1982,10 @@ if (hacerSolo('cap')) {
         : `0 fuera · ${ps.reduce((a, p) => a + p.red.supabase.length, 0)} a Supabase, todas contestadas por la ruta (${[...new Set(ps[0].red.supabase)].join(', ')})`)
     const errores = ps.flatMap((p) => p.errores)
     anota(`cap.errores ${et}`, errores.length === 0, errores.length ? errores.slice(0, 3).join(' · ') : '0 errores de página y de consola')
-    const cmp = await compararPng(lienzo, ps[0].png, ps[1].png)
-    const estable = equivalentes(cmp)
     anota(`cap.estable ${et}`, estable,
-      cmp.mismasDim
+      (cmp.mismasDim
         ? `Δ≤${TOLERANCIA_CAP.deltaFino}: ${pct(cmp.fraccionFina)} (≥ ${pct(TOLERANCIA_CAP.fraccionFina)}) · Δmáx ${cmp.deltaMax} (≤ ${TOLERANCIA_CAP.deltaMax}) · ${cmp.distintos} px distintos de ${cmp.pixeles} · ${ps[0].sha.slice(0, 16)} / ${ps[1].sha.slice(0, 16)}`
-        : `dimensiones distintas ${cmp.dimA} / ${cmp.dimB}`)
+        : `dimensiones distintas ${cmp.dimA} / ${cmp.dimB}`) + (est.nota ? ` · ${est.nota}` : ''))
     writeFileSync(`${DIR_CAP}/${v.maestra}`, ps[0].png)
     // La segunda pasada sólo se guarda si la vara sale ROJA: es para diagnóstico.
     if (!estable) writeFileSync(`${DIR_CAP}/${v.maestra.replace('.png', '')}_pasada2.png`, ps[1].png)
@@ -2000,10 +2008,13 @@ if (hacerSolo('cap')) {
     }
     // Regresión (1b.5): sin --sellar, contra la maestra sellada, misma vara.
     if (!sellar && existsSync(`${DIR_SELLO}/${v.maestra}`)) {
-      const r = await compararPng(lienzo, readFileSync(`${DIR_SELLO}/${v.maestra}`), ps[0].png)
-      anota(`cap.regresion ${et}`, equivalentes(r),
-        r.mismasDim ? `contra ${DIR_SELLO}/${v.maestra}: Δ≤${TOLERANCIA_CAP.deltaFino} ${pct(r.fraccionFina)} · Δmáx ${r.deltaMax} · ${r.distintos} px distintos`
-          : `dimensiones distintas ${r.dimA} / ${r.dimB}`)
+      const maestra = readFileSync(`${DIR_SELLO}/${v.maestra}`)
+      const reg = await conRepeticion(`cap.regresion ${et}`, async (i) =>
+        compararPng(lienzo, maestra, (i ? await pasadaCap(browser, vista, URL_LAMINA) : ps[0]).png), equivalentes)
+      const r = reg.valor
+      anota(`cap.regresion ${et}`, reg.dentro,
+        (r.mismasDim ? `contra ${DIR_SELLO}/${v.maestra}: Δ≤${TOLERANCIA_CAP.deltaFino} ${pct(r.fraccionFina)} · Δmáx ${r.deltaMax} · ${r.distintos} px distintos`
+          : `dimensiones distintas ${r.dimA} / ${r.dimB}`) + (reg.nota ? ` · ${reg.nota}` : ''))
       cap[vista].regresion = r
     }
   }

@@ -63,6 +63,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { contextoCap, mesaQuieta, compararPng, equivalentes, TOLERANCIA_CAP } from '../cap/capMesa.mjs'
+import { anotarRuido, conRepeticion } from '../arnes/repetir.mjs'
 import { recorrerRuta } from '../rutaMesa.mjs'
 import { escalaReal, forzarEscala1 } from '../arnes/comun.mjs'
 import { irA } from '../ios/tam.mjs'
@@ -335,7 +336,14 @@ async function fotoCelda(browser, base, t, n, estado, dpr, { forzar = false } = 
     return { medida: true, png, huella: await page.evaluate(HUELLA_ESCALA), page, ctx, errores }
   } catch (e) { await ctx.close(); throw e }
 }
+// ARN-4 A5 · un par fuera de la vara se repite entero, con sus dos contextos.
 async function parG1(browser, base, ref, t, n, estado, dpr) {
+  const { valor, nota } = await conRepeticion(`V-cel ${t.id} m${n} ${estado}@${dpr}`,
+    () => tomaParG1(browser, base, ref, t, n, estado, dpr),
+    (p) => !p.medida || ((p.distintos === 0 || p.equivalente) && (p.ruido === 0 || p.ruidoEquivalente)))
+  return { ...valor, ruidoFoto: nota }
+}
+async function tomaParG1(browser, base, ref, t, n, estado, dpr) {
   let a = null, b = null
   try {
     a = await fotoCelda(browser, base, t, n, estado, dpr)
@@ -816,14 +824,20 @@ async function varaFuera(browser, base, ref) {
       if (ref) {
         // Hasta tres intentos al píxel (el raster entre contextos no es
         // determinista, ver V-cel); si ninguno sale idéntico, vale EQUIVALENTE
-        // con la vara de `cap`, y el resumen lo cuenta aparte.
+        // con la vara de `cap`, y el resumen lo cuenta aparte. ARN-4 A5 · basta que
+        // uno vuelva a la vara; si antes salió alguno fuera, eso es ruido, y se dice.
+        let fuera = 0
+        c.equivalente = false
         for (let i = 0; i < 3; i++) {
           if (i) { await a.ctx.close(); await b.ctx.close(); a = await fotoFuera(browser, base, t, p); b = null }
           b = await fotoFuera(browser, ref, t, p)
           const d = await compararPng(a.page, a.png, b.png)
-          c.distintos = d.distintos; c.equivalente = equivalentes(d); c.deltaMax = d.deltaMax; c.intentos = i + 1
+          c.distintos = d.distintos; c.deltaMax = d.deltaMax; c.intentos = i + 1
+          if (d.distintos === 0 || equivalentes(d)) c.equivalente = true
+          else if (!c.equivalente) fuera++
           if (c.distintos === 0) break
         }
+        if (c.equivalente && fuera) c.ruidoFoto = anotarRuido(`V-fuera ${c.celda}`, fuera)
       }
       c.errores = a.errores
       c.ok = c.limpia && (!ref || c.distintos === 0 || c.equivalente) && !a.errores.length

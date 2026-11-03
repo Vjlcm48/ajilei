@@ -18,6 +18,7 @@
 // este proceso no (exactamente lo que hace matar la tarea de fondo), un vigía
 // mira cada segundo si el padre sigue vivo y, si no, cierra y sale con 2.
 import { chromium } from 'playwright-core'
+import { resumenRuido } from './repetir.mjs'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -59,6 +60,8 @@ export async function terminar(codigo) {
   if (saliendo) return
   saliendo = true
   await cerrarTodo()
+  const ruido = resumenRuido()
+  if (ruido) console.log(ruido)
   if (RED.contextos > 0) {
     const v = veredictoAislamiento(RED)
     console.log(`· aislamiento (D6): ${resumenRed()} → ${v === 'verde' ? 'verde' : 'ERROR DE INSTRUMENTO'}`)

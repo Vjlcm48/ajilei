@@ -12,6 +12,7 @@
 // algo menos que leer los píxeles de una letra plena a 3× (4,47 frente a 4,67 en
 // el mismo texto), y por eso una misma vara sirve para todo sin excepciones.
 import { inflateSync } from 'node:zlib'
+import { conRepeticion } from './repetir.mjs'
 
 export const PISO_WCAG = 4.5
 
@@ -78,11 +79,23 @@ export const parar = (page) => page.evaluate(() => {
   return new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))
 })
 
+/**
+ * ARN-4 A10a · todas en su estado FINAL, y las infinitas en pausa. En la Portada los
+ * textos entran por animación con `forwards`: la fase 0 de `parar` los dejaría
+ * invisibles, y un texto invisible no se mide.
+ */
+export const fijar = (page) => page.evaluate(() => {
+  for (const a of document.getAnimations()) {
+    try { if (a.effect?.getComputedTiming().iterations === Infinity) a.pause(); else a.finish() } catch { /* sin línea de tiempo */ }
+  }
+  return new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))
+})
+
 /** Espera a que dos fotos seguidas salgan iguales: el póster y el fieltro se pintan con retraso. */
-export async function asentar(page) {
+export async function asentar(page, quieto = parar) {
   let previa = null
   for (let i = 0; i < 14; i++) {
-    await parar(page)
+    await quieto(page)
     const foto = await page.screenshot()
     if (previa && foto.equals(previa)) return
     previa = foto
@@ -125,15 +138,22 @@ export const TEXTOS = () => {
 }
 
 /** Las dos fotos: con el texto y sin él. */
-export async function fotosTinta(page, dpr) {
-  await parar(page)
+export async function fotosTinta(page, dpr, quieto = parar) {
+  await quieto(page)
   const con = decodePNG(await page.screenshot())
   const oculta = await page.addStyleTag({ content: OCULTA_CSS })
-  await parar(page)
+  await quieto(page)
   const sin = decodePNG(await page.screenshot())
   await oculta.evaluate((n) => n.remove())
   return { con, sin, dpr }
 }
+
+/**
+ * ARN-4 A5 · una medida sobre las dos fotos, con la repetición de los rojos de foto.
+ * Se repite la PAREJA: un redibujado entre las dos se contaría como tinta.
+ */
+export const tintaConRepeticion = (page, dpr, etiqueta, medir, dentro, quieto = parar) =>
+  conRepeticion(etiqueta, async () => medir(await fotosTinta(page, dpr, quieto)), dentro)
 
 /**
  * El peor fondo bajo la tinta de un texto. `color` fuerza otro color que el suyo.
@@ -172,17 +192,20 @@ export function esTenue(colorCss, alfa) {
 export async function medirAtenuados(page, dpr) {
   await asentar(page)
   const textos = await page.evaluate(TEXTOS)
-  const fotos = await fotosTinta(page, dpr)
-  const activos = [], apagados = [], viejos = []
-  for (const t of textos) {
-    if (t.enVitrina) continue
-    if (esTenue(t.color, 0.55)) viejos.push({ txt: t.txt, clase: t.clase })
-    if (!esTenue(t.color, 0.65)) continue
-    const m = peorFondo(fotos, t)
-    const fila = { txt: t.txt, clase: t.clase, ...m }
-    if (t.op < 0.9) apagados.push(fila)
-    else if (m?.contraste != null) activos.push(fila)
-  }
-  const peor = activos.reduce((a, b) => (!a || b.contraste < a.contraste ? b : a), null)
-  return { n: activos.length, peor, bajo: activos.filter((t) => t.contraste < PISO_WCAG), apagados: apagados.length, viejos }
+  const v = page.viewportSize()
+  const { valor, nota } = await tintaConRepeticion(page, dpr, `tinta ${v.width}x${v.height}`, (fotos) => {
+    const activos = [], apagados = [], viejos = []
+    for (const t of textos) {
+      if (t.enVitrina) continue
+      if (esTenue(t.color, 0.55)) viejos.push({ txt: t.txt, clase: t.clase })
+      if (!esTenue(t.color, 0.65)) continue
+      const m = peorFondo(fotos, t)
+      const fila = { txt: t.txt, clase: t.clase, ...m }
+      if (t.op < 0.9) apagados.push(fila)
+      else if (m?.contraste != null) activos.push(fila)
+    }
+    const peor = activos.reduce((a, b) => (!a || b.contraste < a.contraste ? b : a), null)
+    return { n: activos.length, peor, bajo: activos.filter((t) => t.contraste < PISO_WCAG), apagados: apagados.length, viejos }
+  }, (m) => m.bajo.length === 0)
+  return { ...valor, ruido: nota }
 }

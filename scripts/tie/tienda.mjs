@@ -478,7 +478,7 @@ export async function runTienda(browser, { base }) {
       ;({ ctx, page } = await abrirTienda(browser, base, celda, errores, { saldo: SALDO }))
       await page.addStyleTag({ content: QUIETA_CSS })
       const anotaVista = (vista, m) => anota('contraste', m.n > 0 && m.bajo.length === 0 && m.viejos.length === 0,
-        { celda: id, vista, n: m.n, peor: m.peor?.contraste ?? null, fondo: m.peor?.fondo ?? null, texto: m.peor?.txt ?? null, bajo: m.bajo, viejos: m.viejos })
+        { celda: id, vista, n: m.n, peor: m.peor?.contraste ?? null, fondo: m.peor?.fondo ?? null, texto: m.peor?.txt ?? null, bajo: m.bajo, viejos: m.viejos, ruido: m.ruido })
       anotaVista('monedas', await medirAtenuados(page, dpr))
       await page.click('[data-accion="tie-estante-tapetes"]')
       await page.waitForSelector('[data-tienda="tapetes"]')

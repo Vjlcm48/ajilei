@@ -351,7 +351,7 @@ import { runTab, VARAS_TAB } from './tab/tab.mjs'
 import { runRnk } from './rnk/rnk.mjs'
 import { runSuma } from './suma/suma.mjs'
 import { runCfg } from './cfg/cfg.mjs'
-import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, fotosTinta as tintaFotos, peorFondo as tintaPeor } from './arnes/tinta.mjs'
+import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, tintaConRepeticion, peorFondo as tintaPeor } from './arnes/tinta.mjs'
 import { runTienda } from './tie/tienda.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -12986,9 +12986,11 @@ async function luzEstadosRival(page, n, t, casos) {
     for (const estado of ['normal', 'atenuado', 'retirado']) {
       await poner(estado)
       const textos = (await page.evaluate(TINTA_TEXTOS)).filter((x) => x.clase.includes('opp-status'))
-      const fotos = await tintaFotos(page, 2)
-      for (const x of textos) {
-        const m = tintaPeor(fotos, x)
+      // ARN-4 A5 · «retirado» y la mesa sin piso no tienen umbral que repetir.
+      const { valor: medidas } = await tintaConRepeticion(page, 2, `luz p2 m${n} ${t.w}x${t.h} ${estado} ${caso.filter(Boolean).join('-')}`,
+        (fotos) => textos.map((x) => tintaPeor(fotos, x)),
+        (ms) => r.sinPiso || estado === 'retirado' || ms.every((m) => m?.contraste == null || m.contraste >= TINTA_PISO))
+      for (const m of medidas) {
         if (m?.contraste == null) continue
         r.lecturas++
         if (!r[estado] || m.contraste < r[estado].contraste) r[estado] = { contraste: m.contraste, fondo: m.fondo, alfa: m.alfa, tapete: caso.filter(Boolean).join('-') }

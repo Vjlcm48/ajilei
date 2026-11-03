@@ -1,10 +1,10 @@
 // ── VIS-1 · El instrumento del contraste ────────────────────────────────────
 // Lo puro de `scripts/arnes/tinta.mjs`: si esto miente, `cfg.contraste`,
 // `tie.contraste` y `luz` p2 mienten con él.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Buffer } from 'node:buffer'
 import { deflateSync } from 'node:zlib'
-import { compone, contraste, decodePNG, esTenue, parseColor, peorFondo } from './arnes/tinta.mjs'
+import { compone, contraste, decodePNG, esTenue, parseColor, peorFondo, PISO_WCAG, tintaConRepeticion } from './arnes/tinta.mjs'
 
 // Un PNG RGB de verdad, con el filtro 0 en todas las filas.
 function png(w, h, pixel) {
@@ -21,6 +21,41 @@ function png(w, h, pixel) {
   ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), trozo('IHDR', ihdr), trozo('IDAT', deflateSync(crudo)), trozo('IEND', Buffer.alloc(0))])
 }
+
+// ARN-4 A5 · una página de mentira: cada foto sale de la lista, y las animaciones no existen.
+function paginaFalsa(fotos) {
+  const page = {
+    tomadas: 0,
+    evaluate: async () => {},
+    screenshot: async () => fotos[page.tomadas++],
+    addStyleTag: async () => ({ evaluate: async () => {} }),
+  }
+  return page
+}
+
+describe('A5 · la repetición de la pareja', () => {
+  const texto = { color: 'rgb(245, 237, 216)', op: 1, rects: [{ l: 0, t: 0, r: 4, b: 4 }] }
+  const plano = (c) => png(4, 4, () => c)
+  const VERDE = [27, 72, 44], CREMA = [245, 237, 216], GRIS = [150, 150, 150]
+  const medir = (fotos) => peorFondo(fotos, texto)
+  const dentro = (m) => m.contraste >= PISO_WCAG
+
+  it('un redibujado entre las dos fotos se repite con las DOS, y vuelve al umbral', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    // Primera pareja: la de «sin texto» salió con un fondo claro. Segunda: limpia.
+    const page = paginaFalsa([plano(CREMA), plano(GRIS), plano(CREMA), plano(VERDE)])
+    const r = await tintaConRepeticion(page, 1, 'prueba', medir, dentro)
+    expect(page.tomadas).toBe(4)
+    expect(r.nota).toBe('ruido, 1 repetición')
+    expect(r.valor.contraste).toBeGreaterThanOrEqual(PISO_WCAG)
+  })
+  it('un contraste bajo de verdad sigue rojo tras tres parejas', async () => {
+    const page = paginaFalsa(Array.from({ length: 6 }, (_, i) => plano(i % 2 ? GRIS : CREMA)))
+    const r = await tintaConRepeticion(page, 1, 'prueba', medir, dentro)
+    expect(page.tomadas).toBe(6)
+    expect(r).toMatchObject({ dentro: false, repeticiones: 2, nota: null })
+  })
+})
 
 describe('WCAG', () => {
   it('blanco sobre negro es 21 y un color consigo mismo es 1', () => {

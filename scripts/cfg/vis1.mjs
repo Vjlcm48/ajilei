@@ -13,7 +13,7 @@
 //   cfg.sonido    (ampliación) el clic SUENA al encender desde la hoja: un
 //                 arranque y pico en la salida del grafo, con el espía de audio.
 import { escalaReal } from '../arnes/comun.mjs'
-import { PISO_WCAG, QUIETA_CSS, medirAtenuados, parseColor, peorFondo, TEXTOS, fotosTinta, asentar } from '../arnes/tinta.mjs'
+import { PISO_WCAG, QUIETA_CSS, medirAtenuados, parseColor, peorFondo, TEXTOS, tintaConRepeticion, asentar } from '../arnes/tinta.mjs'
 import { recorrerRuta } from '../rutaMesa.mjs'
 
 const ZONA_44 = 43.5
@@ -129,7 +129,7 @@ function anotaPantalla(anota, id, pantalla, m, { sinTextos = false } = {}) {
   const medido = sinTextos ? m.n === 0 : m.n > 0
   anota('contraste', medido && m.bajo.length === 0 && m.viejos.length === 0, {
     celda: id, pantalla, n: m.n, peor: m.peor?.contraste ?? null, fondo: m.peor?.fondo ?? null, texto: m.peor?.txt ?? null,
-    bajo: m.bajo, viejos: m.viejos, apagados: m.apagados, medido,
+    bajo: m.bajo, viejos: m.viejos, apagados: m.apagados, medido, ruido: m.ruido,
   })
 }
 
@@ -156,10 +156,10 @@ export async function contrasteLobby(browser, { base, baseDev }, errores, anota,
       await page.locator('.lob-fila-peligro').scrollIntoViewIfNeeded()
       await asentar(page)
       const texto = (await page.evaluate(TEXTOS)).find((t) => t.clase.includes('lob-fila-peligro') || /Eliminar/.test(t.txt))
-      const fotos = await fotosTinta(page, dpr)
-      const m = texto ? peorFondo(fotos, texto) : null
+      const { valor: m, nota } = await tintaConRepeticion(page, dpr, `cfg.contraste ${id} Eliminar cuenta`,
+        (fotos) => (texto ? peorFondo(fotos, texto) : null), (x) => x?.contraste != null && x.contraste >= PISO_WCAG)
       anota('contraste', m?.contraste != null && m.contraste >= PISO_WCAG && parseColor(texto.color)?.rgb[0] > 200,
-        { celda: id, pantalla: 'hoja · Eliminar cuenta', ...m, color: texto?.color })
+        { celda: id, pantalla: 'hoja · Eliminar cuenta', ...m, color: texto?.color, ruido: nota })
     })
     await paso('rankings', async (page) => {
       await page.click('[data-accion="rankings"]')
