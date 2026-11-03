@@ -64,6 +64,10 @@ const PROHIBIDAS = [
   '@electric-sql',
   'pglite',
   'PGlite',
+  // ARN-4 B2 y B3b · el nombre de `PERFIL_DEV` (`useAuth.js`) y el primer jugador
+  // de las tablas del banco imitado: ninguno de los dos llega a producción.
+  'DevLocal',
+  'Bachaquero_VE',
 ]
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las

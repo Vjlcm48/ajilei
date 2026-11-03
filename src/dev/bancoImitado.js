@@ -43,7 +43,9 @@ export const MARCA_BANCO_IMITADO = 'ajilei:banco-imitado'
 // A propósito: si alguien mueve una cifra del cliente y no la del servidor, la
 // prueba de espejo (`bancoImitado.test.js`) compara las tres —SQL, este modelo
 // y el cliente— y lo dice.
-export const APUESTAS_SQL = Object.freeze({
+// ARN-4 B3b · cada `Object.freeze` del módulo va marcado como puro: sin la marca,
+// el empaquetador no puede tirarlo y las tablas acababan en `dist/` (medido).
+export const APUESTAS_SQL = /* @__PURE__ */ Object.freeze({
   basico: [50, 100, 150, 250],
   avanzado: [100, 200, 300, 500],
   pro: [200, 400, 600, 1000],
@@ -54,7 +56,7 @@ export const FACTOR_IA_SQL = 1.5
 export const SILENCIO_RECOGIDA_MS = 10 * 60 * 1000
 // ECO-1d · `limite_dinero()`, `bono_constancia_hc()` y `constancia_ciclo()`.
 // ECO-1g · la 1g la redefine con los dos nombres del video.
-export const LIMITES_SQL = Object.freeze({
+export const LIMITES_SQL = /* @__PURE__ */ Object.freeze({
   sentarse_ia: 10, recargar_ia: 20, salir_ia: 30, recoger_mesa_ia: 10, marcar_ingreso: 6,
   pedir_boleto: 10, cobrar_boleto: 20,
 })
@@ -64,19 +66,19 @@ export const BONO_CONSTANCIA_SQL = 500
 // `contar_intento_dinero`, no en `limite_dinero`: por eso no está en
 // LIMITES_SQL). El espejo los lee de `20261030193000_cfg1e_mano_actual.sql`.
 export const CONSULTAS_GRATIS_SQL = 20
-export const PRECIOS_CONSULTA_SQL = Object.freeze({ basico: 100, avanzado: 200, pro: 300, humanos: 500 })
+export const PRECIOS_CONSULTA_SQL = /* @__PURE__ */ Object.freeze({ basico: 100, avanzado: 200, pro: 300, humanos: 500 })
 export const LIMITE_CONSULTA_SQL = 30
 // TIE-1 1a · el catálogo de la tienda (`inventario_tipo_valido`,
 // `precio_articulo`, `articulo_con_tonos`, `articulo_gratis`) y el tope por
 // minuto de `comprar_articulo`, literal en su llamada como el de la 1e. El
 // espejo los lee de `20261031150000_tie1a_inventario.sql`.
-export const TIPOS_INVENTARIO_SQL = Object.freeze(['tapete'])
-export const PRECIOS_ARTICULO_SQL = Object.freeze({
-  tapete: Object.freeze({ grafito: 10000, azul: 15000, vinotinto: 25000, tricolor: 50000 }),
+export const TIPOS_INVENTARIO_SQL = /* @__PURE__ */ Object.freeze(['tapete'])
+export const PRECIOS_ARTICULO_SQL = /* @__PURE__ */ Object.freeze({
+  tapete: /* @__PURE__ */ Object.freeze({ grafito: 10000, azul: 15000, vinotinto: 25000, tricolor: 50000 }),
 })
-export const CON_TONOS_SQL = Object.freeze({ tapete: Object.freeze(['grafito', 'azul', 'vinotinto']) })
-export const GRATIS_SQL = Object.freeze({ tapete: 'verde' })
-export const TONOS_SQL = Object.freeze(['claro', 'actual', 'oscuro'])
+export const CON_TONOS_SQL = /* @__PURE__ */ Object.freeze({ tapete: /* @__PURE__ */ Object.freeze(['grafito', 'azul', 'vinotinto']) })
+export const GRATIS_SQL = /* @__PURE__ */ Object.freeze({ tapete: 'verde' })
+export const TONOS_SQL = /* @__PURE__ */ Object.freeze(['claro', 'actual', 'oscuro'])
 export const LIMITE_COMPRA_SQL = 30
 // CFG-1 1b · el freno del nombre (`freno_nombre_hasta`: 30 días en UTC, que no
 // tiene cambio de hora, así que son 30 × 24 h exactas), la forma del CHECK de
@@ -90,9 +92,9 @@ export const OTP_EXP_S_PANEL = 600
 export const INTERVALO_ENVIO_S_PANEL = 60
 export const CODIGO_ACTUAL_IMITADO = '111111'
 export const CODIGO_NUEVO_IMITADO = '222222'
-export const CORREOS_OCUPADOS_IMITADOS = Object.freeze(['test1976@gmail.com'])
+export const CORREOS_OCUPADOS_IMITADOS = /* @__PURE__ */ Object.freeze(['test1976@gmail.com'])
 export const FORMA_USERNAME_SQL = /^[A-Za-z0-9_]{6,15}$/
-export const ESTADOS_VE_SQL = Object.freeze([
+export const ESTADOS_VE_SQL = /* @__PURE__ */ Object.freeze([
   'AMA', 'ANZ', 'APU', 'ARA', 'BAR', 'BOL', 'CAR', 'COJ', 'DEL', 'DC',
   'FAL', 'GUA', 'LGU', 'LAR', 'MER', 'MIR', 'MON', 'NES', 'POR', 'SUC',
   'TAC', 'TRU', 'YAR', 'ZUL'])
@@ -118,8 +120,8 @@ export const VIDEO_VIDA_MS_SQL = 10 * 60 * 1000
 // RNK-1a · `puntos_reto_ia()`, `extra_ajilei()` e `ia_tope_manos_minuto()`. La
 // tabla de humanos (`sentados + 3`) vive en el `check` del libro y aquí no hace
 // falta: el banco, como el SQL de hoy, sólo escribe líneas `ias`.
-export const PUNTOS_RETO_SQL = Object.freeze({ basico: 1, avanzado: 2, pro: 3 })
-export const EXTRA_AJILEI_SQL = Object.freeze({ 0: 0, 51: 1, 52: 2 })
+export const PUNTOS_RETO_SQL = /* @__PURE__ */ Object.freeze({ basico: 1, avanzado: 2, pro: 3 })
+export const EXTRA_AJILEI_SQL = /* @__PURE__ */ Object.freeze({ 0: 0, 51: 1, 52: 2 })
 export const TOPE_MANOS_MINUTO_SQL = 12
 /** `ranking_franja(puesto, total)`: ceil(puesto·20/total)·5, en enteros. */
 export const franjaSQL = (puesto, total) => Math.floor((puesto * 20 + total - 1) / total) * 5
@@ -128,17 +130,17 @@ export const franjaSQL = (puesto, total) => Math.floor((puesto * 20 + total - 1)
 // fechas distintas (y un empate en cada ranking que decide la fecha). Sólo los
 // usa quien los pide (`crearBanco({ sembrados })`); las fechas son relativas
 // al reloj del banco al nacer (`…Hace`, en ms).
-export const SEMBRADOS_DEMO = Object.freeze([
-  Object.freeze({ username: 'Bachaquero_VE', puntos: 96, puntosHace: 9e7, saldo: 21400, saldoHace: 8e7 }),
-  Object.freeze({ username: 'ElCatire88', puntos: 74, puntosHace: 8e7, saldo: 48700, saldoHace: 7e7 }),
-  Object.freeze({ username: 'Yulimar77', puntos: 41, puntosHace: 6e7, saldo: 9800, saldoHace: 5e7 }),
-  Object.freeze({ username: 'Mochima_21', puntos: 41, puntosHace: 5e7, saldo: 9800, saldoHace: 4e7 }),
-  Object.freeze({ username: 'Turpial_Rojo', puntos: 11, puntosHace: 3e7, saldo: 3150, saldoHace: 2e7 }),
-  Object.freeze({ username: 'Araguaney5', puntos: null, saldo: 2500, saldoHace: 1e7 }),
+export const SEMBRADOS_DEMO = /* @__PURE__ */ Object.freeze([
+  /* @__PURE__ */ Object.freeze({ username: 'Bachaquero_VE', puntos: 96, puntosHace: 9e7, saldo: 21400, saldoHace: 8e7 }),
+  /* @__PURE__ */ Object.freeze({ username: 'ElCatire88', puntos: 74, puntosHace: 8e7, saldo: 48700, saldoHace: 7e7 }),
+  /* @__PURE__ */ Object.freeze({ username: 'Yulimar77', puntos: 41, puntosHace: 6e7, saldo: 9800, saldoHace: 5e7 }),
+  /* @__PURE__ */ Object.freeze({ username: 'Mochima_21', puntos: 41, puntosHace: 5e7, saldo: 9800, saldoHace: 4e7 }),
+  /* @__PURE__ */ Object.freeze({ username: 'Turpial_Rojo', puntos: 11, puntosHace: 3e7, saldo: 3150, saldoHace: 2e7 }),
+  /* @__PURE__ */ Object.freeze({ username: 'Araguaney5', puntos: null, saldo: 2500, saldoHace: 1e7 }),
 ])
 
 // `dia_chicago(ts)` de la 1a: la fecha en America/Chicago, con la zona por nombre.
-const FECHA_CHICAGO = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
+const FECHA_CHICAGO = /* @__PURE__ */ new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
 export const diaChicagoSQL = (ms) => FECHA_CHICAGO.format(new Date(ms))
 /** Suma `n` días a una fecha 'AAAA-MM-DD' (como `date + n` en SQL). */
 export function sumarDias(dia, n) {

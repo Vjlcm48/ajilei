@@ -91,7 +91,10 @@ export const AUTH_BYPASS = Boolean(import.meta.env.DEV && import.meta.env.VITE_A
 // CFG-1 1b · con lugar vacío; si el bypass trae el banco imitado (`App` pasa
 // `simulacionPerfil()`), lo que cuenta es lo que el banco diga, y el bypass
 // cambia de nombre y de lugar como una cuenta de verdad.
-const PERFIL_DEV = { id: '00000000-0000-4000-8000-000000000000', username: 'DevLocal', pais: null, estado: null }
+// ARN-4 B2 · `null` en producción, para que el nombre no viaje en el paquete.
+const PERFIL_DEV = import.meta.env.DEV
+  ? { id: '00000000-0000-4000-8000-000000000000', username: 'DevLocal', pais: null, estado: null }
+  : null
 
 // ── La regla del username, y por qué está DUPLICADA aquí a propósito ────────
 // La autoridad es la base (SUP-2a: CHECK de formato, índice único sobre
