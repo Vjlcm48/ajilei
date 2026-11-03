@@ -21,7 +21,14 @@
      disco    sólo el fieltro, redondo (el selector de tono y la fila del ⚙)
    Nada de lo de dentro se toca: cartas, fichas y pozo son adorno quieto. */
 
-.vit { display: block; container-type: inline-size; line-height: 1.2; }
+.vit {
+  display: block;
+  container-type: inline-size;
+  line-height: 1.2;
+  /* VIS-1 · el 0,55 de la mesa: `.sal` lo sube a 0,65 y la vitrina no debe
+     heredarlo, o su rótulo «Pozo» dejaría de parecerse al de la mesa (INV-77). */
+  --text-muted: rgba(var(--text-primary-rgb), 0.55);
+}
 
 /* ── La mesa entera ────────────────────────────────────────────────────────── */
 .vit .vit-fondo {

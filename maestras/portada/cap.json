@@ -1,7 +1,7 @@
 {
   "campana": "CAP-1",
-  "generado": "2026-09-26T20:51:53.129Z",
-  "edge": "154.0.4258.37",
+  "generado": "2026-11-03T09:33:48.114Z",
+  "edge": "151.0.7922.34",
   "semilla": 5,
   "prng": "mulberry32 sobre Math.random (addInitScript); crypto sin tocar",
   "receta": "mesa 5 · reto pro · apuesta índice 0 (200) · entrada medio; «A las 2» Apostar ×1; las cuatro IAS igualan; foto en «A las 3 — Tú abre.» con la mesa quieta (getAnimations y vuelos a cero), «20s» comprobado y turnBreath fijada a 1200 ms. Sesión simulada: red a Supabase interceptada entera.",
@@ -23,19 +23,12 @@
         1080,
         2112
       ],
-      "bytes": 1169655,
-      "sha256": "b2ef85c5638e86bca3fb5301dd2a3009898cd50410ab26361de413a0de3f9be8",
+      "bytes": 1170259,
+      "sha256": "8bc8d158ff7140296559a19c034ee9fda4b877d47d8eec97e1579c2dda00dad7",
       "estable": {
-        "fraccionDeltaFino": 1,
-        "deltaMax": 0,
-        "distintos": 0
-      },
-      "resello": {
-        "campana": "CAP-2",
-        "generado": "2026-10-12T05:32:06.487Z",
-        "navegador": "Chromium 151.0.7922.34",
-        "motivo": "PAN-1b (8009d4f): src/styles/tactil.css:29",
-        "anterior": "198289a8f290fca3bc603e5e2b4b941fd3b34bc21c3323101a0573e431ad43bc"
+        "fraccionDeltaFino": 0.9997921927609428,
+        "deltaMax": 30,
+        "distintos": 733836
       }
     },
     "mesah.png": {
@@ -49,12 +42,12 @@
         2058,
         1080
       ],
-      "bytes": 1097468,
-      "sha256": "1e13575a3f10a1f1b3afb37db63d10584250f99762bf8b3ed489d49aaaae2710",
+      "bytes": 1097975,
+      "sha256": "034c7bf65e762cf14f25fb009c7be50f435245629ae89af15eac0e4655fc6cb3",
       "estable": {
-        "fraccionDeltaFino": 0.9998285822265414,
-        "deltaMax": 22,
-        "distintos": 502639
+        "fraccionDeltaFino": 1,
+        "deltaMax": 0,
+        "distintos": 0
       },
       "ogRecorte": {
         "caja": [
@@ -80,8 +73,8 @@
         2732,
         1536
       ],
-      "bytes": 1757307,
-      "sha256": "6bca77f6bb092d3c3a0e36f9cc0cc47d6a495e96a0d441ace14f991a9d6761a6",
+      "bytes": 1758006,
+      "sha256": "b236d148f37080ef5b63086e23a98861fb0c6120279483ffdc7f3092226288a9",
       "estable": {
         "fraccionDeltaFino": 1,
         "deltaMax": 0,

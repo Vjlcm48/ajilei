@@ -13,6 +13,11 @@
 // devuelve 'partida' y la tarjeta-resumen monta. Un clic en "Iniciar mano" y
 // estás en la pantalla.
 //
+// VIS-1 · `?cel=derrota` es la otra cara. Ahí no vale sembrar fichas: un humano
+// sin ante abre la recarga forzosa, y decirle que no saca de la mesa sin pasar
+// por esta pantalla. Así que la siembra entrega el estado terminal que el motor
+// escribe cuando el humano se queda sin fichas y una IA sigue en pie.
+//
 // POR QUÉ ASÍ Y NO DE OTRA FORMA.
 //   · No abre `gameEngine.js`, que es protegido. No hay condición nueva ni
 //     atajo: se usa la condición terminal que el motor YA tiene, alimentándola
@@ -33,6 +38,8 @@
 //                 (`n >= unit`), así que se juegan manos de verdad y la tarjeta
 //                 sale con cifras vividas. NO es determinista: una IA puede
 //                 ganar el pozo y estirar la partida, o ganar la mesa.
+//   ?cel=derrota → VIS-1. La mesa nace ya en GAME_OVER, con la IA 1 de ganadora
+//                 y el humano eliminado: monta la derrota, sin «Iniciar mano».
 //   &frase=<n>  → CEL-1. Fuerza la frase n del banco (1-based) en vez de
 //                 sortearla, para medir la más larga sin depender de la
 //                 lotería. No toca la memoria de "última frase mostrada":
@@ -46,7 +53,10 @@
 // parámetro—, para que ni un despiste de configuración pueda sembrar una mesa
 // real.
 
+import { PHASES } from '../engine/gameEngine'
+
 export const CEL_PARAM = 'cel'
+export const CEL_DERROTA = 'derrota'
 
 // Devuelve el estado tal cual (identidad) salvo que se pida la siembra.
 export function siembraCEL(estado) {
@@ -57,6 +67,15 @@ export function siembraCEL(estado) {
   try { crudo = new URLSearchParams(window.location.search).get(CEL_PARAM) }
   catch { return estado }
   if (crudo == null) return estado
+
+  if (crudo === CEL_DERROTA) {
+    return {
+      ...estado,
+      phase: PHASES.GAME_OVER,
+      winner: 1,
+      players: estado.players.map((p, i) => (i === 0 ? { ...p, chips: 0, eliminated: true, folded: true } : p)),
+    }
+  }
 
   // `?cel` a secas llega como cadena vacía → 0, que es el caso determinista.
   // Un valor no numérico o negativo cae también a 0: el molde nunca se queda a

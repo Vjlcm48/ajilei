@@ -139,6 +139,15 @@
     var(--vino-abyss);
 }
 
+/* VIS-1 · El texto atenuado de las pantallas del lobby, a α 0,65: con 0,55 bajaba
+   de 4,5 : 1 sobre sus fondos (3,85 en el vino, 3,97 en el verde; INV-79). En la
+   mesa el token sigue a 0,55, que ahí ya cumple y que INV-04 no deja tocar en el
+   óvalo. La vitrina vive dentro de `.sal` y vuelve a 0,55 (`vitrina.css`). */
+.lobby,
+.sal {
+  --text-muted: rgba(var(--text-primary-rgb), 0.65);
+}
+
 @media (min-width: 768px) and (min-height: 900px) and (orientation: landscape) {
   :root {
     --card-w: 91px;

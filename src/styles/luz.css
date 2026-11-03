@@ -122,9 +122,13 @@
      .opp-status.opp-status-allin      apu:66   var(--gold-brand)
      .opp-status.opp-status-elim       OP:46    var(--lose-red)
    Cubre las dos vías de dibujo del rival: el `opp-panel` y la `.ai-zone` de la
-   mesa 2 (GameTable.jsx:1728 usa las mismas clases). 0,3,0. */
+   mesa 2 (GameTable.jsx:1728 usa las mismas clases). 0,3,0.
+   VIS-1 · de 0,64 a 0,76: el texto hereda la opacidad de su panel, y mientras
+   otro asiento tiene el turno (`.turn-dimmed`, 0,8) daba 3,70. Con 0,76 da ≥ 4,55
+   en los 11 fieltros (INV-79). «Se retiró» (`.opp-folded`, 0,55) queda exento:
+   es un estado apagado a propósito y no llega a 4,5 ni con α = 1. */
 .game-table-screen .opp-status:not(.opp-status-turn, .opp-status-allin, .opp-status-elim) {
-  color: rgba(var(--text-primary-rgb), 0.64);
+  color: rgba(var(--text-primary-rgb), 0.76);
 }
 
 /* Las dos líneas claras a los lados de la mesa en escritorio (Fase 0 §J-3) son

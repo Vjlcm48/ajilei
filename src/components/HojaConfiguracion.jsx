@@ -13,7 +13,7 @@ import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/cre
 import { CORREO_SOPORTE } from '../config/soporte'
 import { VERSION, COMMIT } from '../config/version'
 import { useIdioma } from '../hooks/useIdioma'
-import { useSounds } from '../hooks/useSounds'
+import { useSounds, reproducir } from '../hooks/useSounds'
 import { useSoundContext } from '../context/SoundContext'
 import { enmascararCorreo, atributosHoja } from '../hooks/lobbyCore'
 import { copiarTexto } from '../lib/copiarTexto'
@@ -210,9 +210,15 @@ export default function HojaConfiguracion({ abierta, onCerrar, ajustesRef, cuent
         {/* Lo que se desplaza: la lista, no la cabecera (V2 de la lámina). */}
         <div className="cfg-hoja-cuerpo">
           {/* Sonido · el clic de `SoundButton` suena ANTES del `onClick`: al
-              apagar, arranca y `Howler.mute` lo corta en el render siguiente;
-              al encender, no suena (aún estaba apagado). Ver el informe. */}
-          <SoundButton className="lob-fila" data-accion="cfg-sonido" aria-pressed={soundEnabled} onClick={alternarSonido}>
+              apagar, arranca y `Howler.mute` lo corta en el render siguiente; al
+              encender, `play` lo descarta porque aún estaba apagado. VIS-1 · por
+              eso aquí se pide con el ajuste que va a quedar. */}
+          <SoundButton
+            className="lob-fila"
+            data-accion="cfg-sonido"
+            aria-pressed={soundEnabled}
+            onClick={() => { if (!soundEnabled) reproducir('buttonClick', true); alternarSonido() }}
+          >
             <span>{t('lob.cfg.sonido')}</span>
             <span className={`lob-pastilla${soundEnabled ? ' cfg-si' : ''}`}>{t(soundEnabled ? 'lob.cfg.si' : 'lob.cfg.no')}</span>
           </SoundButton>

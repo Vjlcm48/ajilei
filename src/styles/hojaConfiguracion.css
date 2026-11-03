@@ -252,9 +252,10 @@
 :is(.lobby, .sal) .lob-acerca a:hover,
 :is(.lobby, .sal) .lob-acerca a:focus-visible { color: var(--text-secondary); }
 
-/* La única fila roja de la app fuera de la mesa (`--loss-red`). */
+/* La única fila roja de la app fuera de la mesa. VIS-1 · `--lose-red`, el rojo
+   del error de esa misma ventana: `--loss-red` sobre este fondo daba 2,66. */
 :is(.lobby, .sal) .lob-fila-peligro {
-  color: var(--loss-red);
+  color: var(--lose-red);
   margin-top: calc(var(--u) * 1.5);
   border-top: 1px solid var(--cfg-linea);
 }

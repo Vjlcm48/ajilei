@@ -10,7 +10,8 @@
    Lo que NO queda muerto de aquel bloque, y conviene tenerlo escrito para que
    una tanda futura no lo borre creyendo que sí:
      · `.game-over-screen` y `.game-over-msg` siguen vistiendo la pantalla de
-       DERROTA, que esta tanda no toca ni un byte.
+       DERROTA, que esta tanda no toca ni un byte (VIS-1 le da el piso táctil a
+       su botón en la §1b de esta hoja).
      · `.vc-ajilei` y `.vc-ajilei-capa` son el overlay de AJILEI EN MANO (VC2),
        que no tiene nada que ver con esta pantalla.
 
@@ -464,6 +465,44 @@ h1.cel-ajilei {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-height: 44px;
+  }
+}
+
+/* ── 1b · VIS-1 · El piso táctil de los botones de fin de mesa ────────────────
+   Victoria y derrota (`AJILEI_Victory_Celebration_v1.2.md`, INV-07). Medían 28 y
+   33 px de caja, con zona de 40 pedida en la mesa. `zoom` en #root multiplica los
+   px propios, así que 44 reales se escriben divididos entre la escala: 44 a secas
+   serían 57,19 a ×1,3 y 38,27 a ×0,87.
+
+   Vertical: caja de 44 reales. Hay sitio, y es donde se toca con el dedo. */
+@media (orientation: portrait) {
+  .cel-acciones .btn,
+  .game-over-screen .btn {
+    min-height: calc(44px / var(--escala, 1));
+  }
+}
+/* Horizontal alto: la caja no cambia, porque 44 sacarían «Ranking» 13,39 px de la
+   vista en 1366×768. Crece la zona, centrada en el botón. */
+@media (orientation: landscape) and (min-height: 601px) {
+  .cel-acciones .btn,
+  .game-over-screen .btn {
+    position: relative;
+  }
+  .cel-acciones .btn::after,
+  .game-over-screen .btn::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: calc(44px / var(--escala, 1));
+    transform: translateY(-50%);
+  }
+}
+/* Apaisado bajo: la victoria ya mide 44 (§1). La derrota no tenía esa regla. */
+@media (orientation: landscape) and (max-height: 600px) {
+  .game-over-screen .btn {
     min-height: 44px;
   }
 }
