@@ -34,6 +34,9 @@
 //   tie.inventario  con grafito oscuro en uso y azul comprado: la lista dice
 //                 «✓ En uso» / «Usar» / precio; «Usar» y un tono cambian el
 //                 servidor y la vitrina sólo con su «ok»
+//   tie.contraste VIS-1, la gemela de `cfg.contraste`: el texto del token ≥ 4,5
+//                 bajo su tinta en Monedas, Tapetes y la vista del artículo sin saldo
+//                 («No te alcanza», INV-79), y el rótulo de la vitrina a 0,55, igual que el de la mesa (INV-77)
 //   consola       sin errores de página
 //
 // Capturas en `capturas-dsk/tienda/` (regenerables).
@@ -41,6 +44,7 @@
 import { mkdirSync } from 'node:fs'
 import { contextoCap, PERFIL_CAP } from '../cap/capMesa.mjs'
 import { crearBanco } from '../../src/dev/bancoImitado.js'
+import { QUIETA_CSS, esTenue, medirAtenuados } from '../arnes/tinta.mjs'
 
 const CELDAS = [
   { w: 1920, h: 1080, movil: false },
@@ -248,7 +252,7 @@ export async function runTienda(browser, { base }) {
   mkdirSync(OUT, { recursive: true })
   const errores = []
   const celdas = []
-  const puertas = { zona: [], solape: [], estantes: [], puerta: [], ventana: [], falta: [], ojito: [], inventario: [] }
+  const puertas = { zona: [], solape: [], estantes: [], puerta: [], ventana: [], falta: [], ojito: [], inventario: [], contraste: [] }
   const anota = (p, ok, detalle) => { puertas[p].push({ ok: ok === true, ...detalle }); return ok === true }
   const foto = (page, nombre) => page.screenshot({ path: `${OUT}/${nombre}.png` })
 
@@ -459,6 +463,41 @@ export async function runTienda(browser, { base }) {
       { lista, antes, azul, grafito })
     } catch (err) {
       anota('inventario', false, { error: String(err?.message ?? err).split('\n')[0] })
+    } finally {
+      await ctx?.close().catch(() => {})
+    }
+  }
+
+  // ── VIS-1 · tie.contraste: la gemela de `cfg.contraste` ───────────────────
+  for (const celda of CELDAS) {
+    const id = `${celda.w}x${celda.h}`
+    const dpr = celda.movil ? 2 : 1
+    let ctx = null
+    try {
+      let page
+      ;({ ctx, page } = await abrirTienda(browser, base, celda, errores, { saldo: SALDO }))
+      await page.addStyleTag({ content: QUIETA_CSS })
+      const anotaVista = (vista, m) => anota('contraste', m.n > 0 && m.bajo.length === 0 && m.viejos.length === 0,
+        { celda: id, vista, n: m.n, peor: m.peor?.contraste ?? null, fondo: m.peor?.fondo ?? null, texto: m.peor?.txt ?? null, bajo: m.bajo, viejos: m.viejos })
+      anotaVista('monedas', await medirAtenuados(page, dpr))
+      await page.click('[data-accion="tie-estante-tapetes"]')
+      await page.waitForSelector('[data-tienda="tapetes"]')
+      anotaVista('tapetes', await medirAtenuados(page, dpr))
+      // La vista del artículo, sin saldo: con el que alcanza no queda texto del
+      // token fuera de `.vit`, y una celda sin medir es roja. El que se mide es
+      // «No te alcanza», que nadie más vigila.
+      await ctx.close()
+      ;({ ctx, page } = await abrirTienda(browser, base, celda, errores, { saldo: 0 }))
+      await page.addStyleTag({ content: QUIETA_CSS })
+      await page.click('[data-accion="tie-estante-tapetes"]')
+      await page.waitForSelector('[data-tienda="tapetes"]')
+      await page.click('[data-tap="azul"] [data-accion="tie-art"]')
+      await page.waitForSelector('[data-tienda="vitrina"] .tie-vitrina[data-tap="azul"]')
+      anotaVista('vitrina', await medirAtenuados(page, dpr))
+      const rotulo = await page.evaluate(() => getComputedStyle(document.querySelector('.vit .vit-pozo-l')).color)
+      anota('contraste', esTenue(rotulo, 0.55), { celda: id, vista: 'el rótulo de la vitrina, a 0,55', rotulo })
+    } catch (err) {
+      anota('contraste', false, { celda: id, error: String(err?.message ?? err).split('\n')[0] })
     } finally {
       await ctx?.close().catch(() => {})
     }

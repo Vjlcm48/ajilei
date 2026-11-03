@@ -36,7 +36,8 @@
 //   cfg.toast    «Copiado» sale y queda por encima del velo
 //   cfg.sonido   «Sonido» en la hoja cambia `ajilei.sound`; en la mesa el ⋮
 //                lleva `is-off` con el sonido apagado (y el icono atenuado), y
-//                encenderlo allí lo deja «Sí» en la hoja
+//                encenderlo allí lo deja «Sí» en la hoja. VIS-1: el clic SUENA al
+//                encender, con el espía de audio (en `vis1.mjs`)
 //   cfg.version  «Acerca de» empieza por «AJILEI 0.9.0 · » + 7 hex o `local`
 //   cfg.inv45    los dos botones de la sugerencia, el crédito de «Acerca de» y
 //                el enlace de SumaMente en Rankings llevan
@@ -75,6 +76,9 @@
 //                banco imitado y Partida rápida con sus duraciones medidas
 //   CFG-1 1d (en `correo1d.mjs`): cfg.correo, el cambio de correo — la fila, el
 //                editor, los errores, los códigos, hecho y los mandos del bypass
+//   VIS-1 (en `vis1.mjs`): cfg.victoria, los botones de la victoria y la
+//                derrota con la escala real, y cfg.contraste, el texto atenuado
+//                y «Eliminar cuenta» bajo su tinta en las pantallas del lobby
 //   consola      sin errores de página
 
 import { readFileSync } from 'node:fs'
@@ -84,6 +88,7 @@ import { crearBanco, sumarDias } from '../../src/dev/bancoImitado.js'
 import { recorrerRuta } from '../rutaMesa.mjs'
 import { mesa1e } from './menu1e.mjs'
 import { correo1d } from './correo1d.mjs'
+import { contrasteLobby, sonidoAudio, victoria } from './vis1.mjs'
 
 const VERSION = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version
 const CELDAS = [
@@ -901,8 +906,9 @@ export async function runCfg(browser, { base, baseDev = null }) {
     perfil: [], freno: [],
     menu: [], consulta: [], rapida: [],
     correo: [],
+    victoria: [], contraste: [],
   }
-  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia', 'perfil', 'freno', 'menu', 'consulta', 'rapida', 'correo']
+  const DE_LA_1C = ['eliminar.ventana', 'eliminar.mesa', 'eliminar.ok', 'salir.reinicia', 'perfil', 'freno', 'menu', 'consulta', 'rapida', 'correo', 'victoria', 'contraste']
   const anota = (p, ok, detalle) => { puertas[p].push({ ok: ok === true, ...detalle }); return ok === true }
 
   for (const celda of CELDAS) {
@@ -1200,6 +1206,11 @@ export async function runCfg(browser, { base, baseDev = null }) {
     abrirLobby, MEDIR, esperarQuieta, perfil: PERFIL_CAP,
     bancoCon: (correo) => crearBanco({ usuario: PERFIL_CAP.username, sembrados: sembradosRanking(), saldo: 5000, correo }),
   })
+
+  // ── 13 · VIS-1 · fin de mesa, contraste y el clic del sonido ──────────────
+  await victoria(browser, baseDev, anota)
+  await contrasteLobby(browser, { base, baseDev }, errores, anota, { abrirLobby, abrirHoja, irRetar })
+  await sonidoAudio(browser, base, errores, anota, { abrirLobby, abrirHoja })
 
   const resumen = Object.fromEntries(Object.entries(puertas).map(([k, v]) => [`cfg.${k}`, v.length > 0 && pasa(v.map((x) => x.ok))]))
   resumen.consola = errores.length === 0

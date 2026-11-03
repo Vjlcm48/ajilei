@@ -46,7 +46,8 @@
 //   cfg    → CFG-1 1a: la hoja del ⚙ y el piso de 44 fuera de la mesa, en 360×640,
 //            412×915, 915×412, 1366×768 y 1920×1080. Catorce puertas con nombre
 //            (cfg.zona, cfg.solape, cfg.ojito, cfg.hoja, cfg.ancla, cfg.toast,
-//            cfg.sonido, cfg.version, cfg.inv45, cfg.sinojito; CFG-1 1c:
+//            cfg.sonido (VIS-1: con espía de audio), cfg.version, cfg.inv45,
+//            cfg.sinojito; VIS-1: cfg.victoria, cfg.contraste; CFG-1 1c:
 //            cfg.eliminar.ventana, cfg.eliminar.mesa, cfg.eliminar.ok,
 //            cfg.salir.reinicia; CFG-1 1d: cfg.correo) y la consola.
 //            Contra el bundle real y el banco imitado. Ver `scripts/cfg/cfg.mjs`.
@@ -350,6 +351,7 @@ import { runTab, VARAS_TAB } from './tab/tab.mjs'
 import { runRnk } from './rnk/rnk.mjs'
 import { runSuma } from './suma/suma.mjs'
 import { runCfg } from './cfg/cfg.mjs'
+import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, fotosTinta as tintaFotos, peorFondo as tintaPeor } from './arnes/tinta.mjs'
 import { runTienda } from './tie/tienda.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
@@ -12870,6 +12872,69 @@ function luzPuertaContraste(on, off) {
   return { ok: fallos.length === 0 && objetivoOk, fallos, objetivo, sinPareja, n: on.length }
 }
 
+// VIS-1 · Puerta 2, los tres estados del texto del rival, bajo la tinta (INV-79).
+// `.opp-status` hereda la opacidad de su panel, y hasta VIS-1 esta puerta solo veía
+// el estado normal. Las clases se ponen a mano, las reales: ninguna IA se retira a
+// voluntad. Normal y atenuado ≥ 4,5. «Se retiró» queda exento (estado apagado a
+// propósito): se mide y se anota, sin piso. La mesa de 2 apaisada también: ahí la
+// marca pisa los huecos de carta (pendiente de MES-PvP), no es un asunto de color.
+const LUZ_CASOS_RIVAL = [['verde', null], ['tricolor', null],
+  ...['grafito', 'azul', 'vinotinto'].flatMap((a) => ['claro', null, 'oscuro'].map((t) => [a, t]))]
+const LUZ_RIVAL_SIN_PISO = (n, t) => n === 2 && t.movil && t.w > t.h
+// Los once fieltros en la mesa de 5; en las otras, los dos con menos margen.
+const luzCasosRival = (n) => (n === 5 ? LUZ_CASOS_RIVAL : [['verde', null], ['vinotinto', 'claro']])
+// El escritorio de 1366×768 no está en `LUZ_TAMANOS` (lo comparte `rev`, con sus
+// celdas selladas), y es uno de los cinco tamaños de VIS-1: se mide aparte.
+async function luzRival1366(browser, n) {
+  const t = { w: 1366, h: 768, movil: false }
+  const ctx = await browser.newContext({ viewport: { width: t.w, height: t.h }, deviceScaleFactor: 2 })
+  const page = await ctx.newPage()
+  try {
+    await irALaMesa(page, BASE, n, 'basico', 0)
+    await page.mouse.move(2, 2)
+    return { id: `m${n}_1366`, ...await luzEstadosRival(page, n, t, luzCasosRival(n)) }
+  } catch (e) { return { id: `m${n}_1366`, ok: false, error: String(e && e.message || e).slice(0, 300) } }
+  finally { await ctx.close() }
+}
+async function luzEstadosRival(page, n, t, casos) {
+  const poner = (estado) => page.evaluate((e) => {
+    for (const el of document.querySelectorAll('.opp-status')) {
+      const p = el.closest('.opp-panel, .ai-zone')
+      p.classList.remove('turn-dimmed', 'opp-folded')
+      if (e === 'atenuado') p.classList.add('turn-dimmed')
+      if (e === 'retirado' && p.classList.contains('opp-panel')) p.classList.add('opp-folded')
+      el.classList.remove('opp-status-turn', 'opp-status-allin', 'opp-status-elim')
+      el.textContent = e === 'retirado' ? 'Se retiró' : 'Pasó'
+    }
+  }, estado)
+  const ponerTapete = ([a, tono]) => page.evaluate(([a, tono]) => {
+    const b = document.body
+    if (a !== 'verde') b.setAttribute('data-tapete', a); else b.removeAttribute('data-tapete')
+    if (tono) b.setAttribute('data-tapete-tono', tono); else b.removeAttribute('data-tapete-tono')
+  }, [a, tono])
+  const q = await page.addStyleTag({ content: TINTA_QUIETA })
+  const r = { normal: null, atenuado: null, retirado: null, lecturas: 0, sinPiso: LUZ_RIVAL_SIN_PISO(n, t) }
+  for (const caso of casos) {
+    await ponerTapete(caso)
+    await page.waitForTimeout(400)      // el fieltro se pinta con retraso
+    await tintaAsentar(page)
+    for (const estado of ['normal', 'atenuado', 'retirado']) {
+      await poner(estado)
+      const textos = (await page.evaluate(TINTA_TEXTOS)).filter((x) => x.clase.includes('opp-status'))
+      const fotos = await tintaFotos(page, 2)
+      for (const x of textos) {
+        const m = tintaPeor(fotos, x)
+        if (m?.contraste == null) continue
+        r.lecturas++
+        if (!r[estado] || m.contraste < r[estado].contraste) r[estado] = { contraste: m.contraste, fondo: m.fondo, alfa: m.alfa, tapete: caso.filter(Boolean).join('-') }
+      }
+    }
+  }
+  await q.evaluate((x) => x.remove())
+  r.ok = r.sinPiso || (!!r.normal && !!r.atenuado && r.normal.contraste >= TINTA_PISO && r.atenuado.contraste >= TINTA_PISO)
+  return r
+}
+
 async function luzCelda(browser, n, clave, tapete = null) {
   const t = LUZ_TAMANOS[clave]
   const id = `m${n}_${clave}${tapete ? '_' + tapete : ''}`
@@ -12900,10 +12965,12 @@ async function luzCelda(browser, n, clave, tapete = null) {
     await luzDesinstalar(page)
     c.contraste = luzPuertaContraste(txOn, txOff)
     c.png = { on: `${id}.png`, pngOn, pngOff }
+    // VIS-1 · la celda de un tapete mide el suyo; las verdes, `luzCasosRival`.
+    c.rival = await luzEstadosRival(page, n, t, tapete ? [[tapete, null]] : luzCasosRival(n))
     const est = c.estados
     c.puertas = {
       p1_delta: c.delta.max === 0 && c.delta.distintos === 0 && c.delta.scrollIgual,
-      p2_contraste: c.contraste.ok,
+      p2_contraste: c.contraste.ok && c.rival.ok,
       p3_estados: !!(est.seleccionada?.igual && est.ganadora?.igual && est.vacia?.igual &&
         (t.movil || est.hover?.igual) && c.turnBreath.soloPaneles && c.turnBreath.luzSinAnimacion),
       p5_token: c.validez.k === '1' && ['mesa', 'ovalo', 'reflejos', 'carta', 'dorso', 'pozo', 'mazo', 'ficha', 'manoN', 'paso', 'rootBorde']
@@ -13000,7 +13067,13 @@ async function runLuz(browser) {
     const c = await luzCelda(browser, n, k)
     celdas.push(c)
     const p = c.puertas
-    console.log(`luz ${c.id.padEnd(8)} · ${c.alcance?.estado} · Δmax=${c.delta?.max} (${c.delta?.distintos}) · contraste ${c.contraste ? (c.contraste.ok ? 'OK' : 'FALLA ' + c.contraste.fallos.length) : '-'} [${(c.contraste?.objetivo || []).map(o => o.texto + ' ' + o.on).join(', ')}] · estados ${p.p3_estados ? 'OK' : 'FALLA'} · token ${p.p5_token ? 'OK' : 'FALLA'}${c.error ? ' · ERROR ' + c.error : ''}`)
+    console.log(`luz ${c.id.padEnd(8)} · ${c.alcance?.estado} · Δmax=${c.delta?.max} (${c.delta?.distintos}) · contraste ${c.contraste ? (c.contraste.ok ? 'OK' : 'FALLA ' + c.contraste.fallos.length) : '-'} [${(c.contraste?.objetivo || []).map(o => o.texto + ' ' + o.on).join(', ')}] · rival ${c.rival?.normal?.contraste}/${c.rival?.atenuado?.contraste}/${c.rival?.retirado?.contraste}${c.rival?.sinPiso ? ' (sin piso)' : ''} ${c.rival?.ok ? 'OK' : 'FALLA'} · estados ${p.p3_estados ? 'OK' : 'FALLA'} · token ${p.p5_token ? 'OK' : 'FALLA'}${c.error ? ' · ERROR ' + c.error : ''}`)
+  }
+  const rival1366 = []
+  for (const n of mesas) {
+    const r = await luzRival1366(browser, n)
+    rival1366.push(r)
+    console.log(`luz ${r.id} · rival ${r.normal?.contraste}/${r.atenuado?.contraste}/${r.retirado?.contraste} ${r.ok ? 'OK' : 'FALLA'}${r.error ? ' · ERROR ' + r.error : ''}`)
   }
   const extras = []
   if (completo) for (const tp of LUZ_TAPETES_EXTRA) {
@@ -13018,7 +13091,7 @@ async function runLuz(browser) {
   const todas = [...celdas, ...extras]
   const verdeDe = (k) => celdas.length > 0 && celdas.every(c => c.puertas[k])
   const puertas = {
-    p1_delta: verdeDe('p1_delta'), p2_contraste: verdeDe('p2_contraste'), p3_estados: verdeDe('p3_estados'),
+    p1_delta: verdeDe('p1_delta'), p2_contraste: verdeDe('p2_contraste') && rival1366.every(r => r.ok), p3_estados: verdeDe('p3_estados'),
     p4_fugas: fugas.every(f => f.ok), p5_token: verdeDe('p5_token'),
   }
   const extrasVerdes = extras.every(c => c.puertas.p1_delta && c.puertas.p2_contraste && c.puertas.p5_token)
@@ -13028,7 +13101,7 @@ async function runLuz(browser) {
   if (completo) writeFileSync(`${LUZ_OUT}/hoja.html`, await luzHojaContacto(browser, todas, fugas, resumen))
   console.log(`── LUZ · ${resumen}`)
   for (const c of todas) if (c.png) c.png = c.png.on   // los PNG no viajan al JSON
-  return { verde, puertas, extrasVerdes, celdas, extras, fugas, semilla: LUZ_SEMILLA, portada: LUZ_BASE_PORTADA }
+  return { verde, puertas, extrasVerdes, celdas, extras, rival1366, fugas, semilla: LUZ_SEMILLA, portada: LUZ_BASE_PORTADA }
 }
 
 // ── REV-1 · Modo `rev`: el reverso de la mesa ────────────────────────────────
