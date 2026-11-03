@@ -1191,8 +1191,8 @@ async function runLob(browser) {
     }
 
     // ── lob.1 · el lobby está, la Bienvenida no ────────────────────────────
-    // La segunda mitad no es redundante: `WelcomeScreen.jsx` SIGUE en el árbol
-    // (borrar es otra tanda) y basta un import olvidado para que vuelva.
+    // La segunda mitad vigila que la Bienvenida no vuelva: `WelcomeScreen.jsx` salió
+    // del árbol en ARN-4 4c, pero `welcome.css` se queda.
     const p1 = await page.evaluate(`(() => ({
       lobby: !!document.querySelector('main.lobby'),
       bienvenida: !!document.querySelector('main.welcome-screen'),

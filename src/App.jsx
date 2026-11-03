@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback, lazy, startTransition } from 'react'
 // ── LOB-1 · `Lobby` releva a `WelcomeScreen` en la casilla de `COMPLETO` ─────
-// `components/WelcomeScreen.jsx` sigue en el árbol —borrar es otra tanda, igual
-// que con `TableSelect` y `Entrada`— pero deja de importarse desde aquí, así que
-// deja de renderizarse y pasa a ser código muerto declarado.
+// `components/WelcomeScreen.jsx` dejó de importarse desde aquí y, ya sin uso, salió
+// del árbol en ARN-4 4c, como `screens/Entrada.jsx`.
 import Lobby from './screens/Lobby'
 // SAL-B1 · Las tres pantallas del PvP. `SalaEspera` es todavia un STUB (rector
 // SAL-B1 §7) y B2 la reemplaza entera; las otras dos son definitivas.
@@ -843,9 +842,8 @@ function App() {
 
   // ── PUE · `SIN_SESION` deja de ser la Entrada y pasa a ser la PORTADA ──────
   // El contrato NO cambia: las mismas dos funciones, el mismo estado, el mismo
-  // sitio en la cascada. Lo que cambia es la cara. `screens/Entrada.jsx` sigue
-  // en el árbol —borrar es otra tanda— y comparte con la portada el MISMO
-  // formulario, extraído a `components/FormularioPuerta.jsx`.
+  // sitio en la cascada. Lo que cambia es la cara. `screens/Entrada.jsx` salió del
+  // árbol en ARN-4 4c; su formulario sigue en `components/FormularioPuerta.jsx`.
   if (auth.estado === SIN_SESION) {
     return <Portada onEnviarCodigo={auth.enviarCodigo} onVerificar={auth.verificarCodigo} />
   }
