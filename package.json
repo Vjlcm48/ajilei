@@ -11,7 +11,8 @@
     "test": "node scripts/arnes/vitest.mjs run scripts/ src/",
     "banco:verificar": "node scripts/bancoVerificar.mjs",
     "guiones": "node scripts/guiones.mjs",
-    "aislado": "node scripts/arnes/aislado.mjs"
+    "aislado": "node scripts/arnes/aislado.mjs",
+    "varas": "node scripts/arnes/orquesta.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
