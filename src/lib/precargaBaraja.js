@@ -10,7 +10,7 @@
 // `precargarSonidos` se pide ahí (App.jsx:62-64): el recorrido dificultad →
 // mesa + apuesta son varios segundos de margen, y el primer reparto cae a los
 // pocos fotogramas de que la mesa exista.
-import { URLS_BARAJA } from '../components/CardImage'
+import { URLS_BARAJA } from './carasBaraja'
 
 // RETENCIÓN DELIBERADA. Sin una referencia viva, el objeto Image es basura
 // recolectable en cuanto acaba la función y el navegador puede desalojar la

@@ -14,7 +14,7 @@ import { CORREO_SOPORTE } from '../config/soporte'
 import { VERSION, COMMIT } from '../config/version'
 import { useIdioma } from '../hooks/useIdioma'
 import { useSounds, reproducir } from '../hooks/useSounds'
-import { useSoundContext } from '../context/SoundContext'
+import { useSoundContext } from '../context/useSoundContext'
 import { enmascararCorreo, atributosHoja } from '../hooks/lobbyCore'
 import { copiarTexto } from '../lib/copiarTexto'
 

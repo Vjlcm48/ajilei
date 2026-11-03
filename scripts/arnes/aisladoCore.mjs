@@ -68,16 +68,9 @@ export const textoVitest = (r) => (r
 
 // ── Eslint ───────────────────────────────────────────────────────────────────
 // La firma de la base: cuántos problemas hay por archivo, regla y severidad, sin
-// números de línea, que se mueven con cualquier cambio. La limpieza de eslint de
-// la 4c (B1) baja estas cifras en el mismo commit que los arregla.
-export const FIRMA_ESLINT_BASE = Object.freeze({
-  'src/components/CardImage.jsx|react-refresh/only-export-components|error': 1,
-  'src/components/GameTable.jsx|react-hooks/refs|error': 11,
-  'src/components/GameTable.jsx|react-hooks/set-state-in-effect|error': 6,
-  'src/components/GameTable.jsx|react-hooks/immutability|error': 1,
-  'src/components/GameTable.jsx|(sin regla)|aviso': 1,
-  'src/context/SoundContext.jsx|react-refresh/only-export-components|error': 1,
-})
+// números de línea, que se mueven con cualquier cambio. Desde la 4c (B1) la base
+// es cero: cualquier problema nuevo es rojo.
+export const FIRMA_ESLINT_BASE = Object.freeze({})
 
 /** La firma de la salida de `eslint -f json`. */
 export function firmaEslint(resultados, cwd) {

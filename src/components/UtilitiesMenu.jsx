@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/utilidadesMesa.css'
-import { useSoundContext } from '../context/SoundContext'
+import { useSoundContext } from '../context/useSoundContext'
 import { BADGE_POPUP_MS } from '../config/consultas'
 import { ENTRADA, VIVAS_ESCRITORIO } from '../config/menuEntradas'
 import { aPropios, escalaActual } from '../lib/escala'

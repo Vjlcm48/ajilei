@@ -8,12 +8,7 @@
 // Este sigue siendo el ÚNICO punto donde se construye la ruta de una cara, y
 // por eso los dos caminos de render —`OpponentPanel` en las mesas 5/4/3 y
 // `.ai-zone` en la mesa 2— quedan cubiertos por construcción, no por repetición.
-const cardImages = import.meta.glob('../assets/cards/webp/*.webp', { eager: true, query: '?url', import: 'default' })
-
-// La lista de URLs que el glob resolvió, para que la precarga no repita el glob
-// —y, sobre todo, para que no pueda quedarse desincronizada de lo que la mesa
-// pide de verdad. Ver `src/lib/precargaBaraja.js`.
-export const URLS_BARAJA = Object.values(cardImages)
+import { cardImages } from '../lib/carasBaraja'
 
 const NUM_MAP = {
   1: 'uno', 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco',

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Howl } from 'howler'
-import { useSoundContext } from '../context/SoundContext'
+import { useSoundContext } from '../context/useSoundContext'
 import { melodiaPara, recuerdaMelodia, fuentesDe, MELODIA_VOLUMEN } from '../config/melodiasCelebracion'
 import { melodiaForzadaCEL } from '../dev/siembraCEL'
 import { marcaCEL, limpiaArcoCEL } from '../dev/arcoCEL'

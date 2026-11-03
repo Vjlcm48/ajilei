@@ -76,17 +76,16 @@ describe('A3 · la firma de eslint', () => {
       'src/components/CardImage.jsx|(sin regla)|aviso': 1,
     })
   })
-  it('la base son 20 errores y 1 aviso', () => {
+  it('la base son 0 errores y 0 avisos', () => {
     const c = compararFirma(FIRMA_ESLINT_BASE)
-    expect([c.errores, c.avisos, c.nuevos, c.menos]).toEqual([20, 1, [], []])
+    expect([c.errores, c.avisos, c.nuevos, c.menos]).toEqual([0, 0, [], []])
   })
   it('lo que sube es rojo, y lo que baja no', () => {
     const sube = { ...FIRMA_ESLINT_BASE, 'src/x.jsx|no-undef|error': 1 }
     expect(compararFirma(sube).nuevos).toEqual(['src/x.jsx|no-undef|error: 0 → 1'])
-    const baja = { ...FIRMA_ESLINT_BASE }
-    delete baja['src/components/CardImage.jsx|react-refresh/only-export-components|error']
-    expect(compararFirma(baja).nuevos).toEqual([])
-    expect(compararFirma(baja).menos).toHaveLength(1)
+    const base = { 'src/x.jsx|no-undef|error': 1 }
+    expect(compararFirma({}, base).nuevos).toEqual([])
+    expect(compararFirma({}, base).menos).toHaveLength(1)
   })
   it('un eslint que no corrió es instrumento, no un rojo', () => {
     expect(leerEslint(2, '', cwd).codigo).toBe(2)

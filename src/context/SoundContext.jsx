@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Howler } from 'howler'
-
-const SoundContext = createContext()
+import { SoundContext } from './useSoundContext'
 
 // DSK-U1 · El ajuste de sonido deja de ser volátil. Antes vivía sólo en estado
 // React: sobrevivía al cambio de pantalla y de mesa (el provider cuelga de la
@@ -39,8 +38,4 @@ export function SoundProvider({ children }) {
       {children}
     </SoundContext.Provider>
   )
-}
-
-export function useSoundContext() {
-  return useContext(SoundContext)
 }

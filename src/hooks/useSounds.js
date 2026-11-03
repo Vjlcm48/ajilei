@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { Howl } from 'howler'
-import { useSoundContext } from '../context/SoundContext'
+import { useSoundContext } from '../context/useSoundContext'
 
 // ── PUE-1.2 · El audio deja de viajar en el arranque ────────────────────────
 // Documento rector: AJILEI_PUE_Fase1_v1.0 §1.2, sobre el hallazgo de la Fase 0

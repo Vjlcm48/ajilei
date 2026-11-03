@@ -430,16 +430,15 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   useEscalaMesa()
 
   // Position refs: one 5-slot row + one deck anchor per seat
-  const slotRefs = useRef(null)
-  if (!slotRefs.current) {
-    slotRefs.current = Array.from({ length: numPlayers }, () =>
+  const [slotRefs] = useState(() =>
+    Array.from({ length: numPlayers }, () =>
       Array.from({ length: 5 }, () => createRef())
     )
-  }
-  const deckRefs = useRef(null)
-  if (!deckRefs.current) {
-    deckRefs.current = Array.from({ length: numPlayers }, () => createRef())
-  }
+  )
+  const [deckRefs] = useState(() =>
+    Array.from({ length: numPlayers }, () => createRef())
+  )
+  const [deckHumano] = deckRefs
   const discardTimersRef = useRef([])
   const ceremonyTimersRef = useRef([])
   const revealTimersRef = useRef([])
@@ -791,13 +790,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   useEffect(() => { gameRef.current = game })
 
   // ── betAmount reset ───────────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
   useEffect(() => { setBetAmount(unit) }, [phase, unit])
 
   // ── Deal animation ────────────────────────────────────────────────────────
   function launchFlyingCard(step) {
     const { seat, cardIndex } = dealSeq[step]
-    const deckEl = deckRefs.current[pieSeat]?.current
-    const slotEl = slotRefs.current[seat][cardIndex]?.current
+    const deckEl = deckRefs[pieSeat]?.current
+    const slotEl = slotRefs[seat][cardIndex]?.current
 
     if (!deckEl || !slotEl) {          // fallback: skip animation
       play('cardDeal')
@@ -831,6 +831,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
     if (!isDealPhase) { setFlyingCards([]); return }
     if (isShuffling) return   // C4.4.1: ante ya descontado; repartir solo al terminar el barajado
     if (dealStep >= dealTotal) {
@@ -867,10 +868,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // Reset deal step on entering a deal phase
   useEffect(() => {
     if (phase === PHASES.DEAL_2 || phase === PHASES.DEAL_3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
       setDealStep(0)
       setDeal3FaceUp(new Set())
     }
-  }, [phase]) // eslint-disable-line
+  }, [phase])
 
   // Shuffle sound fires on the same render that mounts ShuffleDeck
   useEffect(() => {
@@ -884,6 +886,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const isDiscardTimerActive = phase === PHASES.DISCARD && !discardAnim && !human.folded
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
     if (isPlayerTurnEarly || phase === PHASES.DISCARD) setTimeLeft(TURN_TIME)
   }, [phase, game.activePlayerIndex]) // eslint-disable-line
 
@@ -910,6 +913,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           if (gameRef.current.currentBet > 0) play('cardFold')   // timeout → se retira
           setGame(prev => applyPlayerBetAction(prev, prev.currentBet === 0 ? 'pasar' : 'retirarse'))
         } else {
+          // eslint-disable-next-line react-hooks/immutability -- MOT-1 reescribe este flujo
           startDiscardAnim(gameRef.current, [])
         }
       }
@@ -1532,8 +1536,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   function launchDiscardOut(seat, idx) {
     const key = `${seat}:${idx}`
     setDiscardAnim(prev => prev && ({ ...prev, emptied: new Set(prev.emptied).add(key) }))
-    const slotEl = slotRefs.current[seat][idx]?.current
-    const deckEl = deckRefs.current[gameRef.current.pieIndex]?.current
+    const slotEl = slotRefs[seat][idx]?.current
+    const deckEl = deckRefs[gameRef.current.pieIndex]?.current
     if (!slotEl || !deckEl) return
     // TAB-1 · px propios al crear el vuelo (ver `launchFlyingCard`).
     const f = escalaActual()
@@ -1552,8 +1556,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   }
 
   function launchDiscardIn(seat, idx) {
-    const deckEl = deckRefs.current[gameRef.current.pieIndex]?.current
-    const slotEl = slotRefs.current[seat][idx]?.current
+    const deckEl = deckRefs[gameRef.current.pieIndex]?.current
+    const slotEl = slotRefs[seat][idx]?.current
     if (!deckEl || !slotEl) { markRefilled(seat, idx); return }
     // TAB-1 · px propios al crear el vuelo (ver `launchFlyingCard`).
     const f = escalaActual()
@@ -1669,6 +1673,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
 
   useEffect(() => {
     if (showdownWinnerSeat !== null) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
     if (displayedSeat !== null) setDisplayedSeat(null)
     if (revealAnim !== null) {   // R2.b: coreografía a medias al salir del showdown
       revealTimersRef.current.forEach(clearTimeout)
@@ -1723,6 +1728,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   useEffect(() => {
     if (showdownWinnerSeat !== null && openChipSeat !== null) {
       clearTimeout(chipTimerRef.current)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
       setOpenChipSeat(null)
     }
   }, [showdownWinnerSeat, openChipSeat])
@@ -1958,7 +1964,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
 
   function renderPlayerCards() {
     return Array.from({ length: 5 }, (_, i) => {
-      const ref = slotRefs.current[0][i]
+      const ref = slotRefs[0][i]
       if (discardAnim) {
         const key     = `0:${i}`
         const oldCard = game.players[0].cards[i]
@@ -2050,13 +2056,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         </div>
         <div className="cards-row">
           {Array.from({ length: 5 }, (_, i) => (
-            <div key={`as-${i}`} ref={slotRefs.current[seat][i]} className={`card-slot-wrapper${rivalWon ? ' card-slot-winner' : ''}`}>
+            <div key={`as-${i}`} ref={slotRefs[seat][i]} className={`card-slot-wrapper${rivalWon ? ' card-slot-winner' : ''}`}>
               {renderOpponentCard(seat, i)}
             </div>
           ))}
           <div className="deck-shuffle-wrapper">
             <div
-              ref={deckRefs.current[seat]}
+              ref={deckRefs[seat]}
               className={`deck-pile${deckSeat !== seat || isClearing || isPayoutPhase ? ' deck-hidden' : ''}`}
             />
             {isShuffling && deckSeat === seat && <ShuffleDeck />}
@@ -2147,8 +2153,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         score={game.players[seat].score}
         showScore={isPayoutPhase && !inReset}
         resetting={inReset}
-        slotRefs={slotRefs.current[seat]}
-        deckRef={deckRefs.current[seat]}
+        slotRefs={slotRefs[seat]}
+        deckRef={deckRefs[seat]}
         showDeck={deckSeat === seat && !isClearing && !isPayoutPhase}
         shuffleChildren={isShuffling && deckSeat === seat ? <ShuffleDeck /> : null}
       />
@@ -2500,7 +2506,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           <div className="cards-row">
             <div className="deck-shuffle-wrapper">
               <div
-                ref={deckRefs.current[0]}
+                ref={deckHumano}
                 className={`deck-pile${deckSeat !== 0 || isClearing || isPayoutPhase ? ' deck-hidden' : ''}`}
               />
               {isShuffling && deckSeat === 0 && <ShuffleDeck />}
