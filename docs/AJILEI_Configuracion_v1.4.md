@@ -1,3 +1,5 @@
+> Sustituido por v1.5 — 2026-11-03
+
 # AJILEI — Configuración (el ⚙) · v1.4
 
 - **Archivo:** `docs/AJILEI_Configuracion_v1.4.md`. Sustituye a `AJILEI_Configuracion_v1.3.md`, que se conserva como historia (y ésta a la v1.2, ésta a la v1.1 y ésta a la v1.0).

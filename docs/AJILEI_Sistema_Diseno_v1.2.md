@@ -1,7 +1,7 @@
 # AJILEI — Sistema de Diseño Unificado
 
 **Versión:** 1.3
-**Fecha:** 2026-06-12 · última actualización 2026-08-26
+**Fecha:** 2026-06-12 · última actualización 2026-11-03 (adenda 11, VIS-1)
 **Naturaleza:** Documento maestro de referencia permanente. Toda pantalla actual o futura de AJILEI debe diseñarse citando este documento.
 **Changelog v1.3 (2026-08-26):** Campaña ICO-1 — el icono de aplicación oficial entra al repo como activo sellado y se registra como motivo de identidad (sección 2). La tabla de tokens NO cambia: la rampa vinotinto del icono no es token y ninguna pantalla la consume.
 **Changelog v1.2:** Tandas 1, 2 y 3 completadas y verificadas — identidad visual unificada en toda la app. Deuda del dorado único SALDADA. Nuevos patrones registrados (secciones 3 y 9). Lección de contraste incorporada como regla (sección 5).
@@ -115,7 +115,7 @@ Todo valor vive en `src/styles/theme.css` (primer import de `main.jsx`). Nada nu
 | `--text-primary` | `#f5edd8` |
 | `--text-primary-rgb` | `245, 237, 216` |
 | `--text-secondary` | `rgba(245, 237, 216, 0.72)` |
-| `--text-muted` | `rgba(245, 237, 216, 0.55)` |
+| `--text-muted` | `rgba(245, 237, 216, 0.55)`; 0,65 dentro de `.lobby` y `.sal` (adenda 11) |
 | `--text-faint` | `rgba(245, 237, 216, 0.25)` |
 | `--text-dark` | `#1a1a0e` |
 
@@ -417,9 +417,9 @@ ella, no adorno:
 | Texto | Antes | Con LUZ-1 |
 |---|---|---|
 | «Mano #N» (`.hand-badge`) | `rgba(var(--text-primary-rgb), 0.45)` | alfa **0,62** |
-| «Pasó» (`.opp-status` sin variante) | `var(--text-muted)` = alfa 0,55 | alfa **0,64** del mismo color |
+| «Pasó» (`.opp-status` sin variante) | `var(--text-muted)` = alfa 0,55 | alfa **0,76** del mismo color (0,64 hasta VIS-1, adenda 11) |
 
-El token `--text-muted` **no cambia**: es compartido. Quien añada otra fuente de
+El token `--text-muted` **no cambia en la mesa**: es compartido. Quien añada otra fuente de
 luz sobre la mesa tiene que volver a medir estos dos textos con las capas
 encendidas (modo `luz` de `diagDSK.mjs`).
 
@@ -578,6 +578,27 @@ visibilidad.
 - **Si cambia la mesa del juego:** nueva maestra de CAP-1 → `gen_dispositivos.py --reencajar` (sin Blender,
   segundos) → copiar los dos `*_web.webp` a `src/assets/portada/` y los JSON a `maestras/dis1/` →
   `node scripts/dis1/geometria_dis.mjs` (si no está al día, `--escribir`) → `diagPUE dis`.
+
+**11 · El contraste del texto atenuado (VIS-1) — adenda del 2026-11-03, sin cambio de
+versión.** Texto secundario que se lee: **4,5 : 1 como mínimo, medido bajo su tinta**
+(INV-79), sobre el fondo real y contando la opacidad de sus antepasados. El método
+está en `scripts/arnes/tinta.mjs`: dos fotos congeladas, con texto y sin él, y solo
+cuentan los píxeles que cambian. Medir bajo la caja de línea da cifras falsas.
+
+- **Pantallas del lobby:** `--text-muted` se redeclara a α **0,65** en `.lobby` y `.sal`
+  (`theme.css`). Queda a 0,07 de `--text-secondary`: la jerarquía se estrecha y se vio
+  en la lámina de VIS-1. Peor caso: 4,81 (hoy, 3,85).
+- **Mesa y vitrina:** el token sigue a 0,55. En la mesa ya cumple, y el rótulo «Pozo» del
+  óvalo no se toca (INV-04). `.vit` lo devuelve a 0,55 (INV-77).
+- **El texto del rival:** `.opp-status` a α **0,76**, porque hereda la opacidad de su panel.
+  Normal, ≥ 6,31. Atenuado por el turno de otro (`.turn-dimmed`, 0,8), ≥ 4,55.
+- **Exentos, a propósito:** «Se retiró» (`.opp-folded`, 0,55), que da 2,9 y no llega a
+  4,5 ni con α = 1; los controles apagados (opacidad de grupo menor que 0,9); y la mesa
+  de 2 apaisada, donde la marca pisa los huecos de carta. Subir «Se retiró» o mover esa
+  marca abre un protegido: queda para MES-PvP.
+- **«Eliminar cuenta»:** pasa a `--lose-red`. `--loss-red` daba 2,66 sobre `#0c1d13`.
+- **Lo vigilan:** `diagDSK cfg` (cfg.contraste), `diagDSK tienda` (tie.contraste) y
+  `diagDSK luz` (p2, con los tres estados).
 
 ---
 

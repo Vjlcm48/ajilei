@@ -1,3 +1,5 @@
+> Sustituido por v1.2 — 2026-11-03
+
 # AJILEI — Victory Celebration v1.1 · La campaña CEL
 
 - **Archivo:** `docs/AJILEI_Victory_Celebration_v1.1.md`

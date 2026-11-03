@@ -1,3 +1,5 @@
+> Sustituido por v1.3 — 2026-11-03
+
 # AJILEI · Tienda virtual y economía de Heptacoins — v1.2
 
 **Estado:** SELLADO por Victor. v1.0 el 2026-10-02; v1.1 el 2026-10-10; v1.2 el 2026-10-31 (TIE-1 1a).
