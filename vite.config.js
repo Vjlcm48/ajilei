@@ -1,8 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeSync } from 'node:fs'
 import process from 'node:process'
+
+// ── ARN-4 A1 · vitest con la unidad en minúscula ───────────────────────────
+// Con el proceso en `c:\…` vitest se carga dos veces y caen todos los archivos,
+// con errores que no dicen por qué (Fase 0 de ARN-4, §2.2). Un fallo de
+// instrumento tiene que decir que lo es: se corta aquí con código 2. Solo bajo
+// vitest: ni la compilación ni el servidor pasan por esta rama.
+if (process.env.VITEST && /^[a-z]:/.test(process.cwd())) {
+  writeSync(2, `\n✖ ERROR DE INSTRUMENTO (código 2): Vitest arrancado con la unidad en minúscula (${process.cwd().slice(0, 2)}): usa npm test\n`)
+  process.exit(2)
+}
 
 // ── CFG-1 1a · La versión y el commit, escritos en la compilación ──────────
 // Rector: AJILEI_CFG-1_Fase1a_v1.0.md §2.2. «Acerca de» enseña

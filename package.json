@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run scripts/ src/",
+    "test": "node scripts/arnes/vitest.mjs run scripts/ src/",
     "banco:verificar": "node scripts/bancoVerificar.mjs",
     "guiones": "node scripts/guiones.mjs"
   },
