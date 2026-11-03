@@ -16,27 +16,12 @@
 // `precio` en FICHAS. Los precios son constantes deliberadas, no fórmula: la
 // escalera ES el diseño (v1.0 §1) — a mayor carga venezolana, mayor precio, del
 // grafito sobrio al Tricolor insignia. No se derivan de nada.
-//
-// `swatch` es el NOMBRE DEL TOKEN CSS del disco del panel, nunca un color.
-//
-// VIS-1b (Tapetes v1.1). Hasta v1.0 este campo guardaba el hex y `TapetesPanel`
-// lo pintaba inline: una segunda copia del color del fieltro, en otro lenguaje,
-// que sólo coincidía con la de `tapetes.css` por disciplina (hallazgo 8 de
-// VIS-0 — dos fuentes que hay que mover a la vez o el disco miente). Ahora el
-// color vive donde viven los colores y aquí queda sólo su nombre; el panel
-// resuelve `var(<token>)`. PROHIBIDO cualquier hex de tapete en JS.
-//
-// Los tokens se declaran en `tapetes.css` §0, fuera de la media query, y valen
-// el `--green-base` de cada familia (el tono medio, que es el que el jugador
-// reconoce como "el color del tapete"). El Tricolor es un degradado porque su
-// tapete también lo es.
 export const TAPETES = [
   {
     id: 'verde',
     nombre: 'Verde clásico',
     descripcion: 'El de siempre',
     precio: 0,
-    swatch: '--tap-swatch-verde',
     tonos: false,
   },
   {
@@ -44,7 +29,6 @@ export const TAPETES = [
     nombre: 'Negro grafito',
     descripcion: 'Sobrio y neutro',
     precio: 10000,
-    swatch: '--tap-swatch-grafito',
     tonos: true,
   },
   {
@@ -52,7 +36,6 @@ export const TAPETES = [
     nombre: 'Azul profundo',
     descripcion: 'Frío y hondo',
     precio: 15000,
-    swatch: '--tap-swatch-azul',
     tonos: true,
   },
   {
@@ -60,7 +43,6 @@ export const TAPETES = [
     nombre: 'Vinotinto',
     descripcion: 'Cálido y criollo',
     precio: 25000,
-    swatch: '--tap-swatch-vinotinto',
     tonos: true,
   },
   {
@@ -68,9 +50,6 @@ export const TAPETES = [
     nombre: 'Tricolor',
     descripcion: 'La mesa vestida de tricolor',
     precio: 50000,
-    // Las tres bandas del tapete, en su orden y sus tonos exactos. El degradado
-    // vive ahora en `tapetes.css` §0, como los otros cuatro.
-    swatch: '--tap-swatch-tricolor',
     tonos: false,
   },
 ]

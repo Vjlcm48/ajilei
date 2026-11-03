@@ -43,11 +43,10 @@ describe('1. Catálogo sellado (v1.0 §1)', () => {
     precios.slice(1).forEach((p, i) => expect(p).toBeGreaterThan(precios[i]))
   })
 
-  it('todos traen nombre, descripción y swatch: el panel no inventa nada', () => {
+  it('todos traen nombre y descripción: la tienda no inventa nada', () => {
     TAPETES.forEach(t => {
       expect(t.nombre).toBeTruthy()
       expect(t.descripcion).toBeTruthy()
-      expect(t.swatch).toBeTruthy()
     })
   })
 

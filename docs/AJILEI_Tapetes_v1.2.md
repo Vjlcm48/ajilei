@@ -97,3 +97,9 @@ Valores de color (los cinco `k`, las rampas y el tricolor siguen en v1.1 y v1.0)
 - **v1.1 · apéndice VIS-1c** — 2026-08-21. Las tres superficies de cromo de `theme.css` se rederivan; el modo `tapetes` pasa al contrato de color v1.1 y `TAP_ESCALERA_VERDE` desaparece; `scripts/screenshots/` entra en `.gitignore`.
 - **v1.1** — 2026-08-21. Enmienda de color de la campaña **VIS**. Cinco rampas calibradas con factor `k` por familia, muestras selladas en tablero, tricolor en v1.0, un solo verde compartido y fuente única de color para los discos del menú ⋮. Implementado en el commit **VIS-1b**.
 - **v1.0 (15-ago-2026):** documento fundacional. Catálogo de 5, escalera de precios, tricolor como "mesa vestida", vista previa en vivo con confirmación Sí/No, tres estados visuales, cambio libre entre comprados, sin descuento hasta Supabase, cosméticos fuera de la tienda de dinero real. Implementado en la tanda **EMB-2**.
+
+---
+
+## Adenda · La muestra del catálogo se retira (ARN-4 B8) — 2026-11-03, sin cambio de versión
+
+`swatch` sale de `src/config/tapetes.js` y los cinco `--tap-swatch-*` salen de `src/styles/tapetes.css`. Solo los leía el panel del ⋮, y ese panel se retiró en TIE-1 1a: el tapete se elige en la tienda, y el color de cada vitrina sale de la misma rampa que la mesa (INV-77). Lo que la v1.1 §3 y su puerta «Swatch = base» dicen de esos discos queda como historia. Sigue prohibido cualquier hex de tapete en JS. Rampas, catálogo y precios no cambian.

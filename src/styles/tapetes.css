@@ -87,34 +87,6 @@
    Las tintas de zona conservan EXACTAMENTE los alfas de hoy (0,45 y 0,30);
    sólo cambia su rgb, que es el `--green-abyss` de cada familia.             */
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   0 · LOS CINCO DISCOS DEL PANEL · VIS-1b
-   FUENTE ÚNICA DE COLOR. Hasta v1.0 el disco del menú ⋮ se pintaba con un hex
-   guardado en `config/tapetes.js`: una segunda copia del color, en otro
-   lenguaje, que sólo coincidía con el fieltro por disciplina (hallazgo 8 de
-   VIS-0). Desde v1.1 el catálogo guarda el NOMBRE del token y el color vive
-   aquí, con los otros colores. Prohibido cualquier hex de tapete en JS.
-
-   Cada disco es el `--green-base` de su familia — el tono medio, que es el que
-   el jugador reconoce como "el color del tapete". Van escritos como literal y
-   no como `var(--green-base)` porque estos cinco tokens tienen que convivir en
-   el MISMO elemento: `--green-base` sólo vale uno a la vez.
-
-   Fuera de la media query a propósito: son DATO, no estilo gateado. El panel
-   sólo existe dentro del gate, pero un token de dato que se evapora fuera de él
-   dejaría el disco transparente en vez de fallar ruidosamente.
-   ═══════════════════════════════════════════════════════════════════════════ */
-:root {
-  --tap-swatch-verde:     #1b482c;   /* espejo de theme.css --green-base */
-  --tap-swatch-grafito:   #282b2e;
-  --tap-swatch-azul:      #1b2f48;
-  --tap-swatch-vinotinto: #5a1426;
-  /* El tricolor no tiene un tono medio: su disco es el degradado, simplificado
-     a tres paradas (el fieltro real lleva seis y una viñeta). Venía verbatim de
-     `config/tapetes.js`. Sigue en valores de v1.0, como el tapete. */
-  --tap-swatch-tricolor: linear-gradient(to bottom, #3c331b 0%, #1c2e45 50%, #3e191e 100%);
-}
-
 /* ════════════════════════════════════════════════════════════════════════════
    1 · LOS CUATRO FIELTROS Y LA PIEL DEL PANEL
 
@@ -134,8 +106,7 @@
    hay aquí son REDEFINICIONES DE TOKEN sobre `body[data-tapete=...]` más la piel
    de una superficie que ahora existe en las dos ramas. Duplicarlas sería una
    tercera piel que mantener a mano, y la deuda de dos ya está declarada en
-   `menuMovil.css`. El mismo criterio que §0 aplica a los discos del selector:
-   son DATO, no estilo gateado.
+   `menuMovil.css`.
 
    Δ=0 EN ESCRITORIO por construcción —las reglas siguen aplicando ahí igual— y
    Δ=0 en móvil hasta que el panel se monta: ninguno de estos selectores existía
@@ -389,6 +360,5 @@ body[data-tapete="tricolor"] .game-table-screen,
 /* ═════════════════════════════════════════════════════════════════════════
    2 · LA ENTRADA DEL ⋮ Y EL PANEL — RETIRADOS EN TIE-1 1a
    El tapete se elige en la tienda (`screens/Tienda.jsx`, `tienda.css`); la
-   entrada del ⋮, su godete y el panel salen con `TapetesPanel`. Los discos de
-   §0 se quedan: son el color de cada tapete en una sola cifra.
+   entrada del ⋮, su godete y el panel salen con `TapetesPanel`.
    ═════════════════════════════════════════════════════════════════════════ */
