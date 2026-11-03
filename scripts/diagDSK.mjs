@@ -353,6 +353,7 @@ import { runSuma } from './suma/suma.mjs'
 import { runCfg } from './cfg/cfg.mjs'
 import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, fotosTinta as tintaFotos, peorFondo as tintaPeor } from './arnes/tinta.mjs'
 import { runTienda } from './tie/tienda.mjs'
+import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -414,6 +415,8 @@ if (!EXTERNO) process.env.LUZ_BASE_PORTADA = process.env.REV_BASE_PORTADA = `htt
 // `.env.local` de la máquina (Fase 0 de ARN-3, B3). `humo` corre `lob`, así que
 // también levanta el preview, en `--puerto-aux=N` o 4173. `rec` y
 // `voz2.burbuja` se quedan en 5173 a propósito: `?apu=` solo existe en DEV.
+// ARN-4 A6 · en `apu` y `u3`, `--semilla=N` sustituye a las selladas: es como se
+// elige otra cuando una envejece (`arnes/siembra.mjs`).
 // `msg --semilla=azar` (o `--semilla=N`) es EXPLORACIÓN: juega otra población
 // de manos y anota la semilla en el JSON. No es la vara: la vara son las
 // semillas fijas de `MSG_SEMILLAS`. Se quita de la línea de órdenes aquí, antes
@@ -472,9 +475,10 @@ if (!MODOS_DSK.includes(MODE)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: ${MODOS_DSK.join(', ')}`))
 }
 // ARN-3c · D7 · `--semilla` se valida ANTES de levantar nada (un preview compila).
-if (MSG_SEMILLA_ARG && (MODE !== 'msg' || MSG_SEMILLA_ARG.modo === 'invalida')) {
-  await fallarInstrumento(new ErrorInstrumento(`--semilla solo vale en «msg», y como «azar» o un entero (recibido: ${JSON.stringify(MSG_SEMILLA_ARG)})`))
+if (MSG_SEMILLA_ARG && (!['msg', 'apu', 'u3'].includes(MODE) || MSG_SEMILLA_ARG.modo === 'invalida')) {
+  await fallarInstrumento(new ErrorInstrumento(`--semilla solo vale en «msg», «apu» y «u3», y como «azar» o un entero (recibido: ${JSON.stringify(MSG_SEMILLA_ARG)})`))
 }
+const semillaDe = (sellada) => (MODE !== 'msg' && MSG_SEMILLA_ARG ? MSG_SEMILLA_ARG.base : sellada)
 
 // ── Metadatos del instrumento (ARN-1) ────────────────────────────────────────
 // Se vuelcan en cada JSON de salida. Un número de esta tanda que no aparezca
@@ -1940,6 +1944,19 @@ const APU_VIEWPORTS = [
   ...VIEWPORTS.map((v) => ({ ...v, movil: false, nota: 'escritorio' })),
 ]
 
+// ARN-4 A6 · las semillas selladas, una por celda, y el caso que cada una da. Si
+// una deja de darlo sale «sin cobertura» con el aviso de re-elegirla, no un rojo.
+const APU_SEMILLA_MESA = 'la fila de All-in en la mesa de 2 (apu.2, apu.7) y el pozo partido en la de 4 (apu.5)'
+const APU_SEMILLAS = {
+  '360x640':  { semilla: 1, da: `${APU_SEMILLA_MESA}; y «Estás all-in» en la de 4 (tel.linea)` },
+  '640x360':  { semilla: 1, da: APU_SEMILLA_MESA },
+  '844x390':  { semilla: 1, da: APU_SEMILLA_MESA },
+  '1024x768': { semilla: 1, da: APU_SEMILLA_MESA },
+  '1280x720': { semilla: 1, da: APU_SEMILLA_MESA },
+  '1366x768': { semilla: 1, da: APU_SEMILLA_MESA },
+  '1920x937': { semilla: 1, da: APU_SEMILLA_MESA },
+}
+
 // Las capturas de teléfono van a su propio cajón. Las de escritorio son la línea
 // base de 1e y no se pisan.
 const APU_TEL_DIR = `${APU_OUT_DIR}/tel`
@@ -2455,6 +2472,28 @@ async function medirLineaAllinHumano(page) {
 // El alto de la ranura del «pensando», tomado en la misma ventana y sin molde:
 // «Barajando…» sale sola al iniciar la mano y usa exactamente la misma caja
 // (`action-area thinking`). Es la vara contra la que se mide la línea de arriba.
+// ARN-4 A6 · `tel.linea`, la misma medida en la celda de 360×640 y en
+// `apu tel.linea`, que corre solo este punto. Sin la línea no hay qué juzgar: si
+// la semilla ya no la da, `ok` es nulo y el punto queda «sin cobertura».
+async function medirLineaTel(page, dir, tag) {
+  const pensando = await altoDelPensando(page)
+  const l = await lineaAllinEnMesa4(page, dir, tag)
+  return {
+    pensando,
+    linea: {
+      ...l,
+      altoPensando: pensando?.alto ?? null,
+      // Que se parta en dos renglones no es un rojo de por sí —la caja podría dar
+      // de sí— pero SÍ lo es si la caja crece: eso es «una caja más», que es lo
+      // que el JSX promete que no pasa.
+      creceLaCaja: !!(l.hay && pensando?.hay && l.alto > pensando.alto + 1),
+      ok: !!l.hay && !l.recorta && l.dentro && !!(pensando?.hay && l.alto <= pensando.alto + 1),
+    },
+  }
+}
+const puntoTelLinea = (l) => ({ id: 'tel.linea', ok: l.hay === false ? null : l.ok === true })
+const motivoTelLinea = (semilla) => `tel.linea (la semilla ${semilla} no dio la línea all-in del humano: ${AVISO_SEMILLA})`
+
 async function altoDelPensando(page) {
   await page.goto(`${BASE}/`)
   await recorrerRuta(page, 3, 'basico', 0, 'medio')
@@ -2636,8 +2675,8 @@ function varaBotones(b, esPortrait, lamina = null) {
 // poner una ficha — `abrirApuesta` no abre esa fase (§4.3), así que no hay
 // ninguna ronda de apuesta en la que el humano esté en all-in. Hace falta una
 // mesa donde queden DOS rivales con fichas, y la de 4 lo garantiza.
-async function lineaAllinEnMesa4(page, dir, tag) {
-  for (let intento = 0; intento < 3; intento++) {
+async function lineaAllinEnMesa4(page, dir, tag, intentos = 1) {
+  for (let intento = 0; intento < intentos; intento++) {
     await page.goto(`${BASE}/?apu=allinHumano`)
     await recorrerRuta(page, 4, 'basico', 0, 'medio')
     // Bucle propio y no `jugarHasta`: aquél se DETIENE en seco ante el panel de
@@ -2683,7 +2722,7 @@ async function lineaAllinEnMesa4(page, dir, tag) {
       await page.waitForTimeout(300)
     }
   }
-  return { hay: false, intentos: 3 }
+  return { hay: false, intentos }
 }
 
 // ══ REC-2 · RECARGA CON SALDO INSUFICIENTE: LOS ESTADOS PERMANENTES ════════
@@ -2894,16 +2933,17 @@ async function runRec2(browser) {
 // que es donde el molde es exacto (`repartoGanador.js`). Lo que se juzga es lo
 // que se ve: el tono del óvalo (`data-tono`, la señal del pago, D12 de VOZ-3),
 // la frase entera, el chip de la mano en grande y que el pozo se partió.
-// Que la IA apueste (C1) o pague (C3) es cosa de su azar: si en tres mesas no
-// se da el all-in, el punto queda «sin cobertura», no rojo (ARN-3b D4).
+// Que la IA apueste (C1) o pague (C3) es cosa de su azar. ARN-4 A6 · ese azar va
+// sembrado: si la semilla ya no da el all-in, el punto queda «sin cobertura» con
+// el aviso de re-elegirla, no rojo (ARN-3b D4).
 const APU_VOZ3_VISTAS = [
   { w: 360, h: 640, movil: true, nota: 'móvil portrait' },
   { w: 1366, h: 768, movil: false, nota: 'escritorio' },
 ]
 const APU_VOZ3_CASOS = [
-  { id: 'apu.8', caso: 'C1', molde: 'allin', tono: 'gana', chip: '0',
+  { id: 'apu.8', caso: 'C1', molde: 'allin', tono: 'gana', chip: '0', semilla: 1,
     frase: /^¡Ganas con [A-Za-z]+, \d+ pts! A la IA se le devuelven \d+ Heptacoins\.$/ },
-  { id: 'apu.9', caso: 'C3', molde: 'allin-espejo', tono: 'pierde', chip: '1',
+  { id: 'apu.9', caso: 'C3', molde: 'allin-espejo', tono: 'pierde', chip: '1', semilla: 1,
     frase: /^La IA gana con [A-Za-z]+, \d+ pts\. Se te devuelven \d+ Heptacoins\.$/ },
 ]
 // El pago, leído en una sola evaluación: tono, frase entera (el span de VOZ-2,
@@ -2920,7 +2960,7 @@ const APU_VOZ3_PAGO = () => {
   })
   return { tono, texto: (sp || m).textContent.trim(), clase: m.className, capas: Number(m.dataset.capas || 0), chips }
 }
-async function apuVoz3Mano(page, caso, intentos = 3) {
+async function apuVoz3Mano(page, caso, intentos = 1) {
   const espejo = caso.molde === 'allin-espejo'
   for (let i = 0; i < intentos; i++) {
     await page.goto(`${BASE}/?apu=${caso.molde}`)
@@ -2973,9 +3013,11 @@ async function runApuVoz3(browser) {
         consola.push(`${m.type()}: ${m.text()}`)
       })
       const tag = `${vp.w}x${vp.h}`
+      const semilla = semillaDe(caso.semilla)
+      await sembrarAzar(page, semilla)
       let r
       try { r = await apuVoz3Mano(page, caso) } catch (e) { r = { logrado: false, excepcion: e.message.split('\n')[0] } }
-      const fila = { id: caso.id, caso: caso.caso, vp: tag, ...r, consola }
+      const fila = { id: caso.id, caso: caso.caso, vp: tag, semilla, ...r, consola }
       if (r.logrado) {
         await page.mouse.move(5, 5)
         await page.screenshot({ path: `${vp.movil ? APU_TEL_DIR : APU_OUT_DIR}/apu_voz3_${caso.caso}_${tag}.png` })
@@ -2989,13 +3031,30 @@ async function runApuVoz3(browser) {
       await page.close()
     }
   }
-  const sinCobertura = filas.filter((f) => f.ok === null).map((f) => `${f.vp} ${f.id} (${f.caso}: el all-in no se dio en ${f.intentos} mesas)`)
+  const sinCobertura = filas.filter((f) => f.ok === null).map((f) => `${f.vp} ${f.id} (${f.caso}: la semilla ${f.semilla} no dio el all-in: ${AVISO_SEMILLA})`)
   const ok = filas.every((f) => f.ok !== false)
   console.log(`\n── apu · VOZ-3 · C1 y C3 con el molde ── ${filas.filter((f) => f.ok).length}/${filas.length}${sinCobertura.length ? ` · ${sinCobertura.length} sin cobertura` : ''}`)
   for (const f of filas) {
-    console.log(`  ${f.ok ? 'OK  ' : f.ok === null ? 'S/C ' : 'FALLA'} ${f.id} ${f.caso} ${f.vp.padEnd(9)} ${f.logrado ? `tono ${f.tono} · chip ${f.chips.join(',') || '—'} · capas ${f.capas} · «${f.texto}» (mesa ${f.intentos})` : (f.excepcion ?? `sin cobertura en ${f.intentos} mesas`)}${f.consola.length ? ' · consola: ' + f.consola[0] : ''}`)
+    console.log(`  ${f.ok ? 'OK  ' : f.ok === null ? 'S/C ' : 'FALLA'} ${f.id} ${f.caso} ${f.vp.padEnd(9)} ${f.logrado ? `tono ${f.tono} · chip ${f.chips.join(',') || '—'} · capas ${f.capas} · «${f.texto}» (mesa ${f.intentos})` : (f.excepcion ?? `sin cobertura con la semilla ${f.semilla}: ${AVISO_SEMILLA}`)}${f.consola.length ? ' · consola: ' + f.consola[0] : ''}`)
   }
   return { filas, ok, sinCobertura }
+}
+
+async function runApuTelLinea(browser) {
+  const vp = APU_VIEWPORTS[0]
+  const tag = `${vp.w}x${vp.h}`
+  const semilla = semillaDe(APU_SEMILLAS[tag].semilla)
+  const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, hasTouch: true, isMobile: true })
+  const consola = []
+  page.on('pageerror', (e) => consola.push(`pageerror: ${e.message}`))
+  await sembrarAzar(page, semilla)
+  const { linea } = await medirLineaTel(page, APU_TEL_DIR, tag)
+  const tiradas = await page.evaluate(() => window.__azarTiradas)
+  await page.close()
+  const punto = puntoTelLinea(linea)
+  const sinCobertura = punto.ok === null ? [motivoTelLinea(semilla)] : []
+  console.log(`\n── apu · tel.linea · ${tag} · semilla ${semilla} · ${punto.ok === null ? 'S/C' : punto.ok ? 'OK' : 'FALLA'} · ${linea.hay ? `texto ${linea.anchoTexto} px / hueco ${linea.hueco} px · ${linea.lineas} línea(s) · caja ${linea.alto} vs pensando ${linea.altoPensando}` : `sin línea: ${AVISO_SEMILLA}`} · ${tiradas} tiradas${consola.length ? ' · consola: ' + consola[0] : ''}`)
+  return { semilla, punto, linea, tiradas, consola, sinCobertura, ok: punto.ok !== false && consola.length === 0 }
 }
 
 async function runApu(browser) {
@@ -3010,7 +3069,7 @@ async function runApu(browser) {
   // REC-2 · `apu rec2` corre SÓLO los estados de REC-2; una celda filtrada
   // (`apu 360x640`) no los corre, y el JSON lo dice (`rec2: null`).
   for (const vp of APU_VIEWPORTS) {
-    if (vpFilter === 'rec2' || vpFilter === 'voz3') break
+    if (vpFilter === 'rec2' || vpFilter === 'voz3' || vpFilter === 'tel.linea') break
     if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
     // 1f §A.1 · `hasTouch`/`isMobile` sólo en las celdas de teléfono: es lo que
     // hace existir la media query táctil y el piso de 40 px. Las cuatro de
@@ -3030,10 +3089,13 @@ async function runApu(browser) {
       consola.push(`${m.type()}: ${texto}`)
     })
     const tag = `${vp.w}x${vp.h}`
+    // ARN-4 A6 · cada `goto` de la celda vuelve a empezar la secuencia de su semilla.
+    const semilla = semillaDe(APU_SEMILLAS[tag].semilla)
+    await sembrarAzar(page, semilla)
     // Las capturas de teléfono a su cajón; las de escritorio donde 1e las dejó.
     const dir = vp.movil ? APU_TEL_DIR : APU_OUT_DIR
     const esPortrait = vp.h > vp.w
-    const c = { vp: tag, nota: vp.nota, movil: vp.movil }
+    const c = { vp: tag, nota: vp.nota, movil: vp.movil, semilla }
 
     // ── apu.1 · La marca ALL-IN en el asiento (§4.3) ──────────────────────
     // Mesa de 4 para que la marca salga por la vía `opp-panel`, que es la del
@@ -3214,7 +3276,7 @@ async function runApu(browser) {
     c.sinCobertura = []
     if (c['apu.2'].logrado === false) {
       for (const k of ['apu.2', 'apu.7']) { c[k].estado = 'sinCobertura'; c[k].ok = null }
-      c.sinCobertura.push(`apu.2/apu.7 (la fila de All-in no se dio en ${c['apu.2'].intentos} mesas)`)
+      c.sinCobertura.push(`apu.2/apu.7 (la semilla ${semilla} no dio la fila de All-in en ${c['apu.2'].intentos} mesas: ${AVISO_SEMILLA})`)
     }
 
     // ── apu.3 · La recarga: panel, gate y nivelado (§5) ───────────────────
@@ -3379,7 +3441,7 @@ async function runApu(browser) {
     if (!huboCapas) {
       c['apu.5'].estado = 'sinCobertura'
       c['apu.5'].ok = null
-      c.sinCobertura.push(`apu.5 (el pozo no se partió en ${intentosCapas} mesas)`)
+      c.sinCobertura.push(`apu.5 (la semilla ${semilla} no partió el pozo en ${intentosCapas} mesas: ${AVISO_SEMILLA})`)
     }
 
     // ── apu.6 · PAN-1 · la fila A PROPÓSITO, en el turno del humano ──────
@@ -3426,21 +3488,12 @@ async function runApu(browser) {
     // el alto del «pensando» pide una mesa limpia. Ponerlas antes obligaría a
     // rehacer todo lo de arriba.
     if (esPortrait) {
-      c.pensando = await altoDelPensando(page)
       c.marcaPorMesa = await marcaPorMesa(page, dir, tag)
-      c.lineaAllinHumano = await lineaAllinEnMesa4(page, dir, tag)
       // La línea del humano, contra la vara del «pensando»: sin recorte, dentro
-      // de la ventana y con la MISMA caja. Que se parta en dos renglones no es
-      // un rojo de por sí —la caja podría dar de sí— pero SÍ lo es si la caja
-      // crece: eso es «una caja más», que es lo que el JSX promete que no pasa.
-      const l = c.lineaAllinHumano
-      c.lineaAllinHumano = {
-        ...l,
-        altoPensando: c.pensando?.alto ?? null,
-        creceLaCaja: !!(l.hay && c.pensando?.hay && l.alto > c.pensando.alto + 1),
-        ok: !!l.hay && !l.recorta && l.dentro
-          && !!(c.pensando?.hay && l.alto <= c.pensando.alto + 1),
-      }
+      // de la ventana y con la MISMA caja.
+      const mt = await medirLineaTel(page, dir, tag)
+      c.pensando = mt.pensando
+      c.lineaAllinHumano = mt.linea
       // La pregunta suave: se consigue una que no sea forzosa y se le mide el
       // solape con las cartas y el óvalo, el contador y la ranura reservada.
       const suave = await recargaSuave(page)
@@ -3506,8 +3559,9 @@ async function runApu(browser) {
         { id: 'tel.recarga', ok: c.recargaTel?.ok === true },
         // D4 · la línea del humano en all-in solo vive mientras dura la ronda
         // de apuestas: si su All-in la cierra en el acto, no llega a pintarse.
-        // Tres mesas sin verla es un hueco de cobertura, no un rojo.
-        { id: 'tel.linea',   ok: c.lineaAllinHumano.hay === false ? null : c.lineaAllinHumano.ok === true },
+        // Con el azar sembrado, no verla es que la semilla envejeció: un hueco de
+        // cobertura, no un rojo.
+        puntoTelLinea(c.lineaAllinHumano),
         { id: 'tel.blanda',  ok: c.botonesBlanda?.ok === true },
         { id: 'tel.forzosa', ok: c.botonesForzosa?.ok === true },
       ]
@@ -3598,7 +3652,7 @@ async function runApu(browser) {
     c.consolaConocida = conocido.length
     // ARN-3b · D4 · un punto sin cobertura (`ok: null`) no es verde ni rojo:
     // se declara en `sinCobertura` y el modo sale `cobertura`.
-    for (const p of c.telPuntos ?? []) if (p.ok === null) c.sinCobertura.push(`${p.id} (${p.id === 'tel.linea' ? 'la línea all-in del humano no llegó a verse en 3 mesas' : 'sin la fila de All-in'})`)
+    for (const p of c.telPuntos ?? []) if (p.ok === null) c.sinCobertura.push(p.id === 'tel.linea' ? motivoTelLinea(semilla) : `${p.id} (sin la fila de All-in: ${AVISO_SEMILLA})`)
     const vale = (v) => v === true || v === null
     c.ok = APU_PUNTOS.every((k) => vale(c[k].ok)) && consola.length === 0
       && (c.telPuntos ? c.telPuntos.every((p) => vale(p.ok)) : true)
@@ -3606,11 +3660,13 @@ async function runApu(browser) {
     await page.close()
   }
 
+  // ARN-4 A6 · `apu tel.linea` corre solo ese punto: es como se elige su semilla.
+  const telLinea = vpFilter === 'tel.linea' ? await runApuTelLinea(browser) : null
   const rec2 = (!vpFilter || vpFilter === 'rec2') ? await runRec2(browser) : null
   // VOZ-3 · `apu voz3` corre sólo apu.8 y apu.9; una celda filtrada no los corre.
   const voz3 = (!vpFilter || vpFilter === 'voz3') ? await runApuVoz3(browser) : null
-  const ok = celdas.every((c) => c.ok) && (rec2 ? rec2.ok : true) && (voz3 ? voz3.ok : true)
-  const sinCobertura = [...celdas.flatMap((c) => (c.sinCobertura ?? []).map((s) => `${c.vp} ${s}`)), ...(voz3?.sinCobertura ?? [])]
+  const ok = celdas.every((c) => c.ok) && (rec2 ? rec2.ok : true) && (voz3 ? voz3.ok : true) && (telLinea ? telLinea.ok : true)
+  const sinCobertura = [...celdas.flatMap((c) => (c.sinCobertura ?? []).map((s) => `${c.vp} ${s}`)), ...(voz3?.sinCobertura ?? []), ...(telLinea?.sinCobertura ?? [])]
   console.log(`\n── apu · la mesa de APU-1 ── ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas${sinCobertura.length ? ` · ${sinCobertura.length} punto(s) sin cobertura` : ''}`)
   for (const c of celdas) {
     const fallos = [
@@ -3646,7 +3702,7 @@ async function runApu(browser) {
       console.log(`      tarjeta ${b.modal.ancho}×${b.modal.alto} en ${b.modal.top} · tapa ${b.solapeCartas} px² de ${b.areaCartas} de la mano`)
     }
   }
-  return { celdas, ok, rec2, voz3, sinCobertura }
+  return { celdas, ok, rec2, voz3, telLinea, sinCobertura }
 }
 
 // ── DSK-B1 · Presupuesto vertical de la columna central (mesa 5) ──────────────
@@ -9333,11 +9389,17 @@ async function u3Install(page) {
   }, U3_ANCHORS)
 }
 
+// ARN-4 C5 · la semilla de `u3`: en las cuatro mesas, la mano de `u3·manos` llega al
+// recuento del humano. Sin sembrar, a veces acababa sin él y la banda «Tu mejor
+// palo» se ocultaba con toda razón (la semilla 1 lo reproduce en las mesas 5 y 2).
+const U3_SEMILLA = 2
+
 // Siembra las gratis que quedan ANTES de sentarse. CFG-1 1e · el contador ya no
 // vive en el aparato: con el bypass lo lleva el banco imitado de la página, y la
 // mesa lo lee (`mi_consulta`) al montarse, así que se siembra en el lobby, entre
 // la carga y la ruta. Las cifras salen de la fuente única (config/consultas.js).
 async function u3Sembrar(page, n, saldo) {
+  await sembrarAzar(page, semillaDe(U3_SEMILLA))
   await page.goto(BASE)
   await page.waitForSelector('main.lobby [data-accion="jugar-ia"]')
   await page.evaluate((g) => window.__ajileiBancoImitado.banco.gastarConsultas(g), CONSULTAS_GRATIS - saldo)
@@ -9612,11 +9674,13 @@ async function runU3(browser) {
         return { disabled: b ? b.disabled : null, clase: d ? /is-disabled/.test(d.className) : null }
       })
       // La banda gratuita SÍ está visible aquí: la frontera es real, no coinciden.
-      const banda = await page.evaluate(() => {
+      const { banda, recuento } = await page.evaluate(() => {
         const e = document.querySelector('.score-tag-player')
-        return e ? getComputedStyle(e).visibility : null
+        return { banda: e ? getComputedStyle(e).visibility : null, recuento: !!e?.textContent.trim() }
       })
       r.enPago = enPago; r.banda = banda
+      // Sin recuento del humano no hay banda que ver: la semilla envejeció, no es un rojo.
+      r.sinRecuento = !recuento
       await u3CerrarMenu(page)
 
       await clickIf(page, 'button:has-text("Siguiente mano")')
@@ -9633,11 +9697,11 @@ async function runU3(browser) {
       r.val = val.ok
 
       r.p3 = r.tras1 === CONSULTAS_GRATIS - 1 && r.tras2 === CONSULTAS_GRATIS - 2 && val.ok
-      r.p5 = enPago.disabled === true && enPago.clase === true && banda === 'visible'
+      r.p5 = enPago.disabled === true && enPago.clase === true && (r.sinRecuento || banda === 'visible')
     } catch (e) { r.error = String(e && e.message || e).slice(0, 200) }
     r.ok = !!(r.p3 && r.p5)
     manos.push(r)
-    console.log(`u3·manos m${n} · ${r.ok ? 'OK' : 'FALLA'} badge=${r.tras1}→${r.tras2} enPago=${JSON.stringify(r.enPago)} banda=${r.banda} valor=${r.val}${r.error ? ' · ' + r.error : ''}`)
+    console.log(`u3·manos m${n} · ${r.ok ? 'OK' : 'FALLA'} badge=${r.tras1}→${r.tras2} enPago=${JSON.stringify(r.enPago)} banda=${r.banda}${r.sinRecuento ? ` (sin recuento: ${AVISO_SEMILLA})` : ''} valor=${r.val}${r.error ? ' · ' + r.error : ''}`)
     await page.close()
   }
 
@@ -9722,8 +9786,9 @@ async function runU3(browser) {
 
   const passed = cells.every(c => c.passed) && manos.every(r => r.ok) &&
     agotadas.every(r => r.ok) && relojes.every(r => r.ok)
-  console.log(`\n── U3: ${cells.filter(c => c.passed).length}/${cells.length} celdas · manos ${manos.filter(r => r.ok).length}/${manos.length} · agotadas ${agotadas.filter(r => r.ok).length}/${agotadas.length} · relojes ${relojes.filter(r => r.ok).length}/${relojes.length} · ${passed ? 'VERDE' : 'ROJO'}`)
-  return { cells, manos, agotadas, relojes, passed }
+  const sinCobertura = manos.filter((r) => r.sinRecuento).map((r) => `u3·manos m${r.mesa} (la semilla ${semillaDe(U3_SEMILLA)} acabó sin recuento del humano: ${AVISO_SEMILLA})`)
+  console.log(`\n── U3: ${cells.filter(c => c.passed).length}/${cells.length} celdas · manos ${manos.filter(r => r.ok).length}/${manos.length} · agotadas ${agotadas.filter(r => r.ok).length}/${agotadas.length} · relojes ${relojes.filter(r => r.ok).length}/${relojes.length} · ${passed ? (sinCobertura.length ? `SIN COBERTURA: ${sinCobertura.join('; ')}` : 'VERDE') : 'ROJO'}`)
+  return { cells, manos, agotadas, relojes, passed, sinCobertura }
 }
 
 // ── DSK-VC2 · Victory Celebration ────────────────────────────────────────────

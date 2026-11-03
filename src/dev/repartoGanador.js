@@ -190,8 +190,8 @@ export function armarRepartoGanador(n) {
 // mano); en las de 3 a 5, si una IA se retira a las 2, la segunda vuelta se
 // corre y las manos de la IA 1 cambian. Y las IAS deciden con su propio azar:
 // el molde hace probable que la IA 1 apueste (C1) o pague (C3), no seguro. Las
-// celdas de `apu` que lo usan reintentan y, si no se da, lo declaran «sin
-// cobertura».
+// celdas de `apu` que lo usan siembran ese azar (ARN-4 A6) y, si la semilla ya
+// no lo da, lo declaran «sin cobertura».
 const OROS_FUERTE = ['2-Oros', '3-Oros', '4-Oros', '5-Oros', '6-Oros']
 const posicionesDe = (seat, n) => [seat, n + seat, 2 * n + seat, 3 * n + seat, 4 * n + seat]
 

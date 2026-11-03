@@ -31,9 +31,12 @@
 //   ?apu=allin-espejo  VOZ-3 · C3: el espejo. La IA 1 se sienta con 1,5
 //                      apuestas y la mejor mano; el humano apuesta en su
 //                      primer turno y le vuelve el sobrante: «La IA gana con…
-//                      Se te devuelven…». Los dos son para la mesa de 2 (en
-//                      las de 3 a 5 lo más probable, no lo seguro: ver
-//                      `repartoGanador.js`).
+//                      Se te devuelven…». Los dos son para la mesa de 2. En las
+//                      de 3 a 5 lo decide el azar, y con el del arnés sembrado
+//                      (`scripts/arnes/siembra.mjs`) sale siempre igual: `allin`
+//                      da C1 con la semilla 3 («A IA 1 se le devuelven…»), pero
+//                      `allin-espejo` no da C3: paga una tercera IA y se lleva
+//                      el sobrante (ARN-4 A6, ver `repartoGanador.js`).
 //   ?apu=video:<ms>    ECO-1g · el video de recompensa dura <ms> a la vista (y
 //                      el banco imitado del bypass acorta en proporción los
 //                      segundos mínimos antes de cobrar).
