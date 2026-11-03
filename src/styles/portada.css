@@ -127,7 +127,9 @@ body.portada-activa #root {
 .portada-lienzo .pue-lema-categoria {
   margin: 10px 0 0;
   font-size: clamp(14px, 1.1vw, 16px);
-  color: var(--text-secondary);
+  /* ARN-4 4c · α 0,80: con el 0,72 de `--text-secondary` daba 4,10 sobre la luz de
+     la escena AJILEI (INV-79). */
+  color: rgba(var(--text-primary-rgb), 0.8);
 }
 
 /* ══ Escenario rotativo ═══════════════════════════════════════════════════ */
@@ -695,7 +697,8 @@ body.portada-activa #root {
 .portada-lienzo .pue-btn-jugar:hover { background: var(--gold-hover); }
 .portada-lienzo .pue-btn-jugar:active { transform: translateY(1px); }
 .portada-lienzo .pue-btn-jugar:focus-visible { outline: 2px solid var(--gold-hover); outline-offset: 3px; }
-.portada-lienzo .pue-cta-vacuna { margin: 10px 0 0; font-size: 12.5px; color: var(--text-muted); }
+/* ARN-4 4c · α 0,58: con el 0,55 de `--text-muted` daba 4,32 (INV-79). */
+.portada-lienzo .pue-cta-vacuna { margin: 10px 0 0; font-size: 12.5px; color: rgba(var(--text-primary-rgb), 0.58); }
 .pue-velo { display: none; }
 
 /* ══ Selector de idioma ═══════════════════════════════════════════════════ */

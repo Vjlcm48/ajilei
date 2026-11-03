@@ -49,7 +49,7 @@ const SUELTOS_DSK = Object.freeze({
 /** Modos de `diagPUE` en `completo`. `todo` lleva dentro lo que no entra por su nombre. */
 const SUELTOS_PUE = Object.freeze({ todo: 25, cap: 15, voz2: 15, mesa: 15 })
 
-// ARN-4 A10a · la Portada bajo su tinta. Solo mide: informa lo que quede bajo 4,5.
+// ARN-4 A10a · la Portada bajo su tinta. Desde la 4c, un texto bajo 4,5 es rojo.
 const PUE_CONTRASTE = diag('diagPUE', 'pue.contraste', 'contraste', 10)
 
 const OTRAS = Object.freeze([

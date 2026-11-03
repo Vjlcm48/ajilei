@@ -215,12 +215,11 @@ try {
 const browser = NAV.browser
 
 // ════════════════════════════════════════════════════════════════════════════
-// contraste · ARN-4 A10a · el texto de la Portada, bajo su tinta. SOLO MIDE
+// contraste · ARN-4 A10a · el texto de la Portada, bajo su tinta
 // ════════════════════════════════════════════════════════════════════════════
-// Rector: AJILEI_ARN-4_Tanda4b_v1.0.md §5. Lo que queda bajo 4,5 se informa y no sale
-// rojo: el color de la Portada lo decide Victor con sus ojos. Rojo es solo no haber
-// medido. Exentos, como en INV-79, los textos apagados por opacidad (grupo < 0,9) y
-// los que Victor declare en `PUE_DECISIONES`.
+// Rector: AJILEI_ARN-4_Tanda4b_v1.0.md §5 y Tanda4c §5. Desde la 4c, un texto bajo 4,5
+// es rojo. Exentos, como en INV-79, los textos apagados por opacidad (grupo < 0,9) y
+// los que Victor declare en `PUE_DECISIONES`. También es rojo no haber medido.
 // Va por las cinco escenas, porque la frase y el fondo cambian con cada una; el rotor
 // se detiene con el `focusin` de la tarjeta, el que usa cuando alguien escribe.
 if (hacerSolo('contraste')) {
@@ -230,16 +229,13 @@ if (hacerSolo('contraste')) {
     { id: '915x412', w: 915, h: 412, dpr: 2, movil: true },
     { id: '1920x1080', w: 1920, h: 1080, dpr: 1, movil: false },
   ]
-  // Las decisiones de Victor en el STOP-V de la 4b: dos suben a 4,5 o más en la 4c,
-  // con sus ojos en el S25, y una queda exenta por escrito.
+  // La decisión de Victor en el STOP-V de la 4b: esta queda exenta por escrito.
   const PUE_DECISIONES = {
-    'pue-cta-vacuna': 'pendiente 4c',
-    'pue-lema-categoria': 'pendiente 4c',
     'entrada-proximamente': 'exenta: aviso apagado a propósito de una función que aún no existe (INV-79)',
   }
-  const decisionDe = (clase) => Object.entries(PUE_DECISIONES).find(([k]) => clase.split(/\s+/).includes(k))?.[1] ?? 'bajo el piso, sin decidir: se informa'
+  const decisionDe = (clase) => Object.entries(PUE_DECISIONES).find(([k]) => clase.split(/\s+/).includes(k))?.[1] ?? null
   const lecturaDe = (x, clase) => x.filas.find((f) => f.clase.split(/\s+/).includes(clase))?.contraste ?? 'no visible'
-  console.log(`\n── pue.contraste · la Portada bajo su tinta, piso ${PISO_WCAG} · solo mide ──`)
+  console.log(`\n── pue.contraste · la Portada bajo su tinta, piso ${PISO_WCAG} ──`)
   const informe = []
   for (const v of VISTAS) {
     const ctx = await browser.newContext({ viewport: { width: v.w, height: v.h }, deviceScaleFactor: v.dpr, ...(v.movil ? { isMobile: true, hasTouch: true } : {}) })
@@ -258,7 +254,7 @@ if (hacerSolo('contraste')) {
         const textos = await page.evaluate(TEXTOS)
         const { valor } = await tintaConRepeticion(page, v.dpr, `pue.contraste ${v.id} ${NOMBRES_ESC[i]}`,
           (fotos) => textos.map((t) => ({ t, m: peorFondo(fotos, t) })),
-          (ms) => ms.every(({ t, m }) => t.op < 0.9 || m?.contraste == null || m.contraste >= PISO_WCAG), fijar)
+          (ms) => ms.every(({ t, m }) => t.op < 0.9 || decisionDe(t.clase) || m?.contraste == null || m.contraste >= PISO_WCAG), fijar)
         for (const { t, m } of valor) {
           if (t.op < 0.9) { apagados++; continue }
           if (m?.contraste == null) continue
@@ -273,15 +269,16 @@ if (hacerSolo('contraste')) {
     } finally { await ctx.close() }
     const lista = [...filas.values()].sort((a, b) => a.contraste - b.contraste)
     const bajo = lista.filter((f) => f.contraste < PISO_WCAG)
+    const rojos = bajo.filter((f) => !decisionDe(f.clase))
     informe.push({ vista: v.id, medidos: lista.length, apagados, bajo: bajo.map((f) => ({ ...f, decision: decisionDe(f.clase) })), filas: lista })
-    if (lista.length) anota(`pue.contraste ${v.id}`, true, `${lista.length} textos medidos · ${apagados} lecturas apagadas, exentas · ${bajo.length} bajo ${PISO_WCAG}`)
+    if (lista.length) anota(`pue.contraste ${v.id}`, rojos.length === 0, `${lista.length} textos medidos · ${apagados} lecturas apagadas, exentas · ${rojos.length} bajo ${PISO_WCAG}`)
     else anota(`pue.contraste ${v.id}`, false, 'ningún texto medido')
-    for (const f of bajo) console.log(`  ·     · ${decisionDe(f.clase)} · ${v.id} · ${f.contraste} sobre ${f.fondo} · .${f.clase || '(sin clase)'} «${f.txt}» (${f.escena})`)
+    for (const f of bajo) console.log(`  ·     · ${decisionDe(f.clase) ?? `BAJO ${PISO_WCAG}`} · ${v.id} · ${f.contraste} sobre ${f.fondo} · .${f.clase || '(sin clase)'} «${f.txt}» (${f.escena})`)
   }
   // Lo decidido se mide siempre: un texto que deja de verse no es un aprobado.
-  for (const clase of Object.keys(PUE_DECISIONES)) {
+  for (const clase of [...Object.keys(PUE_DECISIONES), 'pue-cta-vacuna', 'pue-lema-categoria']) {
     anota(`pue.contraste .${clase}`, informe.some((x) => lecturaDe(x, clase) !== 'no visible'),
-      `${PUE_DECISIONES[clase]} · ${informe.map((x) => `${x.vista} ${lecturaDe(x, clase)}`).join(' · ')}`)
+      `${PUE_DECISIONES[clase] ?? `exige ${PISO_WCAG}`} · ${informe.map((x) => `${x.vista} ${lecturaDe(x, clase)}`).join(' · ')}`)
   }
   resultados.bloques.contraste = informe
   writeFileSync(`${SALIDA}/contraste.json`, JSON.stringify({ edge: browser.version(), piso: PISO_WCAG, vistas: informe }, null, 2))
