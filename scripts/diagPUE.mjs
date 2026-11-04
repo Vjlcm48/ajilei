@@ -42,6 +42,8 @@ import {
 } from './arnes/comun.mjs'
 // ARN-3c-ii · D9 · la mediana de 3 de `dis` (lo puro).
 import { mayoriaDePuertas } from './arnes/varas.mjs'
+import { commitDelArbol } from './arnes/fuente.mjs'
+import { pesarDist, TECHO_CRITICO_KIB } from './arnes/pesoCore.mjs'
 // ARN-4 A5 · repetir ante un rojo de foto. A10a · `contraste`.
 import { conRepeticion } from './arnes/repetir.mjs'
 import { PISO_WCAG, QUIETA_CSS, TEXTOS, asentar, fijar, peorFondo, tintaConRepeticion } from './arnes/tinta.mjs'
@@ -96,10 +98,9 @@ const HOLGURA_MINIMA = 10
 
 // §3.1 de la ficha: el camino crítico hasta la portada pintada. Se mide sobre
 // lo que VIAJA (ver el bloque 1.8), que es lo que paga el jugador.
-const TECHO_CRITICO_KIB = 200
 const NOMBRES_ESC = ['baraja', 'AJILEI', 'enseñanza', 'Heptacoins', 'mesa']
 
-const resultados = { generado: new Date().toISOString(), url: URL_LAMINA, bloques: {} }
+const resultados = { generado: new Date().toISOString(), commit: commitDelArbol(), url: URL_LAMINA, bloques: {} }
 const fallos = []
 let anotadas = 0   // ARN-3a · una corrida que no anotó nada no puede salir verde
 function anota(id, ok, detalle) {
@@ -1274,6 +1275,12 @@ if (hacer('1.8')) {
   anota('1.8c lo que llega DESPUÉS de pintar', true,
     `diferido ${(suma(despues, 'cable') / 1024).toFixed(1)} KiB (clic de la puerta incluido) · ` +
     `perezoso ${(suma(perezosas, 'cable') / 1024).toFixed(1)} KiB`)
+
+  // ARN-4d · la vara `1.8b` de `commit` pesa `dist/` sin navegador. No decide: esta
+  // línea dice si las dos cifras siguen contando lo mismo.
+  const sinNavegador = pesarDist()
+  anota('1.8f el mismo peso sin navegador (vara `1.8b`)', true,
+    `${(sinNavegador.cable / 1024).toFixed(1)} KiB · Δ ${((sinNavegador.cable - criticoCable) / 1024).toFixed(1)} KiB contra esta bitácora`)
 
   console.log('\n  bitácora completa · cable = gzip nivel 9, salvo lo que ya nace comprimido:')
   for (const b of bitacora.sort((a, z) => a.tPeticion - z.tPeticion)) {
@@ -2574,5 +2581,5 @@ console.log(`\nJSON: ${SALIDA}/diagPUE.json`)
 // ARN-3a · D5 · 0 todo verde · 1 alguna medición en rojo (también los rojos
 // conocidos, como `1.8b`: un rojo dice rojo) · 2 si no se anotó nada.
 const codigo = codigoDeSalida(anotadas === 0 ? [] : [fallos.length ? 'rojo' : 'verde'])
-console.log(`── diagPUE ${modo} · ${anotadas} mediciones · ${fallos.length} en rojo → código ${codigo}`)
+console.log(`── diagPUE ${modo} · ${anotadas} mediciones · ${fallos.length} en rojo → código ${codigo} · ${resultados.commit}`)
 await terminar(codigo)
