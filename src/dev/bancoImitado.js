@@ -56,22 +56,23 @@ export const FACTOR_IA_SQL = 1.5
 export const SILENCIO_RECOGIDA_MS = 10 * 60 * 1000
 // ECO-1d · `limite_dinero()`, `bono_constancia_hc()` y `constancia_ciclo()`.
 // ECO-1g · la 1g la redefine con los dos nombres del video.
+// MOT-1 1d-ii · y la 1d-ii con la garantía PvP y los dos topes que iban literales.
 export const LIMITES_SQL = /* @__PURE__ */ Object.freeze({
   sentarse_ia: 10, recargar_ia: 20, salir_ia: 30, recoger_mesa_ia: 10, marcar_ingreso: 6,
+  crear_sala: 10, unirse_sala: 10, consultar_mano: 30, comprar_articulo: 30,
   pedir_boleto: 10, cobrar_boleto: 20,
 })
 export const BONO_CONSTANCIA_SQL = 500
 // CFG-1 1e · Mano actual de pago: `consultas_gratis()`, `precio_consulta(text)`
-// y el tope por minuto de `consultar_mano` (va literal en la llamada a
-// `contar_intento_dinero`, no en `limite_dinero`: por eso no está en
-// LIMITES_SQL). El espejo los lee de `20261030193000_cfg1e_mano_actual.sql`.
+// y el tope por minuto de `consultar_mano`, la misma cifra que ya da `limite_dinero`
+// desde la 1d-ii. El espejo los lee de `20261030193000_cfg1e_mano_actual.sql`.
 export const CONSULTAS_GRATIS_SQL = 20
 export const PRECIOS_CONSULTA_SQL = /* @__PURE__ */ Object.freeze({ basico: 100, avanzado: 200, pro: 300, humanos: 500 })
 export const LIMITE_CONSULTA_SQL = 30
 // TIE-1 1a · el catálogo de la tienda (`inventario_tipo_valido`,
 // `precio_articulo`, `articulo_con_tonos`, `articulo_gratis`) y el tope por
-// minuto de `comprar_articulo`, literal en su llamada como el de la 1e. El
-// espejo los lee de `20261031150000_tie1a_inventario.sql`.
+// minuto de `comprar_articulo`, en `limite_dinero` desde la 1d-ii como el de la 1e.
+// El espejo los lee de `20261031150000_tie1a_inventario.sql`.
 export const TIPOS_INVENTARIO_SQL = /* @__PURE__ */ Object.freeze(['tapete'])
 export const PRECIOS_ARTICULO_SQL = /* @__PURE__ */ Object.freeze({
   tapete: /* @__PURE__ */ Object.freeze({ grafito: 10000, azul: 15000, vinotinto: 25000, tricolor: 50000 }),

@@ -217,22 +217,22 @@ begin
     v_r := v_r || case when b1 and b2 and not b3 and n1 = 3 then 'PASA' else 'FALLA' end;
     v_d := v_d || format('1.º=%s · 2.º=%s · 3.º=%s · anotados=%s', b1, b2, b3, n1);
 
-    -- ── 16 · aviso de transición (§6): la regla 5× ya mira el saldo real ─
-    -- UNO tiene 2.650: la mesa de 1.000 pide 5.000 y rebota; la de 500 pide
-    -- 2.500 y entra.
+    -- ── 16 · aviso de transición (§6): la entrada ya mira el saldo real ──
+    -- UNO tiene 2.650: la mesa de 200 pide 3.000 y rebota; la de 100 pide
+    -- 1.500 y entra (MOT-1 1d-ii).
     begin
-      perform public.crear_sala('privada', 2::smallint, 1000);
+      perform public.crear_sala('privada', 2::smallint, 200);
       t1 := 'entró';
     exception when others then t1 := sqlerrm;
     end;
     begin
-      sala := public.crear_sala('privada', 2::smallint, 500);
+      sala := public.crear_sala('privada', 2::smallint, 100);
       t2 := case when sala.id is not null then 'entró' else 'sin mesa' end;
     exception when others then t2 := sqlerrm;
     end;
     v_o := v_o || 16; v_p := array_append(v_p, '16 · crear_sala con saldo real'::text);
     v_r := v_r || case when t1 = 'saldo_insuficiente' and t2 = 'entró' then 'PASA' else 'FALLA' end;
-    v_d := v_d || format('saldo=%s · mesa de 1.000→%s · mesa de 500→%s', s1, t1, t2);
+    v_d := v_d || format('saldo=%s · mesa de 200→%s · mesa de 100→%s', s1, t1, t2);
     perform set_config('request.jwt.claims', '', true);
 
     -- ── 20 · un 'repetido' devuelve el saldo de AHORA (rector, M-2) ───────
