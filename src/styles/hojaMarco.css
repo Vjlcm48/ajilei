@@ -1,0 +1,275 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AJILEI · PES-1 §3-C · hojaMarco.css · El marco de la hoja del ⚙
+   ───────────────────────────────────────────────────────────────────────────
+   Rector: AJILEI_PES-1_Fase1_v1.0.md §3-C. Lo que la hoja necesita para abrir antes
+   de que lleguen sus filas (`HojaContenido`, con `trozos.hoja`): el velo, la caja y
+   las cajas de cabecera y filas, que Perfil y la Tienda también usan. Las reglas son
+   las de CFG-1 1a, movidas con el mismo cuerpo y el mismo selector, y esta hoja ocupa
+   en la cascada el sitio que aquélla tenía. Se quedan en `hojaConfiguracion.css` las
+   que solo se ven con las filas.
+
+   NI UN HEX: todo color sale de `theme.css` o se deriva con `rgba(var(--…-rgb))`.
+   Sin `!important`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ══ 0 · LOS DOS TOKENS QUE CAMBIAN DE NOMBRE ENTRE PANTALLAS ═════════════════
+   El relleno del lienzo y el filete de la casa se llaman `--lob-pad` y
+   `--lob-linea` en el lobby, `--pad` y `--linea` en `.sal`. La hoja lee los
+   suyos y no sabe dónde está. `--cfg-pad` se resuelve EN la pantalla, así que
+   recoge también el «traje apretado» de `.sal.es-anclada` (`salas.css:1686`,
+   2,4 u): es lo que deja la hoja a plomo con el ⚙ en 1366×768 y 915×412, donde
+   la lámina V6 midió −6,61 y −4,53 px con el relleno del lobby (R-4). */
+.lobby {
+  --cfg-pad: var(--lob-pad);
+  --cfg-linea: var(--lob-linea);
+}
+.sal {
+  --cfg-pad: var(--pad);
+  --cfg-linea: var(--linea);
+}
+
+
+/* ══ 2 · EL VELO Y LA HOJA ═══════════════════════════════════════════════════
+   UNA sola conducta en todos los viewports (LOB-1 v1.2 §1.9c): la hoja nace
+   del engranaje y se ancla a él. */
+:is(.lobby, .sal) .lob-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  /* El `--green-abyss` al 60 % de la lámina LOB-1 (A1 §2b). Sobre el vino de
+     Rankings sigue siendo verde: la lámina V6 lo miró y se lee bien. */
+  background: rgba(var(--green-abyss-rgb), 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0s 0.2s;
+}
+:is(.lobby, .sal) .lob-velo.is-on { opacity: 1; visibility: visible; transition-delay: 0s; }
+
+/* EL ANCLAJE ES ARITMÉTICA, NO UN NÚMERO: el borde superior cae a la altura
+   del ⚙ más 1,5 u de aire, y el ⚙ mide `--ico-caja`; el derecho comparte el
+   relleno del lienzo, así que queda a plomo con el botón (lo miden `lob.6` y
+   `cfg.ancla`).
+   `absolute` y no `fixed` (corrección medida de LOB-1): el bloque contenedor
+   es la pantalla —`.lobby` y `.sal` son `position: relative`—, que lleva
+   `max-width: 213u` y `margin: 0 auto`; con `fixed` la hoja se iba hasta 321
+   px del ⚙ a 1920×937. El velo sí es `fixed`: oscurece la ventana entera.
+   z 7 sobre el velo (6), y los dos por encima de `.sal-cuerpo` (z 1): en la
+   Sala de espera el velo y el diálogo de «Cancelar» viven DENTRO del cuerpo,
+   así que la hoja les queda encima sin tocarlos. */
+:is(.lobby, .sal) .lob-hoja {
+  position: absolute;
+  z-index: 7;
+  top: calc(
+    env(safe-area-inset-top, 0px) + var(--cfg-pad) + var(--ico-caja) + var(--u) * 1.5
+  );
+  right: calc(env(safe-area-inset-right, 0px) + var(--cfg-pad));
+  width: min(calc(100% - 2 * var(--cfg-pad)), calc(var(--u) * 76));
+  background: var(--surface-modal);
+  border: 1px solid var(--cfg-linea);
+  border-radius: calc(var(--u) * 3);
+  padding: calc(var(--u) * 3) calc(var(--u) * 4);
+  transform-origin: top right;
+  transform: translateY(-6px) scale(0.96);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.18s ease,
+    visibility 0s 0.2s;
+  /* El techo de siempre. Lo que cambia con la 1a es QUÉ se desplaza cuando no
+     cabe: la lista (`.cfg-hoja-cuerpo`), no la cabecera (V2 de la lámina). */
+  max-height: calc(100dvh - var(--u) * 20);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-align: left;
+}
+:is(.lobby, .sal) .lob-hoja.is-on {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+:is(.lobby, .sal) .lob-hoja-t {
+  flex: none;
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: normal;
+  margin: 0 0 calc(var(--u) * 2.5);
+  line-height: 1.2;
+}
+/* Recibe el foco al abrir (`tabIndex={-1}`) y por eso necesita anillo propio. */
+:is(.lobby, .sal) .lob-hoja-t:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 4px; }
+
+/* ══ 1 · LA PASTILLA ═════════════════════════════════════════════════════════
+   «Pronto», y desde la 1a también «Sí» / «No» en Sonido. Venía de `lobby.css`
+   §5: sólo la usa la hoja. */
+:is(.lobby, .sal) .lob-pastilla {
+  font-size: 0.78em;
+  color: var(--text-muted);
+  border: 1px solid var(--cfg-linea);
+  border-radius: 999px;
+  padding: 0.12em 0.7em;
+  white-space: nowrap;
+}
+/* V2 A · «Sí» un punto más claro que «No»; ninguno en oro (INV-08). */
+:is(.lobby, .sal) .lob-pastilla.cfg-si {
+  color: var(--text-secondary);
+  border-color: rgba(var(--text-primary-rgb), 0.32);
+}
+
+
+/* ══ 2 · LA CABECERA Y LAS FILAS ═══════════════════════════════════════════════
+   El velo, la caja y el título son del marco (`hojaMarco.css`, PES-1 §3-C). */
+:is(.lobby, .sal) .lob-hoja-cuenta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  padding-bottom: calc(var(--u) * 2.5);
+  margin-bottom: calc(var(--u) * 1.5);
+  border-bottom: 1px solid var(--cfg-linea);
+  font-size: calc(var(--u) * 3.3);
+  color: var(--text-secondary);
+}
+:is(.lobby, .sal) .lob-hoja-cuenta b { font-weight: 500; color: var(--text-primary); }
+:is(.lobby, .sal) .lob-hoja-correo { font-size: 0.85em; }
+
+/* CFG-1 1b · la cabecera, puerta del perfil (V6 de la lámina 1b-L, §5). Un
+   `<button>` con la cara del bloque de la 1a: mismo filete, misma letra, 44
+   como mínimo, y «›» al final. El filete inferior la separa de «Sonido», así
+   que su zona no pisa la fila (lo midió la lámina). */
+:is(.lobby, .sal) button.lob-hoja-cuenta.cfg-tocable {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0 calc(var(--u) * 2.5);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--cfg-linea);
+  border-radius: calc(var(--u) * 1.6) calc(var(--u) * 1.6) 0 0;
+  font: inherit;
+  font-size: calc(var(--u) * 3.3);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+:is(.lobby, .sal) .lob-hoja-cuenta.cfg-tocable:hover { background: rgba(var(--text-primary-rgb), 0.04); }
+:is(.lobby, .sal) .lob-hoja-cuenta.cfg-tocable:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 2px; }
+:is(.lobby, .sal) .lob-hoja-cuenta > span:not(.lob-avatar, .lob-chev) { min-width: 0; flex: 1 1 auto; }
+:is(.lobby, .sal) .lob-hoja-cuenta > .cfg-chev { margin-left: auto; flex: none; }
+/* La bandera detrás del nombre, del alto de la letra y sin texto (§0-11). */
+:is(.lobby, .sal) .lob-hoja-cuenta { --band-h: max(12px, 0.95em); }
+:is(.lobby, .sal) .lob-hoja-cuenta b + .cfg-band { margin-left: 0.45em; vertical-align: -0.1em; }
+
+/* El cuerpo: lo único que se desplaza. La barra de desplazamiento al borde de
+   la hoja y no dentro del texto: el cuerpo se sale 4 u por cada lado y las
+   devuelve en relleno. */
+:is(.lobby, .sal) .cfg-hoja-cuerpo {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-inline: calc(var(--u) * -4);
+  padding-inline: calc(var(--u) * 4);
+}
+
+/* EXCEPCIÓN · el apaisado bajo (915×412 y todo lo de alto ≤ 520): la hoja se
+   desplaza ENTERA, cabecera incluida, como antes de la 1a. Con la cabecera
+   fija, en 915×412 quedaban 210 px de lista a la vista (lámina, §3). Misma
+   familia de regla que los trajes acostados de `lobby.css` y `salas.css`. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :is(.lobby, .sal) .cfg-hoja-cuerpo { overflow: visible; }
+}
+
+/* LAS FILAS, A 44 VISIBLES. Van pegadas y no queda aire para una zona
+   invisible (Fase 0 F-3). El comentario que esto sustituye decía que 2,4 u de
+   relleno «dejan la fila por encima de los 44px en todo el rango de `--u`»:
+   era falso en teléfono —40,45 px medidos en 360 (Fase 0)—. Con el relleno
+   de siempre y este suelo, la fila mide 44 donde `--u` toca su mínimo y lo de
+   siempre donde hay sitio (INV-07). */
+:is(.lobby, .sal) .lob-fila {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 2);
+  background: none;
+  border: 0;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  font-size: calc(var(--u) * 3.4);
+  padding: calc(var(--u) * 2.4) 0;
+  text-align: left;
+}
+:is(.lobby, .sal) .lob-chev {
+  color: var(--text-muted);
+  font-size: 1.3em;
+  transition: transform 0.18s ease;
+}
+:is(.lobby, .sal) .lob-fila[aria-expanded="true"] .lob-chev { transform: rotate(90deg); }
+
+/* Idioma · «Español» a la derecha, antes de la pastilla «Pronto». */
+:is(.lobby, .sal) .cfg-valor {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+/* TIE-1 1a · Tapetes (V6) · el rótulo con el tapete en uso debajo, el disco
+   (`.vit-disco`, vitrina.css) y el «›». Lámina `laminas/tie1a`, tie1a.css §4. */
+:is(.lobby, .sal) .tie-cfg-fila { justify-content: flex-start; }
+:is(.lobby, .sal) .tie-cfg-txt {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.2;
+}
+:is(.lobby, .sal) .tie-cfg-txt small {
+  color: var(--text-secondary);
+  font-size: 0.8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* La única fila roja de la app fuera de la mesa. VIS-1 · `--lose-red`, el rojo
+   del error de esa misma ventana: `--loss-red` sobre este fondo daba 2,66. */
+:is(.lobby, .sal) .lob-fila-peligro {
+  color: var(--lose-red);
+  margin-top: calc(var(--u) * 1.5);
+  border-top: 1px solid var(--cfg-linea);
+}
+
+/* LA RESERVA (O1) · mientras no llegan las filas, `FilasReservadas` monta las
+   mismas cajas sin nada que enseñar: la hoja ya mide lo que va a medir, sea cual sea
+   la vista y la familia. Lo mide `espera.hoja`. */
+:is(.lobby, .sal) .cfg-reserva { visibility: hidden; }
+
+/* EXCEPCIÓN · el apaisado bajo (915×412 y todo lo de alto ≤ 520): la hoja se
+   desplaza ENTERA, cabecera incluida, como antes de la 1a. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :is(.lobby, .sal) .lob-hoja { display: block; overflow: auto; overscroll-behavior: contain; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.lobby, .sal) .lob-hoja,
+  :is(.lobby, .sal) .lob-velo { transition: none; }
+}
+
+
+/* ══ 6 · EL ⋮ DE LA MESA, PIEL DE ESCRITORIO · SONIDO APAGADO ════════════════
+   El ⋮ ya pone `is-off` en la entrada de sonido (`UtilitiesMenu.jsx:181`) y
+   ninguna hoja le daba regla (Fase 0 B-1): sólo cambiaba el glifo. Aquí se
+   atenúa el icono, el mismo estado que la pastilla «No» de esta hoja
+   (INV-68). La piel móvil lleva la suya en `menuMovil.css`; la puerta es la
+   de escritorio de `gameTable.css` (protegida: no se abre). No es
+   `is-disabled` (opacidad de la fila entera): la entrada sigue viva. */
+@media (orientation: landscape) and (min-height: 601px) {
+  .util-item-sound.is-off .util-ico { opacity: 0.5; }
+}
