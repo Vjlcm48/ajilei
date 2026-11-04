@@ -39,6 +39,10 @@ const FUERA_DE_LA_ENTRADA = [
   'pkg:howler',
   // La mesa (ARN-3d).
   'src/components/GameTable.jsx',
+  // El árbitro (MOT-1 1b): corre en el servidor. Sus esperas no están aquí, porque
+  // `config/esperas.js` lo importa la mesa, que ya es diferida.
+  'src/arbitro/index.js', 'src/arbitro/partida.js', 'src/arbitro/vista.js', 'src/arbitro/sorteo.js', 'src/arbitro/reloj.js',
+  'src/arbitro/ganador.js', 'src/arbitro/motivos.js', 'src/arbitro/asientos.js', 'src/arbitro/azar.js',
 ]
 
 const MUERTO_EN_LA_BUILD = new Set(['src/dev/repartoGanador.js'])
