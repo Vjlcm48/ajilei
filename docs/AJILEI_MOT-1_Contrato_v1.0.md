@@ -5,6 +5,7 @@
 - **Viene de:** ficha `AJILEI_MOT-1_Fase1a_v1.0.md` §2 (decisiones selladas) · `docs/reportes/AJILEI_MOT-1_Fase0b_Informe_v1.0.md` (la sonda).
 - **Regla de la campaña:** lo justo. No rediseña lo que funciona. Donde una sub-tanda tenga que decidir, dice cuál y qué debe cumplir.
 - **Visto bueno del rector, con sus correcciones (2026-11-04):** no queda ninguna propuesta abierta. Las cifras provisionales lo dicen donde aparecen.
+- **Al día con la 1b (2026-11-04):** el §4, el §6 y el §7 recogen los ajustes del rector al STOP-1b. Las citas de esos ajustes a `src/arbitro/` son del árbol de la 1b.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -197,8 +198,9 @@ La arma `vistaDe(estado, asiento)` en la 1b. Lo que no esté en la primera tabla
 |---|---|---|
 | Sus cartas | Las suyas | Sí: `players[i].cards` (`gameEngine.js:571`) |
 | Cartas de los demás | Solo cuántas tienen | `vistaDe` lo deriva |
-| Pilas | Las de todos | Sí: `players[i].chips` |
-| Nombre y estado de cada asiento | Nombre, retirado, all-in, eliminado | Sí: `name`, `folded`, `allIn`, `eliminated` (`gameEngine.js:61-66`) |
+| Pilas | Las de todos. La de un asiento que ya cobró vale 0 (§7) | Sí: `players[i].chips` |
+| Nombre y estado de cada asiento | Nombre, retirado, all-in, eliminado, abandonado | `name`, `folded`, `allIn`, `eliminated`, sí (`gameEngine.js:61-66`). `abandonado`, no: árbitro |
+| Lo cobrado | `cobrado` por asiento: `null` hasta que sale, y luego lo que se llevó. Es de lo que lee la pantalla final | No: árbitro |
 | Lo apostado | `contrib` por asiento, `currentBet`, `unit` | Sí (`gameEngine.js:63, :110, :104`). Es lo que `pozos.esLegal` necesita, para que el cliente consulte sin pedir |
 | Pozo | Total | Sí: `pot` (`gameEngine.js:109`) |
 | Capas | Monto y elegibles de cada una | No guardadas: las deriva `capasDe` (`pozos.js:260`), que necesita `contribMano` |
@@ -270,10 +272,10 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 | Clase | Empieza | Dura | Al vencer |
 |---|---|---|---|
 | Arranque | La sala pasa a `activa` | Ya cumplido | Crea la partida y abre el sorteo (§2) |
-| Reparto del sorteo | Se abre cada ronda | Espera de animación, siempre rápida | Se abre la elección |
-| Elección del sorteo | Termina el reparto de la ronda | 10 s por ronda | Toma la posición 0 de quien no eligió y voltea |
-| Turno | Le toca a un asiento en `BET_*` | `TURN_TIME` = 20 s (`GameTable.jsx:87`) | `pasar` si es legal; si no, `retirarse` (`GameTable.jsx:913-914`). Asiento abandonado: `retirarse` siempre |
-| Descarte | Se abre `DISCARD` | `TURN_TIME` = 20 s (`GameTable.jsx:890`) | Descarte vacío para quien falte (`GameTable.jsx:917`) y aplica |
+| Reparto del sorteo | Se abre cada ronda | Espera de animación, siempre rápida y por oleadas: no depende de los asientos | Se abre la elección |
+| Elección del sorteo | Termina el reparto de la ronda | 10 s por ronda | Toma la posición 0 de quien no eligió y voltea. El abandonado no espera: la toma al instante (§7) |
+| Turno | Le toca a un asiento en `BET_*` | `TURN_TIME` = 20 s (`GameTable.jsx:87`) | `pasar` si es legal; si no, `retirarse` (`GameTable.jsx:913-914`). El abandonado no llega a vencer: se retira en el acto (§7) |
+| Descarte | Se abre `DISCARD` | `TURN_TIME` = 20 s (`GameTable.jsx:890`) | Descarte vacío para quien falte (`GameTable.jsx:917`) y aplica. El abandonado no espera: descarta vacío en el acto (§7) |
 | Reparto | `DEAL_2` o `DEAL_3` | Espera de animación | `advanceFromDeal` (`gameEngine.js:603`) |
 | Barajado | `startHand` | Espera de animación | Se abre el reparto |
 | Revelación y mano siguiente | `PAYOUT` | Fin de la coreografía de revelación + 4 s. Sin revelación, cierre de la mano + 4 s (cifra provisional) | Dinero y puntos (§7), asientos que salen y `startHand` (`gameEngine.js:502`). Con ≤1 vivo, `GAME_OVER` (`:522`) |
@@ -289,8 +291,8 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 | Quién gana | Las elegidas se voltean a la vez y gana la más alta por `drawRank`: el As es la más baja (`deck.js:32-40`) |
 | Quién participa | Todos en la ronda 1; en las siguientes, solo los empatados en la carta más alta. Ninguna ronda arrastra nada de la anterior |
 | Tope | 3 rondas en total: la inicial y 2 de desempate. Si la tercera vuelve a empatar, el árbitro elige al azar (CSPRNG) a uno de los que siguen empatados |
-| Vencimiento | 10 s de elección por ronda. Al vencer, el árbitro toma la posición 0 de quien no eligió |
-| Reparto | Siempre rápido (`FACTOR_RAPIDA`), sea cual sea el ritmo de la mesa |
+| Vencimiento | 10 s de elección por ronda. Al vencer, el árbitro toma la posición 0 de quien no eligió. El abandonado la toma al instante (§7) |
+| Reparto | Siempre rápido (`FACTOR_RAPIDA`), sea cual sea el ritmo de la mesa. Va por oleadas: una carta a cada asiento a la vez, cinco oleadas. La espera no depende del número de asientos |
 | Vista | Las cinco posiciones propias sin valor y quién ya eligió; tras el volteo, la carta elegida de cada participante en cada ronda |
 | Secretos | El valor de las cinco cartas hasta el volteo; el de las no elegidas, nunca |
 | Cuándo | Solo en la primera mano de la mesa |
@@ -317,7 +319,7 @@ Hoy no existe ninguna constante de servidor. **El contrato solo pone una cifra, 
 | Segundo reparto | 300 · 600 · 900 ms (`GameTable.jsx:848-850`) | Sí (`:847`) |
 | Revelación | `REVEAL_CHOREO` (`GameTable.jsx:132-134`) y su coreografía · tope de red `RED_REVELACION_MS = 6000` (`mesaCore.js:395`) | No |
 | Mano siguiente | En PvP no hay botón: arranca sola al terminar la revelación, más una pausa de lectura. **4 s, cifra provisional**, tras el fin de la coreografía de revelación, que la 1b mide desde `REVEAL_CHOREO`. Mano cerrada sin revelación (ganan por retirada de los demás): 4 s después del cierre de la mano, la misma cifra provisional. MES-PvP la ajusta con los teléfonos. Contra las IAS sigue siendo un botón, con 300 ms tras tocarlo (`GameTable.jsx:2716-2726`) | No |
-| Reparto del sorteo | No existe hoy | Siempre rápido |
+| Reparto del sorteo | Cinco oleadas, cada una de un vuelo: 120 + 5 × 297,5 + 400 = 2.008 ms, con cualquier número de asientos (`reloj.js`) | Siempre rápido |
 
 ### Reloj sin congelar
 
@@ -341,6 +343,8 @@ Hoy no existe ninguna constante de servidor. **El contrato solo pone una cifra, 
 |---|---|
 | `saldo_tras >= 0` | Se mantiene (`eco1a:182`) |
 | `monto <> 0` | `eco1a:181`: quien sale con pila 0 no anota movimiento |
+| Quien cobra | Al emitir su salida, su pila queda en 0 en el estado y el monto pasa a `cobrado`. Pilas + pozo + lo ya cobrado es constante |
+| Sin doble pago | Ninguna pila de las que se reescriben al cerrar la mano incluye a un asiento ya cobrado, tampoco al que cobra en ese mismo cierre: su dinero va solo en su salida |
 | `resultado_pvp` | Queda sin escritor: con dos movimientos no hace falta (`eco1a:179`) |
 | El dinero | Nunca vive en el cliente |
 | Residuo | El motor elimina a quien no cubre el ante y le deja las fichas (`gameEngine.js:511, :515`). Vuelven a su saldo al salir |
@@ -371,7 +375,9 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Punto | Regla |
 |---|---|
 | Si el jugador abre otra mesa, en cualquier aparato | Su asiento PvP vivo queda **abandonado** |
-| Qué pasa con su turno | El reloj lo retira (§6). En all-in o sin turno (`pozos.js:120` · `gameEngine.js:361-363`), sigue disputando la mano por lo que puso |
+| Qué pasa con su turno | Actúa al instante, sin reloj: en su turno de apuesta se retira, y si abandonó antes, lo hace al tocarle. En all-in o sin turno (`pozos.js:120` · `gameEngine.js:361-363`), sigue disputando la mano por lo que puso |
+| En el descarte | Descarta vacío al instante, al abandonar o al abrirse la fase. Si ya había descartado, conserva su descarte. Si era el último que faltaba, la fase se aplica en el acto |
+| En el sorteo | Elige al instante la posición 0, al abandonar o al abrirse la elección, también en las rondas de desempate. Si era el último que faltaba, voltea en el acto. Si gana, la Mano pasa al siguiente vivo |
 | Qué cobra | Su pila, al cerrar la mano, con el premio si gana. Sin mano en curso, en el acto |
 | Lo que ya puso en el pozo | No se le devuelve. Eso no significa que lo pierda si gana |
 | Después de cobrar | Sale de la mesa: el árbitro lo marca eliminado y `startHand` ya no lo cuenta (`gameEngine.js:510-518`) |
