@@ -1,7 +1,7 @@
-# AJILEI — Archivos protegidos · Lista canónica v1.8
+# AJILEI — Archivos protegidos · Lista canónica v1.9
 
 - **Archivo:** `docs/AJILEI_Protegidos_v1.0.md`
-- **Versión:** 1.8
+- **Versión:** 1.9
 - **Estado:** **LISTA CANÓNICA ÚNICA.** Sellado 2026-08-20 por Victor
   (HEPTACREATION LLC), al cierre de la campaña IDN-1.
 - **Actualización v1.1 (2026-08-26):** se cierra el hueco de reconstrucción
@@ -51,6 +51,15 @@
   la §3 se re-mide aquí, en el mismo cambio que el archivo (§5), y nace la
   **§7.6** con los rangos, la vara y las huellas de antes y después. Es la única
   apertura de un protegido en TAB-2.
+- **Actualización v1.9 (2026-11-04):** MOT-1 1a. **La lista pasa de seis a SIETE.**
+  Entra `src/engine/pozos.js`, que decide la legalidad de toda apuesta y que el
+  árbitro de MOT-1 lee como contrato (`AJILEI_MOT-1_Contrato_v1.0.md` §3): la ficha
+  MOT-1 1a §2-g lo decide, y entra con el visto bueno de Victor que la §5 exige. Se
+  mide en el blob de `1f5cb14`; las otras seis filas de la §3 no cambian. **Aviso de
+  apertura:** la sub-tanda 1b de MOT-1 abrirá `gameEngine.js` **para la edición 3**
+  (descarte por asiento), bajo la autorización de K-1, **y para corregir el comentario
+  de `:193-197`** (heredado de VOZ-3, ya autorizado), y re-medirá su fila en ese
+  mismo commit (§5). Cualquier otro cambio en ese archivo necesita autorización aparte.
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -90,6 +99,7 @@ sustituyó las 13 apariciones de moneda y las 3 del wordmark sin abrirlo tampoco
 | 4 | `src/config/seatLayouts.js` | `AJILEI_Diseno_Landscape_v1.0.md` §1 · `AJILEI_Componente_Fichas_v2.0.md` §12 · instrucción IDN-1 |
 | 5 | `src/styles/opponentPanel.css` | Instrucción IDN-1 |
 | 6 | `src/styles/gameTable.css` | Instrucción EMB-2 · **reafirmado por fallo de Victor del 2026-08-20** (IDN-1 §5: «Si resultara imprescindible tocar `gameTable.css`: DETENTE y pide autorización») |
+| 7 | `src/engine/pozos.js` | Ficha MOT-1 1a §2-g · `AJILEI_MOT-1_Contrato_v1.0.md` §3 |
 
 Los tres primeros son el **motor** (reglas del juego), la **IA** y la **baraja**;
 el cuarto, la **geometría de asientos**. Tocarlos cambia lo que el juego *es*, no
@@ -133,6 +143,7 @@ pendiente de la decisión de Victor.
 | `src/config/seatLayouts.js` | `0d1bb8ea66a8` | `0049051fd4b8b891` | 59 | — (intacto desde el sellado) |
 | `src/styles/opponentPanel.css` | `fbc9f3d08ede` | `4b91338a205e4a6a` | 1084 | **TAB-1 1d** (la puerta del traje A, 1 línea; §7.5) |
 | `src/styles/gameTable.css` | `87c9cb519bdb` | `9b6b716f23ade19a` | 6289 | TAB-1 1d (la puerta del traje A, 3 líneas; §7.5) · **TAB-2 2c** (dos comentarios, mismas líneas; §7.6) |
+| `src/engine/pozos.js` | `21c083649bcc` | `6f6c2acf0aa3739e` | 364 | — (entra en la v1.9, MOT-1 1a; medido en `1f5cb14`) |
 
 **Las seis filas se volvieron a medir el 2026-09-22**, al cerrar la campaña, y
 salen **idénticas una a una** a las de arriba: blob, `sha256` y líneas. Entre el
