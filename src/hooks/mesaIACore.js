@@ -185,9 +185,7 @@ const puntaje = (p) => p?.score?.points ?? 0
 
 export function finDeMano(state) {
   if (state?.phase !== PHASES.PAYOUT) return null
-  const capa0 = ganadoresPorCapa(state, puntaje)[0]
-  const ganador = capa0 === undefined || capa0 < 0 ? state.winner : capa0
-  const ganoHumano = ganador === 0
+  const ganoHumano = ganadoresPorCapa(state, puntaje)[0] === 0
   return {
     vivos: state.handRules.ruleN,
     ganoHumano,

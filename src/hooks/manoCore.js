@@ -83,7 +83,9 @@ export function lecturaDeMano(state) {
   const tramos = tramosDe(players)
   if (tramos.length !== capas.length) return null   // no casa con `capasDe`: no se inventa nada
 
-  const principal = capas[0].ganador >= 0 ? capas[0].ganador : state.winner
+  // La capa 0 siempre tiene elegibles: el all-in que la define o quien se queda.
+  const principal = capas[0].ganador
+  if (principal < 0) return null
   const porAsiento = players.map(() => ({ disputado: 0, sinDisputa: 0, devuelto: 0 }))
   // Lo que se llevan los demás, en el orden en que aparece (el pozo leído de
   // abajo arriba, como se reparte: E-23).

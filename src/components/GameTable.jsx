@@ -57,6 +57,7 @@ import BurbujaRecarga from './BurbujaRecarga'
 import { Wordmark } from './Wordmark'
 import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
+import { TURN_TIME } from '../config/esperas'
 import {
   PHASES,
   createInitialState,
@@ -84,7 +85,6 @@ import '../styles/tactil.css'
 // TAB-1 · la escala de la mesa (solo bajo html[data-escala], que escribe useEscalaMesa)
 import '../styles/escala.css'
 
-const TURN_TIME  = 20
 const WARNING_AT = 5
 
 // Tanda C3.1: factor único de ritmo de las IAs (+25%) — multiplica TODAS las
