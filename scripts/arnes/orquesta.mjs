@@ -2,8 +2,9 @@
 // Rector: AJILEI_ARN-4_Tanda4a_v1.0.md §4. Se invoca `npm run varas`:
 //
 //   npm run varas -- rapido            eslint, vitest (lanzador), build, guiones
-//   npm run varas -- commit            rapido + humo
-//   npm run varas -- completo          todo, con apu por celdas y tab en dos partes
+//   npm run varas -- commit            rapido + 1.8b (el peso, sin navegador) + humo
+//   npm run varas -- completo          todo, con apu por celdas, tab en dos partes y
+//                                      tactil, h1, m1 y a1 por mesas
 //   npm run varas -- --solo cfg,lob    esas varas, con el build delante si lo piden
 //
 // Opciones: `--sin-build` (mide el `dist/` que haya, solo con `--solo`) y
@@ -13,15 +14,19 @@
 // puertos, y las de tiempo corren solas (INV-36). La lista de varas y la tabla
 // viven en `orquestaCore.mjs`, con su contrato en `orquesta.test.js`.
 //
+// ARN-4d · antes de lanzar una vara, su JSON de veredicto queda como `.caducado`: una
+// vara cortada no deja nada que pase por actual. La tabla y `varas.json` llevan el
+// commit que se midió.
+//
 // Códigos: 0 = todo verde · 1 = algún rojo · 2 = error de instrumento.
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs'
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { codigoVitest, correr, leerEslint, resumenVitest, textoVitest } from './aisladoCore.mjs'
-import { RAIZ as RAIZ_FUENTE } from './fuente.mjs'
+import { commitDelArbol, RAIZ as RAIZ_FUENTE } from './fuente.mjs'
 import { MODOS_DSK } from './nucleo.mjs'
-import { codigoDeVara, codigoGlobal, MANUALES, modosPueDe, PERFILES, tablaDeVaras, topeMs, varasDeSolo } from './orquestaCore.mjs'
+import { codigoDeVara, codigoGlobal, MANUALES, modosPueDe, PERFILES, tablaDeVaras, topeMs, varasDeSolo, veredictoDeVara } from './orquestaCore.mjs'
 import { corregirUnidad } from './unidad.mjs'
 
 const RAIZ = corregirUnidad(resolve(RAIZ_FUENTE))
@@ -58,8 +63,18 @@ function elegirVaras(opc) {
   return varas
 }
 
+/** Lo que una corrida anterior dejó como veredicto de esta vara ya no vale. */
+function caducar(veredicto) {
+  for (const rel of [veredicto?.comun, veredicto?.propio]) {
+    const abs = rel && join(RAIZ, rel)
+    if (abs && existsSync(abs)) renameSync(abs, `${abs}.caducado`)
+  }
+}
+
 /** Corre una vara y devuelve su fila de la tabla. */
 async function correrVara(vara, salidas) {
+  const veredicto = veredictoDeVara(vara)
+  caducar(veredicto)
   const archivo = join(salidas, `${vara.id}.log`)
   const json = join(salidas, `${vara.id}.json`)
   const args = vara.tipo === 'eslint' ? [...vara.args, '-o', json] : vara.args
@@ -70,7 +85,8 @@ async function correrVara(vara, salidas) {
   } finally {
     closeSync(fd)
   }
-  const fila = { id: vara.id, ms: r.ms, archivo, codigo: codigoDeVara(r.status), nota: r.topado ? `tope de ${vara.topeMin} min` : null }
+  if (veredicto?.propio && existsSync(join(RAIZ, veredicto.comun))) copyFileSync(join(RAIZ, veredicto.comun), join(RAIZ, veredicto.propio))
+  const fila = { id: vara.id, ms: r.ms, tope: vara.topeMin, archivo, codigo: codigoDeVara(r.status), nota: r.topado ? `tope de ${vara.topeMin} min` : null }
   if (vara.tipo === 'vitest') {
     const resumen = resumenVitest(readFileSync(archivo, 'utf8'))
     fila.codigo = codigoVitest(r.status, resumen)
@@ -88,12 +104,14 @@ async function main() {
   const varas = elegirVaras(opc)
   const salidas = join(opc.carpeta, `varas-${Date.now().toString(36)}`)
   mkdirSync(salidas, { recursive: true })
-  console.log(`· ${varas.length} varas, en serie. Salidas en ${salidas}`)
+  const commit = commitDelArbol()
+  console.log(`· ${varas.length} varas, en serie, sobre ${commit}. Salidas en ${salidas}`)
 
   const filas = []
   const cerrar = (codigo) => {
     console.log(`\n${tablaDeVaras([...filas, ...MANUALES.map((m) => ({ ...m, manual: true }))])}`)
-    console.log(`\n── varas · ${filas.length} corridas → código ${codigo}`)
+    writeFileSync(join(salidas, 'varas.json'), JSON.stringify({ commit, codigo, filas }, null, 2))
+    console.log(`\n── varas · ${filas.length} corridas sobre ${commit} → código ${codigo}`)
     process.exit(codigo)
   }
   for (const s of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.on(s, () => cerrar(2))

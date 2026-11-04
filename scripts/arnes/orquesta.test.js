@@ -1,5 +1,5 @@
 // ── ARN-4 A4 · la lista es el contrato ───────────────────────────────────────
-// El perfil `completo` no se corre para validarlo (unas 3 h): su contrato se vigila
+// El perfil `completo` no se corre para validarlo (unas 7 h): su contrato se vigila
 // aquí, contra los modos que cada arnés dice tener.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { RAIZ } from './fuente.mjs'
 import { MODOS_DSK } from './nucleo.mjs'
 import {
-  CELDAS_APU, codigoDeVara, codigoGlobal, contratoDeModos, EXCLUIDOS_DSK, EXCLUIDOS_PUE, MANUALES, modosPueDe, modosQueCorren, PERFILES, tablaDeVaras, topeMs, varasDeSolo,
+  CELDAS_APU, codigoDeVara, codigoGlobal, contratoDeModos, EXCLUIDOS_DSK, EXCLUIDOS_PUE, MANUALES, MESAS_PARTIDAS, modosPueDe, modosQueCorren, PERFILES, tablaDeVaras, topeMs, varasDeSolo, veredictoDeVara,
 } from './orquestaCore.mjs'
 
 const fuenteDSK = readFileSync(join(RAIZ, 'scripts/diagDSK.mjs'), 'utf8')
@@ -48,12 +48,22 @@ describe('A4 · el contrato: ningún modo sin declarar', () => {
     const partidas = completo.filter((v) => v.id.startsWith('tab.')).flatMap((v) => v.args.slice(2).filter((a) => a !== '--sin-build'))
     expect(partidas.sort()).toEqual(reales.sort())
   })
+  it('ARN-4d · los modos partidos por mesas llevan todas las mesas del arnés', () => {
+    const mesasDe = (nombre) => [...(fuenteDSK.match(new RegExp(`const ${nombre} = \\[([^\\]]*)\\]`))?.[1] ?? '').matchAll(/\d+/g)].map((m) => Number(m[0]))
+    for (const nombre of ['H1_TABLES', 'M1_TABLES', 'A1_TABLES']) expect(mesasDe(nombre), nombre).toEqual([...MESAS_PARTIDAS])
+    expect(fuenteDSK).toMatch(/const TABLES = \[5, 4, 3, 2\]\s+\/\/ táctil coarse/)
+    for (const modo of ['tactil', 'h1', 'm1', 'a1']) {
+      expect(ids(completo).filter((i) => i.startsWith(`${modo}.`))).toEqual(MESAS_PARTIDAS.map((m) => `${modo}.${m}`))
+      expect(ids(completo), modo).not.toContain(modo)
+    }
+  })
 })
 
 describe('A4 · los perfiles', () => {
-  it('`rapido` son las cuatro varas de la ficha, y `commit` añade humo', () => {
+  it('`rapido` son las cuatro varas de la ficha, y `commit` añade el peso y humo', () => {
     expect(ids(rapido)).toEqual(['eslint', 'vitest', 'build', 'guiones'])
-    expect(ids(commit)).toEqual([...ids(rapido), 'humo'])
+    expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'humo'])
+    expect(ids(completo)).toContain('1.8b')
   })
   it('vitest pasa por el lanzador', () => {
     expect(rapido.find((v) => v.id === 'vitest').args[0]).toBe('scripts/arnes/vitest.mjs')
@@ -104,6 +114,37 @@ describe('A4 · --solo', () => {
   it('un nombre que no existe no se calla', () => {
     expect(varasDeSolo(['noexiste'], opciones).desconocidos).toEqual(['noexiste'])
   })
+  it('ARN-4d · un modo partido se pide por su nombre y se abre en sus partes', () => {
+    expect(ids(varasDeSolo(['m1'], opciones).varas)).toEqual(['build', 'm1.5', 'm1.4', 'm1.3', 'm1.2'])
+    expect(varasDeSolo(['m1'], opciones).varas[1].args).toEqual(['scripts/diagDSK.mjs', 'm1', '5', '--sin-build'])
+  })
+})
+
+describe('ARN-4d · el veredicto de cada vara', () => {
+  const de = (id) => veredictoDeVara(completo.find((v) => v.id === id))
+  it('un modo suelto no necesita copia', () => {
+    expect(de('tam')).toEqual({ comun: 'capturas-dsk/diag_tam.json', propio: null })
+    expect(de('menu-movil').comun).toBe('capturas-dsk/diag_menu-movil.json')
+    expect(de('sal')).toEqual({ comun: 'capturas-sal/diag_sal.json', propio: null })
+  })
+  it('las partes de un modo no se pisan: cada una guarda el suyo', () => {
+    expect(de('m1.5')).toEqual({ comun: 'capturas-dsk/diag_m1.json', propio: 'capturas-dsk/diag_m1.5.json' })
+    expect(de('apu.rec2').propio).toBe('capturas-dsk/diag_apu.rec2.json')
+    expect(de('tab.frase').propio).toBe('capturas-dsk/diag_tab.frase.json')
+  })
+  it('los modos de diagPUE comparten archivo, y cada vara guarda el suyo', () => {
+    expect(de('todo')).toEqual({ comun: 'capturas-pue/diagPUE.json', propio: 'capturas-pue/diag_todo.json' })
+    expect(de('pue.contraste').propio).toBe('capturas-pue/diag_pue.contraste.json')
+  })
+  it('toda vara de un arnés que da veredicto sabe dónde está el suyo', () => {
+    for (const v of completo.filter((x) => /scripts\/diag/.test(x.args[0]))) expect(veredictoDeVara(v), v.id).not.toBeNull()
+    for (const id of ['eslint', 'vitest', 'build', 'guiones', '1.8b', 'banco']) expect(de(id), id).toBeNull()
+  })
+  it('todos los arneses escriben el commit en su JSON', () => {
+    for (const a of ['diagDSK', 'diagPUE', 'diagSAL', 'diagCEL0']) {
+      expect(readFileSync(join(RAIZ, `scripts/${a}.mjs`), 'utf8'), a).toMatch(/commit(: |\s*=\s*)commitDelArbol\(\)/)
+    }
+  })
 })
 
 describe('A4 · el código global y la tabla', () => {
@@ -128,7 +169,7 @@ describe('A4 · el código global y la tabla', () => {
       { id: 'no', codigo: 2, ms: null, archivo: null, nota: 'no corrió' },
       { id: 'guiones en la base real', manual: true, motivo: 'SQL Editor' },
     ]).split('\n')
-    expect(t[0]).toMatch(/Vara.*Código.*Duración.*Salida/)
+    expect(t[0]).toMatch(/Vara.*Código.*Duración.*Tope.*Salida/)
     expect(t[2]).toMatch(/vitest.*0.*5 s.*88\/88 · vitest\.log/)
     expect(t[3]).toMatch(/humo.*1.*13 min 16 s.*humo\.log/)
     expect(t[4]).toMatch(/no.*2.*—.*no corrió/)

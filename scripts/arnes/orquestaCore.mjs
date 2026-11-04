@@ -33,6 +33,13 @@ const HUMO = diag('diagDSK', 'humo', 'humo', 25)
 export const CELDAS_APU = Object.freeze(['360x640', '640x360', '844x390', '1024x768', '1280x720', '1366x768', '1920x937'])
 const APU = [...CELDAS_APU, 'rec2', 'voz3'].map((c) => diag('diagDSK', `apu.${c}`, 'apu', 20, [c]))
 
+// ARN-4d · un modo que no cabe en una tirada va por mesas, con su propio tope:
+// `m1`, `a1`, `h1` y `tactil` miden 35, 28, 28 y 22 min, y con 1,5 × lo medido
+// pasarían de los 30. `orquesta.test.js` las compara con las mesas del arnés.
+export const MESAS_PARTIDAS = Object.freeze([5, 4, 3, 2])
+const porMesas = (modo, topeMin) => MESAS_PARTIDAS.map((m) => diag('diagDSK', `${modo}.${m}`, modo, topeMin, [String(m)]))
+const PARTIDOS = [...porMesas('tactil', 15), ...porMesas('h1', 15), ...porMesas('m1', 20), ...porMesas('a1', 20)]
+
 // `tab` entera roza el tope (27 min): `frase` por un lado, las otras nueve por otro.
 const TAB = [
   diag('diagDSK', 'tab.frase', 'tab', 20, ['frase']),
@@ -41,8 +48,10 @@ const TAB = [
 
 /** Modos de `diagDSK` que corren solos en `completo`, con su tope en minutos. */
 const SUELTOS_DSK = Object.freeze({
-  b1: 15, tactil: 15, p1: 15, p2: 15, r1: 15, r2: 15, o1: 15, h1: 15, m1: 15, a1: 15, f1: 15, z1: 15, o2: 15, a2: 15, u1: 15,
-  'menu-movil': 15, u2: 15, u3: 15, vc: 15, msg: 25, tapetes: 15, vuelo: 15, luz: 29, rev: 15, rec: 25, congelado: 15,
+  // ARN-4d · `f1`, `a2` y `u1` a ≥ 1,5 × lo medido en la línea base; `vuelo` no se
+  // puede partir (busca una victoria, hasta 40 manos) y va a su techo.
+  b1: 15, p1: 15, p2: 15, r1: 15, r2: 15, o1: 15, f1: 25, z1: 15, o2: 15, a2: 22, u1: 23,
+  'menu-movil': 15, u2: 15, u3: 15, vc: 15, msg: 25, tapetes: 15, vuelo: 29, luz: 29, rev: 15, rec: 25, congelado: 15,
   saldo: 15, mesaia: 15, revive: 15, constancia: 15, video: 15, tam: 15, webkit: 20,
 })
 
@@ -51,6 +60,10 @@ const SUELTOS_PUE = Object.freeze({ todo: 25, cap: 15, voz2: 15, mesa: 15 })
 
 // ARN-4 A10a · la Portada bajo su tinta. Desde la 4c, un texto bajo 4,5 es rojo.
 const PUE_CONTRASTE = diag('diagPUE', 'pue.contraste', 'contraste', 10)
+
+// ARN-4d · el camino crítico de INV-30, sin navegador: va en `commit`. Lo que cruza
+// el techo se ve en cada commit, no en una corrida de `completo` (`diagPUE 1.8`).
+const PESO = { id: '1.8b', args: ['scripts/arnes/peso.mjs', '--sin-build'], topeMin: 5, necesitaDist: true }
 
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
@@ -66,6 +79,10 @@ export const EXCLUIDOS_DSK = Object.freeze({
   retar: EN_HUMO, rnk: EN_HUMO, suma: EN_HUMO, cfg: EN_HUMO, tienda: EN_HUMO,
   apu: 'corre partida por celdas: `apu.<celda>`, `apu.rec2` y `apu.voz3`',
   tab: 'corre partida en dos: `tab.frase` y `tab.resto`',
+  tactil: 'corre partida por mesas: `tactil.<mesa>`',
+  h1: 'corre partida por mesas: `h1.<mesa>`',
+  m1: 'corre partida por mesas: `m1.<mesa>`',
+  a1: 'corre partida por mesas: `a1.<mesa>`',
 })
 export const EXCLUIDOS_PUE = Object.freeze({
   puerta: EN_TODO, '1.1': EN_TODO, '1.2': EN_TODO, '1.3': EN_TODO, '1.4': EN_TODO, '1.5': EN_TODO, '1.6': EN_TODO, '1.7': EN_TODO, '1.8': EN_TODO, '1.9': EN_TODO,
@@ -85,8 +102,8 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
-  commit: [...BASE, HUMO],
-  completo: [...BASE, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
+  commit: [...BASE, PESO, HUMO],
+  completo: [...BASE, PESO, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]
@@ -113,6 +130,27 @@ export function varasDeSolo(nombres, { modosDsk, modosPue, build = true }) {
   }
   const pide = build && varas.some((v) => v.necesitaDist) && !varas.some((v) => v.id === 'build')
   return { varas: unica(pide ? [BUILD, ...varas] : varas), desconocidos }
+}
+
+// ── El veredicto de cada vara ────────────────────────────────────────────────
+// ARN-4d · una vara cortada no reescribe su JSON: la línea base dejó seis verdes de
+// octubre pasando por actuales. Antes de lanzarla, lo que hubiera se marca caducado.
+const DIR_DIAG = { diagDSK: 'capturas-dsk', diagSAL: 'capturas-sal' }
+
+/**
+ * Dónde deja una vara su veredicto. `comun` es lo que escribe el arnés; `propio`,
+ * adonde se copia si ese archivo lo comparten varias varas (las partes de un modo y
+ * los modos de `diagPUE`), para que la siguiente no se lo lleve por delante.
+ * Sin JSON, `null`: `eslint`, `vitest`, `build`, `guiones`, `1.8b` y `banco`.
+ */
+export function veredictoDeVara(vara) {
+  const arnes = vara.args[0].match(/^scripts\/(diag\w+)\.mjs$/)?.[1]
+  const modo = vara.args[1]
+  if (arnes === 'diagPUE') return { comun: 'capturas-pue/diagPUE.json', propio: `capturas-pue/diag_${vara.id}.json` }
+  if (arnes === 'diagCEL0') return { comun: '../_cel2/cel0.json', propio: null }
+  if (!DIR_DIAG[arnes]) return null
+  const dir = DIR_DIAG[arnes]
+  return { comun: `${dir}/diag_${modo}.json`, propio: vara.id === modo ? null : `${dir}/diag_${vara.id}.json` }
 }
 
 /** Cuántos ms puede tardar una vara. */
@@ -159,15 +197,16 @@ const duracion = (ms) => {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`
 }
 
-/** La tabla de salida: vara, código, duración y archivo, con las manuales al final. */
+/** La tabla de salida: vara, código, duración, tope y archivo, con las manuales al final. */
 export function tablaDeVaras(filas) {
   const celdas = filas.map((f) => [
     f.id,
     f.manual ? 'manual' : String(f.codigo),
     duracion(f.ms),
+    f.tope ? `${f.tope} min` : '—',
     f.manual ? f.motivo : `${f.nota ? `${f.nota} · ` : ''}${f.archivo ?? '—'}`,
   ])
-  const cabecera = ['Vara', 'Código', 'Duración', 'Salida']
+  const cabecera = ['Vara', 'Código', 'Duración', 'Tope', 'Salida']
   const anchos = cabecera.map((c, i) => Math.max(c.length, ...celdas.map((f) => f[i].length)))
   const linea = (f) => f.map((c, i) => (i === f.length - 1 ? c : c.padEnd(anchos[i]))).join(' | ')
   return [linea(cabecera), anchos.map((a) => '-'.repeat(a)).join('-|-'), ...celdas.map(linea)].join('\n')
