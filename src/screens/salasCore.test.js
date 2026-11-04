@@ -78,11 +78,11 @@ describe('SAL-B1 · la máscara del código', () => {
   })
 })
 
-describe('SAL-B1 · la regla 5× y el «Te faltan»', () => {
-  it('alcanza exige CINCO veces la apuesta, no una', () => {
-    expect(alcanza(100, 499)).toBe(false)
-    expect(alcanza(100, 500)).toBe(true)   // el borde exacto entra
-    expect(alcanza(100, 501)).toBe(true)
+describe('SAL-B1 · la entrada Corta y el «Te faltan»', () => {
+  it('alcanza exige QUINCE veces la apuesta, no una', () => {
+    expect(alcanza(100, 1499)).toBe(false)
+    expect(alcanza(100, 1500)).toBe(true)   // el borde exacto entra
+    expect(alcanza(100, 1501)).toBe(true)
   })
 
   it('un saldo que no es número no alcanza nada', () => {
@@ -107,15 +107,15 @@ describe('SAL-B1 · la regla 5× y el «Te faltan»', () => {
     expect(normalizarConfig({ jugadores: 5, apuesta: 5000, tipo: 'abierta' }, Infinity).apuesta).toBe(5000)
   })
 
-  it('la cifra de la lámina: 5.000 de saldo, mesa de 5.000 → faltan 20.000', () => {
-    // Es el estado `opciones-fuera-alcance` del arnés (§8.3), palabra por
-    // palabra: 5 × 5.000 = 25.000, menos los 5.000 que hay, son 20.000.
-    expect(faltanPara(5000, 5000)).toBe(20000)
+  it('5.000 de saldo, mesa de 5.000 → faltan 70.000', () => {
+    // El estado `opciones-fuera-alcance` del arnés (§8.3), con la Corta de MOT-1:
+    // 15 × 5.000 = 75.000, menos los 5.000 que hay, son 70.000.
+    expect(faltanPara(5000, 5000)).toBe(70000)
   })
 
   it('nunca es negativo: a quien le sobra no le falta', () => {
     expect(faltanPara(100, 5000)).toBe(0)
-    expect(faltanPara(100, 500)).toBe(0)
+    expect(faltanPara(100, 1500)).toBe(0)
   })
 })
 
@@ -150,7 +150,7 @@ describe('SAL-B1 · el orden del listado', () => {
       mesa('x', 4, 5000, 1),
       mesa('y', 4, 2000, 3),
       mesa('z', 4, 100, 0),
-    ], 500)
+    ], 1500)
     expect(orden.map((m) => m.id)).toEqual(['z', 'y', 'x'])
   })
 
@@ -209,20 +209,20 @@ describe('SAL-B1 · lo que ArmarMesa le pregunta al listado', () => {
 describe('SAL-B1 · el aviso al anfitrión', () => {
   it('se enciende justo donde el bono deja de alcanzar', () => {
     // La ficha lo enunciaba como «apuesta > 200» y la lámina como
-    // `apuesta × 5 > bono`, y se implementó la fórmula. ECO-1b (B4) re-sella:
-    // con el bono en 2.500 la frontera pasó sola de la mesa de 500 a la de
-    // 1.000, que es justo lo que la fórmula prometía.
+    // `apuesta × regla > bono`, y se implementó la fórmula. MOT-1 re-sella: con
+    // la Corta (15×) la frontera pasó sola de la mesa de 500 a la de 200, que es
+    // justo lo que la fórmula prometía.
     expect(fueraDelAlcanceDeNuevos(100, BONO_BIENVENIDA)).toBe(false)
-    expect(fueraDelAlcanceDeNuevos(200, BONO_BIENVENIDA)).toBe(false)
-    expect(fueraDelAlcanceDeNuevos(500, BONO_BIENVENIDA)).toBe(false)
+    expect(fueraDelAlcanceDeNuevos(200, BONO_BIENVENIDA)).toBe(true)
+    expect(fueraDelAlcanceDeNuevos(500, BONO_BIENVENIDA)).toBe(true)
     expect(fueraDelAlcanceDeNuevos(1000, BONO_BIENVENIDA)).toBe(true)
     expect(fueraDelAlcanceDeNuevos(5000, BONO_BIENVENIDA)).toBe(true)
   })
 
   it('la frontera se mueve con el bono, no con una cifra escrita', () => {
-    // Con un bono de 2.500, la mesa de 500 pasa a estar al alcance de un
+    // Con un bono de 7.500, la mesa de 500 pasa a estar al alcance de un
     // invitado nuevo y el aviso se apaga solo.
-    expect(fueraDelAlcanceDeNuevos(500, 2500)).toBe(false)
+    expect(fueraDelAlcanceDeNuevos(500, 7500)).toBe(false)
   })
 })
 
@@ -242,8 +242,8 @@ describe('SAL-B1 · §4.4 · la guarda de la configuración recordada', () => {
   })
 
   it('una configuración buena pasa entera', () => {
-    expect(normalizarConfig({ jugadores: 5, apuesta: 1000, tipo: 'abierta' }, SALDO))
-      .toEqual({ jugadores: 5, apuesta: 1000, tipo: 'abierta' })
+    expect(normalizarConfig({ jugadores: 5, apuesta: 200, tipo: 'abierta' }, SALDO))
+      .toEqual({ jugadores: 5, apuesta: 200, tipo: 'abierta' })
   })
 
   it('un valor fuera de las listas selladas NO se aproxima: cae al defecto', () => {

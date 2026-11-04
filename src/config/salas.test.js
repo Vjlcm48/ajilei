@@ -37,28 +37,28 @@ describe('SAL-A · las seis apuestas', () => {
   })
 })
 
-describe('SAL-A · la regla del 5×', () => {
-  it('el saldo mínimo es cinco veces la apuesta', () => {
-    expect(REGLA_ASIENTO).toBe(5)
-    expect(saldoMinimo(100)).toBe(500)
-    expect(saldoMinimo(5000)).toBe(25000)
+describe('MOT-1 · la entrada Corta', () => {
+  it('el saldo mínimo es quince veces la apuesta', () => {
+    expect(REGLA_ASIENTO).toBe(15)
+    expect(saldoMinimo(100)).toBe(1500)
+    expect(saldoMinimo(5000)).toBe(75000)
   })
 
   it('un saldo justo para el mínimo SÍ alcanza', () => {
-    // El borde: `>=`, no `>`. Con exactamente 500 se puede jugar la de 100.
-    expect(apuestasAlAlcance(500)).toEqual([100])
-    expect(apuestasAlAlcance(499)).toEqual([])
+    // El borde: `>=`, no `>`. Con exactamente 1.500 se puede jugar la de 100.
+    expect(apuestasAlAlcance(1500)).toEqual([100])
+    expect(apuestasAlAlcance(1499)).toEqual([])
   })
 
   it('el alcance crece con el saldo y conserva el orden', () => {
-    expect(apuestasAlAlcance(25000)).toEqual(APUESTAS_PVP)
-    expect(apuestasAlAlcance(2500)).toEqual([100, 200, 500])
+    expect(apuestasAlAlcance(75000)).toEqual(APUESTAS_PVP)
+    expect(apuestasAlAlcance(7500)).toEqual([100, 200, 500])
   })
 
   it('devuelve un array nuevo, no la lista sellada', () => {
     // Sin esto, un consumidor que hiciera `.sort()` sobre el resultado
     // reordenaría `APUESTAS_PVP` para toda la app.
-    const alcance = apuestasAlAlcance(25000)
+    const alcance = apuestasAlAlcance(75000)
     expect(alcance).not.toBe(APUESTAS_PVP)
     alcance.reverse()
     expect(APUESTAS_PVP[0]).toBe(100)
@@ -78,10 +78,9 @@ describe('SAL-A · el bono de bienvenida', () => {
     expect(BONO_BIENVENIDA).toBe(2500)
   })
 
-  it('una cuenta nueva alcanza exactamente las tres primeras mesas', () => {
-    // Con 2.500 se llega a la de 500 (5 × 500 = 2.500, el borde exacto entra) y
-    // no a la de 1.000 (5.000). Con el 1.200 de SAL-A eran [100, 200].
-    expect(ALCANCE_NUEVOS).toEqual([100, 200, 500])
+  it('una cuenta nueva alcanza solo la primera mesa', () => {
+    // Con 2.500 se llega a la de 100 (15 × 100 = 1.500) y no a la de 200 (3.000).
+    expect(ALCANCE_NUEVOS).toEqual([100])
   })
 
   it('el alcance de nuevos se DERIVA y no está escrito a mano', () => {

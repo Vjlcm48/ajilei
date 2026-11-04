@@ -20,8 +20,8 @@
 // ── EL ESPEJO DEL SERVIDOR ──────────────────────────────────────────────────
 // Estas mismas cifras están del otro lado, en `check` de columna y en las
 // funciones de la migración `<timestamp>_sal_a_salas.sql`: las seis apuestas en
-// `salas.apuesta`, la regla 5× en `crear_sala`/`unirse_sala`, el alfabeto en
-// `salas_codigo_formato_chk`, los 180 s en el defecto de `expira_en`.
+// `salas.apuesta`, la entrada en `entrada_de` (`<timestamp>_mot1_dinero.sql`), el
+// alfabeto en `salas_codigo_formato_chk`, los 180 s en el defecto de `expira_en`.
 //
 // LA DUPLICACIÓN ES DELIBERADA Y NO ES UNA FUENTE DE VERDAD PARTIDA. El cliente
 // no valida: decide qué botón enseñar apagado para no gastar un viaje de red en
@@ -49,12 +49,12 @@ export const APUESTAS_PVP = [100, 200, 500, 1000, 2000, 5000]
 // cambia a mano: Vitest no puede leer una función SQL.
 export const BONO_BIENVENIDA = 2500
 
-// ── La regla del 5× ─────────────────────────────────────────────────────────
-// Para sentarse a una mesa hay que tener CINCO veces la apuesta, no una. No es
-// una traba: una mesa donde alguien entra con el saldo justo para el ante se
-// queda sin ese jugador en la primera mano y deja la partida coja para los otros
-// cuatro. El 5 es el colchón que hace que un asiento ocupado siga ocupado.
-export const REGLA_ASIENTO = 5
+// ── La entrada Corta ────────────────────────────────────────────────────────
+// MOT-1 (C-12) · Para sentarse hay que tener la entrada de la mesa, que sale del
+// saldo al sentarse. Hoy todas las mesas que arma el cliente son Cortas: 15 veces
+// la apuesta (`entrada_de` en la migración `mot1_dinero`). Con el 5× de antes,
+// `ArmarMesa` ofrecía mesas que el servidor rechaza. MES-PvP trae la fila Entrada.
+export const REGLA_ASIENTO = 15
 
 /** Saldo mínimo para sentarse a una mesa de esta apuesta. */
 export function saldoMinimo(apuesta) {
@@ -71,8 +71,8 @@ export function apuestasAlAlcance(saldo) {
   return APUESTAS_PVP.filter((apuesta) => saldoMinimo(apuesta) <= saldo)
 }
 
-// Lo que alcanza una cuenta recién nacida: [100, 200, 500] desde ECO-1b (con
-// 1.200 eran [100, 200]: 5 × 500 = 2.500 cabe justo en el bono). Se DERIVA en vez de
+// Lo que alcanza una cuenta recién nacida: [100] desde MOT-1 (15 × 100 = 1.500 cabe
+// en el bono de 2.500; 15 × 200 = 3.000, no). Se DERIVA en vez de
 // escribirse, para que el día que el bono o la regla cambien esta lista cambie
 // sola en vez de quedarse mintiendo.
 export const ALCANCE_NUEVOS = apuestasAlAlcance(BONO_BIENVENIDA)

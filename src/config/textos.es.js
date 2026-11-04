@@ -204,7 +204,7 @@ export const TEXTOS_ES = {
   'sal.espera.llego':           '{quien} se sentó',
   'sal.espera.consejo.1':       'Se juega con los que estén sentados cuando el reloj llegue a cero',
   'sal.espera.consejo.2':       'En mesas de 4 y 5 jugadores entra el comodín',
-  'sal.espera.consejo.3':       'Para sentarte necesitas 5 veces la apuesta de la mesa',
+  'sal.espera.consejo.3':       'Para sentarte necesitas 15 veces la apuesta de la mesa',
   'sal.espera.consejo.4':       'El anfitrión puede arrancar desde 2 jugadores con «Jugar ya»',
   'sal.espera.consejo.5':       'Copia el código o comparte el enlace por WhatsApp: sienta a tu invitado aquí mismo',
   'sal.espera.llena':           '¡Mesa completa! Arranca sola',
