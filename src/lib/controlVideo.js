@@ -138,8 +138,9 @@ export function crearControlVideo({
     if (cuenta === null || ocupadoEn(foto) || sinVideosHoy(foto.estado)) return
     const g = generacion
     fija({ fase: FASES_CONTROL.PIDIENDO })
-    precargar()
-    const r = await api.pedir()
+    // PES-1 §3-B · el reloj del video no arranca sin sus capas: con red lenta, el
+    // jugador vería menos video del que se le cuenta. Si el trozo falla, sigue.
+    const [r] = await Promise.all([api.pedir(), Promise.resolve(precargar()).catch(() => {})])
     if (g !== generacion) return
     const estado = estadoTras(foto.estado, r, ahora())
     const que = alPedir(r)

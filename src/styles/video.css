@@ -4,9 +4,11 @@
    (2 = A, 1 = B), más el «Guardando tu premio…» del cobro (P-2).
 
    HOJA NUEVA Y ADITIVA: todas las clases son `vid-*` y ninguna regla de otra
-   hoja cambia. Las capas cuelgan de `.vid-raiz`, que `MarcoVideo` monta en
-   <body> (portal); el contador `.vid-quedan` vive además dentro del bloque de
-   saldo de Retar (`.sal-saldo`), con la unidad `--u` de esa pantalla.
+   hoja cambia. Las capas cuelgan de `.vid-raiz`, que `CapasVideo` monta en
+   <body> (portal).
+
+   PES-1 §3-B · esta hoja viaja con las capas. El contador `.vid-quedan` y el saldo
+   de Retar se mudaron a `salas.css`, y las filas de Monedas a `tienda.css`.
 
    Mide en `--u`, la misma unidad del lobby y de las salas
    (`clamp(3.2px, 1vmin, 6px)`), y sólo usa los tokens de `theme.css`.
@@ -33,57 +35,6 @@
 /* `:where` para no ganarle por especificidad a ninguna pieza de abajo. */
 :where(.vid-raiz) button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
 
-/* ── El contador «Te quedan N de 8 hoy» / «Vuelven en …» ────────────────────
-   Una sola caja para los dos textos, siempre presente (O1). */
-.vid-quedan {
-  display: block;
-  margin: 0;
-  min-height: 1.3em;
-  font-size: calc(var(--u) * 2.7);
-  font-weight: 400;
-  line-height: 1.3;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-/* En el bloque de saldo de Retar (`.sal-saldo`, rejilla centrada). */
-.sal-saldo > .vid-quedan { margin-top: calc(var(--u) * -0.4); }
-/* ── EN EL TRAJE CORTO Y ANCHO DE RETAR, EL CONTADOR VA AL LADO ─────────────
-   Debajo del botón, el contador le cuesta 24 px a la columna. En un 1024×768,
-   un 1366×768 o un iPad girado (1133×744) esos 24 px sacan el CTA de la
-   ventana, y esa pantalla no desplaza: medido con `diagDSK retar`, que salía
-   rojo en sus celdas de 768 de alto. La doctrina de `salas.css` para ese traje
-   es apretar, no desplazar («lo que no cabe NO se scrollea, se aprieta»).
-
-   Aquí no se aprieta nada: con 660 px de columna sobra sitio a los lados del
-   botón, y el contador se sienta a su derecha. El botón sigue centrado donde
-   estaba (columna del medio) y el contador ocupa la tercera, así que pasar de
-   «Te quedan N de 8 hoy» a «Vuelven en…» no mueve el botón (O1). El bloque
-   vuelve a medir lo que medía antes del contador.
-
-   La frontera de alto es la del traje corto de `.es-retar` (800 px). La de
-   ancho deja fuera a los teléfonos girados, que ya desplazan por diseño y
-   conservan el contador debajo, como en la lámina. */
-@media (min-width: 1000px) and (max-height: 800px) {
-  .sal-saldo:has(> .vid-quedan) {
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    column-gap: calc(var(--u) * 2.4);
-  }
-  .sal-saldo:has(> .vid-quedan) > .sal-saldo-txt { grid-column: 1 / -1; }
-  .sal-saldo:has(> .vid-quedan) > .sal-saldo-cta { grid-column: 2; }
-  .sal-saldo:has(> .vid-quedan) > .vid-quedan {
-    grid-column: 3;
-    justify-self: start;
-    margin-top: 0;
-    text-align: left;
-  }
-}
-
-/* El tope del día: el botón del video, apagado (G6). */
-.sal-saldo .sal-saldo-cta:disabled { opacity: 0.4; cursor: default; }
-.sal-saldo .sal-saldo-cta:disabled:hover { background: transparent; }
-.sal-saldo .sal-saldo-cta:disabled:active { transform: none; }
-
 /* ── Velos ──────────────────────────────────────────────────────────────── */
 .vid-velo {
   position: fixed;
@@ -98,66 +49,6 @@
   place-items: center;
   padding: var(--vid-margen);
   background: rgba(var(--green-abyss-rgb), 0.78);
-}
-
-/* ══ LAS FILAS DE «CONSEGUIR MONEDAS» ══════════════════════════════════
-   TIE-1 1a · la hoja que colgaba de la píldora (`.vid-hoja`) se retira con
-   `HojaMonedas`: el «+» abre la tienda en el estante Monedas, que pinta estas
-   mismas filas (`tienda.css` les da su filete fuera de `.vid-raiz`). */
-.vid-fila {
-  width: 100%;
-  min-height: max(44px, calc(var(--u) * 12));
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: calc(var(--u) * 2.4);
-  padding: calc(var(--u) * 1.8) 0;
-  background: none;
-  border: 0;
-  border-top: 1px solid var(--vid-linea);
-  text-align: left;
-  cursor: pointer;
-}
-.vid-fila-ico {
-  width: calc(var(--u) * 8);
-  height: calc(var(--u) * 8);
-  min-width: 28px;
-  min-height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--green-abyss);
-  background: var(--gold-brand);
-}
-.vid-fila-ico svg { width: 56%; height: 56%; }
-.vid-fila-txt { min-width: 0; display: grid; gap: 0.15em; }
-.vid-fila-txt b { font-size: calc(var(--u) * 3.4); font-weight: 500; color: var(--text-primary); }
-.vid-fila-premio {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35em;
-  font-size: calc(var(--u) * 3.4);
-  font-weight: 700;
-  color: var(--gold-brand);
-  white-space: nowrap;
-}
-.vid-fila-premio .chip-token { width: 1.15em; height: 1.15em; }
-.vid-fila:disabled { cursor: default; }
-.vid-fila:disabled .vid-fila-ico { background: none; color: var(--text-muted); border: 1px solid var(--vid-linea); }
-.vid-fila:disabled .vid-fila-txt b { color: var(--text-muted); }
-.vid-fila:disabled .vid-fila-premio { color: var(--text-muted); }
-.vid-fila:disabled .vid-fila-premio .chip-token { opacity: 0.45; }
-.vid-fila-off { cursor: default; }
-.vid-fila-off .vid-fila-ico { background: none; color: var(--text-muted); border: 1px solid var(--vid-linea); }
-.vid-fila-off .vid-fila-txt b { color: var(--text-muted); }
-/* La pastilla «Pronto», la del lobby (`.lob-pastilla`). */
-.vid-pastilla {
-  font-size: calc(var(--u) * 2.65);
-  color: var(--text-muted);
-  border: 1px solid var(--vid-linea);
-  border-radius: 999px;
-  padding: 0.12em 0.7em;
-  white-space: nowrap;
 }
 
 /* ══ LA CAPA DEL VIDEO ════════════════════════════════════════════════════

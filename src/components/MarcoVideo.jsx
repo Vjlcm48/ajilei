@@ -1,16 +1,11 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { createPortal } from 'react-dom'
-import '../styles/video.css'
-
-import CapaVideo from './CapaVideo'
-import GuardandoVideo from './GuardandoVideo'
-import SinVideo from './SinVideo'
-import CelebracionVideo from './CelebracionVideo'
+import { lazy, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import PantallaDiferida from './PantallaDiferida'
 import { VideoContext } from '../hooks/useVideo'
 import { useIdioma } from '../hooks/useIdioma'
 import { contadorDe, sinVideosHoy, tocaReleer } from '../hooks/videoCore'
 import { FASES_CONTROL } from '../lib/controlVideo'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
+import { trozos } from '../lib/trozos'
 
 // ── ECO-1g · El marco del video de recompensa ───────────────────────────────
 // Rector: AJILEI_ECO-1_Fase1g_v1.0.md §2.2 («se monta una vez cerca de App») y
@@ -25,8 +20,9 @@ import { AJILEI_CONFIG } from '../config/ajileiConfig'
 // pantallas necesitan (`hooks/useVideo`). No decide nada: las reglas están en
 // `hooks/videoCore` y el recorrido en el canal.
 //
-// LAS CAPAS VAN EN <body> (portal), como la cápsula del aviso de saldo: son
-// `position: fixed`, y un antecesor con `transform` las anclaría a él.
+// PES-1 §3-B · LAS CAPAS VIVEN EN SU TROZO (`CapasVideo`, con `video.css`): este
+// marco se queda en la entrada como cascarón, y solo las pide cuando hay algo que
+// enseñar. Fuera de un video no hay `.vid-raiz` en el DOM.
 //
 // P-4 (rector) · si una sala arranca con un video abierto, la capa sigue
 // encima. Queda anotado en el registro para MES-PvP.
@@ -37,6 +33,7 @@ import { AJILEI_CONFIG } from '../config/ajileiConfig'
 // va envuelta en este marco como las demás pantallas con barra.
 
 const ESPEJO = AJILEI_CONFIG.economy
+const CapasVideo = lazy(trozos.capasVideo.fabrica)
 
 export default function MarcoVideo({ control, avisoEnCurso = false, onMonedas, children }) {
   const { t } = useIdioma()
@@ -89,20 +86,20 @@ export default function MarcoVideo({ control, avisoEnCurso = false, onMonedas, c
   return (
     <VideoContext.Provider value={valor}>
       {children}
-      {createPortal(
-        <div className="vid-raiz">
-          {sesion && <CapaVideo key={sesion.id} reproductor={control.reproductor} sesion={sesion} premio={premio} />}
-          {foto.fase === FASES_CONTROL.COBRANDO && (
-            <GuardandoVideo premio={premio} salible={foto.salible} onSalir={control.salirDelCobro} />
-          )}
-          {foto.fase === FASES_CONTROL.SIN && <SinVideo total={tope} onVolver={control.cerrarSin} />}
-          {/* Si hay un aviso de saldo en curso, espera a que termine: nunca los
-              dos a la vez sobre la píldora. */}
-          {cel && !avisoEnCurso && (
-            <CelebracionVideo key={cel.id} cel={cel} contador={contador} onPildora={setPintura} onFin={control.finCelebracion} />
-          )}
-        </div>,
-        document.body,
+      {(sesion || foto.fase === FASES_CONTROL.COBRANDO || foto.fase === FASES_CONTROL.SIN || cel) && (
+        <PantallaDiferida trozo={trozos.capasVideo} familia="capa">
+          <CapasVideo
+            control={control}
+            foto={foto}
+            sesion={sesion}
+            cel={cel}
+            avisoEnCurso={avisoEnCurso}
+            premio={premio}
+            tope={tope}
+            contador={contador}
+            onPildora={setPintura}
+          />
+        </PantallaDiferida>
       )}
     </VideoContext.Provider>
   )

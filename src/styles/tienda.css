@@ -9,6 +9,69 @@
    mide 44 o más (INV-07): estantes, filas, «Usar», muestras, enlace y botones.
    La vitrina es de vitrina.css. */
 
+/* PES-1 §3-B · de `video.css`: solo las pinta el estante Monedas. Delante de las
+   reglas de esta hoja, que les dan su filete: es el orden que tenían. */
+/* ══ LAS FILAS DE «CONSEGUIR MONEDAS» ══════════════════════════════════
+   TIE-1 1a · la hoja que colgaba de la píldora (`.vid-hoja`) se retira con
+   `HojaMonedas`: el «+» abre la tienda en el estante Monedas, que pinta estas
+   mismas filas (`tienda.css` les da su filete fuera de `.vid-raiz`). */
+.vid-fila {
+  width: 100%;
+  min-height: max(44px, calc(var(--u) * 12));
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: calc(var(--u) * 2.4);
+  padding: calc(var(--u) * 1.8) 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--vid-linea);
+  text-align: left;
+  cursor: pointer;
+}
+.vid-fila-ico {
+  width: calc(var(--u) * 8);
+  height: calc(var(--u) * 8);
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--green-abyss);
+  background: var(--gold-brand);
+}
+.vid-fila-ico svg { width: 56%; height: 56%; }
+.vid-fila-txt { min-width: 0; display: grid; gap: 0.15em; }
+.vid-fila-txt b { font-size: calc(var(--u) * 3.4); font-weight: 500; color: var(--text-primary); }
+.vid-fila-premio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: calc(var(--u) * 3.4);
+  font-weight: 700;
+  color: var(--gold-brand);
+  white-space: nowrap;
+}
+.vid-fila-premio .chip-token { width: 1.15em; height: 1.15em; }
+.vid-fila:disabled { cursor: default; }
+.vid-fila:disabled .vid-fila-ico { background: none; color: var(--text-muted); border: 1px solid var(--vid-linea); }
+.vid-fila:disabled .vid-fila-txt b { color: var(--text-muted); }
+.vid-fila:disabled .vid-fila-premio { color: var(--text-muted); }
+.vid-fila:disabled .vid-fila-premio .chip-token { opacity: 0.45; }
+.vid-fila-off { cursor: default; }
+.vid-fila-off .vid-fila-ico { background: none; color: var(--text-muted); border: 1px solid var(--vid-linea); }
+.vid-fila-off .vid-fila-txt b { color: var(--text-muted); }
+/* La pastilla «Pronto», la del lobby (`.lob-pastilla`). */
+.vid-pastilla {
+  font-size: calc(var(--u) * 2.65);
+  color: var(--text-muted);
+  border: 1px solid var(--vid-linea);
+  border-radius: 999px;
+  padding: 0.12em 0.7em;
+  white-space: nowrap;
+}
+
+
 /* ── El cuerpo ─────────────────────────────────────────────────────────────── */
 /* Aire bajo la cabecera (D-2 de la lámina): las zonas de 44 de la flecha y la
    casa bajan 6,3 px por debajo de su caja y, en 360×640, pisaban la fila de

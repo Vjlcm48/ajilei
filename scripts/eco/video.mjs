@@ -597,7 +597,8 @@ export async function runVideo(browser, { base, baseDev = null, externo = false,
           filaMin: Math.min(...filas.map((f) => f.h)),
           filasDentro: filas.length === 2 && filas.every((f) => f.l >= -0.5 && f.r <= de.clientWidth + 0.5 && f.t >= 0 && f.b <= de.clientHeight + 0.5),
           desbordaX: de.scrollWidth > de.clientWidth,
-          corchetes: document.querySelector('.vid-raiz')?.innerText.includes('⟦') ?? true,
+          // PES-1 · fuera de un video ya no hay `.vid-raiz`: se mira la pantalla entera.
+          corchetes: document.body.innerText.includes('⟦'),
           contador: document.querySelector('[data-accion="tie-monedas"] [data-accion="video-quedan"]')?.textContent?.trim(),
         }
       })
