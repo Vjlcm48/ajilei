@@ -39,6 +39,7 @@ import {
   instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
   ErrorInstrumento, codigoDeSalida,
 } from './arnes/comun.mjs'
+import { commitDelArbol } from './arnes/fuente.mjs'
 
 instalarSalidas()
 const OPC = opcionesDelArnes()
@@ -1910,7 +1911,7 @@ if (MODO === 'celebracion') {
   await terminar(codigo)
 }
 
-const informe = { tanda: 'CEL-0', chromium: browser.version(), audio: null, celdas: {}, molde: [] }
+const informe = { tanda: 'CEL-0', commit: commitDelArbol(), chromium: browser.version(), audio: null, celdas: {}, molde: [] }
 const errores = []
 
 // (1) Audio — una sola pestaña, sin mesa: no depende de la pantalla.

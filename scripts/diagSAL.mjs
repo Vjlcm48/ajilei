@@ -52,6 +52,7 @@ import {
   instalarSalidas, opcionesDelArnes, navegadorArnes, servidorArnes, terminar, fallarInstrumento,
   ErrorInstrumento, codigoDeSalida,
 } from './arnes/comun.mjs'
+import { commitDelArbol } from './arnes/fuente.mjs'
 
 // ARN-1 · el instrumento se autoetiqueta. `playwright-core` va pineado exacto en
 // devDependencies porque los píxeles cambian entre versiones. Desde ARN-3a el
@@ -951,6 +952,7 @@ try {
 
 await browser.close()
 
+report.commit = commitDelArbol()   // ARN-4d · de qué commit es este veredicto
 const json = JSON.stringify(report, (k, v) => (typeof v === 'number' ? round(v) : v), 2)
 try {
   mkdirSync(OUT_DIR, { recursive: true })

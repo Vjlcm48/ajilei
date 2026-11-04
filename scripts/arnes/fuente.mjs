@@ -9,11 +9,24 @@
 // de línea, para que las líneas que se informan cuadren con el archivo. Si un
 // día un `//` dentro de una cadena le engañara, el error sería un ROJO falso
 // (más código a la vista), nunca un verde falso.
+import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const RAIZ = fileURLToPath(new URL('../../', import.meta.url))
+
+/**
+ * ARN-4d · el commit que se está midiendo, con `-dirty` si hay cambios sin confirmar
+ * en lo que tiene seguimiento. Sin git, lo dice: un veredicto no se queda sin firma.
+ */
+export function commitDelArbol() {
+  try {
+    return execFileSync('git', ['describe', '--always', '--dirty', '--abbrev=7', '--exclude=*'], { cwd: RAIZ, encoding: 'utf8' }).trim()
+  } catch {
+    return 'sin git'
+  }
+}
 
 /** Los archivos bajo `dir` (relativo a la raíz) cuyo nombre cumple `filtro`, sin `node_modules`. */
 export function archivos(dir, filtro) {

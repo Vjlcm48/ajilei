@@ -229,7 +229,7 @@ export const MODOS_DSK = Object.freeze([
   'r1', 'r2', 'o1', 'h1', 'm1', 'a1', 'f1', 'z1', 'o2', 'a2', 'u1', 'menu-movil', 'u2', 'u3',
   'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo', 'mesaia', 'revive', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk', 'suma', 'cfg', 'tienda',
 ])
-const CLAVES_META = new Set(['mode', 'ts', 'arnes', 'error', 'veredicto', 'codigo'])
+const CLAVES_META = new Set(['mode', 'ts', 'commit', 'arnes', 'error', 'veredicto', 'codigo'])
 
 /**
  * El veredicto de una corrida de `diagDSK`: un par [clave, veredicto] por modo
