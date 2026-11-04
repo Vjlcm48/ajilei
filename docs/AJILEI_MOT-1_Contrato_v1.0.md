@@ -7,6 +7,7 @@
 - **Visto bueno del rector, con sus correcciones (2026-11-04):** no queda ninguna propuesta abierta. Las cifras provisionales lo dicen donde aparecen.
 - **Al día con la 1b (2026-11-04):** el §4, el §6 y el §7 recogen los ajustes del rector al STOP-1b. Las citas de esos ajustes a `src/arbitro/` son del árbol de la 1b.
 - **Al día con la 1d-i (2026-11-04):** el §4 y el §5 recogen las dos decisiones del rector al STOP-1: el ritmo no es secreto, y la recepción con un cliente suscrito se prueba en la 1e.
+- **Al día con la 1d-ii (2026-11-04):** el §6, el §7 y el §9 recogen la precisión de la C-10 (borrar la cuenta no cierra la partida de los demás, con la excepción del anfitrión) y que la llamada a los puntos vive en `guardar_jugada`.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -326,7 +327,8 @@ Hoy no existe ninguna constante de servidor. **El contrato solo pone una cifra, 
 ### Reloj sin congelar
 
 - **Manda el servidor.** El reloj no se congela con la pantalla apagada. `useCongelado` queda solo para las mesas contra las IAS (`GameTable.jsx:904` · `hooks/useCongelado.js`).
-- **Partida muerta.** Si una partida pasa 15 min sin cambiar de versión, `barrer_salas` la cierra. La mano en curso se anula y cada asiento cobra, por `liberacion_pvp`, la pila de la última mano cerrada, la que está en SQL. Lo mismo al borrar una cuenta con partida viva. Cifra provisional. Va a la 1d-i y la 1d-ii (§9).
+- **Partida muerta.** Si una partida pasa 15 min sin cambiar de versión, `barrer_salas` la cierra. La mano en curso se anula y cada asiento no cobrado recibe, por `liberacion_pvp`, la pila de la última mano cerrada, la que está en SQL. Cifra provisional. Va a la 1d-i y la 1d-ii (§9).
+- **Borrar la cuenta con partida viva.** No cierra la partida: perjudicaría a los demás. Mientras el jugador tenga un asiento no cobrado, `partida_abierta_de` (`cfg1c:45-77`) la cuenta como partida abierta y el borrado se rechaza. Podrá borrarla cuando haya cobrado o cuando la partida muera. **Excepción:** el anfitrión, aunque haya cobrado, sigue bloqueado hasta que la partida termine o muera: `salas.anfitrion_id` es `on delete cascade`, y borrarlo se llevaría la sala, la partida y las pilas de todos.
 - **Gracia de reconexión y lo que ve el que vuelve:** MES-PvP.
 
 ---
@@ -390,8 +392,8 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Punto | Regla | Prueba |
 |---|---|---|
 | Tabla | `libro_puntos`, sin cambios | `rnk1a:112-142` |
-| Quién escribe | El árbitro. La función la crea la 1d-ii y la llamada es de la 1e | Rankings v1.2 `:143` |
-| Interruptor | La llamada de la 1e queda detrás de un interruptor apagado, como la válvula de ECO-1, y se enciende en MES-PvP. El humo de la 1f no escribe en los rankings | `eco1d:229` |
+| Quién escribe | El árbitro. La función y la llamada son de la 1d-ii: la llamada vive en `guardar_jugada`, al procesar `mano_cerrada` | Rankings v1.2 `:143` |
+| Interruptor | La llamada queda detrás de un interruptor apagado, como la válvula de ECO-1, y se enciende en MES-PvP. El humo de la 1f no escribe en los rankings | `eco1d:229` |
 | Cuándo | Al cerrar la mano, en la misma transacción que las pilas | Paso 2 del §5 |
 | `origen` | `'humanos'` | `rnk1a:125-141` |
 | `nivel` | Nulo | `rnk1a:125-141` |
@@ -443,12 +445,12 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Tabla de partida, vistas y `realtime.messages` | §5 | 1d-i |
 | `barrer_salas` no puede cancelar partidas vivas | `sal_b1:116-120`: mira `estado_partida`, que seguirá nula | 1d-i |
 | `sala_estado` sin valor de partida terminada | `sal_a:67` | 1d-i |
-| Partida muerta: cierre a los 15 min y al borrar la cuenta (§6) | `sal_b1:116-120` · `cfg1c:45-77` | 1d-i y 1d-ii |
+| Partida muerta: cierre a los 15 min, y la guarda de borrar la cuenta (§6) | `sal_b1:116-120` · `cfg1c:45-77` | 1d-i y 1d-ii |
 | `mi_sala` debe devolver la mesa viva | `sal_b1:346-372` | 1d-i |
 | **Saldo ≥ entrada** | `sal_a:285` · `sal_b1:157` · `sal_b2:143` | 1d-ii, con la garantía |
 | Garantía, liberación y pilas por mano | §7 | 1d-ii |
 | C4 entre modos y los casos de la espera (§7) | `eco1c:303-343` · `sal_b1:154` · `sal_b2:140` | 1d-ii |
-| Libro de puntos contra humanos (RNK-1) | `rnk1a:112-142` · Rankings v1.2 `:88, :143` | 1d-ii la función; 1e la llamada, con el interruptor apagado (§7) |
+| Libro de puntos contra humanos (RNK-1) | `rnk1a:112-142` · Rankings v1.2 `:88, :143` | 1d-ii la función y la llamada en `guardar_jugada`, con el interruptor apagado (§7) |
 | Unificar topes en `limite_dinero()` (ARN-4) | `eco1g:100-113` · `cfg1e:199` · `tie1a:162` | 1d-ii |
 | Motor en el trozo de la mesa (PES-1) | `cargarMesa.js:124` · `trozos.js:28, :32` · `testEntradaLigera.test.js:34` | 1e y 1f: lo nuevo nace en `trozos.partidaPvP` |
 | Limpiar la sonda | `sonda_mot1/` · `.gitignore:127-129` | 1e |
