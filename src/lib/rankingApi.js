@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { conTope, TOPE_ESPERA_MS } from './red'
-import { lugarValido } from './lugarCore'
+import { lugarValido } from './lugarCodigos'
 
 // ── RNK-1c · La puerta del cliente a los rankings ───────────────────────────
 // Rector: AJILEI_RNK-1_Fase1c-i_v1.0.md §2.4. Molde de `mesaIAApi.js`:

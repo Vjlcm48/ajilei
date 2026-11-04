@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { normalizar, buscarPaises, textoLugar, lugarValido, DIASPORA, POR_CODIGO } from './lugarCore'
+import { CODIGOS_PAIS, CODIGOS_ESTADO_VE } from '../config/lugaresCodigos'
 import { PAISES } from '../config/paises'
+import { esEstado, esPais, lugarValido as lugarValidoEntrada } from './lugarCodigos'
 import { ESTADOS_VE } from '../config/estados'
 
 // ── CFG-1 1b · «De dónde eres» ──────────────────────────────────────────────
@@ -86,5 +88,24 @@ describe('CFG-1 1b · el texto del lugar y lo que llega del servidor', () => {
     expect(lugarValido('VE', 'ESQ')).toEqual({ pais: 'VE', estado: null })
     expect(lugarValido('ve', null)).toEqual({ pais: null, estado: null })
     expect(lugarValido(undefined, undefined)).toEqual({ pais: null, estado: null })
+  })
+})
+
+describe('PES-1 §3-D · los códigos de la entrada son las claves de los nombres', () => {
+  it('los mismos países, en el mismo orden', () => {
+    expect([...CODIGOS_PAIS]).toEqual(PAISES.map((p) => p.c))
+  })
+  it('los mismos estados, en el mismo orden', () => {
+    expect([...CODIGOS_ESTADO_VE]).toEqual(ESTADOS_VE.map((e) => e.c))
+  })
+  it('sin nombres: el archivo de la entrada no lleva ninguno', () => {
+    expect(JSON.stringify(CODIGOS_PAIS)).not.toMatch(/Venezuela/)
+    expect(esPais('VE')).toBe(true)
+    expect(esPais('XX')).toBe(false)
+    expect(esEstado('VE', 'ZUL')).toBe(true)
+    expect(esEstado('CO', 'ZUL')).toBe(false)
+  })
+  it('lugarCore reexporta la misma validación', () => {
+    expect(lugarValido).toBe(lugarValidoEntrada)
   })
 })

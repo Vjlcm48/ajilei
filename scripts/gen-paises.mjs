@@ -24,6 +24,7 @@
 import { writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { RAIZ } from './arnes/fuente.mjs'
+import { ESTADOS_VE } from '../src/config/estados.js'
 
 export const ORIGEN_BANDERAS = 'country-flag-icons@1.6.20'
 
@@ -83,6 +84,16 @@ const cuerpo = `export const PAISES = Object.freeze([\n${paises.map((p) => '  ' 
 const destino = join(RAIZ, 'src/config/paises.js')
 writeFileSync(destino, cab + cuerpo)
 console.log(`${paises.length} países → ${destino}`)
+
+// PES-1 §3-D · los códigos, de la misma lista: es lo único que viaja en la entrada.
+// Los nombres van con lo que los enseña. `lugarCore.test.js` exige que coincidan.
+const destinoCodigos = join(RAIZ, 'src/config/lugaresCodigos.js')
+writeFileSync(destinoCodigos, `// GENERADO por scripts/gen-paises.mjs — no editar a mano.
+// Los códigos de \`paises.js\` y \`estados.js\`, sin los nombres.
+export const CODIGOS_PAIS = Object.freeze(${JSON.stringify(paises.map((p) => p.c))})
+export const CODIGOS_ESTADO_VE = Object.freeze(${JSON.stringify(ESTADOS_VE.map((e) => e.c))})
+`)
+console.log(`${paises.length} países y ${ESTADOS_VE.length} estados → ${destinoCodigos}`)
 
 const i = process.argv.indexOf('--banderas')
 if (i > 0) {

@@ -48,7 +48,7 @@
 }
 /* La que está: la moneda de la casa (el maestro sellado, sin recolorear). */
 .lobby .lob-top .cst-pip.is-llena {
-  background: url("../assets/heptacoin.svg") center / contain no-repeat;
+  background: url("../assets/heptacoin.svg?no-inline") center / contain no-repeat;
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.45));
 }
 .lobby .lob-top .cst-n { min-inline-size: 2.2ch; }

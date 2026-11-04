@@ -2,6 +2,11 @@ import {
   TIPOS, CODIGOS, DESTINOS, destinoDe, colaNueva, encolarPila, encolarRecarga, encolarSalida,
   proximo, enviando, alResponder, anotarPila,
 } from '../hooks/mesaIACore'
+import { ESPERAS_RED_MS } from './esperasRed'
+
+// PES-1 §3-A · `App` carga este módulo al sentarse, y con él lo que necesita.
+export { ESPERAS_RED_MS }
+export { LIMITE_SENTARSE } from '../hooks/mesaIACore'
 
 // ── ECO-1c · El canal de UNA mesa contra las IAS con el servidor ────────────
 // Rector: AJILEI_ECO-1_Fase1c_v1.0.md §2.2 y el plan aprobado del STOP-1 (§1,
@@ -34,8 +39,6 @@ import {
 // IOS-1c · con `{ forzarTrasMs }` (volver a primer plano) se fuerza sólo lo que
 // lleve EN VUELO más de ese tiempo: lo colgado de verdad, no lo que acaba de
 // salir. Rector: AJILEI_IOS-1_Fase1c_v1.0.md §3.2.
-
-export const ESPERAS_RED_MS = Object.freeze([1000, 2000, 4000, 8000, 15000])
 
 /**
  * @param {object} o

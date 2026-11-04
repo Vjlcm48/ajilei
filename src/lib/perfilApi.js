@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { lugarValido } from './lugarCore'
+import { lugarValido } from './lugarCodigos'
 
 // ── CFG-1 1b · La puerta del cliente al perfil propio ───────────────────────
 // Rector: AJILEI_CFG-1_Fase1b_v1.0.md §2.3 (R-6). Envoltorio delgado sobre

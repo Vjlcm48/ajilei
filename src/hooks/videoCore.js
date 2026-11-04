@@ -136,7 +136,7 @@ export const AL_COBRAR = Object.freeze({
   CELEBRAR: 'celebrar', ESPERAR: 'esperar', REINTENTAR: 'reintentar', TOPE: 'tope', SIN: 'sin',
 })
 
-// Los reintentos de la casa (`controlMesaIA.ESPERAS_RED_MS`): 1, 2, 4, 8 y
+// Los reintentos de la casa (`esperasRed.ESPERAS_RED_MS`): 1, 2, 4, 8 y
 // luego 15 s. La PRIMERA TANDA son esos cinco (unos 30 s): mientras dura, la ✕
 // no está (P-2 del rector).
 export const ESPERAS_COBRO_MS = Object.freeze([1000, 2000, 4000, 8000, 15000])

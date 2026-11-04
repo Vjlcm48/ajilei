@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { TOPE_ESPERA_MS, conTope } from '../lib/red'
-import { ESPERAS_RED_MS } from '../lib/controlMesaIA'
+import { ESPERAS_RED_MS } from '../lib/esperasRed'
 import { perfilApi, traducirPerfilPropio, fechaDelServidor, fechaDelFreno } from '../lib/perfilApi'
 
 // ── SUP-2b · La puerta: fuente única del estado de sesión ────────────────────

@@ -50,7 +50,7 @@
 
 /** Los tres estados de la lectura. */
 import { TOPE_RED_MS } from '../lib/red'
-import { ESPERAS_RED_MS } from '../lib/controlMesaIA'
+import { ESPERAS_RED_MS } from '../lib/esperasRed'
 
 export const CARGANDO = 'cargando'
 export const LISTO = 'listo'

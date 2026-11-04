@@ -5,6 +5,9 @@
 import { PAISES } from '../config/paises'
 import { ESTADOS_VE } from '../config/estados'
 
+// PES-1 §3-D · la validación solo pide códigos y vive en la entrada.
+export { lugarValido } from './lugarCodigos'
+
 export const POR_CODIGO = new Map(PAISES.map((p) => [p.c, p]))
 const ESTADO_POR_CODIGO = new Map(ESTADOS_VE.map((e) => [e.c, e]))
 
@@ -62,14 +65,4 @@ export function textoLugar(pais, estado) {
   if (!p) return ''
   const e = estadoDe(pais, estado)
   return e ? `${p.n} · ${e.n}` : p.n
-}
-
-/**
- * Lo que llega del servidor, validado contra las listas (INV-74): un país que
- * no está en la lista se lee como «sin país», y un estado sin Venezuela o fuera
- * de la lista, como «sin estado». Nunca lanza.
- */
-export function lugarValido(pais, estado) {
-  const p = paisDe(pais) ? pais : null
-  return { pais: p, estado: estadoDe(p, estado) ? estado : null }
 }
