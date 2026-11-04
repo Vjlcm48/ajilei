@@ -6,6 +6,7 @@
 - **Regla de la campaña:** lo justo. No rediseña lo que funciona. Donde una sub-tanda tenga que decidir, dice cuál y qué debe cumplir.
 - **Visto bueno del rector, con sus correcciones (2026-11-04):** no queda ninguna propuesta abierta. Las cifras provisionales lo dicen donde aparecen.
 - **Al día con la 1b (2026-11-04):** el §4, el §6 y el §7 recogen los ajustes del rector al STOP-1b. Las citas de esos ajustes a `src/arbitro/` son del árbol de la 1b.
+- **Al día con la 1d-i (2026-11-04):** el §4 y el §5 recogen las dos decisiones del rector al STOP-1: el ritmo no es secreto, y la recepción con un cliente suscrito se prueba en la 1e.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -228,8 +229,9 @@ La arma `vistaDe(estado, asiento)` en la 1b. Lo que no esté en la primera tabla
 | El estado del RNG | `deck.js:57` y el adaptador CSPRNG | Nunca |
 | `message` | `gameEngine.js:244-270, :447-468` | K-12: va en perspectiva del asiento 0 y la voz vive en el cliente |
 | `isHuman` y `nivelIA` | Estado del motor | No significan nada en PvP |
-| El ritmo | Fila de la mesa | No se muestra; el cliente recibe la hora de vencimiento ya escalada (§6) |
 | Cuentas de los demás | Correspondencia `uid → índice` | El cliente solo ve índices |
+
+**El ritmo no es secreto: no se muestra en ninguna pantalla.** Viaja en la fila de la mesa (`salas.ritmo`), que el cliente puede leer, y `vistaDe` no lo lleva. El cliente recibe la hora de vencimiento ya escalada (§6).
 
 ---
 
@@ -241,7 +243,7 @@ Sellado el 12-sep. La línea «vistas por Broadcast privado» de la Fase 0b qued
 |---|---|---|---|---|---|
 | Tabla de partida | El estado completo, la versión y el vencimiento | **Nadie del cliente**: RLS sin políticas, sin privilegios y fuera de la publicación | Solo el árbitro | `mesas_ia` (`eco1c:803-807`) · K-6(b) | 1d-i |
 | Tabla de vistas | Una fila por mesa y asiento, con la vista del §4 | Cada asiento la suya, por RLS | Solo el árbitro | Nueva | 1d-i |
-| Canal privado por mesa | Nada: solo pasa el aviso | Los miembros, con política sobre `realtime.messages` | Solo el árbitro | Sin políticas hoy. Emisión probada en público (`sonda_mot1/index.ts:153-161`); recepción privada sin probar (H-S2) | 1d-i verifica con un cliente suscrito |
+| Canal privado por mesa | Nada: solo pasa el aviso | Los miembros, con política sobre `realtime.messages` | Solo el árbitro | Sin políticas hoy. Emisión probada en público (`sonda_mot1/index.ts:153-161`); recepción privada sin probar (H-S2) | 1d-i las políticas; la recepción con un cliente suscrito se prueba en la 1e, cuando la Edge Function emita |
 
 ### El recorrido
 
