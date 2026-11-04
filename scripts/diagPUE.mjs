@@ -25,6 +25,7 @@
 //       node scripts/diagPUE.mjs dis             (DIS-1: los aparatos renderizados de la escena 5, Edge y WebKit; SÍ entra en `todo`)
 //       node scripts/diagPUE.mjs bie             (BIE-1: qué suena en la puerta y el «Cargando», con la red de Supabase simulada; SÍ entra en `todo`)
 //       node scripts/diagPUE.mjs voz2 [--control=contain|nowrap|capa] [--celdas=…] [--sin-burbuja]  (VOZ-2: la frase del óvalo recortada y desplegada; NO entra en `todo`; voz2.burbuja usa además el 5173, VOZ2_DEV)
+//       node scripts/diagPUE.mjs espera          (PES-1: abrir una pantalla antes de que llegue su trozo, y el trozo caído)
 //       node scripts/diagPUE.mjs mesa            (ARN-3d: del toque de «Jugar» a la mesa pintada, con 4G lento; vara de tiempo: corre SOLA; NO entra en `todo`)
 //
 // ARN-3a · el arnés COMPILA (vite build) y levanta su propio `vite preview` en
@@ -43,7 +44,7 @@ import {
 // ARN-3c-ii · D9 · la mediana de 3 de `dis` (lo puro).
 import { mayoriaDePuertas } from './arnes/varas.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
-import { pesarDist, TECHO_CRITICO_KIB } from './arnes/pesoCore.mjs'
+import { instrumentosCoinciden, pesarDist, TECHO_CRITICO_KIB } from './arnes/pesoCore.mjs'
 // ARN-4 A5 · repetir ante un rojo de foto. A10a · `contraste`.
 import { conRepeticion } from './arnes/repetir.mjs'
 import { PISO_WCAG, QUIETA_CSS, TEXTOS, asentar, fijar, peorFondo, tintaConRepeticion } from './arnes/tinta.mjs'
@@ -190,7 +191,7 @@ const hacer = (id) => modo === 'todo' || modo === id
 const hacerSolo = (id) => modo === id
 
 // ARN-3a · D5 · un modo que no existe no medía nada y salía «TODO VERDE».
-const MODOS_PUE = ['todo', 'puerta', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '2.4', '2.5', 'mon', 'dis', 'bie', 'cap', 'voz2', 'mesa', 'contraste']
+const MODOS_PUE = ['todo', 'puerta', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '2.4', '2.5', 'mon', 'dis', 'bie', 'cap', 'voz2', 'mesa', 'contraste', 'espera']
 if (!MODOS_PUE.includes(modo)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${modo}». Los modos son: ${MODOS_PUE.join(', ')}`))
 }
@@ -1265,7 +1266,7 @@ if (hacer('1.8')) {
   const criticoCrudo = suma(criticas, 'bytes')
   // El techo NO se re-selló nunca (decisión del rector en CAP-1): el rojo se vio
   // desde CAP-1 hasta que ARN-3d sacó la mesa a su propio chunk (B11) y el
-  // camino crítico bajó de 222,0 a ~168,8 KiB. Ya no hay rojo conocido: un rojo
+  // camino crítico bajó de 222,0 a 169,2 KiB. Ya no hay rojo conocido: un rojo
   // aquí desde hoy es un hallazgo (¿alguien volvió a importar `GameTable` de
   // forma estática? Lo vigila `scripts/testMesaDiferida.test.js`).
   const dentroCritico = criticoCable <= TECHO_CRITICO_KIB * 1024
@@ -1276,10 +1277,11 @@ if (hacer('1.8')) {
     `diferido ${(suma(despues, 'cable') / 1024).toFixed(1)} KiB (clic de la puerta incluido) · ` +
     `perezoso ${(suma(perezosas, 'cable') / 1024).toFixed(1)} KiB`)
 
-  // ARN-4d · la vara `1.8b` de `commit` pesa `dist/` sin navegador. No decide: esta
-  // línea dice si las dos cifras siguen contando lo mismo.
+  // ARN-4d · la vara `1.8b` de `commit` pesa `dist/` sin navegador. PES-1 §3-G · esta
+  // línea decide: si las dos cifras se separan 1 KiB o más, una de las dos cuenta otra
+  // cosa, y lo normal es una imagen nueva en el primer pintado (`IMAGENES_DEL_PINTADO`).
   const sinNavegador = pesarDist()
-  anota('1.8f el mismo peso sin navegador (vara `1.8b`)', true,
+  anota('1.8f el mismo peso sin navegador (vara `1.8b`)', instrumentosCoinciden(criticoCable, sinNavegador.cable),
     `${(sinNavegador.cable / 1024).toFixed(1)} KiB · Δ ${((sinNavegador.cable - criticoCable) / 1024).toFixed(1)} KiB contra esta bitácora`)
 
   console.log('\n  bitácora completa · cable = gzip nivel 9, salvo lo que ya nace comprimido:')
@@ -1294,6 +1296,232 @@ if (hacer('1.8')) {
   resultados.bloques['1.8'] = { fcp, bitacora, perezosas, criticoCable, criticoCrudo, todasPerezosas }
   await ctx.close()
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// espera · PES-1 §3-G · abrir una pantalla antes de que llegue su trozo
+// ════════════════════════════════════════════════════════════════════════════
+// Solo en la build: en desarrollo no hay trozos. Sesión simulada (`contextoCap`) y
+// el trozo retenido por `page.route`, que abre una compuerta cuando toca.
+//
+//   espera.<pantalla>  el fondo enseguida, el «Cargando» pasados ~300 ms, nunca vacío
+//   espera.corta       si el trozo tarda poco, nada de «Cargando»: sin parpadeo
+//   espera.hoja.<vista> la hoja abre animada; al llegar las filas, Δ alto ≤ 2 px
+//   espera.sala        `?sala=` con el trozo retenido cae en la misma espera
+//   espera.caido       trozo bloqueado: la precarga calla, al entrar recarga UNA vez
+//   espera.precarga    en la Portada no se pide nada; el lobby pide lo suyo y no más
+const ESPERA_CASOS = [
+  { id: 'tienda', trozo: /\/assets\/Tienda-[\w-]+\.js/, toca: 'main.lobby .lob-nav [data-accion="tienda"]', listo: '.tie-estantes' },
+  { id: 'perfil', trozo: /\/assets\/Perfil-[\w-]+\.js/, toca: 'main.lobby [data-accion="perfil"]', listo: '[data-accion="pf-fila-nombre"]' },
+  { id: 'rankings', trozo: /\/assets\/Rankings-[\w-]+\.js/, toca: 'main.lobby [data-accion="rankings"]', listo: 'main.sal[data-ranking]' },
+  { id: 'retar', trozo: /\/assets\/RetarIAS-[\w-]+\.js/, toca: 'main.lobby [data-accion="jugar-ia"]', listo: 'main.sal [data-accion="cta"]' },
+]
+const ESPERA_VISTAS_HOJA = [{ w: 1366, h: 768 }, { w: 360, h: 640 }, { w: 915, h: 412 }, { w: 1920, h: 1080 }]
+const ESPERA_PRECARGA = /\/assets\/(Tienda|Perfil|Rankings|HojaContenido|RetarIAS)-/
+const ESPERA_AL_TOCARLOS = /\/assets\/(SalaOpciones|ArmarMesa|SalaEspera|PartidaPvP|IntersticialSumaMente|CapasVideo)-/
+
+// Cada fotograma tras el toque: ¿hay algo en #root? ¿cuándo apareció cada cosa?
+const VIGIA_ESPERA = () => {
+  const T = { toque: null, vacios: 0, espera: null, fondo: null, cargando: null }
+  window.__esp = T
+  document.addEventListener('pointerdown', () => { if (T.toque == null) T.toque = performance.now() }, true)
+  const mira = () => {
+    if (T.toque != null) {
+      const t = performance.now() - T.toque
+      if (document.getElementById('root')?.children.length === 0) T.vacios += 1
+      if (T.espera == null && document.querySelector('[data-espera-trozo]')) T.espera = Math.round(t)
+      if (T.fondo == null && document.querySelector('[data-espera-trozo] .sal-fondo')) T.fondo = Math.round(t)
+      if (T.cargando == null && document.querySelector('[data-espera-trozo] .cargando')) T.cargando = Math.round(t)
+    }
+    requestAnimationFrame(mira)
+  }
+  requestAnimationFrame(mira)
+}
+
+function compuerta() {
+  let abre
+  const abierta = new Promise((ok) => { abre = ok })
+  return { abierta, abre }
+}
+
+// El trozo retenido hasta que se abra la compuerta. Se ve también la precarga.
+async function retener(page, patron) {
+  const c = compuerta()
+  await page.route(patron, async (r) => { await c.abierta; await r.continue().catch(() => {}) })
+  return c
+}
+
+async function conSesion(vista, f) {
+  const { ctx, page, errores } = await contextoCap(browser, { ...vista, dpr: 1 }, BASE)
+  try {
+    await ctx.addInitScript(VIGIA_ESPERA)
+    return await f(page, errores)
+  } finally {
+    await ctx.close()
+  }
+}
+
+// `retardo` null: la compuerta se abre cuando el «Cargando» ya se ve.
+async function esperaDePantalla(caso, retardo) {
+  return conSesion({ w: 1366, h: 768 }, async (page, errores) => {
+    const c = await retener(page, caso.trozo)
+    await page.goto(URL_LAMINA, { waitUntil: 'load' })
+    await page.waitForSelector(caso.toca)
+    await page.click(caso.toca)
+    if (retardo === null) {
+      await page.waitForSelector('[data-espera-trozo] .cargando', { timeout: 5000 })
+      await page.waitForTimeout(100)
+    } else {
+      await page.waitForTimeout(retardo)
+    }
+    c.abre()
+    await page.waitForSelector(caso.listo, { timeout: 15000 })
+    await page.waitForTimeout(100)
+    const T = await page.evaluate(() => window.__esp)
+    const quedo = await page.evaluate(() => !!document.querySelector('[data-espera-trozo]'))
+    return { ...T, quedo, errores: errores.slice(0, 3) }
+  })
+}
+
+// La hoja con su trozo retenido: el marco abre y las filas no mueven la caja.
+async function esperaDeHoja(vista, desde) {
+  return conSesion(vista, async (page, errores) => {
+    const c = await retener(page, /\/assets\/HojaContenido-[\w-]+\.js/)
+    await page.goto(URL_LAMINA, { waitUntil: 'load' })
+    await page.waitForSelector('main.lobby [data-accion="ajustes"]')
+    if (desde === 'retar') {
+      await page.click('main.lobby [data-accion="jugar-ia"]')
+      await page.waitForSelector('main.sal [data-accion="ajustes"]', { timeout: 15000 })
+    }
+    await page.click('[data-accion="ajustes"]')
+    await page.waitForSelector('.lob-hoja.is-on.es-reservada', { timeout: 5000 })
+    const anima = await page.evaluate(() => document.querySelector('.lob-hoja').getAnimations().length > 0)
+    await page.waitForTimeout(320)
+    const caja = () => page.evaluate(() => {
+      const r = document.querySelector('.lob-hoja').getBoundingClientRect()
+      return { top: r.top, right: r.right, alto: r.height, ancho: r.width }
+    })
+    const antes = await caja()
+    const fondo = await page.evaluate(() => getComputedStyle(document.querySelector('.lob-hoja')).backgroundColor)
+    c.abre()
+    await page.waitForSelector('.lob-hoja .lob-fila', { timeout: 15000 })
+    await page.waitForTimeout(100)
+    const despues = await caja()
+    const foco = await page.evaluate(() => document.activeElement?.id)
+    const T = await page.evaluate(() => window.__esp)
+    return { antes, despues, anima, fondo, foco, vacios: T.vacios, errores: errores.slice(0, 3) }
+  })
+}
+
+async function esperaDeSala() {
+  return conSesion({ w: 1366, h: 768 }, async (page, errores) => {
+    const c = await retener(page, /\/assets\/SalaOpciones-[\w-]+\.js/)
+    await page.goto(`${URL_LAMINA}?sala=AJ7K2M`, { waitUntil: 'load' })
+    await page.waitForSelector('[data-espera-trozo] .sal-fondo', { timeout: 15000 })
+    await page.waitForSelector('[data-espera-trozo] .cargando', { timeout: 5000 })
+    const vivo = await page.evaluate(() => document.getElementById('root').children.length > 0)
+    c.abre()
+    await page.waitForSelector('main.sal .sal-campo', { timeout: 15000 })
+    return { vivo, errores: errores.slice(0, 3) }
+  })
+}
+
+// El trozo bloqueado de verdad: como tras un despliegue con el servidor sin él.
+async function trozoCaido(patron, toca, tras) {
+  const { ctx, page, errores } = await contextoCap(browser, { w: 1366, h: 768, dpr: 1 }, BASE)
+  try {
+    let cargas = 0
+    page.on('framenavigated', (f) => { if (f === page.mainFrame()) cargas += 1 })
+    await page.route(patron, (r) => r.abort())
+    await page.goto(URL_LAMINA, { waitUntil: 'load' })
+    await page.waitForSelector(toca)
+    await page.waitForTimeout(1200)
+    const trasPrecarga = cargas
+    await page.click(toca)
+    await page.waitForFunction(() => sessionStorage.getItem('ajilei.recargaPorChunk') !== null, null, { timeout: 15000 })
+    await page.waitForTimeout(800)
+    await page.waitForSelector(toca, { timeout: 15000 })
+    const trasEntrada = cargas
+    const lobby = await page.evaluate(() => !!document.querySelector('main.lobby'))
+    // La segunda vez no hay guarda: ni otra recarga, ni la pantalla vacía.
+    await page.click(toca)
+    await page.waitForTimeout(tras)
+    const final = await page.evaluate(() => ({
+      vivo: document.getElementById('root').children.length > 0,
+      cargando: !!document.querySelector('[data-espera-trozo] .cargando'),
+      hoja: !!document.querySelector('.lob-hoja.is-on'),
+    }))
+    return { trasPrecarga, trasEntrada, lobby, cargasFinal: cargas, final, errores: errores.slice(0, 3) }
+  } finally {
+    await ctx.close()
+  }
+}
+
+async function esperaPrecarga() {
+  const pide = (page) => page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name))
+  const anon = await browser.newContext({ viewport: { width: 1366, height: 768 } })
+  let portada
+  try {
+    const page = await anon.newPage()
+    await page.goto(URL_LAMINA, { waitUntil: 'load' })
+    await page.waitForSelector('main.portada-lienzo')
+    await page.waitForTimeout(1500)
+    const fcp = await page.evaluate(() => performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null)
+    const howler = await page.evaluate(() => performance.getEntriesByType('resource').find((e) => /\/assets\/howler-/.test(e.name))?.startTime ?? null)
+    portada = { pedidos: (await pide(page)).filter((n) => ESPERA_PRECARGA.test(n) || ESPERA_AL_TOCARLOS.test(n)), fcp, howler }
+  } finally {
+    await anon.close()
+  }
+  const lobby = await conSesion({ w: 1366, h: 768 }, async (page) => {
+    await page.goto(URL_LAMINA, { waitUntil: 'load' })
+    await page.waitForSelector('main.lobby')
+    await page.waitForLoadState('networkidle')
+    const n = await pide(page)
+    return { suyos: [...new Set(n.filter((x) => ESPERA_PRECARGA.test(x)).map((x) => x.match(ESPERA_PRECARGA)[1]))], otros: n.filter((x) => ESPERA_AL_TOCARLOS.test(x)) }
+  })
+  return { portada, lobby }
+}
+
+if (hacerSolo('espera')) {
+  console.log('\n── espera · PES-1 · abrir antes de que llegue el trozo ──')
+  for (const caso of ESPERA_CASOS) {
+    const f = await esperaDePantalla(caso, null)
+    anota(`espera.${caso.id} el fondo enseguida y «Cargando» pasados 300 ms, nunca vacío`,
+      f.vacios === 0 && f.fondo != null && f.fondo < 200 && f.cargando >= 280 && !f.quedo && f.errores.length === 0,
+      `fondo ${f.fondo} ms · «Cargando» ${f.cargando} ms · vacío ${f.vacios} fotogramas${f.errores.length ? ` · errores: ${f.errores.join(' | ')}` : ''}`)
+  }
+  const corta = await esperaDePantalla(ESPERA_CASOS[0], 120)
+  anota('espera.corta un trozo que tarda poco no enseña «Cargando»', corta.cargando == null && corta.vacios === 0 && corta.fondo != null,
+    `«Cargando» ${corta.cargando ?? 'nunca'} · fondo ${corta.fondo} ms · vacío ${corta.vacios} fotogramas`)
+  for (const v of ESPERA_VISTAS_HOJA) {
+    const h = await esperaDeHoja(v, 'lobby')
+    const delta = Math.abs(h.despues.alto - h.antes.alto)
+    anota(`espera.hoja.${v.w}x${v.h} abre animada, y las filas no mueven la caja (Δ ≤ 2 px)`,
+      h.anima && delta <= 2 && h.antes.top === h.despues.top && h.antes.right === h.despues.right && h.foco === 'lob-hoja-t' && h.vacios === 0 && h.errores.length === 0,
+      `alto ${h.antes.alto.toFixed(1)} → ${h.despues.alto.toFixed(1)} · Δ ${delta.toFixed(1)} · anima ${h.anima} · foco ${h.foco}`)
+  }
+  const hs = await esperaDeHoja({ w: 1366, h: 768 }, 'retar')
+  const dS = Math.abs(hs.despues.alto - hs.antes.alto)
+  anota('espera.hoja.retar lo mismo desde una pantalla `.sal`', hs.anima && dS <= 2 && hs.errores.length === 0,
+    `alto ${hs.antes.alto.toFixed(1)} → ${hs.despues.alto.toFixed(1)} · Δ ${dS.toFixed(1)}`)
+  const sala = await esperaDeSala()
+  anota('espera.sala `?sala=` con el trozo retenido cae en la espera, no en blanco', sala.vivo && sala.errores.length === 0, sala.errores.join(' | ') || 'fondo y «Cargando», y luego Salas')
+  const caido = await trozoCaido(/\/assets\/Tienda-[\w-]+\.js/, 'main.lobby .lob-nav [data-accion="tienda"]', 900)
+  anota('espera.caido.pantalla la precarga calla; al entrar recarga una vez y vuelve al lobby; a la segunda, «Cargando» y no vacío',
+    caido.trasPrecarga === 1 && caido.trasEntrada === 2 && caido.lobby && caido.cargasFinal === 2 && caido.final.vivo && caido.final.cargando,
+    `cargas ${caido.trasPrecarga} → ${caido.trasEntrada} → ${caido.cargasFinal} · lobby ${caido.lobby} · ${JSON.stringify(caido.final)}`)
+  const caidoH = await trozoCaido(/\/assets\/HojaContenido-[\w-]+\.js/, 'main.lobby [data-accion="ajustes"]', 900)
+  anota('espera.caido.hoja la hoja hace lo mismo; a la segunda abre con su marco',
+    caidoH.trasPrecarga === 1 && caidoH.trasEntrada === 2 && caidoH.lobby && caidoH.cargasFinal === 2 && caidoH.final.vivo && caidoH.final.hoja,
+    `cargas ${caidoH.trasPrecarga} → ${caidoH.trasEntrada} → ${caidoH.cargasFinal} · ${JSON.stringify(caidoH.final)}`)
+  const p = await esperaPrecarga()
+  anota('espera.precarga la Portada no pide ningún trozo, y Howler llega tras pintar',
+    p.portada.pedidos.length === 0 && p.portada.howler != null && p.portada.fcp != null && p.portada.howler >= p.portada.fcp,
+    `trozos ${p.portada.pedidos.length} · FCP ${Math.round(p.portada.fcp)} ms · howler ${Math.round(p.portada.howler)} ms`)
+  anota('espera.precarga.lobby el lobby pide lo que se abre desde él, y no las salas ni el intersticial',
+    p.lobby.suyos.length === 5 && p.lobby.otros.length === 0,
+    `${p.lobby.suyos.sort().join(', ')} · al tocarlos pedidos: ${p.lobby.otros.length}`)
+}
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // mesa · ARN-3d · del toque de «Jugar» a la mesa pintada

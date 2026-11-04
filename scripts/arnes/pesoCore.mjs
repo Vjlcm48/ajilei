@@ -9,6 +9,9 @@
 // el primer pintado solo la ve `diagPUE 1.8`, que sigue en `completo` y dice la
 // diferencia entre las dos cifras (`1.8f`). Una de la lista que desaparezca es error de
 // instrumento: esta lista no envejece callada.
+//
+// PES-1 · INV-30 sigue en 200, y la meta es 185: los 15 de margen son para lo que la
+// ruta sume a la entrada. Toda pantalla nueva nace diferida (INV-84).
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
@@ -82,6 +85,14 @@ export function pesarDist(dist = join(RAIZ, 'dist')) {
   const porTipo = Object.fromEntries(['html', 'js', 'css', 'resto'].map((t) => [t, suma(recursos.filter((r) => r.tipo === t), 'cable')]))
   return { recursos, cable: suma(recursos, 'cable'), crudo: suma(recursos, 'crudo'), porTipo }
 }
+
+// PES-1 §3-G · `1.8f` sale roja si las dos cifras se separan: desde aquí, una imagen
+// nueva en el primer pintado es un rojo y no una línea que nadie lee. La Fase 0 midió
+// un ruido de cero en cinco corridas.
+export const TOLERANCIA_1_8F_BYTES = 1024
+
+/** ¿El navegador y `pesarDist` cuentan lo mismo? */
+export const instrumentosCoinciden = (navegador, sinNavegador) => Math.abs(navegador - sinNavegador) < TOLERANCIA_1_8F_BYTES
 
 /** ¿Está dentro del techo? */
 export const dentroDelTecho = (cable) => cable <= TECHO_CRITICO_KIB * 1024

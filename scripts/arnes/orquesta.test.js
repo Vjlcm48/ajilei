@@ -60,9 +60,9 @@ describe('A4 · el contrato: ningún modo sin declarar', () => {
 })
 
 describe('A4 · los perfiles', () => {
-  it('`rapido` son las cuatro varas de la ficha, y `commit` añade el peso y humo', () => {
+  it('`rapido` son las cuatro varas de la ficha, y `commit` añade el peso, la espera y humo', () => {
     expect(ids(rapido)).toEqual(['eslint', 'vitest', 'build', 'guiones'])
-    expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'humo'])
+    expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'pue.espera', 'humo'])
     expect(ids(completo)).toContain('1.8b')
   })
   it('vitest pasa por el lanzador', () => {

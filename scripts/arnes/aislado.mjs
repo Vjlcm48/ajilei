@@ -109,6 +109,11 @@ async function probarCopia(sha, copia, perfil, fd, base) {
   notas.push(lectura.texto)
 
   if (perfil === 'commit') {
+    // PES-1 §3-G · el peso, antes que el humo: es lo que un commit puede romper sin
+    // que nada más se entere.
+    const peso = await paso(fd, '1.8b', ['scripts/arnes/peso.mjs', '--sin-build'], { cwd: copia, topeMs: 5 * MINUTO })
+    pasos.peso = peso.status === 0 ? 0 : peso.status === 1 ? 1 : 2
+    notas.push(`1.8b código ${peso.status ?? 'tope'}`)
     const humo = await paso(fd, 'diagDSK humo', ['scripts/diagDSK.mjs', 'humo', '--sin-build'], { cwd: copia, topeMs: 25 * MINUTO })
     pasos.humo = humo.status === 0 ? 0 : humo.status === 1 ? 1 : 2
     notas.push(`humo código ${humo.status ?? 'tope'}`)

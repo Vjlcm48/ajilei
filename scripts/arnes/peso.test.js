@@ -4,7 +4,7 @@ import { Buffer } from 'node:buffer'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { dentroDelTecho, importsEstaticos, pesarDist, pesoEnCable, rutasDelHtml } from './pesoCore.mjs'
+import { dentroDelTecho, importsEstaticos, instrumentosCoinciden, pesarDist, pesoEnCable, rutasDelHtml } from './pesoCore.mjs'
 
 describe('ARN-4d · lo que pide el HTML', () => {
   const html = `<!-- <script src="/comentado.js"></script> -->
@@ -66,5 +66,18 @@ describe('ARN-4d · el peso', () => {
   })
   it('sin compilar es error de instrumento', () => {
     expect(() => pesarDist(join(tmpdir(), 'no-existe-este-dist'))).toThrow(/¿Se compiló\?/)
+  })
+})
+
+describe('PES-1 §3-G · 1.8f: el navegador y `peso` dicen lo mismo', () => {
+  it('coinciden por debajo de 1 KiB (el ruido medido en la Fase 0 es cero)', () => {
+    expect(instrumentosCoinciden(241220, 241220)).toBe(true)
+    expect(instrumentosCoinciden(241220, 241220 + 1023)).toBe(true)
+    expect(instrumentosCoinciden(241220 + 1023, 241220)).toBe(true)
+  })
+  it('CONTROL ROJO · 1 KiB o más de diferencia, en cualquier sentido, es rojo', () => {
+    expect(instrumentosCoinciden(241220, 241220 + 1024)).toBe(false)
+    expect(instrumentosCoinciden(241220 + 1024, 241220)).toBe(false)
+    expect(instrumentosCoinciden(241220, 0)).toBe(false)
   })
 })
