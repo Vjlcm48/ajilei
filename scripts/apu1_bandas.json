@@ -3,7 +3,7 @@
   "generado": "2026-09-22T21:18:51.397Z",
   "commitOrigen": null,
   "motor": {
-    "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+    "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
     "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
     "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
   },
@@ -1460,7 +1460,7 @@
       "origen": "capturas-dsk/_res_conv_m2_aleatorio_avanzado.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1487,7 +1487,7 @@
       "origen": "capturas-dsk/_res_conv_m2_aleatorio_basico.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1514,7 +1514,7 @@
       "origen": "capturas-dsk/_res_conv_m2_aleatorio_pro.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1541,7 +1541,7 @@
       "origen": "capturas-dsk/_res_conv_m3_aleatorio_avanzado.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1568,7 +1568,7 @@
       "origen": "capturas-dsk/_res_conv_m3_aleatorio_basico.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1595,7 +1595,7 @@
       "origen": "capturas-dsk/_res_conv_m3_aleatorio_pro.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1622,7 +1622,7 @@
       "origen": "capturas-dsk/_res_conv_m4_aleatorio_avanzado.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1649,7 +1649,7 @@
       "origen": "capturas-dsk/_res_conv_m4_aleatorio_basico.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1676,7 +1676,7 @@
       "origen": "capturas-dsk/_res_conv_m4_aleatorio_pro.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1703,7 +1703,7 @@
       "origen": "capturas-dsk/_res_conv_m5_aleatorio_avanzado.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1730,7 +1730,7 @@
       "origen": "capturas-dsk/_res_conv_m5_aleatorio_basico.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1757,7 +1757,7 @@
       "origen": "capturas-dsk/_res_conv_m5_aleatorio_pro.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1784,7 +1784,7 @@
       "origen": "capturas-dsk/_res_m3_avanzado_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1811,7 +1811,7 @@
       "origen": "capturas-dsk/_res_m3_pro_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1838,7 +1838,7 @@
       "origen": "capturas-dsk/_res_m4_avanzado_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1865,7 +1865,7 @@
       "origen": "capturas-dsk/_res_m4_pro_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1892,7 +1892,7 @@
       "origen": "capturas-dsk/_res_m5_avanzado_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1919,7 +1919,7 @@
       "origen": "capturas-dsk/_res_m5_pro_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1946,7 +1946,7 @@
       "origen": "capturas-dsk/_res_m2_avanzado_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -1973,7 +1973,7 @@
       "origen": "capturas-dsk/_res_m2_pro_aleatorio.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -2000,7 +2000,7 @@
       "origen": "capturas-dsk/_res_m4_avanzado_manoso.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -2027,7 +2027,7 @@
       "origen": "capturas-dsk/_res_m4_pro_manoso.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -2054,7 +2054,7 @@
       "origen": "capturas-dsk/_res_m5_avanzado_manoso.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -2081,7 +2081,7 @@
       "origen": "capturas-dsk/_res_m5_pro_manoso.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -2108,7 +2108,7 @@
       "origen": "capturas-dsk/_res_e20_m5_basico.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -2135,7 +2135,7 @@
       "origen": "capturas-dsk/_res_e20_m5_avanzado.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },
@@ -2162,7 +2162,7 @@
       "origen": "capturas-dsk/_res_e20_m5_pro.json",
       "tanda": "APU1-C04",
       "blobs": {
-        "src/engine/gameEngine.js": "21c4d3f56318b160266342b83e8d3c2f0a9d6a5a",
+        "src/engine/gameEngine.js": "98014fd85a9985ddc41f7d4bb0782184e57e4d56",
         "src/engine/aiPlayer.js": "8cfc3736cba2fa251dc0d954aec14cfce2905349",
         "src/engine/deck.js": "eb61426083ca07c54cbe782c0af3ed848d6003e3"
       },

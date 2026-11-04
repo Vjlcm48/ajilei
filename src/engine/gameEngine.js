@@ -192,9 +192,9 @@ function primerTurno(players, desde) {
 // ── Resolve winner ─────────────────────────────────────────────────────────────
 // Ruta de pago del ÚLTIMO EN PIE (todos los demás retirados). La regla no
 // cambia —cobra él—, pero cobra por `repartirCapas` para que el dinero salga
-// del mismo sitio en las dos rutas. Es siempre UNA capa: un asiento en all-in
-// no puede retirarse (`pozos.esLegal` → `en_all_in`), así que si hay algún
-// all-in vivo quedan al menos dos sin retirar y esta ruta no se toma.
+// del mismo sitio en las dos rutas. Un asiento en all-in no puede retirarse
+// (`pozos.esLegal` → `en_all_in`), pero sí quedarse solo si los demás se van:
+// entonces puede haber dos capas, la suya y, encima, lo no igualado, que vuelve (D-7).
 function resolveWinner(state) {
   const { winner } = state
   const ganadores  = ganadoresPorCapa(state, (p, i) => (i === winner ? 1 : 0))
@@ -678,6 +678,9 @@ export function aplicarRecarga(state, seat, monto) {
 }
 
 // Discard phase: replenish cards in Mano→Pie order, then advance to BET_3.
+// MOT-1 · edición 3 · `humanDiscardIndices` es la lista de siempre, o un objeto
+// `{ asiento: índices }` con los de cada humano (el que falta no descarta). Las
+// IAS siguen con `decideDiscard`, y el orden y el azar no cambian.
 export function applyDiscard(state, humanDiscardIndices) {
   const { players, manoIndex, numPlayers } = state
   const N = players.length
@@ -693,7 +696,7 @@ export function applyDiscard(state, humanDiscardIndices) {
     if (player.folded) continue
 
     let indices = player.isHuman
-      ? humanDiscardIndices
+      ? (Array.isArray(humanDiscardIndices) ? humanDiscardIndices : humanDiscardIndices[seat] ?? [])
       : decideDiscard(state, seat)
 
     indices = indices.slice(0, topeDescarte)

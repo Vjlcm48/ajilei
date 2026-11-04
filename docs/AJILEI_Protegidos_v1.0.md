@@ -137,7 +137,7 @@ pendiente de la decisión de Victor.
 
 | Archivo | blob git | sha256 (16) | líneas | abierto en |
 |---|---|---|---|---|
-| `src/engine/gameEngine.js` | `21c4d3f56318` | `317452ec5b57408a` | 748 | APU-1 1b-ii, 1c, 1d-i, **1e-iii** |
+| `src/engine/gameEngine.js` | `98014fd85a99` | `b7f4d147a777082c` | 751 | APU-1 1b-ii, 1c, 1d-i, 1e-iii · **MOT-1 1b** (dos rangos: el comentario de `:193-197`, y `applyDiscard` para la edición 3, `:681-683` y `:699`) |
 | `src/engine/aiPlayer.js` | `8cfc3736cba2` | `3a8ea7b0386c7ddf` | 1445 | NIV-1, NIV-2, NIV-CAL, APU-1 1c, **1c-2** |
 | `src/engine/deck.js` | `eb61426083ca` | `69f92d6b9aac433c` | 69 | APU-1 **1b-ii y 1d-i** (siembra pre-autorizada) |
 | `src/config/seatLayouts.js` | `0d1bb8ea66a8` | `0049051fd4b8b891` | 59 | — (intacto desde el sellado) |

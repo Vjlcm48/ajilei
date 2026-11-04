@@ -141,6 +141,10 @@ describe('La vara viva de APU-1 dice con qué se selló, y sólo eso se le añad
   // El sha del archivo entero de 84 celdas antes del re-sello —el que probo que
   // el back-fill no movia nada— era 3ed210cc… y queda en el informe de cierre.
   const SHA_INTACTAS = '02c3e5c598b33c5f6fafec624634950939b9bf9aabb430f0112028e89c489013'
+  // La cabecera `motor` sigue al blob cada vez que se abre el motor (MOT-1 1b) y las
+  // sesenta se comparan por ella: no es una cifra medida. El sello se tomó con ésta, y
+  // que la de hoy sea la vigente lo vigila `banco:verificar`.
+  const MOTOR_DEL_SELLO = '21c4d3f56318b160266342b83e8d3c2f0a9d6a5a'
 
   it('las celdas de 1c-2 traen su apuesta de mesa y su siembra', () => {
     const v = JSON.parse(readFileSync(join(RAIZ, VIVA), 'utf8'))
@@ -219,6 +223,7 @@ describe('La vara viva de APU-1 dice con qué se selló, y sólo eso se le añad
   it('quitando lo añadido vuelve el archivo sellado, byte a byte', () => {
     const v = JSON.parse(readFileSync(join(RAIZ, VIVA), 'utf8'))
     delete v.procedencia
+    v.motor['src/engine/gameEngine.js'] = MOTOR_DEL_SELLO
     // Se comparan SOLO las 84 de 1c-2: lo que se re-selle despues es una medida
     // nueva y no tiene por que reproducir el archivo viejo.
     v.celdas = v.celdas.filter(c => c.tanda?.startsWith('APU1-1c2'))
