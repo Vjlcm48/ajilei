@@ -354,6 +354,7 @@ import { runCfg } from './cfg/cfg.mjs'
 import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, tintaConRepeticion, peorFondo as tintaPeor } from './arnes/tinta.mjs'
 import { runTienda } from './tie/tienda.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
+import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
 import {
   jugarMano, siguienteMano, marcarReducida, nuevoJuego, resumenJuego, separarReducida,
@@ -3852,10 +3853,14 @@ async function runTactil(browser) {
   // PAN-1 1b · LAS CELDAS DE TELÉFONO. El aplazado 21 vivía en 360×640 y el modo
   // no la visitaba nunca: medía sólo escritorio táctil. Y `tactil [celda] [mesa]`
   // corre un trozo de la matriz (`tactil 360x640`, `tactil 640x360 4`).
+  // ARN-4d · `tactil 5` corre una mesa entera, como `h1`, `m1` y `a1`: así parte el
+  // orquestador las 36 páginas.
   const TOUCH_VPS = [{ w: 1024, h: 768 }, { w: 1280, h: 720 }, { w: 1366, h: 768 }, { w: 1920, h: 1080 },
     { w: 360, h: 640 }, { w: 390, h: 844 }, { w: 412, h: 915 }, { w: 915, h: 412 }, { w: 640, h: 360 }]
   const TABLES = [5, 4, 3, 2]   // táctil coarse en CADA mesa (mesa 2 = sin nombre-tap)
-  const fCelda = process.argv[3] || null, fMesa = process.argv[4] ? Number(process.argv[4]) : null
+  const soloMesa = /^\d+$/.test(process.argv[3] || '')
+  const fCelda = soloMesa ? null : process.argv[3] || null
+  const fMesa = soloMesa ? Number(process.argv[3]) : process.argv[4] ? Number(process.argv[4]) : null
   const out = []
   for (const n of TABLES) for (const vp of TOUCH_VPS) {
     if (fCelda && `${vp.w}x${vp.h}` !== fCelda) continue
@@ -5188,6 +5193,8 @@ async function runH1(browser) {
       overflow: base.overflow, overflowOk,
       passed,
     })
+    // ARN-4d · una línea por celda: sin ella, un log cortado no distingue lenta de colgada.
+    console.log(`h1 T${n} ${vp.w}x${vp.h} · frames=${states.length} · ${passed ? 'OK' : 'ROJO'}`)
     await page.close()
   }
   return out
@@ -12526,6 +12533,9 @@ async function runVuelo(browser) {
             return ({ gana: 'win', pierde: 'lose', neutro: 'neutro' })[m?.dataset.tono] ?? 'fin'
           })
         }
+        // ARN-4d · la celda de `vuelo` es un escenario, de hasta 40 manos: sin esta
+        // línea, un log cortado no distingue lenta de colgada.
+        console.log(`vuelo ${esc.id} · mano ${mano}/${esc.maxManos} · ${r.cerrada ? `cerró: ${fin}` : 'no cerró'}`)
         if (fin === esc.quien) break
         if (juego.ausente) { c.abortadaEn = `mano ${mano}: la mesa se acabó`; break }
         // "Siguiente mano" con reintento: el botón puede tardar en montarse
@@ -15341,6 +15351,7 @@ const chromiumVivo = browser.version()
 const report = {
   mode: MODE,
   ts: new Date().toISOString(),
+  commit: commitDelArbol(),   // ARN-4d · de qué commit es este veredicto
   arnes: {
     ...ARNES,
     playwrightCore: PW_VERSION,
@@ -15480,6 +15491,6 @@ report.codigo = codigoDeSalida(veredictos.map(([, v]) => v))
 const json = JSON.stringify(report, (k, v) => typeof v === 'number' ? round(v) : v, 2)
 console.log(json)
 try { writeFileSync(`${OUT_DIR}/diag_${MODE}.json`, json) } catch {}
-console.log(`\n── diagDSK ${MODE} · ${veredictos.map(([k, v]) => `${k} ${v}`).join(' · ')} → código ${report.codigo}`)
+console.log(`\n── diagDSK ${MODE} · ${veredictos.map(([k, v]) => `${k} ${v}`).join(' · ')} → código ${report.codigo} · ${report.commit}`)
 if (report.error) console.error(`✖ el modo abortó: ${String(report.error).split('\n')[0]}`)
 await terminar(report.codigo)
