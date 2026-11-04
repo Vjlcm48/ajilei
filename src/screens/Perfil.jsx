@@ -6,6 +6,9 @@ import '../styles/perfil.css'
 import Bautizo from './Bautizo'
 import Bandera from '../components/Bandera'
 import CambiarCorreo from '../components/CambiarCorreo'
+// PES-1 §3-B · la API del correo viaja con la pantalla, y se resuelve una vez.
+import { correoApi } from '../lib/correoApi'
+import { simulacionCorreo } from '../dev/correoFalso'
 import { SoundButton } from '../components/SoundButton'
 import { useIdioma } from '../hooks/useIdioma'
 import { useCambioCorreo } from '../hooks/useCambioCorreo'
@@ -242,6 +245,8 @@ function Filas({ cuenta, correoPropio, pendiente, abrir, t }) {
 
 const TITULO = { inicio: 'perfil.titulo', nombre: 'perfil.titulo', correo: 'perfil.titulo', avatar: 'perfil.fila.avatar', pais: 'perfil.fila.lugar', estado: 'perfil.fila.lugar' }
 
+const apiCorreo = simulacionCorreo() ?? correoApi
+
 export default function Perfil({ cuenta, billetera, aviso, onAvisoFin, onVolver, onLobby }) {
   const { t } = useIdioma()
   const [sub, setSub] = useState('inicio')
@@ -253,7 +258,7 @@ export default function Perfil({ cuenta, billetera, aviso, onAvisoFin, onVolver,
   const [guardando, setGuardando] = useState(undefined)
   const toast = useRef(null)
   const avisar = (clave, vars) => toast.current?.avisar(clave, vars)
-  const cambioCorreo = useCambioCorreo(cuenta.correoApi, cuenta.correo)
+  const cambioCorreo = useCambioCorreo(apiCorreo, cuenta.correo)
 
   const abrir =(s) => { setBusqueda(''); setDesdePais(false); setSub(s) }
   const volver = () => {
@@ -341,7 +346,7 @@ export default function Perfil({ cuenta, billetera, aviso, onAvisoFin, onVolver,
       )}
       {sub === 'correo' && createPortal(
         <CambiarCorreo
-          api={cuenta.correoApi}
+          api={apiCorreo}
           actual={cambioCorreo.correo}
           pendiente={cambioCorreo.pendiente}
           onPedido={cambioCorreo.alPedir}

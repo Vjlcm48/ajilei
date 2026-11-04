@@ -46,7 +46,6 @@ import { crearVideoApi } from '../lib/videoApi'
 import { crearRankingApi } from '../lib/rankingApi'
 import { crearCuentaApi } from '../lib/cuentaApi'
 import { crearPerfilApi } from '../lib/perfilApi'
-import { crearCorreoApi } from '../lib/correoApi'
 import { crearConsultaApi } from '../lib/consultaApi'
 import { crearTiendaApi } from '../lib/tiendaApi'
 import { saldoOculto } from '../lib/saldoOculto'
@@ -161,7 +160,7 @@ export function simulacionRanking() {
 export const CFG_PARAM = 'cfg'
 const CUENTA_TARDA_MS = 900
 
-function mandoCfg() {
+export function mandoCfg() {
   try { return new URLSearchParams(window.location.search).get(CFG_PARAM) } catch { return null }
 }
 
@@ -243,8 +242,8 @@ export function simulacionPerfil() {
 //   ?cfg=correo-codigo-mal → todo código contesta 403 otp_expired
 //   ?cfg=correo-limite     → pedir y reenviar contestan 429
 // Sin mando, lo que diga el banco. Cada respuesta (menos las lecturas) tarda
-// `CORREO_TARDA_MS`, para que «Enviando…» y «Comprobando…» se vean.
-const CORREO_TARDA_MS = 450
+// `CORREO_TARDA_MS`, para que «Enviando…» y «Comprobando…» se vean. PES-1 · la API
+// se arma en `dev/correoFalso.js`, que viaja con el Perfil.
 
 /** Un cliente con la forma de `supabase` para `correoApi`: `auth`, como el SDK 2.112.4. */
 export function clienteCorreoDe(b, { tarda = 0 } = {}) {
@@ -274,17 +273,6 @@ export function clienteCorreoDe(b, { tarda = 0 } = {}) {
       },
     },
   }
-}
-
-/** La API del correo contra el banco imitado, o `null` fuera de desarrollo con bypass. */
-export function simulacionCorreo() {
-  if (!import.meta.env.DEV) return null
-  const b = bancoDelBypass()
-  if (!b) return null
-  const mando = mandoCfg()
-  if (mando === 'correo-pendiente') b.sembrarCambioCorreo('nuevo.correo@gmail.com', 20_000)
-  b.forzarCorreo({ 'correo-en-uso': 'en_uso', 'correo-codigo-mal': 'codigo_mal', 'correo-limite': 'limite' }[mando] ?? null)
-  return crearCorreoApi(clienteCorreoDe(b, { tarda: CORREO_TARDA_MS }))
 }
 
 // ── CFG-1 1e · Mano actual de pago contra el banco imitado ─────────────────

@@ -22,6 +22,11 @@
   line-height: 1.45;
 }
 
+/* PES-1 §3-B · dentro de la espera de un trozo, sobre el fondo de su familia. La
+   capa del video tapa lo de debajo: sigue en verde y por encima de la pantalla. */
+.espera-trozo .cargando { background: transparent; }
+.espera-trozo.es-capa .cargando { background: var(--green-abyss); z-index: 1000; }
+
 .cargando-indicador {
   display: grid;
   justify-items: center;

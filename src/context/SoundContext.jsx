@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Howler } from 'howler'
 import { SoundContext } from './useSoundContext'
+import { conHowler } from '../lib/motorHowler'
 
 // DSK-U1 · El ajuste de sonido deja de ser volátil. Antes vivía sólo en estado
 // React: sobrevivía al cambio de pantalla y de mesa (el provider cuelga de la
@@ -30,7 +30,8 @@ export function SoundProvider({ children }) {
   useEffect(() => {
     try { window.localStorage.setItem(SOUND_KEY, soundEnabled ? 'on' : 'off') }
     catch { /* storage no disponible: el ajuste sigue vivo en memoria */ }
-    Howler.mute(!soundEnabled)
+    // PES-1 §3-E · si el motor aún no llegó, entra el primero al llegar.
+    conHowler(({ Howler }) => Howler.mute(!soundEnabled))
   }, [soundEnabled])
 
   return (

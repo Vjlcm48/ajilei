@@ -34,6 +34,7 @@ import ChipToken from '../components/ChipToken'
 import { useIdioma } from '../hooks/useIdioma'
 import { useSounds, precargarSonidos, SONIDOS_LOBBY } from '../hooks/useSounds'
 import { precargarMesa } from '../lib/cargarMesa'
+import { precargarDelLobby } from '../lib/trozos'
 import { saldoOculto as ojitoGuardado } from '../lib/saldoOculto'
 
 // ── El isotipo del lobby ────────────────────────────────────────────────────
@@ -107,7 +108,8 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
   // monta y no paga la mesa antes de su primera pintura (`1.8b`). Un humano
   // tarda segundos en elegir las cuatro filas de Retar; el chunk, con 4G lento,
   // menos de uno.
-  useEffect(() => { precargarMesa() }, [])
+  // PES-1 §3-B · y, en el mismo momento, lo que se abre desde aquí.
+  useEffect(() => { precargarMesa(); precargarDelLobby() }, [])
 
   // ── La jaula de 1126px se EXCEPCIONA, no se demuele ───────────────────────
   // Molde EXACTO de `Portada.jsx:217-223`: `index.css` es andamiaje de Vite y

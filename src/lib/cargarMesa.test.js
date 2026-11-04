@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { creaCargadorMesa, decidirFalloChunk } from './cargarMesa.js'
+import { creaCargador, decidirFalloChunk } from './cargarMesa.js'
 
 // ARN-3d §2.4 (B11) · la fábrica, con su importador y su reloj inyectados. En
 // Node pelado: el `import()` real y `requestIdleCallback` no entran aquí.
@@ -10,7 +10,7 @@ function cargador() {
   const importar = vi.fn(() => new Promise((ok, ko) => { resolver = ok; rechazar = ko }))
   const pendientes = []
   const ocioso = vi.fn((f) => { pendientes.push(f) })
-  const c = creaCargadorMesa(importar, ocioso)
+  const c = creaCargador(importar, ocioso)
   return {
     c, importar, ocioso,
     llega: () => resolver(MOD),
@@ -139,5 +139,29 @@ describe('ARN-3d · decidirFalloChunk(origen, guarda)', () => {
 
   it('un origen desconocido se trata como precarga: no recarga', () => {
     expect(decidirFalloChunk(undefined, 'libre')).toBe('silencio')
+  })
+})
+
+describe('PES-1 · llego y esperando, para clasificar con varios trozos', () => {
+  it('esperando es la marca mientras el módulo no ha llegado', async () => {
+    const k = cargador()
+    expect(k.c.llego()).toBe(false)
+    expect(k.c.esperando()).toBe(false)
+    k.c.marcarEntrada()
+    expect(k.c.esperando()).toBe(true)
+    const p = k.c.cargar()
+    k.llega()
+    await p
+    expect(k.c.llego()).toBe(true)
+    expect(k.c.esperando()).toBe(false)
+  })
+
+  it('un import() que Vite resuelve sin módulo no cuenta como llegado', async () => {
+    const importar = vi.fn(() => Promise.resolve(undefined))
+    const c = creaCargador(importar, vi.fn())
+    c.marcarEntrada()
+    await c.cargar()
+    expect(c.llego()).toBe(false)
+    expect(c.esperando()).toBe(true)
   })
 })

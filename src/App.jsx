@@ -3,21 +3,12 @@ import { useState, useEffect, useRef, useCallback, lazy, startTransition } from 
 // `components/WelcomeScreen.jsx` dejó de importarse desde aquí y, ya sin uso, salió
 // del árbol en ARN-4 4c, como `screens/Entrada.jsx`.
 import Lobby from './screens/Lobby'
-// SAL-B1 · Las tres pantallas del PvP. `SalaEspera` es todavia un STUB (rector
-// SAL-B1 §7) y B2 la reemplaza entera; las otras dos son definitivas.
-import SalaOpciones from './screens/SalaOpciones'
-import ArmarMesa from './screens/ArmarMesa'
-import SalaEspera from './screens/SalaEspera'
-// SAL-B2 F1b · el destino de una mesa que arranco: un stub hasta MES-PvP.
-import PartidaPvP from './screens/PartidaPvP'
-// APU-1 1e · «Retar a las IAS» releva a `NivelSelect` + `ModeSelect`, que se
-// RETIRAN del árbol en esta tanda (rector 1e §2.3) junto con `TableSelect`.
-import RetarIAS from './screens/RetarIAS'
-import Rankings from './screens/Rankings'
-import Tienda from './screens/Tienda'
+// PES-1 §3-B · la hoja de toda la familia `.sal` se queda en la entrada: sus
+// pantallas viajan aparte, pero la espera pinta su fondo y todas la comparten.
+import './styles/salas.css'
 // RNK-1 1e · el intersticial de SumaMente: una pantalla de la cascada, entre el
 // lobby y Rankings. La decisión es pura (`sumaCore`); el contador, del aparato.
-import IntersticialSumaMente from './screens/IntersticialSumaMente'
+// PES-1 · `sumaCore` se queda en la entrada: se decide al tocar, sin esperar a la red.
 import { decidir, diaChicago } from './lib/sumaCore'
 import { sumaContador } from './lib/sumaContador'
 import { siembraSuma } from './dev/siembraSuma'
@@ -27,6 +18,9 @@ import { useIdioma } from './hooks/useIdioma'
 // NO puede quedar un import estático de `GameTable` (lo vigila
 // `scripts/testMesaDiferida.test.js`), o la mesa volvería al paquete principal.
 import { cargarMesa, fabricaMesa, marcarEntradaMesa } from './lib/cargarMesa'
+// PES-1 · el resto de lo diferido: el mismo molde (`lib/trozos`) y la misma espera.
+import { trozos } from './lib/trozos'
+import PantallaDiferida from './components/PantallaDiferida'
 import Portada from './screens/Portada'
 import Bautizo from './screens/Bautizo'
 // ECO-1b · la fuente única del saldo. `billeteraApi` lee `mi_billetera()`; la
@@ -34,22 +28,19 @@ import Bautizo from './screens/Bautizo'
 // producción devuelve `null` en su primera línea y desaparece del bundle.
 import { useBilletera } from './hooks/useBilletera'
 import { billeteraApi } from './lib/billeteraApi'
-import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil, simulacionCorreo, simulacionConsulta, simulacionTienda, mesaContraHumanosDev } from './dev/billeteraFalsa'
+import { simulacionBilletera, simulacionMesaIA, simulacionConstancia, simulacionVideo, simulacionRanking, simulacionCuenta, simulacionPerfil, simulacionConsulta, simulacionTienda, mesaContraHumanosDev } from './dev/billeteraFalsa'
 import { perfilApi } from './lib/perfilApi'
-import Perfil from './screens/Perfil'
 import { cuentaApi } from './lib/cuentaApi'
-import { correoApi } from './lib/correoApi'
 import { limpiarAparato } from './lib/limpiarAparato'
 import { rankingApi } from './lib/rankingApi'
 import { consultaApi } from './lib/consultaApi'
 import { tiendaApi } from './lib/tiendaApi'
 import { crearControlTapetes } from './lib/controlTapetes'
 import { crearAlmacenTapetes } from './hooks/useTapetes'
-// ECO-1c · la mesa contra las IAS vive en el servidor: la API, el canal de cada
-// mesa (avisos, recargas, salida), la marca del dispositivo (P-4) y la entrada
-// que siembran los moldes de humano en desarrollo (P-6).
+// ECO-1c · la mesa contra las IAS vive en el servidor: la API, la marca del
+// dispositivo (P-4) y la entrada que siembran los moldes de humano en desarrollo
+// (P-6). PES-1 · el canal de cada mesa llega con `trozos.controlMesa`, al sentarse.
 import { mesaIAApi } from './lib/mesaIAApi'
-import { crearControlMesa } from './lib/controlMesaIA'
 import { idDispositivo } from './lib/dispositivo'
 import { TOPE_RED_MS } from './lib/red'
 import { saldoRecordado } from './lib/saldoRecordado'
@@ -57,10 +48,9 @@ import CuentaSinRed from './components/CuentaSinRed'
 import { entradaSembradaAPU, videoSembradoAPU } from './dev/siembraAPU'
 import { avisoDeVuelta, TIEMPOS_AVISO, encolarAviso, sacarAviso, sustituirFila } from './hooks/avisoSaldoCore'
 // ECO-1d · la constancia: la API de `marcar_ingreso`, cuándo preguntar y la
-// ficha del lobby (lámina `laminas/eco1d`, ubicación A). Y el límite al sentarse.
+// ficha del lobby (lámina `laminas/eco1d`, ubicación A).
 import { constanciaApi } from './lib/constanciaApi'
 import { debeMarcar, fichaTrasMarcar, soltarAvisoDeFicha } from './hooks/constanciaCore'
-import { LIMITE_SENTARSE } from './hooks/mesaIACore'
 // ECO-1g · el video de recompensa: la API de sus tres funciones, el canal que
 // pide y cobra el boleto, la costura del reproductor y el marco que monta sus
 // capas una vez para todas las pantallas con barra.
@@ -84,6 +74,17 @@ import { useEsperaVisible } from './hooks/useEsperaVisible'
 // cada vez. `fabricaMesa` da un thenable SÍNCRONO cuando el chunk ya llegó, así
 // que con la precarga hecha `lazy` no suspende (Fase 0 §B4, H3d-2).
 const GameTable = lazy(fabricaMesa)
+// PES-1 §3-B · las pantallas, igual que la mesa. Van siempre dentro de
+// `PantallaDiferida`, así que el `lazy` no llega a suspender.
+const SalaOpciones = lazy(trozos.salaOpciones.fabrica)
+const ArmarMesa = lazy(trozos.armarMesa.fabrica)
+const SalaEspera = lazy(trozos.salaEspera.fabrica)
+const PartidaPvP = lazy(trozos.partidaPvP.fabrica)
+const RetarIAS = lazy(trozos.retar.fabrica)
+const IntersticialSumaMente = lazy(trozos.sumamente.fabrica)
+const Perfil = lazy(trozos.perfil.fabrica)
+const Rankings = lazy(trozos.rankings.fabrica)
+const Tienda = lazy(trozos.tienda.fabrica)
 // ECO-1d · aplica `f` a la ficha de la constancia guardada como `{ uid, ficha }`.
 const conFicha = (f) => (c) => (c ? { ...c, ficha: f(c.ficha) } : c)
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
@@ -315,8 +316,6 @@ function App() {
   // más que el tope ya se llevó la cuenta. Quedarse dentro sería un reintento
   // sin fin.
   const [apiCuenta] = useState(() => simulacionCuenta() ?? cuentaApi)
-  // CFG-1 1d · el cambio de correo, con el mismo reparto.
-  const [apiCorreo] = useState(() => simulacionCorreo() ?? correoApi)
 
   // ── CFG-1 1b · LA PANTALLA DE PERFIL Y DE DÓNDE SE VINO ───────────────────
   // Rector CFG-1 1b §2.5 (R-9). La flecha del perfil vuelve a la pantalla que
@@ -433,7 +432,10 @@ function App() {
     duracionMs: AJILEI_CONFIG.economy.video.duracionMs,
     premioEspejo: AJILEI_CONFIG.economy.videoReward,
     mandos: videoSembradoAPU(),
-    precargar: () => precargarSonidos(['chipsCollect']),
+    precargar: () => {
+      precargarSonidos(['chipsCollect'])
+      return trozos.capasVideo.cargar()
+    },
   }))
 
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
@@ -740,6 +742,17 @@ function App() {
     if (intento.current?.firma !== firma) intento.current = { firma, token: nuevoToken() }
     enviandoRef.current = true
     setSentando({ fase: 'enviando' })
+    // PES-1 §3-A · el canal ANTES de cobrar: una entrada cobrada sin canal dejaría
+    // la mesa abierta en el servidor. Sin el trozo no se ha pedido nada: es un `red`
+    // más, con su reintento, y si Vite lo da por caído, recarga (`origenFalloChunk`).
+    trozos.controlMesa.marcarEntrada()
+    const canal = await trozos.controlMesa.cargar().catch(() => null)
+    if (!canal) {
+      enviandoRef.current = false
+      setSentando({ fase: 'error', codigo: 'red' })
+      return
+    }
+    const { crearControlMesa, LIMITE_SENTARSE } = canal
     const pedir = () => apiMesa.sentarse({ ...elegida, entrada, token: intento.current.token, dispositivo: idDispositivo() })
     let r = await pedir()
     // ECO-1d · K7 · `limite` es «no contesta»: se espera y se vuelve a pedir con
@@ -893,7 +906,6 @@ function App() {
     id: auth.perfil?.id ?? null,
     username: auth.perfil?.username ?? '',
     correo: auth.correo ?? '',
-    correoApi: apiCorreo,
     pais: auth.perfil?.pais ?? null,
     estado: auth.perfil?.estado ?? null,
     proximoCambio: auth.proximoCambio,
@@ -932,6 +944,11 @@ function App() {
   const conVideo = (pantalla) => (
     <MarcoVideo control={video} avisoEnCurso={filaAvisos.length > 0} onMonedas={() => abrirTienda('monedas')}>{pantalla}</MarcoVideo>
   )
+  // PES-1 §3-B · la misma forma, con la espera de su trozo. La `key` es la pantalla:
+  // sin ella, React reutilizaría el `llegado` de la anterior al pasar de una a otra.
+  const diferida = (trozo, pantalla) => conVideo(
+    <PantallaDiferida key={screen} trozo={trozo}>{pantalla}</PantallaDiferida>,
+  )
 
   // ── SAL-B1 · Las tres pantallas del PvP ───────────────────────────────────
   // Van ANTES de las de vs-IA y en el orden en que se recorren, que es la misma
@@ -944,7 +961,7 @@ function App() {
   // LA CASA VA AL LOBBY DESDE LAS TRES (§5.1) y la flecha deshace UN paso, que
   // en `SalaOpciones` coincide con el lobby y en `ArmarMesa` no.
   if (screen === 'sala-opciones') {
-    return conVideo(
+    return diferida(trozos.salaOpciones,
       <SalaOpciones
         api={api}
         cuenta={cuenta}
@@ -962,7 +979,7 @@ function App() {
   }
 
   if (screen === 'armar-mesa') {
-    return conVideo(
+    return diferida(trozos.armarMesa,
       <ArmarMesa
         api={api}
         cuenta={cuenta}
@@ -976,7 +993,7 @@ function App() {
   }
 
   if (screen === 'sala-espera') {
-    return conVideo(
+    return diferida(trozos.salaEspera,
       <SalaEspera
         api={api}
         cuenta={cuenta}
@@ -1002,7 +1019,7 @@ function App() {
   // espera. La casa hace lo mismo que la casita de la sala (:421): olvida la
   // invitacion, suelta la mesa y va al lobby.
   if (screen === 'partida-pvp') {
-    return conVideo(
+    return diferida(trozos.partidaPvP,
       <PartidaPvP
         cuenta={cuenta}
         billetera={billetera}
@@ -1053,7 +1070,7 @@ function App() {
   }
 
   if (screen === 'retar-ias') {
-    return conVideo(
+    return diferida(trozos.retar,
       <RetarIAS
         cuenta={cuenta}
         billetera={billetera}
@@ -1077,13 +1094,17 @@ function App() {
   // —Omitir, Continuar o «atrás» pasados los 5 s— va a Rankings y no queda
   // nada montado detrás.
   if (screen === 'sumamente') {
-    return <IntersticialSumaMente idioma={idioma} onFin={() => setScreen('rankings')} />
+    return (
+      <PantallaDiferida trozo={trozos.sumamente} familia="abismo">
+        <IntersticialSumaMente idioma={idioma} onFin={() => setScreen('rankings')} />
+      </PantallaDiferida>
+    )
   }
 
   // ── CFG-1 1b · El perfil ─────────────────────────────────────────────────
   // Pantalla con barra: con el marco del video, como Rankings.
   if (screen === 'perfil') {
-    return conVideo(
+    return diferida(trozos.perfil,
       <Perfil
         cuenta={cuenta}
         billetera={billetera}
@@ -1100,7 +1121,7 @@ function App() {
   // `data-escala` (INV-59, la escala es sólo de la mesa). Flecha y casa vuelven
   // al lobby. El mini-perfil lo abre `Rankings` por dentro: `App` no pasa `onJugador`.
   if (screen === 'rankings') {
-    return conVideo(
+    return diferida(trozos.rankings,
       <Rankings
         api={apiRanking}
         cuenta={cuenta}
@@ -1117,7 +1138,7 @@ function App() {
   // Pantalla con barra: con el marco del video (el estante Monedas pide el
   // video por su contexto).
   if (screen === 'tienda') {
-    return conVideo(
+    return diferida(trozos.tienda,
       <Tienda
         key={tienda.n}
         cuenta={cuenta}

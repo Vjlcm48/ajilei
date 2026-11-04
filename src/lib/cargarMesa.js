@@ -46,10 +46,16 @@
 // fallido y no lo vuelve a pedir aunque vuelva la red. Tras una precarga
 // cortada, la entrada falla AL ACTO con el mismo error; sólo la recarga trae un
 // documento limpio que pida el chunk otra vez.
+//
+// ── PES-1 · EL MOLDE ES DE TODOS ─────────────────────────────────────────────
+// Rector: AJILEI_PES-1_Fase1_v1.0.md §1. `creaCargador` es la fábrica de todo
+// trozo diferido, y `lib/trozos.js` guarda los demás. Con varios trozos, «ya tocó
+// Jugar» no basta para clasificar un fallo: por eso `esperando()`, que es la marca
+// mientras el módulo no ha llegado. La pregunta es `origenFalloChunk` (`trozos`).
 
 // La fábrica, separada de los dos efectos del navegador (el `import()` y el
 // reloj ocioso) para que vitest la pruebe en Node pelado con los suyos.
-export function creaCargadorMesa(importar, ocioso) {
+export function creaCargador(importar, ocioso) {
   let modulo = null
   let entrando = false
   // La promesa EN VUELO, para que dos peticiones seguidas (el lobby y el efecto
@@ -85,8 +91,10 @@ export function creaCargadorMesa(importar, ocioso) {
   // recarga trae un módulo nuevo con la marca a cero.
   const marcarEntrada = () => { entrando = true }
   const origenFallo = () => (entrando ? 'entrada' : 'precarga')
+  const llego = () => Boolean(modulo)
+  const esperando = () => entrando && !modulo
 
-  return { cargar, fabrica, precargar, marcarEntrada, origenFallo }
+  return { cargar, fabrica, precargar, marcarEntrada, origenFallo, llego, esperando }
 }
 
 // ── La decisión del escuchador, pura ────────────────────────────────────────
@@ -107,16 +115,17 @@ export function decidirFalloChunk(origen, guarda) {
 
 // `requestIdleCallback` donde exista; Safari no lo tiene, y allí un `setTimeout`
 // corto deja pasar el pintado del lobby antes de pedir nada.
-const ociosoDelNavegador = (f) => (
+export const ociosoDelNavegador = (f) => (
   typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
     ? window.requestIdleCallback(f)
     : setTimeout(f, 1)
 )
 
-const mesa = creaCargadorMesa(() => import('../components/GameTable'), ociosoDelNavegador)
+const mesa = creaCargador(() => import('../components/GameTable'), ociosoDelNavegador)
+
+export const trozoMesa = mesa
 
 export const cargarMesa = mesa.cargar
 export const fabricaMesa = mesa.fabrica
 export const precargarMesa = mesa.precargar
 export const marcarEntradaMesa = mesa.marcarEntrada
-export const origenFalloMesa = mesa.origenFallo

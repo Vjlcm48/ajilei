@@ -25,9 +25,12 @@ import './styles/tactilLobby.css'
 import App from './App.jsx'
 import { SoundProvider } from './context/SoundContext.jsx'
 import EsperaDiferida from './components/EsperaDiferida'
-import { decidirFalloChunk, origenFalloMesa } from './lib/cargarMesa'
+import { decidirFalloChunk } from './lib/cargarMesa'
+import { origenFalloChunk } from './lib/trozos'
+import { arrancarHowler } from './lib/motorHowler'
 
 // ── ARN-3d §2.4 (D11) · un chunk que ya no está: recargar UNA vez ───────────
+// PES-1 · vale para todos los trozos (`lib/trozos`), no solo para la mesa.
 // La mesa viaja en su propio chunk con nombre de hash. Si se despliega una
 // versión nueva mientras una pestaña sigue abierta con la vieja, esa pestaña
 // pide un `GameTable-<hash viejo>.js` que ya no existe, y el servidor contesta
@@ -48,7 +51,7 @@ const GUARDA_RECARGA = 'ajilei.recargaPorChunk'
 window.addEventListener('vite:preloadError', (evento) => {
   let guarda
   try { guarda = sessionStorage.getItem(GUARDA_RECARGA) === null ? 'libre' : 'usada' } catch { guarda = 'rota' }
-  const decision = decidirFalloChunk(origenFalloMesa(), guarda)
+  const decision = decidirFalloChunk(origenFalloChunk(), guarda)
   if (decision === 'silencio') { evento.preventDefault(); return }
   if (decision !== 'recargar') return
   try { sessionStorage.setItem(GUARDA_RECARGA, String(Date.now())) } catch { return }
@@ -68,3 +71,6 @@ createRoot(document.getElementById('root')).render(
     </SoundProvider>
   </StrictMode>,
 )
+
+// PES-1 §3-E · el motor de sonido, después de pintar.
+arrancarHowler()

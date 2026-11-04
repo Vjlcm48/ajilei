@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { Howl } from 'howler'
 import { useSoundContext } from '../context/useSoundContext'
+import { conHowler, howlerYa } from '../lib/motorHowler'
 
 // ── PUE-1.2 · El audio deja de viajar en el arranque ────────────────────────
 // Documento rector: AJILEI_PUE_Fase1_v1.0 §1.2, sobre el hallazgo de la Fase 0
@@ -48,7 +48,11 @@ const vivos = {}
 function obtener(nombre) {
   const receta = FUENTES[nombre]
   if (!receta) return null
-  if (!vivos[nombre]) vivos[nombre] = new Howl({ ...receta, preload: true })
+  // PES-1 §3-E · sin motor todavía no hay `Howl`: `precargarSonidos` y `reproducir`
+  // lo dejan pendiente en `motorHowler`.
+  const motor = howlerYa()
+  if (!motor) return null
+  if (!vivos[nombre]) vivos[nombre] = new motor.Howl({ ...receta, preload: true })
   return vivos[nombre]
 }
 
@@ -129,7 +133,7 @@ export const SONIDOS_SALAS = ['chipsCollect', 'cardShuffle', 'tableKnock']
 /** Construye y arranca la descarga de los sonidos nombrados. Idempotente. */
 export function precargarSonidos(nombres) {
   if (!Array.isArray(nombres)) return
-  nombres.forEach(obtener)
+  conHowler(() => nombres.forEach(obtener))
 }
 
 // ── Recorte del rasgueo, en reproducción ────────────────────────────────────
@@ -204,8 +208,19 @@ function programaRecorte(nombre, sound, id, esperaMs, fadeMs) {
 // stop(id), y sin stop(id) el toque que corta una celebración cortaría el
 // dibujo pero no el sonido. Una línea, aditiva: quien no lo usa —todas las
 // llamadas anteriores— no se entera.
+const enEspera = new Set()
+
 export function reproducir(soundName, activo, sonido = obtener) {
   if (!activo) return null
+  // PES-1 §3-E · antes del motor, como hoy con un archivo que aún carga: suena al
+  // llegar. Una vez por sonido: diez toques de espera no son diez clics seguidos.
+  if (sonido === obtener && !howlerYa()) {
+    if (FUENTES[soundName] && !enEspera.has(soundName)) {
+      enEspera.add(soundName)
+      conHowler(() => { enEspera.delete(soundName); reproducir(soundName, true) })
+    }
+    return null
+  }
   const sound = sonido(soundName)
   if (!sound) return null
 
