@@ -48,8 +48,12 @@
 //          PAN-1 (casa, flecha, ⚙, «+», campo de código, chips de 40 en
 //          vertical) no entran: se listan
 //   tam.11 la casa vive en la cabecera y no roza el título ni el botón
-//   tam.12 el «Pronto» sale entero ENCIMA de la zona, sin tapar el botón
-//          (a 1366×623, 412×915 y 360×640)
+//   tam.12 desde CFG-1 1a el ⚙ abre la hoja, y el «Pronto» es el de sus filas: sale
+//          entero y por encima del velo, y al cerrar la hoja el botón vuelve a
+//          estar donde estaba y se toca (a 1366×623, 412×915 y 360×640)
+//   matriz el barrido y las celdas MEDIDAS son las esperadas (ARN-4d: tamaños por
+//          estados, 301 hoy). Antes contaba solo el barrido: un error a media
+//          pasada se llevaba las celdas que faltaban y esto seguía en verde
 //   consola  sin errores de página
 //
 // UN VERDE MIDE LO QUE DICE. Una celda que no se pudo medir (el estado no llegó)
@@ -371,6 +375,42 @@ async function gesto(page, perfil, cdp) {
   await quieto(page)
 }
 
+// ARN-4d · tam.12. Abre la hoja, pide su «Pronto», lo lee y CIERRA: la matriz sigue
+// en la misma página, y una hoja abierta falsea todas las celdas que vienen detrás.
+const LEE_AVISO = () => {
+  const t = document.querySelector('.cfg-toast.is-on')
+  if (!t) return null
+  // `pointer-events: none` lo deja fuera de `elementFromPoint`: se le devuelve un
+  // instante para preguntar quién pinta encima en su centro.
+  t.style.pointerEvents = 'auto'
+  const r = t.getBoundingClientRect()
+  const arriba = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+  t.style.pointerEvents = ''
+  return { texto: t.textContent.trim(), t: r.top, b: r.bottom, l: r.left, r: r.right, encima: !!arriba && (arriba === t || t.contains(arriba)) }
+}
+
+async function medirPronto(page, obj) {
+  const antes = await lee(page, obj)
+  await page.click('.lob-ajustes')
+  await page.waitForSelector('.lob-hoja.is-on')
+  await page.click('.lob-hoja.is-on [data-accion="cfg-idioma"]')
+  await page.waitForSelector('.cfg-toast.is-on', { timeout: 3000 })
+  await page.waitForTimeout(220) // su transición: 0,18 s
+  const aviso = await page.evaluate(LEE_AVISO)
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(() => {
+    const visible = (s) => getComputedStyle(document.querySelector(s)).visibility !== 'hidden'
+    return !visible('.lob-hoja') && !visible('.lob-velo')
+  })
+  const tras = await lee(page, obj)
+  const entero = !!aviso && aviso.texto === 'Pronto' && aviso.encima && aviso.t >= -TOL && aviso.b <= tras.vh + TOL && aviso.l >= -TOL && aviso.r <= tras.vw + TOL
+  const mismoSitio = !!antes.boton && !!tras.boton && Math.abs(tras.boton.t - antes.boton.t) <= 1 && Math.abs(tras.boton.l - antes.boton.l) <= 1
+  return {
+    pronto: entero && mismoSitio && tras.tocable,
+    prontoCaja: `${aviso ? `«${aviso.texto}» ${aviso.t.toFixed(1)}–${aviso.b.toFixed(1)} de ${tras.vh}, encima=${aviso.encima}` : 'no salió'} · al cerrar, botón tocable=${tras.tocable} en su sitio=${mismoSitio}`,
+  }
+}
+
 const dentro = (c, vh) => !!c && c.t >= -TOL && c.b <= vh + 1
 // La caja, si dice algo, entera en la ventana y encima del botón.
 const cajaBien = (l) => !l.notaVisible || (dentro(l.nota, l.vh) && (!l.boton || l.nota.b <= l.boton.t + 1))
@@ -485,12 +525,7 @@ export async function matriz(browser, { base, tamanos, estados, errores }) {
             solapes: l.solapes,
           })
           if (estado === 'retar' && PRONTO_EN.includes(t.id)) {
-            await page.click('.lob-ajustes')
-            await page.waitForTimeout(300)
-            const p = await lee(page, OBJETIVO[estado])
-            celda.pronto = !!p.toast && !!p.zona && p.toast.b <= p.zona.t + 1 && p.toast.t >= 0
-              && !(p.boton && Math.min(p.toast.b, p.boton.b) - Math.max(p.toast.t, p.boton.t) > TOL)
-            celda.prontoCaja = p.toast ? `${p.toast.t.toFixed(1)}–${p.toast.b.toFixed(1)} sobre zona ${p.zona?.t.toFixed(1)}` : 'no salió'
+            Object.assign(celda, await medirPronto(page, OBJETIVO[estado]))
           }
         }
       } catch (e) {
@@ -502,6 +537,16 @@ export async function matriz(browser, { base, tamanos, estados, errores }) {
   }
   await Promise.all([corre(false), corre(true)])
   return celdas
+}
+
+/**
+ * ARN-4d · lo que le falta a la matriz: una entrada por celda esperada (tamaños por
+ * estados) que no se midió. Una celda perdida a media pasada no llega a `celdas`,
+ * así que no se cuenta lo que hay: se cuenta lo que tenía que haber.
+ */
+export function celdasSinMedir(celdas, tamanos, estados) {
+  const medidas = new Set(celdas.filter((c) => c.medida).map((c) => `${c.estado} ${c.tam}`))
+  return estados.flatMap((e) => tamanos.map((t) => `${e} ${t.id}`)).filter((n) => !medidas.has(n))
 }
 
 /**
@@ -543,12 +588,18 @@ export async function runTam(browser, {
       'tam.10': { fallos: medidas.filter((c) => c.tactil && c.menor && c.menor.lado < PISO - 0.01).map((c) => `${nombre(c)} ${c.menor.k} ${c.menor.lado}`) },
       'tam.11': { fallos: medidas.filter((c) => !c.casaEnCab || c.casaTitulo || c.casaBoton).map(nombre) },
       'tam.12': { fallos: medidas.filter((c) => 'pronto' in c && !c.pronto).map((c) => `${nombre(c)} ${c.prontoCaja}`), medidos: medidas.filter((c) => 'pronto' in c).length },
-      'no medidas': { fallos: celdas.filter((c) => !c.medida).map(nombre) },
     })
     puntos['tam.12'].ok = puntos['tam.12'].fallos.length === 0 && puntos['tam.12'].medidos === PRONTO_EN.length
   }
   for (const p of Object.values(puntos)) if (p.ok === undefined) p.ok = p.fallos.length === 0
-  puntos.matriz = { medidas: filas.length, esperadas, celdas: celdas.length, ok: filas.length === esperadas }
+  // ARN-4d · sustituye a «no medidas», que solo veía las celdas que llegaron a nacer.
+  const celdasEsperadas = conMatriz ? tamanos.length * estados.length : 0
+  const sinMedir = conMatriz ? celdasSinMedir(celdas, tamanos, estados) : []
+  puntos.matriz = {
+    medidas: filas.length, esperadas, celdas: celdasEsperadas - sinMedir.length, celdasEsperadas,
+    fallos: [...(filas.length === esperadas ? [] : [`barrido ${filas.length} de ${esperadas}`]), ...sinMedir],
+  }
+  puntos.matriz.ok = puntos.matriz.fallos.length === 0
   puntos.consola = { errores, ok: errores.length === 0 }
   // Las filas que no caben se tienen que haber recorrido en algún punto: si en
   // ninguno hizo falta, tam.6 no midió que lo que no cabe se alcanza.
@@ -557,7 +608,7 @@ export async function runTam(browser, {
   const verde = Object.values(puntos).every((x) => x.ok === true)
   const orden = Object.keys(puntos)
   const resumen = `${verde ? (sinCobertura.length ? 'SIN COBERTURA' : 'VERDE') : 'ROJO'} · ` + orden.map((k) => `${k} ${puntos[k].ok ? '✓' : `✗${puntos[k].fallos ? ` (${puntos[k].fallos.length})` : ''}`}`).join(' · ')
-    + ` · ${filas.length} puntos de barrido (${ejercidas} con filas recorridas) · ${celdas.length} celdas`
+    + ` · ${filas.length} puntos de barrido (${ejercidas} con filas recorridas) · ${celdasEsperadas - sinMedir.length} de ${celdasEsperadas} celdas`
   console.log(`── ${etiqueta} · ${resumen}`)
   for (const k of orden) {
     const f = puntos[k].fallos
