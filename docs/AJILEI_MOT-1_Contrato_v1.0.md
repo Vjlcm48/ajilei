@@ -364,10 +364,10 @@ Sustituye a la «gracia de reconexión». No se distingue a quien no está de qu
 
 | Punto | Regla |
 |---|---|
-| Qué cuenta | Cada vencimiento propio resuelto por el reloj: turno de apuesta, descarte o elección del sorteo. Da igual qué cliente lo reclame. Agotar la pausa de anuncio no cuenta |
+| Qué cuenta | Cada vencimiento propio resuelto por el reloj: turno de apuesta o descarte. Da igual qué cliente lo reclame. Agotar la pausa de anuncio no cuenta, y tampoco la elección del sorteo: quien no elige recibe la posición 0, sin falta |
 | Qué pone a 0 la cuenta | Cualquier acción propia: `apostar`, `descartar`, `elegir_carta_sorteo` o `volver_anuncio` |
 | `ausente` | `true` en la vista desde el 2.º vencimiento seguido |
-| Abandono | Al llegar a **`N_AUSENCIA` = 6** vencimientos seguidos, **provisional · se cierra con los teléfonos**. El árbitro lo abandona por la misma ruta que `abandonarPorServidor`, y el §7 dice qué pasa con su dinero. En su turno de apuesta, ese 6.º vencimiento lo retira, como a cualquier abandonado |
+| Abandono | Al llegar a **`N_AUSENCIA` = 3** vencimientos seguidos, **provisional · se cierra con los teléfonos**. El árbitro lo abandona por la misma ruta que `abandonarPorServidor`, y el §7 dice qué pasa con su dinero. En su turno de apuesta, ese 3.er vencimiento lo retira, como a cualquier abandonado |
 | Lo que ve el que vuelve | MES-PvP, sub-tanda 6 |
 
 ### Publicidad
