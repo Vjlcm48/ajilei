@@ -11,7 +11,7 @@ import { AJILEI_CONFIG } from '../config/ajileiConfig'
 import { costoDe, esLegal } from '../engine/pozos'
 import { supabase } from '../lib/supabase'
 import {
-  ETAPA_ELECCION, FASE_DESCARTE, FASE_FIN, FASE_SORTEO, crearClientePartida, leerMarcaMot1,
+  CLASE_PAUSA_ANUNCIO, ETAPA_ELECCION, FASE_DESCARTE, FASE_FIN, FASE_SORTEO, crearClientePartida, leerMarcaMot1,
 } from '../lib/partidaCliente'
 
 // ── SAL-B2 F1b · PartidaPvP · STUB ──────────────────────────────────────────
@@ -175,6 +175,8 @@ function estadoDeAsiento(p, i, vista) {
     p.allIn ? 'all-in' : null,
     p.eliminated ? 'eliminado' : null,
     p.abandonado ? 'abandonó' : null,
+    p.enAnuncio ? 'en anuncio' : null,
+    p.ausente ? 'ausente' : null,
     p.cobrado !== null ? `cobró ${montoTexto(p.cobrado)}` : null,
   ].filter(Boolean).join(' · ')
 }
@@ -192,6 +194,16 @@ function Vista({ vista, ahora, enviar }) {
         <p>Fase <b data-mot1="fase">{vista.phase}</b>{turno ? <> · turno de #{vista.activePlayerIndex} {turno.name}</> : null}</p>
         <p data-mot1="vencimiento">{vista.vencimiento ? `${vista.vencimiento.clase}: ${restan} s` : 'Sin vencimiento'}</p>
         <p>Pozo {montoTexto(vista.pot)} · apuesta viva {montoTexto(vista.currentBet)} · unidad {montoTexto(vista.unit)}</p>
+        <p data-mot1="ultima-accion">Última acción: {vista.ultimaAccion ? JSON.stringify(vista.ultimaAccion) : 'ninguna'}</p>
+        {vista.vencimiento?.clase === CLASE_PAUSA_ANUNCIO && propio.enAnuncio
+          ? (
+            <div className="mot1-botones">
+              <button type="button" data-mot1="volver-anuncio" onClick={() => enviar('volver_anuncio', { mano: vista.handCount })}>
+                Volví del anuncio
+              </button>
+            </div>
+          )
+          : null}
       </section>
 
       <section className="mot1-bloque" data-mot1="cartas">

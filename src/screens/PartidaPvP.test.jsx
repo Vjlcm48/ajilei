@@ -5,7 +5,20 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 
+// Con una foto puesta a mano, el panel pinta esa vista; sin ella, el cliente de verdad.
+const pruebas = vi.hoisted(() => ({ foto: null }))
+vi.mock('../lib/partidaCliente', async (original) => {
+  const real = await original()
+  return {
+    ...real,
+    crearClientePartida: (partes) => (pruebas.foto
+      ? { suscribir: () => () => {}, foto: () => pruebas.foto, iniciar: () => {}, parar: () => {}, enviar: () => {}, releer: () => {} }
+      : real.crearClientePartida(partes)),
+  }
+})
+
 import { SoundProvider } from '../context/SoundContext'
+import { CLASES, crearPartida, vistaDe } from '../arbitro/index.js'
 import PartidaPvP from './PartidaPvP'
 
 const SALA = { id: '11111111-1111-4111-8111-111111111111', jugadores: 2, apuesta: 100 }
@@ -24,7 +37,10 @@ function pintar(search, { sala = SALA, guardada = false } = {}) {
   )
 }
 
-afterEach(() => { vi.unstubAllGlobals() })
+afterEach(() => {
+  vi.unstubAllGlobals()
+  pruebas.foto = null
+})
 
 describe('MOT-1 1f · PartidaPvP y la marca', () => {
   it('sin marca, el stub de hoy: su rótulo y su CTA, y nada del panel', () => {
@@ -46,6 +62,35 @@ describe('MOT-1 1f · PartidaPvP y la marca', () => {
   it('la marca guardada vale sin el parámetro, y `?mot1=0` manda sobre ella', () => {
     expect(pintar('', { guardada: true })).toContain('data-mot1="panel"')
     expect(pintar('?mot1=0', { guardada: true })).toContain('data-accion="pronto"')
+  })
+
+  describe('MES-PvP 1 · lo mínimo para probar con los teléfonos', () => {
+    const SILLAS = [{ asiento: 0, uid: 'a', nombre: 'Ana' }, { asiento: 1, uid: 'b', nombre: 'Beto' }]
+    const FOTO = { canal: 'SUBSCRIBED', avisos: 0, msAccion: null, msAviso: null, msEco: null, rechazo: null }
+
+    function conVista(cambios, asientos = (a) => a) {
+      const partida = crearPartida({ apuesta: 100, entrada: 'corta', ritmo: 'normal' }, SILLAS, 0)
+      const estado = { ...partida, ...cambios, asientos: partida.asientos.map(asientos) }
+      pruebas.foto = { ...FOTO, vista: vistaDe(estado, 0) }
+      return pintar('?mot1=1')
+    }
+
+    it('en la pausa: quién está en anuncio y el botón de volver, solo si el asiento propio sigue en ella', () => {
+      const pausa = { vencimiento: { clase: CLASES.PAUSA_ANUNCIO, hora: 45000 } }
+      const html = conVista(pausa, (a) => ({ ...a, enAnuncio: true }))
+      expect(html).toContain('data-mot1="volver-anuncio"')
+      expect(html).toContain('en anuncio')
+      expect(conVista(pausa, (a) => ({ ...a, enAnuncio: a.uid !== 'a' }))).not.toContain('data-mot1="volver-anuncio"')
+      expect(conVista({}, (a) => ({ ...a, enAnuncio: true }))).not.toContain('data-mot1="volver-anuncio"')
+    })
+
+    it('«ausente» y la última acción, en una línea', () => {
+      const ultimaAccion = { asiento: 1, tipo: 'pasar', puesto: 0, apuestaAntes: 0, apuestaDespues: 0, porReloj: true }
+      const html = conVista({ ultimaAccion }, (a) => ({ ...a, vencidos: a.uid === 'b' ? 2 : 0 }))
+      expect(html).toContain('ausente')
+      expect(html).toContain('data-mot1="ultima-accion"')
+      expect(html).toContain('porReloj')
+    })
   })
 
   it('con la marca pero sin mesa no hay nada que probar: el stub', () => {

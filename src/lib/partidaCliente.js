@@ -26,6 +26,7 @@ export const FASE_SORTEO = 'SORTEO'
 export const FASE_DESCARTE = 'DISCARD'
 export const FASE_FIN = 'GAME_OVER'
 export const ETAPA_ELECCION = 'eleccion'
+export const CLASE_PAUSA_ANUNCIO = 'pausa_anuncio'
 
 export const MARGEN_VENCIMIENTO_MS = 300
 export const REINTENTO_RECLAMO_MS = 1000

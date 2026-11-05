@@ -1,12 +1,13 @@
 // MOT-1 1f · El cliente de la partida, con un doble de Supabase: sin red y sin socket.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MOTIVOS as M } from '../arbitro/motivos.js'
+import { CLASES } from '../arbitro/reloj.js'
 import { ETAPAS } from '../arbitro/sorteo.js'
 import { FASE_SORTEO as SORTEO_ARBITRO } from '../arbitro/vista.js'
 import { PHASES } from '../engine/gameEngine.js'
 import { EVENTO_AVISO as AVISO_FUNCION } from '../../supabase/functions/partida/nucleo.js'
 import {
-  ETAPA_ELECCION, EVENTO_AVISO, FASE_DESCARTE, FASE_FIN, FASE_SORTEO, MARGEN_VENCIMIENTO_MS,
+  CLASE_PAUSA_ANUNCIO, ETAPA_ELECCION, EVENTO_AVISO, FASE_DESCARTE, FASE_FIN, FASE_SORTEO, MARGEN_VENCIMIENTO_MS,
   REINTENTO_RECLAMO_MS, RELECTURA_MS, REVISION_MS, crearClientePartida, leerMarcaMot1,
 } from './partidaCliente'
 
@@ -66,6 +67,7 @@ describe('MOT-1 1f · los literales son los del servidor', () => {
     expect(FASE_DESCARTE).toBe(PHASES.DISCARD)
     expect(FASE_FIN).toBe(PHASES.GAME_OVER)
     expect(ETAPA_ELECCION).toBe(ETAPAS.ELECCION)
+    expect(CLASE_PAUSA_ANUNCIO).toBe(CLASES.PAUSA_ANUNCIO)
   })
 })
 
