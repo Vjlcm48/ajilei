@@ -43,6 +43,8 @@ const FUERA_DE_LA_ENTRADA = [
   // `config/esperas.js` lo importa la mesa, que ya es diferida.
   'src/arbitro/index.js', 'src/arbitro/partida.js', 'src/arbitro/vista.js', 'src/arbitro/sorteo.js', 'src/arbitro/reloj.js',
   'src/arbitro/ganador.js', 'src/arbitro/motivos.js', 'src/arbitro/asientos.js', 'src/arbitro/azar.js',
+  // El cliente de la partida y su panel de prueba (MOT-1 1f): en `trozos.partidaPvP`.
+  'src/lib/partidaCliente.js', 'src/styles/panelMot1.css',
 ]
 
 const MUERTO_EN_LA_BUILD = new Set(['src/dev/repartoGanador.js'])

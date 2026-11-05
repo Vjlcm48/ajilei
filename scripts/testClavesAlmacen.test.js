@@ -39,6 +39,7 @@ const CLAVES = [
   { clave: 'ajilei.saldoOculto', almacen: 'local', fuente: 'CFG-1 Fase 1a · Configuracion_v1.1 §6 · saldoOculto.js · el ojito de la píldora del lobby, en el aparato' },
   { clave: 'ajilei.partidaRapida', almacen: 'local', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §2 · partidaRapida.js · el ritmo de la mesa contra las IAS, en el aparato (INV-70)' },
   { clave: 'ajilei.consultaConfirmada', almacen: 'session', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §3 · consultaConfirmada.js · el primer cobro de Mano actual ya se confirmó en esta sesión' },
+  { clave: 'ajilei.mot1', almacen: 'local', fuente: 'MOT-1 Fase 1f §3 · partidaCliente.js · la marca del panel de prueba, en el aparato; se va con el panel en MES-PvP' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -56,6 +57,7 @@ const ACCESORES = [
   'src/lib/saldoOculto.js',        // ajilei.saldoOculto (CFG-1 1a)
   'src/lib/partidaRapida.js',      // ajilei.partidaRapida (CFG-1 1e)
   'src/lib/consultaConfirmada.js', // ajilei.consultaConfirmada (CFG-1 1e, sessionStorage)
+  'src/lib/partidaCliente.js',     // ajilei.mot1 (MOT-1 1f)
   'src/lib/limpiarAparato.js',     // CFG-1 1c: borra TODAS las ajilei.* y vacía sessionStorage al eliminar la cuenta (no escribe ninguna)
 ]
 
