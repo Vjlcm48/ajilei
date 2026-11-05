@@ -8,6 +8,7 @@
 - **Al día con la 1b (2026-11-04):** el §4, el §6 y el §7 recogen los ajustes del rector al STOP-1b. Las citas de esos ajustes a `src/arbitro/` son del árbol de la 1b.
 - **Al día con la 1d-i (2026-11-04):** el §4 y el §5 recogen las dos decisiones del rector al STOP-1: el ritmo no es secreto, y la recepción con un cliente suscrito se prueba en la 1e.
 - **Al día con la 1d-ii (2026-11-04):** el §6, el §7 y el §9 recogen la precisión de la C-10 (borrar la cuenta no cierra la partida de los demás, con la excepción del anfitrión) y que la llamada a los puntos vive en `guardar_jugada`.
+- **Al día con la 1e (2026-11-04):** el §5 dice que la recepción con un cliente suscrito se prueba en la 1f. La línea anterior de la 1d-i queda corregida por esta.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -244,7 +245,7 @@ Sellado el 12-sep. La línea «vistas por Broadcast privado» de la Fase 0b qued
 |---|---|---|---|---|---|
 | Tabla de partida | El estado completo, la versión y el vencimiento | **Nadie del cliente**: RLS sin políticas, sin privilegios y fuera de la publicación | Solo el árbitro | `mesas_ia` (`eco1c:803-807`) · K-6(b) | 1d-i |
 | Tabla de vistas | Una fila por mesa y asiento, con la vista del §4 | Cada asiento la suya, por RLS | Solo el árbitro | Nueva | 1d-i |
-| Canal privado por mesa | Nada: solo pasa el aviso | Los miembros, con política sobre `realtime.messages` | Solo el árbitro | Sin políticas hoy. Emisión probada en público (`sonda_mot1/index.ts:153-161`); recepción privada sin probar (H-S2) | 1d-i las políticas; la recepción con un cliente suscrito se prueba en la 1e, cuando la Edge Function emita |
+| Canal privado por mesa | Nada: solo pasa el aviso | Los miembros, con política sobre `realtime.messages` | Solo el árbitro | Sin políticas hoy. Emisión probada en público (`sonda_mot1/index.ts:153-161`); recepción privada sin probar (H-S2) | 1d-i las políticas; la recepción con un cliente suscrito se prueba en la 1f, con los dos teléfonos |
 
 ### El recorrido
 
