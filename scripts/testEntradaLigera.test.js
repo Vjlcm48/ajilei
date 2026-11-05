@@ -45,6 +45,8 @@ const FUERA_DE_LA_ENTRADA = [
   'src/arbitro/ganador.js', 'src/arbitro/motivos.js', 'src/arbitro/asientos.js', 'src/arbitro/azar.js',
   // El cliente de la partida y su panel de prueba (MOT-1 1f): en `trozos.partidaPvP`.
   'src/lib/partidaCliente.js', 'src/styles/panelMot1.css',
+  // El puente de la mesa (MES-PvP 2): también en `trozos.partidaPvP`.
+  'src/lib/vistaAMesa.js', 'src/hooks/vozHumanos.js',
 ]
 
 const MUERTO_EN_LA_BUILD = new Set(['src/dev/repartoGanador.js'])

@@ -22,12 +22,22 @@
 // clasificar, ni "sólo para el caso raro". El día que se lea, el motor vuelve a
 // ser la voz y esto es un adorno. Todo sale del ESTADO y de la TRANSICIÓN.
 import { PHASES } from '../engine/gameEngine'
+import { montoTexto } from '../config/tapetes'
 
 // La marca. Vive aquí y no en el motor: ése es el punto entero de REN-2.
 export const MONEDA = 'Heptacoins'
 // El singular, por regla (VOZ-3 D5): los montos son múltiplos de la apuesta de
 // mesa y hoy nunca llega a volver una sola, pero la frase no depende de eso.
 export const MONEDA_UNA = 'Heptacoin'
+
+// MES-PvP 2 · Quién habla en el pago. Contra las IAS, lo de siempre al byte: es el valor
+// por defecto. Entre personas, nombres en vez de «la IA». La voz de las acciones entre
+// personas vive en `vozHumanos.js`.
+export const VOZ = Object.freeze({ IAS: 'ias', HUMANOS: 'humanos' })
+
+// El único sitio por donde pasa un nombre en la voz entre personas. Hoy no recorta: la
+// medida de los 15 «W» en el óvalo es de la sub-tanda 3, y si no cabe se recorta aquí.
+export const nombreEnVoz = (p) => p.name
 
 // ── Verbo de la acción, deducido de la transición ───────────────────────────
 // Mismo método que `inferAction` en GameTable (que rotula el panel del rival):
@@ -186,10 +196,16 @@ export function componeFase(estado, prev = null) {
 // su vuelto (informe de la Fase 0 de VOZ-3, §A.3).
 //
 // `players` da los nombres. La mesa de dos dice «la IA»; las de 3 a 5, el
-// nombre del asiento, igual que `resultadoCore.sujetoInicial`.
-export function componeCapas(lectura, players) {
+// nombre del asiento, igual que `resultadoCore.sujetoInicial`. Entre personas
+// (`voz`), siempre el nombre, y las cifras con su punto de millar.
+export function componeCapas(lectura, players, voz = VOZ.IAS) {
   if (!lectura) return null
-  const nombre = (seat) => (seat === 0 ? 'Tú' : (players?.[seat]?.name ?? 'la mesa'))
+  const humanos = voz === VOZ.HUMANOS
+  const nombre = (seat) => {
+    if (seat === 0) return 'Tú'
+    return humanos ? nombreEnVoz(players[seat]) : (players?.[seat]?.name ?? 'la mesa')
+  }
+  const cifra = (monto) => (humanos ? montoTexto(monto) : monto)
 
   // APU-1 1e-iv · E-23. SE AGRUPA POR GANADOR Y SE SUMA. Un asiento puede
   // llevarse más de una capa, y recorrer la lista sin agrupar lo nombraba una
@@ -200,8 +216,8 @@ export function componeCapas(lectura, players) {
   // CUÁNTO y A QUIÉN. `lectura.otras` ya viene agrupada y en orden de primera
   // aparición, para que la frase siga leyendo el pozo de abajo arriba.
   const otras = lectura.otras.map(({ asiento, monto }) => (asiento === 0
-    ? `Te llevas otros ${monto} ${MONEDA}.`
-    : `${nombre(asiento)} se lleva ${monto}.`))
+    ? `Te llevas otros ${cifra(monto)} ${MONEDA}.`
+    : `${nombre(asiento)} se lleva ${cifra(monto)}.`))
 
   // VOZ-3 · D5 · lo que vuelve, al final y en orden de asiento, con UNA sola
   // forma en todo el juego. D6: la devolución al propio principal no se
@@ -212,9 +228,9 @@ export function componeCapas(lectura, players) {
     .map(({ asiento, monto }) => {
       const verbo = monto === 1 ? 'devuelve' : 'devuelven'
       const moneda = monto === 1 ? MONEDA_UNA : MONEDA
-      if (asiento === 0) return `Se te ${verbo} ${monto} ${moneda}.`
-      const quien = lectura.numPlayers === 2 ? 'A la IA' : `A ${nombre(asiento)}`
-      return `${quien} se le ${verbo} ${monto} ${moneda}.`
+      if (asiento === 0) return `Se te ${verbo} ${cifra(monto)} ${moneda}.`
+      const quien = lectura.numPlayers === 2 && !humanos ? 'A la IA' : `A ${nombre(asiento)}`
+      return `${quien} se le ${verbo} ${cifra(monto)} ${moneda}.`
     })
 
   // Sin «El pozo se partió:» cuando lo único que hay es una devolución (D5).

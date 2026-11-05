@@ -712,6 +712,18 @@ export const TEXTOS_ES = {
   'tie.listo':              '¡Listo! {nombre} es tu tapete',
   'tie.cambio.error':       'No se pudo cambiar. Inténtalo de nuevo.',
   'tie.cfg.valor':          '{nombre} · {tono}',
+
+  // ── MES-PvP 2 · El rótulo de cada asiento (`lib/vistaAMesa.estadoDeAsiento`) ──
+  'pvp.asiento.abandono':   'Abandonó',
+  'pvp.asiento.anuncio':    'En anuncio',
+  'pvp.asiento.retirado':   'Se retiró',
+  'pvp.asiento.ausente':    'Ausente',
+  'pvp.asiento.turno':      'Su turno',
+  'pvp.asiento.paso':       'Pasó',
+  'pvp.asiento.aposto':     'Apostó',
+  'pvp.asiento.igualo':     'Igualó',
+  'pvp.asiento.subio':      'Subió',
+  'pvp.asiento.descarto':   'Descartó {n}',
 }
 
 export default TEXTOS_ES

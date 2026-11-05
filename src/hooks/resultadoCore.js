@@ -1,5 +1,6 @@
 import { PHASES } from '../engine/gameEngine'
 import { isAjilei } from '../engine/handEvaluator'
+import { VOZ, nombreEnVoz } from './cronicaCore'
 
 // ── MSG-U1 · El compositor de resultados ────────────────────────────────────
 // Documento rector: docs/AJILEI_Mensajes_Resultado_v1.0.md.
@@ -34,9 +35,11 @@ export const vozResto = (score) => `, ${score.points} pts`
 
 // Segunda persona para el humano, tercera para las IAs. Dos formas porque el
 // castellano las distingue: al inicio de frase "La IA gana…", en medio "Gana la
-// IA…". En mesas de 3+ el nombre propio ("IA 2") vale para las dos.
-const sujetoInicial = (p, numPlayers) => (numPlayers === 2 ? 'La IA' : p.name)
-const sujetoMedio   = (p, numPlayers) => (numPlayers === 2 ? 'la IA' : p.name)
+// IA…". En mesas de 3+ el nombre propio ("IA 2") vale para las dos. MES-PvP 2 ·
+// Entre personas (`voz`), el nombre en toda mesa.
+const nombreDe = (p, habla) => (habla === VOZ.HUMANOS ? nombreEnVoz(p) : p.name)
+const sujetoInicial = (p, numPlayers, habla) => (numPlayers === 2 && habla !== VOZ.HUMANOS ? 'La IA' : nombreDe(p, habla))
+const sujetoMedio   = (p, numPlayers, habla) => (numPlayers === 2 && habla !== VOZ.HUMANOS ? 'la IA' : nombreDe(p, habla))
 
 // "Ambos" no sobrevive a una mesa de cinco. Improbable no es imposible: hay un
 // AJILEI natural por palo (as + tres + las tres figuras = 51) más la variante de
@@ -65,12 +68,12 @@ export function claseTono(tono) {
 // El resto de la voz —la crónica de fases y acciones, que este módulo nunca
 // cubrió— vive en su hermano `cronicaCore.js` desde REN-2. Entre los dos, nadie
 // pinta `game.message`.
-function finDePartida({ winner, players }) {
+function finDePartida({ winner, players, habla }) {
   if (winner === 0) {
     return { texto: '¡Ganaste la mesa! Eres el último con Heptacoins.', tono: 'oro' }
   }
   if (winner != null) {
-    return { texto: `${players[winner].name} gana la mesa. Te quedaste sin Heptacoins.`, tono: 'neutro' }
+    return { texto: `${nombreDe(players[winner], habla)} gana la mesa. Te quedaste sin Heptacoins.`, tono: 'neutro' }
   }
   // Sin ganador: o no queda nadie en pie, o el humano quebró con la mesa viva.
   // El motor los distingue por su rama; aquí se deriva de los vivos, que es el
@@ -84,9 +87,18 @@ function finDePartida({ winner, players }) {
 // "Pierdes." y sin contraste— así que se conservan al pie de la letra. Cambia
 // sólo de dónde salen. Se reconocen porque el ganador NO tiene score: no hubo
 // comparación, luego no hubo volteo.
-function porRetiros({ winner, players, numPlayers }) {
+//
+// MES-PvP 2 · Entre personas, «mesa de dos» es la de dos sentados en esta mano
+// (`ruleN`), no la de dos sillas: «Los demás se retiran» suena raro con un solo
+// rival, también en una mesa de cinco que se quedó en dos.
+function porRetiros({ winner, players, numPlayers, ruleN, habla }) {
   const tono = winner === 0 ? 'gana' : 'pierde'
-  if (numPlayers === 2) {
+  if (habla === VOZ.HUMANOS && ruleN === 2) {
+    if (winner !== 0) return { texto: `Te retiras. ${nombreDe(players[winner], habla)} gana el pozo.`, tono }
+    const rival = players.find((p, i) => i !== 0 && !p.eliminated)
+    return { texto: `¡${nombreDe(rival, habla)} se retira! Ganas el pozo.`, tono }
+  }
+  if (numPlayers === 2 && habla !== VOZ.HUMANOS) {
     return {
       texto: winner === 0 ? '¡La IA se retira! Ganaste el pozo.' : 'Te retiras. La IA gana el pozo.',
       tono,
@@ -94,8 +106,8 @@ function porRetiros({ winner, players, numPlayers }) {
   }
   return {
     texto: winner === 0
-      ? 'Los demás se retiran. ¡Ganaste el pozo!'
-      : `Los demás se retiran. Gana ${players[winner].name}.`,
+      ? (habla === VOZ.HUMANOS ? 'Los demás se retiran. ¡Ganas el pozo!' : 'Los demás se retiran. ¡Ganaste el pozo!')
+      : `Los demás se retiran. Gana ${nombreDe(players[winner], habla)}.`,
     tono,
   }
 }
@@ -103,12 +115,12 @@ function porRetiros({ winner, players, numPlayers }) {
 // ── Showdown ────────────────────────────────────────────────────────────────
 // Mismo criterio en las CUATRO mesas: se anuncia al ganador y su mano, nunca la
 // del perdedor. La palabra "Pierdes." no existe en ninguna plantilla.
-function deShowdown({ winner, players, numPlayers, manoIndex, ruleN }) {
+function deShowdown({ winner, players, numPlayers, manoIndex, ruleN, habla }) {
   const g       = players[winner]
   const humano  = winner === 0
   const tono    = humano ? 'gana' : 'pierde'
-  const suIni   = sujetoInicial(g, numPlayers)
-  const suMed   = sujetoMedio(g, numPlayers)
+  const suIni   = sujetoInicial(g, numPlayers, habla)
+  const suMed   = sujetoMedio(g, numPlayers, habla)
 
   // Sólo cuentan los que llegaron a comparación: el motor deja score en null a
   // quien se retiró.
@@ -121,7 +133,9 @@ function deShowdown({ winner, players, numPlayers, manoIndex, ruleN }) {
 
   // El desempate lo gana el más cercano a la Mano; si el ganador ES la Mano, se
   // dice así. Se deriva de manoIndex, no se supone.
-  const desempate = winner === manoIndex ? 'por ser la Mano' : 'por ser el más cercano a la Mano'
+  const desempate = winner === manoIndex
+    ? 'por ser la Mano'
+    : (habla === VOZ.HUMANOS ? 'por estar más cerca de la Mano' : 'por ser el más cercano a la Mano')
 
   // 1 · Varias manos perfectas Y empate: el caso que en mesa 2 mentía. Ahora se
   //     compone desde `winner`, así que es veraz en las DOS direcciones y el
@@ -172,11 +186,11 @@ function deShowdown({ winner, players, numPlayers, manoIndex, ruleN }) {
 
 // ── La puerta ───────────────────────────────────────────────────────────────
 // Devuelve null fuera de resultado: ahí el óvalo sigue pintando game.message.
-export function composeResultado({ phase, winner, players, numPlayers, manoIndex, ruleN }) {
+export function composeResultado({ phase, winner, players, numPlayers, manoIndex, ruleN, voz: habla = VOZ.IAS }) {
   if (!Array.isArray(players) || players.length === 0) return null
-  if (phase === PHASES.GAME_OVER) return finDePartida({ winner, players })
+  if (phase === PHASES.GAME_OVER) return finDePartida({ winner, players, habla })
   if (phase !== PHASES.PAYOUT || winner == null) return null
   if (!players[winner]) return null
-  if (!players[winner].score) return porRetiros({ winner, players, numPlayers })
-  return deShowdown({ winner, players, numPlayers, manoIndex, ruleN })
+  if (!players[winner].score) return porRetiros({ winner, players, numPlayers, ruleN, habla })
+  return deShowdown({ winner, players, numPlayers, manoIndex, ruleN, habla })
 }

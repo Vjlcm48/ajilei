@@ -98,7 +98,7 @@ describe('IDI-0 · diccionario es', () => {
     //
     // TIE-1 1a es la novena: `tie.*` es la tienda (estantes, vitrina, ventana
     // de compra) y la fila «Tapetes» del ⚙.
-    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.', 'tie.']
+    const PREFIJOS = ['pvp.', 'lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.', 'tie.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }

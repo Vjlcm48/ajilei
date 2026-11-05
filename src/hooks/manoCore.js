@@ -161,6 +161,7 @@ export function resultadoDeMano(state, lectura) {
     numPlayers: state.numPlayers,
     manoIndex: state.manoIndex,
     ruleN: state.handRules?.ruleN,
+    voz: state.voz, // MES-PvP 2 · lo pone `vistaAMesa`; el motor no lo tiene: contra las IAS, la de siempre
   }
   if (!lectura) return composeResultado({ ...base, winner: state.winner })
   const r = composeResultado({ ...base, winner: lectura.principal })
