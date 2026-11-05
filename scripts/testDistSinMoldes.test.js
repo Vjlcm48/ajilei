@@ -55,6 +55,9 @@ const PROHIBIDAS = [
   // contador de SumaMente a una entrada del video. Su huella es el rótulo del
   // aviso de consola, que sólo vive detrás de la puerta.
   'molde-suma',
+  // MES-PvP 2 · el árbitro imitado (`MARCA_PARTIDA_IMITADA`) y una escena del mando `?pvp=`
+  'ajilei:partida-imitada',
+  'sorteo-empate-2',
   // los estados de `?sal=`
   'opciones-fuera-alcance',
   'espera-fantasma',

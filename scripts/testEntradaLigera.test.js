@@ -47,6 +47,7 @@ const FUERA_DE_LA_ENTRADA = [
   'src/lib/partidaCliente.js', 'src/styles/panelMot1.css',
   // El puente de la mesa (MES-PvP 2): también en `trozos.partidaPvP`.
   'src/lib/vistaAMesa.js', 'src/hooks/vozHumanos.js', 'src/hooks/mesaPvPCore.js', 'src/hooks/useMesaPvP.js',
+  'src/dev/partidaImitada.js',
 ]
 
 const MUERTO_EN_LA_BUILD = new Set(['src/dev/repartoGanador.js'])

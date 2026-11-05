@@ -205,8 +205,9 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
       expect(leer(f), f).not.toMatch(/Date\.now|Math\.random|\bwindow\b|\bdocument\b|from '(react|howler|node:|@supabase)/)
       for (const m of leer(f).matchAll(/from '(\.[^']+)'/g)) expect(m[1], f).toMatch(/\.js$/)
     }
-    // Del árbitro, el cliente solo lee sus motivos (`index.js`, cabecera; ficha 1f §2).
-    for (const f of fuentes('../').filter((x) => !x.startsWith('../arbitro/'))) {
+    // Del árbitro, el cliente solo lee sus motivos (`index.js`, cabecera; ficha 1f §2). La
+    // excepción es el árbitro imitado, que es el árbitro y no llega a `dist/` (`testDistSinMoldes`).
+    for (const f of fuentes('../').filter((x) => !x.startsWith('../arbitro/') && x !== '../dev/partidaImitada.js')) {
       expect(leer(f), f).not.toMatch(/from '[^']*arbitro\/(?!motivos\.js')/)
     }
   })
