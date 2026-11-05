@@ -13,6 +13,10 @@
 // EL RELOJ LO MUEVEN LOS TELÉFONOS (K-7). Con la hora cumplida, cada cliente reclama, y
 // el servidor decide con su reloj. Si dos reclaman a la vez, uno recibe `version_vieja`.
 //
+// MES-PvP 2 · EL RELOJ DEL TELÉFONO NO ES EL DEL SERVIDOR. Toda respuesta trae `ahora`, y
+// con ella se corrige el desfase (`desfaseDe`). Y para que cinco asientos no reclamen a la
+// vez el mismo vencimiento, cada uno espera su escalón.
+//
 // EL CLIENTE ENTRA POR PARÁMETRO, como en `crearSalasApi`: las pruebas le pasan un doble
 // y no se abre ningún socket.
 
@@ -27,8 +31,12 @@ export const FASE_DESCARTE = 'DISCARD'
 export const FASE_FIN = 'GAME_OVER'
 export const ETAPA_ELECCION = 'eleccion'
 export const CLASE_PAUSA_ANUNCIO = 'pausa_anuncio'
+export const CLASE_TURNO = 'turno'
+export const CLASE_DESCARTE = 'descarte'
+export const CLASE_ELECCION = 'eleccion_sorteo'
 
 export const MARGEN_VENCIMIENTO_MS = 300
+export const ESCALON_RECLAMO_MS = 200
 export const REINTENTO_RECLAMO_MS = 1000
 export const RELECTURA_MS = 3000
 export const REVISION_MS = 250
@@ -41,6 +49,18 @@ const TOLERADOS = [M.VENCIMIENTO_NO_CUMPLIDO, M.VERSION_VIEJA]
 const PASAJEROS = ['red', 'servidor']
 
 const fallo = (motivo) => ({ ok: false, motivo, version: null })
+
+// ── El desfase ──────────────────────────────────────────────────────────────
+// Una muestra por respuesta: `desfase = ahora + rtt/2 − local`. Se usa la de menor rtt de
+// las últimas, no un promedio. El error de una muestra está acotado por su rtt/2 (la red
+// no es simétrica, y `ahora` se toma al responder, tras el trabajo de la función), así que
+// la más rápida es la mejor, y promediar solo mezclaría el ruido de las lentas. Como la
+// ventana se renueva, si el teléfono cambia de hora se corrige en `VENTANA_DESFASE` respuestas.
+export const VENTANA_DESFASE = 8
+
+export const desfaseDe = (muestras) => (
+  muestras.length === 0 ? 0 : muestras.reduce((mejor, m) => (m.rtt < mejor.rtt ? m : mejor)).desfase
+)
 
 // ── La marca del panel de prueba ────────────────────────────────────────────
 // `?mot1=1` la enciende y `?mot1=0` la apaga. Vive en el trozo de la partida, así que
@@ -72,7 +92,7 @@ export function leerMarcaMot1() {
 export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento = globalThis.document ?? null }) {
   let foto = Object.freeze({
     vista: null, version: null, canal: 'SIN_ABRIR', avisos: 0,
-    msAccion: null, msAviso: null, msEco: null, rechazo: null,
+    msAccion: null, msAviso: null, msEco: null, rechazo: null, desfase: 0, muerta: false,
   })
   const oyentes = new Set()
   const poner = (cambios) => {
@@ -94,6 +114,8 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
   let avisoPendiente = null
   let ultimoAviso = null
   let ecoPendiente = null
+  let muestras = []
+  let terminada = false
 
   // ── Leer ──
   // Una lectura a la vez. Lo que se pida mientras tanto repite al acabar: el aviso de
@@ -130,6 +152,9 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
         if (error) console.warn('MOT-1 1f: no se pudo leer la vista —', error.message ?? error)
         else aplicarFila(data)
       } while (otraVez)
+      // El servidor dijo `partida_terminada`: si tras releer la vista sigue viva, no terminó
+      // en una mano. Murió (contrato §6). Si otro teléfono la acabó, ya se ve `GAME_OVER`.
+      if (terminada && !foto.muerta && foto.vista && foto.vista.phase !== FASE_FIN) poner({ muerta: true })
     } catch (e) {
       console.warn('MOT-1 1f: no se pudo leer la vista —', String(e?.message ?? e))
     } finally {
@@ -138,19 +163,31 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
   }
 
   // ── Mandar ──
+  function anotarDesfase(servidor, salio) {
+    if (typeof servidor !== 'number') return
+    const llego = ahora()
+    const rtt = llego - salio
+    muestras = [...muestras, { rtt, desfase: Math.round(servidor + rtt / 2 - llego) }].slice(-VENTANA_DESFASE)
+    const desfase = desfaseDe(muestras)
+    if (desfase !== foto.desfase) poner({ desfase })
+  }
+
   async function llamar(cuerpo) {
     try {
       const { data: { session } = {} } = await cliente.auth.getSession()
       if (!session?.access_token) return fallo(M.NO_AUTENTICADO)
+      const salio = ahora()
       const { data, error } = await cliente.functions.invoke(FUNCION_PARTIDA, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: { mesa, ...cuerpo },
       })
-      if (!error) return data ?? fallo('servidor')
-      if (error.name !== 'FunctionsHttpError') return fallo('red')
+      if (error && error.name !== 'FunctionsHttpError') return fallo('red')
       // El 401 y el 500 de la función también traen `{ ok, motivo, version }`.
-      return (await Promise.resolve().then(() => error.context.json()).catch(() => null)) ?? fallo('servidor')
+      const r = error ? await Promise.resolve().then(() => error.context.json()).catch(() => null) : data
+      if (!r) return fallo('servidor')
+      anotarDesfase(r.ahora, salio)
+      return r
     } catch (e) {
       console.warn('MOT-1 1f: la función no contestó —', String(e?.message ?? e))
       return fallo('red')
@@ -170,7 +207,8 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
       if (!PASAJEROS.includes(r.motivo)) detenido = true
       poner({ rechazo: { accion: 'reclamar_vencimiento', motivo: r.motivo } })
     }
-    if (hayNueva(r) || r.motivo === M.VERSION_VIEJA) await leer()
+    if (r.motivo === M.PARTIDA_TERMINADA) terminada = true
+    if (hayNueva(r) || r.motivo === M.VERSION_VIEJA || terminada) await leer()
   }
 
   /** Una acción del jugador: la mide y deja su rechazo a la vista. */
@@ -255,9 +293,13 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
 
     // Un aviso cuya lectura no trajo su versión: se insiste sin esperar a otro aviso.
     if (avisoPendiente && t - ultimaLectura >= RELECTURA_MS) leer()
+    // Con el canal caído no llega ningún aviso: se relee por si acaso (el bus no manda).
+    const viva = !detenido && foto.vista.phase !== FASE_FIN
+    if (viva && foto.canal !== 'SUBSCRIBED' && t - ultimaLectura >= RELECTURA_MS) leer()
 
     const v = foto.vista.vencimiento
-    if (!v || t < v.hora + MARGEN_VENCIMIENTO_MS) return
+    const margen = MARGEN_VENCIMIENTO_MS + foto.vista.asiento * ESCALON_RECLAMO_MS
+    if (!v || t + foto.desfase < v.hora + margen) return
     if (t - ultimaLectura >= RELECTURA_MS) leer()
     // El árbitro rechaza al abandonado con `asiento_abandonado`: no reclama (§2).
     const propio = foto.vista.players?.[foto.vista.asiento]
@@ -287,6 +329,8 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
 
   async function releer() {
     detenido = false
+    terminada = false
+    if (foto.muerta) poner({ muerta: false })
     await leer()
   }
 

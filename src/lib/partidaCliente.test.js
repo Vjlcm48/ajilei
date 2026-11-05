@@ -7,8 +7,8 @@ import { FASE_SORTEO as SORTEO_ARBITRO } from '../arbitro/vista.js'
 import { PHASES } from '../engine/gameEngine.js'
 import { EVENTO_AVISO as AVISO_FUNCION } from '../../supabase/functions/partida/nucleo.js'
 import {
-  CLASE_PAUSA_ANUNCIO, ETAPA_ELECCION, EVENTO_AVISO, FASE_DESCARTE, FASE_FIN, FASE_SORTEO, MARGEN_VENCIMIENTO_MS,
-  REINTENTO_RECLAMO_MS, RELECTURA_MS, REVISION_MS, crearClientePartida, leerMarcaMot1,
+  CLASE_DESCARTE, CLASE_ELECCION, CLASE_PAUSA_ANUNCIO, CLASE_TURNO, ESCALON_RECLAMO_MS, ETAPA_ELECCION, EVENTO_AVISO, FASE_DESCARTE, FASE_FIN,
+  FASE_SORTEO, MARGEN_VENCIMIENTO_MS, REINTENTO_RECLAMO_MS, RELECTURA_MS, REVISION_MS, VENTANA_DESFASE, crearClientePartida, desfaseDe, leerMarcaMot1,
 } from './partidaCliente'
 
 const MESA = '11111111-1111-4111-8111-111111111111'
@@ -68,6 +68,9 @@ describe('MOT-1 1f · los literales son los del servidor', () => {
     expect(FASE_FIN).toBe(PHASES.GAME_OVER)
     expect(ETAPA_ELECCION).toBe(ETAPAS.ELECCION)
     expect(CLASE_PAUSA_ANUNCIO).toBe(CLASES.PAUSA_ANUNCIO)
+    expect(CLASE_TURNO).toBe(CLASES.TURNO)
+    expect(CLASE_DESCARTE).toBe(CLASES.DESCARTE)
+    expect(CLASE_ELECCION).toBe(CLASES.ELECCION_SORTEO)
   })
 })
 
@@ -274,10 +277,198 @@ describe('MOT-1 1f · el bus no manda', () => {
     c.parar()
   })
 
-  it('sin vencimiento cumplido no relee por su cuenta', async () => {
+  it('sin vencimiento cumplido y con el canal suscrito no relee por su cuenta', async () => {
     const { d, c } = await arrancado({ fila: filaDe(1, { clase: 'turno', hora: Date.now() + 60_000 }) })
+    d.alEstado('SUBSCRIBED')
+    await reposar()
+    d.maybeSingle.mockClear()
     await vi.advanceTimersByTimeAsync(RELECTURA_MS * 3)
     expect(d.maybeSingle).not.toHaveBeenCalled()
+    c.parar()
+  })
+})
+
+describe('MES-PvP 2 · canal caído', () => {
+  it.each([['CHANNEL_ERROR'], ['CLOSED'], ['TIMED_OUT']])('con el canal en %s relee cada `RELECTURA_MS`, y al volver deja de hacerlo', async (estado) => {
+    const { d, c } = await arrancado({ fila: filaDe(1, { clase: 'turno', hora: Date.now() + 60_000 }) })
+    d.alEstado('SUBSCRIBED')
+    await reposar()
+    d.alEstado(estado)
+    d.maybeSingle.mockClear()
+    await vi.advanceTimersByTimeAsync(RELECTURA_MS * 3)
+    expect(d.maybeSingle.mock.calls.length).toBeGreaterThanOrEqual(2)
+    d.alEstado('SUBSCRIBED')
+    await reposar()
+    d.maybeSingle.mockClear()
+    await vi.advanceTimersByTimeAsync(RELECTURA_MS * 3)
+    expect(d.maybeSingle).not.toHaveBeenCalled()
+    c.parar()
+  })
+
+  it('sin canal abierto todavía, también', async () => {
+    const { d, c } = await arrancado({ fila: filaDe(1, { clase: 'turno', hora: Date.now() + 60_000 }) })
+    await vi.advanceTimersByTimeAsync(RELECTURA_MS * 2)
+    expect(d.maybeSingle.mock.calls.length).toBeGreaterThanOrEqual(1)
+    c.parar()
+  })
+
+  it('con la partida acabada no sigue releyendo', async () => {
+    const fin = filaDe(1)
+    fin.vista.phase = FASE_FIN
+    const { d, c } = await arrancado({ fila: fin })
+    await vi.advanceTimersByTimeAsync(RELECTURA_MS * 3)
+    expect(d.maybeSingle).not.toHaveBeenCalled()
+    c.parar()
+  })
+})
+
+describe('MES-PvP 2 · reclamar escalonado', () => {
+  const conAsiento = (asiento, hora) => {
+    const f = filaDe(7, { clase: 'turno', hora })
+    f.vista.asiento = asiento
+    f.vista.players = Array.from({ length: 5 }, () => ({ abandonado: false }))
+    return f
+  }
+
+  it.each([[0], [1], [4]])('el asiento %i reclama a `MARGEN + asiento × 200 ms`, y no antes', async (asiento) => {
+    expect(ESCALON_RECLAMO_MS).toBe(200)
+    const hora = Date.now() + 2000
+    const margen = MARGEN_VENCIMIENTO_MS + asiento * ESCALON_RECLAMO_MS
+    const { d, c } = await arrancado({ fila: conAsiento(asiento, hora), responder: () => ({ ok: true, version: 8 }) })
+    await vi.advanceTimersByTimeAsync(2000 + margen - 1)
+    expect(reclamos(d)).toHaveLength(0)
+    await vi.advanceTimersByTimeAsync(REVISION_MS + 1)
+    expect(reclamos(d)).toHaveLength(1)
+    c.parar()
+  })
+})
+
+describe('MES-PvP 2 · el desfase', () => {
+  it('sin muestras es 0, y se queda con la de menor rtt', () => {
+    expect(desfaseDe([])).toBe(0)
+    expect(desfaseDe([{ rtt: 400, desfase: 900 }, { rtt: 50, desfase: 700 }, { rtt: 200, desfase: 800 }])).toBe(700)
+  })
+
+  it('`desfase = ahora + rtt/2 − local`, con el rtt solo de la llamada', async () => {
+    const { d, c } = await arrancado()
+    expect(c.foto().desfase).toBe(0)
+    d.invoke.mockImplementationOnce(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+      return { data: { ok: false, motivo: M.FUERA_DE_TURNO, version: 1, ahora: Date.now() + 5000 }, error: null }
+    })
+    await c.enviar('apostar', { tipo: 'pasar' })
+    expect(c.foto().desfase).toBe(5050)
+    c.parar()
+  })
+
+  it('una respuesta lenta no estropea la estimación, y un 401 también trae su muestra', async () => {
+    const { d, c } = await arrancado()
+    const responder = (rtt, error) => async () => {
+      await vi.advanceTimersByTimeAsync(rtt)
+      const cuerpo = { ok: false, motivo: M.NO_AUTENTICADO, version: null, ahora: Date.now() + 5000 }
+      return error ? { data: null, error: { name: 'FunctionsHttpError', context: { json: async () => cuerpo } } } : { data: cuerpo, error: null }
+    }
+    d.invoke.mockImplementationOnce(responder(100, true))
+    await c.enviar('abandonar')
+    expect(c.foto().desfase).toBe(5050)
+    d.invoke.mockImplementationOnce(responder(4000, false))
+    await c.enviar('abandonar')
+    expect(c.foto().desfase).toBe(5050)
+    c.parar()
+  })
+
+  it('si el teléfono cambia de hora, se corrige al renovarse la ventana', async () => {
+    const { d, c } = await arrancado()
+    const con = (dif) => async () => {
+      await vi.advanceTimersByTimeAsync(100)
+      return { data: { ok: false, motivo: M.FUERA_DE_TURNO, version: 1, ahora: Date.now() + dif }, error: null }
+    }
+    d.invoke.mockImplementationOnce(con(5000))
+    await c.enviar('abandonar')
+    for (let i = 0; i < VENTANA_DESFASE; i++) {
+      d.invoke.mockImplementationOnce(con(-1000))
+      await c.enviar('abandonar')
+    }
+    expect(c.foto().desfase).toBe(-950)
+    c.parar()
+  })
+
+  it('sin `ahora` (la función de antes), sin cambios', async () => {
+    const { c } = await arrancado()
+    await c.enviar('abandonar')
+    expect(c.foto().desfase).toBe(0)
+    c.parar()
+  })
+
+  it('reclama según la hora del servidor: un teléfono atrasado 10 s no llega tarde', async () => {
+    const { d, c } = await arrancado({ fila: filaDe(1, { clase: 'turno', hora: Date.now() + 3000 }) })
+    d.invoke.mockResolvedValueOnce({ data: { ok: false, motivo: M.FUERA_DE_TURNO, version: 1, ahora: Date.now() + 10_000 }, error: null })
+    await c.enviar('abandonar')
+    await vi.advanceTimersByTimeAsync(REVISION_MS)
+    expect(reclamos(d)).toHaveLength(1)
+    c.parar()
+  })
+
+  it('y uno adelantado 10 s no reclama antes de tiempo', async () => {
+    const { d, c } = await arrancado({ fila: filaDe(1, { clase: 'turno', hora: Date.now() + 3000 }) })
+    d.invoke.mockResolvedValueOnce({ data: { ok: false, motivo: M.FUERA_DE_TURNO, version: 1, ahora: Date.now() - 10_000 }, error: null })
+    await c.enviar('abandonar')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(reclamos(d)).toHaveLength(0)
+    c.parar()
+  })
+})
+
+describe('MES-PvP 2 · la partida muerta', () => {
+  const vencida = () => filaDe(1, { clase: 'turno', hora: Date.now() - 5000 })
+  const terminada = () => ({ ok: false, motivo: M.PARTIDA_TERMINADA, version: 1 })
+
+  it('un reclamo con `partida_terminada` y la vista viva: muerta', async () => {
+    const { c } = await arrancado({ fila: vencida(), responder: terminada })
+    expect(c.foto().muerta).toBe(false)
+    await vi.advanceTimersByTimeAsync(REVISION_MS)
+    expect(c.foto().muerta).toBe(true)
+    c.parar()
+  })
+
+  it('si releer trae el fin, no murió: otro teléfono la acabó', async () => {
+    const { d, c } = await arrancado({ fila: vencida(), responder: terminada })
+    const fin = filaDe(2)
+    fin.vista.phase = FASE_FIN
+    d.fila = fin
+    await vi.advanceTimersByTimeAsync(REVISION_MS)
+    expect(c.foto().vista.phase).toBe(FASE_FIN)
+    expect(c.foto().muerta).toBe(false)
+    c.parar()
+  })
+
+  it('con una lectura en el aire, espera a que acabe para decidir', async () => {
+    const { d, c } = await arrancado({ fila: vencida(), responder: terminada })
+    const fin = filaDe(2)
+    fin.vista.phase = FASE_FIN
+    let soltar
+    d.maybeSingle.mockImplementationOnce(() => new Promise((res) => { soltar = () => res({ data: filaDe(1), error: null }) }))
+    d.aviso({ payload: { version: 2 } })
+    await reposar()
+    d.fila = fin
+    await vi.advanceTimersByTimeAsync(REVISION_MS)
+    expect(c.foto().muerta).toBe(false)
+    soltar()
+    await reposar()
+    expect(c.foto().muerta).toBe(false)
+    expect(c.foto().vista.phase).toBe(FASE_FIN)
+    c.parar()
+  })
+
+  it('«Releer» la destapa, y una acción rechazada no la declara', async () => {
+    const { d, c } = await arrancado({ fila: vencida(), responder: terminada })
+    await c.enviar('apostar', { tipo: 'pasar' })
+    expect(c.foto().muerta).toBe(false)
+    await vi.advanceTimersByTimeAsync(REVISION_MS)
+    expect(c.foto().muerta).toBe(true)
+    d.fila = filaDe(5)
+    await c.releer()
+    expect(c.foto().muerta).toBe(false)
     c.parar()
   })
 })
