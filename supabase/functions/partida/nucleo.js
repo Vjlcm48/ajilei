@@ -17,8 +17,8 @@ import { setRng } from '../../../src/engine/deck.js'
 
 // C-4: las únicas que reintentan al chocar con otra escritura (contrato §5, paso 3). Con
 // 5 asientos a la vez, el último choca hasta 4 veces y acierta en la quinta: nadie recibe
-// `version_vieja` por elegir o descartar a la vez que otro (§2).
-const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar']
+// `version_vieja` por elegir, descartar o volver del anuncio a la vez que otro (§2).
+const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar', 'volver_anuncio']
 export const INTENTOS_SIMULTANEAS = 5
 
 // Lo que `abandonarPorServidor` puede responder sin que nada vaya mal: el asiento sigue
@@ -271,7 +271,8 @@ export function crearManejador(partes) {
 
   return async (req) => {
     const cors = cabecerasCors(req.headers.get('Origin'))
-    const responder = (status, cuerpo) => new Response(JSON.stringify(cuerpo), {
+    // `ahora` en toda respuesta (§2): el cliente corrige con ella el desfase de su reloj.
+    const responder = (status, cuerpo) => new Response(JSON.stringify({ ...cuerpo, ahora: deps.ahora() }), {
       status,
       headers: { ...cors, 'Content-Type': 'application/json; charset=utf-8' },
     })

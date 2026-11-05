@@ -4,12 +4,14 @@ import { readFileSync } from 'node:fs'
 import { resetRng, setRng } from '../engine/deck.js'
 import { PHASES } from '../engine/gameEngine.js'
 import {
-  ANTES_DEL_REPARTO_MS, BARAJADO_MS, FACTOR_RAPIDA, FIN_SEGUNDO_REPARTO_MS, MANO_SIGUIENTE_MS, REVELACION_MS,
+  ANTES_DEL_REPARTO_MS, AUSENTE_DESDE, AVISO_SALIDA_MS, BARAJADO_MS, FACTOR_RAPIDA, FIN_SEGUNDO_REPARTO_MS,
+  LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, N_AUSENCIA, PAUSA_ANUNCIO_MS, RED_REVELACION_MS, REPOSICION_SIN_CARTAS_MS,
   TRAS_PRIMER_REPARTO_MS, TURN_TIME, VOLTEOS_SEGUNDO_REPARTO_MS, VOLTEO_SORTEO_MS, VUELO_REPARTO_MS,
 } from '../config/esperas.js'
 import { FACTOR_RAPIDA as FACTOR_DE_SU_SITIO } from '../lib/partidaRapida.js'
 import {
-  CLASES, ESPERA_REPARTO_SORTEO_MS, aplicarAccion, crearPartida, esperaManoSiguiente, esperaPrimerReparto, esperaSegundoReparto,
+  CLASES, ESPERA_REPARTO_SORTEO_MS, aplicarAccion, crearPartida, esperaManoSiguiente, esperaPrimerReparto, esperaReposicion,
+  esperaSegundoReparto, llevaAnuncio,
 } from './index.js'
 
 const SILLAS = [0, 1, 2].map((asiento) => ({ asiento, uid: `u${asiento}` }))
@@ -18,6 +20,8 @@ const pasos = (e, n) => {
   let x = e
   for (let i = 0; i < n; i++) {
     x = aplicarAccion(x, { uid: 'u0', version: x.version, accion: 'reclamar_vencimiento' }, { ahora: x.vencimiento.hora }).estado
+    // Avanzar por reloj no debe abandonar a nadie: estas pruebas no van de la ausencia.
+    x = { ...x, asientos: x.asientos.map((a) => ({ ...a, vencidos: 0 })) }
   }
   return x
 }
@@ -30,12 +34,10 @@ const dura = (e) => {
 
 // Del arranque hasta el volteo de la primera ronda, con un ganador claro.
 function hastaVolteo(ritmo) {
-  const e = pasos(crearPartida({ apuesta: 100, entrada: 'corta', ritmo }, SILLAS, 0), 1)
+  const e = pasos(crearPartida({ apuesta: 100, entrada: 'corta', ritmo }, SILLAS, 0), 2)
   const cartas = e.sorteo.cartas.map((c, i) => c.map((k) => ({ ...k, value: i === 0 ? 12 : 2 })))
   return pasos({ ...e, sorteo: { ...e.sorteo, cartas } }, 1)
 }
-
-const duracion = (e) => e.vencimiento.hora
 
 beforeEach(() => { let n = 0; setRng(() => ((n += 0.37) % 1)) })
 afterEach(() => resetRng())
@@ -46,7 +48,7 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
     expect(esperaPrimerReparto(6, 'rapido')).toBe(120 + 3 * 595 + 400)
     expect(esperaSegundoReparto(9, 'normal')).toBe(120 + 9 * 595 + 2000)
     expect(esperaSegundoReparto(9, 'rapido')).toBe(Math.round(120 + 9 * 297.5 + 1000))
-    expect(esperaManoSiguiente(true)).toBe(960 + 4000)
+    expect(esperaManoSiguiente(true)).toBe(6000 + 2000)
     expect(esperaManoSiguiente(false)).toBe(4000)
   })
 
@@ -76,14 +78,29 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
     for (const ritmo of ['normal', 'rapido']) {
       for (const n of [2, 3, 4, 5]) {
         const sillas = Array.from({ length: n }, (_, asiento) => ({ asiento, uid: `u${asiento}` }))
-        expect(duracion(crearPartida({ apuesta: 100, entrada: 'corta', ritmo }, sillas, 0))).toBe(ESPERA_REPARTO_SORTEO_MS)
+        const partida = crearPartida({ apuesta: 100, entrada: 'corta', ritmo }, sillas, 0)
+        expect(partida.vencimiento).toEqual({ clase: CLASES.BARAJADO_SORTEO, hora: BARAJADO_MS })
+        expect(dura(partida)).toBe(ESPERA_REPARTO_SORTEO_MS)
       }
     }
   })
 
-  it('las provisionales: 3 s de volteo y 4 s de pausa', () => {
-    expect(VOLTEO_SORTEO_MS).toBe(3000)
+  it('las cifras nuevas: reposición, aviso, pausa y ausencia', () => {
+    expect(VOLTEO_SORTEO_MS).toBe(4000)
     expect(MANO_SIGUIENTE_MS).toBe(4000)
+    expect(LECTURA_TRAS_REVELACION_MS).toBe(2000)
+    expect(AVISO_SALIDA_MS).toBe(3000)
+    expect(PAUSA_ANUNCIO_MS).toBe(45000)
+    expect(N_AUSENCIA).toBe(3)
+    expect(AUSENTE_DESDE).toBe(2)
+    expect(esperaReposicion(0)).toBe(REPOSICION_SIN_CARTAS_MS)
+    expect(REPOSICION_SIN_CARTAS_MS).toBe(600)
+    expect(esperaReposicion(5)).toBe(120 + 5 * 595 + 400)
+  })
+
+  it('el anuncio va en las manos 5, 11, 16, 22, 27, 33, 38 y 44', () => {
+    const con = Array.from({ length: 45 }, (_, i) => i + 1).filter(llevaAnuncio)
+    expect(con).toEqual([5, 11, 16, 22, 27, 33, 38, 44])
   })
 
   it('las cifras son las que mide hoy la mesa, y el factor no se duplica', () => {
@@ -101,9 +118,7 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
       expect(mesa).toContain(`revealDeal3(${i + 2}), ${ms} * k)`)
     })
 
-    const coreo = /const REVEAL_CHOREO = \{\s*FLIP_MS: (\d+),[^\n]*\s*STAGGER_MS: (\d+),[^\n]*\s*SCALE_MS: (\d+),[^\n]*\s*GROW_AT: ([\d.]+)/.exec(mesa)
-    const [flip, stagger, scale, grow] = coreo.slice(1).map(Number)
-    const giro = flip + 4 * stagger
-    expect(giro + Math.round(scale * grow) + scale + giro).toBe(REVELACION_MS)
+    const nucleoMesa = readFileSync(new URL('../hooks/mesaCore.js', import.meta.url), 'utf8')
+    expect(nucleoMesa).toContain(`export const RED_REVELACION_MS = ${RED_REVELACION_MS}`)
   })
 })

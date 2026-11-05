@@ -2,7 +2,11 @@
 // Normativo: contrato §4. Se arma campo a campo: lo que no está aquí no sale del
 // servidor, y un campo nuevo del motor no se cuela por un `...`. Los nombres son los
 // del motor para que el cliente pueda consultar `pozos.esLegal` sobre la vista.
+//
+// R-4: una partida guardada antes de la v1.1 no trae `enAnuncio`, `vencidos`,
+// `ultimaAccion` ni `posicion`. Se leen con su valor por defecto.
 
+import { AUSENTE_DESDE } from '../config/esperas.js'
 import { PHASES } from '../engine/gameEngine.js'
 import { capasDe } from '../engine/pozos.js'
 import { ganadorDeMano, ganadoresDeCapas, huboRevelacion } from './ganador.js'
@@ -11,16 +15,19 @@ import { CARTAS_POR_ASIENTO, ETAPAS } from './sorteo.js'
 
 export const FASE_SORTEO = 'SORTEO'
 
-function asientoVisto(p, { abandonado, cobrado }, propio) {
+function asientoVisto(p, { abandonado, cobrado, enAnuncio, vencidos }, propio) {
   return {
     name: p.name,
     chips: p.chips,
     contrib: p.contrib,
+    contribMano: p.contribMano,
     folded: p.folded,
     allIn: p.allIn,
     eliminated: p.eliminated,
     abandonado,
     cobrado,
+    enAnuncio: enAnuncio ?? false,
+    ausente: (vencidos ?? 0) >= AUSENTE_DESDE,
     numCartas: p.cards.length,
     ...(propio ? { cards: p.cards } : {}),
   }
@@ -36,7 +43,10 @@ function sorteoVisto({ sorteo }, asiento) {
       ? Array.from({ length: CARTAS_POR_ASIENTO }, (_, i) => i)
       : [],
     yaEligieron: sorteo.elecciones.flatMap((e, i) => (e === null ? [] : [i])),
-    rondas: sorteo.rondas,
+    rondas: sorteo.rondas.map((r) => ({
+      ...r,
+      volteo: r.volteo.map((v) => ({ ...v, posicion: v.posicion ?? null })),
+    })),
   }
 }
 
@@ -54,7 +64,7 @@ function resultadoVisto(motor) {
 
 /** @returns {object} la fila de vistas de ese asiento (contrato §5). */
 export function vistaDe(estado, asiento) {
-  const { motor, asientos, vencimiento, descarte, descartaron, version } = estado
+  const { motor, asientos, vencimiento, descarte, descartaron, version, ultimaAccion } = estado
   const abierto = sorteoAbierto(estado)
   return {
     version,
@@ -77,5 +87,6 @@ export function vistaDe(estado, asiento) {
     },
     sorteo: sorteoVisto(estado, asiento),
     resultado: resultadoVisto(motor),
+    ultimaAccion: ultimaAccion ?? null,
   }
 }

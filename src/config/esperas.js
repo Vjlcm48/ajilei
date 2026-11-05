@@ -23,16 +23,31 @@ export const TRAS_PRIMER_REPARTO_MS = 400
 export const VOLTEOS_SEGUNDO_REPARTO_MS = Object.freeze([300, 600, 900])
 export const FIN_SEGUNDO_REPARTO_MS = 2000
 
-// La coreografía de revelación entera (`REVEAL_CHOREO`): cerrar 320, recoger 120,
-// crecer 200 y abrir 320. No la escala el ritmo.
-export const REVELACION_MS = 960
-
 // La elección del sorteo, por ronda (contrato §6).
 export const ELECCION_SORTEO_MS = 10000
 
-// provisional · se ajusta en MES-PvP. El volteo y el resultado de cada ronda.
-export const VOLTEO_SORTEO_MS = 3000
+// provisional · se cierra con los teléfonos. El volteo y el resultado de cada ronda.
+export const VOLTEO_SORTEO_MS = 4000
 
-// provisional · se ajusta en MES-PvP. La pausa antes de la mano siguiente, desde el
-// fin de la revelación o desde el cierre si se ganó por retirada.
+// provisional · se cierra con los teléfonos. La mano siguiente con revelación: el tope
+// de red de la celebración (`mesaCore.js`), porque el cambio de fase la apaga, y la
+// lectura. Sin revelación, desde el cierre de la mano.
+export const RED_REVELACION_MS = 6000
+export const LECTURA_TRAS_REVELACION_MS = 2000
 export const MANO_SIGUIENTE_MS = 4000
+
+// provisional · la animación en paralelo nace en la sub-tanda 3 y debe caber aquí. La
+// reposición usa la fórmula del reparto (`reloj.js`); ésta es la de nadie descartó.
+export const REPOSICION_SIN_CARTAS_MS = 600
+
+// provisional · se cierra con los teléfonos. Quién sale antes del barajado.
+export const AVISO_SALIDA_MS = 3000
+
+// El tope de la pausa de anuncio (contrato §6, «Publicidad»).
+export const PAUSA_ANUNCIO_MS = 45000
+
+// provisional · se cierra con los teléfonos. Vencimientos propios seguidos de apuesta o
+// descarte resueltos por el reloj: desde `AUSENTE_DESDE` la mesa lo ve ausente, y en
+// `N_AUSENCIA` el árbitro lo abandona (contrato §6, «Ausencia»).
+export const AUSENTE_DESDE = 2
+export const N_AUSENCIA = 3

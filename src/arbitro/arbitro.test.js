@@ -7,6 +7,7 @@ import { resetRng, setRng } from '../engine/deck.js'
 import { MOTIVOS as MOTIVOS_POZOS } from '../engine/pozos.js'
 import { PHASES, applyDiscard, createInitialState, makeHandRules, startHand } from '../engine/gameEngine.js'
 import { ajileiDe as ajileiDelCliente } from '../lib/puntos.js'
+import { BARAJADO_MS } from '../config/esperas.js'
 import {
   CLASES, ESPERA_REPARTO_SORTEO_MS, ETAPAS, FASE_SORTEO, MOTIVOS, MOTIVOS_ARBITRO, abandonarPorServidor, ajileiDe, aplicarAccion,
   azarSeguro, compactarAsientos, crearPartida, partidaTerminada, vistaDe,
@@ -41,17 +42,19 @@ const conMotor = (e, cambios) => ({ ...e, motor: { ...e.motor, ...cambios } })
 const conJugador = (e, i, cambios) => conMotor(e, {
   players: e.motor.players.map((p, j) => (j === i ? { ...p, ...cambios } : p)),
 })
+const aCero = (e) => ({ ...e, asientos: e.asientos.map((a) => ({ ...a, vencidos: 0 })) })
 
 // Del sorteo a la primera mano: a la Mano la decide la carta que se le pone al ganador.
 function hastaLaMano(n, ganador = 0, ritmo = 'normal') {
-  let e = reclama(crear(n, ritmo))
+  let e = reclama(reclama(crear(n, ritmo)))
   e = { ...e, sorteo: { ...e.sorteo, cartas: e.sorteo.cartas.map((c, i) => c.map(() => carta(i === ganador ? 12 : 2))) } }
   e = reclama(e)
   return reclama(e)
 }
 const hastaFase = (e, fase) => {
   let x = e
-  for (let i = 0; i < 40 && x.motor.phase !== fase; i++) x = reclama(x)
+  // Avanzar por reloj no debe abandonar a nadie: estas pruebas no van de la ausencia.
+  for (let i = 0; i < 40 && x.motor.phase !== fase; i++) x = aCero(reclama(x))
   expect(x.motor.phase).toBe(fase)
   return x
 }
@@ -65,13 +68,20 @@ afterEach(() => resetRng())
 
 // ── 1 · Propiedad ───────────────────────────────────────────────────────────
 describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () => {
-  const PROHIBIDAS = ['"deck"', '"message"', '"isHuman"', '"nivelIA"', '"uid"', '"ritmo"', '"contribMano"', '"mazo"', '"rng"']
+  const PROHIBIDAS = ['"deck"', '"message"', '"isHuman"', '"nivelIA"', '"uid"', '"ritmo"', '"mazo"', '"rng"', '"motorTrasDescarte"', '"vencidos"', '"sinAnuncio"']
 
   function vigilarVistas(e) {
     e.asientos.forEach((_, i) => {
       const vista = vistaDe(e, i)
       const texto = JSON.stringify(vista)
       for (const clave of PROHIBIDAS) expect(texto, clave).not.toContain(clave)
+      // Los cinco campos de la v1.1 son datos: ninguno lleva una carta.
+      const nuevos = JSON.stringify([
+        vista.ultimaAccion,
+        vista.players.map((p) => [p.contribMano, p.enAnuncio, p.ausente]),
+        vista.sorteo.rondas.flatMap((r) => r.volteo.map((v) => v.posicion)),
+      ])
+      expect(nuevos).not.toContain('"id"')
       const enMesa = JSON.stringify({ ...vista, sorteo: null })
       for (const c of e.motor.deck ?? []) expect(enMesa).not.toContain(`"${c.id}"`)
       const revelados = new Set((vista.resultado?.revelacion ?? []).map((r) => r.asiento))
@@ -91,6 +101,9 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
     if (dado < 0.002) return { ...base, accion: 'abandonar' }
     if (dado < 0.02) return { ...base, accion: 'inventada' }
     if (dado < 0.35) return { ...base, accion: 'reclamar_vencimiento' }
+    if (e.vencimiento?.clase === CLASES.PAUSA_ANUNCIO) {
+      return { ...base, accion: 'volver_anuncio', mano: e.motor.handCount - (dado < 0.4 ? 1 : 0) }
+    }
     if (e.sorteo.etapa !== ETAPAS.CERRADO) {
       return { ...base, accion: 'elegir_carta_sorteo', ronda: e.sorteo.ronda, carta: uno([0, 1, 2, 3, 4, 4, 7, -1, 'x']) }
     }
@@ -106,6 +119,8 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
       k: uno([1, 2, 5, 10, 3, undefined]),
     }
   }
+
+  const clasesVistas = new Set()
 
   for (const n of [2, 3, 4, 5]) {
     it(`mesa de ${n}: dinero, versión, rechazos y secretos en cada paso, y siempre termina`, () => {
@@ -149,8 +164,11 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
             expect(r.estado.asientos[ef.asiento].cobrado).toBe(ef.monto)
             cobros.set(ef.asiento, ef.monto)
           }
-          e = r.estado
+          // Con la ausencia en 3, el azar abandona a casi todos antes de arruinar a nadie:
+          // esta semilla juega sin ella, para que la bancarrota y su aviso sigan pasando por aquí.
+          e = s === 37 ? aCero(r.estado) : r.estado
           expect(sumaDinero(e)).toBe(total)
+          if (e.vencimiento) clasesVistas.add(e.vencimiento.clase)
           // Un abandonado nunca tiene a la mesa esperando: ni en su turno, ni en el descarte.
           if (e.sorteo.etapa === ETAPAS.ELECCION) {
             e.sorteo.participan.forEach((i) => { if (e.asientos[i].abandonado) expect(e.sorteo.elecciones[i]).not.toBe(null) })
@@ -173,6 +191,10 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
       }
     }, 60000)
   }
+
+  it('que no sea una prueba vacía: entre las cuatro mesas, el azar pasó por todos los relojes', () => {
+    expect([...clasesVistas].sort()).toEqual(Object.values(CLASES).sort())
+  })
 
   it('es puro y nadie del cliente lo importa', () => {
     const fuentes = (dir) => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true }).flatMap((d) => (
@@ -202,9 +224,9 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
     expect(a({ uid: 'u0', accion: 'constructor' })).toBe(M.DESCONOCIDA)
   })
 
-  it('los motivos: los once de `pozos.js`, tal cual, y los once del árbitro', () => {
+  it('los motivos: los once de `pozos.js`, tal cual, y los doce del árbitro', () => {
     expect(Object.keys(MOTIVOS_POZOS)).toHaveLength(11)
-    expect(Object.keys(MOTIVOS_ARBITRO)).toHaveLength(11)
+    expect(Object.keys(MOTIVOS_ARBITRO)).toHaveLength(12)
     for (const [k, v] of Object.entries(MOTIVOS_POZOS)) expect(M[k]).toBe(v)
   })
 
@@ -250,7 +272,7 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
 
 // ── 2 · Sorteo ──────────────────────────────────────────────────────────────
 describe('MOT-1 1b · el sorteo', () => {
-  const abierto = (n) => reclama(crear(n))
+  const abierto = (n) => reclama(reclama(crear(n)))
   const conCartas = (e, valores) => ({
     ...e,
     sorteo: { ...e.sorteo, cartas: e.sorteo.cartas.map((c, i) => (c ? c.map(() => carta(valores[i])) : c)) },
@@ -263,7 +285,7 @@ describe('MOT-1 1b · el sorteo', () => {
     const e = crear(5)
     expect(e.version).toBe(0)
     expect(e.sorteo.ronda).toBe(1)
-    expect(e.vencimiento.clase).toBe(CLASES.REPARTO_SORTEO)
+    expect(e.vencimiento.clase).toBe(CLASES.BARAJADO_SORTEO)
     const ids = e.sorteo.cartas.flat().map((c) => c.id)
     expect(ids).toHaveLength(25)
     expect(new Set(ids).size).toBe(25)
@@ -286,10 +308,14 @@ describe('MOT-1 1b · el sorteo', () => {
     const hora = e.vencimiento.hora
     e = reclama(e)
     expect(e.sorteo.ronda).toBe(2)
-    expect(e.vencimiento.hora).toBe(hora + ESPERA_REPARTO_SORTEO_MS)
+    expect(e.sorteo.etapa).toBe(ETAPAS.BARAJADO)
+    expect(e.vencimiento).toEqual({ clase: CLASES.BARAJADO_SORTEO, hora: hora + BARAJADO_MS })
     expect(e.sorteo.participan).toEqual([0, 2])
     expect(e.sorteo.cartas[1]).toBe(null)
     expect(e.sorteo.cartas[0]).toHaveLength(5)
+    e = reclama(e)
+    expect(e.sorteo.etapa).toBe(ETAPAS.REPARTO)
+    expect(e.vencimiento).toEqual({ clase: CLASES.REPARTO_SORTEO, hora: hora + BARAJADO_MS + ESPERA_REPARTO_SORTEO_MS })
     e = reclama(e)
     expect(pide(e, 1, 'elegir_carta_sorteo', { ronda: 2, carta: 0 }, 0).respuesta.motivo).toBe(M.NO_PARTICIPA)
   })
@@ -301,7 +327,7 @@ describe('MOT-1 1b · el sorteo', () => {
       let e = abierto(3)
       for (let ronda = 1; ronda <= 3; ronda++) {
         e = eligen(conCartas(e, [12, 12, 2]), e.sorteo.participan)
-        if (ronda < 3) { expect(e.sorteo.mano).toBe(null); e = reclama(reclama(e)) }
+        if (ronda < 3) { expect(e.sorteo.mano).toBe(null); e = reclama(reclama(reclama(e))) }
       }
       expect(e.sorteo.rondas[2].azar).toBe(true)
       expect([0, 1]).toContain(e.sorteo.mano)
@@ -411,7 +437,7 @@ describe('MOT-1 1b · el descarte', () => {
     expect(vistaDe(e, 0).descarte.yaDescartaron).toEqual([1, 2])
     expect(JSON.stringify(vistaDe(e, 0).descarte)).not.toContain('indices')
     e = descarta(e, 0, [3, 4]).estado
-    expect(e.motor.phase).toBe(PHASES.BET_3)
+    expect(e.vencimiento.clase).toBe(CLASES.REPOSICION)
     const orden = [0, 1, 2].map((k) => (mano + k) % 3)
     let ptr = 0
     const quita = { 0: [3, 4], 1: [], 2: [0] }
@@ -420,6 +446,8 @@ describe('MOT-1 1b · el descarte', () => {
       expect(e.motor.players[i].cards.map((c) => c.id)).toEqual(esperadas)
     }
     expect(vistaDe(e, 2).descarte.cuantas).toEqual([2, 0, 1])
+    e = reclama(e)
+    expect(e.motor.phase).toBe(PHASES.BET_3)
     expect(descarta(e, 0, []).respuesta.motivo).toBe(M.FASE)
   })
 
@@ -462,7 +490,7 @@ describe('MOT-1 1b · los vencimientos', () => {
     const cartas1 = e.motor.players[1].cards.map((c) => c.id)
     e = pide(e, 0, 'descartar', { mano: e.motor.handCount, indices: [0] }, 0).estado
     expect(e.motor.phase).toBe(PHASES.DISCARD)
-    e = reclama(e)
+    e = reclama(reclama(e))
     expect(e.motor.phase).toBe(PHASES.BET_3)
     expect(e.motor.players[1].cards.map((c) => c.id)).toEqual(cartas1)
   })
@@ -531,12 +559,12 @@ describe('MOT-1 1b · los vencimientos', () => {
     expect(vista.resultado.revelacion.map((x) => x.asiento)).toEqual([0, 1, 2])
   })
 
-  it('tras la revelación, la coreografía y 4 s', () => {
+  it('tras la revelación, la red de la celebración y la lectura', () => {
     const e = hastaFase(hastaLaMano(2), PHASES.BET_3)
     const r = [0, 1].reduce((x) => pide(x, x.motor.activePlayerIndex, 'apostar', { tipo: 'pasar' }, 1000).estado, e)
     expect(r.motor.phase).toBe(PHASES.PAYOUT)
     expect(r.vencimiento.clase).toBe(CLASES.MANO_SIGUIENTE)
-    expect(r.vencimiento.hora).toBe(1000 + 960 + 4000)
+    expect(r.vencimiento.hora).toBe(1000 + 6000 + 2000)
     expect(reclama(r).motor.handCount).toBe(2)
   })
 
@@ -646,9 +674,10 @@ describe('MOT-1 1b · el abandono', () => {
     d = pide(d, 1, 'descartar', { mano: d.motor.handCount, indices: [] }, 0).estado
     const cartas = d.motor.players[2].cards.map((c) => c.id)
     const ultimo = pide(d, 2, 'abandonar', {}, 0).estado
-    expect(ultimo.motor.phase).toBe(PHASES.BET_3)
+    expect(ultimo.vencimiento.clase).toBe(CLASES.REPOSICION)
     expect(ultimo.descartaron).toEqual([1, 0, 0])
     expect(ultimo.motor.players[2].cards.map((c) => c.id)).toEqual(cartas)
+    expect(reclama(ultimo).motor.phase).toBe(PHASES.BET_3)
 
     // En all-in no se retira y llega al descarte: descarta vacío al abrirse.
     let v = hastaFase(hastaLaMano(3), PHASES.BET_2)
@@ -678,7 +707,7 @@ describe('MOT-1 1b · el abandono', () => {
   })
 
   it('en el sorteo elige al instante la posición 0, sin esperar los 10 s', () => {
-    const abierto = reclama(crear(3))
+    const abierto = reclama(reclama(crear(3)))
     const elige = (x, i) => pide(x, i, 'elegir_carta_sorteo', { ronda: x.sorteo.ronda, carta: 1 }, 0).estado
 
     // Con la elección abierta, y otro aún sin elegir: se anota y la ronda sigue abierta.
@@ -692,13 +721,13 @@ describe('MOT-1 1b · el abandono', () => {
     const r = pide(elige(elige(abierto, 0), 1), 2, 'abandonar', {}, 500)
     expect(r.efectos).toEqual([{ tipo: 'salida', asiento: 2, monto: 1500 }])
     expect(r.estado.sorteo.etapa).toBe(ETAPAS.VOLTEO)
-    expect(r.estado.vencimiento).toEqual({ clase: CLASES.VOLTEO_SORTEO, hora: 500 + 3000 })
+    expect(r.estado.vencimiento).toEqual({ clase: CLASES.VOLTEO_SORTEO, hora: 500 + 4000 })
     expect(r.estado.sorteo.rondas[0].volteo[2].carta).toEqual(abierto.sorteo.cartas[2][0])
 
-    // Si abandona durante el reparto, elige al abrirse la elección.
+    // Si abandona antes del reparto, elige al abrirse la elección.
     const antes = pide(crear(3), 2, 'abandonar', {}, 0).estado
-    expect(antes.sorteo.etapa).toBe(ETAPAS.REPARTO)
-    const abre = reclama(antes)
+    expect(antes.sorteo.etapa).toBe(ETAPAS.BARAJADO)
+    const abre = reclama(reclama(antes))
     expect(abre.sorteo.etapa).toBe(ETAPAS.ELECCION)
     expect(abre.sorteo.elecciones).toEqual([null, null, 0])
 
@@ -708,7 +737,7 @@ describe('MOT-1 1b · el abandono', () => {
     const volteo = pide(sale, 0, 'elegir_carta_sorteo', { ronda: 1, carta: 1 }, 0).estado
     expect(volteo.sorteo.etapa).toBe(ETAPAS.VOLTEO)
     expect(volteo.sorteo.participan).toEqual([0, 1])
-    const ronda2 = reclama(reclama(volteo))
+    const ronda2 = reclama(reclama(reclama(volteo)))
     expect(ronda2.sorteo.ronda).toBe(2)
     expect(ronda2.sorteo.elecciones).toEqual([null, 0, null])
   })
@@ -742,5 +771,512 @@ describe('MOT-1 1b · el abandono', () => {
     expect(r.estado.version).toBe(e.version + 1)
     expect(abandonarPorServidor(r.estado, 'u1', { ahora: 0 }).respuesta.motivo).toBe(M.ASIENTO_ABANDONADO)
     expect(abandonarPorServidor(e, 'nadie', { ahora: 0 }).respuesta.motivo).toBe(M.NO_ES_DE_ESTA_MESA)
+  })
+})
+
+// ── 6 · MES-PvP 1: el árbitro v1.1 ──────────────────────────────────────────
+describe('MES-PvP 1 · el árbitro v1.1', () => {
+  const crearLlena = (n) => crear(n, 'normal', 'llena')
+  const quienAcciona = (x) => x.asientos.findIndex((a) => !a.abandonado)
+
+  // Todos presentes: cada uno hace lo suyo, y lo demás lo reclama el primero que queda.
+  function paso(x) {
+    const { clase } = x.vencimiento
+    const { sorteo, motor } = x
+    if (clase === CLASES.ELECCION_SORTEO) {
+      const i = sorteo.participan.find((a) => sorteo.elecciones[a] === null)
+      return pide(x, i, 'elegir_carta_sorteo', { ronda: sorteo.ronda, carta: 0 })
+    }
+    if (clase === CLASES.TURNO) return pide(x, motor.activePlayerIndex, 'apostar', { tipo: 'pasar' })
+    if (clase === CLASES.DESCARTE) {
+      const i = motor.players.findIndex((p, j) => !p.folded && x.descarte[j] === null)
+      return pide(x, i, 'descartar', { mano: motor.handCount, indices: [] })
+    }
+    return pide(x, quienAcciona(x), 'reclamar_vencimiento')
+  }
+
+  function jugarHasta(e, llego, alPasar = () => {}) {
+    let x = e
+    for (let i = 0; i < 4000 && !llego(x); i++) {
+      const r = paso(x)
+      expect(r.respuesta.ok, r.respuesta.motivo).toBe(true)
+      alPasar(r, x)
+      x = r.estado
+    }
+    expect(llego(x)).toBe(true)
+    return x
+  }
+
+  const enPausa = (x) => x.vencimiento?.clase === CLASES.PAUSA_ANUNCIO
+  const pausaDeLaMano = (e, mano) => jugarHasta(e, (x) => x.motor.handCount === mano && enPausa(x))
+  const vuelve = (x, i, mano = x.motor.handCount) => pide(x, i, 'volver_anuncio', { mano }, 0)
+
+  describe('la partida entera y sus pausas', () => {
+    it.each([2, 3, 5])('mesa de %i: solo en las manos 5 y 11, una con todos de vuelta y otra a los 45 s, y el dinero cuadra', (n) => {
+      setRng(semilla(100 + n))
+      let e = crearLlena(n)
+      const total = sumaDinero(e)
+      const pausas = []
+      const cuadra = (r) => expect(sumaDinero(r.estado)).toBe(total)
+      const hacia = (mano) => jugarHasta(e, (x) => x.motor.handCount === mano && enPausa(x), (r, antes) => {
+        cuadra(r)
+        if (enPausa(r.estado) && !enPausa(antes)) pausas.push(r.estado.motor.handCount)
+      })
+
+      e = hacia(5)
+      expect(e.motor.phase).toBe(PHASES.PAYOUT)
+      const cartas = JSON.stringify(e.motor.players.map((p) => p.cards))
+      expect(vistaDe(e, 0).players.every((p) => p.enAnuncio)).toBe(true)
+      for (let i = 0; i < n - 1; i++) {
+        e = vuelve(e, i).estado
+        expect(enPausa(e), 'falta alguien: la mano no arranca').toBe(true)
+        expect(e.motor.handCount).toBe(5)
+        expect(JSON.stringify(e.motor.players.map((p) => p.cards))).toBe(cartas)
+        expect(vuelve(e, i).respuesta.motivo).toBe(M.YA_VOLVIO)
+      }
+      e = vuelve(e, n - 1).estado
+      expect(e.motor.handCount).toBe(6)
+      expect(e.motor.phase).toBe(PHASES.DEAL_2)
+      expect(e.vencimiento.clase).toBe(CLASES.BARAJADO)
+      expect(e.asientos.some((a) => a.enAnuncio)).toBe(false)
+
+      e = hacia(11)
+      const antes = e
+      expect(pide(antes, 0, 'reclamar_vencimiento', {}, antes.vencimiento.hora - 1).respuesta.motivo).toBe(M.VENCIMIENTO_NO_CUMPLIDO)
+      e = reclama(antes)
+      expect(e.motor.handCount).toBe(12)
+      expect(e.asientos.some((a) => a.enAnuncio)).toBe(false)
+      expect(pausas).toEqual([5, 11])
+      expect(sumaDinero(e)).toBe(total)
+
+      // Lo que entra es lo que sale: se levantan todos menos uno y la partida termina.
+      expect(total).toBe(n * 5000)
+      for (let i = 1; i < n; i++) e = pide(e, i, 'abandonar', {}, e.vencimiento.hora).estado
+      if (!partidaTerminada(e)) e = jugarHasta(e, partidaTerminada)
+      expect(cobrado(e)).toBe(total)
+      expect(suma(e.motor.players.map((p) => p.chips)) + e.motor.pot).toBe(0)
+    })
+
+    it('la pausa dura 45 s desde que vence la mano siguiente', () => {
+      const e = jugarHasta(crearLlena(2), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+      const ahora = e.vencimiento.hora + 1234
+      const r = pide(e, 0, 'reclamar_vencimiento', {}, ahora)
+      expect(r.estado.vencimiento).toEqual({ clase: CLASES.PAUSA_ANUNCIO, hora: ahora + 45000 })
+    })
+
+    it('`fase` y `no_participa`: fuera de la pausa, con otra mano, y quien no sigue', () => {
+      const fuera = hastaFase(hastaLaMano(2), PHASES.BET_1)
+      expect(vuelve(fuera, 0).respuesta.motivo).toBe(M.FASE)
+      const e = pausaDeLaMano(crearLlena(3), 5)
+      expect(vuelve(e, 0, 4).respuesta.motivo).toBe(M.FASE)
+      expect(vuelve({ ...e, asientos: e.asientos.map((a, i) => (i === 1 ? { ...a, enAnuncio: false, sinAnuncio: true } : a)) }, 1).respuesta.motivo)
+        .toBe(M.NO_PARTICIPA)
+    })
+
+    it('volver no choca con la versión de otro', () => {
+      const e = pausaDeLaMano(crearLlena(3), 5)
+      const una = vuelve(e, 0).estado
+      const r = aplicarAccion(una, { uid: 'u1', version: e.version, accion: 'volver_anuncio', mano: 5 }, { ahora: 0 })
+      expect(r.respuesta.ok).toBe(true)
+    })
+
+    it('quien no cubre el ante cobra al abrirse la pausa, una sola vez, y luego el aviso de salida', () => {
+      let e = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+      const total = sumaDinero(e)
+      e = conJugador(conJugador(e, 0, { chips: e.motor.players[0].chips + e.motor.players[1].chips - 50 }), 1, { chips: 50 })
+      expect(sumaDinero(e)).toBe(total)
+
+      const r = pide(e, 0, 'reclamar_vencimiento')
+      expect(r.efectos).toEqual([{ tipo: 'salida', asiento: 1, monto: 50 }])
+      expect(enPausa(r.estado)).toBe(true)
+      expect(r.estado.asientos[1].cobrado).toBe(50)
+      expect(r.estado.motor.players[1].chips).toBe(0)
+      expect(r.estado.asientos.map((a) => a.enAnuncio)).toEqual([true, false, true])
+      expect(vuelve(r.estado, 1).respuesta.motivo).toBe(M.NO_PARTICIPA)
+
+      const uno = vuelve(r.estado, 0).estado
+      const fin = vuelve(uno, 2)
+      expect(fin.efectos.filter((x) => x.tipo === 'salida')).toEqual([])
+      expect(fin.estado.vencimiento.clase).toBe(CLASES.AVISO_SALIDA)
+      expect(fin.estado.vencimiento.hora).toBe(3000)
+      expect(fin.estado.motor.players[1].eliminated).toBe(true)
+      expect(sumaDinero(fin.estado)).toBe(total)
+      expect(reclama(fin.estado).vencimiento.clase).toBe(CLASES.BARAJADO)
+    })
+
+    describe('quien cobra al abrirse la pausa, hasta que `startHand` lo elimina', () => {
+      // El asiento 1 no cubre el ante y está en medio: el turno tendría que saltarlo.
+      function conCobrado() {
+        const e = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+        const antes = conJugador(conJugador(e, 0, { chips: e.motor.players[0].chips + e.motor.players[1].chips - 50 }), 1, { chips: 50 })
+        return { antes, e: pide(antes, 0, 'reclamar_vencimiento').estado }
+      }
+
+      it('no actúa ni recibe cartas: todo se rechaza, y ni la fase ni las cartas se mueven', () => {
+        const { antes, e } = conCobrado()
+        expect(e.motor.players[1].eliminated).toBe(false)
+        expect(e.asientos[1].cobrado).toBe(50)
+        expect(e.motor.phase).toBe(PHASES.PAYOUT)
+        expect(e.motor.handCount).toBe(5)
+        expect(e.motor.players[1].cards).toEqual(antes.motor.players[1].cards)
+
+        for (const [accion, campos, motivo] of [
+          ['apostar', { tipo: 'pasar' }, M.FASE],
+          ['descartar', { mano: 5, indices: [] }, M.FASE],
+          ['elegir_carta_sorteo', { ronda: e.sorteo.ronda, carta: 0 }, M.FASE],
+          ['volver_anuncio', { mano: 5 }, M.NO_PARTICIPA],
+          ['reclamar_vencimiento', {}, M.VENCIMIENTO_NO_CUMPLIDO],
+        ]) {
+          const r = pide(e, 1, accion, campos, e.vencimiento.hora - 1)
+          expect(r.respuesta.motivo, accion).toBe(motivo)
+          expect(r.estado, accion).toBe(e)
+        }
+      })
+
+      it('levantarse en ese intervalo no le paga dos veces', () => {
+        const { e } = conCobrado()
+        for (const r of [pide(e, 1, 'abandonar', {}, 0), abandonarPorServidor(e, 'u1', { ahora: 0 })]) {
+          expect(r.efectos).toEqual([])
+          expect(r.estado.asientos[1].cobrado).toBe(50)
+          expect(sumaDinero(r.estado)).toBe(sumaDinero(e))
+          expect(enPausa(r.estado)).toBe(true)
+        }
+      })
+
+      it.each([
+        ['vuelven los otros dos', (e) => vuelve(vuelve(e, 0).estado, 2).estado],
+        ['vencen los 45 s', (e) => reclama(e)],
+      ])('%s: la mano arranca sin él, el turno lo salta y el reloj no le cuenta', (_caso, cerrar) => {
+        const { e } = conCobrado()
+        const conAviso = cerrar(e)
+        expect(conAviso.motor.handCount).toBe(6)
+        expect(conAviso.vencimiento.clase).toBe(CLASES.AVISO_SALIDA)
+        expect(conAviso.motor.players[1]).toMatchObject({ eliminated: true, folded: true, cards: [], chips: 0, contribMano: 0 })
+        expect(conAviso.motor.pot).toBe(2 * conAviso.motor.unit)
+        expect(conAviso.motor.handRules.ruleN).toBe(2)
+        expect([conAviso.motor.pieIndex, conAviso.motor.manoIndex]).not.toContain(1)
+
+        // La mano entera por reloj, reclamada por otro: es donde se contaría un vencimiento.
+        let x = conAviso
+        const turnos = new Set()
+        const contados = [0, 0, 0]
+        for (let i = 0; i < 60 && x.vencimiento.clase !== CLASES.MANO_SIGUIENTE; i++) {
+          if (x.vencimiento.clase === CLASES.TURNO) turnos.add(x.motor.activePlayerIndex)
+          expect(pide(x, 1, 'apostar', { tipo: 'pasar' }).respuesta.ok).toBe(false)
+          expect(pide(x, 1, 'descartar', { mano: 6, indices: [] }).respuesta.ok).toBe(false)
+          expect(x.motor.players[1].cards).toEqual([])
+          x = reclama(x)
+          x.asientos.forEach((a, j) => { contados[j] += a.vencidos })
+          x = aCero(x)
+        }
+        expect(x.vencimiento.clase).toBe(CLASES.MANO_SIGUIENTE)
+        expect([...turnos].sort()).toEqual([0, 2])
+        expect(contados[1]).toBe(0)
+        expect(contados[0]).toBeGreaterThan(0)
+        expect(contados[2]).toBeGreaterThan(0)
+      })
+    })
+
+    it('un abandono dentro de la pausa cobra al instante y sin ante', () => {
+      const e = pausaDeLaMano(crearLlena(3), 5)
+      const total = sumaDinero(e)
+      const pila = e.motor.players[2].chips
+      const r = pide(e, 2, 'abandonar', {}, 0)
+      expect(r.efectos).toEqual([{ tipo: 'salida', asiento: 2, monto: pila }])
+      expect(r.estado.asientos[2].enAnuncio).toBe(false)
+      expect(enPausa(r.estado)).toBe(true)
+      expect(sumaDinero(r.estado)).toBe(total)
+      const uno = vuelve(r.estado, 0).estado
+      const sigue = vuelve(uno, 1).estado
+      expect(sigue.motor.handCount).toBe(6)
+      expect(sigue.motor.players[2].contribMano).toBe(0)
+      expect(sigue.vencimiento.clase).toBe(CLASES.BARAJADO)
+    })
+
+    it('si el abandono deja a alguien sin rivales, o era el último que faltaba, la pausa se cierra', () => {
+      const dos = pausaDeLaMano(crearLlena(2), 5)
+      const r = pide(dos, 1, 'abandonar', {}, 0)
+      expect(r.estado.motor.phase).toBe(PHASES.GAME_OVER)
+      expect(r.efectos.at(-1).tipo).toBe('partida_terminada')
+      expect(cobrado(r.estado)).toBe(sumaDinero(dos))
+
+      const tres = pausaDeLaMano(crearLlena(3), 5)
+      const faltaUno = vuelve(vuelve(tres, 0).estado, 1).estado
+      const ultimo = pide(faltaUno, 2, 'abandonar', {}, 0)
+      expect(ultimo.estado.motor.handCount).toBe(6)
+      expect(ultimo.efectos.filter((x) => x.tipo === 'salida').map((x) => x.asiento)).toEqual([2])
+    })
+
+    it('con un solo asiento que siga no hay pausa, y un Premium no entra en ella', () => {
+      let e = jugarHasta(crearLlena(2), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+      e = conJugador(conJugador(e, 0, { chips: e.motor.players[0].chips + e.motor.players[1].chips - 50 }), 1, { chips: 50 })
+      expect(reclama(e).motor.phase).toBe(PHASES.GAME_OVER)
+
+      const tres = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+      const conPremium = { ...tres, asientos: tres.asientos.map((a, i) => ({ ...a, sinAnuncio: i === 0 })) }
+      expect(crearLlena(2).asientos.every((a) => a.sinAnuncio === false)).toBe(true)
+      expect(reclama(conPremium).asientos.map((a) => a.enAnuncio)).toEqual([false, true, true])
+      const todos = { ...tres, asientos: tres.asientos.map((a) => ({ ...a, sinAnuncio: true })) }
+      expect(reclama(todos).motor.handCount).toBe(6)
+    })
+  })
+
+  describe('la ausencia', () => {
+    const presente = 0
+    const ausente = 1
+    // Solo juega `presente`: lo del otro lo resuelve el reloj.
+    function pasoSinElOtro(x) {
+      const { clase } = x.vencimiento
+      if (clase === CLASES.TURNO && x.motor.activePlayerIndex === presente) return pide(x, presente, 'apostar', { tipo: 'pasar' })
+      if (clase === CLASES.DESCARTE && x.descarte[presente] === null) return pide(x, presente, 'descartar', { mano: x.motor.handCount, indices: [] })
+      return pide(x, presente, 'reclamar_vencimiento')
+    }
+    const cuenta = (e) => e.asientos[ausente].vencidos
+
+    it('tres vencimientos seguidos lo abandonan: `ausente` desde el 2.º, y cobra su pila una vez', () => {
+      let e = aCero(hastaFase(hastaLaMano(2), PHASES.BET_2))
+      const total = sumaDinero(e)
+      const vistos = []
+      let ultimo = null
+      for (let i = 0; i < 200 && !e.asientos[ausente].abandonado; i++) {
+        const antes = cuenta(e)
+        ultimo = pasoSinElOtro(e)
+        e = ultimo.estado
+        if (cuenta(e) !== antes) vistos.push([cuenta(e), vistaDe(e, presente).players[ausente].ausente])
+        expect(sumaDinero(e)).toBe(total)
+      }
+      expect(vistos).toEqual([[1, false], [2, true], [3, true]])
+      expect(e.asientos[ausente].abandonado).toBe(true)
+      expect(e.motor.players[ausente].folded).toBe(true)
+      expect(e.ultimaAccion).toMatchObject({ asiento: ausente, tipo: 'retirarse', porReloj: true })
+
+      const salida = ultimo.efectos.find((x) => x.tipo === 'salida')
+      const cierre = ultimo.efectos.find((x) => x.tipo === 'mano_cerrada')
+      expect(salida.asiento).toBe(ausente)
+      expect(salida.monto).toBeGreaterThan(0)
+      expect(cierre.pilas[ausente]).toBe(0)
+      expect(e.asientos[ausente].cobrado).toBe(salida.monto)
+      expect(pide(e, ausente, 'apostar', { tipo: 'pasar' }).respuesta.motivo).toBe(M.ASIENTO_ABANDONADO)
+
+      const fin = pide(e, presente, 'reclamar_vencimiento')
+      expect(fin.estado.motor.phase).toBe(PHASES.GAME_OVER)
+      expect(cobrado(fin.estado)).toBe(total)
+      expect(fin.efectos.filter((x) => x.tipo === 'salida').map((x) => x.asiento)).toEqual([presente])
+    })
+
+    it('da igual quién reclame: lo reclama él mismo y cuenta', () => {
+      const e = aCero(hastaFase(hastaLaMano(2), PHASES.BET_1))
+      const a = e.motor.activePlayerIndex
+      expect(pide(e, a, 'reclamar_vencimiento').estado.asientos[a].vencidos).toBe(1)
+      expect(pide(e, 1 - a, 'reclamar_vencimiento').estado.asientos[a].vencidos).toBe(1)
+    })
+
+    it('una acción propia en medio pone la cuenta a 0, también volver del anuncio', () => {
+      const e = hastaFase(hastaLaMano(2), PHASES.BET_1)
+      const a = e.motor.activePlayerIndex
+      const conDos = { ...e, asientos: e.asientos.map((x, i) => (i === a ? { ...x, vencidos: 2 } : x)) }
+      const jugo = pide(conDos, a, 'apostar', { tipo: 'pasar' })
+      expect(jugo.estado.asientos[a].vencidos).toBe(0)
+      expect(vistaDe(jugo.estado, 0).players[a].ausente).toBe(false)
+
+      const pausa = pausaDeLaMano(crearLlena(3), 5)
+      const enPausaConDos = { ...pausa, asientos: pausa.asientos.map((x) => ({ ...x, vencidos: 2 })) }
+      expect(vuelve(enPausaConDos, 1).estado.asientos.map((x) => x.vencidos)).toEqual([2, 0, 2])
+      expect(reclama(enPausaConDos).asientos.map((x) => x.vencidos)).toEqual([2, 2, 2])
+    })
+
+    it('reclamar no cuenta como jugar, y el vencimiento de otro no le suma', () => {
+      const e = aCero(hastaFase(hastaLaMano(3), PHASES.BET_1))
+      const a = e.motor.activePlayerIndex
+      const otro = (a + 1) % 3
+      const conDos = { ...e, asientos: e.asientos.map((x, i) => (i === otro ? { ...x, vencidos: 2 } : x)) }
+      const r = pide(conDos, otro, 'reclamar_vencimiento').estado
+      expect(r.asientos[otro].vencidos).toBe(2)
+      expect(r.asientos[a].vencidos).toBe(1)
+    })
+
+    it('el descarte cuenta a quien falte, y solo a él', () => {
+      let d = aCero(hastaFase(hastaLaMano(3), PHASES.DISCARD))
+      d = pide(d, 0, 'descartar', { mano: d.motor.handCount, indices: [] }, 0).estado
+      expect(reclama(d).asientos.map((a) => a.vencidos)).toEqual([0, 1, 1])
+    })
+
+    it('el sorteo no cuenta: quien deja vencer las tres rondas llega a la primera mano con 0, y sin falta', () => {
+      const empatan = (x) => ({ ...x, sorteo: { ...x.sorteo, cartas: x.sorteo.cartas.map((c) => c.map(() => carta(12))) } })
+      let e = crear(2)
+      for (let ronda = 1; ronda <= 3; ronda++) {
+        e = reclama(empatan(reclama(reclama(e))))
+        expect(e.sorteo.rondas[ronda - 1].volteo.map((v) => v.posicion)).toEqual([0, 0])
+        expect(e.asientos.map((a) => [a.vencidos, a.abandonado])).toEqual([[0, false], [0, false]])
+        if (ronda < 3) e = reclama(e)
+      }
+      e = reclama(e)
+      expect(e.sorteo.etapa).toBe(ETAPAS.CERRADO)
+      expect(e.motor.handCount).toBe(1)
+      expect(e.asientos.map((a) => [a.vencidos, a.abandonado])).toEqual([[0, false], [0, false]])
+      expect(vistaDe(e, 0).players.map((p) => p.ausente)).toEqual([false, false])
+    })
+
+    it('si el 3.º llega en el descarte, también abandona sin pagar dos veces', () => {
+      let d = hastaFase(hastaLaMano(3), PHASES.DISCARD)
+      const total = sumaDinero(d)
+      d = pide(d, 0, 'descartar', { mano: d.motor.handCount, indices: [] }, 0).estado
+      d = pide(d, 1, 'descartar', { mano: d.motor.handCount, indices: [] }, 0).estado
+      d = { ...d, asientos: d.asientos.map((a, i) => (i === 2 ? { ...a, vencidos: 2 } : a)) }
+      d = reclama(d)
+      expect(d.asientos[2].abandonado).toBe(true)
+      expect(d.asientos[2].cobrado).toBe(null)
+      const bet3 = reclama(d)
+      expect(bet3.motor.phase).toBe(PHASES.BET_3)
+      expect(sumaDinero(bet3)).toBe(total)
+    })
+  })
+
+  describe('la reposición', () => {
+    const enDescarte = (n) => hastaFase(hastaLaMano(n), PHASES.DISCARD)
+    const descartan = (e, listas, ahora = 1000) => listas.reduce(
+      (x, indices, i) => pide(x, i, 'descartar', { mano: x.motor.handCount, indices }, ahora).estado, e,
+    )
+
+    it('dura la tanda de quien más descartó, y 600 ms si nadie; el turno no corre', () => {
+      const uno = descartan(enDescarte(3), [[0, 1, 2], [0], []])
+      expect(uno.vencimiento).toEqual({ clase: CLASES.REPOSICION, hora: 1000 + 120 + 3 * 595 + 400 })
+      expect(uno.motor.phase).toBe(PHASES.DISCARD)
+      const nadie = descartan(enDescarte(3), [[], [], []])
+      expect(nadie.vencimiento).toEqual({ clase: CLASES.REPOSICION, hora: 1000 + 600 })
+      const trasVencer = pide(nadie, 0, 'reclamar_vencimiento', {}, 5000).estado
+      expect(trasVencer.motor.phase).toBe(PHASES.BET_3)
+      expect(trasVencer.vencimiento).toEqual({ clase: CLASES.TURNO, hora: 5000 + 20000 })
+    })
+
+    it('la vista lleva las cartas nuevas de cada uno y nada más; apostar da `fase` y descartar `ya_descarto`', () => {
+      const antes = enDescarte(3)
+      const e = descartan(antes, [[0, 1], [], [2]])
+      const vista = vistaDe(e, 0)
+      expect(vista.phase).toBe(PHASES.DISCARD)
+      expect(vista.descarte.cuantas).toEqual([2, 0, 1])
+      expect(vista.descarte.yaDescartaron).toEqual([0, 1, 2])
+      expect(vista.resultado).toBe(null)
+      expect(vista.players[0].cards).not.toEqual(antes.motor.players[0].cards)
+      const texto = JSON.stringify(vista)
+      for (const c of e.motor.players[2].cards) expect(texto).not.toContain(`"${c.id}"`)
+      for (const c of e.motorTrasDescarte.deck) expect(texto).not.toContain(`"${c.id}"`)
+
+      const turno = e.motorTrasDescarte.activePlayerIndex
+      expect(pide(e, turno, 'apostar', { tipo: 'pasar' }, 0).respuesta.motivo).toBe(M.FASE)
+      expect(pide(e, 0, 'descartar', { mano: e.motor.handCount, indices: [] }, 0).respuesta.motivo).toBe(M.YA_DESCARTO)
+    })
+
+    it('con todos en all-in, el showdown y el pago esperan a que venza', () => {
+      let e = enDescarte(2)
+      const total = sumaDinero(e)
+      const puesto = e.motor.pot + e.motor.players[0].chips + e.motor.players[1].chips
+      e = conMotor(e, {
+        pot: puesto,
+        players: e.motor.players.map((p) => ({ ...p, chips: 0, allIn: true, contribMano: puesto / 2 })),
+      })
+      expect(sumaDinero(e)).toBe(total)
+      const repone = descartan(e, [[0], []])
+      expect(repone.motor.pot).toBe(puesto)
+      expect(vistaDe(repone, 0).resultado).toBe(null)
+      expect(vistaDe(repone, 0).players.map((p) => p.chips)).toEqual([0, 0])
+      const r = pide(repone, 0, 'reclamar_vencimiento')
+      expect(r.estado.motor.phase).toBe(PHASES.PAYOUT)
+      expect(r.efectos.map((x) => x.tipo)).toContain('mano_cerrada')
+      expect(sumaDinero(r.estado)).toBe(total)
+      expect(r.estado.motorTrasDescarte).toBeUndefined()
+    })
+
+    it('quien abandona en la reposición no la repite: se retira al abrirse su turno y cobra al cerrar', () => {
+      const e = descartan(enDescarte(2), [[0], [1]])
+      const cartas = JSON.stringify(e.motor.players.map((p) => p.cards))
+      const turno = e.motorTrasDescarte.activePlayerIndex
+      const r = pide(e, turno, 'abandonar', {}, 0).estado
+      expect(r.vencimiento).toEqual(e.vencimiento)
+      expect(JSON.stringify(r.motor.players.map((p) => p.cards))).toBe(cartas)
+      const fin = pide(r, 1 - turno, 'reclamar_vencimiento')
+      expect(fin.estado.motor.phase).toBe(PHASES.PAYOUT)
+      expect(fin.estado.asientos[turno].cobrado).not.toBe(null)
+    })
+  })
+
+  describe('los demás vencimientos y campos', () => {
+    it('el barajado va antes de cada ronda, con una sola velocidad', () => {
+      for (const ritmo of ['normal', 'rapido']) {
+        const e = crear(2, ritmo)
+        expect(e.sorteo.etapa).toBe(ETAPAS.BARAJADO)
+        expect(vistaDe(e, 0).sorteo.posiciones).toEqual([])
+        expect(e.vencimiento).toEqual({ clase: CLASES.BARAJADO_SORTEO, hora: BARAJADO_MS })
+      }
+    })
+
+    it('`volteo[].posicion` dice qué carta girar, también la que tomó el reloj; nada de las no elegidas', () => {
+      let e = reclama(reclama(crear(3)))
+      const elegida = e.sorteo.cartas[0][3]
+      const noElegida = e.sorteo.cartas[0][1]
+      e = pide(e, 0, 'elegir_carta_sorteo', { ronda: 1, carta: 3 }, 0).estado
+      e = reclama(e)
+      const { volteo } = vistaDe(e, 2).sorteo.rondas[0]
+      expect(volteo.map((v) => v.posicion)).toEqual([3, 0, 0])
+      expect(volteo[0].carta).toEqual(elegida)
+      expect(JSON.stringify(vistaDe(e, 2))).not.toContain(`"${noElegida.id}"`)
+    })
+
+    it('`contribMano` y `ultimaAccion`: el dato de cada jugada, con el reloj dicho, y nada al empezar la mano', () => {
+      let e = hastaFase(hastaLaMano(3), PHASES.BET_1)
+      expect(vistaDe(e, 0).ultimaAccion).toBe(null)
+      expect(vistaDe(e, 0).players.map((p) => p.contribMano)).toEqual([100, 100, 100])
+
+      const a = e.motor.activePlayerIndex
+      e = pide(e, a, 'apostar', { tipo: 'apostar', k: 2 }, 0).estado
+      expect(vistaDe(e, 0).ultimaAccion).toEqual({ asiento: a, tipo: 'apostar', puesto: 200, apuestaAntes: 0, apuestaDespues: 200, porReloj: false })
+      expect(vistaDe(e, 0).players[a].contribMano).toBe(300)
+
+      const b = e.motor.activePlayerIndex
+      e = pide(e, b, 'apostar', { tipo: 'subir', k: 1 }, 0).estado
+      expect(vistaDe(e, 0).ultimaAccion).toEqual({ asiento: b, tipo: 'subir', puesto: 300, apuestaAntes: 200, apuestaDespues: 300, porReloj: false })
+
+      const c = e.motor.activePlayerIndex
+      e = reclama(e, c)
+      expect(vistaDe(e, 0).ultimaAccion).toEqual({ asiento: c, tipo: 'retirarse', puesto: 0, apuestaAntes: 300, apuestaDespues: 300, porReloj: true })
+
+      const igual = e.motor.activePlayerIndex
+      e = pide(e, igual, 'apostar', { tipo: 'igualar' }, 0).estado
+      expect(vistaDe(e, 0).ultimaAccion).toEqual({ asiento: igual, tipo: 'igualar', puesto: 100, apuestaAntes: 300, apuestaDespues: 300, porReloj: false })
+    })
+
+    it('la retirada automática de un abandonado no pisa la jugada que la provocó', () => {
+      const e = hastaFase(hastaLaMano(3), PHASES.BET_1)
+      const uno = e.motor.activePlayerIndex
+      const dos = (uno + 1) % 3
+      const r = pide(pide(e, dos, 'abandonar', {}, 0).estado, uno, 'apostar', { tipo: 'pasar' }, 0).estado
+      expect(r.motor.players[dos].folded).toBe(true)
+      expect(r.ultimaAccion).toMatchObject({ asiento: uno, tipo: 'pasar' })
+      const mano2 = jugarHasta(r, (x) => x.motor.handCount === 2)
+      expect(mano2.ultimaAccion).toBe(null)
+    })
+
+    it('R-4: una partida guardada antes de la v1.1 sigue leyéndose y jugándose', () => {
+      const vieja = (x) => {
+        const copia = JSON.parse(JSON.stringify(x))
+        delete copia.ultimaAccion
+        copia.asientos.forEach((a) => { delete a.vencidos; delete a.enAnuncio; delete a.sinAnuncio })
+        copia.sorteo.rondas.forEach((r) => r.volteo.forEach((v) => { delete v.posicion }))
+        return copia
+      }
+      const e = vieja(hastaFase(hastaLaMano(2), PHASES.BET_1))
+      const vista = vistaDe(e, 0)
+      expect(vista.ultimaAccion).toBe(null)
+      expect(vista.players.map((p) => [p.enAnuncio, p.ausente])).toEqual([[false, false], [false, false]])
+      expect(vista.sorteo.rondas[0].volteo.map((v) => v.posicion)).toEqual([null, null])
+
+      const a = e.motor.activePlayerIndex
+      const vencido = reclama(e)
+      expect(vencido.asientos[a].vencidos).toBe(1)
+      expect(vencido.ultimaAccion).toMatchObject({ asiento: a, porReloj: true })
+
+      const pausa = vieja(jugarHasta(crearLlena(2), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE))
+      expect(reclama(pausa).asientos.map((x) => x.enAnuncio)).toEqual([true, true])
+    })
   })
 })

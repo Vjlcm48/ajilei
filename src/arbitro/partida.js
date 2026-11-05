@@ -17,11 +17,15 @@
 // monto pasa a `asientos[i].cobrado`. Pilas + pozo + cobrado es constante, y la pila
 // de un asiento ya cobrado no vuelve a pagarse: ni en `mano_cerrada`, ni en la partida
 // muerta, que cobra lo que `mano_cerrada` dejó en SQL (contrato §7).
+//
+// R-4: una partida guardada antes de la v1.1 no trae `vencidos`, `enAnuncio`,
+// `sinAnuncio` ni `ultimaAccion`. Se leen con su valor por defecto.
 
 import {
   PHASES, advanceFromDeal, applyBetAction, applyDiscard, createInitialState, startHand,
 } from '../engine/gameEngine.js'
-import { esLegal } from '../engine/pozos.js'
+import { costoDe, esLegal } from '../engine/pozos.js'
+import { N_AUSENCIA } from '../config/esperas.js'
 import { MOTIVOS as M } from './motivos.js'
 import { compactarAsientos } from './asientos.js'
 import { ajileiDe, ganadorDeMano, huboRevelacion } from './ganador.js'
@@ -29,8 +33,9 @@ import {
   CARTAS_POR_ASIENTO, ETAPAS, abrirRonda, cerrar, eligieronTodos, siguienteRonda, voltear,
 } from './sorteo.js'
 import {
-  CLASES, ESPERA_BARAJADO_MS, ESPERA_ELECCION_MS, ESPERA_REPARTO_SORTEO_MS, ESPERA_TURNO_MS,
-  ESPERA_VOLTEO_MS, RITMOS, esperaManoSiguiente, esperaPrimerReparto, esperaSegundoReparto,
+  CLASES, ESPERA_AVISO_SALIDA_MS, ESPERA_BARAJADO_MS, ESPERA_ELECCION_MS, ESPERA_PAUSA_ANUNCIO_MS,
+  ESPERA_REPARTO_SORTEO_MS, ESPERA_TURNO_MS, ESPERA_VOLTEO_MS, RITMOS, esperaManoSiguiente,
+  esperaPrimerReparto, esperaReposicion, esperaSegundoReparto, llevaAnuncio,
 } from './reloj.js'
 
 export const ENTRADAS = Object.freeze({ corta: 15, llena: 50 })
@@ -38,11 +43,14 @@ export const ENTRADAS = Object.freeze({ corta: 15, llena: 50 })
 export const APUESTAS = Object.freeze([50, 100, 200, 500, 1000, 2000, 5000])
 
 export const ACCIONES_ARBITRO = Object.freeze([
-  'elegir_carta_sorteo', 'apostar', 'descartar', 'reclamar_vencimiento', 'abandonar',
+  'elegir_carta_sorteo', 'apostar', 'descartar', 'reclamar_vencimiento', 'abandonar', 'volver_anuncio',
 ])
 
 // C-4: éstas se validan contra la ronda o la fase abierta, no contra la versión.
-const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar']
+const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar', 'volver_anuncio']
+
+// Las que dicen que el asiento está: ponen a 0 su cuenta de ausencia (contrato §6).
+const PROPIAS = ['elegir_carta_sorteo', 'apostar', 'descartar', 'volver_anuncio']
 
 const nulos = (n) => Array(n).fill(null)
 
@@ -92,6 +100,18 @@ function sacarAbandonados(estado) {
   return { estado: { ...liquidado, motor }, efectos }
 }
 
+// ── La ausencia ─────────────────────────────────────────────────────────────
+// Cuenta el reloj, reclame quien reclame. Al llegar a `N_AUSENCIA` queda abandonado antes
+// de resolver el vencimiento: así, si esto cierra la mano, su pila va solo en su salida.
+const contarVencidos = (estado, vencidos) => ({
+  ...estado,
+  asientos: estado.asientos.map((a, i) => {
+    if (!vencidos.includes(i)) return a
+    const cuenta = (a.vencidos ?? 0) + 1
+    return { ...a, vencidos: cuenta, abandonado: a.abandonado || cuenta >= N_AUSENCIA }
+  }),
+})
+
 // ── La mano, por fases ──────────────────────────────────────────────────────
 
 function cerrarMano(estado, ahora) {
@@ -121,6 +141,7 @@ function trasMoverMotor(estado, motor, ahora) {
     case PHASES.BET_2:
     case PHASES.BET_3:
       // El abandonado no gasta el reloj de nadie. El motor no da turno a un all-in.
+      // Esta retirada no pisa `ultimaAccion`: la jugada que la provocó sigue siendo la última.
       if (estado.asientos[motor.activePlayerIndex].abandonado) {
         return trasMoverMotor(estado, applyBetAction(motor, motor.activePlayerIndex, 'retirarse'), ahora)
       }
@@ -138,9 +159,20 @@ function trasMoverMotor(estado, motor, ahora) {
   }
 }
 
+// El dato de la jugada, no su frase (K-12). `puesto` y la apuesta se leen antes de mover
+// el motor, porque cerrar la ronda pone `currentBet` a cero.
+function moverApuesta(estado, asiento, tipo, k, porReloj, ahora) {
+  const { motor } = estado
+  const puesto = costoDe(motor, asiento, tipo, k)
+  const apuestaAntes = motor.currentBet
+  const apuestaDespues = tipo === 'apostar' ? puesto : tipo === 'subir' ? apuestaAntes + k * motor.unit : apuestaAntes
+  const ultimaAccion = { asiento, tipo, puesto, apuestaAntes, apuestaDespues, porReloj }
+  return trasMoverMotor({ ...estado, ultimaAccion }, applyBetAction(motor, asiento, tipo, k), ahora)
+}
+
 function empezarMano(estado, motorPrevio, ahora) {
   const motor = startHand(motorPrevio)
-  const base = { ...estado, motor, descarte: nulos(motor.numPlayers), descartaron: null }
+  const base = { ...estado, motor, descarte: nulos(motor.numPlayers), descartaron: null, ultimaAccion: null }
   if (motor.phase === PHASES.GAME_OVER) {
     const { estado: fin, efectos } = liquidar(base, () => true)
     return {
@@ -149,8 +181,58 @@ function empezarMano(estado, motorPrevio, ahora) {
     }
   }
   const { estado: conEliminados, efectos } = liquidar(base, (_a, i) => motor.players[i].eliminated)
-  return { estado: { ...conEliminados, vencimiento: en(CLASES.BARAJADO, ahora + ESPERA_BARAJADO_MS) }, efectos }
+  const salenAhora = motor.players.some((p, i) => p.eliminated && !motorPrevio.players[i].eliminated)
+  const vencimiento = salenAhora
+    ? en(CLASES.AVISO_SALIDA, ahora + ESPERA_AVISO_SALIDA_MS)
+    : en(CLASES.BARAJADO, ahora + ESPERA_BARAJADO_MS)
+  return { estado: { ...conEliminados, vencimiento }, efectos }
 }
+
+// ── La pausa de anuncio ─────────────────────────────────────────────────────
+// Contrato §6, «Publicidad». Va antes de `startHand`: la fase sigue en `PAYOUT`, no hay
+// cartas nuevas y quien abandona cobra sin pagar el ante.
+function sigue({ motor, asientos }, i) {
+  const p = motor.players[i]
+  return !p.eliminated && !asientos[i].abandonado && p.chips >= motor.unit
+}
+
+const cuantosSiguen = (estado) => estado.asientos.filter((_a, i) => sigue(estado, i)).length
+
+const veAnuncio = (estado, i) => sigue(estado, i) && !estado.asientos[i].sinAnuncio
+
+const pausaAbierta = ({ vencimiento }) => vencimiento?.clase === CLASES.PAUSA_ANUNCIO
+
+function trasManoSiguiente(estado, ahora) {
+  const { motor } = estado
+  const hayPausa = llevaAnuncio(motor.handCount)
+    && cuantosSiguen(estado) > 1
+    && estado.asientos.some((_a, i) => veAnuncio(estado, i))
+  if (!hayPausa) return empezarMano(estado, motor, ahora)
+
+  const noCubre = (_a, i) => !motor.players[i].eliminated && motor.players[i].chips < motor.unit
+  const { estado: liquidado, efectos } = liquidar(estado, noCubre)
+  return {
+    estado: {
+      ...liquidado,
+      asientos: liquidado.asientos.map((a, i) => ({ ...a, enAnuncio: veAnuncio(estado, i) })),
+      vencimiento: en(CLASES.PAUSA_ANUNCIO, ahora + ESPERA_PAUSA_ANUNCIO_MS),
+    },
+    efectos,
+  }
+}
+
+function cerrarPausa(estado, ahora) {
+  const asientos = estado.asientos.map((a) => ({ ...a, enAnuncio: false }))
+  return empezarMano({ ...estado, asientos }, estado.motor, ahora)
+}
+
+// Se acaba sola cuando ya no queda a quién esperar, o nadie con quien jugar.
+function seguirPausa(estado, ahora) {
+  const nadieEnAnuncio = !estado.asientos.some((a) => a.enAnuncio)
+  return nadieEnAnuncio || cuantosSiguen(estado) <= 1 ? cerrarPausa(estado, ahora) : { estado, efectos: [] }
+}
+
+// ── El descarte ─────────────────────────────────────────────────────────────
 
 function aplicarDescartes(estado, ahora) {
   const { motor, descarte } = estado
@@ -161,8 +243,25 @@ function aplicarDescartes(estado, ahora) {
     porAsiento[i] = descarte[i] ?? []
     descartaron[i] = porAsiento[i].length
   })
-  const limpio = { ...estado, descarte: nulos(motor.numPlayers), descartaron }
-  return trasMoverMotor(limpio, applyDiscard(motor, porAsiento), ahora)
+  // Las cartas nuevas van ya a la vista; todo lo demás espera a que venza la reposición,
+  // porque `applyDiscard` puede abrir `BET_3` o llegar al showdown y pagar (contrato §6).
+  const motorTrasDescarte = applyDiscard(motor, porAsiento)
+  const players = motor.players.map((p, i) => ({ ...p, cards: motorTrasDescarte.players[i].cards }))
+  return {
+    estado: {
+      ...estado,
+      motor: { ...motor, players, deck: motorTrasDescarte.deck },
+      motorTrasDescarte,
+      descarte: motor.players.map((p, i) => (p.folded ? null : porAsiento[i])),
+      descartaron,
+      vencimiento: en(CLASES.REPOSICION, ahora + esperaReposicion(Math.max(0, ...descartaron))),
+    },
+    efectos: [],
+  }
+}
+
+function trasReposicion({ motorTrasDescarte, ...estado }, ahora) {
+  return trasMoverMotor({ ...estado, descarte: nulos(motorTrasDescarte.numPlayers) }, motorTrasDescarte, ahora)
 }
 
 // El abandonado descarta vacío en el acto. Sin nadie pendiente, se aplica sin esperar.
@@ -200,7 +299,7 @@ function trasVolteo(estado, ahora) {
   if (sorteo.mano === null) {
     const nueva = siguienteRonda(sorteo)
     return {
-      estado: { ...estado, sorteo: nueva, vencimiento: en(CLASES.REPARTO_SORTEO, ahora + ESPERA_REPARTO_SORTEO_MS) },
+      estado: { ...estado, sorteo: nueva, vencimiento: en(CLASES.BARAJADO_SORTEO, ahora + ESPERA_BARAJADO_MS) },
       efectos: [],
     }
   }
@@ -232,7 +331,7 @@ function apostar(estado, asiento, peticion, ahora) {
   const k = tipo === 'apostar' || tipo === 'subir' ? peticion.k ?? null : undefined
   const juicio = esLegal(estado.motor, asiento, tipo, k)
   if (!juicio.ok) return juicio.motivo
-  return trasMoverMotor(estado, applyBetAction(estado.motor, asiento, tipo, k), ahora)
+  return moverApuesta(estado, asiento, tipo, k, false, ahora)
 }
 
 function indicesValidos(indices, cartas, tope) {
@@ -254,11 +353,25 @@ function descartar(estado, asiento, peticion, ahora) {
   return seguirDescarte({ ...estado, descarte }, ahora)
 }
 
+function volverAnuncio(estado, asiento, peticion, ahora) {
+  if (!pausaAbierta(estado) || peticion.mano !== estado.motor.handCount) return M.FASE
+  if (!estado.asientos[asiento].enAnuncio) return veAnuncio(estado, asiento) ? M.YA_VOLVIO : M.NO_PARTICIPA
+  const asientos = estado.asientos.map((a, i) => (i === asiento ? { ...a, enAnuncio: false } : a))
+  return seguirPausa({ ...estado, asientos }, ahora)
+}
+
 function alVencerTurno(estado, ahora) {
   const { motor } = estado
   const asiento = motor.activePlayerIndex
-  const accion = esLegal(motor, asiento, 'pasar').ok ? 'pasar' : 'retirarse'
-  return trasMoverMotor(estado, applyBetAction(motor, asiento, accion), ahora)
+  const contado = contarVencidos(estado, [asiento])
+  // El vencimiento que lo abandona lo retira, como a cualquier abandonado en su turno.
+  const pasa = !contado.asientos[asiento].abandonado && esLegal(motor, asiento, 'pasar').ok
+  return moverApuesta(contado, asiento, pasa ? 'pasar' : 'retirarse', undefined, true, ahora)
+}
+
+function alVencerDescarte(estado, ahora) {
+  const faltan = estado.motor.players.flatMap((p, i) => (!p.folded && estado.descarte[i] === null ? [i] : []))
+  return aplicarDescartes(contarVencidos(estado, faltan), ahora)
 }
 
 function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
@@ -266,6 +379,15 @@ function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
   if (!v || ahora < v.hora) return M.VENCIMIENTO_NO_CUMPLIDO
 
   switch (v.clase) {
+    case CLASES.BARAJADO_SORTEO:
+      return {
+        estado: {
+          ...estado,
+          sorteo: { ...sorteo, etapa: ETAPAS.REPARTO },
+          vencimiento: en(CLASES.REPARTO_SORTEO, ahora + ESPERA_REPARTO_SORTEO_MS),
+        },
+        efectos: [],
+      }
     case CLASES.REPARTO_SORTEO:
       return {
         estado: seguirEleccion({
@@ -276,9 +398,12 @@ function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
         efectos: [],
       }
     case CLASES.ELECCION_SORTEO:
+      // No cuenta para la ausencia: quien no eligió se queda con la posición 0, sin falta.
       return { estado: conVolteo(estado, sorteo, ahora), efectos: [] }
     case CLASES.VOLTEO_SORTEO:
       return trasVolteo(estado, ahora)
+    case CLASES.AVISO_SALIDA:
+      return { estado: { ...estado, vencimiento: en(CLASES.BARAJADO, ahora + ESPERA_BARAJADO_MS) }, efectos: [] }
     case CLASES.BARAJADO:
       return {
         estado: {
@@ -292,9 +417,13 @@ function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
     case CLASES.TURNO:
       return alVencerTurno(estado, ahora)
     case CLASES.DESCARTE:
-      return aplicarDescartes(estado, ahora)
+      return alVencerDescarte(estado, ahora)
+    case CLASES.REPOSICION:
+      return trasReposicion(estado, ahora)
     case CLASES.MANO_SIGUIENTE:
-      return empezarMano(estado, motor, ahora)
+      return trasManoSiguiente(estado, ahora)
+    case CLASES.PAUSA_ANUNCIO:
+      return cerrarPausa(estado, ahora)
     default:
       throw new Error(`MOT-1 · vencimiento desconocido: ${v.clase}`)
   }
@@ -304,7 +433,9 @@ const manoEnCurso = (estado) => !sorteoAbierto(estado) && estado.motor.phase !==
 
 // En mano no cobra: si le tocaba actuar, actúa ya, y si no, espera a que le toque.
 function actuarAbandonado(estado, asiento, ahora) {
-  const { motor } = estado
+  const { motor, vencimiento } = estado
+  // En la reposición ya descartaron todos, y su turno lo resuelve `trasMoverMotor` al vencer.
+  if (vencimiento?.clase === CLASES.REPOSICION) return { estado, efectos: [] }
   if (motor.phase === PHASES.DISCARD) return seguirDescarte(estado, ahora)
   const apostando = motor.phase === PHASES.BET_1 || motor.phase === PHASES.BET_2 || motor.phase === PHASES.BET_3
   return apostando && motor.activePlayerIndex === asiento ? trasMoverMotor(estado, motor, ahora) : { estado, efectos: [] }
@@ -312,11 +443,15 @@ function actuarAbandonado(estado, asiento, ahora) {
 
 // C-8: en mano, no mueve dinero y sigue disputando lo que puso. Sin mano, sale ya.
 function marcarAbandono(estado, asiento, ahora) {
-  const asientos = estado.asientos.map((a, i) => (i === asiento ? { ...a, abandonado: true } : a))
+  const asientos = estado.asientos.map((a, i) => (i === asiento ? { ...a, abandonado: true, enAnuncio: false } : a))
   const marcado = { ...estado, asientos }
   if (manoEnCurso(marcado)) return actuarAbandonado(marcado, asiento, ahora)
 
   const { estado: fuera, efectos } = sacarAbandonados(marcado)
+  if (pausaAbierta(fuera)) {
+    const sigueLaPausa = seguirPausa(fuera, ahora)
+    return { estado: sigueLaPausa.estado, efectos: [...efectos, ...sigueLaPausa.efectos] }
+  }
   const vivos = fuera.motor.players.filter((p) => !p.eliminated).length
   if (!sorteoAbierto(fuera)) return { estado: fuera, efectos }
   if (vivos > 1) {
@@ -334,6 +469,12 @@ const MANEJADORES = {
   descartar,
   reclamar_vencimiento: reclamarVencimiento,
   abandonar: (estado, asiento, _peticion, ahora) => marcarAbandono(estado, asiento, ahora),
+  volver_anuncio: volverAnuncio,
+}
+
+function cuentaACero(hecho, asiento) {
+  const asientos = hecho.estado.asientos.map((a, i) => (i === asiento ? { ...a, vencidos: 0 } : a))
+  return { ...hecho, estado: { ...hecho.estado, asientos } }
 }
 
 // ── Lo público ──────────────────────────────────────────────────────────────
@@ -357,7 +498,8 @@ export function aplicarAccion(estado, peticion, { ahora }) {
   if (!ACCIONES_ARBITRO.includes(accion)) return rechazo(estado, M.DESCONOCIDA)
 
   const hecho = MANEJADORES[accion](estado, asiento, peticion, ahora)
-  return typeof hecho === 'string' ? rechazo(estado, hecho) : confirmar(hecho)
+  if (typeof hecho === 'string') return rechazo(estado, hecho)
+  return confirmar(PROPIAS.includes(accion) ? cuentaACero(hecho, asiento) : hecho)
 }
 
 /**
@@ -374,7 +516,7 @@ export function abandonarPorServidor(estado, uid, { ahora }) {
 
 /**
  * La partida de una sala `activa`: versión 0, sorteo abierto en la ronda 1 y el
- * vencimiento de su reparto (§2, arranque).
+ * vencimiento de su barajado (§2, arranque).
  *
  * @param {{ apuesta: number, entrada: 'corta'|'llena', ritmo: 'normal'|'rapido' }} mesa
  * @param {{ asiento: number, uid: string, nombre?: string }[]} sillas las de la sala
@@ -397,11 +539,14 @@ export function crearPartida({ apuesta, entrada, ritmo }, sillas, ahora) {
   return {
     version: 0,
     ritmo,
-    asientos: compactos.map((a) => ({ ...a, abandonado: false, cobrado: null })),
+    asientos: compactos.map((a) => ({
+      ...a, abandonado: false, cobrado: null, vencidos: 0, enAnuncio: false, sinAnuncio: false,
+    })),
     sorteo,
     motor,
     descarte: nulos(n),
     descartaron: null,
-    vencimiento: en(CLASES.REPARTO_SORTEO, ahora + ESPERA_REPARTO_SORTEO_MS),
+    ultimaAccion: null,
+    vencimiento: en(CLASES.BARAJADO_SORTEO, ahora + ESPERA_BARAJADO_MS),
   }
 }

@@ -19,6 +19,7 @@ export const MOTIVOS_ARBITRO = Object.freeze({
   CARTA_INVALIDA:          'carta_invalida',
   YA_DESCARTO:             'ya_descarto',
   DESCARTE_INVALIDO:       'descarte_invalido',
+  YA_VOLVIO:               'ya_volvio',
 })
 
 export const MOTIVOS = Object.freeze({ ...MOTIVOS_APUESTA, ...MOTIVOS_ARBITRO })

@@ -1,6 +1,6 @@
 // ── MOT-1 1b · El sorteo de la primera Mano ─────────────────────────────────
-// Normativo: contrato §6, «El sorteo». Cada ronda baraja las 40 y reparte 5 a cada
-// asiento que participa; no arrastra nada de la anterior, así que de las no elegidas
+// Normativo: contrato §6, «El sorteo». Cada ronda se abre con su barajado, baraja las
+// 40 y reparte 5 a cada asiento que participa; no arrastra nada de la anterior, así que de las no elegidas
 // no queda ni rastro. Tope: 3 rondas, y en la tercera empatada decide el azar.
 
 import { createDeck, drawRank, shuffleDeck } from '../engine/deck.js'
@@ -9,7 +9,7 @@ export const CARTAS_POR_ASIENTO = 5
 export const TOPE_RONDAS = 3
 
 export const ETAPAS = Object.freeze({
-  REPARTO: 'reparto', ELECCION: 'eleccion', VOLTEO: 'volteo', CERRADO: 'cerrado',
+  BARAJADO: 'barajado', REPARTO: 'reparto', ELECCION: 'eleccion', VOLTEO: 'volteo', CERRADO: 'cerrado',
 })
 
 // `cartas` y `elecciones` son listas por asiento, con `null` en quien no participa:
@@ -22,7 +22,7 @@ export function abrirRonda(numAsientos, ronda, participan, rondas = []) {
   })
   return {
     ronda,
-    etapa: ETAPAS.REPARTO,
+    etapa: ETAPAS.BARAJADO,
     participan,
     cartas,
     elecciones: Array(numAsientos).fill(null),
@@ -38,6 +38,7 @@ export const eligieronTodos = (sorteo) => sorteo.participan.every((a) => sorteo.
 export function voltear(sorteo) {
   const volteo = sorteo.participan.map((asiento) => ({
     asiento,
+    posicion: sorteo.elecciones[asiento] ?? 0,
     carta: sorteo.cartas[asiento][sorteo.elecciones[asiento] ?? 0],
   }))
   const mejor = Math.max(...volteo.map(({ carta }) => drawRank(carta.value)))

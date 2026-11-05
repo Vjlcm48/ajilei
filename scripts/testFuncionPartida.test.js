@@ -91,7 +91,9 @@ function montar({ n = 2, sala = SALA, sillas = SILLAS.slice(0, n), sinPartida = 
       headers: { Authorization: `Bearer uid:${uid}` },
       body: JSON.stringify({ mesa: MESA, ...cuerpo }),
     }))
-    return { status: r.status, ...(await r.json()) }
+    const { ahora, ...respuesta } = await r.json()
+    expect(ahora).toBe(b.hora)
+    return { status: r.status, ...respuesta }
   }
   // Pone una partida en la base sin pasar por la función.
   if (!sinPartida && sala?.estado === 'activa') {
@@ -108,6 +110,9 @@ async function hasta(m, llego, uid = 'A') {
     m.b.hora = Math.max(m.b.hora, m.b.fila.estado.vencimiento.hora)
     const r = await m.pedir(uid, { version: m.b.fila.version, accion: 'reclamar_vencimiento' })
     expect(r.ok).toBe(true)
+    // Avanzar por reloj no debe abandonar a nadie: estas pruebas no van de la ausencia.
+    const { estado } = m.b.fila
+    m.b.fila.estado = { ...estado, asientos: estado.asientos.map((a) => ({ ...a, vencidos: 0 })) }
   }
   expect(llego(m.b.fila.estado)).toBe(true)
   m.b.guardados.length = 0
@@ -135,7 +140,7 @@ describe('MOT-1 1e · regla 1: sin token o con token inválido', () => {
       method: 'POST', headers, body: JSON.stringify({ mesa: MESA, version: 0, accion: 'apostar' }),
     }))
     expect(r.status).toBe(401)
-    expect(await r.json()).toEqual({ ok: false, motivo: 'no_autenticado', version: null })
+    expect(await r.json()).toEqual({ ok: false, motivo: 'no_autenticado', version: null, ahora: expect.any(Number) })
     expect(m.rpc).not.toHaveBeenCalled()
     expect(m.leerSala).not.toHaveBeenCalled()
   })
@@ -197,7 +202,7 @@ describe('MOT-1 1e · el verificador, con jose de verdad', () => {
     const manejar = crearManejador({ verificarToken, registrar: (...c) => registros.push(c.join(' ')) })
     const r = await manejar(new Request('https://x/partida', { method: 'POST', headers: { Authorization: 'Bearer cualquiera' }, body: '{}' }))
     expect(r.status).toBe(500)
-    expect(await r.json()).toEqual({ ok: false, motivo: 'servidor', version: null })
+    expect(await r.json()).toEqual({ ok: false, motivo: 'servidor', version: null, ahora: expect.any(Number) })
     expect(registros.join()).toMatch(/SUPABASE_JWKS|JSON/)
   })
 
@@ -512,6 +517,8 @@ describe('MOT-1 1e · regla 5: una acción válida', () => {
 
   it('el azar se fija en cada jugada, justo antes del árbitro', async () => {
     const azar = vi.fn(semilla(5))
+    // Con esta semilla la primera ronda no empata: un empate abriría otra en vez de cerrar.
+    setRng(semilla(1))
     const m = montar({ azar })
     await hasta(m, (e) => e.vencimiento?.clase === CLASES.VOLTEO_SORTEO)
     azar.mockClear()
@@ -584,6 +591,28 @@ describe('MOT-1 1e · regla 7: `version_vieja`', () => {
     const r = await m.pedir('A', { version: leida, accion: 'descartar', mano, indices: [] })
     expect(r).toEqual({ status: 200, ok: true, version: leida + 2 })
     expect(m.b.fila.estado.descarte.slice(0, 2)).toEqual([[], [0]])
+  })
+
+  it('dos vuelven del anuncio a la vez: se relee y el segundo acierta', async () => {
+    const m = montar({ n: 3 })
+    const estado = m.b.fila.estado
+    const mano = 5
+    m.b.fila = {
+      version: 40,
+      estado: {
+        ...estado,
+        version: 40,
+        sorteo: { ...estado.sorteo, etapa: ETAPAS.CERRADO },
+        motor: { ...estado.motor, handCount: mano, phase: 'PAYOUT' },
+        asientos: estado.asientos.map((a) => ({ ...a, enAnuncio: true })),
+        vencimiento: { clase: CLASES.PAUSA_ANUNCIO, hora: m.b.hora + 45000 },
+      },
+    }
+    m.b.alGuardar = async () => { await m.pedir('B', { version: 40, accion: 'volver_anuncio', mano }) }
+    const r = await m.pedir('A', { version: 40, accion: 'volver_anuncio', mano })
+    expect(r).toEqual({ status: 200, ok: true, version: 42 })
+    expect(m.b.fila.estado.asientos.map((a) => a.enAnuncio)).toEqual([false, false, true])
+    expect(m.b.fila.estado.vencimiento.clase).toBe(CLASES.PAUSA_ANUNCIO)
   })
 
   it('si al releer la ronda ya no está abierta, rechaza con `fase` y no guarda', async () => {
@@ -821,7 +850,7 @@ describe('MOT-1 1e · regla 10: el `OPTIONS` del navegador', () => {
     const m = montar()
     const r = await m.manejar(new Request('https://x/partida'))
     expect(r.status).toBe(405)
-    expect(await r.json()).toEqual({ ok: false, motivo: 'metodo', version: null })
+    expect(await r.json()).toEqual({ ok: false, motivo: 'metodo', version: null, ahora: expect.any(Number) })
   })
 })
 
