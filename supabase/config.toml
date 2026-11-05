@@ -34,3 +34,8 @@ project_id = "ajilei"
 # del proyecto (sb_publishable_ / sb_secret_), como ya midió la sonda de MOT-1.
 [functions.eliminar_cuenta]
 verify_jwt = false
+
+# MOT-1 1e · La Edge Function `partida` verifica el token ella misma, en local y contra
+# `SUPABASE_JWKS`.
+[functions.partida]
+verify_jwt = false
