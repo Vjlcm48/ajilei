@@ -60,6 +60,7 @@
   (descarte por asiento), bajo la autorización de K-1, **y para corregir el comentario
   de `:193-197`** (heredado de VOZ-3, ya autorizado), y re-medirá su fila en ese
   mismo commit (§5). Cualquier otro cambio en ese archivo necesita autorización aparte.
+- **Corrección sin versión (2026-11-05):** MES-PvP, sub-tanda 0. La fila E-4 de la §7.1 decía que el pozo deja de ser escalar: sigue siendo un entero y las capas se derivan (Reglas v1.5 §4.3).
 - **Alcance:** qué archivos del árbol no se abren sin autorización explícita,
   con qué autoridad, y qué hace un agente cuando una tanda parece exigirlo.
 
@@ -314,7 +315,7 @@ fichas rectoras no viven en el repositorio—.
 | 1b-ii | lector de la unidad por defecto (`:20`) | renombre §3.1 `betting.entrada` → `betting.unidadPorDefecto` | ficha 1b §3.1 |
 | 1b-ii | `makePlayer` | **E-2** · §4.3 (`allIn` propio), §4.2 (`contribMano`) | ficha 1b §3 |
 | 1b-ii | `createInitialState` | **E-3** · §2.2/§2.3 — fichas por asiento | ficha 1b §3 |
-| 1b-ii | estado base / `pot` | **E-4** · §4.2 — el pozo deja de ser escalar | forma decidida por el rector antes de 1b |
+| 1b-ii | estado base / `pot` | **E-4** · §4.2 — el pozo sigue siendo un entero (`state.pot`) y las capas no se guardan: las deriva `pozos.capasDe` (Reglas v1.5 §4.3) | forma decidida por el rector antes de 1b |
 | 1b-ii | `isRoundOver`, `nextActiveIndex`, `primerTurno` | **E-5/E-6** · §4.3 — saltar también a `allIn` | ficha 1b §3 |
 | 1b-ii | `resolveWinner`, `doShowdown` | **E-7/E-8** · §4.2 — reparto por capas con elegibles | ficha 1b §3 |
 | 1b-ii | `advanceBettingPhase` y el reset de `applyDiscard` | **E-9** · §4.2 — `contrib` a cero, `contribMano` intacto | ficha 1b §3 |

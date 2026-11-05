@@ -21,8 +21,8 @@
 //
 // LAS LLAVES las inyecta Supabase en toda función: no hay secreto que poner a
 // mano. El proyecto usa las llaves nuevas (`sb_publishable_` / `sb_secret_`);
-// se prueban las legadas y las nuevas, como en la sonda de MOT-1 (el patrón
-// `llave()`, `supabase/functions/sonda_mot1/index.ts:33-45`).
+// se prueban las legadas y las nuevas, con el patrón `llave()`, que nació en la
+// sonda de MOT-1, ya borrada.
 //
 // SE DESPLIEGA CON `--no-verify-jwt` (y `verify_jwt = false` en config.toml),
 // como la sonda: la puerta del gateway no sirve con las llaves nuevas, y esta
