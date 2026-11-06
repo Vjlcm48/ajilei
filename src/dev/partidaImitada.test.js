@@ -32,8 +32,15 @@ const ESPERADO = {
   abandono: ['mesa', (v) => rivalAbandono(v) && v.phase === 'BET_1' && v.activePlayerIndex === v.asiento],
   'final-gana': ['final', (v) => v.phase === 'GAME_OVER' && !propio(v).eliminated && propio(v).cobrado > 0],
   'final-pierde': ['final', (v) => v.phase === 'GAME_OVER' && propio(v).eliminated],
-  // MES-PvP 3-A · quien abandona va a su pantalla final en el acto.
-  'final-fuera': ['final', (v) => v.phase !== 'GAME_OVER' && propio(v).abandonado && propio(v).cobrado !== null],
+  // MES-PvP 3-A · quien abandona va a su pantalla final en el acto, siga o no la partida.
+  'final-fuera': ['final', (v) => propio(v).abandonado && (v.players.length === 2
+    ? v.phase === 'GAME_OVER'
+    : v.phase !== 'GAME_OVER' && propio(v).cobrado === null)],
+  'final-negativo': ['final', (v) => v.phase === 'GAME_OVER' && !propio(v).eliminated && propio(v).cobrado < 1500
+    && v.players.every((p, i) => i === v.asiento || p.abandonado) && v.resultado !== null],
+  'final-cero': ['final', (v) => v.phase === 'GAME_OVER' && propio(v).cobrado === 1500 && v.handCount === 0],
+  'final-todas': ['final', (v) => v.phase === 'GAME_OVER' && propio(v).cobrado > 1500
+    && v.players.every((p, i) => i === v.asiento || (p.eliminated && !p.abandonado))],
   muerta: ['muerta', (v) => v.phase === 'BET_1' && v.activePlayerIndex !== v.asiento],
   'aviso-salida': ['mesa', (v) => clase(v) === 'aviso_salida' && v.players.some((p, i) => i !== v.asiento && p.eliminated) && v.players.filter((p) => !p.eliminated).length >= 2],
 }
@@ -41,11 +48,10 @@ const ESPERADO = {
 const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
 
 describe('MES-PvP 2 · las escenas', () => {
-  it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, y `descarte-propio` (MES-PvP 3)', () => {
+  it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, `descarte-propio` (MES-PvP 3) y los tres fines de la 3-A', () => {
     expect([...ESCENAS_PVP].sort()).toEqual(Object.keys(ESPERADO).sort())
-    expect(ESCENAS_PVP).toHaveLength(22)
+    expect(ESCENAS_PVP).toHaveLength(25)
     expect(mesasDe('abandono')).toEqual([3, 4, 5])
-    expect(mesasDe('final-fuera')).toEqual([3, 4, 5])
     expect(mesasDe('aviso-salida')).toEqual([3, 4, 5])
     expect(mesasDe('sorteo-empate-3')).toEqual([3, 4, 5])
     expect(mesasDe('turno-propio')).toEqual([2, 3, 4, 5])

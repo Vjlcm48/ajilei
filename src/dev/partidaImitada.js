@@ -209,6 +209,34 @@ const ESCENAS = {
       pide(m, m.otro, 'abandonar')
     },
   },
+  // MES-PvP 3-A · el caso de Victor: el propio va perdiendo (1.000 menos, que tiene el otro) y
+  // los rivales abandonan en el descarte. Fin con resultado negativo, y con el pago de la mano.
+  'final-negativo': {
+    jugar: (m) => {
+      pila(m, m.yo, m.e.motor.players[m.yo].chips - 1000)
+      pila(m, m.otro, m.e.motor.players[m.otro].chips + 1000)
+      hasta(m, (e) => e.motor.phase === PHASES.DISCARD && e.vencimiento?.clase === CLASES.DESCARTE)
+      m.e.asientos.forEach((_a, i) => { if (i !== m.yo) pide(m, i, 'abandonar') })
+      exige(partidaTerminada(m.e))
+    },
+  },
+  // MES-PvP 3-A · los rivales abandonan en el sorteo: nadie puso nada, resultado cero.
+  'final-cero': {
+    jugar: (m) => {
+      m.e.asientos.forEach((_a, i) => { if (i !== m.yo) pide(m, i, 'abandonar') })
+      exige(partidaTerminada(m.e))
+    },
+  },
+  // MES-PvP 3-A · todos los rivales entran con una sola apuesta, van all-in con el ante y
+  // pierden contra el propio: «todas las fichas», el único fin con las frases de victoria.
+  'final-todas': {
+    jugar: (m) => {
+      m.e.asientos.forEach((_a, i) => { if (i !== m.yo) pila(m, i, APUESTA) })
+      hasta(m, enPago)
+      exige(m.e.motor.players.every((p, i) => i === m.yo || p.chips === 0))
+      hasta(m, partidaTerminada)
+    },
+  },
   'final-gana': {
     jugar: (m) => {
       hastaPrimeraApuesta(m)
@@ -226,15 +254,12 @@ const ESCENAS = {
       hasta(m, partidaTerminada)
     },
   },
-  // El propio abandona y cobra, con la partida sin terminar. Con dos no cabe: desde
-  // MES-PvP 3-A la partida terminaría (R2).
+  // El propio abandona con la mano en curso. En la mesa de 2 la partida termina; en las
+  // demás sigue sin él (MES-PvP 3-A). Llega ya abandonado: es quien vuelve, y va al lobby.
   'final-fuera': {
-    minimo: 3,
     jugar: (m) => {
       hastaPrimeraApuesta(m)
       pide(m, m.yo, 'abandonar')
-      hasta(m, (e) => e.asientos[m.yo].cobrado !== null)
-      exige(!partidaTerminada(m.e))
     },
   },
   muerta: {

@@ -16,6 +16,8 @@
 // resultado), `.opp-name` y `.ai-name`, en 412×915 y 915×412.
 // Y la reposición hecha desde la mesa (cierre de la 3, hallazgo 5): se marcan dos cartas, se
 // descarta, la mesa repone, y ninguna carta queda levantada. Capturas en `capturas-dsk/`.
+// MES-PvP 3-A · los fines (Reglas v1.7 §8.3): tono y frase de cada uno, sin lluvia si no es
+// positivo, y la salida en vivo, que va a la pantalla final propia. Capturas en 412×915.
 
 import { mkdirSync } from 'node:fs'
 import { PISO_WCAG, TEXTOS, fotosTinta, peorFondo } from '../arnes/tinta.mjs'
@@ -201,13 +203,14 @@ const PANTALLA_DE = (escena) => (
       // Llega con el asiento propio ya abandonado: es quien vuelve, y va al lobby (§3.3).
       : escena === 'final-fuera' ? '.lob-nav-tienda'
         : escena === 'muerta' ? '[data-pvp="muerta"]'
-          : escena === 'final-gana' ? '.cel-pantalla, [class*="cel-"]'
-            : escena === 'final-pierde' ? '.game-over-screen'
+          : ['final-gana', 'final-todas'].includes(escena) ? '.cel-screen'
+            : ['final-pierde', 'final-negativo', 'final-cero'].includes(escena) ? '.game-over-screen'
               : '[data-clavada="0"]'
 )
 const ESCENAS = ['sorteo-baraja', 'sorteo-oleadas', 'sorteo-eleccion', 'sorteo-empate-2', 'sorteo-empate-3', 'sorteo-azar',
   'turno-propio', 'turno-ajeno', 'descarte-espera', 'reposicion', 'revelacion', 'retirada', 'anuncio-yo', 'anuncio-vuelta',
-  'ausente', 'abandono', 'aviso-salida', 'final-gana', 'final-pierde', 'final-fuera', 'muerta', 'descarte-propio']
+  'ausente', 'abandono', 'aviso-salida', 'final-gana', 'final-pierde', 'final-fuera', 'muerta', 'descarte-propio',
+  'final-negativo', 'final-cero', 'final-todas']
 
 async function escenas(browser, base) {
   const out = []
@@ -227,21 +230,86 @@ async function escenas(browser, base) {
     }
     await page.context().close()
   }
-  // Y la salida con la mesa viva, de verdad: ✕, «Dejar la mesa», y su pantalla.
+  // Y la salida con la mesa viva, de verdad: ✕, «Dejar la mesa», y su pantalla final, en el
+  // acto (MES-PvP 3-A): «Saliste de la mesa», sobria (se va con 1.400 de 1.500), y no cambia
+  // cuando la mano sigue sin él.
   const page = await abrir(browser, VIEWPORTS[0])
   try {
+    mkdirSync(OUT_DIR, { recursive: true })
     await aEscena(page, base, { escena: 'turno-propio', n: 3, asiento: 1 })
     await page.click('.btn-leave')
     const aviso = await page.textContent('.leave-modal-sub')
     await page.click('.leave-modal-actions .btn-fold')
-    const pantalla = await page.waitForSelector('[data-pvp="fuera"]', { timeout: 8000 }).then(() => true, () => false)
-    const texto = pantalla ? (await page.textContent('[data-pvp="fuera"]')).trim() : null
-    out.push({ escena: 'abandonar-en-vivo', aviso, texto, ok: pantalla && /abandonado/.test(aviso) })
+    const pantalla = await page.waitForSelector('.game-over-screen [data-caso="1"]', { timeout: 8000 }).then(() => true, () => false)
+    const leer = () => page.evaluate(MEDIR_FIN)
+    const fin = pantalla ? await leer() : null
+    for (let k = 0; k < 6; k++) await page.evaluate(() => window.__pvpImitada.avanzar())
+    await page.waitForTimeout(400)
+    const despues = pantalla ? await leer() : null
+    await page.screenshot({ path: `${OUT_DIR}/pvp_fin_propio_412x915.png` })
+    const igual = JSON.stringify(fin) === JSON.stringify(despues)
+    out.push({
+      escena: 'abandonar-en-vivo', aviso, fin, igual,
+      ok: pantalla && /abandonado/.test(aviso) && fin.frase === 'Saliste de la mesa' && fin.tono === 'sobrio' && !fin.lluvia && igual,
+    })
   } catch (e) {
     out.push({ escena: 'abandonar-en-vivo', ok: false, error: String(e?.message || e).slice(0, 160) })
   }
   await page.context().close()
   out.push(await reposicionDesdeMesa(browser, base))
+  out.push(...await fines(browser, base))
+  return out
+}
+
+// ── MES-PvP 3-A · Los fines, en 412×915 y en la mesa de 2 (Reglas v1.7 §8.3) ─────────────
+// El tono por el signo (celebración con lluvia; neutro y sobrio, sin ella y en la pantalla de
+// fin, la cifra en rojo solo si es negativa) y la frase por cómo terminó.
+const MEDIR_FIN = () => {
+  const cel = document.querySelector('.cel-screen')
+  const msg = document.querySelector('.game-over-screen .game-over-msg')
+  const cifra = document.querySelector('.pvp-fin-cifra')
+  return {
+    pantalla: cel ? 'victoria' : msg ? 'fin' : null,
+    tono: cifra?.dataset.tono ?? (cel ? 'celebracion' : null),
+    caso: msg?.dataset.caso ?? null,
+    frase: (cel?.querySelector('.cel-frase') ?? msg)?.textContent.trim() ?? null,
+    cifra: cifra?.textContent.trim() ?? null,
+    color: cifra ? getComputedStyle(cifra).color : null,
+    lluvia: !!document.querySelector('.cel-lluvia'),
+  }
+}
+const ROJO_PERDIDA = 'rgb(239, 83, 80)'   // --lose-red
+const SELECTOR_LLUVIA = '.cel-lluvia'
+const FINES = [
+  // escena, captura, lo que debe dar
+  ['final-negativo', 'pvp_fin_negativo_412x915.png', (f) => f.pantalla === 'fin' && f.tono === 'sobrio' && f.caso === '3'
+    && f.frase === 'Te quedaste solo: Beto abandonó la mesa' && /^−/.test(f.cifra) && f.color === ROJO_PERDIDA && !f.lluvia],
+  ['final-gana', 'pvp_fin_positivo_412x915.png', (f) => f.pantalla === 'victoria' && f.frase === 'Te quedaste solo: Beto abandonó la mesa' && f.lluvia],
+  ['final-cero', 'pvp_fin_cero_412x915.png', (f) => f.pantalla === 'fin' && f.tono === 'neutro' && f.cifra === '0 Heptacoins'
+    && f.color !== ROJO_PERDIDA && !f.lluvia],
+  ['final-pierde', null, (f) => f.pantalla === 'fin' && f.caso === '2' && f.frase === 'Te quedaste sin fichas' && f.tono === 'sobrio' && !f.lluvia],
+  ['final-todas', null, (f) => f.pantalla === 'victoria' && !/abandonó|solo|Saliste/.test(f.frase) && f.lluvia],
+]
+async function fines(browser, base) {
+  const out = []
+  mkdirSync(OUT_DIR, { recursive: true })
+  for (const [escena, shot, cumple] of FINES) {
+    const page = await abrir(browser, VIEWPORTS[0])
+    try {
+      await page.goto(`${base}/?pvp=${escena}&n=2&asiento=0`, { waitUntil: 'networkidle' })
+      await page.waitForSelector('.cel-screen, .game-over-screen', { timeout: 15000 })
+      // La celebración pasa a `fiesta` tras el toc-toc: la lluvia llega a los pocos segundos.
+      const celebra = escena === 'final-gana' || escena === 'final-todas'
+      if (celebra) await page.waitForSelector(SELECTOR_LLUVIA, { timeout: 12000 }).catch(() => {})
+      else await page.waitForTimeout(1500)
+      const f = await page.evaluate(MEDIR_FIN)
+      if (shot) await page.screenshot({ path: `${OUT_DIR}/${shot}` })
+      out.push({ escena: `fin·${escena}`, ...f, shot, ok: cumple(f) })
+    } catch (e) {
+      out.push({ escena: `fin·${escena}`, ok: false, error: String(e?.message || e).slice(0, 160) })
+    }
+    await page.context().close()
+  }
   return out
 }
 
