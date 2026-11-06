@@ -22,7 +22,7 @@ import reversoUrl from '../assets/cards/reverso_carta_mesa.svg?no-inline'
 //
 // Lo que la escena decide (`mesaPvPCore.escenaDe`):
 //   arrancando · sorteo · mesa · anuncio (la mesa, con su capa encima) · final (la mesa) ·
-//   fuera (quien ya no juega y la mesa sigue) · muerta.
+//   muerta. Quien ya no juega (abandonó o quebró) va a `final` en el acto (MES-PvP 3-A).
 //
 // El árbitro imitado (`?pvp=<escena>`) entra solo con la puerta doble DEV + bypass, y por un
 // `import()` dentro de ella: en producción la rama es falsa y el módulo no se empaqueta.
@@ -157,11 +157,11 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   useEffect(() => { cargarMesa().catch(() => {}) }, [])
 
   // §3.3 · quien vuelve a una partida en la que ya abandonó no tiene nada que ver: al lobby.
-  // Solo en la primera lectura; si abandona aquí, ve su pantalla de salida.
+  // Solo en la primera lectura; si abandona aquí, ve su pantalla final (MES-PvP 3-A).
   const primera = useRef(true)
   useEffect(() => {
     if (!game) return
-    if (primera.current && escena === 'fuera' && game.players[0].abandonado) onLobby?.()
+    if (primera.current && escena === 'final' && game.players[0].abandonado) onLobby?.()
     primera.current = false
   }, [game, escena, onLobby])
 
@@ -197,13 +197,6 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   }
   if (escena === 'muerta') {
     return <Traje sala={sala} t={t}><Aviso texto={t('pvp.muerta')} onLobby={onLobby} t={t} pvp="muerta" /></Traje>
-  }
-  if (escena === 'fuera') {
-    const cobrado = game.players[0].cobrado
-    const texto = cobrado === null
-      ? t('pvp.fuera.cobrando')
-      : cobrado > 0 ? t('pvp.fuera.cobrado', { hc: montoTexto(cobrado) }) : t('pvp.fuera.sin')
-    return <Traje sala={sala} t={t}><Aviso texto={texto} onLobby={onLobby} t={t} pvp="fuera" /></Traje>
   }
 
   // mesa · anuncio · final: la misma mesa, montada una sola vez.

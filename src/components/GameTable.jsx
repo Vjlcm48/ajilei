@@ -986,9 +986,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // CEL-1 · La condición que decidía inline si montaba la tarjeta, con nombre:
   // ahora decide una PANTALLA entera, y una condición sin nombre repetida en un
   // ternario de dos ramas se lee peor. Misma llamada, mismo decisor sellado.
-  const esVictoriaDeMesa = isGameOver && decideCelebracion({
-    phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN,
-  }) === 'partida'
+  // MES-PvP 3-A · contra personas, ganar la mesa no lo decide quien queda en pie: la
+  // celebración la pone el signo del resultado (Reglas v1.7 §8.3, `vozHumanos.finDePartida`).
+  const finPvP = partida ? partida.fin : null
+  const esVictoriaDeMesa = isGameOver && (partida
+    ? finPvP?.tono === 'celebracion'
+    : decideCelebracion({
+      phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN,
+    }) === 'partida')
 
   // ── ECO-1c · C8 · «SALDO ACTUAL» ES EL SALDO REAL ─────────────────────────
   // La mesa ganada no tiene más manos: se cobra AL ENTRAR en la celebración, no
@@ -1140,8 +1145,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const tocPartidaRef = useRef(null)
   const precedenteToc = useCallback(() => tocPartidaRef.current, [])
   useEffect(() => {
-    if (phase !== PHASES.GAME_OVER) return
-    if (decideCelebracion({ phase, winner: game.winner, humanCards: human.cards, ruleN: game.handRules.ruleN }) !== 'partida') return
+    // MES-PvP 3-A · la misma condición que la pantalla: contra las IAS es la de siempre.
+    if (!esVictoriaDeMesa) return
     tocPartidaRef.current = play('tableKnock') ?? { mudo: true }
   }, [phase]) // eslint-disable-line
 
@@ -2528,6 +2533,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               onLeave={salir}
               listoRanking={listoRanking}
               abrirRanking={abrirRanking}
+              frase={finPvP?.frase ?? null}
             />
             {/* RNK-1d · tu tarjeta, sin `onNoHay`: si el banco no te tiene, las
                 líneas dicen «No se pudo cargar el ranking.» y la tarjeta se queda. */}
@@ -2549,12 +2555,24 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 Lo que cambia es el tono: el oro de marca queda RESERVADO a la
                 victoria; la derrota pasa a neutro sobrio. Antes las dos se
                 pintaban en el mismo oro, sin consultar winner para nada. */}
-            <p
-              className={`game-over-msg${resultado?.tono === 'neutro' ? ' game-over-msg-neutro' : ''}`}
-              data-tono={resultado?.tono ?? ''}
-            >
-              {resultado ? resultado.texto : cronica}
-            </p>
+            {/* MES-PvP 3-A · contra personas: la frase por cómo terminó y, debajo, el
+                resultado, en rojo si es negativo (Reglas v1.7 §8.3). Sin lluvia: la lluvia es
+                de `PantallaVictoria`. Forma mínima hasta la lámina L-M. */}
+            {finPvP ? (
+              <>
+                <p className="game-over-msg game-over-msg-neutro" data-tono={finPvP.tono} data-caso={finPvP.caso}>
+                  {finPvP.frase}
+                </p>
+                <p className="pvp-fin-cifra" data-tono={finPvP.tono}>{finPvP.cifra}</p>
+              </>
+            ) : (
+              <p
+                className={`game-over-msg${resultado?.tono === 'neutro' ? ' game-over-msg-neutro' : ''}`}
+                data-tono={resultado?.tono ?? ''}
+              >
+                {resultado ? resultado.texto : cronica}
+              </p>
+            )}
             <SoundButton className="btn btn-primary" onClick={salir}>Salir de la mesa</SoundButton>
           </div>
           )

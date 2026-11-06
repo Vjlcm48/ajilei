@@ -6,7 +6,10 @@ import { PHASES } from '../engine/gameEngine'
 import { VOZ, componeCapas } from './cronicaCore'
 import { lecturaDeMano, resultadoDeMano } from './manoCore'
 import { composeResultado } from './resultadoCore'
-import { cronicaDe, faseHumanos, fraseDeAccion, listaDeNombres, sonidoDe } from './vozHumanos'
+import {
+  TONOS_FIN, avisoDeAbandono, cronicaDe, faseHumanos, finDePartida, fraseDeAccion, listaDeNombres, nuevosAbandonos, sonidoDe,
+} from './vozHumanos'
+import { FRASES_VICTORIA } from '../config/frasesVictoria'
 
 const NOMBRES = ['Yo', 'Ana', 'Beto', 'Caro', 'Dani']
 const mesa = (n, extra = {}) => ({
@@ -238,5 +241,86 @@ describe('MES-PvP 3 · alguien deja la mesa', () => {
     expect(listaDeNombres(['Juan'])).toBe('Juan')
     expect(listaDeNombres(['Juan', 'Ana'])).toBe('Juan y Ana')
     expect(listaDeNombres(['Juan', 'Ana', 'María'])).toBe('Juan, Ana y María')
+  })
+})
+
+// ── MES-PvP 3-A · El abandono y la pantalla final (Reglas v1.7 §8.2 y §8.3) ───────────
+describe('MES-PvP 3-A · la pantalla final: el tono por el resultado, la frase por cómo terminó', () => {
+  // En el fin, `chips` es lo cobrado (`vistaAMesa`). Entrada corta de mesa 100: 1.500.
+  const fin = (yo, rivales) => mesa(1 + rivales.length, {
+    phase: PHASES.GAME_OVER,
+    players: [{ name: 'Yo', chips: 1500, entrada: 1500, abandonado: false, eliminated: false, ...yo },
+      ...rivales.map((r, k) => ({ name: NOMBRES[k + 1], chips: 0, entrada: 1500, abandonado: false, eliminated: true, ...r }))],
+  })
+  const SE_FUE = { abandonado: true }
+  const QUEBRO = {}
+
+  it.each([
+    // caso, quien mira, rivales, cobrado → tono, frase
+    [1, { abandonado: true, eliminated: true }, [{ eliminated: false }], 1800, TONOS_FIN.CELEBRACION, 'Saliste de la mesa'],
+    [1, { abandonado: true, eliminated: true }, [{ eliminated: false }], 1500, TONOS_FIN.NEUTRO, 'Saliste de la mesa'],
+    [1, { abandonado: true, eliminated: true }, [{ eliminated: false }], 200, TONOS_FIN.SOBRIO, 'Saliste de la mesa'],
+    [2, { eliminated: true }, [{ eliminated: false }], 0, TONOS_FIN.SOBRIO, 'Te quedaste sin fichas'],
+    [2, { eliminated: true }, [{ eliminated: false }, SE_FUE], 40, TONOS_FIN.SOBRIO, 'Te quedaste sin fichas'],
+    [3, {}, [SE_FUE], 200, TONOS_FIN.SOBRIO, 'Te quedaste solo: Ana abandonó la mesa'],
+    [3, {}, [SE_FUE], 1500, TONOS_FIN.NEUTRO, 'Te quedaste solo: Ana abandonó la mesa'],
+    [3, {}, [QUEBRO, SE_FUE], 2900, TONOS_FIN.CELEBRACION, 'Te quedaste solo: Beto abandonó la mesa'],
+    [4, {}, [SE_FUE, SE_FUE], 1000, TONOS_FIN.SOBRIO, 'Te quedaste solo en la mesa'],
+    [4, {}, [SE_FUE, SE_FUE, QUEBRO], 1500, TONOS_FIN.NEUTRO, 'Te quedaste solo en la mesa'],
+    [4, {}, [SE_FUE, QUEBRO, SE_FUE], 3100, TONOS_FIN.CELEBRACION, 'Te quedaste solo en la mesa'],
+    [5, {}, [QUEBRO, QUEBRO], 4500, TONOS_FIN.CELEBRACION, null],
+  ])('caso %i · %o, %o, cobra %i → %s', (caso, yo, rivales, chips, tono, frase) => {
+    const r = finDePartida(fin({ ...yo, chips }, rivales))
+    expect(r).toMatchObject({ caso, tono, frase })
+  })
+
+  it('el caso 5 deja la frase a las de victoria, que solo se dicen con resultado positivo', () => {
+    const r = finDePartida(fin({ chips: 4500 }, [QUEBRO, QUEBRO]))
+    expect(r.frase).toBe(null)
+    expect(FRASES_VICTORIA).toContain('¡Qué molleja! Arrasaste con la mesa.')
+    // Si no fuera positivo, nunca una de victoria (no se alcanza: quien se queda con todo gana).
+    expect(finDePartida(fin({ chips: 1500 }, [QUEBRO])).frase).toBe('Te quedaste solo en la mesa')
+  })
+
+  it('la cifra: con su signo y su punto de millar', () => {
+    expect(finDePartida(fin({ chips: 200 }, [SE_FUE])).cifra).toBe('−1.300 Heptacoins')
+    expect(finDePartida(fin({ chips: 1500 }, [SE_FUE])).cifra).toBe('0 Heptacoins')
+    expect(finDePartida(fin({ chips: 2800 }, [SE_FUE])).cifra).toBe('+1.300 Heptacoins')
+  })
+
+  it('el caso de Victor: solo, con −1.300, no celebra ni dice «Arrasaste»', () => {
+    const r = finDePartida(fin({ chips: 200 }, [{ ...SE_FUE, name: 'ticotest2022' }]))
+    expect(r.tono).toBe(TONOS_FIN.SOBRIO)
+    expect(r.frase).toBe('Te quedaste solo: ticotest2022 abandonó la mesa')
+    expect(FRASES_VICTORIA).not.toContain(r.frase)
+  })
+})
+
+describe('MES-PvP 3-A · el aviso del abandono, en el óvalo', () => {
+  const con = (abandonos) => mesa(3, { players: mesa(3).players.map((p, i) => ({ ...p, abandonado: abandonos.includes(i) })) })
+
+  it('solo los de esta lectura, y nunca el propio', () => {
+    expect(nuevosAbandonos(con([1]), con([]))).toEqual(['Ana'])
+    expect(nuevosAbandonos(con([1, 2]), con([1]))).toEqual(['Beto'])
+    expect(nuevosAbandonos(con([0, 1]), con([1]))).toEqual([])
+    expect(nuevosAbandonos(con([1]), null)).toEqual([])
+  })
+
+  it('el texto sellado, y el de «la partida termina»', () => {
+    expect(avisoDeAbandono(['Ana'], false)).toBe('Ana abandonó la mesa.')
+    expect(avisoDeAbandono(['Ana'], true)).toBe('Ana abandonó la mesa. La partida termina.')
+    expect(avisoDeAbandono(['Ana', 'Beto'], true)).toBe('Ana y Beto abandonaron la mesa. La partida termina.')
+    expect(avisoDeAbandono([], true)).toBe(null)
+  })
+
+  it('si el abandono cerró la mano, el titular del pago es el aviso, con su tono', () => {
+    const pago = mesa(2, {
+      phase: PHASES.PAYOUT, winner: 0, pot: 0,
+      players: mesa(2).players.map((p, i) => (i === 1 ? { ...p, folded: true, abandonado: true } : { ...p, chips: 1200 })),
+    })
+    const lectura = lecturaDeMano(pago)
+    expect(resultadoDeMano(pago, lectura).texto).not.toContain('abandonó')
+    const conAviso = resultadoDeMano({ ...pago, aviso: 'Ana abandonó la mesa. La partida termina.' }, lectura)
+    expect(conAviso).toEqual({ ...resultadoDeMano(pago, lectura), texto: 'Ana abandonó la mesa. La partida termina.' })
   })
 })

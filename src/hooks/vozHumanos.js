@@ -10,6 +10,7 @@
 // Las frases llevan los verbos que `messageActionKind` (`GameTable.jsx`) busca para el
 // color: «Pasaste» y «Te retiraste» contienen «Pasas» y «Te retiras» a propósito.
 import { montoTexto } from '../config/tapetes'
+import { t } from '../config/textos'
 import { PHASES } from '../engine/gameEngine'
 import { MONEDA, nombreEnVoz } from './cronicaCore'
 import { CLASE_AVISO_SALIDA, CLASE_REPOSICION } from '../lib/partidaCliente'
@@ -103,6 +104,52 @@ export function cronicaDe(game, previa = null, anterior = '') {
   if (!previa || previa.phase !== game.phase || game.phase === PHASES.DISCARD) return linea
   if (nueva) return fraseDeAccion(accion, game)
   return anterior || linea
+}
+
+// ── MES-PvP 3-A · El abandono, en el óvalo (Reglas v1.7 §8.2) ─────────────────
+// Quién abandonó en esta lectura y no en la anterior: dos `game` de `vistaAMesa`, con la
+// misma rotación. Sin lectura anterior no hay aviso: quien llega no vio a nadie irse.
+export function nuevosAbandonos(game, previa) {
+  if (!previa) return []
+  return game.players.flatMap((p, i) => (i !== 0 && p.abandonado && !previa.players[i]?.abandonado ? [p.name] : []))
+}
+
+/** «Ana abandonó la mesa.», y con `termina`, «… La partida termina.». `null` sin nadie. */
+export function avisoDeAbandono(nombres, termina) {
+  if (nombres.length === 0) return null
+  if (nombres.length === 1) return t(termina ? 'pvp.abandono.termina' : 'pvp.abandono.aviso', { nombre: nombres[0] })
+  return t(termina ? 'pvp.abandono.termina.varios' : 'pvp.abandono.aviso.varios', { lista: listaDeNombres(nombres) })
+}
+
+// ── MES-PvP 3-A · La pantalla final (Reglas v1.7 §8.3) ─────────────────────────
+// Cada uno la suya. El TONO lo pone el resultado, `cobrado − entrada` (en el fin,
+// `vistaAMesa` pone lo cobrado en `chips`; quien se fue con la mano en curso aún no cobró, y su
+// pila es la de irse). La FRASE la pone cómo terminó, en este orden. Ganar la mesa no se
+// decide por `winner`: las frases de victoria solo cuando todos los rivales quebraron.
+export const TONOS_FIN = Object.freeze({ CELEBRACION: 'celebracion', NEUTRO: 'neutro', SOBRIO: 'sobrio' })
+
+export function finDePartida(game) {
+  const yo = game.players[0]
+  const neta = yo.chips - yo.entrada
+  const tono = neta > 0 ? TONOS_FIN.CELEBRACION : neta < 0 ? TONOS_FIN.SOBRIO : TONOS_FIN.NEUTRO
+  const fueron = game.players.filter((p, i) => i !== 0 && p.abandonado)
+  let caso
+  if (yo.abandonado) caso = 1
+  else if (yo.eliminated) caso = 2
+  else if (fueron.length === 1) caso = 3
+  else if (fueron.length >= 2) caso = 4
+  else caso = 5
+  // El caso 5 siempre es positivo (se quedó con todo). Si no lo fuera, nunca una frase de
+  // victoria: la del caso 4, que también es cierta.
+  const frase = {
+    1: t('pvp.fin.saliste'),
+    2: t('pvp.fin.sinfichas'),
+    3: t('pvp.fin.solo.uno', { nombre: fueron[0]?.name }),
+    4: t('pvp.fin.solo'),
+    5: tono === TONOS_FIN.CELEBRACION ? null : t('pvp.fin.solo'),
+  }[caso]
+  const cifra = `${neta > 0 ? '+' : neta < 0 ? '−' : ''}${montoTexto(Math.abs(neta))}`
+  return { caso, tono, neta, frase, cifra: t('pvp.fin.resultado', { cifra }) }
 }
 
 // ── El sonido de una jugada ─────────────────────────────────────────────────

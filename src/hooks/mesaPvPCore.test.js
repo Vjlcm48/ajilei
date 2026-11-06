@@ -1,7 +1,8 @@
 // MES-PvP 2 §3 · El controlador de la mesa, con una `partida` doble y relojes falsos, sin
 // `@testing-library`: la receta de la casa para los hooks.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RITMO_RAPIDO, TOPE_RELOJ_MS, creaMesaPvP, escenaDe, relojDe } from './mesaPvPCore'
+import { AVISO_FIN_MS, RITMO_RAPIDO, TOPE_RELOJ_MS, creaMesaPvP, escenaDe, relojDe } from './mesaPvPCore'
+import { MANO_SIGUIENTE_MS } from '../config/esperas'
 
 const asiento = (extra = {}) => ({
   name: 'A', chips: 1000, contrib: 0, contribMano: 100, folded: false, allIn: false, eliminated: false,
@@ -132,8 +133,10 @@ describe('MES-PvP 2 · la escena', () => {
     ['una mano', vista(), false, 'mesa'],
     ['la pausa, en el anuncio', vista({ phase: 'PAYOUT', vencimiento: { clase: 'pausa_anuncio', hora: 1 } }, { enAnuncio: true }), false, 'anuncio'],
     ['la pausa, ya de vuelta', vista({ phase: 'PAYOUT', vencimiento: { clase: 'pausa_anuncio', hora: 1 } }), false, 'mesa'],
-    ['abandonó', vista({}, { abandonado: true }), false, 'fuera'],
-    ['sin fichas con la mesa viva', vista({}, { eliminated: true }), false, 'fuera'],
+    // MES-PvP 3-A · quien ya no juega ve su pantalla final en el acto (antes, `fuera`).
+    ['abandonó', vista({}, { abandonado: true }), false, 'final'],
+    ['sin fichas con la mesa viva', vista({}, { eliminated: true }), false, 'final'],
+    ['abandonó y la mesa murió', vista({}, { abandonado: true }), true, 'final'],
     ['terminó', vista({ phase: 'GAME_OVER' }, { eliminated: true }), false, 'final'],
     ['murió', vista(), true, 'muerta'],
     ['murió y un fin le gana', vista({ phase: 'GAME_OVER' }), true, 'final'],
@@ -229,5 +232,102 @@ describe('MES-PvP 3 · el ritmo escala el reparto', () => {
     expect(montar({ vista: vista() }).nucleo.foto().factorReparto).toBe(factorDe(RITMOS.RAPIDO))
     const normal = creaMesaPvP({ partida: doble({ vista: vista() }), sala: { ...SALA, ritmo: 'normal' } })
     expect(normal.foto().factorReparto).toBe(1)
+  })
+})
+
+// ── MES-PvP 3-A · El fin con un abandono (Reglas v1.7 §8.2 y §8.3) ────────────────────
+// El propio es el asiento 1 de la vista; «B» es el rival. Entrada corta de mesa 100: 1.500.
+describe('MES-PvP 3-A · el fin con un abandono', () => {
+  const rivalSeFue = (extra = {}) => asiento({ name: 'B', abandonado: true, eliminated: true, folded: true, chips: 0, ...extra })
+  // El fin que cierra la mano en la misma jugada: trae el resultado de esa mano.
+  const finConPago = (propio) => vista({
+    version: 2, phase: 'GAME_OVER', vencimiento: null, pot: 0, activePlayerIndex: 0,
+    players: [rivalSeFue({ cobrado: 1200 }), asiento({ chips: 0, ...propio })],
+    resultado: { ganador: 1, ganadoresPorCapa: [1] },
+  })
+
+  it('quien se queda ve el pago completo, con el aviso, y después su pantalla final', () => {
+    const { nucleo, partida } = montar({ vista: vista() })
+    partida.poner({ vista: finConPago({ cobrado: 1800 }) })
+    let f = nucleo.foto()
+    expect(f.escena).toBe('mesa')
+    expect(f.game.phase).toBe('PAYOUT')
+    expect(f.game.winner).toBe(0)
+    expect(f.game.players[0].chips).toBe(1800)
+    expect(f.cronica).toBe('B abandonó la mesa. La partida termina.')
+    expect(f.game.aviso).toBe('B abandonó la mesa. La partida termina.')
+    vi.advanceTimersByTime(MANO_SIGUIENTE_MS - 300)
+    expect(nucleo.foto().escena).toBe('mesa')
+    vi.advanceTimersByTime(600)
+    f = nucleo.foto()
+    expect(f.escena).toBe('final')
+    expect(f.game.phase).toBe('GAME_OVER')
+    expect(f.fin).toMatchObject({ caso: 3, tono: 'celebracion', frase: 'Te quedaste solo: B abandonó la mesa', cifra: '+300 Heptacoins' })
+    nucleo.parar()
+  })
+
+  it('el caso de Victor: el pago, y una pantalla sobria con la frase del caso 3', () => {
+    const { nucleo, partida } = montar({ vista: vista({ phase: 'DISCARD', vencimiento: { clase: 'descarte', hora: 20_000 } }) })
+    partida.poner({ vista: finConPago({ cobrado: 200 }) })
+    vi.advanceTimersByTime(MANO_SIGUIENTE_MS + 300)
+    expect(nucleo.foto().fin).toMatchObject({ caso: 3, tono: 'sobrio', cifra: '−1.300 Heptacoins' })
+    nucleo.parar()
+  })
+
+  it('si el pago ya estaba en la mesa, se deja terminar; sin pozo, el aviso y unos segundos', () => {
+    const enPago = vista({ phase: 'PAYOUT', vencimiento: { clase: 'mano_siguiente', hora: 1500 }, resultado: { ganador: 1, ganadoresPorCapa: [1] } })
+    const b = montar({ vista: enPago })
+    b.partida.poner({ vista: finConPago({ cobrado: 1800 }) })
+    expect(b.nucleo.foto().game.phase).toBe('PAYOUT')
+    expect(b.nucleo.foto().game.aviso).toBe('B abandonó la mesa. La partida termina.')
+    vi.advanceTimersByTime(1500 + 300)
+    expect(b.nucleo.foto().escena).toBe('final')
+    b.nucleo.parar()
+
+    vi.setSystemTime(0)
+    const pausa = vista({ phase: 'PAYOUT', vencimiento: { clase: 'pausa_anuncio', hora: 45_000 }, resultado: { ganador: 1, ganadoresPorCapa: [1] } })
+    const c = montar({ vista: pausa })
+    c.partida.poner({ vista: { ...finConPago({ cobrado: 1600 }), resultado: null } })
+    expect(c.nucleo.foto().cronica).toBe('B abandonó la mesa. La partida termina.')
+    vi.advanceTimersByTime(AVISO_FIN_MS + 300)
+    expect(c.nucleo.foto().escena).toBe('final')
+    c.nucleo.parar()
+  })
+
+  it('sin lectura anterior, o sin abandono, el fin va directo', () => {
+    const { nucleo } = montar({ vista: finConPago({ cobrado: 1800 }) })
+    expect(nucleo.foto().escena).toBe('final')
+    nucleo.parar()
+    const quiebra = montar({ vista: vista({ phase: 'PAYOUT', vencimiento: { clase: 'mano_siguiente', hora: 0 }, resultado: { ganador: 1, ganadoresPorCapa: [1] } }) })
+    quiebra.partida.poner({ vista: vista({ version: 2, phase: 'GAME_OVER', vencimiento: null, players: [asiento({ name: 'B', eliminated: true, cobrado: 0 }), asiento({ cobrado: 3000 })] }) })
+    expect(quiebra.nucleo.foto().escena).toBe('final')
+    expect(quiebra.nucleo.foto().fin).toMatchObject({ caso: 5, tono: 'celebracion', frase: null })
+    quiebra.nucleo.parar()
+  })
+
+  it('quien abandona ve su pantalla final en el acto, que no cambia, y nunca «B gana la mesa»', () => {
+    const { nucleo, partida } = montar({ vista: vista() })
+    // En la mesa de 3 la partida sigue: aún no cobró, y su pila es la de irse.
+    partida.poner({ vista: vista({ version: 2 }, { abandonado: true, folded: true, chips: 1300 }) })
+    const f = nucleo.foto()
+    expect(f.escena).toBe('final')
+    expect(f.game.phase).toBe('GAME_OVER')
+    expect(f.fin).toMatchObject({ caso: 1, tono: 'sobrio', frase: 'Saliste de la mesa', cifra: '−200 Heptacoins' })
+    // Cobra al cerrar la mano, y la partida termina: la pantalla es la misma.
+    partida.poner({ vista: vista({ version: 3, phase: 'GAME_OVER', vencimiento: null, players: [asiento({ name: 'B', cobrado: 1700 }), asiento({ abandonado: true, eliminated: true, chips: 0, cobrado: 1300 })] }) })
+    expect(nucleo.foto().game).toBe(f.game)
+    expect(nucleo.foto().fin).toBe(f.fin)
+    expect(nucleo.foto().escena).toBe('final')
+    nucleo.parar()
+  })
+
+  it('con la partida viva, el aviso va a la crónica y la mano sigue', () => {
+    const tres = (version, b) => vista({ version, players: [asiento({ name: 'B', ...b }), asiento(), asiento({ name: 'C' })] })
+    const { nucleo, partida } = montar({ vista: tres(1, {}) })
+    partida.poner({ vista: tres(2, { abandonado: true, folded: true }) })
+    expect(nucleo.foto().escena).toBe('mesa')
+    expect(nucleo.foto().cronica).toBe('B abandonó la mesa.')
+    expect(nucleo.foto().game.players.find((p) => p.name === 'B').estado.texto).toBe('Abandonó')
+    nucleo.parar()
   })
 })

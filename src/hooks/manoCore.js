@@ -165,5 +165,9 @@ export function resultadoDeMano(state, lectura) {
   }
   if (!lectura) return composeResultado({ ...base, winner: state.winner })
   const r = composeResultado({ ...base, winner: lectura.principal })
-  return r ? { ...r, tono: lectura.tono } : r
+  if (!r) return r
+  // MES-PvP 3-A · contra personas, si un abandono cerró la mano, el titular es el aviso
+  // («Ana abandonó la mesa.»), con el tono de la lectura. Lo pone `mesaPvPCore`; el motor
+  // no tiene `aviso`, así que contra las IAS esta línea no existe.
+  return { ...r, tono: lectura.tono, ...(state.aviso ? { texto: state.aviso } : {}) }
 }

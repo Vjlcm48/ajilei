@@ -331,12 +331,14 @@ export function TarjetaResumen({ sesion, netas, saldo, puntos, numeros = NUMEROS
 // que tiene la API y la cuenta; aquí sólo vive el botón. `listoRanking` dice
 // que llegó `saldoFinal` —el libro ya tiene la última mano (Fase 0 §E.2)—:
 // antes, el botón está en su sitio y con su caja pero apagado (O1).
-export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onLeave, listoRanking = false, abrirRanking }) {
+export function PantallaVictoria({ sesion, netas, saldo, puntos, precedente, onLeave, listoRanking = false, abrirRanking, frase: fraseFija = null }) {
   const { t } = useIdioma()
   // CEL-2c · la frase se sortea al montar y se RECUERDA aparte, desde un efecto:
   // así la que se ve y la que se guarda son siempre la misma, también bajo el
   // doble montaje de StrictMode. Mismo molde que la bolsa de melodías.
-  const [eleccion] = useState(() => frasePara(fraseForzadaCEL()))
+  // MES-PvP 3-A · contra personas puede llegar dada (Reglas v1.7 §8.3, casos 1, 3 y 4): no
+  // se sortea ni se recuerda. Contra las IAS no llega nunca.
+  const [eleccion] = useState(() => (fraseFija ? { indice: null, texto: fraseFija } : frasePara(fraseForzadaCEL())))
   const frase = eleccion.texto
   useEffect(() => { recuerdaFrase(eleccion.indice) }, [eleccion])
   // CEL-2 · El arco. `precedente` es el toc-toc que GameTable ya disparaba al

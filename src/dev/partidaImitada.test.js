@@ -32,7 +32,8 @@ const ESPERADO = {
   abandono: ['mesa', (v) => rivalAbandono(v) && v.phase === 'BET_1' && v.activePlayerIndex === v.asiento],
   'final-gana': ['final', (v) => v.phase === 'GAME_OVER' && !propio(v).eliminated && propio(v).cobrado > 0],
   'final-pierde': ['final', (v) => v.phase === 'GAME_OVER' && propio(v).eliminated],
-  'final-fuera': ['fuera', (v) => v.phase !== 'GAME_OVER' && propio(v).abandonado && propio(v).cobrado !== null],
+  // MES-PvP 3-A · quien abandona va a su pantalla final en el acto.
+  'final-fuera': ['final', (v) => v.phase !== 'GAME_OVER' && propio(v).abandonado && propio(v).cobrado !== null],
   muerta: ['muerta', (v) => v.phase === 'BET_1' && v.activePlayerIndex !== v.asiento],
   'aviso-salida': ['mesa', (v) => clase(v) === 'aviso_salida' && v.players.some((p, i) => i !== v.asiento && p.eliminated) && v.players.filter((p) => !p.eliminated).length >= 2],
 }

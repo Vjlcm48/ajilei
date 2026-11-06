@@ -37,6 +37,7 @@ export const CLASE_ELECCION = 'eleccion_sorteo'
 export const CLASE_BARAJADO = 'barajado'
 export const CLASE_REPOSICION = 'reposicion'
 export const CLASE_AVISO_SALIDA = 'aviso_salida'
+export const CLASE_MANO_SIGUIENTE = 'mano_siguiente'
 
 export const MARGEN_VENCIMIENTO_MS = 300
 export const ESCALON_RECLAMO_MS = 200

@@ -102,3 +102,18 @@
   --cta-w: 240px;
   --u: 4px;
 }
+
+/* ── MES-PvP 3-A · La cifra del fin contra personas (Reglas v1.7 §8.3) ──────────────────
+   Forma mínima hasta la lámina L-M: el resultado debajo de la frase, en la pantalla de fin
+   de la mesa (`.game-over-screen`, cuya hoja es protegida y no se toca). Mismo cuerpo que
+   `.game-over-msg`; en rojo solo si es negativo, con el rojo de las netas negativas de la
+   mesa (`.vc-netas-neg`). */
+.pvp-fin-cifra {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.pvp-fin-cifra[data-tono='sobrio'] { color: var(--lose-red); }

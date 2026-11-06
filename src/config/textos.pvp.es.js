@@ -35,8 +35,18 @@ export const TEXTOS_PVP_ES = {
   'pvp.sorteo.azar.tu':     'Siguen empatados: el azar te elige como Mano',
   'pvp.anuncio.titulo':     'Anuncio',
   'pvp.anuncio.volver':     'Volver a la mesa',
-  'pvp.fuera.cobrado':      'Te llevas {hc} Heptacoins',
-  'pvp.fuera.sin':          'Te quedaste sin Heptacoins',
-  'pvp.fuera.cobrando':     'Cobras tu pila al cerrar la mano',
   'pvp.muerta':             'La mesa se cerró por inactividad. Tu pila volvió a tu saldo',
+
+  // ── MES-PvP 3-A · El abandono y la pantalla final (Reglas v1.7 §8.2 y §8.3) ──
+  // Sellados por Victor: el aviso del óvalo en singular y las cuatro frases del fin. Las dos
+  // formas plurales (varios abandonos en la misma jugada) no están selladas.
+  'pvp.abandono.aviso':          '{nombre} abandonó la mesa.',
+  'pvp.abandono.termina':        '{nombre} abandonó la mesa. La partida termina.',
+  'pvp.abandono.aviso.varios':   '{lista} abandonaron la mesa.',
+  'pvp.abandono.termina.varios': '{lista} abandonaron la mesa. La partida termina.',
+  'pvp.fin.saliste':             'Saliste de la mesa',
+  'pvp.fin.sinfichas':           'Te quedaste sin fichas',
+  'pvp.fin.solo.uno':            'Te quedaste solo: {nombre} abandonó la mesa',
+  'pvp.fin.solo':                'Te quedaste solo en la mesa',
+  'pvp.fin.resultado':           '{cifra} Heptacoins',
 }
