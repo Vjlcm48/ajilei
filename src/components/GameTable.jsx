@@ -329,7 +329,12 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, 
 // `onSaldo`: el saldo que contesta `consultar_mano`, para la billetera de App.
 // TIE-1 1a · `tapetes`: el canal de los tapetes de App (`lib/controlTapetes`);
 // la mesa pone en `<body>` el tapete y el tono en uso. Sin él, el verde.
-export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null, contraIAS = false, apiConsulta = null, onSaldo = null, tapetes = null }) {
+// MES-PvP 3 · `partida`: la mesa contra personas, `null` contra las IAS. Es la foto de
+// `useMesaPvP` (`{ game, cronica, enviar, reloj }`, más `alternarDescarte(i)`), y llega
+// siempre con `game`. Con ella la mesa no mueve el motor: pinta la vista del servidor y
+// manda las jugadas por `enviar`. Cada guarda dice `partida` y, contra las IAS, es falsa:
+// ningún hook cambia de sitio y ninguna tirada cambia (Fase 0 de MES-PvP, §B.1-B.2).
+export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null, contraIAS = false, apiConsulta = null, onSaldo = null, tapetes = null, partida = null }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -351,6 +356,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // presentación — que es como "Apuestas N Heptacoins." se pudo renombrar sin
   // abrir `gameEngine.js`, que está protegido.
   const [motor, setMotor] = useState(() => {
+    // MES-PvP 3 · contra personas no hay motor local: ni mesa que crear ni tirada.
+    if (partida) return { game: null, cronica: '' }
     // CEL-0 · `siembraCEL` es la IDENTIDAD salvo en desarrollo y con `?cel` en
     // la URL; ahí siembra a los rivales sin fichas para que la mesa cierre en
     // el primer "Iniciar mano". No hay rama de render ni condición nueva: lo
@@ -369,8 +376,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const inicial = siembraMesaAPU(siembraCEL(conNivel(createInitialState(stake, lista), nivel)))
     return { game: inicial, cronica: componeCronica(null, inicial) }
   })
-  const game    = motor.game
-  const cronica = motor.cronica
+  const game    = partida ? partida.game : motor.game
+  const cronica = partida ? partida.cronica : motor.cronica
   const setGame = useCallback((arg) => {
     setMotor(m => {
       const next = typeof arg === 'function' ? arg(m.game) : arg
@@ -384,9 +391,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const [discardAnim,  setDiscardAnim]  = useState(null)
   const [discardMsg,   setDiscardMsg]   = useState(null)
   const [lastActions,  setLastActions]  = useState({})
-  const [timeLeft,     setTimeLeft]     = useState(TURN_TIME)
+  const [relojLocal,   setTimeLeft]     = useState(TURN_TIME)
+  // MES-PvP 3 · contra personas el reloj es el del servidor, ya con el desfase corregido.
+  const timeLeft = partida ? (partida.reloj.timeLeft ?? 0) : relojLocal
   const [confirmLeave, setConfirmLeave] = useState(false)
-  const [isShuffling,  setIsShuffling]  = useState(false)
+  const [barajaLocal,  setIsShuffling]  = useState(false)
+  // MES-PvP 3 · contra personas se baraja mientras el servidor espera el barajado.
+  const isShuffling = partida ? partida.game.barajando : barajaLocal
   const [isClearing,   setIsClearing]   = useState(false)
   const [deal3FaceUp,  setDeal3FaceUp]  = useState(new Set())
   const [potAnim,      setPotAnim]      = useState(null)   // Tanda C4.3: pulso + "+N" del pozo
@@ -848,6 +859,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         const t0 = setTimeout(() => revealDeal3(2), 300 * k)
         const t1 = setTimeout(() => revealDeal3(3), 600 * k)
         const t2 = setTimeout(() => revealDeal3(4), 900 * k)
+        // MES-PvP 3 · contra personas el reparto acaba aquí: las cartas quedan como
+        // están y la fase la cambia la vista siguiente, cuando el servidor avance.
+        if (partida) return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
         const t3 = setTimeout(() => {
           setDeal3FaceUp(new Set())
           setDealStep(0)
@@ -855,6 +869,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         }, 2000 * k)
         return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
       }
+      if (partida) return
       const t = setTimeout(() => {
         setDealStep(0)
         setGame(prev => advanceFromDeal(prev))
@@ -883,7 +898,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const toCallEarly          = currentBet - human.contrib
   const isBetPhaseEarly      = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
   const isPlayerTurnEarly    = humanIsTurn && isBetPhaseEarly && !human.folded
-  const isDiscardTimerActive = phase === PHASES.DISCARD && !discardAnim && !human.folded
+  // MES-PvP 3 · contra personas, una vez mandado el descarte se espera a la mesa: sin reloj ni botón.
+  const yaDescarte           = !!partida && game.descarte.yaDescartaron.includes(0)
+  const isDiscardTimerActive = phase === PHASES.DISCARD && !discardAnim && !human.folded && !yaDescarte
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
@@ -901,6 +918,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // de ≤5 ni el auto-pasar de 0 pueden disparar durante la ausencia ni
   // duplicarse al volver: en cualquier instante hay como mucho un timer vivo.
   useEffect(() => {
+    // MES-PvP 3 · contra personas el reloj lo cuenta y lo resuelve el servidor.
+    if (partida) return
     if (congelado) return
     if (!isPlayerTurnEarly && !isDiscardTimerActive) return
     if (timeLeft <= 0) return
@@ -1138,6 +1157,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // `gameRef.current` fresco, así que no hay jugada obsoleta ni doble. Es la
   // propiedad que la Fase 0 verificó en §2.4 y sobre la que se apoya todo esto.
   useEffect(() => {
+    // MES-PvP 3 · contra personas no hay IA: la guarda va antes de `decidirIA`, la tirada.
+    if (partida) return
     if (congelado) return
     const isBet = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
     const active = game.players[game.activePlayerIndex]
@@ -1191,6 +1212,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // guarda de `folded`, así que la continuación diferida es la misma decisión,
   // tomada más tarde y sobre el estado de entonces.
   useEffect(() => {
+    if (partida) return   // MES-PvP 3 · el turno de un retirado lo salta el servidor
     const isBet = phase === PHASES.BET_1 || phase === PHASES.BET_2 || phase === PHASES.BET_3
     if (!isBet) return
     const active = game.players[game.activePlayerIndex]
@@ -1228,6 +1250,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // vez de tras el compás de 1125 ms — y solo en el caso raro de ocultarse
   // dentro de esa ventana, estando el humano retirado.
   useEffect(() => {
+    if (partida) return   // MES-PvP 3 · el descarte de los demás lo aplica el servidor
     if (phase === PHASES.DISCARD && human.folded && !discardAnim) {
       const arranca = () => startDiscardAnim(gameRef.current, [])
       if (congeladoRef.current) { diferir(arranca); return }
@@ -1270,6 +1293,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     // no el timbre.
     if (['apostar', 'igualar', 'subir', 'allIn'].includes(action)) play('coinBet')
     if (action === 'retirarse') play('cardFold')
+    // MES-PvP 3 · contra personas la jugada va al árbitro, con el mismo `k`.
+    if (partida) { partida.enviar('apostar', { tipo: action, k: kElegido }); return }
     // 1e-iii · al motor va el MULTIPLICADOR, no el monto. Es el mismo `k` con
     // el que `filaAcciones` acaba de preguntar si esta acción era legal, así que
     // lo que se aplica y lo que se ofreció no pueden separarse.
@@ -1285,7 +1310,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // Las tres formas salen de UNA función pura, `pideRecarga`, que mira la fase,
   // la pila, el techo de la mesa y el bolsillo. La pantalla no vuelve a decidir
   // nada: pinta lo que esa función dice y cobra por `aplicarRecarga`.
-  const motivoRec  = pideRecarga(game, saldo)
+  // MES-PvP 3 · la recarga es solo contra las IAS (Reglas v1.5 §5).
+  const motivoRec  = partida ? RECARGA.NINGUNA : pideRecarga(game, saldo)
   // REC-2 · la tarjeta ENTERA sale del núcleo: qué caso es (fila, «todo» o sin
   // saldo), qué montos se pintan y cuál nace elegido. El monto elegido es
   // `null` en el caso 3 y nunca 0: aquí no se rellena ningún hueco.
@@ -1628,8 +1654,78 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   }
 
   function handleDiscard() {
+    // MES-PvP 3 · contra personas se mandan los índices con la mano; repone el servidor.
+    if (partida) { partida.enviar('descartar', { mano: game.handCount, indices: [...game.selectedDiscards] }); return }
     startDiscardAnim(game, [...game.selectedDiscards])
   }
+
+  // ── MES-PvP 3 · La reposición en paralelo (P-3) ───────────────────────────
+  // Contra personas el servidor ya repuso: la vista trae las cartas nuevas y cuántas
+  // descartó cada uno, y espera `esperaReposicion` (120 + mayor × 595 + 400 ms) a que
+  // se vea. Todos reponen a la vez y con vuelos cortos: la secuencia de las IAS, asiento
+  // por asiento, no cabe ni con una carta. Salen las cartas de la vista anterior, con su
+  // selección (la nueva ya llega vacía, `vistaAMesa`); de un rival solo se sabe cuántas,
+  // así que salen sus primeras. Al acabar no se toca el
+  // estado: ya es el del servidor. Una carta: 1.100 ms contra 1.115 de espera.
+  function startReposicionPvP(previa, next) {
+    const cuantas = next.descarte.cuantas ?? []
+    const propias = [...previa.selectedDiscards].sort((a, b) => a - b)
+    const indicesDe = (seat) => (seat === 0 && propias.length === (cuantas[0] ?? 0)
+      ? propias
+      : Array.from({ length: cuantas[seat] ?? 0 }, (_, k) => k))
+    const plan = next.players.map((_, seat) => ({ seat, indices: indicesDe(seat) })).filter(p => p.indices.length > 0)
+    if (plan.length === 0) return
+    discardNextRef.current = next
+    refillTimersRef.current.forEach(clearTimeout)
+    refillTimersRef.current = []
+    const allKeys = new Set(plan.flatMap(p => p.indices.map(i => `${p.seat}:${i}`)))
+    setDiscardAnim({ nextGame: next, oldGame: previa, allKeys, emptied: new Set(), refilled: new Set(), revealed: new Set() })
+    const SALE_MS = 250, SALE_PASO = 40, PAUSA = 50, ENTRA_MS = 400, ENTRA_PASO = 120
+    const mayor = Math.max(...plan.map(p => p.indices.length))
+    const entra = (mayor - 1) * SALE_PASO + SALE_MS + PAUSA
+    // Los vuelos son los del descarte (`launchDiscardOut` / `launchDiscardIn`) con su duración;
+    // se crean aquí y no llamándolas: con la llamada, el compilador de `react-hooks` dejaba de
+    // ver el acceso adelantado a `startDiscardAnim` del reloj de turno (STOP-V).
+    const vuela = (seat, idx, sale) => {
+      const slotEl = slotRefs[seat][idx]?.current
+      const deckEl = deckRefs[gameRef.current.pieIndex]?.current
+      if (sale) setDiscardAnim(prev => prev && ({ ...prev, emptied: new Set(prev.emptied).add(`${seat}:${idx}`) }))
+      if (!slotEl || !deckEl) {
+        if (!sale) setDiscardAnim(prev => prev && ({ ...prev, refilled: new Set(prev.refilled).add(`${seat}:${idx}`) }))
+        return
+      }
+      const f = escalaActual()
+      const sr = aPropios(slotEl.getBoundingClientRect(), f)
+      const dr = aPropios(deckEl.getBoundingClientRect(), f)
+      const [desde, hasta] = sale ? [sr, dr] : [dr, sr]
+      play('cardDeal')
+      setFlyingCards(prev => [...prev, {
+        id: `${sale ? 'rout' : 'rin'}-${seat}-${idx}`,
+        fromX: desde.left, fromY: desde.top, toX: hasta.left, toY: hasta.top, w: hasta.width, h: hasta.height,
+        dur: (sale ? SALE_MS : ENTRA_MS) / 1000,
+        ...(sale ? { isDiscardOut: true } : { isDiscardIn: true, seat, slotIdx: idx }),
+      }])
+    }
+    const timers = []
+    plan.forEach(({ seat, indices }) => indices.forEach((idx, k) => {
+      timers.push(setTimeout(() => vuela(seat, idx, true), k * SALE_PASO))
+      timers.push(setTimeout(() => vuela(seat, idx, false), entra + k * ENTRA_PASO))
+    }))
+    const propio = plan.some(p => p.seat === 0)
+    timers.push(setTimeout(() => setDiscardAnim(null), entra + (mayor - 1) * ENTRA_PASO + ENTRA_MS + (propio ? 350 : 0) + 50))
+    discardTimersRef.current = timers
+  }
+
+  // La vista anterior, para saber qué cartas salen y cuándo empieza la reposición. Aquí
+  // se fija también el ritmo de la mesa, que escala el reparto como «Partida rápida».
+  const previaPvPRef = useRef(null)
+  useEffect(() => {
+    if (!partida) return
+    const previa = previaPvPRef.current
+    previaPvPRef.current = game
+    factorManoRef.current = partida.factorReparto
+    if (game.reponiendo && previa && !previa.reponiendo && previa.handCount === game.handCount) startReposicionPvP(previa, game)
+  }, [game]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isDiscardPhase = phase === PHASES.DISCARD
   const isPayoutPhase  = phase === PHASES.PAYOUT
@@ -1939,7 +2035,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   function renderOpponentCard(seat, i) {
     if (discardAnim) {
       const key  = `${seat}:${i}`
-      const card = game.players[seat].cards[i]
+      const card = (discardAnim.oldGame ?? game).players[seat].cards[i]
       if (!discardAnim.allKeys.has(key)) {
         return card ? <PlayingCard card={card} faceDown /> : <PlayingCard />
       }
@@ -1967,7 +2063,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       const ref = slotRefs[0][i]
       if (discardAnim) {
         const key     = `0:${i}`
-        const oldCard = game.players[0].cards[i]
+        const oldCard = (discardAnim.oldGame ?? game).players[0].cards[i]
         const newCard = discardAnim.nextGame.players[0].cards[i]
         let content
         if (!discardAnim.allKeys.has(key)) {
@@ -2003,7 +2099,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 card={card}
                 selected={game.selectedDiscards.includes(i)}
                 highlight={showdownWinnerSeat === 0 && isWinningCard(card)}
-                onClick={isDiscardPhase && !human.folded ? () => setGame(prev => toggleDiscard(prev, i)) : undefined}
+                onClick={isDiscardPhase && !human.folded
+                  ? () => (partida ? partida.alternarDescarte(i) : setGame(prev => toggleDiscard(prev, i)))
+                  : undefined}
               />}
         </div>
       )
@@ -2087,10 +2185,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             regla contada dos veces por una división que es de layout, no de
             producto. Aquí el hueco mide 726 px: sobra sitio. */}
         {(isPortraitTable || isDesktopTable) && (
-          <span className={`opp-status${turnSeat === seat ? ' opp-status-turn' : ''}${marcadoAllIn(rival) && !inReset ? ' opp-status-allin' : ''}`}>
-            {inReset || (isPayoutPhase && rival.score)
+          <span className={`opp-status${turnSeat === seat ? ' opp-status-turn' : ''}${(partida ? rival.estado.tipo === 'allin' : marcadoAllIn(rival)) && !inReset ? ' opp-status-allin' : ''}`}>
+            {/* MES-PvP 3 · contra personas manda `estadoDeAsiento`; «En anuncio» y «Abandonó» se
+                ven también en el pago, que es cuando ocurren. */}
+            {inReset || (isPayoutPhase && rival.score && !(partida && ['anuncio', 'abandono'].includes(rival.estado.tipo)))
               ? ' '
-              : rival.folded
+              : partida
+                ? (rival.estado.texto || ' ')
+                : rival.folded
                 ? 'Se retiró'
                 : marcadoAllIn(rival)
                   ? t('ia.mesa.marca.allin')
@@ -2149,6 +2251,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         isChipOpen={openChipSeat === seat}
         onChipTap={() => handleChipTap(seat)}
         lastAction={lastActions[seat]}
+        rotulo={partida ? game.players[seat].estado : null}
         renderCard={i => renderOpponentCard(seat, i)}
         score={game.players[seat].score}
         showScore={isPayoutPhase && !inReset}
@@ -2419,7 +2522,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             <PantallaVictoria
               sesion={sesion}
               netas={fichasNetas(human.chips, human.entrada)}
-              saldo={control ? saldoFinal : human.chips}
+              saldo={control ? saldoFinal : partida ? saldo : human.chips}
               puntos={sesion.puntos}
               precedente={precedenteToc}
               onLeave={salir}
@@ -2558,7 +2661,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   la tarjeta; como burbuja no hay velo y el botón quedaría vivo al
                   lado de la ranura reservada, ofreciendo repartir con una pila
                   que no cubre el ante. Mismo gate que «Siguiente mano». */}
-              {phase === PHASES.WAITING && !isShuffling && !recarga && (
+              {/* MES-PvP 3 · contra personas la mano arranca sola: ni este botón ni «Siguiente mano». */}
+              {!partida && phase === PHASES.WAITING && !isShuffling && !recarga && (
                 <div className="action-area">
                   {/* PAN-1 1c · R4: dentro de la mesa, la pantalla completa solo
                       vuelve aquí y en «Siguiente mano», síncrona y lo primero. */}
@@ -2595,9 +2699,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
 
               {isBetPhase && !marcadoAllIn(human) && !humanIsTurn && !human.folded && !game.players[game.activePlayerIndex].folded && (
                 <div className="action-area thinking">
-                  {numPlayers === 2
-                    ? 'La IA está pensando…'
-                    : `${game.players[game.activePlayerIndex].name} está pensando…`}
+                  {partida
+                    ? t('pvp.mesa.pensando', { nombre: game.players[game.activePlayerIndex].name })
+                    : numPlayers === 2
+                      ? 'La IA está pensando…'
+                      : `${game.players[game.activePlayerIndex].name} está pensando…`}
                 </div>
               )}
 
@@ -2641,10 +2747,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               )}
 
               {isBetPhase && human.folded && (
-                <div className="action-area thinking">Te retiraste — los rivales siguen jugando…</div>
+                <div className="action-area thinking">{partida ? t('pvp.mesa.retirado') : 'Te retiraste — los rivales siguen jugando…'}</div>
               )}
 
-              {isDiscardPhase && !discardAnim && !human.folded && (
+              {isDiscardPhase && !discardAnim && !human.folded && !yaDescarte && (
                 <div className="action-area discard-area">
                   <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
                     {timeLeft}s
@@ -2689,7 +2795,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               )}
 
               {isDiscardPhase && !discardAnim && human.folded && (
-                <div className="action-area thinking">Los rivales descartan…</div>
+                <div className="action-area thinking">{partida ? t('pvp.mesa.descartan') : 'Los rivales descartan…'}</div>
+              )}
+
+              {isDiscardPhase && !discardAnim && !human.folded && yaDescarte && (
+                <div className="action-area thinking">{t('pvp.mesa.espera')}</div>
               )}
 
               {isDiscardPhase && discardAnim && (
@@ -2702,7 +2812,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   el normativo, y no es un detalle de cortesía: la recarga sólo
                   existe ENTRE manos, así que dejar el botón vivo mientras la
                   pregunta está abierta es ofrecer la única acción que la anula. */}
-              {isPayoutPhase && !isClearing && !isShuffling && !ceremony && !recarga && (
+              {!partida && isPayoutPhase && !isClearing && !isShuffling && !ceremony && !recarga && (
                 <div className="action-area">
                   {/* FRZ-1 §2.4 · El otro extremo del arranque de mano. Handle
                       para poder cancelarlo, y si al vencer estamos a oscuras la
@@ -2917,8 +3027,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       {confirmLeave && (
         <div className="leave-overlay" onClick={() => setConfirmLeave(false)}>
           <div className="leave-modal" onClick={e => e.stopPropagation()}>
-            <p className="leave-modal-title">¿Abandonar la mesa?</p>
-            <p className="leave-modal-sub">Perderás el progreso de esta mano.</p>
+            <p className="leave-modal-title">{partida ? t('pvp.salir.titulo') : '¿Abandonar la mesa?'}</p>
+            <p className="leave-modal-sub">{partida ? t('pvp.salir.texto') : 'Perderás el progreso de esta mano.'}</p>
             <div className="leave-modal-actions">
               <SoundButton className="btn btn-pass" onClick={() => setConfirmLeave(false)}>
                 Cancelar
@@ -2928,10 +3038,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 onClick={() => {
                   // TODO: sync balance to Supabase (Step 7)
                   setConfirmLeave(false)
-                  salir()
+                  // MES-PvP 3 · contra personas se deja el asiento; la salida la da la vista.
+                  if (partida) partida.enviar('abandonar')
+                  else salir()
                 }}
               >
-                Abandonar mesa
+                {partida ? t('pvp.salir.si') : 'Abandonar mesa'}
               </SoundButton>
             </div>
           </div>

@@ -48,6 +48,7 @@ export default function OpponentPanel({
   deckRef,          // ref del mazo anclado a este asiento
   showDeck,         // este asiento es el Pie → mazo visible
   shuffleChildren,  // <ShuffleDeck/> cuando baraja este asiento
+  rotulo = null,    // MES-PvP 3 · contra personas, `estadoDeAsiento` ({ tipo, texto }); manda en la ranura
 }) {
   // VIS-3c · una sola lectura del saldo a pintar, para que las dos apariciones
   // —el saldo inline y el flotante de la ficha de esquina— no puedan discrepar.
@@ -162,12 +163,14 @@ export default function OpponentPanel({
           recibe turno nunca más en esa mano (§4.3), así que la ranura es suya
           hasta que la mano acabe. Y tiene que serlo: es la única señal de que
           ese asiento sigue disputando su capa aunque no vuelva a hablar. */}
-      <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}${isEliminating ? ' opp-status-elim' : ''}${marcadoAllIn(player) && !resetting && !isEliminating ? ' opp-status-allin' : ''}`}>
+      <span className={`opp-status${isTurn ? ' opp-status-turn' : ''}${isEliminating ? ' opp-status-elim' : ''}${(rotulo ? rotulo.tipo === 'allin' : marcadoAllIn(player)) && !resetting && !isEliminating ? ' opp-status-allin' : ''}`}>
         {isEliminating
           ? 'Sin saldo'
           : resetting
             ? ' '
-            : player.folded
+            : rotulo
+              ? (rotulo.texto || ' ')
+              : player.folded
               ? 'Se retiró'
               : marcadoAllIn(player)
                 ? t('ia.mesa.marca.allin')
