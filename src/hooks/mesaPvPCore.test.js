@@ -1,7 +1,7 @@
 // MES-PvP 2 §3 · El controlador de la mesa, con una `partida` doble y relojes falsos, sin
 // `@testing-library`: la receta de la casa para los hooks.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TOPE_RELOJ_MS, creaMesaPvP, escenaDe, relojDe } from './mesaPvPCore'
+import { RITMO_RAPIDO, TOPE_RELOJ_MS, creaMesaPvP, escenaDe, relojDe } from './mesaPvPCore'
 
 const asiento = (extra = {}) => ({
   name: 'A', chips: 1000, contrib: 0, contribMano: 100, folded: false, allIn: false, eliminated: false,
@@ -179,5 +179,55 @@ describe('MES-PvP 2 · la píldora', () => {
     nucleo.iniciar()
     expect(alCobrar).toHaveBeenCalledWith(800)
     nucleo.parar()
+  })
+})
+
+describe('MES-PvP 3 · la selección del descarte', () => {
+  const cartas = Array.from({ length: 5 }, (_, k) => ({ id: `c${k}` }))
+  const enDescarte = (extra = {}, propio = {}) => vista({ phase: 'DISCARD', vencimiento: { clase: 'descarte', hora: 20_000 }, ...extra }, { cards: cartas, numCartas: 5, ...propio })
+
+  it('alterna con el tope de la mano y sobrevive a la lectura siguiente de la misma mano', () => {
+    const { partida, nucleo } = montar({ vista: enDescarte() })
+    nucleo.foto().alternarDescarte(1)
+    nucleo.foto().alternarDescarte(3)
+    nucleo.foto().alternarDescarte(4)
+    expect(nucleo.foto().game.selectedDiscards).toEqual([1, 3])
+    nucleo.foto().alternarDescarte(1)
+    expect(nucleo.foto().game.selectedDiscards).toEqual([3])
+    partida.poner({ vista: enDescarte({ version: 2, descarte: { yaDescartaron: [0], cuantas: null } }) })
+    expect(nucleo.foto().game.selectedDiscards).toEqual([3])
+  })
+
+  // Lo que vio Victor (cierre de la 3): las cartas repuestas llegaban levantadas.
+  it('se vacía al abrirse la reposición, no antes: las marcadas siguen arriba mientras la mesa descarta', () => {
+    const { partida, nucleo } = montar({ vista: enDescarte() })
+    nucleo.foto().alternarDescarte(1)
+    nucleo.foto().alternarDescarte(3)
+    partida.poner({ vista: enDescarte({ version: 2, descarte: { yaDescartaron: [1], cuantas: null } }) })
+    expect(nucleo.foto().game.selectedDiscards).toEqual([1, 3])
+    partida.poner({ vista: enDescarte({ version: 3, vencimiento: { clase: 'reposicion', hora: 21_000 }, descarte: { yaDescartaron: [0, 1], cuantas: [0, 2] } }) })
+    expect(nucleo.foto().game.reponiendo).toBe(true)
+    expect(nucleo.foto().game.selectedDiscards).toEqual([])
+    nucleo.foto().alternarDescarte(2)
+    expect(nucleo.foto().game.selectedDiscards).toEqual([])
+  })
+
+  it('no cambia nada fuera del descarte, retirado o con el descarte ya mandado', () => {
+    for (const v of [vista(), enDescarte({}, { folded: true }), enDescarte({ descarte: { yaDescartaron: [1], cuantas: null } })]) {
+      const { nucleo } = montar({ vista: v })
+      const antes = nucleo.foto()
+      antes.alternarDescarte(0)
+      expect(nucleo.foto()).toBe(antes)
+    }
+  })
+})
+
+describe('MES-PvP 3 · el ritmo escala el reparto', () => {
+  it('rápido es FACTOR_RAPIDA, con el literal del árbitro; normal, 1', async () => {
+    const { RITMOS, factorDe } = await import('../arbitro/reloj.js')
+    expect(RITMO_RAPIDO).toBe(RITMOS.RAPIDO)
+    expect(montar({ vista: vista() }).nucleo.foto().factorReparto).toBe(factorDe(RITMOS.RAPIDO))
+    const normal = creaMesaPvP({ partida: doble({ vista: vista() }), sala: { ...SALA, ritmo: 'normal' } })
+    expect(normal.foto().factorReparto).toBe(1)
   })
 })

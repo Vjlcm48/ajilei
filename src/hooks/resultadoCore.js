@@ -1,6 +1,7 @@
 import { PHASES } from '../engine/gameEngine'
 import { isAjilei } from '../engine/handEvaluator'
 import { VOZ, nombreEnVoz } from './cronicaCore'
+import { montoTexto } from '../config/tapetes'
 
 // ── MSG-U1 · El compositor de resultados ────────────────────────────────────
 // Documento rector: docs/AJILEI_Mensajes_Resultado_v1.0.md.
@@ -71,6 +72,11 @@ export function claseTono(tono) {
 function finDePartida({ winner, players, habla }) {
   if (winner === 0) {
     return { texto: '¡Ganaste la mesa! Eres el último con Heptacoins.', tono: 'oro' }
+  }
+  // MES-PvP 3 · entre personas se pierde la mesa con lo que se cobró, que puede no ser cero:
+  // quien abandonó se lleva su pila (en el fin, `vistaAMesa` la pone en `chips`).
+  if (winner != null && habla === VOZ.HUMANOS && players[0].chips > 0) {
+    return { texto: `${nombreDe(players[winner], habla)} gana la mesa. Te llevas ${montoTexto(players[0].chips)} Heptacoins.`, tono: 'neutro' }
   }
   if (winner != null) {
     return { texto: `${nombreDe(players[winner], habla)} gana la mesa. Te quedaste sin Heptacoins.`, tono: 'neutro' }

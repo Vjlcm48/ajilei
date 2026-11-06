@@ -7,8 +7,10 @@ import {
   IDIOMA_POR_DEFECTO,
   IDIOMAS_DISPONIBLES,
   CLAVE_IDIOMA_STORAGE,
+  sumarTextos,
 } from './textos.js'
 import { TEXTOS_ES } from './textos.es.js'
+import { TEXTOS_PVP_ES } from './textos.pvp.es.js'
 
 // ── IDI-0 · Contrato del diccionario ────────────────────────────────────────
 // Documento rector: AJILEI_LOB1_Fase1_v1.1.md §2.4.
@@ -98,7 +100,7 @@ describe('IDI-0 · diccionario es', () => {
     //
     // TIE-1 1a es la novena: `tie.*` es la tienda (estantes, vitrina, ventana
     // de compra) y la fila «Tapetes» del ⚙.
-    const PREFIJOS = ['pvp.', 'lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.', 'tie.']
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.', 'tie.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
@@ -143,11 +145,6 @@ describe('IDI-0 · diccionario es', () => {
       if (vistos.has(valor)) repetidos.push([vistos.get(valor), clave].sort().join(' = '))
       else vistos.set(valor, clave)
     }
-    //
-    //   sal.espera.fin.entrar.nota = sal.partida.pronto  (SAL-B2 F1b)
-    //     La nota bajo «Entrar a la mesa» y el rótulo de la pantalla a la que
-    //     lleva dicen lo mismo: «Partida PvP · Próximamente». Cuando MES-PvP
-    //     traiga la partida, la nota desaparece y la pantalla cambia de nombre.
     //
     //   sal.espera.cod.eti = sal.opciones.codigo.aria  (SAL-B2 F1b)
     //     «Código de invitación»: el nombre accesible del campo donde se PEGA
@@ -245,7 +242,6 @@ describe('IDI-0 · diccionario es', () => {
       'sal.armar.titulo = sal.opciones.armar',
       'sal.casa.aria = sal.partida.volver',
       'sal.espera.cod.eti = sal.opciones.codigo.aria',
-      'sal.espera.fin.entrar.nota = sal.partida.pronto',
       'sal.espera.sentados = sal.opciones.mesa.estado',
       'sal.volver.aria = video.sin.volver',
     ])
@@ -423,5 +419,49 @@ describe('IDI-0 · constantes de la plomería', () => {
 
   it('la clave de almacenamiento sigue la convención ajilei.<cosa>', () => {
     expect(CLAVE_IDIOMA_STORAGE).toBe('ajilei.idioma')
+  })
+})
+
+describe('MES-PvP 3 · los textos que viajan con la partida (INV-84)', () => {
+  it('todos son `pvp.`, en minúscula, sin vacíos y no están también en la entrada', () => {
+    for (const [clave, valor] of Object.entries(TEXTOS_PVP_ES)) {
+      expect(clave, clave).toMatch(/^pvp\.[a-z0-9.]+$/)
+      expect(typeof valor === 'string' && valor.length > 0, clave).toBe(true)
+      expect(TEXTOS_ES[clave], clave).toBeUndefined()
+    }
+  })
+
+  it('ningún texto repetido, ni entre ellos ni con el diccionario de la entrada', () => {
+    const vistos = new Map(Object.entries(TEXTOS_ES).map(([k, v]) => [v, k]))
+    const repetidos = []
+    for (const [clave, valor] of Object.entries(TEXTOS_PVP_ES)) {
+      if (vistos.has(valor)) repetidos.push(`${vistos.get(valor)} = ${clave}`)
+      else vistos.set(valor, clave)
+    }
+    expect(repetidos).toEqual([])
+  })
+
+  it('sin sumar no existen (⟦⟧); sumados, `t()` los resuelve con sus huecos', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(t('pvp.sorteo.mano', { nombre: 'Ana' })).toBe('⟦pvp.sorteo.mano⟧')
+    sumarTextos('es', TEXTOS_PVP_ES)
+    expect(t('pvp.sorteo.mano', { nombre: 'Ana' })).toBe('Ana es Mano por tener la carta más alta')
+    expect(clavesDe('es').some((c) => c.startsWith('pvp.'))).toBe(false)
+    // Como la entrada: con sus huecos llenos, ninguno queda sin llenar.
+    for (const [clave, crudo] of Object.entries(TEXTOS_PVP_ES)) {
+      const vars = Object.fromEntries([...crudo.matchAll(/\{([a-z0-9_]+)\}/g)].map(([, n]) => [n, 'X']))
+      expect(t(clave, vars), clave).not.toContain('⟦')
+    }
+  })
+
+  it('el sorteo dice los textos sellados (cierre de la sub-tanda 3)', () => {
+    sumarTextos('es', TEXTOS_PVP_ES)
+    expect(t('pvp.sorteo.elige', { nombre: 'Ana' })).toBe('Ana, vamos a elegir el jugador Mano. Elige una carta.')
+    expect(t('pvp.sorteo.mano.tu')).toBe('Eres Mano por tener la carta más alta')
+    expect(t('pvp.sorteo.empate', { lista: 'Juan, Ana y María' })).toBe('Hay empate entre Juan, Ana y María: vamos al desempate')
+    expect(t('pvp.sorteo.azar', { nombre: 'Ana' })).toBe('Siguen empatados: el azar elige a Ana como Mano')
+    expect(t('pvp.sorteo.azar.tu')).toBe('Siguen empatados: el azar te elige como Mano')
+    expect(Object.keys(TEXTOS_PVP_ES).filter((c) => c.startsWith('pvp.sorteo.')).sort()).toEqual(
+      ['pvp.sorteo.azar', 'pvp.sorteo.azar.tu', 'pvp.sorteo.elige', 'pvp.sorteo.empate', 'pvp.sorteo.mano', 'pvp.sorteo.mano.tu'])
   })
 })

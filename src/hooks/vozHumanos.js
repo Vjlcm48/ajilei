@@ -12,9 +12,8 @@
 import { montoTexto } from '../config/tapetes'
 import { PHASES } from '../engine/gameEngine'
 import { MONEDA, nombreEnVoz } from './cronicaCore'
+import { CLASE_AVISO_SALIDA, CLASE_REPOSICION } from '../lib/partidaCliente'
 import { mismaAccion } from '../lib/vistaAMesa'
-
-const CLASE_REPOSICION = 'reposicion'
 
 // La línea de una jugada. Las cifras con su punto de millar, como en la pantalla.
 export function fraseDeAccion(accion, game) {
@@ -58,8 +57,22 @@ function resumenDescarte(game) {
   return `Descartaste ${cuantas[0] ?? 0}, ${nombreEnVoz(game.players[rival])} descartó ${cuantas[rival] ?? 0}.`
 }
 
+/** MES-PvP 3 · «Juan», «Juan y Ana», «Juan, Ana y María». */
+export function listaDeNombres(nombres) {
+  return nombres.length < 2 ? (nombres[0] ?? '') : `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}`
+}
+
+// MES-PvP 3 · alguien deja la mesa (quiebra o abandono): el aviso de salida lo dice en el óvalo,
+// con su texto propio, no «sin Heptacoins» (Fase 0, §C).
+function avisoDeSalida(game) {
+  const nombres = game.eliminatedNames
+  const quien = `${listaDeNombres(nombres)} ${nombres.length === 1 ? 'dejó' : 'dejaron'} la mesa`
+  return `${quien} · la mesa ahora es de ${game.aliveCount}`
+}
+
 export function faseHumanos(game) {
   const yo = game.players[0]
+  if (game.vencimiento?.clase === CLASE_AVISO_SALIDA && game.eliminatedNames.length > 0) return avisoDeSalida(game)
   switch (game.phase) {
     case PHASES.DEAL_2:
     case PHASES.DEAL_3:  return 'Repartiendo...'

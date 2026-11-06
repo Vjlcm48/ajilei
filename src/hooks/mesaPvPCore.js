@@ -3,18 +3,24 @@
 // (`creaCongelador`, `coreografiaCore`): el núcleo se prueba y el hook solo ejecuta.
 //
 // Envuelve la `partida` (`crearClientePartida`, o su imitación con la misma forma) y deja
-// una foto: `{ game, cronica, enviar, reloj, escena, mesa, ritmo }`. La foto solo cambia si
+// una foto: `{ game, cronica, enviar, reloj, escena, mesa, ritmo, alternarDescarte }`. La foto solo cambia si
 // cambia algo que se pinta: el reloj se revisa cuatro veces por segundo, y la mesa se
 // repinta una, cuando cambia el segundo.
+import { PHASES, toggleDiscard } from '../engine/gameEngine'
 import { ELECCION_SORTEO_MS, PAUSA_ANUNCIO_MS, TURN_TIME } from '../config/esperas'
 import {
   CLASE_DESCARTE, CLASE_ELECCION, CLASE_PAUSA_ANUNCIO, CLASE_TURNO, FASE_FIN, FASE_SORTEO, REVISION_MS,
 } from '../lib/partidaCliente'
+import { FACTOR_RAPIDA } from '../lib/partidaRapida'
 import { vistaAMesa } from '../lib/vistaAMesa'
 import { cronicaDe } from './vozHumanos'
 
 // Solo estas clases cuentan segundos en pantalla. Las demás son esperas de animación: no
 // tienen reloj que pintar, y su `timeLeft` es `null`.
+// El ritmo rápido de la mesa (`RITMOS.RAPIDO` del árbitro; la prueba lo ancla) escala el
+// reparto como «Partida rápida» contra las IAS (contrato §6, «El ritmo»).
+export const RITMO_RAPIDO = 'rapido'
+
 export const TOPE_RELOJ_MS = Object.freeze({
   [CLASE_TURNO]: TURN_TIME * 1000,
   [CLASE_DESCARTE]: TURN_TIME * 1000,
@@ -58,8 +64,23 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     escena: 'arrancando',
     mesa: sala.id,
     ritmo: sala.ritmo ?? null,
+    alternarDescarte: (i) => alternarDescarte(i),
+    factorReparto: sala.ritmo === RITMO_RAPIDO ? FACTOR_RAPIDA : 1,
   })
   const oyentes = new Set()
+  const publicar = (cambios) => {
+    foto = Object.freeze({ ...foto, ...cambios })
+    oyentes.forEach((o) => o())
+  }
+
+  // MES-PvP 3 · la selección del descarte es local, con la regla del motor (`toggleDiscard`).
+  // La conserva `vistaAMesa` entre lecturas de la misma mano. Solo en el descarte, en pie y
+  // antes de mandarlo: una vez mandado no hay nada que cambiar.
+  function alternarDescarte(i) {
+    const g = foto.game
+    if (!g || g.phase !== PHASES.DISCARD || g.players[0].folded || g.descarte.yaDescartaron.includes(0)) return
+    publicar({ game: toggleDiscard(g, i) })
+  }
   let version = null
   let cobrado = null
   let alCobrar = () => {}
@@ -83,10 +104,7 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     if (nuevo.clase !== foto.reloj.clase || nuevo.timeLeft !== foto.reloj.timeLeft) cambios.reloj = nuevo
     const escena = escenaDe(vista, muerta)
     if (escena !== foto.escena) cambios.escena = escena
-    if (Object.keys(cambios).length > 0) {
-      foto = Object.freeze({ ...foto, ...cambios })
-      oyentes.forEach((o) => o())
-    }
+    if (Object.keys(cambios).length > 0) publicar(cambios)
     // La píldora no relee sola: quien monta la mesa refresca el saldo cuando se cobra.
     if (cobro) alCobrar(cobrado)
   }

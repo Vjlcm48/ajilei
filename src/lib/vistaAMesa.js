@@ -20,10 +20,18 @@
 //     `undefined` al último rival. El jugador sale a su pantalla final (`escena: 'fuera'`),
 //     pero la mesa nunca recibe ese estado, ni durante un render.
 //
+// EN EL FIN, la pila de cada asiento es lo que cobró (la vista la deja en 0 al cobrar): es lo
+// que la victoria resta de la entrada para sus netas.
+//
 // `isHuman` no se inventa: la voz entre personas no depende de él (`hooks/vozHumanos.js`).
 
-import { t } from '../config/textos'
+import { sumarTextos, t } from '../config/textos'
+import { TEXTOS_PVP_ES } from '../config/textos.pvp.es'
 import { VOZ } from '../hooks/cronicaCore'
+import { CLASE_BARAJADO, CLASE_REPOSICION } from './partidaCliente'
+
+// MES-PvP 3 · los textos de la partida viajan con este trozo, no en la entrada (INV-84).
+sumarTextos('es', TEXTOS_PVP_ES)
 
 // Literales de contrato, sin importar el motor; `vistaAMesa.test.js` los ancla.
 export const FASE_PAGO = 'PAYOUT'
@@ -61,6 +69,12 @@ export function vistaAMesa(vista, previa, sala) {
   const mismaMano = previa?.handCount === vista.handCount
   const enPago = phase === FASE_PAGO
   const enFin = phase === FASE_FIN_MESA
+  const reponiendo = vista.vencimiento?.clase === CLASE_REPOSICION
+  // MES-PvP 3 · la selección del descarte es local y se vacía cuando la vista confirma el
+  // descarte aplicado (se abre la reposición), antes de los vuelos: una carta nueva no llega
+  // nunca levantada. De guardia, también al cambiar de fase o de mano. Hasta entonces las
+  // marcadas siguen arriba: así se ve qué se va.
+  const seleccion = mismaMano && previa.phase === phase && !reponiendo ? previa.selectedDiscards : []
 
   const revelacion = vista.resultado?.revelacion ?? []
   const activo = rotar(vista.activePlayerIndex)
@@ -83,12 +97,12 @@ export function vistaAMesa(vista, previa, sala) {
       entrada,
       cards: p.cards ?? revelado?.cards ?? dorsos(real, p.numCartas),
       score: revelado?.score ?? null,
-      chips: sigueEnPago ? p.cobrado : p.chips,
+      chips: sigueEnPago || (enFin && p.cobrado !== null) ? p.cobrado : p.chips,
       eliminated: p.eliminated && !sigueEnPago && (id !== 0 || enFin),
       turno: id === activo && FASES_APUESTA.includes(phase),
       ultima: ultimaDe(id, comun, previa, mismaMano),
     }
-  })
+  }).map((p) => ({ ...p, estado: estadoDeAsiento(p) }))
 
   const vivos = players.filter((p) => !p.eliminated)
   const nuevos = previa ? players.filter((p, i) => p.eliminated && !previa.players[i].eliminated).map((p) => p.name) : []
@@ -103,7 +117,7 @@ export function vistaAMesa(vista, previa, sala) {
     aliveCount: vivos.length,
     players,
     eliminatedNames: [...(mismaMano ? previa.eliminatedNames : []), ...nuevos],
-    selectedDiscards: mismaMano ? previa.selectedDiscards : [],
+    selectedDiscards: seleccion,
     currentBet: vista.currentBet,
     unit: vista.unit,
     pot: vista.pot,
@@ -115,6 +129,9 @@ export function vistaAMesa(vista, previa, sala) {
     handCount: vista.handCount,
     winner: enPago ? rotar(vista.resultado.ganador) : enFin && ganadorDelFin >= 0 ? ganadorDelFin : null,
     vencimiento: vista.vencimiento,
+    // MES-PvP 3 · las esperas de animación que la mesa pinta: el barajado y la reposición.
+    barajando: vista.vencimiento?.clase === CLASE_BARAJADO,
+    reponiendo,
     ...comun,
     sorteo: {
       ...vista.sorteo,

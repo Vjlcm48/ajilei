@@ -34,6 +34,9 @@ export const CLASE_PAUSA_ANUNCIO = 'pausa_anuncio'
 export const CLASE_TURNO = 'turno'
 export const CLASE_DESCARTE = 'descarte'
 export const CLASE_ELECCION = 'eleccion_sorteo'
+export const CLASE_BARAJADO = 'barajado'
+export const CLASE_REPOSICION = 'reposicion'
+export const CLASE_AVISO_SALIDA = 'aviso_salida'
 
 export const MARGEN_VENCIMIENTO_MS = 300
 export const ESCALON_RECLAMO_MS = 200
@@ -61,24 +64,6 @@ export const VENTANA_DESFASE = 8
 export const desfaseDe = (muestras) => (
   muestras.length === 0 ? 0 : muestras.reduce((mejor, m) => (m.rtt < mejor.rtt ? m : mejor)).desfase
 )
-
-// ── La marca del panel de prueba ────────────────────────────────────────────
-// `?mot1=1` la enciende y `?mot1=0` la apaga. Vive en el trozo de la partida, así que
-// se lee al llegar a esta pantalla y no al abrir la app: con la marca ya guardada no
-// hace falta el parámetro; la primera vez, sí.
-const CLAVE_MARCA = 'ajilei.mot1'
-
-export function leerMarcaMot1() {
-  const pedida = new URLSearchParams(globalThis.location?.search ?? '').get('mot1')
-  try {
-    if (pedida === '1') globalThis.localStorage.setItem(CLAVE_MARCA, '1')
-    if (pedida === '0') globalThis.localStorage.removeItem(CLAVE_MARCA)
-    if (pedida === null) return globalThis.localStorage.getItem(CLAVE_MARCA) === '1'
-  } catch {
-    // Sin almacenamiento, la marca vale mientras siga en la dirección.
-  }
-  return pedida === '1'
-}
 
 // ── El cliente ──────────────────────────────────────────────────────────────
 /**

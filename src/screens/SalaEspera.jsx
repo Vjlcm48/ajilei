@@ -135,6 +135,12 @@ export default function SalaEspera({
   // para él que para un invitado (defecto E5, lámina v1.6)—.
   const resumen = resumenDe(sala, asientos ?? [], uid)
   const fin = finDe(sala, resuelta, resumen.esAnfitrion)
+  // MES-PvP 3 §3.3 · la mesa que arranca se abre sola, sin tocar nada: quien no entraba no
+  // montaba el cliente y su sorteo vencía con la posición 0 (Fase 0, §B.9). El CTA se queda
+  // por si el efecto no llegara a correr.
+  useEffect(() => {
+    if (fin === 'activa') fns.current.onPartida?.(sala)
+  }, [fin, sala])
   const sillas = sillasDe(sala, asientos ?? [], uid)
   const abierta = sala?.tipo === 'abierta'
   const nombreAnfitrion = sillas.find((s) => s.esAnfitrion)?.username ?? '…'
@@ -435,7 +441,7 @@ export default function SalaEspera({
         <button type="button" className="sal-cta" data-accion="cta" onClick={() => onPartida?.(sala)}>
           {t('sal.espera.fin.entrar')}
         </button>
-        <small data-accion="cta-nota">{t('sal.espera.fin.entrar.nota')}</small>
+        <small data-accion="cta-nota"> </small>
       </>
     )
   } else if (fin !== null) {

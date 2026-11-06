@@ -6,7 +6,7 @@ import { PHASES } from '../engine/gameEngine'
 import { VOZ, componeCapas } from './cronicaCore'
 import { lecturaDeMano, resultadoDeMano } from './manoCore'
 import { composeResultado } from './resultadoCore'
-import { cronicaDe, faseHumanos, fraseDeAccion, sonidoDe } from './vozHumanos'
+import { cronicaDe, faseHumanos, fraseDeAccion, listaDeNombres, sonidoDe } from './vozHumanos'
 
 const NOMBRES = ['Yo', 'Ana', 'Beto', 'Caro', 'Dani']
 const mesa = (n, extra = {}) => ({
@@ -170,8 +170,12 @@ describe('MES-PvP 2 · el resultado y las capas', () => {
 
   it('el fin de partida, con nombre', () => {
     const m = mesa(3, { phase: PHASES.GAME_OVER })
-    expect(composeResultado({ phase: PHASES.GAME_OVER, winner: 2, players: m.players, voz: VOZ.HUMANOS }).texto)
-      .toBe('Beto gana la mesa. Te quedaste sin Heptacoins.')
+    const fin = (chips) => composeResultado({
+      phase: PHASES.GAME_OVER, winner: 2, players: m.players.map((p, i) => (i === 0 ? { ...p, chips } : p)), voz: VOZ.HUMANOS,
+    }).texto
+    expect(fin(0)).toBe('Beto gana la mesa. Te quedaste sin Heptacoins.')
+    // MES-PvP 3 · quien abandonó con pila no se quedó sin nada: se lleva lo que cobró.
+    expect(fin(1200)).toBe('Beto gana la mesa. Te llevas 1.200 Heptacoins.')
   })
 
   it('`resultadoDeMano` toma la voz del `game` y, sin ella, es la de las IAS', () => {
@@ -217,5 +221,22 @@ describe('MES-PvP 2 · sonidoDe', () => {
     [null, null],
   ])('%j → %s', (a, sonido) => {
     expect(sonidoDe(a)).toBe(sonido)
+  })
+})
+
+describe('MES-PvP 3 · alguien deja la mesa', () => {
+  it('el aviso de salida lo dice con su texto, y la mesa nueva', () => {
+    const aviso = (eliminatedNames, aliveCount) => faseHumanos(mesa(5, {
+      phase: PHASES.DEAL_2, vencimiento: { clase: 'aviso_salida', hora: 0 }, eliminatedNames, aliveCount,
+    }))
+    expect(aviso(['Pepito'], 4)).toBe('Pepito dejó la mesa · la mesa ahora es de 4')
+    expect(aviso(['Pepito', 'Ana', 'Beto'], 2)).toBe('Pepito, Ana y Beto dejaron la mesa · la mesa ahora es de 2')
+    expect(aviso([], 5)).toBe('Repartiendo...')
+  })
+
+  it('la lista de nombres: comas y «y» antes del último (también el empate del sorteo)', () => {
+    expect(listaDeNombres(['Juan'])).toBe('Juan')
+    expect(listaDeNombres(['Juan', 'Ana'])).toBe('Juan y Ana')
+    expect(listaDeNombres(['Juan', 'Ana', 'María'])).toBe('Juan, Ana y María')
   })
 })

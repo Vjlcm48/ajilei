@@ -43,6 +43,19 @@ const DICCIONARIOS = {
   es: TEXTOS_ES,
 }
 
+// ── MES-PvP 3 · Los textos de un trozo diferido viajan con su trozo (INV-84) ──
+// `textos.es.js` va en la entrada, y cada clave suya pesa en `1.8b`. Lo que solo pinta un
+// trozo diferido (la partida entre personas: `pvp.*`) vive en su propio diccionario, que
+// ese trozo SUMA al cargarse. Antes no se pide: solo lo pinta lo que el trozo monta.
+const SUMADOS = {
+  es: {},
+}
+
+/** Suma al idioma los textos de un trozo diferido. Lo llama el trozo al cargarse. */
+export function sumarTextos(idioma, textos) {
+  Object.assign(SUMADOS[idioma] ??= {}, textos)
+}
+
 // ── El fallback VISIBLE, y por qué no es la cadena vacía ────────────────────
 // Una clave que no existe devuelve `⟦lob.loquesea⟧`, no `''`. La diferencia es
 // todo: una cadena vacía deja un botón mudo que nadie nota hasta que un jugador
@@ -79,7 +92,7 @@ const PATRON_VAR = /\{([a-z0-9_]+)\}/g
  */
 export function t(clave, vars = {}, idioma = IDIOMA_POR_DEFECTO) {
   const dicc = DICCIONARIOS[idioma] ?? DICCIONARIOS[IDIOMA_POR_DEFECTO]
-  const valor = dicc?.[clave]
+  const valor = dicc?.[clave] ?? (SUMADOS[idioma] ?? SUMADOS[IDIOMA_POR_DEFECTO])?.[clave]
 
   if (typeof valor === 'string' && valor.length > 0) return interpolar(valor, vars, clave)
 

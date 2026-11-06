@@ -438,3 +438,36 @@ describe('ECO-1g · controlVideo', () => {
     expect(avisos).toBe(1)
   })
 })
+
+describe('MES-PvP 3 · el video abierto cuando la mesa entra sola (ECO-1g, P-4)', () => {
+  it('se cierra antes de tiempo: el boleto no se cobra, el saldo no cambia y no vuelve a salir', async () => {
+    const m = montaje()
+    m.ctl.pedir()
+    await vaciar()
+    expect(m.ctl.leer().fase).toBe(FASES_CONTROL.VIENDO)
+    m.ctl.cerrarPorMesa()
+    await vaciar()
+    expect(m.ctl.leer()).toMatchObject({ fase: null, cel: null })
+    expect(m.reproductor.leer()).toBeNull()
+    // Aunque el reloj del video llegara al final después, ya no hay sesión que completar.
+    m.verEntero()
+    await vaciar()
+    expect(m.cobros()).toHaveLength(0)
+    expect(m.videos()).toHaveLength(0)
+    expect(m.banco.saldo).toBe(300)
+    expect(m.tomados).toEqual([])
+  })
+
+  it('sin video a la vista no hace nada; un cobro en curso sigue', async () => {
+    const m = montaje()
+    m.ctl.cerrarPorMesa()
+    expect(m.ctl.leer().fase).toBe(null)
+    m.ctl.pedir()
+    await vaciar()
+    m.verEntero()
+    m.ctl.cerrarPorMesa()
+    await vaciar()
+    expect(m.cobros()).toHaveLength(1)
+    expect(m.banco.saldo).toBe(800)
+  })
+})

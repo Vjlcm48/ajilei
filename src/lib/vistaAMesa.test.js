@@ -241,6 +241,15 @@ describe('MES-PvP 2 · lo que depende de la lectura anterior', () => {
     expect(vistaAMesa(vista([asiento('A'), asiento('B'), asiento('C')], { handCount: 4 }), marcadas, SALA).selectedDiscards).toEqual([])
   })
 
+  it('`selectedDiscards` se vacía al abrirse la reposición y, de guardia, al cambiar de fase', () => {
+    const tres = [asiento('A'), asiento('B'), asiento('C')]
+    const descarte = { phase: PHASES.DISCARD, vencimiento: { clase: 'descarte', hora: 1 } }
+    const marcadas = { ...vistaAMesa(vista(tres, descarte), null, SALA), selectedDiscards: [0, 2] }
+    expect(vistaAMesa(vista(tres, { ...descarte, version: 2 }), marcadas, SALA).selectedDiscards).toEqual([0, 2])
+    expect(vistaAMesa(vista(tres, { ...descarte, version: 3, vencimiento: { clase: 'reposicion', hora: 2 } }), marcadas, SALA).selectedDiscards).toEqual([])
+    expect(vistaAMesa(vista(tres, { version: 3, phase: PHASES.BET_2 }), marcadas, SALA).selectedDiscards).toEqual([])
+  })
+
   it('cada asiento conserva su última jugada hasta la mano siguiente, y el descarte la pisa', () => {
     const accion = (a, tipo) => ({ asiento: a, tipo, puesto: 0, apuestaAntes: 0, apuestaDespues: 0, porReloj: false })
     const uno = vistaAMesa(vista([asiento('A'), asiento('B'), asiento('C')], { ultimaAccion: accion(1, 'pasar') }), null, SALA)

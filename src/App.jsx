@@ -239,6 +239,9 @@ function App() {
   const [intentarInvitacion, setIntentarInvitacion] = useState(() => Boolean(simulacion?.codigo))
 
   const [screen, setScreen] = useState(() => {
+    // MES-PvP 3 · `?pvp=<escena>` abre la partida con el árbitro imitado (`PartidaPvP` lo monta),
+    // detrás de la misma puerta doble que `?sal=`. En producción la condición es constante.
+    if (import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS && new URLSearchParams(window.location.search).has('pvp')) return 'partida-pvp'
     if (simulacion) {
       // A2 §2.3 · la guarda del ultimo metro tambien en la entrada simulada: un
       // fixture que pida el stub sin una mesa CON id se queda en la pantalla
@@ -437,6 +440,9 @@ function App() {
       return trozos.capasVideo.cargar()
     },
   }))
+  // MES-PvP 3 · la partida entra sola (la sala arrancó, o se vuelve a ella) y no lleva el marco
+  // del video: el que estuviera a la vista se cierra antes de tiempo y no se cobra (P-4).
+  useEffect(() => { if (screen === 'partida-pvp') video.cerrarPorMesa() }, [screen, video])
 
   // ── SAL-A · La invitación se recoge ANTES de la puerta ────────────────────
   // Rector: AJILEI_SALA_Fase1_v1.0.md §4.3. Un `?sala=AJ7K2M` compartido por
@@ -458,11 +464,15 @@ function App() {
   // devuelva basura, o PostgREST su fila de nulos, el stub no se pinta con
   // «Mesa de ⟦n⟧». `useCallback` con dependencias vacias porque los dos
   // `set` son estables y el efecto de arranque la lista entre las suyas.
+  // MES-PvP 3 §3.3 · `mi_sala` también devuelve la mesa con partida viva (MOT-1): quien vuelve
+  // a ella va directo a la partida, no a la sala de espera. Y la píldora relee al entrar.
+  const refrescarSaldo = billetera.refrescar
   const entrarSala = useCallback((mesa) => {
     if (!esMesa(mesa)) return
     setSala(mesa)
-    setScreen('sala-espera')
-  }, [])
+    refrescarSaldo?.()
+    setScreen(mesa.estado === 'activa' ? 'partida-pvp' : 'sala-espera')
+  }, [refrescarSaldo])
 
   // ── SAL-B1 · El arranque de las salas, UNA sola vez ───────────────────────
   // Rector SAL-B1 §5.2 y §5.3, con la PRECEDENCIA que el Ajuste A1 §2.5 hizo
@@ -1001,13 +1011,13 @@ function App() {
         salaInicial={sala}
         // Salir devuelve a `SalaOpciones` y no al lobby (§7): quien acaba de
         // dejar una mesa casi siempre quiere otra, y el listado esta ahi.
-        onSalir={() => { setSala(null); setScreen('sala-opciones') }}
+        onSalir={() => { setSala(null); refrescarSaldo?.(); setScreen('sala-opciones') }}
         // A1 §2.4 · «Volver al inicio» desde una mesa que arranco o murio va al
         // lobby y DESCARTA cualquier codigo pendiente: no hay nada que reanudar,
         // y un codigo que sobreviviera aqui volveria a intentarse solo.
         onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); setScreen('lobby') }}
         // SAL-B2 F1b · «Entrar a la mesa» cuando la mesa arranco: la mesa se
-        // CONSERVA en el estado (el stub la nombra) y solo cambia la pantalla.
+        // CONSERVA en el estado y solo cambia la pantalla. MES-PvP 3 · la sala entra sola.
         onPartida={(mesa) => { if (esMesa(mesa)) setSala(mesa); setScreen('partida-pvp') }}
       />,
     )
@@ -1018,14 +1028,19 @@ function App() {
   // sala, para que MES-PvP la releve con su nombre sin desmontar la sala de
   // espera. La casa hace lo mismo que la casita de la sala (:421): olvida la
   // invitacion, suelta la mesa y va al lobby.
+  // MES-PvP 3 · ya es LA MESA: sin el marco del video, como la mesa contra las IAS (G3) y
+  // `sumamente`. Si el video estaba abierto al entrar sola, el marco se desmonta y se cierra.
   if (screen === 'partida-pvp') {
-    return diferida(trozos.partidaPvP,
-      <PartidaPvP
-        cuenta={cuenta}
-        billetera={billetera}
-        sala={sala}
-        onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); setScreen('lobby') }}
-      />,
+    return (
+      <PantallaDiferida key={screen} trozo={trozos.partidaPvP}>
+        <PartidaPvP
+          cuenta={cuenta}
+          billetera={billetera}
+          sala={sala}
+          tapetes={tapetes}
+          onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); refrescarSaldo?.(); setScreen('lobby') }}
+        />
+      </PantallaDiferida>
     )
   }
 

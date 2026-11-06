@@ -206,6 +206,12 @@ export function crearControlVideo({
     /** Volver a primer plano: el reintento del cobro no espera su cuenta atrás. */
     reintentarAhora() { cobro?.despertar?.() },
     finCelebracion(id) { if (foto.cel && (id === undefined || foto.cel.id === id)) fija({ cel: null }) },
+    /** MES-PvP 3 · la mesa entre personas entra sola (la sala arrancó) y en la mesa no hay
+     *  video (G3): el que estaba a la vista se cierra antes de tiempo, que no cobra el boleto
+     *  (G2) ni vuelve a salir al regresar. El cobro ya en curso sigue: el video ya se vio. */
+    cerrarPorMesa() {
+      if (foto.fase === FASES_CONTROL.VIENDO) reproductor.terminar(ESTADOS.CERRADO_ANTES)
+    },
     /** El marco se desmonta (se entra en la mesa): lo que sólo era pintura se
      *  recoge, para que no reaparezca al volver. El saldo ya se tomó al cobrar;
      *  un video a la vista o un cobro en curso no se tocan. */

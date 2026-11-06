@@ -7,8 +7,8 @@ import { FASE_SORTEO as SORTEO_ARBITRO } from '../arbitro/vista.js'
 import { PHASES } from '../engine/gameEngine.js'
 import { EVENTO_AVISO as AVISO_FUNCION } from '../../supabase/functions/partida/nucleo.js'
 import {
-  CLASE_DESCARTE, CLASE_ELECCION, CLASE_PAUSA_ANUNCIO, CLASE_TURNO, ESCALON_RECLAMO_MS, ETAPA_ELECCION, EVENTO_AVISO, FASE_DESCARTE, FASE_FIN,
-  FASE_SORTEO, MARGEN_VENCIMIENTO_MS, REINTENTO_RECLAMO_MS, RELECTURA_MS, REVISION_MS, VENTANA_DESFASE, crearClientePartida, desfaseDe, leerMarcaMot1,
+  CLASE_AVISO_SALIDA, CLASE_BARAJADO, CLASE_DESCARTE, CLASE_ELECCION, CLASE_REPOSICION, CLASE_PAUSA_ANUNCIO, CLASE_TURNO, ESCALON_RECLAMO_MS, ETAPA_ELECCION, EVENTO_AVISO, FASE_DESCARTE, FASE_FIN,
+  FASE_SORTEO, MARGEN_VENCIMIENTO_MS, REINTENTO_RECLAMO_MS, RELECTURA_MS, REVISION_MS, VENTANA_DESFASE, crearClientePartida, desfaseDe,
 } from './partidaCliente'
 
 const MESA = '11111111-1111-4111-8111-111111111111'
@@ -71,6 +71,9 @@ describe('MOT-1 1f · los literales son los del servidor', () => {
     expect(CLASE_TURNO).toBe(CLASES.TURNO)
     expect(CLASE_DESCARTE).toBe(CLASES.DESCARTE)
     expect(CLASE_ELECCION).toBe(CLASES.ELECCION_SORTEO)
+    expect(CLASE_BARAJADO).toBe(CLASES.BARAJADO)
+    expect(CLASE_REPOSICION).toBe(CLASES.REPOSICION)
+    expect(CLASE_AVISO_SALIDA).toBe(CLASES.AVISO_SALIDA)
   })
 })
 
@@ -660,55 +663,5 @@ describe('MOT-1 1f · parar', () => {
     await reposar()
     expect(d.cliente.channel).toHaveBeenCalledTimes(1)
     c.parar()
-  })
-})
-
-describe('MOT-1 1f · la marca', () => {
-  function entorno(search, guardado = {}) {
-    const memoria = new Map(Object.entries(guardado))
-    vi.stubGlobal('location', { search })
-    vi.stubGlobal('localStorage', {
-      getItem: (k) => (memoria.has(k) ? memoria.get(k) : null),
-      setItem: (k, v) => memoria.set(k, v),
-      removeItem: (k) => memoria.delete(k),
-    })
-    return memoria
-  }
-  afterEach(() => { vi.unstubAllGlobals() })
-
-  it('sin parámetro ni guardada, apagada', () => {
-    entorno('')
-    expect(leerMarcaMot1()).toBe(false)
-  })
-
-  it('`?mot1=1` la enciende y la guarda; luego vale sin el parámetro', () => {
-    const memoria = entorno('?mot1=1')
-    expect(leerMarcaMot1()).toBe(true)
-    expect(memoria.get('ajilei.mot1')).toBe('1')
-    vi.stubGlobal('location', { search: '' })
-    expect(leerMarcaMot1()).toBe(true)
-  })
-
-  it('`?mot1=0` la apaga y la borra', () => {
-    const memoria = entorno('?mot1=0', { 'ajilei.mot1': '1' })
-    expect(leerMarcaMot1()).toBe(false)
-    expect(memoria.has('ajilei.mot1')).toBe(false)
-  })
-
-  it('otro valor no la enciende', () => {
-    entorno('?mot1=si')
-    expect(leerMarcaMot1()).toBe(false)
-  })
-
-  it('sin almacenamiento no revienta: vale mientras siga en la dirección', () => {
-    vi.stubGlobal('location', { search: '?mot1=1' })
-    vi.stubGlobal('localStorage', {
-      getItem: () => { throw new Error('bloqueado') },
-      setItem: () => { throw new Error('bloqueado') },
-      removeItem: () => { throw new Error('bloqueado') },
-    })
-    expect(leerMarcaMot1()).toBe(true)
-    vi.stubGlobal('location', { search: '' })
-    expect(leerMarcaMot1()).toBe(false)
   })
 })

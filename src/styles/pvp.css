@@ -1,0 +1,104 @@
+/* ── MES-PvP 3 · Las capas mínimas de la partida entre personas ───────────────
+   Hoja aditiva y nueva (regla 1 de la ficha): no toca la mesa ni sus hojas protegidas, y
+   no lleva `!important`. Solo la carga `PartidaPvP` (trozo de la partida, INV-84). Las
+   formas completas del sorteo y del anuncio son de la sub-tanda 5, tras la lámina.
+   Usa los tokens del traje de las salas (`--u`, `--gold-brand`): el sorteo vive en él. */
+
+.pvp-sorteo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 4);
+  text-align: center;
+}
+
+.pvp-sorteo-titulo {
+  margin: 0;
+  font-size: calc(var(--u) * 4.4);
+  font-weight: 500;
+  color: var(--gold-brand);
+}
+
+.pvp-sorteo-reloj { font-variant-numeric: tabular-nums; }
+
+.pvp-sorteo-cartas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(var(--u) * 2);
+}
+
+/* La carta del sorteo: 63 × 98 como el hueco de la mesa de 2 apaisada, muy por encima del
+   piso táctil de 40. */
+.pvp-carta {
+  width: 63px;
+  height: 98px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 120ms ease-out;
+}
+.pvp-carta img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pvp-carta:disabled { cursor: default; }
+.pvp-carta.is-elegida { transform: translateY(-8px); box-shadow: 0 0 0 2px var(--gold-brand); }
+.pvp-carta-cara { display: inline-block; cursor: default; }
+
+.pvp-sorteo-rondas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 3);
+}
+
+.pvp-sorteo-volteo {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(var(--u) * 2);
+}
+
+.pvp-volteo { margin: 0; }
+.pvp-volteo figcaption {
+  max-width: 63px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.pvp-sorteo-mensaje {
+  margin: calc(var(--u) * 1.5) 0 0;
+  font-weight: 600;
+}
+
+/* La pausa de anuncio: encima de la mesa, sin tocarla. */
+.pvp-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+}
+
+.pvp-capa-titulo {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* El CTA de la capa usa las medidas del traje de las salas, que fuera de él no existen. */
+.pvp-capa .sal-cta {
+  --cta-h: 48px;
+  --cta-w: 240px;
+  --u: 4px;
+}
