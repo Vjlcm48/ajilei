@@ -68,6 +68,10 @@ const PESO = { id: '1.8b', args: ['scripts/arnes/peso.mjs', '--sin-build'], tope
 // PES-1 §3-G · la espera de las pantallas diferidas y el trozo caído: corta y en `commit`.
 const PUE_ESPERA = diag('diagPUE', 'pue.espera', 'espera', 5)
 
+// MES-PvP 3 · la mesa contra personas sobre el árbitro imitado, en `commit` (cierre de la
+// sub-tanda 3): unos 2 min 30 s. Si un día no cabe, va por mesas (`diagDSK pvp <n>`).
+const PVP = diag('diagDSK', 'pvp', 'pvp', 10)
+
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
   diag('diagSAL', 'sal', 'sal', 15),
@@ -105,8 +109,8 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
-  commit: [...BASE, PESO, PUE_ESPERA, HUMO],
-  completo: [...BASE, PESO, PUE_ESPERA, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
+  commit: [...BASE, PESO, PUE_ESPERA, PVP, HUMO],
+  completo: [...BASE, PESO, PUE_ESPERA, PVP, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]

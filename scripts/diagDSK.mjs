@@ -353,6 +353,7 @@ import { runSuma } from './suma/suma.mjs'
 import { runCfg } from './cfg/cfg.mjs'
 import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, tintaConRepeticion, peorFondo as tintaPeor } from './arnes/tinta.mjs'
 import { runTienda } from './tie/tienda.mjs'
+import { runPvp } from './pvp/pvp.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -15473,6 +15474,12 @@ try {
   // (`scripts/tie/tienda.mjs`). Entra en `humo`: el mismo preview que `cfg`.
   if (MODE === 'tienda' || MODE === 'humo') {
     report.tienda = await runTienda(browser, { base: BASE_PROD })
+  }
+  // MES-PvP 3 · `pvp`: la mesa contra personas sobre el árbitro imitado (`?pvp=`, DEV y
+  // bypass, así que 5173): rotación, O1, piso de 40, tinta, ⟦⟧ y `data-clavada`, por mesas
+  // 2–5 y cinco tamaños, más la medida de los 15 «W» (`scripts/pvp/pvp.mjs`). `pvp <n>`, una mesa.
+  if (MODE === 'pvp') {
+    report.pvp = await runPvp(browser, { base: BASE, ...(process.argv[3] ? { mesas: [Number(process.argv[3])] } : {}) })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

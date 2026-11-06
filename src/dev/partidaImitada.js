@@ -179,6 +179,12 @@ const ESCENAS = {
   'descarte-espera': {
     jugar: (m) => hasta(m, (e) => e.motor.phase === PHASES.DISCARD && e.descarte[m.yo] !== null, { descarte: () => [0] }),
   },
+  // MES-PvP 3 · el descarte abierto y el propio sin mandar: lo hace la mesa, tocando cartas
+  // (la reposición con la selección de verdad; `reposicion` llega con el descarte de guion).
+  'descarte-propio': {
+    jugar: (m) => hasta(m, (e) => e.motor.phase === PHASES.DISCARD && e.vencimiento?.clase === CLASES.DESCARTE
+      && e.descarte[m.yo] === null && !e.motor.players[m.yo].folded),
+  },
   reposicion: { jugar: (m) => hasta(m, (e) => e.vencimiento?.clase === CLASES.REPOSICION, { descarte: () => [0] }) },
   revelacion: { jugar: (m) => hasta(m, (e) => enPago(e) && huboRevelacion(e.motor)) },
   // Apuesta el primero que hable y los demás se retiran.

@@ -22,6 +22,7 @@ const ESPERADO = {
   'turno-ajeno': ['mesa', (v) => v.phase === 'BET_1' && clase(v) === 'turno' && v.activePlayerIndex !== v.asiento],
   'descarte-espera': ['mesa', (v) => v.phase === 'DISCARD' && clase(v) === 'descarte' && v.descarte.yaDescartaron.includes(v.asiento)
     && v.descarte.yaDescartaron.length < v.players.filter((p) => !p.folded).length],
+  'descarte-propio': ['mesa', (v) => v.phase === 'DISCARD' && clase(v) === 'descarte' && !v.descarte.yaDescartaron.includes(v.asiento) && !propio(v).folded],
   reposicion: ['mesa', (v) => v.phase === 'DISCARD' && clase(v) === 'reposicion' && v.descarte.cuantas[v.asiento] === 1],
   revelacion: ['mesa', (v) => v.phase === 'PAYOUT' && v.resultado.revelacion.length >= 2 && clase(v) === 'mano_siguiente'],
   retirada: ['mesa', (v) => v.phase === 'PAYOUT' && !v.resultado.revelacion],
@@ -39,9 +40,9 @@ const ESPERADO = {
 const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
 
 describe('MES-PvP 2 · las escenas', () => {
-  it('la lista es la del §I.2, con `reposicion` y `aviso-salida`', () => {
+  it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, y `descarte-propio` (MES-PvP 3)', () => {
     expect([...ESCENAS_PVP].sort()).toEqual(Object.keys(ESPERADO).sort())
-    expect(ESCENAS_PVP).toHaveLength(21)
+    expect(ESCENAS_PVP).toHaveLength(22)
     expect(mesasDe('aviso-salida')).toEqual([3, 4, 5])
     expect(mesasDe('sorteo-empate-3')).toEqual([3, 4, 5])
     expect(mesasDe('turno-propio')).toEqual([2, 3, 4, 5])
@@ -130,6 +131,26 @@ describe('MES-PvP 2 · la misma forma que el cliente', () => {
     p.avanzar()
     expect(nucleo.foto().game.version).toBe(antes + 1)
     expect(nucleo.foto().cronica).toMatch(/pasa\.$/)
+    nucleo.parar()
+  })
+
+  // MES-PvP 3 · lo que vio Victor: la mesa marca, descarta, y las repuestas no llegan levantadas.
+  it('con el árbitro de verdad, la selección sigue hasta abrirse la reposición y ahí se vacía', async () => {
+    const p = crearPartidaImitada({ escena: 'descarte-propio', n: 3, asiento: 1 })
+    const nucleo = creaMesaPvP({ partida: p, sala: p.sala })
+    nucleo.iniciar()
+    nucleo.foto().alternarDescarte(0)
+    nucleo.foto().alternarDescarte(2)
+    const marcadas = [...nucleo.foto().game.selectedDiscards]
+    expect(marcadas.length).toBeGreaterThan(0)
+    const { game } = nucleo.foto()
+    expect((await p.enviar('descartar', { mano: game.handCount, indices: marcadas })).ok).toBe(true)
+    expect(nucleo.foto().game.descarte.yaDescartaron).toContain(0)
+    expect(nucleo.foto().game.selectedDiscards).toEqual(marcadas)
+    for (let k = 0; k < 10 && !nucleo.foto().game.reponiendo; k++) p.avanzar()
+    expect(nucleo.foto().game.reponiendo).toBe(true)
+    expect(nucleo.foto().game.descarte.cuantas[0]).toBe(marcadas.length)
+    expect(nucleo.foto().game.selectedDiscards).toEqual([])
     nucleo.parar()
   })
 
