@@ -20,11 +20,16 @@
 //
 // R-4: una partida guardada antes de la v1.1 no trae `vencidos`, `enAnuncio`,
 // `sinAnuncio` ni `ultimaAccion`. Se leen con su valor por defecto.
+//
+// v1.2 (MES-PvP 3-A, regla C-8 del Contrato v1.2 · Reglas v1.7 §8.2): abandonar es
+// retirarse en el acto, en cualquier fase de la mano, y con menos de 2 sentados la partida
+// termina en la misma jugada. Las tres vías (la ✕, el 3.er vencimiento y otra mesa) pasan
+// por `retirarEnMano` y `terminarSiQuedaUno`.
 
 import {
   PHASES, advanceFromDeal, applyBetAction, applyDiscard, createInitialState, startHand,
 } from '../engine/gameEngine.js'
-import { costoDe, esLegal } from '../engine/pozos.js'
+import { costoDe, esLegal, ganadoresPorCapa, repartirCapas } from '../engine/pozos.js'
 import { N_AUSENCIA } from '../config/esperas.js'
 import { MOTIVOS as M } from './motivos.js'
 import { compactarAsientos } from './asientos.js'
@@ -61,6 +66,12 @@ export const sorteoAbierto = (estado) => estado.sorteo.etapa !== ETAPAS.CERRADO
 const en = (clase, hora) => ({ clase, hora })
 
 const cuantosNoRetirados = (motor) => motor.players.filter((p) => !p.folded).length
+
+const FASES_APUESTA = [PHASES.BET_1, PHASES.BET_2, PHASES.BET_3]
+
+// R2 · sentado es quien no abandonó ni quedó eliminado. Quien quebró en la mano que se
+// acaba de cerrar sigue sentado hasta que `startHand` lo elimina.
+const sentados = ({ motor, asientos }) => asientos.filter((a, i) => !a.abandonado && !motor.players[i].eliminated).length
 
 const rechazo = (estado, motivo) => ({
   estado,
@@ -142,7 +153,9 @@ function trasMoverMotor(estado, motor, ahora) {
     case PHASES.BET_3:
       // El abandonado no gasta el reloj de nadie. El motor no da turno a un all-in.
       // Esta retirada no pisa `ultimaAccion`: la jugada que la provocó sigue siendo la última.
-      if (estado.asientos[motor.activePlayerIndex].abandonado) {
+      // Desde la v1.2 `retirarEnMano` lo retira antes; esto queda de guardia, y nunca sobre
+      // un retirado, que el motor rechazaría y dejaría esta recursión sin fin.
+      if (estado.asientos[motor.activePlayerIndex].abandonado && !motor.players[motor.activePlayerIndex].folded) {
         return trasMoverMotor(estado, applyBetAction(motor, motor.activePlayerIndex, 'retirarse'), ahora)
       }
       return { estado: { ...nuevo, vencimiento: en(CLASES.TURNO, ahora + ESPERA_TURNO_MS) }, efectos: [] }
@@ -264,15 +277,12 @@ function trasReposicion({ motorTrasDescarte, ...estado }, ahora) {
   return trasMoverMotor({ ...estado, descarte: nulos(motorTrasDescarte.numPlayers) }, motorTrasDescarte, ahora)
 }
 
-// El abandonado descarta vacío en el acto. Sin nadie pendiente, se aplica sin esperar.
+// Sin nadie pendiente, se aplica sin esperar. El abandonado ya no descarta: está retirado
+// (v1.2, `retirarEnMano`).
 function seguirDescarte(estado, ahora) {
-  const { motor, asientos } = estado
-  const descarte = estado.descarte.map((d, i) => (
-    d === null && asientos[i].abandonado && !motor.players[i].folded ? [] : d
-  ))
-  const anotado = { ...estado, descarte }
+  const { motor, descarte } = estado
   const faltan = motor.players.some((p, i) => !p.folded && descarte[i] === null)
-  return faltan ? { estado: anotado, efectos: [] } : aplicarDescartes(anotado, ahora)
+  return faltan ? { estado, efectos: [] } : aplicarDescartes(estado, ahora)
 }
 
 // ── El sorteo ───────────────────────────────────────────────────────────────
@@ -366,12 +376,17 @@ function alVencerTurno(estado, ahora) {
   const contado = contarVencidos(estado, [asiento])
   // El vencimiento que lo abandona lo retira, como a cualquier abandonado en su turno.
   const pasa = !contado.asientos[asiento].abandonado && esLegal(motor, asiento, 'pasar').ok
-  return moverApuesta(contado, asiento, pasa ? 'pasar' : 'retirarse', undefined, true, ahora)
+  return terminarSiQuedaUno(moverApuesta(contado, asiento, pasa ? 'pasar' : 'retirarse', undefined, true, ahora))
 }
 
+// El vencimiento que lo abandona lo retira (R1), y a los demás que faltan les descarta vacío.
 function alVencerDescarte(estado, ahora) {
   const faltan = estado.motor.players.flatMap((p, i) => (!p.folded && estado.descarte[i] === null ? [i] : []))
-  return aplicarDescartes(contarVencidos(estado, faltan), ahora)
+  const retirado = retirarEnMano(contarVencidos(estado, faltan), ahora)
+  const { estado: e } = retirado
+  if (e.motor.phase !== PHASES.DISCARD || e.vencimiento?.clase !== CLASES.DESCARTE) return terminarSiQuedaUno(retirado)
+  const aplicado = aplicarDescartes(e, ahora)
+  return { estado: aplicado.estado, efectos: [...retirado.efectos, ...aplicado.efectos] }
 }
 
 function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
@@ -429,23 +444,105 @@ function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
   }
 }
 
+// «Mano en curso» incluye el barajado y el reparto de una mano con el ante ya cobrado: la
+// fase ya no es `PAYOUT` desde `startHand` (Reglas v1.7 §8.2, R1).
 const manoEnCurso = (estado) => !sorteoAbierto(estado) && estado.motor.phase !== PHASES.PAYOUT
 
-// En mano no cobra: si le tocaba actuar, actúa ya, y si no, espera a que le toque.
-function actuarAbandonado(estado, asiento, ahora) {
-  const { motor, vencimiento } = estado
-  // En la reposición ya descartaron todos, y su turno lo resuelve `trasMoverMotor` al vencer.
-  if (vencimiento?.clase === CLASES.REPOSICION) return { estado, efectos: [] }
-  if (motor.phase === PHASES.DISCARD) return seguirDescarte(estado, ahora)
-  const apostando = motor.phase === PHASES.BET_1 || motor.phase === PHASES.BET_2 || motor.phase === PHASES.BET_3
-  return apostando && motor.activePlayerIndex === asiento ? trasMoverMotor(estado, motor, ahora) : { estado, efectos: [] }
+// ── El abandono (regla C-8 del Contrato v1.2) ───────────────────────────────
+
+const plegar = (motor, quienes) => ({
+  ...motor,
+  players: motor.players.map((p, i) => (quienes.includes(i) ? { ...p, folded: true } : p)),
+})
+
+// La copia de `primerTurno` (`gameEngine.js:182-190`, no exportada): el primero desde la
+// Mano que puede actuar. La ronda que se abra tras un reparto no puede caer en un retirado.
+function primerTurno(players, desde) {
+  const N = players.length
+  for (let k = 0; k < N; k++) {
+    const i = (desde + k) % N
+    if (!players[i].folded && !players[i].allIn && players[i].chips > 0) return i
+  }
+  return desde
 }
 
-// C-8: en mano, no mueve dinero y sigue disputando lo que puso. Sin mano, sale ya.
+// La ruta de los retiros: el mismo resultado que `resolveWinner` (`gameEngine.js:198-207`),
+// con las piezas de `pozos.js`. Una capa sin elegibles vuelve a quien la puso (D-7).
+function pagarAlUltimo(motor) {
+  const ultimo = motor.players.findIndex((p) => !p.folded)
+  const ganadores = ganadoresPorCapa(motor, (_p, i) => (i === ultimo ? 1 : 0))
+  return { ...motor, phase: PHASES.PAYOUT, pot: 0, winner: ultimo, players: repartirCapas(motor, ganadores) }
+}
+
+// R1 · todo abandonado que siga en la mano se retira en el acto, en cualquier fase. Si queda
+// uno solo, cobra el pozo y la mano se cierra; si quedan dos o más, la mano sigue sin él. Su
+// pila no se mueve hasta el cierre: ahí la cobra, sin nada del pozo (R3).
+function retirarEnMano(estado, ahora) {
+  const { motor, asientos, vencimiento } = estado
+  let fuera = motor.players.flatMap((p, i) => (!p.folded && asientos[i].abandonado ? [i] : []))
+  // Si se van a la vez todos los que siguen en la mano (el 3.er vencimiento de varios en el
+  // mismo descarte), el más cercano a la Mano no se retira: alguien cobra el pozo, como en
+  // el motor, donde el último en pie no se retira. Cobra al cerrar, como todo abandonado.
+  if (fuera.length > 0 && fuera.length === cuantosNoRetirados(motor)) {
+    const N = motor.numPlayers
+    const cercano = Array.from({ length: N }, (_, k) => (motor.manoIndex + k) % N).find((i) => fuera.includes(i))
+    fuera = fuera.filter((i) => i !== cercano)
+  }
+  if (fuera.length === 0 || !manoEnCurso(estado)) return { estado, efectos: [] }
+
+  // En su turno de apuesta, el camino de siempre: el motor lo retira y sigue la ronda.
+  const activo = motor.activePlayerIndex
+  const enSuTurno = FASES_APUESTA.includes(motor.phase) && fuera.includes(activo)
+  const plegado = plegar(motor, fuera.filter((i) => !(enSuTurno && i === activo)))
+  const descarte = estado.descarte.map((d, i) => (fuera.includes(i) ? null : d))
+  const base = { ...estado, motor: plegado, descarte }
+
+  if (enSuTurno) return trasMoverMotor(base, applyBetAction(plegado, activo, 'retirarse'), ahora)
+
+  if (cuantosNoRetirados(plegado) === 1) {
+    // Lo calculado para la reposición ya no vale: la mano se cierra aquí.
+    const sinCalculo = { ...base, descarte: nulos(motor.numPlayers), motor: pagarAlUltimo(plegado) }
+    delete sinCalculo.motorTrasDescarte
+    return cerrarMano(sinCalculo, ahora)
+  }
+  // En la reposición, lo calculado (la apuesta 3 o el showdown) se recalcula sin él. Las
+  // cartas nuevas ya están en su sitio: nadie roba otra vez.
+  if (vencimiento?.clase === CLASES.REPOSICION) {
+    return { estado: { ...base, motorTrasDescarte: applyDiscard(plegado, {}) }, efectos: [] }
+  }
+  if (motor.phase === PHASES.DISCARD) return seguirDescarte(base, ahora)
+  // Repartiendo: la ronda que viene no puede abrir en él.
+  if (plegado.players[activo].folded) {
+    return { estado: { ...base, motor: { ...plegado, activePlayerIndex: primerTurno(plegado.players, plegado.manoIndex) } }, efectos: [] }
+  }
+  return { estado: base, efectos: [] }
+}
+
+// R2 · con menos de 2 sentados, la partida termina en la misma jugada, sin empezar otra
+// mano. Si la mano acaba de cerrarse, el fin conserva sus cartas y sus capas: la vista
+// publica su resultado (`vista.js`, `resultadoVisto`) y el cliente enseña el pago antes de
+// la pantalla final.
+function terminarSiQuedaUno({ estado, efectos }) {
+  if (estado.motor.phase !== PHASES.PAYOUT || pausaAbierta(estado) || sentados(estado) >= 2) return { estado, efectos }
+  const { motor, asientos } = estado
+  const ganador = motor.players.findIndex((p, i) => !p.eliminated && !asientos[i].abandonado)
+  const fin = {
+    ...estado,
+    motor: { ...motor, phase: PHASES.GAME_OVER, winner: ganador >= 0 ? ganador : null, aliveCount: ganador >= 0 ? 1 : 0 },
+    descarte: nulos(motor.numPlayers),
+  }
+  const { estado: liquidado, efectos: salidas } = liquidar(fin, () => true)
+  return {
+    estado: { ...liquidado, vencimiento: null },
+    efectos: [...efectos, ...salidas, { tipo: 'partida_terminada', ganador: fin.motor.winner }],
+  }
+}
+
+// Con mano, se retira y cobra al cerrarse. Sin mano, sale ya.
 function marcarAbandono(estado, asiento, ahora) {
   const asientos = estado.asientos.map((a, i) => (i === asiento ? { ...a, abandonado: true, enAnuncio: false } : a))
   const marcado = { ...estado, asientos }
-  if (manoEnCurso(marcado)) return actuarAbandonado(marcado, asiento, ahora)
+  if (manoEnCurso(marcado)) return terminarSiQuedaUno(retirarEnMano(marcado, ahora))
 
   const { estado: fuera, efectos } = sacarAbandonados(marcado)
   if (pausaAbierta(fuera)) {
@@ -453,7 +550,7 @@ function marcarAbandono(estado, asiento, ahora) {
     return { estado: sigueLaPausa.estado, efectos: [...efectos, ...sigueLaPausa.efectos] }
   }
   const vivos = fuera.motor.players.filter((p) => !p.eliminated).length
-  if (!sorteoAbierto(fuera)) return { estado: fuera, efectos }
+  if (!sorteoAbierto(fuera)) return terminarSiQuedaUno({ estado: fuera, efectos })
   if (vivos > 1) {
     return { estado: fuera.sorteo.etapa === ETAPAS.ELECCION ? seguirEleccion(fuera, ahora) : fuera, efectos }
   }

@@ -192,7 +192,10 @@ describe('MES-PvP 2 · propiedades, en partidas completas', () => {
         })
       }
       // No es una prueba vacía: las partidas pasan por todo.
-      for (const f of [FASE_SORTEO, PHASES.BET_1, PHASES.BET_2, PHASES.DISCARD, PHASES.BET_3, PHASES.PAYOUT, 'cobra en el pago']) expect(vistos, f).toContain(f)
+      // MES-PvP 3-A · en la mesa de 2 ya no hay pago con un abandonado que cobra: su abandono
+      // termina la partida en la misma jugada (R2). La trampa sigue en las de 3 a 5.
+      const esperados = [FASE_SORTEO, PHASES.BET_1, PHASES.BET_2, PHASES.DISCARD, PHASES.BET_3, PHASES.PAYOUT, ...(n > 2 ? ['cobra en el pago'] : [])]
+      for (const f of esperados) expect(vistos, f).toContain(f)
     })
   }
 })

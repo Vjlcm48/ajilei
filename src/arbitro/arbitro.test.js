@@ -9,7 +9,7 @@ import { PHASES, applyDiscard, createInitialState, makeHandRules, startHand } fr
 import { ajileiDe as ajileiDelCliente } from '../lib/puntos.js'
 import { BARAJADO_MS } from '../config/esperas.js'
 import {
-  CLASES, ESPERA_REPARTO_SORTEO_MS, ETAPAS, FASE_SORTEO, MOTIVOS, MOTIVOS_ARBITRO, abandonarPorServidor, ajileiDe, aplicarAccion,
+  CLASES, ESPERA_REPARTO_SORTEO_MS, ETAPAS, FASE_SORTEO, MOTIVOS, MOTIVOS_ARBITRO, abandonarPorServidor, ajileiDe, aplicarAccion, ganadorDeMano,
   azarSeguro, compactarAsientos, crearPartida, partidaTerminada, vistaDe,
 } from './index.js'
 
@@ -152,12 +152,20 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
             expect(Object.values(M)).toContain(r.respuesta.motivo)
             expect(r.efectos).toEqual([])
           }
+          r.efectos.forEach((ef, k) => {
+            if (ef.tipo !== 'mano_cerrada') return
+            manos++
+            // MES-PvP 3-A · el fin en la misma jugada (R2) cobra a quien se queda DESPUÉS del
+            // cierre: su pila del cierre es lo que cobra, la misma plata, y no se suma dos veces.
+            const despues = r.efectos.slice(k + 1).filter((x) => x.tipo === 'salida')
+            r.estado.asientos.forEach((a, i) => {
+              if (a.cobrado === null) return
+              expect([0, despues.find((x) => x.asiento === i)?.monto ?? 0], 'pila de un cobrado').toContain(ef.pilas[i])
+            })
+            const doble = suma(despues.map((x) => ef.pilas[x.asiento]))
+            expect(suma(ef.pilas) + cobrado(r.estado) - doble).toBe(total)
+          })
           for (const ef of r.efectos) {
-            if (ef.tipo === 'mano_cerrada') {
-              manos++
-              r.estado.asientos.forEach((a, i) => { if (a.cobrado !== null) expect(ef.pilas[i], 'pila de un cobrado').toBe(0) })
-              expect(suma(ef.pilas) + cobrado(r.estado)).toBe(total)
-            }
             if (ef.tipo !== 'salida') continue
             expect(cobros.has(ef.asiento), 'nada se cobra dos veces').toBe(false)
             expect(r.estado.motor.players[ef.asiento].chips).toBe(0)
@@ -596,7 +604,9 @@ describe('MOT-1 1b · el abandono', () => {
   const GANADORA = [carta(1, 'Oros'), carta(12, 'Oros'), carta(11, 'Oros'), carta(10, 'Oros'), carta(7, 'Oros')]
   const MALA = [carta(2, 'Copas'), carta(3, 'Copas'), carta(4, 'Espadas'), carta(5, 'Bastos'), carta(6, 'Oros')]
 
-  it('el abandonado en all-in sigue disputando la mano y, si gana, el premio va a su pila (C-8)', () => {
+  // MES-PvP 3-A · reescrita: con la C-8 vieja seguía disputando y, con la mano ganadora,
+  // cobraba el pozo. Con la v1.2 se retira en el acto y pierde lo que puso.
+  it('el abandonado en all-in se retira en el acto: con la mano ganadora, no cobra nada del pozo (C-8, v1.2)', () => {
     let e = hastaFase(hastaLaMano(3), PHASES.BET_3)
     e = conMotor(e, {
       pot: 700,
@@ -613,18 +623,20 @@ describe('MOT-1 1b · el abandono', () => {
         cards: i === 0 ? GANADORA : MALA,
       })),
     })
-    e = pide(e, 0, 'abandonar', {}, 0).estado
-    expect(e.motor.players[0].folded).toBe(false)
-    e = pide(e, 1, 'apostar', { tipo: 'pasar' }, 0).estado
+    const total = sumaDinero(e)
+    const sale = pide(e, 0, 'abandonar', {}, 0)
+    expect(sale.estado.motor.players[0].folded).toBe(true)
+    expect(sale.efectos).toEqual([])
+    e = pide(sale.estado, 1, 'apostar', { tipo: 'pasar' }, 0).estado
     const r = pide(e, 2, 'apostar', { tipo: 'pasar' }, 0)
     const cierre = r.efectos.find((x) => x.tipo === 'mano_cerrada')
-    expect(cierre.ganador).toBe(0)
+    expect(cierre.ganador).not.toBe(0)
     expect(cierre.pilas[0]).toBe(0)
-    expect(r.efectos).toContainEqual({ tipo: 'salida', asiento: 0, monto: 300 })
+    expect(r.efectos).toContainEqual({ tipo: 'salida', asiento: 0, monto: 0 })
     expect(r.estado.motor.players[0].eliminated).toBe(true)
-    expect(r.estado.motor.players[0].chips).toBe(0)
-    expect(r.estado.asientos[0].cobrado).toBe(300)
-    expect(vistaDe(r.estado, 1).resultado.ganador).toBe(0)
+    expect(r.estado.asientos[0].cobrado).toBe(0)
+    expect(suma(cierre.pilas)).toBe(total)
+    expect(vistaDe(r.estado, 1).resultado.ganador).toBe(cierre.ganador)
     const sig = reclama(r.estado, 1)
     expect(sig.motor.players[0].folded).toBe(true)
     expect(sig.motor.aliveCount).toBe(2)
@@ -651,7 +663,9 @@ describe('MOT-1 1b · el abandono', () => {
     expect(r.efectos.filter((x) => x.tipo === 'salida')).toEqual([])
   })
 
-  it('actúa al instante: en su turno se retira y en el descarte descarta vacío, sin esperar el reloj', () => {
+  // MES-PvP 3-A · reescrita: con la C-8 vieja, fuera de su turno esperaba a que le tocara, en
+  // el descarte descartaba vacío y en all-in seguía en la mano. Con la v1.2 se retira en el acto.
+  it('se retira en el acto, en cualquier fase: en su turno, fuera de él, en el descarte y en all-in (C-8, v1.2)', () => {
     // Abandona en su turno: se retira ya, aunque pudiera pasar, y el reloj es del siguiente.
     const e = hastaFase(hastaLaMano(3), PHASES.BET_1)
     const primero = e.motor.activePlayerIndex
@@ -662,35 +676,37 @@ describe('MOT-1 1b · el abandono', () => {
     expect(enSuTurno.estado.motor.activePlayerIndex).toBe(segundo)
     expect(enSuTurno.estado.vencimiento).toEqual({ clase: CLASES.TURNO, hora: 1000 + 20000 })
 
-    // Abandona antes de que le toque: se retira cuando le llega, y sin dar un paso más.
+    // Abandona antes de que le toque: se retira ya, y el reloj de quien juega no cambia.
     const antes = pide(e, segundo, 'abandonar', {}, 0).estado
-    expect(antes.motor.players[segundo].folded).toBe(false)
+    expect(antes.motor.players[segundo].folded).toBe(true)
+    expect(antes.motor.activePlayerIndex).toBe(primero)
+    expect(antes.vencimiento).toEqual(e.vencimiento)
     const movio = pide(antes, primero, 'apostar', { tipo: 'pasar' }, 1000).estado
-    expect(movio.motor.players[segundo].folded).toBe(true)
     expect(movio.motor.activePlayerIndex).toBe(tercero)
 
-    // En el descarte: si era el último que faltaba, la mesa sigue en el acto.
+    // En el descarte: no descarta, está retirado; si era el último que faltaba, la mesa sigue en el acto.
     let d = hastaFase(hastaLaMano(3), PHASES.DISCARD)
     d = pide(d, 0, 'descartar', { mano: d.motor.handCount, indices: [0] }, 0).estado
     d = pide(d, 1, 'descartar', { mano: d.motor.handCount, indices: [] }, 0).estado
     const cartas = d.motor.players[2].cards.map((c) => c.id)
     const ultimo = pide(d, 2, 'abandonar', {}, 0).estado
+    expect(ultimo.motor.players[2].folded).toBe(true)
     expect(ultimo.vencimiento.clase).toBe(CLASES.REPOSICION)
-    expect(ultimo.descartaron).toEqual([1, 0, 0])
+    expect(ultimo.descartaron).toEqual([1, 0, null])
     expect(ultimo.motor.players[2].cards.map((c) => c.id)).toEqual(cartas)
     expect(reclama(ultimo).motor.phase).toBe(PHASES.BET_3)
 
-    // En all-in no se retira y llega al descarte: descarta vacío al abrirse.
+    // En all-in también: se retira al abandonar y no llega al descarte.
     let v = hastaFase(hastaLaMano(3), PHASES.BET_2)
     const uno = v.motor.activePlayerIndex
     const dos = reclama(v, uno).motor.activePlayerIndex
     const tres = 3 - uno - dos
     v = pide(conJugador(v, tres, { allIn: true, chips: 0 }), tres, 'abandonar', {}, 0).estado
+    expect(v.motor.players[tres].folded).toBe(true)
     v = pide(v, uno, 'apostar', { tipo: 'pasar' }, 0).estado
     v = pide(v, dos, 'apostar', { tipo: 'pasar' }, 0).estado
     expect(v.motor.phase).toBe(PHASES.DISCARD)
-    expect(v.motor.players[tres].folded).toBe(false)
-    expect(v.descarte[tres]).toEqual([])
+    expect(v.descarte[tres]).toBe(null)
     expect(v.vencimiento.clase).toBe(CLASES.DESCARTE)
   })
 
@@ -1034,7 +1050,9 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
     }
     const cuenta = (e) => e.asientos[ausente].vencidos
 
-    it('tres vencimientos seguidos lo abandonan: `ausente` desde el 2.º, y cobra su pila una vez', () => {
+    // MES-PvP 3-A · reescrita en su final: con la C-8 vieja la partida seguía hasta la mano
+    // siguiente; con la v1.2, en la mesa de 2, termina en la misma jugada (R2).
+    it('tres vencimientos seguidos lo abandonan: `ausente` desde el 2.º, cobra su pila una vez y la partida termina', () => {
       let e = aCero(hastaFase(hastaLaMano(2), PHASES.BET_2))
       const total = sumaDinero(e)
       const vistos = []
@@ -1057,12 +1075,12 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(salida.monto).toBeGreaterThan(0)
       expect(cierre.pilas[ausente]).toBe(0)
       expect(e.asientos[ausente].cobrado).toBe(salida.monto)
-      expect(pide(e, ausente, 'apostar', { tipo: 'pasar' }).respuesta.motivo).toBe(M.ASIENTO_ABANDONADO)
+      expect(pide(e, ausente, 'apostar', { tipo: 'pasar' }).respuesta.motivo).toBe(M.PARTIDA_TERMINADA)
 
-      const fin = pide(e, presente, 'reclamar_vencimiento')
-      expect(fin.estado.motor.phase).toBe(PHASES.GAME_OVER)
-      expect(cobrado(fin.estado)).toBe(total)
-      expect(fin.efectos.filter((x) => x.tipo === 'salida').map((x) => x.asiento)).toEqual([presente])
+      expect(e.motor.phase).toBe(PHASES.GAME_OVER)
+      expect(cobrado(e)).toBe(total)
+      expect(ultimo.efectos.map((x) => x.tipo)).toEqual(['mano_cerrada', 'salida', 'salida', 'partida_terminada'])
+      expect(ultimo.efectos.filter((x) => x.tipo === 'salida').map((x) => x.asiento)).toEqual([ausente, presente])
     })
 
     it('da igual quién reclame: lo reclama él mismo y cuenta', () => {
@@ -1126,6 +1144,8 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       d = { ...d, asientos: d.asientos.map((a, i) => (i === 2 ? { ...a, vencidos: 2 } : a)) }
       d = reclama(d)
       expect(d.asientos[2].abandonado).toBe(true)
+      expect(d.motor.players[2].folded).toBe(true)
+      expect(d.descartaron).toEqual([0, 0, null])
       expect(d.asientos[2].cobrado).toBe(null)
       const bet3 = reclama(d)
       expect(bet3.motor.phase).toBe(PHASES.BET_3)
@@ -1188,16 +1208,191 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(r.estado.motorTrasDescarte).toBeUndefined()
     })
 
-    it('quien abandona en la reposición no la repite: se retira al abrirse su turno y cobra al cerrar', () => {
+    // MES-PvP 3-A · reescrita: con la C-8 vieja esperaba a su turno de la apuesta 3. Con la
+    // v1.2 se retira en el acto; en la mesa de 2 el otro cobra el pozo y la partida termina.
+    it('quien abandona en la reposición se retira en el acto, sin repetirla; con uno solo, la partida termina (C-8, v1.2)', () => {
       const e = descartan(enDescarte(2), [[0], [1]])
+      const total = sumaDinero(e)
       const cartas = JSON.stringify(e.motor.players.map((p) => p.cards))
       const turno = e.motorTrasDescarte.activePlayerIndex
-      const r = pide(e, turno, 'abandonar', {}, 0).estado
-      expect(r.vencimiento).toEqual(e.vencimiento)
-      expect(JSON.stringify(r.motor.players.map((p) => p.cards))).toBe(cartas)
-      const fin = pide(r, 1 - turno, 'reclamar_vencimiento')
-      expect(fin.estado.motor.phase).toBe(PHASES.PAYOUT)
-      expect(fin.estado.asientos[turno].cobrado).not.toBe(null)
+      const pila = e.motor.players[turno].chips
+      const r = pide(e, turno, 'abandonar', {}, 0)
+      expect(JSON.stringify(r.estado.motor.players.map((p) => p.cards))).toBe(cartas)
+      expect(partidaTerminada(r.estado)).toBe(true)
+      expect(r.estado.motorTrasDescarte).toBeUndefined()
+      expect(r.efectos.find((x) => x.tipo === 'salida' && x.asiento === turno).monto).toBe(pila)
+      expect(r.estado.asientos[1 - turno].cobrado).toBe(total - pila)
+      expect(vistaDe(r.estado, 1 - turno).resultado.ganador).toBe(1 - turno)
+    })
+
+    // El caso raro de la C-8: la reposición ya traía calculado un showdown que ganaba él.
+    it('el showdown ya calculado se recalcula sin él (C-8, v1.2)', () => {
+      const GANADORA = [carta(1, 'Oros'), carta(12, 'Oros'), carta(11, 'Oros'), carta(10, 'Oros'), carta(7, 'Oros')]
+      const MALA = [carta(2, 'Copas'), carta(3, 'Copas'), carta(4, 'Espadas'), carta(5, 'Bastos'), carta(6, 'Oros')]
+      let e = enDescarte(3)
+      const total = sumaDinero(e)
+      const puesto = e.motor.pot + suma(e.motor.players.map((p) => p.chips))
+      e = conMotor(e, {
+        pot: puesto,
+        players: e.motor.players.map((p, i) => ({
+          ...p, chips: 0, allIn: true, contribMano: puesto / 3, cards: i === 2 ? GANADORA : MALA.map((c) => ({ ...c, id: `${c.id}-${i}` })),
+        })),
+      })
+      const repone = descartan(e, [[], [], []])
+      expect(repone.motorTrasDescarte.phase).toBe(PHASES.PAYOUT)
+      expect(ganadorDeMano(repone.motorTrasDescarte)).toBe(2)
+
+      const r = pide(repone, 2, 'abandonar', {}, 0)
+      expect(r.efectos).toEqual([])
+      expect(r.estado.motor.players[2].folded).toBe(true)
+      expect(ganadorDeMano(r.estado.motorTrasDescarte)).not.toBe(2)
+      const fin = pide(r.estado, 0, 'reclamar_vencimiento')
+      const cierre = fin.efectos.find((x) => x.tipo === 'mano_cerrada')
+      expect(cierre.ganador).not.toBe(2)
+      expect(fin.efectos).toContainEqual({ tipo: 'salida', asiento: 2, monto: 0 })
+      expect(suma(cierre.pilas)).toBe(total)
+    })
+  })
+
+  // ── MES-PvP 3-A · la tabla B de la sonda, fila a fila (Reglas v1.7 §8.2) ──────────────
+  // En cada caso, con su dinero: quien se va cobra exactamente su pila al irse (R3); el pozo
+  // va a quien se queda; la mesa cuadra, todos cobraron y el neto es 0; y en la mesa de 2 la
+  // partida termina en la misma jugada del abandono (R2).
+  describe('MES-PvP 3-A · abandonar es retirarse (C-8, Contrato v1.2)', () => {
+    function abandona(e, x, via = 'x') {
+      const pila = e.motor.players[x].chips
+      const total = sumaDinero(e)
+      const r = via === 'servidor' ? abandonarPorServidor(e, `u${x}`, { ahora: 0 }) : pide(e, x, 'abandonar', {}, 0)
+      expect(r.respuesta.ok).toBe(true)
+      return { r, pila, total }
+    }
+    function terminaYCuadra({ r, pila, total }, x, queda) {
+      expect(partidaTerminada(r.estado)).toBe(true)
+      expect(r.estado.vencimiento).toBe(null)
+      expect(r.efectos.find((f) => f.tipo === 'salida' && f.asiento === x).monto).toBe(pila)
+      expect(r.estado.asientos[x].cobrado).toBe(pila)
+      expect(r.estado.asientos.every((a) => a.cobrado !== null)).toBe(true)
+      expect(cobrado(r.estado)).toBe(total)
+      expect(r.estado.asientos[queda].cobrado).toBe(total - suma(r.estado.asientos.map((a, i) => (i === queda ? 0 : a.cobrado))))
+      expect(r.efectos.at(-1)).toEqual({ tipo: 'partida_terminada', ganador: queda })
+      expect(r.estado.motor.winner).toBe(queda)
+    }
+
+    it('mesa de 2 · en la apuesta, le toca al que se va: el otro cobra el pozo y termina', () => {
+      const e = hastaFase(hastaLaMano(2), PHASES.BET_1)
+      const x = e.motor.activePlayerIndex
+      const hecho = abandona(e, x)
+      terminaYCuadra(hecho, x, 1 - x)
+      expect(hecho.r.efectos.map((f) => f.tipo)).toEqual(['mano_cerrada', 'salida', 'salida', 'partida_terminada'])
+      expect(hecho.r.efectos[0].ganador).toBe(1 - x)
+    })
+
+    it('mesa de 2 · en la apuesta, le toca al que se queda: pierde lo que apostó, sin que corra el reloj de nadie (la sonda: cobraba 1.600)', () => {
+      let e = hastaFase(hastaLaMano(2), PHASES.BET_1)
+      const x = e.motor.activePlayerIndex
+      e = pide(e, x, 'apostar', { tipo: 'apostar', k: 2 }, 0).estado
+      expect(e.motor.activePlayerIndex).toBe(1 - x)
+      const hecho = abandona(e, x)
+      terminaYCuadra(hecho, x, 1 - x)
+      expect(hecho.pila).toBe(1500 - 100 - 200)
+      expect(hecho.r.estado.asientos[1 - x].cobrado).toBe(1500 + 300)
+      const vista = vistaDe(hecho.r.estado, 1 - x)
+      expect(vista.phase).toBe(PHASES.GAME_OVER)
+      expect(vista.resultado.ganador).toBe(1 - x)
+    })
+
+    it('mesa de 2 · en el descarte: nadie más descarta, el otro cobra el pozo y termina', () => {
+      const e = hastaFase(hastaLaMano(2), PHASES.DISCARD)
+      const hecho = abandona(e, 1)
+      terminaYCuadra(hecho, 1, 0)
+      expect(hecho.r.estado.descarte).toEqual([null, null])
+    })
+
+    it('mesa de 2 · en la reposición: lo prueba «quien abandona en la reposición…» (arriba)', () => {
+      const e = pide(pide(hastaFase(hastaLaMano(2), PHASES.DISCARD), 0, 'descartar', { mano: 1, indices: [0] }, 0).estado, 1, 'descartar', { mano: 1, indices: [] }, 0).estado
+      expect(e.vencimiento.clase).toBe(CLASES.REPOSICION)
+      terminaYCuadra(abandona(e, 0), 0, 1)
+    })
+
+    it('mesa de 2 · entre manos, en el pago: cobra ya y la partida termina sin esperar la mano siguiente', () => {
+      let e = hastaFase(hastaLaMano(2), PHASES.BET_1)
+      e = pide(e, e.motor.activePlayerIndex, 'apostar', { tipo: 'retirarse' }, 0).estado
+      expect(e.vencimiento.clase).toBe(CLASES.MANO_SIGUIENTE)
+      const hecho = abandona(e, 0)
+      terminaYCuadra(hecho, 0, 1)
+      expect(hecho.r.efectos.map((f) => f.tipo)).toEqual(['salida', 'salida', 'partida_terminada'])
+      // La vista del fin conserva el resultado de esa mano: el cliente ya lo estaba pintando.
+      expect(vistaDe(hecho.r.estado, 1).resultado).not.toBe(null)
+    })
+
+    it('mesa de 2 · entre manos, en el barajado de una mano con el ante cobrado: es mano en curso', () => {
+      const e = hastaLaMano(2)
+      expect(e.vencimiento.clase).toBe(CLASES.BARAJADO)
+      expect(e.motor.pot).toBe(200)
+      const hecho = abandona(e, 0)
+      terminaYCuadra(hecho, 0, 1)
+      expect(hecho.pila).toBe(1400)
+      expect(hecho.r.estado.asientos[1].cobrado).toBe(1600)
+    })
+
+    it('mesa de 2 · en la pausa de anuncio y en el sorteo: cobra sin ante y la partida termina', () => {
+      const pausa = pausaDeLaMano(crearLlena(2), 5)
+      terminaYCuadra(abandona(pausa, 1), 1, 0)
+      const sorteo = abandona(crear(2), 1)
+      terminaYCuadra(sorteo, 1, 0)
+      expect(sorteo.r.estado.asientos.map((a) => a.cobrado)).toEqual([1500, 1500])
+      // Sin mano que cerrar, el fin no trae resultado.
+      expect(vistaDe(sorteo.r.estado, 0).resultado).toBe(null)
+    })
+
+    it('las tres vías, el mismo camino: la otra mesa (servidor) y el 3.er vencimiento, en el descarte', () => {
+      const e = hastaFase(hastaLaMano(2), PHASES.DISCARD)
+      const porX = abandona(e, 1).r
+      const porServidor = abandona(e, 1, 'servidor')
+      terminaYCuadra(porServidor, 1, 0)
+      expect(porServidor.r.efectos).toEqual(porX.efectos)
+
+      const conDos = { ...e, asientos: e.asientos.map((a, i) => (i === 1 ? { ...a, vencidos: 2 } : a)) }
+      const listo = pide(conDos, 0, 'descartar', { mano: e.motor.handCount, indices: [] }, 0).estado
+      const pila = listo.motor.players[1].chips
+      const r = pide(listo, 0, 'reclamar_vencimiento')
+      terminaYCuadra({ r, pila, total: sumaDinero(listo) }, 1, 0)
+      expect(r.efectos.filter((f) => f.tipo === 'salida')).toEqual(porX.efectos.filter((f) => f.tipo === 'salida'))
+    })
+
+    it('mesa de 3 · uno abandona a mitad de mano: la mano sigue entre los otros dos y cobra su pila al cerrar', () => {
+      const e = hastaFase(hastaLaMano(3), PHASES.BET_1)
+      const activo = e.motor.activePlayerIndex
+      const x = (activo + 1) % 3
+      const { r, pila, total } = abandona(e, x)
+      expect(r.efectos).toEqual([])
+      expect(r.estado.motor.players[x].folded).toBe(true)
+      expect(r.estado.motor.activePlayerIndex).toBe(activo)
+      // Los otros dos juegan: apuesta uno, se retira el otro.
+      let m = pide(r.estado, activo, 'apostar', { tipo: 'apostar', k: 1 }, 0).estado
+      const cierre = pide(m, m.motor.activePlayerIndex, 'apostar', { tipo: 'retirarse' }, 0)
+      m = cierre.estado
+      expect(m.motor.phase).toBe(PHASES.PAYOUT)
+      expect(partidaTerminada(m)).toBe(false)
+      expect(cierre.efectos).toContainEqual({ tipo: 'salida', asiento: x, monto: pila })
+      const mano = cierre.efectos.find((f) => f.tipo === 'mano_cerrada')
+      expect(mano.ganador).toBe(activo)
+      expect(mano.pilas[x]).toBe(0)
+      expect(suma(mano.pilas) + pila).toBe(total)
+    })
+
+    it('mesa de 3 · después abandona el segundo a mitad de mano: el último cobra el pozo y la partida termina', () => {
+      let e = hastaFase(hastaLaMano(3), PHASES.BET_1)
+      const primero = (e.motor.activePlayerIndex + 1) % 3
+      e = abandona(e, primero).r.estado
+      e = jugarHasta(e, (x) => x.motor.handCount === 2 && x.motor.phase === PHASES.BET_1 && x.vencimiento.clase === CLASES.TURNO)
+      expect(e.motor.players[primero].eliminated).toBe(true)
+      const vivos = [0, 1, 2].filter((i) => i !== primero)
+      const segundo = vivos.find((i) => i !== e.motor.activePlayerIndex)
+      const queda = vivos.find((i) => i !== segundo)
+      const hecho = abandona(e, segundo)
+      terminaYCuadra(hecho, segundo, queda)
+      expect(hecho.r.efectos.find((f) => f.tipo === 'mano_cerrada').ganador).toBe(queda)
     })
   })
 

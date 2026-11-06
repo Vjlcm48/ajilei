@@ -50,8 +50,13 @@ function sorteoVisto({ sorteo }, asiento) {
   }
 }
 
+// v1.2 · el fin que llega en la misma jugada que cierra la mano (R2, `terminarSiQuedaUno`)
+// conserva las contribuciones de esa mano; el de `startHand` las pone a cero. Con ellas, la
+// vista del fin publica el resultado de la mano, y el cliente enseña su pago antes.
+const finConPago = (motor) => motor.phase === PHASES.GAME_OVER && motor.players.some((p) => (p.contribMano ?? 0) > 0)
+
 function resultadoVisto(motor) {
-  if (motor.phase !== PHASES.PAYOUT) return null
+  if (motor.phase !== PHASES.PAYOUT && !finConPago(motor)) return null
   const base = { ganador: ganadorDeMano(motor), ganadoresPorCapa: ganadoresDeCapas(motor) }
   if (!huboRevelacion(motor)) return base
   return {

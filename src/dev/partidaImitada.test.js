@@ -43,6 +43,8 @@ describe('MES-PvP 2 · las escenas', () => {
   it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, y `descarte-propio` (MES-PvP 3)', () => {
     expect([...ESCENAS_PVP].sort()).toEqual(Object.keys(ESPERADO).sort())
     expect(ESCENAS_PVP).toHaveLength(22)
+    expect(mesasDe('abandono')).toEqual([3, 4, 5])
+    expect(mesasDe('final-fuera')).toEqual([3, 4, 5])
     expect(mesasDe('aviso-salida')).toEqual([3, 4, 5])
     expect(mesasDe('sorteo-empate-3')).toEqual([3, 4, 5])
     expect(mesasDe('turno-propio')).toEqual([2, 3, 4, 5])

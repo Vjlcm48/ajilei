@@ -200,8 +200,10 @@ const ESCENAS = {
       descarte: (_x, i) => (i === m.otro ? RELOJ : []),
     }),
   },
-  // Un rival abandona con la mano en curso, en el turno del propio.
+  // Un rival abandona con la mano en curso, en el turno del propio, y la mano sigue. Con dos
+  // no cabe: desde MES-PvP 3-A la partida terminaría (R2).
   abandono: {
+    minimo: 3,
     jugar: (m) => {
       hastaTurnoPropio(m)
       pide(m, m.otro, 'abandonar')
@@ -224,8 +226,10 @@ const ESCENAS = {
       hasta(m, partidaTerminada)
     },
   },
-  // El propio abandona y cobra, con la partida sin terminar.
+  // El propio abandona y cobra, con la partida sin terminar. Con dos no cabe: desde
+  // MES-PvP 3-A la partida terminaría (R2).
   'final-fuera': {
+    minimo: 3,
     jugar: (m) => {
       hastaPrimeraApuesta(m)
       pide(m, m.yo, 'abandonar')
