@@ -1,4 +1,4 @@
-# AJILEI · MOT-1 · Contrato del árbitro · v1.1
+# AJILEI · MOT-1 · Contrato del árbitro · v1.2
 
 - **Normativo de MOT-1.** Las fichas 1b–1f se escriben contra este documento: lo que no esté aquí no se construye.
 - **Base:** `main` en `1f5cb14`. Toda cita `archivo:líneas` es de ese árbol.
@@ -10,6 +10,7 @@
 - **Al día con la 1d-ii (2026-11-04):** el §6, el §7 y el §9 recogen la precisión de la C-10 (borrar la cuenta no cierra la partida de los demás, con la excepción del anfitrión) y que la llamada a los puntos vive en `guardar_jugada`.
 - **Al día con la 1e (2026-11-04):** el §5 dice que la recepción con un cliente suscrito se prueba en la 1f. La línea anterior de la 1d-i queda corregida por esta.
 - **Al día con MES-PvP, sub-tanda 0 (2026-11-05):** v1.1. El §2, el §3, el §4, el §6, el §7, el §9 y el §11 recogen lo que necesita la mesa real, con las decisiones del rector y de Victor sobre la Fase 0 de MES-PvP. Lo normativo para MES-PvP es este mismo archivo. Las citas de lo nuevo son del árbol `de468b3`.
+- **Al día con MES-PvP, sub-tanda 3-A (2026-11-06):** v1.2, la del árbitro que se despliega con ella. La **regla C-8** (el abandono, §7) se reescribe según las Reglas v1.7 §8.2: abandonar es retirarse en el acto, en cualquier fase; si queda uno solo en la mano, cobra el pozo; con menos de 2 sentados la partida termina en la misma jugada; quien se va cobra su pila al irse, y con mano en curso al cerrarse esa mano; el showdown ya calculado se recalcula sin él; las tres vías siguen el mismo camino. El §2, el §4 y el §6 se ponen al día con ella. **Renumeración:** lo que la v1.1 dejaba para el árbitro y el Contrato «v1.2» (la recarga PvP, la reposición uno a uno y el volteo de 5 s del sorteo, en el informe de la sub-tanda 3) pasa a la **v1.3**. Las citas de lo nuevo son del árbol `db0313b`.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -139,10 +140,10 @@ Cada ronda, el tope y el vencimiento están en el §6.
 |---|---|
 | **Campos** | Ninguno |
 | **Precondiciones** | Las comunes |
-| **Efecto** | Marca el asiento como abandonado y no mueve dinero. El resto, en el §7 |
+| **Efecto** | Marca el asiento como abandonado y, con mano en curso, lo retira en el acto (regla C-8, §7). Con mano en curso no mueve dinero: cobra al cerrarse la mano. El resto, en el §7 |
 | **Motivos** | Solo los comunes. Un segundo `abandonar` recibe `asiento_abandonado` |
 
-El abandono por regla de una partida por cuenta no pasa por esta acción: lo marca el servidor, sin versión del cliente (§7). El abandono por ausencia (§6) tampoco: lo marca el árbitro al resolver un vencimiento.
+El abandono por regla de una partida por cuenta no pasa por esta acción: lo marca el servidor, sin versión del cliente (§7). El abandono por ausencia (§6) tampoco: lo marca el árbitro al resolver un vencimiento. Desde la v1.2 las tres vías siguen el mismo camino (C-8, `partida.js`, `retirarEnMano` y `terminarSiQuedaUno`).
 
 ### `volver_anuncio`
 
@@ -232,6 +233,7 @@ La arma `vistaDe(estado, asiento)` en la 1b. Lo que no esté en la primera tabla
 | Descarte | Quién ya descartó, y cuántas tras aplicarse | No: árbitro. `applyDiscard` lo cuenta y no lo guarda (`gameEngine.js:688, :700`) |
 | Sorteo | La ronda abierta, las cinco posiciones propias sin valor y quién ya eligió; tras el volteo, la carta elegida de cada participante en cada ronda y su posición (`rondas[].volteo[].posicion`) | No: árbitro |
 | Revelación, solo en `PAYOUT` por showdown | Cartas y `score` de los no retirados; ganadores por capa | Datos sí (`gameEngine.js:238-241`, `pozos.js:311`). El filtro es de `vistaDe` |
+| `resultado` en el fin, desde la v1.2 | Si la partida termina en la misma jugada que cierra una mano (C-8, R2), la vista del fin publica el `resultado` de esa mano, con la forma del pago. En los demás fines vale `null`. Es lo que deja al cliente enseñar el pago antes de la pantalla final. No es un campo nuevo | No: árbitro (`vista.js`, `finConPago`) |
 | Fin por retirada de los demás | Ganador, sin cartas de nadie | Sí (`gameEngine.js:198-207`) |
 
 ### Lo que no sale nunca del servidor
@@ -296,7 +298,7 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 | Elección del sorteo | Termina el reparto de la ronda | 10 s por ronda | Toma la posición 0 de quien no eligió y voltea. El abandonado no espera: la toma al instante (§7) |
 | Volteo del sorteo · `volteo_sorteo` | Voltean las elegidas | 4 s, **provisional · se cierra con los teléfonos** | La Mano queda fijada y arranca la primera mano, o se abre la ronda siguiente |
 | Turno | Le toca a un asiento en `BET_*` | `TURN_TIME` = 20 s (`GameTable.jsx:87`) | `pasar` si es legal; si no, `retirarse` (`GameTable.jsx:913-914`). El abandonado no llega a vencer: se retira en el acto (§7) |
-| Descarte | Se abre `DISCARD` | `TURN_TIME` = 20 s (`GameTable.jsx:890`) | Descarte vacío para quien falte (`GameTable.jsx:917`) y aplica. El abandonado no espera: descarta vacío en el acto (§7) |
+| Descarte | Se abre `DISCARD` | `TURN_TIME` = 20 s (`GameTable.jsx:890`) | Descarte vacío para quien falte (`GameTable.jsx:917`) y aplica. El abandonado no descarta: está retirado desde que abandonó (C-8, §7) |
 | Reposición · `reposicion` | Se aplica el descarte | Una sola tanda de vuelos a la vez: todos reponen en paralelo, con la fórmula del reparto sobre el mayor descarte (120 + mayor × 595 + 400 ms). Si nadie descartó, 600 ms. **provisional · se cierra con los teléfonos** | El motor sale de `DISCARD`: se abre `BET_3` y su turno, o lo que toque. Ver abajo |
 | Reparto | `DEAL_2` o `DEAL_3` | Espera de animación | `advanceFromDeal` (`gameEngine.js:603`) |
 | Aviso de salida · `aviso_salida` | `startHand` deja eliminados nuevos y la partida sigue | 3 s, **provisional · se cierra con los teléfonos** | Empieza el barajado |
@@ -306,7 +308,7 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 
 **`TURN_TIME` no está exportado:** vive dentro del componente de mesa. La 1b lo lleva a donde el árbitro lo lea, sin cambiar la cifra.
 
-**Durante la reposición, la mano sigue en `DISCARD`.** La vista ya lleva las cartas nuevas de cada asiento y `descarte.cuantas`, y `vencimiento.clase` dice `reposicion`. El motor no abre `BET_3`, no llega al showdown ni paga hasta que vence: nadie ve el resultado antes de ver reponer, y ningún reloj de turno corre durante la animación. Una `apostar` recibe `fase`, y una `descartar`, `ya_descarto`. Quien abandona en la reposición sigue la regla de siempre: actúa al abrirse su turno y cobra al cerrar la mano (§7).
+**Durante la reposición, la mano sigue en `DISCARD`.** La vista ya lleva las cartas nuevas de cada asiento y `descarte.cuantas`, y `vencimiento.clase` dice `reposicion`. El motor no abre `BET_3`, no llega al showdown ni paga hasta que vence: nadie ve el resultado antes de ver reponer, y ningún reloj de turno corre durante la animación. Una `apostar` recibe `fase`, y una `descartar`, `ya_descarto`. Quien abandona en la reposición se retira en el acto (C-8, §7): lo calculado para la apuesta 3 o el showdown se recalcula sin él, y si queda uno solo, cobra el pozo.
 
 ### El sorteo
 
@@ -367,7 +369,7 @@ Sustituye a la «gracia de reconexión». No se distingue a quien no está de qu
 | Qué cuenta | Cada vencimiento propio resuelto por el reloj: turno de apuesta o descarte. Da igual qué cliente lo reclame. Agotar la pausa de anuncio no cuenta, y tampoco la elección del sorteo: quien no elige recibe la posición 0, sin falta |
 | Qué pone a 0 la cuenta | Cualquier acción propia: `apostar`, `descartar`, `elegir_carta_sorteo` o `volver_anuncio` |
 | `ausente` | `true` en la vista desde el 2.º vencimiento seguido |
-| Abandono | Al llegar a **`N_AUSENCIA` = 3** vencimientos seguidos, **provisional · se cierra con los teléfonos**. El árbitro lo abandona por la misma ruta que `abandonarPorServidor`, y el §7 dice qué pasa con su dinero. En su turno de apuesta, ese 3.er vencimiento lo retira, como a cualquier abandonado |
+| Abandono | Al llegar a **`N_AUSENCIA` = 3** vencimientos seguidos, **provisional · se cierra con los teléfonos**. El árbitro lo abandona por la misma ruta que `abandonarPorServidor`, y el §7 dice qué pasa con su dinero. Ese 3.er vencimiento lo retira, en su turno de apuesta o en el descarte, como a cualquier abandonado (C-8) |
 | Lo que ve el que vuelve | MES-PvP, sub-tanda 6 |
 
 ### Publicidad
@@ -433,11 +435,13 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Punto | Regla |
 |---|---|
 | Si el jugador abre otra mesa, en cualquier aparato | Su asiento PvP vivo queda **abandonado** |
-| Qué pasa con su turno | Actúa al instante, sin reloj: en su turno de apuesta se retira, y si abandonó antes, lo hace al tocarle. En all-in o sin turno (`pozos.js:120` · `gameEngine.js:361-363`), sigue disputando la mano por lo que puso |
-| En el descarte | Descarta vacío al instante, al abandonar o al abrirse la fase. Si ya había descartado, conserva su descarte. Si era el último que faltaba, la fase se aplica en el acto |
+| Qué pasa en la mano (regla C-8, v1.2) | **Se retira en el acto, en cualquier fase**: en la apuesta (le toque o no; en su turno, por el motor), en el descarte, en la reposición, y en el barajado y el reparto de una mano con el ante cobrado. También en all-in. Pierde lo que puso y no es elegible en ninguna capa. Si queda uno solo en la mano, cobra el pozo por la ruta de los retiros (el resultado de `resolveWinner`, `gameEngine.js:198-207`, con `ganadoresPorCapa` y `repartirCapas`); si quedan dos o más, la mano sigue sin él. Si se van a la vez todos los que seguían en la mano (varios terceros vencimientos en el mismo descarte), el más cercano a la Mano no se retira y cobra el pozo, como el último en pie del motor |
+| En el descarte | No descarta: está retirado. Si era el último que faltaba, la fase se aplica en el acto |
+| En la reposición | Lo calculado (la apuesta 3 o el showdown) se recalcula sin él, con las cartas nuevas ya repuestas |
+| Fin de partida (R2) | Con menos de 2 sentados (ni abandonados ni eliminados), la partida termina **en la misma jugada**, sin empezar otra mano: el estado final y el dinero quedan resueltos ahí. Si la mano se cerró en esa jugada, el fin conserva sus contribuciones y la vista publica su `resultado` (§4) |
 | En el sorteo | Elige al instante la posición 0, al abandonar o al abrirse la elección, también en las rondas de desempate. Si era el último que faltaba, voltea en el acto. Si gana, la Mano pasa al siguiente vivo |
-| Qué cobra | Su pila, al cerrar la mano, con el premio si gana. Sin mano en curso, en el acto. **La pausa de anuncio es «sin mano en curso»:** quien abandona en ella cobra en el acto y no paga el ante. Sale de `enAnuncio`, y si era el último que faltaba, la mano arranca |
-| Lo que ya puso en el pozo | No se le devuelve. Eso no significa que lo pierda si gana |
+| Qué cobra | **Su pila al irse, nunca más** (R3): con mano en curso, al cerrarse esa mano y sin nada del pozo; sin mano en curso, en el acto. Lo que nadie igualó le vuelve, como a cualquiera que se retira (D-7). **La pausa de anuncio es «sin mano en curso»:** quien abandona en ella cobra en el acto y no paga el ante. Sale de `enAnuncio`, y si era el último que faltaba, la mano arranca |
+| Lo que ya puso en el pozo | Lo pierde: se retiró (C-8). Antes de la v1.2 lo seguía disputando y podía ganarlo |
 | Después de cobrar | Sale de la mesa: el árbitro lo marca eliminado y `startHand` ya no lo cuenta (`gameEngine.js:510-518`) |
 | La pieza | `cerrar_partida_abierta` solo conoce `mesas_ia` (`eco1c:303-343`). La 1d-ii la lleva a los dos modos |
 
