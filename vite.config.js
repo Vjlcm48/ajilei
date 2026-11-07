@@ -54,4 +54,7 @@ export default defineConfig({
   // Permite abrir `vite preview` a través de un túnel temporal de Cloudflare
   // (pruebas con teléfonos reales fuera de la red local). Solo afecta a preview.
   preview: { allowedHosts: ['.trycloudflare.com'] },
+  // MES-PvP L-M 1 · lo mismo para el servidor de desarrollo: la lámina (`?pvp=`, con el bypass
+  // de `.env.local`) se abre en el teléfono por un túnel contra 5173.
+  server: { allowedHosts: ['.trycloudflare.com'] },
 })
