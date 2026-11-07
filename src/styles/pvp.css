@@ -173,3 +173,47 @@
    mueve nada). */
 body.pvp-en-sorteo .game-table-screen .pot-box,
 body.pvp-en-sorteo .game-table-screen .comodin-note { visibility: hidden; }
+
+/* ── L-M 2 · Los mensajes de la mesa (lámina) ─────────────────────────────────
+   La burbuja es la de las IAS (`.u2-burbuja`, piel en gameTable.css y menuMovil.css); aquí solo
+   lo que cambia en PvP. Las ajenas cuelgan BAJO el nombre de su recuadro: el pico va arriba. */
+.u2-burbuja.pvp-msj-ajena::before,
+.u2-burbuja.pvp-msj-ajena::after {
+  border: var(--u2-pico) solid transparent;
+  border-top: 0;
+}
+.u2-burbuja.pvp-msj-ajena::before {
+  top: auto;
+  bottom: 100%;
+  border-bottom-color: rgba(var(--text-primary-rgb), 0.22);
+}
+.u2-burbuja.pvp-msj-ajena::after {
+  top: auto;
+  bottom: calc(100% - 1px);
+  border-bottom-color: var(--surface-modal);
+}
+/* Congelada (lámina): cada burbuja en su instante. */
+.pvp-msj-propia.es-congelada .u2-burbuja {
+  animation-delay: var(--pvp-msj-ms);
+  animation-play-state: paused;
+}
+
+/* El freno de 10 s (variante a, elegida por Victor): la entrada 💬 atenuada, sin respuesta, con un anillo que se
+   vacía. `--pvp-freno-frac` (1 → 0) lo pone la capa en `body`. */
+body.pvp-freno .util-item-reacciones {
+  opacity: 0.6;
+  pointer-events: none;
+}
+body.pvp-freno .util-item-reacciones .util-ico { position: relative; }
+body.pvp-freno .util-item-reacciones .util-ico::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: conic-gradient(var(--gold-brand) calc(var(--pvp-freno-frac, 0) * 1turn), rgba(255, 255, 255, 0.12) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+}
+/* La propia sobre el óvalo (teléfono vertical): sin pico. */
+.u2-burbuja.pvp-msj-ajena.es-en-ovalo::before,
+.u2-burbuja.pvp-msj-ajena.es-en-ovalo::after { content: none; }

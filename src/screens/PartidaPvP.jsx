@@ -11,6 +11,7 @@ import { cargarMesa, fabricaMesa } from '../lib/cargarMesa'
 import { CLASE_DESCARTE, CLASE_ELECCION, CLASE_TURNO } from '../lib/partidaCliente'
 import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
 import SorteoMesa from './SorteoMesa'
+import MensajesMesa from './MensajesMesa'
 import { AVISO_RELOJ_S } from '../lib/sorteoMesaCore'
 
 // ── MES-PvP 3 · La partida entre personas ───────────────────────────────────
@@ -128,7 +129,13 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   // L-M 1 · en el sorteo el mensaje va en la franja de la capa; la línea de la crónica del
   // óvalo se queda vacía.
   const enSorteo = escena === 'sorteo' && !!game
-  const partidaMesa = useMemo(() => (enSorteo ? { ...foto, cronica: '' } : foto), [foto, enSorteo])
+  // L-M 2 · §4 · tú, ausente (desde el 2.º vencimiento propio seguido): el aviso va en la línea
+  // de la crónica hasta que juegues (variante a, elegida por Victor en el STOP-L de la tanda 2).
+  const yo = game?.players[0]
+  const yoAusente = !!yo?.ausente && !yo.abandonado && escena === 'mesa'
+  const cronicaAusente = yoAusente ? t('pvp.ausente.aviso') : null
+  const partidaMesa = useMemo(() => (enSorteo ? { ...foto, cronica: '' }
+    : cronicaAusente ? { ...foto, cronica: cronicaAusente } : foto), [foto, enSorteo, cronicaAusente])
 
   if (escena === 'arrancando' || !game) {
     return <Traje sala={sala} t={t}><Aviso texto={t('pvp.arrancando')} t={t} pvp="arrancando" /></Traje>
@@ -151,6 +158,8 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
       />
       {enSorteo && <SorteoMesa game={game} reloj={reloj} enviar={foto.enviar} anfitrion={foto.anfitrion} lamina={partida?.lamina ?? null} />}
       {escena === 'anuncio' && <CapaAnuncio game={game} enviar={foto.enviar} t={t} />}
+      {/* L-M 2 · §2 · los mensajes; durante tu pausa de anuncio no se pintan (propuesta). */}
+      <MensajesMesa partida={partida} oculta={escena === 'anuncio'} />
     </Suspense>
   )
 }
