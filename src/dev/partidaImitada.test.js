@@ -56,6 +56,15 @@ const ESPERADO = {
   'sorteo-azar-propio': ['sorteo', (v) => v.sorteo.rondas.at(-1).azar && v.sorteo.rondas.at(-1).mano === v.asiento],
   'sorteo-azar-ajeno': ['sorteo', (v) => v.sorteo.rondas.at(-1).azar && ![null, v.asiento].includes(v.sorteo.rondas.at(-1).mano)],
   'sorteo-vuelta': ['sorteo', (v) => v.sorteo.etapa === 'volteo' && ![null, v.asiento].includes(v.sorteo.rondas.at(-1).mano)],
+  // L-M 2 · la mesa de 5 de punta a punta y la ausencia (lámina).
+  'mano-reparto': ['mesa', (v) => clase(v) === 'reparto'],
+  // Llega al primer turno; las cuatro jugadas caen una a una al arrancar (`enPasos`).
+  'ultima-accion': ['mesa', (v) => v.phase === 'BET_1' && clase(v) === 'turno'],
+  'allin-rival': ['mesa', (v) => clase(v) === 'turno' && v.activePlayerIndex === v.asiento && v.players.some((p, i) => i !== v.asiento && p.allIn)],
+  'pago-capas': ['mesa', (v) => v.phase === 'PAYOUT' && v.capas.length >= 2],
+  'ausente-yo': ['mesa', (v) => propio(v).ausente && clase(v) === 'turno' && v.activePlayerIndex === v.asiento],
+  'ausencia-tercero': ['mesa', (v) => v.players.some((p, i) => i !== v.asiento && p.abandonado) && v.phase !== 'GAME_OVER'],
+  'ausencia-fuera': ['final', (v) => propio(v).abandonado],
 }
 
 const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
@@ -63,7 +72,7 @@ const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
 describe('MES-PvP 2 · las escenas', () => {
   it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, `descarte-propio` (MES-PvP 3) y los tres fines de la 3-A', () => {
     expect([...ESCENAS_PVP].sort()).toEqual(Object.keys(ESPERADO).sort())
-    expect(ESCENAS_PVP).toHaveLength(36)
+    expect(ESCENAS_PVP).toHaveLength(43)
     expect(mesasDe('abandono')).toEqual([3, 4, 5])
     expect(mesasDe('aviso-salida')).toEqual([3, 4, 5])
     expect(mesasDe('sorteo-empate-3')).toEqual([3, 4, 5])
@@ -203,13 +212,16 @@ describe('MES-PvP 2 · el mando', () => {
   it('con la puerta abierta, lee la escena y sus datos, y corrige lo que no vale', () => {
     vi.stubEnv('VITE_AUTH_BYPASS', '1')
     // L-M 1 · y los mandos de la lámina, con sus valores por defecto.
-    const lamina = { vivo: false, corte: null, momento: null }
+    const lamina = { vivo: false, corte: null, momento: null, msj: null, msjMs: 1200 }
     expect(leerMandoPvP('?pvp=revelacion&n=4&asiento=3&nombres=largo')).toEqual({ escena: 'revelacion', n: 4, asiento: 3, nombres: 'largo', ...lamina })
     expect(leerMandoPvP('?pvp=revelacion')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })
     expect(leerMandoPvP('?pvp=revelacion&n=9&asiento=7')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })
     expect(leerMandoPvP('?pvp=sorteo-elige&ver=vivo&corte=0&momento=900')).toMatchObject({ vivo: true, corte: 0, momento: 900 })
     expect(leerMandoPvP('?pvp=sorteo-elige&corte=12')).toMatchObject({ corte: null })
     expect(leerMandoPvP('?pvp=sorteo-elige&var=b')).not.toHaveProperty('variante')
+    // L-M 2 · los mensajes de la lámina.
+    expect(leerMandoPvP('?pvp=turno-ajeno&msj=todos&msjms=800')).toMatchObject({ msj: 'todos', msjMs: 800 })
+    expect(leerMandoPvP('?pvp=turno-ajeno&msj=otro')).toMatchObject({ msj: null })
     expect(leerMandoPvP('?pvp=revelacion&n=3&asiento=3')).toMatchObject({ n: 3, asiento: 0 })
     expect(leerMandoPvP('?pvp=inventada')).toBeNull()
     expect(leerMandoPvP('')).toBeNull()

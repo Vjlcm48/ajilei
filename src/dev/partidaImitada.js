@@ -25,6 +25,9 @@ import {
 } from '../arbitro/index.js'
 import { ESPERA_REPARTO_SORTEO_MS } from '../arbitro/reloj.js'
 import { esperaRepartoSorteo } from '../lib/sorteoMesaCore.js'
+import { REACCIONES, codepointDe } from '../config/reacciones.js'
+import { rechazoDeMensaje } from '../lib/mensajesMesaCore.js'
+import { lecturaDeMano } from '../hooks/manoCore.js'
 
 export const MARCA_PARTIDA_IMITADA = 'ajilei:partida-imitada'
 export const PARAM_PVP = 'pvp'
@@ -252,6 +255,130 @@ const escenaDeLamina = ({ guion, llega, luego, minimo, momento }) => ({
   },
 })
 
+// ── L-M 2 · La mesa de 5 de punta a punta y la ausencia ─────────────────────
+// Ficha AJILEI_MES-PvP_LM-2_v1.0.md §3 y §4. Mismo molde: el árbitro real decide; el guion
+// solo dice qué hace cada uno. `golpe` es el último paso: congelada, la escena llega con él
+// dado; con `&ver=vivo`, llega antes y el golpe cae a los `GOLPE_VIVO_MS` (el reloj que vence).
+const GOLPE_VIVO_MS = 2500
+const enTurnoDe = (e, i) => turnoDe(e) && e.motor.activePlayerIndex === i
+const vencidosDe = (e, i) => e.asientos[i].vencidos ?? 0
+
+// Las cuatro últimas acciones distintas antes del turno propio: el primero que habla pasa, el
+// siguiente apuesta, el siguiente sube y los demás igualan (en la de 5, los cuatro rivales).
+function apuestaVariada(m, i) {
+  const { motor } = m.e
+  m.pasaron ??= new Set()
+  if (motor.currentBet === 0) {
+    if (m.pasaron.size === 0 && esLegal(motor, i, 'pasar').ok) { m.pasaron.add(i); return { tipo: 'pasar' } }
+    return { tipo: 'apostar', k: 1 }
+  }
+  if (!m.subio && motor.players[i].contrib === 0 && esLegal(motor, i, 'subir', 1).ok) { m.subio = true; return { tipo: 'subir', k: 1 } }
+  return apuestaPrudente(m, i)
+}
+
+// Pilas escalonadas (300, 650, 1.000, …), que no se igualan justo con ninguna apuesta: con
+// los all-in salen capas, y la pila mayor no queda cubierta, así que hay devolución. La mayor es
+// la del rival siguiente (`otro`): la devolución lleva su nombre.
+function pilasEscalonadas(m) {
+  m.e.asientos.forEach((_a, i) => pila(m, (m.otro + 1 + i) % m.n, 350 * (i + 1) - 50))
+}
+const todoAllIn = (m, i) => {
+  const { motor } = m.e
+  if (esLegal(motor, i, 'allIn').ok) return { tipo: 'allIn' }
+  const k = Math.floor(motor.players[i].chips / motor.unit)
+  if (motor.currentBet === 0 && k > 0 && esLegal(motor, i, 'apostar', k).ok) return { tipo: 'apostar', k }
+  return apuestaPrudente(m, i)
+}
+
+// El guion en el que `quien(m)` deja vencer todo lo suyo.
+const relojDe = (quien) => ({
+  apuesta: (x, i) => (i === quien(x) ? RELOJ : apuestaPrudente(x, i)),
+  descarte: (x, i) => (i === quien(x) ? RELOJ : []),
+})
+
+// Abre la pila mayor con lo más alto que le dejan (×10, ×5, …); los demás igualan si pueden y,
+// si no, van all-in: sale el pozo por capas, y lo que nadie cubre vuelve a quien abrió.
+const MULTIPLOS = [10, 5, 2, 1]
+function apuestaGrande(m, i) {
+  const { motor } = m.e
+  if (motor.currentBet === 0) {
+    const vivos = motor.players.map((p, j) => ({ p, j })).filter(({ p }) => !p.folded && !p.allIn && !p.eliminated)
+    const mayor = vivos.reduce((a, b) => (b.p.chips > a.p.chips ? b : a), vivos[0])
+    if (mayor?.j === i) {
+      const k = MULTIPLOS.find((x) => esLegal(motor, i, 'apostar', x).ok)
+      if (k) return { tipo: 'apostar', k }
+    }
+    return esLegal(motor, i, 'pasar').ok ? { tipo: 'pasar' } : apuestaPrudente(m, i)
+  }
+  if (esLegal(motor, i, 'igualar').ok) return { tipo: 'igualar' }
+  if (esLegal(motor, i, 'allIn').ok) return { tipo: 'allIn' }
+  return apuestaPrudente(m, i)
+}
+
+const ESCENAS_LM2 = {
+  // El reparto de la primera mano, recién decidido el Mano.
+  'mano-reparto': { jugar: (m) => hasta(m, (e) => e.vencimiento?.clase === CLASES.REPARTO) },
+  // Tu turno con la última acción de cada rival a la vista (pasó, apostó, subió, igualó). La
+  // mesa las aprende jugada a jugada (`ultimaDe` compara con la lectura anterior): la escena
+  // llega al primer turno y los rivales juegan uno a uno, también congelada (`enPasos`).
+  'ultima-accion': {
+    minimo: 3,
+    antes: (m) => hasta(m, (e) => turnoDe(e) && e.motor.phase === PHASES.BET_1, { apuesta: apuestaVariada }),
+    enPasos: {
+      guion: { apuesta: apuestaVariada },
+      llega: (e, m) => enTurnoDe(e, m.yo) && e.motor.phase === PHASES.BET_1 && !!m.subio
+        && e.motor.players.every((p, i) => i === m.yo || p.contrib > 0 || m.pasaron?.has(i)),
+    },
+  },
+  // Un rival va all-in con su pila corta; llega tu turno.
+  'allin-rival': {
+    jugar: (m) => {
+      pila(m, m.otro, 300)
+      hasta(m, (e) => enTurnoDe(e, m.yo) && e.motor.players[m.otro].allIn, {
+        apuesta: (x, i) => (i === m.otro ? todoAllIn(x, i) : x.e.motor.currentBet === 0 && i !== m.yo ? { tipo: 'apostar', k: 2 } : apuestaPrudente(x, i)),
+      })
+    },
+  },
+  // El pago con el pozo partido en capas y una devolución.
+  // Afinado tras el STOP-L: un rival gana una capa que no es la principal («El pozo se partió:
+  // … se lleva …», en las mesas de 3 o más) y a otro se le devuelve lo que nadie cubrió.
+  'pago-capas': {
+    jugar: (m) => {
+      pilasEscalonadas(m)
+      hasta(m, (e) => {
+        if (!enPago(e)) return false
+        const l = lecturaDeMano(e.motor)
+        if (!l || !l.devoluciones.some((d) => d.asiento !== l.principal && d.asiento !== m.yo)) return false
+        return m.n === 2 || l.otras.some((o) => o.asiento !== m.yo)
+      }, { apuesta: apuestaGrande })
+    },
+  },
+  // §4 · tú, ausente: el reloj resolvió tus dos últimos turnos y vuelve a tocarte.
+  'ausente-yo': {
+    jugar: (m) => hasta(m, (e) => enTurnoDe(e, m.yo) && vencidosDe(e, m.yo) >= AUSENTE_DESDE, {
+      apuesta: (x, i) => (i === m.yo && vencidosDe(x.e, m.yo) < AUSENTE_DESDE ? RELOJ : apuestaPrudente(x, i)),
+      descarte: (x, i) => (i === m.yo && vencidosDe(x.e, m.yo) < AUSENTE_DESDE ? RELOJ : []),
+    }),
+  },
+  // §4 · el 3.er vencimiento de un rival: abandona y la mano sigue sin él (mesa de 3 o más).
+  'ausencia-tercero': {
+    minimo: 3,
+    antes: (m) => hasta(m, (e) => vencidosDe(e, m.otro) >= AUSENTE_DESDE && turnoDe(e), relojDe((x) => x.otro)),
+    golpe: (m) => hasta(m, (e) => e.asientos[m.otro].abandonado, relojDe((x) => x.otro)),
+  },
+  // §4 · tu 3.er vencimiento: sales de la mesa y ves tu pantalla final. Solo en vivo: quien llega
+  // ya abandonado va al lobby (MES-PvP 3-A, §3.3).
+  'ausencia-fuera': {
+    antes: (m) => ESCENAS_LM2['ausente-yo'].jugar(m),
+    golpe: (m) => hasta(m, (e) => e.asientos[m.yo].abandonado, relojDe((x) => x.yo)),
+  },
+}
+// Con `golpe`, `jugar` llega con él dado (congelada); con `enPasos`, jugando hasta `llega`.
+for (const e of Object.values(ESCENAS_LM2)) {
+  if (e.golpe) e.jugar = (m) => { e.antes(m); e.golpe(m) }
+  if (e.enPasos) e.jugar = (m) => { e.antes(m); hasta(m, (x) => e.enPasos.llega(x, m), e.enPasos.guion) }
+}
+
 // Una por escena: `jugar(m)` llega o lanza `NoLlega`; `minimo` es la mesa más chica posible.
 const ESCENAS = {
   'sorteo-baraja': { jugar: () => {} },
@@ -356,6 +483,7 @@ const ESCENAS = {
       m.muerta = true
     },
   },
+  ...ESCENAS_LM2,
   // Un rival entra con una sola apuesta, la pierde y sale; la mesa sigue. Con dos no cabe:
   // quedaría un solo vivo y la partida terminaría.
   'aviso-salida': {
@@ -381,6 +509,7 @@ export const escenaCabeEn = (escena, n) => n >= (ESCENAS[escena].minimo ?? 2)
  */
 export function crearPartidaImitada({
   escena, n = 2, asiento = 0, nombres = null, semilla = 1, ahora = Date.now, vivo = false, corte = null, momento = null,
+  msj = null, msjMs = 1200,
 }) {
   if (!ESCENAS[escena]) throw new Error(`MES-PvP 2 · escena desconocida: ${escena}`)
   if (!escenaCabeEn(escena, n)) throw new Error(`MES-PvP 2 · «${escena}» no cabe en una mesa de ${n}`)
@@ -414,6 +543,55 @@ export function crearPartidaImitada({
     m = nuevaMesa({ n, asiento, nombres, ahora: ahora() })
     guionVivo = ESCENAS[escena].guion?.(m) ?? {}
     resetRng()
+  }
+  // L-M 2 · `vivo` en una escena con golpe: llega antes, y el golpe (el reloj que vence) cae a
+  // los 2,5 s de arrancar.
+  const golpe = vivo && ESCENAS[escena].golpe ? ESCENAS[escena].golpe : null
+  const enPasos = ESCENAS[escena].enPasos ?? null
+  if (golpe || enPasos) {
+    rng = mulberry32(semillaBuena)
+    setRng(rng)
+    m = nuevaMesa({ n, asiento, nombres, ahora: ahora() })
+    ESCENAS[escena].antes(m)
+    resetRng()
+  }
+  let golpeId = null
+
+  // ── L-M 2 · Los mensajes de la mesa ──────────────────────────────────────
+  // Viajan aparte de la vista (la sub-tanda 5 dirá por dónde): [{ id, asiento, clave, hora }],
+  // con el asiento ya rotado (0 = el propio) y la hora del reloj de quien mira. `msj`:
+  //   uno    · el rival siguiente manda una;
+  //   todos  · los rivales y tú, a la vez (el peor caso: las frases más largas);
+  //   propio · tú mandaste una (el freno corre).
+  // Congelada: cada burbuja se pinta en su ms `msjMs` (lo hace la capa). Con `ver=vivo`, los
+  // rivales hablan solos: a los 1,5 s y luego cada 11 s, escalonados.
+  const mensajes = []
+  let idMsj = 0
+  const LARGAS = [...REACCIONES].sort((a, b) => b.length - a.length)
+  const publica = (k, frase, hora) => mensajes.push({ id: ++idMsj, asiento: k, clave: codepointDe(frase), hora })
+  if (msj && !vivo) {
+    const t0 = ahora() - msjMs
+    if (msj === 'uno') publica(1, REACCIONES[4], t0)
+    if (msj === 'todos') for (let k = 0; k < n; k++) publica(k, LARGAS[k], t0)
+    if (msj === 'propio') publica(0, REACCIONES[1], t0)
+  }
+  let charla = null
+  const arrancarCharla = () => {
+    if (!msj || !vivo || charla) return
+    const t0 = ahora()
+    const rivales = msj === 'propio' ? [] : msj === 'uno' ? [1] : Array.from({ length: n - 1 }, (_x, k) => k + 1)
+    let ronda = 0
+    charla = setInterval(() => {
+      const t = ahora() - t0
+      rivales.forEach((k, j) => {
+        const cuando = 1500 + 400 * j + 11000 * ronda
+        if (t >= cuando && !mensajes.some((x) => x.asiento === k && x.hora >= t0 + cuando - 1)) {
+          publica(k, msj === 'todos' ? LARGAS[(k + ronda) % LARGAS.length] : REACCIONES[(4 + ronda + j) % REACCIONES.length], ahora())
+          poner()
+        }
+      })
+      if (rivales.length && t >= 1500 + 400 * (rivales.length - 1) + 11000 * ronda) ronda++
+    }, 100)
   }
 
   const oyentes = new Set()
@@ -500,12 +678,47 @@ export function crearPartidaImitada({
     lamina: Object.freeze({
       corte, volteoMs: VOLTEO_LAMINA_MS,
       momento: vivo || !deLamina ? null : (momento ?? ESCENAS[escena].momento ?? null),
+      // L-M 2 · las burbujas congeladas en su ms `msjMs`.
+      msjMs: msj && !vivo ? msjMs : null,
     }),
+    mensajes: {
+      lista: () => mensajes,
+      enviar: (clave) => {
+        const motivo = rechazoDeMensaje(mensajes, 0, clave, ahora())
+        if (motivo) return { ok: false, motivo }
+        publica(0, REACCIONES.find((f) => codepointDe(f) === clave), ahora())
+        poner()
+        return { ok: true }
+      },
+    },
     iniciar: async () => {
       setRng(rng)
       if (guionVivo && !conductor) conductor = setInterval(conducir, 100)
+      arrancarCharla()
+      if (enPasos && golpeId === null) {
+        golpeId = setInterval(() => {
+          setRng(rng)
+          if (enPasos.llega(m.e, m)) { clearInterval(golpeId); return }
+          m.t = Math.max(m.t, ahora() + foto.desfase)
+          paso(m, enPasos.guion)
+          poner()
+        }, vivo ? 1200 : 150)
+      }
+      if (golpe && golpeId === null) {
+        golpeId = setTimeout(() => {
+          setRng(rng)
+          m.t = Math.max(m.t, ahora() + foto.desfase)
+          golpe(m)
+          poner()
+        }, GOLPE_VIVO_MS)
+      }
     },
-    parar: () => { clearInterval(conductor); conductor = null; resetRng() },
+    parar: () => {
+      clearInterval(conductor); conductor = null
+      clearInterval(charla); charla = null
+      clearTimeout(golpeId); clearInterval(golpeId); golpeId = null
+      resetRng()
+    },
     revisar: () => {},
     releer: async () => {},
     suscribir: (avisar) => {
@@ -533,7 +746,7 @@ export function crearPartidaImitada({
 
 // ── El mando ────────────────────────────────────────────────────────────────
 
-/** `?pvp=<escena>&n=2..5&asiento=k&nombres=largo&ver=vivo&corte=0&momento=ms`. Detrás de la puerta doble. */
+/** `?pvp=<escena>&n=2..5&asiento=k&nombres=largo&ver=vivo&corte=0&momento=ms&msj=…&msjms=ms`. Detrás de la puerta doble. */
 export function leerMandoPvP(search = globalThis.location?.search ?? '') {
   if (!import.meta.env.DEV) return null
   if (!import.meta.env.VITE_AUTH_BYPASS) return null
@@ -548,8 +761,12 @@ export function leerMandoPvP(search = globalThis.location?.search ?? '') {
   // otro instante). La variante del mazo es la c (STOP-L2) y el corte, el de 10 (STOP-L3).
   const corte = q.get('corte') === '0' ? 0 : null
   const momento = q.has('momento') && Number.isFinite(Number(q.get('momento'))) ? Number(q.get('momento')) : null
+  // L-M 2 · `msj=uno|todos|propio` (los mensajes) y `msjms=<ms>` (el instante de la burbuja
+  // congelada).
+  const msj = ['uno', 'todos', 'propio'].includes(q.get('msj')) ? q.get('msj') : null
+  const msjMs = Number.isFinite(Number(q.get('msjms'))) && q.has('msjms') ? Number(q.get('msjms')) : 1200
   return {
     escena, n, asiento, nombres: q.get('nombres') === 'largo' ? 'largo' : null,
-    vivo: q.get('ver') === 'vivo', corte, momento,
+    vivo: q.get('ver') === 'vivo', corte, momento, msj, msjMs,
   }
 }
