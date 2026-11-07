@@ -21,6 +21,8 @@
 
 import { mkdirSync } from 'node:fs'
 import { PISO_WCAG, TEXTOS, fotosTinta, peorFondo } from '../arnes/tinta.mjs'
+import { runVarasLM } from './varasLM.mjs'
+import { runMensajesLM } from './mensajesLM.mjs'
 
 const VIEWPORTS = [
   { id: '412x915', w: 412, h: 915, movil: true },
@@ -201,7 +203,7 @@ const PANTALLA_DE = (escena) => (
   escena.startsWith('sorteo-') ? '[data-pvp="sorteo"]'
     : escena === 'anuncio-yo' ? '[data-pvp="anuncio"]'
       // Llega con el asiento propio ya abandonado: es quien vuelve, y va al lobby (§3.3).
-      : escena === 'final-fuera' ? '.lob-nav-tienda'
+      : escena === 'final-fuera' || escena === 'ausencia-fuera' ? '.lob-nav-tienda'
         : escena === 'muerta' ? '[data-pvp="muerta"]'
           : ['final-gana', 'final-todas'].includes(escena) ? '.cel-screen'
             : ['final-pierde', 'final-negativo', 'final-cero'].includes(escena) ? '.game-over-screen'
@@ -213,7 +215,9 @@ const ESCENAS = ['sorteo-baraja', 'sorteo-oleadas', 'sorteo-eleccion', 'sorteo-e
   'final-negativo', 'final-cero', 'final-todas',
   // L-M 1 · el sorteo sobre la mesa (lámina): las escenas congeladas de `SORTEO_LAMINA`.
   'sorteo-reparto', 'sorteo-elige', 'sorteo-elige-algunos', 'sorteo-volteo-propio', 'sorteo-volteo-ajeno', 'sorteo-empate',
-  'sorteo-desempate', 'sorteo-desempate-fuera', 'sorteo-azar-propio', 'sorteo-azar-ajeno', 'sorteo-vuelta']
+  'sorteo-desempate', 'sorteo-desempate-fuera', 'sorteo-azar-propio', 'sorteo-azar-ajeno', 'sorteo-vuelta',
+  // L-M 2 · la mesa de 5 de punta a punta y la ausencia (lámina).
+  'mano-reparto', 'ultima-accion', 'allin-rival', 'pago-capas', 'ausente-yo', 'ausencia-tercero', 'ausencia-fuera']
 
 async function escenas(browser, base) {
   const out = []
@@ -367,9 +371,18 @@ export async function runPvp(browser, { base, mesas = MESAS }) {
   }
   const vistas = mesas.length === MESAS.length ? await escenas(browser, base) : []
   for (const v of vistas) console.log(`pvp·escena ${v.escena} · ${v.ok ? 'OK' : 'FALLA'}${v.ok ? '' : ` · ${JSON.stringify(v)}`}`)
+  // L-M 2 · §1.3 · las tres varas de la tanda 1 de la lámina, cada una con su control rojo.
+  const varas = mesas.length === MESAS.length ? (await runVarasLM(browser, base)).celdas : []
+  // L-M 2 · §2–§4 · los mensajes (con su control rojo) y el aviso de ausencia; y las capturas.
+  if (mesas.length === MESAS.length) {
+    const lm2 = await runMensajesLM(browser, base)
+    varas.push(...lm2.celdas)
+    for (const c of lm2.celdas) console.log(`pvp·${c.celda} · ${c.ok ? 'OK' : 'FALLA'} · ${JSON.stringify(c)}`)
+    console.log(`pvp·lm·msj control · ${lm2.control.rojo ? 'ROJO (mide)' : 'NO MIDE'} · capturas fallidas ${lm2.fallosCaptura}`)
+  }
   const largos = await nombresLargos(browser, base)
   for (const l of largos) console.log(`pvp·15W ${l.vp} mesa ${l.n} ${l.que} · ${JSON.stringify(l)}`)
-  const verde = celdas.length > 0 && celdas.every((c) => c.ok) && vistas.every((v) => v.ok)
-  console.log(`── PVP · ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas · ${vistas.filter((v) => v.ok).length}/${vistas.length} escenas · ${verde ? 'VERDE' : 'ROJO'}`)
-  return { verde, celdas, escenas: vistas, largos }
+  const verde = celdas.length > 0 && celdas.every((c) => c.ok) && vistas.every((v) => v.ok) && varas.every((v) => v.ok)
+  console.log(`── PVP · ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas · ${vistas.filter((v) => v.ok).length}/${vistas.length} escenas · ${varas.filter((v) => v.ok).length}/${varas.length} varas LM · ${verde ? 'VERDE' : 'ROJO'}`)
+  return { verde, celdas, escenas: vistas, varas, largos }
 }
