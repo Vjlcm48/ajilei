@@ -4,77 +4,6 @@
    formas completas del sorteo y del anuncio son de la sub-tanda 5, tras la lámina.
    Usa los tokens del traje de las salas (`--u`, `--gold-brand`): el sorteo vive en él. */
 
-.pvp-sorteo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: calc(var(--u) * 4);
-  text-align: center;
-}
-
-.pvp-sorteo-titulo {
-  margin: 0;
-  font-size: calc(var(--u) * 4.4);
-  font-weight: 500;
-  color: var(--gold-brand);
-}
-
-.pvp-sorteo-reloj { font-variant-numeric: tabular-nums; }
-
-.pvp-sorteo-cartas {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: calc(var(--u) * 2);
-}
-
-/* La carta del sorteo: 63 × 98 como el hueco de la mesa de 2 apaisada, muy por encima del
-   piso táctil de 40. */
-.pvp-carta {
-  width: 63px;
-  height: 98px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  transition: transform 120ms ease-out;
-}
-.pvp-carta img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.pvp-carta:disabled { cursor: default; }
-.pvp-carta.is-elegida { transform: translateY(-8px); box-shadow: 0 0 0 2px var(--gold-brand); }
-.pvp-carta-cara { display: inline-block; cursor: default; }
-
-.pvp-sorteo-rondas {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--u) * 3);
-}
-
-.pvp-sorteo-volteo {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: calc(var(--u) * 2);
-}
-
-.pvp-volteo { margin: 0; }
-.pvp-volteo figcaption {
-  max-width: 63px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-}
-
-.pvp-sorteo-mensaje {
-  margin: calc(var(--u) * 1.5) 0 0;
-  font-weight: 600;
-}
-
 /* La pausa de anuncio: encima de la mesa, sin tocarla. */
 .pvp-capa {
   position: fixed;
@@ -117,3 +46,130 @@
 }
 
 .pvp-fin-cifra[data-tono='sobrio'] { color: var(--lose-red); }
+
+/* ── MES-PvP L-M 1 · El sorteo sobre la mesa (lámina, sin commit) ──────────────────────
+   `SorteoMesa.jsx`: una capa `fixed` encima de la mesa montada. Las cajas las escribe la
+   capa en px propios (medidas de `.card-slot-wrapper` y del recuadro del anfitrión, con
+   `escala.aPropios`). No toca la mesa: solo se pone encima, sin capturar el puntero salvo en
+   las cartas propias mientras se elige. Por debajo de las cartas en vuelo (200) y de los
+   menús y modales de la mesa. */
+.pvp-sc-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  pointer-events: none;
+}
+.pvp-sc-capa .pvp-sc-mazo {
+  position: fixed;
+  pointer-events: none;
+}
+.pvp-sc-capa .pvp-sc-mazo-pila {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+/* 3.ª vuelta · el cronómetro propio del sorteo: la pieza del turno (`.timer-display`, y a los
+   3 s `.timer-warning`), en su sitio natural; la capa escribe `left`/`top`. En el carril del
+   apaisado, el tamaño del `.ls-timer`. */
+.pvp-sc-capa .pvp-sc-reloj {
+  position: fixed;
+  pointer-events: none;
+}
+.pvp-sc-capa .pvp-sc-reloj.es-carril { font-size: 22px; min-width: 0; }
+/* 3.ª vuelta · la marca de Mano: la pastilla de la mesa, que se desliza del centro al asiento. */
+.pvp-sc-capa .pvp-sc-marca {
+  position: fixed;
+  margin: 0;
+  transform: translateY(-50%);
+  transition: left 600ms ease-in-out, top 600ms ease-in-out;
+  pointer-events: none;
+}
+.pvp-sc-capa .pvp-sc-marca.es-derecha { transform: translate(-100%, -50%); }
+.pvp-sc-capa.es-quieta .pvp-sc-marca { transition: none; }
+.pvp-sc {
+  position: fixed;
+  box-sizing: border-box;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  perspective: 600px;
+  pointer-events: none;
+  /* 3.ª vuelta · el vuelo del reparto rápido del juego (0,595 s × 0,5), también de vuelta al mazo. */
+  transition: left 297.5ms ease-out, top 297.5ms ease-out, width 297.5ms ease-out, height 297.5ms ease-out;
+}
+.pvp-sc.es-tocable { pointer-events: auto; cursor: pointer; }
+.pvp-sc-capa.es-quieta .pvp-sc,
+.pvp-sc-capa.es-quieta .pvp-sc-giro { transition: none; }
+.pvp-sc-giro {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 300ms ease-in-out;
+}
+.pvp-sc.es-cara .pvp-sc-giro { transform: rotateY(180deg); }
+.pvp-sc-dorso,
+.pvp-sc-frente {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 2px solid rgba(var(--gold-brand-rgb), 0.45);
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+.pvp-sc-dorso { display: block; object-fit: cover; }
+.pvp-sc-frente { transform: rotateY(180deg); background: #fff; }
+/* La elegida (variante c): la luz de «seleccionada» (`.card-selected`). */
+.pvp-sc.es-adelantada .pvp-sc-dorso,
+.pvp-sc.es-adelantada .pvp-sc-frente {
+  border-color: var(--gold-brand);
+  box-shadow: 0 14px 26px rgba(var(--gold-brand-rgb), 0.6);
+}
+/* 3.ª vuelta · la carta de quien es Mano brilla. */
+.pvp-sc.es-ganadora .pvp-sc-frente {
+  border-color: var(--gold-brand);
+  box-shadow: 0 0 0 2px var(--gold-brand), 0 0 22px 6px rgba(var(--gold-brand-rgb), 0.85);
+  animation: pvpScBrilla 1.1s ease-in-out infinite;
+}
+@keyframes pvpScBrilla {
+  0%, 100% { box-shadow: 0 0 0 2px var(--gold-brand), 0 0 14px 3px rgba(var(--gold-brand-rgb), 0.6); }
+  50%      { box-shadow: 0 0 0 2px var(--gold-brand), 0 0 26px 9px rgba(var(--gold-brand-rgb), 0.95); }
+}
+.pvp-sc-capa.es-quieta .pvp-sc.es-ganadora .pvp-sc-frente { animation: none; }
+
+/* 2.ª vuelta · el mensaje del sorteo, en su franja, sobre el centro de la mesa (la capa la
+   coloca; el óvalo no cambia). Encima de las cartas: es lo que se lee. */
+.pvp-sc-franja {
+  position: fixed;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px 14px;
+  transform: translateY(-50%);
+  border-radius: 12px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.45);
+  background: rgba(0, 0, 0, 0.62);
+  color: #f5ecd2;
+  font: 600 15px/1.3 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+@media (max-width: 480px), (max-height: 480px) {
+  .pvp-sc-franja { padding: 5px 10px; font-size: 14px; }
+}
+/* 3.ª vuelta · donde la franja chocaría con un recuadro (mesa de 2 acostada), el mensaje va
+   dentro del óvalo de la crónica, con su ancho de texto: sin caja propia y sin mover el óvalo. */
+.pvp-sc-franja.es-en-cronica {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font: 600 12px/1.25 system-ui, sans-serif;
+}
+/* Sin «Pozo 0» ni «Comodín activo · vale 11» durante el sorteo; las cajas se quedan (no se
+   mueve nada). */
+body.pvp-en-sorteo .game-table-screen .pot-box,
+body.pvp-en-sorteo .game-table-screen .comodin-note { visibility: hidden; }

@@ -1,17 +1,17 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import '../styles/salas.css'
 import '../styles/pvp.css'
 
-import CardImage from '../components/CardImage'
 import { useIdioma } from '../hooks/useIdioma'
 import { useMesaPvP } from '../hooks/useMesaPvP'
 import { useSounds } from '../hooks/useSounds'
-import { listaDeNombres, sonidoDe } from '../hooks/vozHumanos'
+import { sonidoDe } from '../hooks/vozHumanos'
 import { montoTexto } from '../config/tapetes'
 import { cargarMesa, fabricaMesa } from '../lib/cargarMesa'
-import { CLASE_DESCARTE, CLASE_TURNO, ETAPA_ELECCION } from '../lib/partidaCliente'
+import { CLASE_DESCARTE, CLASE_ELECCION, CLASE_TURNO } from '../lib/partidaCliente'
 import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
-import reversoUrl from '../assets/cards/reverso_carta_mesa.svg?no-inline'
+import SorteoMesa from './SorteoMesa'
+import { AVISO_RELOJ_S } from '../lib/sorteoMesaCore'
 
 // ── MES-PvP 3 · La partida entre personas ───────────────────────────────────
 // Ficha: AJILEI_MES-PvP_Fase1-3_v1.0.md §3. Diagnóstico: informe de la Fase 0, §B y §D.
@@ -29,78 +29,9 @@ import reversoUrl from '../assets/cards/reverso_carta_mesa.svg?no-inline'
 
 const GameTable = lazy(fabricaMesa)
 
-// ── El sorteo, en su forma mínima (§3.2) ───────────────────────────────────
-// Cinco cartas boca abajo propias, tocar una, el volteo de cada ronda y su mensaje. Sin
-// oleadas ni animación fina: eso es de la sub-tanda 5, tras la lámina. Los textos son los
-// sellados (cierre de la sub-tanda 3): quien debe elegir ve la llamada, con su nombre, hasta
-// que su ronda tiene veredicto; quien no empató se queda con el texto del empate, en la lista.
-function CapaSorteo({ game, reloj, enviar, t }) {
-  const { sorteo, players } = game
-  const [elegida, setElegida] = useState(null)
-  const participo = sorteo.participan.includes(0)
-  const yaElegi = sorteo.yaEligieron.includes(0)
-  const eligiendo = sorteo.etapa === ETAPA_ELECCION && participo && !yaElegi
-  const sinVeredicto = !sorteo.rondas.some((r) => r.ronda === sorteo.ronda)
-  const nombre = (i) => players[i].name
-
-  const elegir = (p) => {
-    if (!eligiendo) return
-    reentrarPantallaCompleta(document, window)   // §3.1: vuelve con el toque de elegir carta
-    setElegida({ ronda: sorteo.ronda, p })
-    enviar('elegir_carta_sorteo', { ronda: sorteo.ronda, carta: p })
-  }
-
-  const mensajeDe = (r) => {
-    if (r.mano === null) return t('pvp.sorteo.empate', { lista: listaDeNombres(r.empatados.map(nombre)) })
-    if (r.azar) return r.mano === 0 ? t('pvp.sorteo.azar.tu') : t('pvp.sorteo.azar', { nombre: nombre(r.mano) })
-    return r.mano === 0 ? t('pvp.sorteo.mano.tu') : t('pvp.sorteo.mano', { nombre: nombre(r.mano) })
-  }
-
-  return (
-    <div className="sal-cuerpo pvp-sorteo" data-pvp="sorteo">
-      {participo && sinVeredicto && (
-        <p className="pvp-sorteo-titulo" role="status">
-          {t('pvp.sorteo.elige', { nombre: nombre(0) })}
-          {eligiendo && reloj.timeLeft !== null ? <span className="pvp-sorteo-reloj"> {reloj.timeLeft}s</span> : null}
-        </p>
-      )}
-      {participo && (
-        <div className="pvp-sorteo-cartas" data-pvp="sorteo-cartas">
-          {sorteo.posiciones.map((p) => {
-            const marcada = elegida?.ronda === sorteo.ronda && elegida.p === p
-            return (
-              <button
-                key={p}
-                type="button"
-                className={`pvp-carta${marcada ? ' is-elegida' : ''}`}
-                data-pvp={`sorteo-carta-${p}`}
-                disabled={!eligiendo}
-                onClick={() => elegir(p)}
-              >
-                <img src={reversoUrl} alt="" draggable="false" />
-              </button>
-            )
-          })}
-        </div>
-      )}
-      <ol className="pvp-sorteo-rondas" data-pvp="sorteo-rondas">
-        {sorteo.rondas.map((r) => (
-          <li key={r.ronda}>
-            <div className="pvp-sorteo-volteo">
-              {r.volteo.map((v) => (
-                <figure key={v.asiento} className="pvp-volteo">
-                  <span className="pvp-carta pvp-carta-cara"><CardImage card={v.carta} /></span>
-                  <figcaption>{nombre(v.asiento)}</figcaption>
-                </figure>
-              ))}
-            </div>
-            <p className="pvp-sorteo-mensaje">{mensajeDe(r)}</p>
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
-}
+// ── El sorteo, sobre la mesa (lámina L-M 1) ─────────────────────────────────
+// La capa del centro se fue: la mesa se monta ya en el sorteo y `SorteoMesa` pinta encima el
+// mazo del anfitrión, las cartas y el mensaje, en una franja propia sobre el centro de la mesa.
 
 // ── La pausa de anuncio, en su forma mínima (§3.2) ─────────────────────────
 function CapaAnuncio({ game, enviar, t }) {
@@ -184,22 +115,29 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
     (reloj.clase === CLASE_TURNO && game.activePlayerIndex === 0)
     || (reloj.clase === CLASE_DESCARTE && !game.players[0].folded && !game.descarte.yaDescartaron.includes(0))
   )
+  // L-M 1 · 3.ª vuelta · y los del sorteo, a los 3 s, mientras te falta elegir (el aviso del
+  // turno: el pulso rojo de `.timer-warning` en la capa y este sonido).
+  const eligeSorteo = !!game?.sorteo && reloj.clase === CLASE_ELECCION
+    && game.sorteo.participan.includes(0) && !game.sorteo.yaEligieron.includes(0)
+  const umbral = eligeSorteo ? AVISO_RELOJ_S : 5
   const tl = reloj.timeLeft
   useEffect(() => {
-    if (propio && tl !== null && tl > 0 && tl <= 5) play('timerWarning')
-  }, [propio, tl, play])
+    if ((propio || eligeSorteo) && tl !== null && tl > 0 && tl <= umbral) play('timerWarning')
+  }, [propio, eligeSorteo, umbral, tl, play])
+
+  // L-M 1 · en el sorteo el mensaje va en la franja de la capa; la línea de la crónica del
+  // óvalo se queda vacía.
+  const enSorteo = escena === 'sorteo' && !!game
+  const partidaMesa = useMemo(() => (enSorteo ? { ...foto, cronica: '' } : foto), [foto, enSorteo])
 
   if (escena === 'arrancando' || !game) {
     return <Traje sala={sala} t={t}><Aviso texto={t('pvp.arrancando')} t={t} pvp="arrancando" /></Traje>
-  }
-  if (escena === 'sorteo') {
-    return <Traje sala={sala} t={t}><CapaSorteo game={game} reloj={reloj} enviar={foto.enviar} t={t} /></Traje>
   }
   if (escena === 'muerta') {
     return <Traje sala={sala} t={t}><Aviso texto={t('pvp.muerta')} onLobby={onLobby} t={t} pvp="muerta" /></Traje>
   }
 
-  // mesa · anuncio · final: la misma mesa, montada una sola vez.
+  // sorteo · mesa · anuncio · final: la misma mesa, montada una sola vez.
   return (
     <Suspense fallback={<Traje sala={sala} t={t}><Aviso texto={t('pvp.arrancando')} t={t} pvp="arrancando" /></Traje>}>
       <GameTable
@@ -208,9 +146,10 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
         cuenta={cuenta ? { username: cuenta.username, correo: cuenta.correo } : null}
         saldo={billetera?.saldo ?? 0}
         tapetes={tapetes}
-        partida={foto}
+        partida={partidaMesa}
         onLeave={onLobby}
       />
+      {enSorteo && <SorteoMesa game={game} reloj={reloj} enviar={foto.enviar} anfitrion={foto.anfitrion} lamina={partida?.lamina ?? null} />}
       {escena === 'anuncio' && <CapaAnuncio game={game} enviar={foto.enviar} t={t} />}
     </Suspense>
   )
