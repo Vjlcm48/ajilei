@@ -16,6 +16,7 @@ import {
 import { FACTOR_RAPIDA } from '../lib/partidaRapida'
 import { FASE_PAGO, vistaAMesa } from '../lib/vistaAMesa'
 import { avisoDeAbandono, cronicaDe, finDePartida, nuevosAbandonos } from './vozHumanos'
+import { CORTE_VOZ, conNombresDeVoz } from '../lib/corteVoz'
 
 // MES-PvP 3-A · sin pozo que pagar, la pantalla final llega tras el aviso del óvalo (Reglas
 // v1.7 §8.2: «unos 2-3 s»).
@@ -63,6 +64,10 @@ export function escenaDe(vista, muerta) {
  *   ahora?: () => number }} partes
  */
 export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
+  // L-M 1 · el corte de los nombres en la voz (`lib/corteVoz`): 10, salvo que la sala diga otro
+  // (la lámina, `&corte=0`, sin corte).
+  const corte = sala.corteVoz ?? CORTE_VOZ
+  const voz = (g) => conNombresDeVoz(g, corte)
   let foto = Object.freeze({
     game: null,
     cronica: '',
@@ -75,6 +80,9 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     factorReparto: sala.ritmo === RITMO_RAPIDO ? FACTOR_RAPIDA : 1,
     // MES-PvP 3-A · el tono y la frase de la pantalla final (`vozHumanos.finDePartida`).
     fin: null,
+    corteVoz: corte,
+    // L-M 1 · el anfitrión (asiento real 0) en la mesa rotada: junto a él va el mazo del sorteo.
+    anfitrion: 0,
   })
   const oyentes = new Set()
   const publicar = (cambios) => {
@@ -113,7 +121,7 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
   //   C · sin pozo (la pausa de anuncio): el aviso, y la pantalla final tras él.
   function pagoAntesDelFin(vista, previa, horaServidor) {
     if (!previa || vista.phase !== FASE_FIN || !['mesa', 'anuncio'].includes(foto.escena)) return null
-    const aviso = avisoDeAbandono(nuevosAbandonos(vistaAMesa(vista, previa, sala), previa), true)
+    const aviso = avisoDeAbandono(nuevosAbandonos(voz(vistaAMesa(vista, previa, sala)), voz(previa)), true)
     if (!aviso) return null
     const yaEnElPago = previa.phase === FASE_PAGO && previa.vencimiento?.clase === CLASE_MANO_SIGUIENTE
     if (vista.resultado && !yaEnElPago) {
@@ -131,6 +139,8 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     let cobro = false
     if (vista && vista.version !== version) {
       version = vista.version
+      const anfitrion = (vista.players.length - vista.asiento) % vista.players.length
+      if (anfitrion !== foto.anfitrion) cambios.anfitrion = anfitrion
       const propio = vista.players[vista.asiento].cobrado
       cobro = propio !== cobrado
       cobrado = propio
@@ -150,9 +160,9 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
           const game = vistaAMesa(vista, previa, sala)
           // Quien abandona con la partida viva: el aviso en el óvalo, en la línea de la crónica, y
           // en el titular del pago si su retirada cerró la mano (`manoCore.resultadoDeMano`).
-          const aviso = avisoDeAbandono(nuevosAbandonos(game, previa), false)
+          const aviso = avisoDeAbandono(nuevosAbandonos(voz(game), voz(previa)), false)
           cambios.game = aviso ? { ...game, aviso } : game
-          cambios.cronica = aviso ?? cronicaDe(game, previa, foto.cronica)
+          cambios.cronica = aviso ?? cronicaDe(voz(game), voz(previa), foto.cronica)
         }
       }
     }
