@@ -19,10 +19,12 @@
 import { drawRank, resetRng, setRng } from '../engine/deck.js'
 import { PHASES } from '../engine/gameEngine.js'
 import { esLegal } from '../engine/pozos.js'
-import { AUSENTE_DESDE } from '../config/esperas.js'
+import { AUSENTE_DESDE, ELECCION_SORTEO_MS, VOLTEO_SORTEO_MS } from '../config/esperas.js'
 import {
   CLASES, ETAPAS, MOTIVOS, aplicarAccion, crearPartida, huboRevelacion, partidaTerminada, vistaDe,
 } from '../arbitro/index.js'
+import { ESPERA_REPARTO_SORTEO_MS } from '../arbitro/reloj.js'
+import { esperaRepartoSorteo } from '../lib/sorteoMesaCore.js'
 
 export const MARCA_PARTIDA_IMITADA = 'ajilei:partida-imitada'
 export const PARAM_PVP = 'pvp'
@@ -128,14 +130,18 @@ function hasta(m, cumple, guion) {
 // ── El empate forzado ───────────────────────────────────────────────────────
 // Los rivales de guion ven sus cartas: en cada ronda, `cuantos` eligen la carta más alta en
 // la que coinciden y los demás, la más baja. Si esa baraja no da para empatar, otra semilla.
-function cartaParaEmpatar(cuantos) {
+function cartaParaEmpatar(cuantos, { yo = null, conYo = null } = {}) {
   const planes = new Map()
   const plan = ({ sorteo }) => {
     const { participan, cartas } = sorteo
     const rangos = (a) => cartas[a].map((c) => drawRank(c.value))
     const quieren = Math.min(cuantos, participan.length)
+    // L-M 1 · el propio dentro (`conYo`) o fuera del empate; sin la opción, como antes.
+    const orden = conYo === null ? participan
+      : conYo ? [yo, ...participan.filter((a) => a !== yo)] : participan.filter((a) => a !== yo)
     for (let r = 50; r >= 0; r--) {
-      const tienen = participan.filter((a) => rangos(a).includes(r)).slice(0, quieren)
+      const tienen = orden.filter((a) => rangos(a).includes(r)).slice(0, quieren)
+      if (conYo && participan.includes(yo) && !tienen.includes(yo)) continue
       if (tienen.length < quieren) continue
       const resto = participan.filter((a) => !tienen.includes(a))
       if (!resto.every((a) => Math.min(...rangos(a)) < r)) continue
@@ -165,6 +171,87 @@ const empate = (m, cuantos, llego) => hasta(m, llego, { carta: cartaParaEmpatar(
 const ultimaRonda = (e) => e.sorteo.rondas.at(-1)
 const enVolteo = (e) => e.sorteo.etapa === ETAPAS.VOLTEO
 
+// ── L-M 1 · El sorteo sobre la mesa ─────────────────────────────────────────
+// Ficha AJILEI_MES-PvP_LM-1_v1.0.md §2. Cada escena dice su guion (qué carta elige cada uno),
+// dónde se congela (`llega`) y en qué momento de la etapa (`momento`, ms): la capa del sorteo
+// pinta ese instante, sin animar. Con `&ver=vivo` la misma semilla y el mismo guion se juegan
+// desde el barajado de la ronda 1, a la hora real, hasta el primer turno.
+export const VOLTEO_LAMINA_MS = 5000   // lo sellado (§2.5); el árbitro real sigue en 4 s hasta la v1.3
+
+// Gana `quien(m)`: elige su carta más alta y los demás la más baja; si no basta, otra semilla.
+function cartaParaGanar(quien) {
+  const planes = new Map()
+  return (m, i) => {
+    const clave = `${m.e.sorteo.ronda}`
+    if (!planes.has(clave)) {
+      const { participan, cartas } = m.e.sorteo
+      const rangos = (a) => cartas[a].map((c) => drawRank(c.value))
+      const g = quien(m)
+      const alta = Math.max(...rangos(g))
+      exige(participan.every((a) => a === g || Math.min(...rangos(a)) < alta))
+      planes.set(clave, new Map(participan.map((a) => [a, a === g ? rangos(a).indexOf(alta) : rangos(a).indexOf(Math.min(...rangos(a)))])))
+    }
+    return planes.get(clave).get(i)
+  }
+}
+const cuantosEmpatan = (m) => (m.n >= 5 ? 3 : 2)
+const volteoDeRonda = (ronda, cumple) => (e, m) => enVolteo(e) && e.sorteo.ronda === ronda && cumple(ultimaRonda(e), m)
+const SORTEO_LAMINA = {
+  'sorteo-reparto': { llega: (e) => e.sorteo.etapa === ETAPAS.REPARTO, momento: 1000 },
+  'sorteo-elige': { llega: (e) => e.sorteo.etapa === ETAPAS.ELECCION, momento: 600 },
+  // El propio ya eligió y el siguiente también; los demás faltan (en la de 2, falta el otro).
+  'sorteo-elige-algunos': {
+    llega: (e) => e.sorteo.etapa === ETAPAS.ELECCION,
+    luego: (m) => {
+      pide(m, m.yo, 'elegir_carta_sorteo', { ronda: m.e.sorteo.ronda, carta: 1 })
+      if (m.n > 2) pide(m, m.otro, 'elegir_carta_sorteo', { ronda: m.e.sorteo.ronda, carta: 3 })
+    },
+    momento: 1500,
+  },
+  'sorteo-volteo-propio': { guion: () => ({ carta: cartaParaGanar((m) => m.yo) }), llega: volteoDeRonda(1, (r, m) => r.mano === m.yo), momento: 1500 },
+  'sorteo-volteo-ajeno': { guion: () => ({ carta: cartaParaGanar((m) => m.otro) }), llega: volteoDeRonda(1, (r, m) => r.mano === m.otro), momento: 1500 },
+  'sorteo-empate': {
+    guion: (m) => ({ carta: cartaParaEmpatar(cuantosEmpatan(m), { yo: m.yo, conYo: true }) }),
+    llega: volteoDeRonda(1, (r, m) => r.mano === null && r.empatados.length === cuantosEmpatan(m) && r.empatados.includes(m.yo)),
+    momento: 1500,
+  },
+  // El desempate, mirado por un empatado (elige) y por quien no empató (ve el reparto ajeno).
+  'sorteo-desempate': {
+    guion: (m) => ({ carta: cartaParaEmpatar(cuantosEmpatan(m), { yo: m.yo, conYo: true }) }),
+    llega: (e, m) => e.sorteo.ronda === 2 && e.sorteo.etapa === ETAPAS.ELECCION && e.sorteo.participan.includes(m.yo),
+    momento: 600,
+  },
+  'sorteo-desempate-fuera': {
+    minimo: 3,
+    guion: (m) => ({ carta: cartaParaEmpatar(cuantosEmpatan(m), { yo: m.yo, conYo: false }) }),
+    llega: (e, m) => e.sorteo.ronda === 2 && e.sorteo.etapa === ETAPAS.REPARTO && !e.sorteo.participan.includes(m.yo),
+    momento: 1000,
+  },
+  'sorteo-azar-propio': {
+    guion: (m) => ({ carta: cartaParaEmpatar(2, { yo: m.yo, conYo: true }) }),
+    llega: (e, m) => enVolteo(e) && ultimaRonda(e).azar && ultimaRonda(e).mano === m.yo,
+    momento: 1500,
+  },
+  'sorteo-azar-ajeno': {
+    guion: (m) => ({ carta: cartaParaEmpatar(2, { yo: m.yo, conYo: true }) }),
+    llega: (e, m) => enVolteo(e) && ultimaRonda(e).azar && ultimaRonda(e).mano !== m.yo,
+    momento: 1500,
+  },
+  // Las cartas volviendo al mazo, con «… es Mano» en el óvalo.
+  'sorteo-vuelta': { guion: () => ({ carta: cartaParaGanar((m) => m.otro) }), llega: volteoDeRonda(1, (r, m) => r.mano === m.otro), momento: VOLTEO_LAMINA_MS - 600 },
+}
+const escenaDeLamina = ({ guion, llega, luego, minimo, momento }) => ({
+  minimo,
+  momento,
+  guion,
+  jugar: (m) => {
+    const g = guion?.(m) ?? {}
+    hasta(m, (e) => llega(e, m), g)
+    luego?.(m)
+    return g
+  },
+})
+
 // Una por escena: `jugar(m)` llega o lanza `NoLlega`; `minimo` es la mesa más chica posible.
 const ESCENAS = {
   'sorteo-baraja': { jugar: () => {} },
@@ -173,6 +260,7 @@ const ESCENAS = {
   'sorteo-empate-2': { jugar: (m) => empate(m, 2, (e) => enVolteo(e) && ultimaRonda(e).empatados.length === 2) },
   'sorteo-empate-3': { minimo: 3, jugar: (m) => empate(m, 3, (e) => enVolteo(e) && ultimaRonda(e).empatados.length === 3) },
   'sorteo-azar': { jugar: (m) => empate(m, 2, (e) => enVolteo(e) && ultimaRonda(e).azar) },
+  ...Object.fromEntries(Object.entries(SORTEO_LAMINA).map(([k, v]) => [k, escenaDeLamina(v)])),
   'turno-propio': { jugar: hastaTurnoPropio },
   'turno-ajeno': { jugar: hastaTurnoAjeno },
   // El propio ya descartó y espera a los demás.
@@ -291,13 +379,16 @@ export const escenaCabeEn = (escena, n) => n >= (ESCENAS[escena].minimo ?? 2)
  *   ahora?: () => number }} pedido
  * @returns la forma de `crearClientePartida`, con `marca`, `sala` y `avanzar` (un paso de guion).
  */
-export function crearPartidaImitada({ escena, n = 2, asiento = 0, nombres = null, semilla = 1, ahora = Date.now }) {
+export function crearPartidaImitada({
+  escena, n = 2, asiento = 0, nombres = null, semilla = 1, ahora = Date.now, vivo = false, corte = null, momento = null,
+}) {
   if (!ESCENAS[escena]) throw new Error(`MES-PvP 2 · escena desconocida: ${escena}`)
   if (!escenaCabeEn(escena, n)) throw new Error(`MES-PvP 2 · «${escena}» no cabe en una mesa de ${n}`)
 
   // El azar del árbitro es global (`setRng`): se fija para llegar y al arrancar, y se suelta al parar.
   let m = null
   let rng = null
+  let semillaBuena = null
   for (let s = semilla; s < semilla + TOPE_SEMILLAS && !m; s++) {
     rng = mulberry32(s)
     setRng(rng)
@@ -305,6 +396,7 @@ export function crearPartidaImitada({ escena, n = 2, asiento = 0, nombres = null
     try {
       ESCENAS[escena].jugar(intento)
       m = intento
+      semillaBuena = s
     } catch (e) {
       if (!(e instanceof NoLlega)) throw e
     }
@@ -312,10 +404,29 @@ export function crearPartidaImitada({ escena, n = 2, asiento = 0, nombres = null
   resetRng()
   if (!m) throw new Error(`MES-PvP 2 · «${escena}» no llega en ${TOPE_SEMILLAS} semillas`)
 
+  // L-M 1 · `vivo`: la misma semilla y el mismo guion, desde el barajado de la ronda 1 y a la
+  // hora real (el conductor de abajo). Se juega hasta el primer turno de la primera mano.
+  const deLamina = escena.startsWith('sorteo-')
+  let guionVivo = null
+  if (vivo && deLamina) {
+    rng = mulberry32(semillaBuena)
+    setRng(rng)
+    m = nuevaMesa({ n, asiento, nombres, ahora: ahora() })
+    guionVivo = ESCENAS[escena].guion?.(m) ?? {}
+    resetRng()
+  }
+
   const oyentes = new Set()
   const desfaseDeAhora = () => m.t - ahora()
+  // L-M 1 · qué carta eligió cada uno, ya rotado (índice 0 = el propio). La vista del contrato
+  // solo dice quién eligió; la lámina lo enseña con la carta de verdad (pide el Contrato v1.3).
+  const conEleccion = (vista) => {
+    const elecciones = m.e.sorteo?.elecciones
+    if (!elecciones || vista.phase !== 'SORTEO') return vista
+    return { ...vista, sorteo: { ...vista.sorteo, eligioLamina: elecciones.map((_x, k) => elecciones[(k + asiento) % n]) } }
+  }
   const fotoDe = (cambios = {}) => Object.freeze({
-    vista: JSON.parse(JSON.stringify(vistaDe(m.e, asiento))),
+    vista: conEleccion(JSON.parse(JSON.stringify(vistaDe(m.e, asiento)))),
     version: m.e.version,
     canal: 'SUBSCRIBED',
     avisos: 0,
@@ -333,11 +444,68 @@ export function crearPartidaImitada({ escena, n = 2, asiento = 0, nombres = null
     oyentes.forEach((o) => o())
   }
 
+  // L-M 1 · el conductor de `vivo`: el reloj virtual sigue al real; los rivales eligen a su
+  // ritmo (el propio, si no toca, a los 6 s, con la carta del guion), el volteo dura lo sellado
+  // de la lámina y todo lo demás vence a su hora. Para en el primer turno.
+  let conductor = null
+  let etapaVista = null
+  // La carta del guion; pasado lo que la escena pide (p. ej. la ronda 2 de
+  // `sorteo-desempate-fuera`, que la búsqueda no jugó), cada uno elige su carta más alta.
+  const cartaEnVivo = (a) => {
+    try {
+      return guionVivo.carta?.(m, a) ?? 0
+    } catch (e) {
+      if (!(e instanceof NoLlega)) throw e
+      const rangos = m.e.sorteo.cartas[a].map((c) => drawRank(c.value))
+      return rangos.indexOf(Math.max(...rangos))
+    }
+  }
+  const conducir = () => {
+    setRng(rng)
+    m.t = ahora()
+    const { vencimiento: v, sorteo } = m.e
+    if (!v || v.clase === CLASES.TURNO || partidaTerminada(m.e)) { clearInterval(conductor); conductor = null; return }
+    const clave = `${v.clase}:${v.hora}`
+    if (clave !== etapaVista) etapaVista = clave
+    const inicio = v.hora - (v.clase === CLASES.ELECCION_SORTEO ? ELECCION_SORTEO_MS : 0)
+    let cambio = false
+    if (v.clase === CLASES.ELECCION_SORTEO) {
+      const rivales = sorteo.participan.filter((a) => a !== m.yo)
+      sorteo.participan.forEach((a) => {
+        if (sorteo.elecciones[a] !== null) return
+        // 3.ª vuelta · el propio, si no toca, a los 9,5 s: antes ve el aviso de los 3 s.
+        const espera = a === m.yo ? 9500 : 1500 + 1700 * rivales.indexOf(a)
+        if (m.t >= inicio + espera && m.e.sorteo.elecciones[a] === null && m.e.vencimiento?.clase === CLASES.ELECCION_SORTEO) {
+          pide(m, a, 'elegir_carta_sorteo', { ronda: m.e.sorteo.ronda, carta: cartaEnVivo(a) })
+          cambio = true
+        }
+      })
+    }
+    // El volteo dura lo sellado de la lámina; el reparto del sorteo, lo de repartir de una en
+    // una a quienes participan (3.ª vuelta; el árbitro real reparte por oleadas hasta la v1.3).
+    const extra = v.clase === CLASES.VOLTEO_SORTEO ? VOLTEO_LAMINA_MS - VOLTEO_SORTEO_MS
+      : v.clase === CLASES.REPARTO_SORTEO ? esperaRepartoSorteo(sorteo.participan.length) - ESPERA_REPARTO_SORTEO_MS : 0
+    if (!cambio && m.e.vencimiento === v && m.t >= v.hora + extra) {
+      m.t = Math.max(m.t, v.hora)
+      pide(m, m.e.asientos.findIndex((a) => !a.abandonado), 'reclamar_vencimiento')
+      cambio = true
+    }
+    if (cambio) poner()
+  }
+
   return {
     marca: MARCA_PARTIDA_IMITADA,
-    sala: { id: `imitada-${escena}`, apuesta: APUESTA, jugadores: n, entrada: 'corta', ritmo: 'normal' },
-    iniciar: async () => { setRng(rng) },
-    parar: () => { resetRng() },
+    sala: { id: `imitada-${escena}`, apuesta: APUESTA, jugadores: n, entrada: 'corta', ritmo: 'normal', corteVoz: corte },
+    // L-M 1 · lo que la capa del sorteo lee de la lámina.
+    lamina: Object.freeze({
+      corte, volteoMs: VOLTEO_LAMINA_MS,
+      momento: vivo || !deLamina ? null : (momento ?? ESCENAS[escena].momento ?? null),
+    }),
+    iniciar: async () => {
+      setRng(rng)
+      if (guionVivo && !conductor) conductor = setInterval(conducir, 100)
+    },
+    parar: () => { clearInterval(conductor); conductor = null; resetRng() },
     revisar: () => {},
     releer: async () => {},
     suscribir: (avisar) => {
@@ -365,7 +533,7 @@ export function crearPartidaImitada({ escena, n = 2, asiento = 0, nombres = null
 
 // ── El mando ────────────────────────────────────────────────────────────────
 
-/** `?pvp=<escena>&n=2..5&asiento=k&nombres=largo`. Detrás de la puerta doble. */
+/** `?pvp=<escena>&n=2..5&asiento=k&nombres=largo&ver=vivo&corte=0&momento=ms`. Detrás de la puerta doble. */
 export function leerMandoPvP(search = globalThis.location?.search ?? '') {
   if (!import.meta.env.DEV) return null
   if (!import.meta.env.VITE_AUTH_BYPASS) return null
@@ -376,5 +544,12 @@ export function leerMandoPvP(search = globalThis.location?.search ?? '') {
   const n = pedido >= 2 && pedido <= 5 && Number.isInteger(pedido) ? pedido : 2
   const elegido = Number(q.get('asiento'))
   const asiento = Number.isInteger(elegido) && elegido >= 0 && elegido < n ? elegido : 0
-  return { escena, n, asiento, nombres: q.get('nombres') === 'largo' ? 'largo' : null }
+  // L-M 1 · `ver=vivo` · `corte=0` (sin el corte de 10, para comparar) · `momento=<ms>` (congela
+  // otro instante). La variante del mazo es la c (STOP-L2) y el corte, el de 10 (STOP-L3).
+  const corte = q.get('corte') === '0' ? 0 : null
+  const momento = q.has('momento') && Number.isFinite(Number(q.get('momento'))) ? Number(q.get('momento')) : null
+  return {
+    escena, n, asiento, nombres: q.get('nombres') === 'largo' ? 'largo' : null,
+    vivo: q.get('ver') === 'vivo', corte, momento,
+  }
 }

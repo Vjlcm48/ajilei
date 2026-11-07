@@ -210,7 +210,10 @@ const PANTALLA_DE = (escena) => (
 const ESCENAS = ['sorteo-baraja', 'sorteo-oleadas', 'sorteo-eleccion', 'sorteo-empate-2', 'sorteo-empate-3', 'sorteo-azar',
   'turno-propio', 'turno-ajeno', 'descarte-espera', 'reposicion', 'revelacion', 'retirada', 'anuncio-yo', 'anuncio-vuelta',
   'ausente', 'abandono', 'aviso-salida', 'final-gana', 'final-pierde', 'final-fuera', 'muerta', 'descarte-propio',
-  'final-negativo', 'final-cero', 'final-todas']
+  'final-negativo', 'final-cero', 'final-todas',
+  // L-M 1 · el sorteo sobre la mesa (lámina): las escenas congeladas de `SORTEO_LAMINA`.
+  'sorteo-reparto', 'sorteo-elige', 'sorteo-elige-algunos', 'sorteo-volteo-propio', 'sorteo-volteo-ajeno', 'sorteo-empate',
+  'sorteo-desempate', 'sorteo-desempate-fuera', 'sorteo-azar-propio', 'sorteo-azar-ajeno', 'sorteo-vuelta']
 
 async function escenas(browser, base) {
   const out = []
