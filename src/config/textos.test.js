@@ -443,9 +443,9 @@ describe('MES-PvP 3 · los textos que viajan con la partida (INV-84)', () => {
 
   it('sin sumar no existen (⟦⟧); sumados, `t()` los resuelve con sus huecos', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(t('pvp.sorteo.mano', { nombre: 'Ana' })).toBe('⟦pvp.sorteo.mano⟧')
+    expect(t('pvp.fin.solo.uno', { nombre: 'Ana' })).toBe('⟦pvp.fin.solo.uno⟧')
     sumarTextos('es', TEXTOS_PVP_ES)
-    expect(t('pvp.sorteo.mano', { nombre: 'Ana' })).toBe('Ana es Mano por tener la carta más alta')
+    expect(t('pvp.fin.solo.uno', { nombre: 'Ana' })).toBe('Te quedaste solo: Ana abandonó la mesa')
     expect(clavesDe('es').some((c) => c.startsWith('pvp.'))).toBe(false)
     // Como la entrada: con sus huecos llenos, ninguno queda sin llenar.
     for (const [clave, crudo] of Object.entries(TEXTOS_PVP_ES)) {
@@ -454,14 +454,7 @@ describe('MES-PvP 3 · los textos que viajan con la partida (INV-84)', () => {
     }
   })
 
-  it('el sorteo dice los textos sellados (cierre de la sub-tanda 3)', () => {
-    sumarTextos('es', TEXTOS_PVP_ES)
-    expect(t('pvp.sorteo.elige', { nombre: 'Ana' })).toBe('Ana, vamos a elegir el jugador Mano. Elige una carta.')
-    expect(t('pvp.sorteo.mano.tu')).toBe('Eres Mano por tener la carta más alta')
-    expect(t('pvp.sorteo.empate', { lista: 'Juan, Ana y María' })).toBe('Hay empate entre Juan, Ana y María: vamos al desempate')
-    expect(t('pvp.sorteo.azar', { nombre: 'Ana' })).toBe('Siguen empatados: el azar elige a Ana como Mano')
-    expect(t('pvp.sorteo.azar.tu')).toBe('Siguen empatados: el azar te elige como Mano')
-    expect(Object.keys(TEXTOS_PVP_ES).filter((c) => c.startsWith('pvp.sorteo.')).sort()).toEqual(
-      ['pvp.sorteo.azar', 'pvp.sorteo.azar.tu', 'pvp.sorteo.elige', 'pvp.sorteo.empate', 'pvp.sorteo.mano', 'pvp.sorteo.mano.tu'])
+  it('el sorteo ya no vive en el diccionario: sus textos son los de `TEXTOS_SORTEO` (L-M tanda 2)', () => {
+    expect(Object.keys(TEXTOS_PVP_ES).filter((c) => c.startsWith('pvp.sorteo.'))).toEqual([])
   })
 })

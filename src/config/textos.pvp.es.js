@@ -25,14 +25,6 @@ export const TEXTOS_PVP_ES = {
   'pvp.salir.texto':        'Si sales, tu asiento queda abandonado y cobras tu pila al cerrar la mano.',
   'pvp.salir.si':           'Dejar la mesa',
   'pvp.arrancando':         'Arrancando la partida…',
-  // El sorteo: textos sellados por Victor (2026-11-06). `{nombre}` de `elige` es el de quien
-  // mira; `{lista}` lleva a todos los empatados, el propio incluido («Juan, Ana y María»).
-  'pvp.sorteo.elige':       '{nombre}, vamos a elegir el jugador Mano. Elige una carta.',
-  'pvp.sorteo.mano':        '{nombre} es Mano por tener la carta más alta',
-  'pvp.sorteo.mano.tu':     'Eres Mano por tener la carta más alta',
-  'pvp.sorteo.empate':      'Hay empate entre {lista}: vamos al desempate',
-  'pvp.sorteo.azar':        'Siguen empatados: el azar elige a {nombre} como Mano',
-  'pvp.sorteo.azar.tu':     'Siguen empatados: el azar te elige como Mano',
   'pvp.anuncio.titulo':     'Anuncio',
   'pvp.anuncio.volver':     'Volver a la mesa',
   'pvp.muerta':             'La mesa se cerró por inactividad. Tu pila volvió a tu saldo',
@@ -49,4 +41,7 @@ export const TEXTOS_PVP_ES = {
   'pvp.fin.solo.uno':            'Te quedaste solo: {nombre} abandonó la mesa',
   'pvp.fin.solo':                'Te quedaste solo en la mesa',
   'pvp.fin.resultado':           '{cifra} Heptacoins',
+
+  // ── L-M 2 · El aviso de ausencia (texto de Victor; se sella en las Reglas de APU-1 v1.9) ──
+  'pvp.ausente.aviso':           '1 turno más y saldrás de la mesa',
 }

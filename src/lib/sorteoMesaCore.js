@@ -51,8 +51,7 @@ const HUECO_MARCA = 5          // escritorio: la «M» va delante de la «T» re
 
 // ── Los textos (3.ª vuelta) ─────────────────────────────────────────────────
 // Neutrales y sin nombres; los mismos para toda la mesa. Sellados en las Reglas de APU-1 v1.8
-// §8.4. Sustituyen a `pvp.sorteo.*` de `textos.pvp.es.js`, que se retiran con la tanda 2 de
-// L-M; hasta entonces viven aquí, en el trozo de la partida.
+// §8.4 (comprobados al byte en la tanda 2 de L-M, que retiró los viejos `pvp.sorteo.*`).
 export const TEXTOS_SORTEO = Object.freeze({
   elige: 'Elige una carta para saber quién es Mano',
   empate: 'Hay empate entre {n} jugadores, vamos a desempatar',
