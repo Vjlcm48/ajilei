@@ -25,8 +25,6 @@ export const TEXTOS_PVP_ES = {
   'pvp.salir.texto':        'Si sales, tu asiento queda abandonado y cobras tu pila al cerrar la mano.',
   'pvp.salir.si':           'Dejar la mesa',
   'pvp.arrancando':         'Arrancando la partida…',
-  'pvp.anuncio.titulo':     'Anuncio',
-  'pvp.anuncio.volver':     'Volver a la mesa',
   'pvp.muerta':             'La mesa se cerró por inactividad. Tu pila volvió a tu saldo',
 
   // ── MES-PvP 3-A · El abandono y la pantalla final (Reglas v1.7 §8.2 y §8.3) ──

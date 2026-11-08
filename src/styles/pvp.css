@@ -47,7 +47,7 @@
 
 .pvp-fin-cifra[data-tono='sobrio'] { color: var(--lose-red); }
 
-/* ── MES-PvP L-M 1 · El sorteo sobre la mesa (lámina, sin commit) ──────────────────────
+/* ── MES-PvP L-M 1 · El sorteo sobre la mesa ──────────────────────
    `SorteoMesa.jsx`: una capa `fixed` encima de la mesa montada. Las cajas las escribe la
    capa en px propios (medidas de `.card-slot-wrapper` y del recuadro del anfitrión, con
    `escala.aPropios`). No toca la mesa: solo se pone encima, sin capturar el puntero salvo en
@@ -217,3 +217,153 @@ body.pvp-freno .util-item-reacciones .util-ico::after {
 /* La propia sobre el óvalo (teléfono vertical): sin pico. */
 .u2-burbuja.pvp-msj-ajena.es-en-ovalo::before,
 .u2-burbuja.pvp-msj-ajena.es-en-ovalo::after { content: none; }
+
+/* ── MES-PvP L-M 3 · Entre una mano y otra ───────────────────────────
+   Capas `fixed` en portal a `.game-table-screen`: no tocan la maqueta (Δ = 0) ni el óvalo. */
+
+/* §1 · La recarga. El ancla centra la burbuja de REC-1 (sus clases, tal cual) o el texto de
+   espera en la ranura de las acciones (o, sentado fuera, en la fila de tus cartas, vacía). Por
+   debajo de las cartas en vuelo (200) y de los modales. */
+.pvp-rec-ancla {
+  position: fixed;
+  z-index: 120;
+  transform: translate(-50%, -50%);
+}
+.pvp-rec-ancla .rec-burbuja { position: static; transform: none; animation-name: pvp-rec-entra; }
+/* La entrada de REC-1 (8 px de subida) sin su `translate(-50%, -50%)`: aquí centra el ancla. */
+@keyframes pvp-rec-entra {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.pvp-rec-espera {
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+/* La tarjeta es la suave de las IAS (`apu.css`), apoyada abajo y sin velo. */
+.pvp-rec-tarjeta .bankrupt-sub { max-width: 34ch; margin-inline: auto; }
+
+/* La entrada del ⋮, con la moneda (variante b). Pedida: una marca ✓ en su esquina, y un punto
+   dorado sobre el ⋮ cerrado. */
+.util-item-recarga { position: relative; }
+.util-item-recarga img { display: block; }
+.pvp-rec-pedida {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: #1a1a1a;
+  background: var(--gold-brand, #e8c15c);
+}
+.pvp-rec-punto {
+  position: fixed;
+  z-index: 121;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--gold-brand, #e8c15c);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* §3 · La pausa de anuncio. El anuncio simulado: una pieza 16:9 con su etiqueta y «Omitir». */
+.pvp-anu { gap: 18px; padding: 16px; }
+.pvp-anu-pieza {
+  position: relative;
+  width: min(560px, 92vw);
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2c3a33 0%, #1a2420 55%, #26302b 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.pvp-anu-etiqueta {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(0, 0, 0, 0.45);
+}
+.pvp-anu-omitir { min-width: 120px; }
+
+/* Quien volvió antes: centrada sobre la mesa, con velo (variante a, elegida por Victor). */
+.pvp-anu-espera {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.pvp-anu-tarjeta {
+  position: relative;
+  pointer-events: auto;
+  width: min(380px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 16px 18px 12px;
+  border-radius: 14px;
+  background: rgba(16, 22, 19, 0.96);
+  border: 1px solid rgba(232, 193, 92, 0.4);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  color: #fff;
+}
+.pvp-anu-quien { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.pvp-anu-frase { margin: 0 0 6px; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+/* «Quitar publicidad»: llamativo pero discreto (un enlace dorado), con su zona de 40 por eje. */
+.pvp-anu-quitar {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--gold-brand, #e8c15c);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.pvp-anu-premium {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 10px;
+  background: rgba(22, 30, 26, 0.98);
+  border: 1px solid rgba(232, 193, 92, 0.6);
+}
+.pvp-anu-premium-titulo { margin: 0; font-size: 18px; font-weight: 700; color: var(--gold-brand, #e8c15c); }
+
+/* §4 · Los tres tonos de la pantalla final. La celebración ya existe (`PantallaVictoria`) y no
+   se toca. Neutro (resultado 0): la frase en blanco, sin oro, y la cifra en gris, separada por
+   un filo. Sobrio (negativo, variante b elegida por Victor): la misma frase, y la cifra en rojo
+   dentro de una pastilla. */
+.game-over-screen:has(.pvp-fin-cifra) .game-over-msg-neutro { color: var(--text-primary, #f2f2f2); }
+.pvp-fin-cifra[data-tono='neutro'] {
+  padding-top: 12px;
+  min-width: 180px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text-secondary);
+}
+.pvp-fin-cifra[data-tono='sobrio'] {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(231, 76, 60, 0.55);
+  background: rgba(231, 76, 60, 0.1);
+}

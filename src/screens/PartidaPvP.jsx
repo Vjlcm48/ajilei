@@ -8,11 +8,12 @@ import { useSounds } from '../hooks/useSounds'
 import { sonidoDe } from '../hooks/vozHumanos'
 import { montoTexto } from '../config/tapetes'
 import { cargarMesa, fabricaMesa } from '../lib/cargarMesa'
-import { CLASE_DESCARTE, CLASE_ELECCION, CLASE_TURNO } from '../lib/partidaCliente'
-import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
+import { CLASE_DESCARTE, CLASE_ELECCION, CLASE_PAUSA_ANUNCIO, CLASE_TURNO } from '../lib/partidaCliente'
 import SorteoMesa from './SorteoMesa'
 import MensajesMesa from './MensajesMesa'
 import { AVISO_RELOJ_S } from '../lib/sorteoMesaCore'
+import RecargaPvP from './RecargaPvP'
+import { AnuncioSimulado, EsperaAnuncio } from './AnuncioPvP'
 
 // ── MES-PvP 3 · La partida entre personas ───────────────────────────────────
 // Ficha: AJILEI_MES-PvP_Fase1-3_v1.0.md §3. Diagnóstico: informe de la Fase 0, §B y §D.
@@ -34,21 +35,7 @@ const GameTable = lazy(fabricaMesa)
 // La capa del centro se fue: la mesa se monta ya en el sorteo y `SorteoMesa` pinta encima el
 // mazo del anfitrión, las cartas y el mensaje, en una franja propia sobre el centro de la mesa.
 
-// ── La pausa de anuncio, en su forma mínima (§3.2) ─────────────────────────
-function CapaAnuncio({ game, enviar, t }) {
-  const volver = () => {
-    reentrarPantallaCompleta(document, window)   // §3.1: y al cerrar el anuncio
-    enviar('volver_anuncio', { mano: game.handCount })
-  }
-  return (
-    <div className="pvp-capa" role="dialog" aria-modal="true" data-pvp="anuncio">
-      <p className="pvp-capa-titulo">{t('pvp.anuncio.titulo')}</p>
-      <button type="button" className="sal-cta" data-accion="volver-anuncio" onClick={volver}>
-        {t('pvp.anuncio.volver')}
-      </button>
-    </div>
-  )
-}
+// ── La pausa de anuncio: la forma de la lámina L-M 3 (`AnuncioPvP.jsx`) ─────
 
 // Las pantallas en el traje de las salas: arrancar, salir con la mesa viva y la mesa muerta.
 function Traje({ sala, t, children }) {
@@ -134,8 +121,15 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   const yo = game?.players[0]
   const yoAusente = !!yo?.ausente && !yo.abandonado && escena === 'mesa'
   const cronicaAusente = yoAusente ? t('pvp.ausente.aviso') : null
-  const partidaMesa = useMemo(() => (enSorteo ? { ...foto, cronica: '' }
-    : cronicaAusente ? { ...foto, cronica: cronicaAusente } : foto), [foto, enSorteo, cronicaAusente])
+  // L-M 3 · §2 · la transición la monta `GameTable` (su núcleo vive solo en el trozo de la mesa):
+  // aquí solo va el desfase con la hora del árbitro, para que la recogida caiga a su hora.
+  const desfase = partida?.foto?.().desfase ?? 0
+  const partidaMesa = useMemo(() => ({
+    ...foto,
+    desfase,
+    ...(enSorteo ? { cronica: '' } : cronicaAusente ? { cronica: cronicaAusente } : {}),
+  }), [foto, desfase, enSorteo, cronicaAusente])
+  const lamina = partida?.lamina ?? null
 
   if (escena === 'arrancando' || !game) {
     return <Traje sala={sala} t={t}><Aviso texto={t('pvp.arrancando')} t={t} pvp="arrancando" /></Traje>
@@ -157,7 +151,12 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
         onLeave={onLobby}
       />
       {enSorteo && <SorteoMesa game={game} reloj={reloj} enviar={foto.enviar} anfitrion={foto.anfitrion} lamina={partida?.lamina ?? null} />}
-      {escena === 'anuncio' && <CapaAnuncio game={game} enviar={foto.enviar} t={t} />}
+      {escena === 'anuncio' && <AnuncioSimulado game={game} enviar={foto.enviar} />}
+      {/* L-M 3 · §3 · quien volvió antes (centrada con velo); §1 · la recarga (solo la lámina). */}
+      {escena === 'mesa' && game.vencimiento?.clase === CLASE_PAUSA_ANUNCIO && (
+        <EsperaAnuncio game={game} premiumInicial={!!lamina?.premium} />
+      )}
+      {partida?.recarga && escena === 'mesa' && <RecargaPvP partida={partida} desfase={desfase} />}
       {/* L-M 2 · §2 · los mensajes; durante tu pausa de anuncio no se pintan (propuesta). */}
       <MensajesMesa partida={partida} oculta={escena === 'anuncio'} />
     </Suspense>
