@@ -1,0 +1,33 @@
+/* ── MES-PvP L-M 3 · §2 · La transición entre manos ─────────────────
+   Hoja aditiva y propia (`gameTable.css` es protegida): solo la pastilla. Las cartas y las
+   marcas se animan con Web Animations (`TransicionMano.jsx`), con `transform` y `opacity`, sin
+   tocar el layout. La pastilla es una capa `fixed` centrada en el óvalo: no lo mueve, y no
+   captura el puntero. Por debajo de las cartas en vuelo (200) y de los modales. */
+.tm-pastilla {
+  position: fixed;
+  z-index: 140;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(12, 16, 14, 0.86);
+  border: 1px solid rgba(232, 193, 92, 0.55);
+  color: #f3e3b3;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  animation: tm-pastilla 1.9s ease both;
+}
+
+@keyframes tm-pastilla {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+  14%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  82%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-pastilla { animation: none; }
+}

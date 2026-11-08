@@ -54,6 +54,8 @@ import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
 import ChipToken from './ChipToken'
 import BurbujaRecarga from './BurbujaRecarga'
+import TransicionMano from './TransicionMano'
+import { esperaSiguienteMano, recogerEnPvP } from '../lib/transicionCore'
 import { Wordmark } from './Wordmark'
 import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
@@ -81,6 +83,7 @@ import '../styles/luz.css'
 import '../styles/voz2.css'
 import '../styles/rev.css'
 import '../styles/rec.css'
+import '../styles/transicion.css'   // L-M 3 · §2 · la pastilla de la transición (las dos mesas)
 import '../styles/tactil.css'
 // TAB-1 · la escala de la mesa (solo bajo html[data-escala], que escribe useEscalaMesa)
 import '../styles/escala.css'
@@ -2193,7 +2196,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           <span className={`opp-status${turnSeat === seat ? ' opp-status-turn' : ''}${(partida ? rival.estado.tipo === 'allin' : marcadoAllIn(rival)) && !inReset ? ' opp-status-allin' : ''}`}>
             {/* MES-PvP 3 · contra personas manda `estadoDeAsiento`; «En anuncio» y «Abandonó» se
                 ven también en el pago, que es cuando ocurren. */}
-            {inReset || (isPayoutPhase && rival.score && !(partida && ['anuncio', 'abandono'].includes(rival.estado.tipo)))
+            {inReset || (isPayoutPhase && rival.score && !(partida && ['anuncio', 'abandono', 'recarga'].includes(rival.estado.tipo)))
               ? ' '
               : partida
                 ? (rival.estado.texto || ' ')
@@ -2765,7 +2768,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               )}
 
               {isBetPhase && human.folded && (
-                <div className="action-area thinking">{partida ? t('pvp.mesa.retirado') : 'Te retiraste — los rivales siguen jugando…'}</div>
+                <div className="action-area thinking">{partida ? t(human.recarga === 'fuera' ? 'pvp.asiento.fuera' : 'pvp.mesa.retirado') : 'Te retiraste — los rivales siguen jugando…'}</div>
               )}
 
               {isDiscardPhase && !discardAnim && !human.folded && !yaDescarte && (
@@ -2851,7 +2854,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                       }
                       if (congeladoRef.current) { diferir(sigue); return }
                       sigue()
-                    }, 300)
+                    }, esperaSiguienteMano())  // L-M 3 · §2 · la recogida (300 ms hasta hoy)
                   }}>
                     Siguiente mano
                   </SoundButton>
@@ -3038,6 +3041,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       {/* DSK-VC2 · celebración de mesa. Hermanas del área, como el panel de
           utilidades y las burbujas: overlays puros `fixed`, jamás dentro de un
           panel. Δ=0 por construcción — no ocupan una celda del flujo. */}
+      {/* L-M 3 · §2 · la transición entre manos, en las dos mesas: contra las IAS, al pulsar
+          «Siguiente mano»; contra personas, al final de la pausa entre manos. */}
+      <TransicionMano game={game} recoger={!partida && isPayoutPhase && isClearing} recogerA={partida ? recogerEnPvP(game.vencimiento, partida.desfase ?? 0) : null} />
       <CelebracionMesa activa={celebracion.activa} />
       <AjileiOverlay activa={celebracion.activa} />
 
