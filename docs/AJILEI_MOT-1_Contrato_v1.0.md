@@ -1,4 +1,4 @@
-# AJILEI · MOT-1 · Contrato del árbitro · v1.2
+# AJILEI · MOT-1 · Contrato del árbitro · v1.3
 
 - **Normativo de MOT-1.** Las fichas 1b–1f se escriben contra este documento: lo que no esté aquí no se construye.
 - **Base:** `main` en `1f5cb14`. Toda cita `archivo:líneas` es de ese árbol.
@@ -11,6 +11,7 @@
 - **Al día con la 1e (2026-11-04):** el §5 dice que la recepción con un cliente suscrito se prueba en la 1f. La línea anterior de la 1d-i queda corregida por esta.
 - **Al día con MES-PvP, sub-tanda 0 (2026-11-05):** v1.1. El §2, el §3, el §4, el §6, el §7, el §9 y el §11 recogen lo que necesita la mesa real, con las decisiones del rector y de Victor sobre la Fase 0 de MES-PvP. Lo normativo para MES-PvP es este mismo archivo. Las citas de lo nuevo son del árbol `de468b3`.
 - **Al día con MES-PvP, sub-tanda 3-A (2026-11-06):** v1.2, la del árbitro que se despliega con ella. La **regla C-8** (el abandono, §7) se reescribe según las Reglas v1.7 §8.2: abandonar es retirarse en el acto, en cualquier fase; si queda uno solo en la mano, cobra el pozo; con menos de 2 sentados la partida termina en la misma jugada; quien se va cobra su pila al irse, y con mano en curso al cerrarse esa mano; el showdown ya calculado se recalcula sin él; las tres vías siguen el mismo camino. El §2, el §4 y el §6 se ponen al día con ella. **Renumeración:** lo que la v1.1 dejaba para el árbitro y el Contrato «v1.2» (la recarga PvP, la reposición uno a uno y el volteo de 5 s del sorteo, en el informe de la sub-tanda 3) pasa a la **v1.3**. Las citas de lo nuevo son del árbol `db0313b`.
+- **Al día con MES-PvP, árbitro v1.3 (2026-11-08):** v1.3, la del árbitro que se despliega con las sub-tandas v1.3-a y v1.3-b. Recoge el sorteo sobre la mesa (el reparto según los participantes, el volteo de 5 s y las posiciones elegidas en la vista), el **mensaje de la mesa** (la excepción escrita a «por el canal solo versiones», §5) y la **recarga PvP** entera (§2, §3, §4, §6 y §7), según las Reglas de APU-1 v1.9 §8 y el informe de la Fase 0 del árbitro v1.3 (`docs/reportes/AJILEI_MES-PvP_Arbitro-v1.3_Fase0_Informe_v1.0.md`). La **reposición uno a uno** queda para la sub-tanda 5, con el Contrato v1.4 (§6). Las citas de lo nuevo son del árbol del STOP-C del v1.3-b.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -27,6 +28,9 @@
 | `cfg1c` | `20261030001500_cfg1c_eliminar_cuenta.sql` |
 | `cfg1e` | `20261030193000_cfg1e_mano_actual.sql` |
 | `tie1a` | `20261031150000_tie1a_inventario.sql` |
+| `mot1_dinero` | `20261104170000_mot1_dinero.sql` |
+| `v13_mensaje` | `20261107200000_mespvp_v13_mensaje.sql` |
+| `v13_recarga` | `20261108120000_mespvp_v13_recarga.sql` |
 
 ---
 
@@ -67,7 +71,7 @@ No hay cifra libre.
 
 ## §2 · Acciones del cliente al árbitro
 
-Lista cerrada de seis acciones. Una séptima exige cambiar este contrato.
+Lista cerrada de nueve acciones (v1.3: las tres de la recarga). Una décima exige cambiar este contrato. El **mensaje de la mesa** no es una acción del árbitro: va aparte, al final de este §2.
 
 ### Lo común a todas
 
@@ -81,14 +85,16 @@ Lista cerrada de seis acciones. Una séptima exige cambiar este contrato.
 | 2 | La cuenta tiene asiento en esa mesa | `no_es_de_esta_mesa` |
 | 3 | La partida no terminó | `partida_terminada` |
 | 4 | El asiento no está abandonado | `asiento_abandonado` |
-| 5 | `version` es la vigente. No se aplica a `elegir_carta_sorteo`, a `descartar` ni a `volver_anuncio` | `version_vieja` |
+| 5 | `version` es la vigente. No se aplica a `elegir_carta_sorteo`, a `descartar`, a `volver_anuncio` ni a las tres de la recarga | `version_vieja` |
 | 6 | `accion` es de esta lista | `accion_desconocida` |
 
 **Respuesta:** `{ ok: true, version, ahora }` o `{ ok: false, motivo, version, ahora }`. No lleva estado: el cliente relee su vista (§5). `ahora` es la hora del servidor en ms y va en toda respuesta de la función, también en los rechazos: solo sirve para corregir el desfase del reloj del teléfono.
 
 **Toda acción con efecto sube la versión en 1.** Un rechazo no la sube.
 
-**Versión en las fases simultáneas.** En el sorteo, en el descarte y en la pausa de anuncio, la acción se valida contra la ronda o la fase abierta, no contra la versión global: `elegir_carta_sorteo` lleva `ronda`, y `descartar` y `volver_anuncio` llevan `mano`; si no son la abierta se rechaza con `fase`. Si la escritura choca con otra acción simultánea, el árbitro reintenta dentro del servidor. Nadie recibe `version_vieja` por elegir, descartar o volver del anuncio a la vez que otro.
+**Versión en las fases simultáneas.** En el sorteo, en el descarte y en la pausa de anuncio, la acción se valida contra la ronda o la fase abierta, no contra la versión global: `elegir_carta_sorteo` lleva `ronda`, y `descartar` y `volver_anuncio` llevan `mano`; si no son la abierta se rechaza con `fase`. Si la escritura choca con otra acción simultánea, el árbitro reintenta dentro del servidor. Nadie recibe `version_vieja` por elegir, descartar o volver del anuncio a la vez que otro. **v1.3:** `recargar`, `pedir_recarga` y `anular_recarga` se validan igual, contra `mano`: durante la mano la versión cambia sin parar (`partida.js:74`, `nucleo.js:27`).
+
+**El saldo (v1.3).** El árbitro es puro y no conoce la billetera: la función le pasa el saldo de cada asiento con la hora, `{ ahora, saldos }`, leído por `leer_partida` (§5). Nunca se guarda en el estado (`partida.js`, `conSaldos` y `sinSaldos`).
 
 ### `elegir_carta_sorteo`
 
@@ -154,6 +160,45 @@ El abandono por regla de una partida por cuenta no pasa por esta acción: lo mar
 | **Efecto** | Saca el asiento de `enAnuncio` y pone a 0 su cuenta de ausencia (§6). Si no queda nadie en anuncio, cierra la pausa y arranca la mano |
 | **Motivos** | `fase` · `no_participa` · `ya_volvio` |
 
+### `recargar` (v1.3)
+
+| | |
+|---|---|
+| **Campos** | `mano`: el `handCount` vigente |
+| **Precondiciones** | Partida con recarga (`estado.entrada`; R-4) · el asiento no cobró · `mano` es la vigente. **En la pausa entre manos** (la mano siguiente, la de anuncio o la retención de la oferta): pila por debajo de la entrada y saldo ≥ `entrada − pila`. **Dentro de la mano**: solo sentado fuera |
+| **Efecto** | En la pausa, en el acto: la pila vuelve a la entrada, `recargas` suma el monto y emite el efecto `recarga` (§7). Sentado fuera, vuelve a la mesa para la mano siguiente; en la retención, si ya no queda nadie decidiendo o la mesa puede seguir, arranca la mano en la misma jugada. **Sentado fuera durante la mano, la deja PEDIDA** para la pausa siguiente (P-6): el dinero nunca se mueve dentro de una mano (`partida.js:509`) |
+| **Motivos** | `fase` (mano equivocada, sorteo, o dentro de la mano sin estar fuera) · `sin_recarga` · `saldo_insuficiente` · `ya_pedida` |
+
+### `pedir_recarga` (v1.3)
+
+| | |
+|---|---|
+| **Campos** | `mano` |
+| **Precondiciones** | Mano en curso · `mano` es la vigente · partida con recarga · el asiento no cobró · sin pedido abierto · pila por debajo de la entrada |
+| **Efecto** | `pedida = true`. Se aplica (o se cancela) al cerrarse la mano, en la jugada que la cierra (§6) (`partida.js:530`) |
+| **Motivos** | `fase` · `sin_recarga` · `ya_pedida`. Un doble toque recibe `ya_pedida`, y el cliente lo toma como éxito |
+
+### `anular_recarga` (v1.3)
+
+| | |
+|---|---|
+| **Campos** | `mano` |
+| **Precondiciones** | Mano en curso · `mano` es la vigente · hay un pedido abierto |
+| **Efecto** | `pedida = false` (`partida.js:539`) |
+| **Motivos** | `fase` · `sin_pedido` |
+
+**«Ahora no» no es una acción (P-2).** Solo cierra la tarjeta en el cliente: la oferta sigue hasta su plazo.
+
+### El mensaje de la mesa (v1.3, fuera de la lista)
+
+| | |
+|---|---|
+| **Campos** | `accion: 'mensaje'` · `clave`: uno de los 12 ids fijos de `config/mensajes.js`, en el orden de `REACCIONES` |
+| **Recorrido** | La función lo desvía antes del árbitro (`nucleo.js:266`): `leer_partida` → `puedeMandarMensaje` (`arbitro/mensaje.js`) → `anotar_mensaje` (el freno, `v13_mensaje:34`) → evento `mensaje` por el canal (§5). **No toca el estado ni sube la versión** |
+| **Precondiciones** | En este orden: token; asiento en la mesa; partida no terminada; no abandonado; no cobrado; clave de la lista; no está en su propio anuncio (Reglas v1.9 §8.6). Y el freno: **un mensaje cada 10 s por jugador**, atómico en SQL |
+| **Respuesta** | `{ ok: true, version }` con la versión leída, o el rechazo |
+| **Motivos** | `no_autenticado` · `no_es_de_esta_mesa` · `partida_terminada` · `asiento_abandonado` · `clave_desconocida` · `en_anuncio` · `freno` |
+
 ---
 
 ## §3 · Motivos de rechazo
@@ -182,7 +227,7 @@ Manda el código: la ficha pide los nombres de `pozos.js`. La columna de Reglas 
 
 ### B · Los del árbitro
 
-Lista cerrada. «No es tu turno» y «fase equivocada» no son motivos nuevos: se reutilizan `fuera_de_turno` y `fase`, también en el sorteo y el descarte. `fase` cubre además una `ronda` o una `mano` que no son la abierta. `retirado` y `accion_desconocida` se reutilizan igual.
+Lista cerrada, de diecinueve desde la v1.3 (`motivos.js:10-33`). «No es tu turno» y «fase equivocada» no son motivos nuevos: se reutilizan `fuera_de_turno` y `fase`, también en el sorteo y el descarte. `fase` cubre además una `ronda` o una `mano` que no son la abierta. `retirado` y `accion_desconocida` se reutilizan igual.
 
 | Motivo | Cuándo | Acciones |
 |---|---|---|
@@ -198,6 +243,13 @@ Lista cerrada. «No es tu turno» y «fase equivocada» no son motivos nuevos: s
 | `ya_descarto` | El asiento ya descartó en esta mano | `descartar` |
 | `descarte_invalido` | No es lista, índice fuera de rango o repetido, o por encima del tope | `descartar` |
 | `ya_volvio` | El asiento ya volvió del anuncio en esta pausa | `volver_anuncio` |
+| `clave_desconocida` | v1.3 · la clave del mensaje no es uno de los 12 ids | `mensaje` |
+| `en_anuncio` | v1.3 · el asiento está en su pausa de anuncio | `mensaje` |
+| `freno` | v1.3 · otro mensaje del mismo jugador hace menos de 10 s | `mensaje` |
+| `sin_recarga` | v1.3 · no hay nada que recargar: la pila ya está en la entrada, el asiento ya cobró, o la partida no tiene recarga (R-4) | `recargar` · `pedir_recarga` |
+| `saldo_insuficiente` | v1.3 · el saldo no cubre `entrada − pila` | `recargar` |
+| `ya_pedida` | v1.3 · ya hay un pedido abierto | `recargar` (sentado fuera) · `pedir_recarga` |
+| `sin_pedido` | v1.3 · no hay pedido que anular | `anular_recarga` |
 
 **No van a `CLAVES_ERROR`.** Esa lista es de las RPC de salas y es exhaustiva (`salasApi.js:40-54`). La de los motivos nace en el trozo de la partida (`trozos.js:28`; INV-84).
 
@@ -231,10 +283,13 @@ La arma `vistaDe(estado, asiento)` en la 1b. Lo que no esté en la primera tabla
 | Versión | Entero | No: árbitro |
 | Mano | Su número: lo que `descartar` manda en `mano` | Sí: `handCount` (`gameEngine.js:598`) |
 | Descarte | Quién ya descartó, y cuántas tras aplicarse | No: árbitro. `applyDiscard` lo cuenta y no lo guarda (`gameEngine.js:688, :700`) |
-| Sorteo | La ronda abierta, las cinco posiciones propias sin valor y quién ya eligió; tras el volteo, la carta elegida de cada participante en cada ronda y su posición (`rondas[].volteo[].posicion`) | No: árbitro |
+| Sorteo | La ronda abierta, las cinco posiciones propias sin valor y quién ya eligió; tras el volteo, la carta elegida de cada participante en cada ronda y su posición (`rondas[].volteo[].posicion`). **v1.3 · `sorteo.elegidas`:** qué posición (0..4) eligió cada asiento, o `null`, **nunca su valor** antes del volteo: la carta elegida se adelanta también en los asientos ajenos (Reglas v1.9 §8.4) (`vista.js:74`) | No: árbitro |
 | Revelación, solo en `PAYOUT` por showdown | Cartas y `score` de los no retirados; ganadores por capa | Datos sí (`gameEngine.js:238-241`, `pozos.js:311`). El filtro es de `vistaDe` |
 | `resultado` en el fin, desde la v1.2 | Si la partida termina en la misma jugada que cierra una mano (C-8, R2), la vista del fin publica el `resultado` de esa mano, con la forma del pago. En los demás fines vale `null`. Es lo que deja al cliente enseñar el pago antes de la pantalla final. No es un campo nuevo | No: árbitro (`vista.js`, `finConPago`) |
 | Fin por retirada de los demás | Ganador, sin cartas de nadie | Sí (`gameEngine.js:198-207`) |
+| `players[i].recarga`, v1.3 | La marca pública de la recarga, de todos: `'decide'` en la pausa entre manos (quebró, o se saltó la mano y decide), `'fuera'` mientras se salta la mano, o `null`. Es lo que pinta «Recargando» y «Fuera de esta mano» | No: árbitro (`vista.js:22-46`) |
+| Sentado fuera, v1.3 | Quien se salta la mano va **`eliminated: false`**, `folded: true` y sin cartas (`numCartas: 0`), aunque el motor lo lleve eliminado. **Obligatorio por el cliente ya publicado**, que con `eliminated` enseña la pantalla final | No: árbitro |
+| `recarga`, v1.3, solo el asiento propio | `{ monto, oferta, pedida, cancelada, recargas }`: `monto = entrada − pila`; `oferta`, si decide (quebró o está fuera); `pedida`; `cancelada`, `null` o `{ motivo: 'saldo', mano }`, la mano en que el árbitro canceló un pedido por saldo (la versión no sirve: la función la reescribe cuando aplica abandonos en la misma llamada); `recargas`, la suma recargada, también tras cobrar (la pantalla final la necesita). **El saldo no va en la vista.** Sin recarga en la partida (R-4), `null` (`vista.js:49-61`) | No: árbitro |
 
 ### Lo que no sale nunca del servidor
 
@@ -249,6 +304,8 @@ La arma `vistaDe(estado, asiento)` en la 1b. Lo que no esté en la primera tabla
 | `message` | `gameEngine.js:244-270, :447-468` | K-12: va en perspectiva del asiento 0 y la voz vive en el cliente |
 | `isHuman` y `nivelIA` | Estado del motor | No significan nada en PvP |
 | Cuentas de los demás | Correspondencia `uid → índice` | El cliente solo ve índices |
+
+**El saldo de la billetera no viaja en la vista (v1.3).** Una vista no se reescribe cuando la billetera cambia fuera de la mesa: el cliente lee el saldo de su billetera, y la relee tras cada recarga.
 
 **El ritmo no es secreto: no se muestra en ninguna pantalla.** Viaja en la fila de la mesa (`salas.ritmo`), que el cliente puede leer, y `vistaDe` no lo lleva. El cliente recibe la hora de vencimiento ya escalada (§6).
 
@@ -271,13 +328,15 @@ Sellado el 12-sep. La línea «vistas por Broadcast privado» de la Fase 0b qued
 | 1 | Llega la acción. El árbitro lee el estado y corre el motor |
 | 2 | **Una sola transacción, condicionada a la versión leída:** estado, versión nueva, las vistas y, si cerró la mano, las pilas y los puntos |
 | 3 | Si la versión ya cambió, no escribe nada y responde `version_vieja`. En `elegir_carta_sorteo` y `descartar` no responde eso: relee y valida otra vez `ronda` o `mano` contra la abierta. Si sigue siéndolo, reintenta; si no, rechaza con `fase` |
-| 4 | Tras confirmar, emite en el canal: `{ version: N }` y nada más |
+| 4 | Tras confirmar, emite en el canal: `{ version: N }` y nada más. La única excepción es el mensaje de la mesa (abajo) |
 | 5 | Cada cliente con otra versión relee su fila de vistas |
 
 ### Qué debe cumplir
 
 - **El bus no manda.** Un aviso perdido no rompe nada: el cliente se pone al día al releer, y una acción con versión vieja se rechaza sin efecto. En las fases simultáneas deciden `ronda` y `mano` (§2).
 - **Ningún secreto viaja por el bus.** El payload es solo la versión.
+- **v1.3 · la excepción escrita: el mensaje de la mesa (decisión P-1 de Victor).** Por el mismo canal privado viaja el evento `mensaje`, `{ asiento, clave }` (`nucleo.js:109`). Es contenido público y efímero, no estado: nadie lo reconcilia y perderlo no rompe nada. El freno vive en `partida_asientos.ultimo_mensaje` y lo impone `anotar_mensaje`, atómico y solo para `service_role` (`v13_mensaje:34-72`). El cliente descarta el suyo (le llega por la respuesta), el de un asiento fuera de la mesa o con clave desconocida, y **todo mientras está en su propio anuncio** (`partidaCliente.js:257-263`).
+- **v1.3 · `leer_partida` trae `saldos bigint[]`**, el saldo de cada asiento en su orden (`v13_recarga:210`), que la función pasa al árbitro y no guarda. Cambió lo que devuelve: `drop` + `create`, y vuelve a dar sus permisos a `service_role`.
 - **`salas.estado_partida` sigue nula** (`sal_a:104, :119`). Esa columna se difunde a los clientes (`sal_a:205, :852-865` · `salasApi.js:284-292`) y por eso el estado no vive ahí.
 - **Las RPC del árbitro no leen `auth.uid()`.** Con llave de servicio no hay sesión: llevan el uid por parámetro y solo `service_role` las ejecuta (molde `partida_abierta_de`, `cfg1c:45`; N-1).
 - **La sala de espera no cambia:** sigue con `postgres_changes` (`salasApi.js:307-318`).
@@ -294,9 +353,9 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 |---|---|---|---|
 | Arranque | La sala pasa a `activa` | Ya cumplido | Crea la partida y abre el sorteo (§2) |
 | Barajado del sorteo · `barajado_sorteo` | Se abre cada ronda, también la primera | `BARAJADO_MS`, una sola velocidad | Empieza el reparto del sorteo |
-| Reparto del sorteo | Termina `barajado_sorteo` | Espera de animación, siempre rápida y por oleadas: no depende de los asientos | Se abre la elección |
+| Reparto del sorteo | Termina `barajado_sorteo` | v1.3 · espera de animación, siempre rápida, **de una en una y según los participantes de la ronda**: `esperaRepartoSorteo(p)`, 3.495 · 4.983 · 6.470 · 7.958 ms con 2…5 (`esperas.js:42`) | Se abre la elección |
 | Elección del sorteo | Termina el reparto de la ronda | 10 s por ronda | Toma la posición 0 de quien no eligió y voltea. El abandonado no espera: la toma al instante (§7) |
-| Volteo del sorteo · `volteo_sorteo` | Voltean las elegidas | 4 s, **provisional · se cierra con los teléfonos** | La Mano queda fijada y arranca la primera mano, o se abre la ronda siguiente |
+| Volteo del sorteo · `volteo_sorteo` | Voltean las elegidas | v1.3 · **5 s** (Reglas v1.9 §8; `esperas.js:33`) | La Mano queda fijada y arranca la primera mano, o se abre la ronda siguiente |
 | Turno | Le toca a un asiento en `BET_*` | `TURN_TIME` = 20 s (`GameTable.jsx:87`) | `pasar` si es legal; si no, `retirarse` (`GameTable.jsx:913-914`). El abandonado no llega a vencer: se retira en el acto (§7) |
 | Descarte | Se abre `DISCARD` | `TURN_TIME` = 20 s (`GameTable.jsx:890`) | Descarte vacío para quien falte (`GameTable.jsx:917`) y aplica. El abandonado no descarta: está retirado desde que abandonó (C-8, §7) |
 | Reposición · `reposicion` | Se aplica el descarte | Una sola tanda de vuelos a la vez: todos reponen en paralelo, con la fórmula del reparto sobre el mayor descarte (120 + mayor × 595 + 400 ms). Si nadie descartó, 600 ms. **provisional · se cierra con los teléfonos** | El motor sale de `DISCARD`: se abre `BET_3` y su turno, o lo que toque. Ver abajo |
@@ -304,7 +363,31 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 | Aviso de salida · `aviso_salida` | `startHand` deja eliminados nuevos y la partida sigue | 3 s, **provisional · se cierra con los teléfonos** | Empieza el barajado |
 | Barajado | `startHand`, o termina `aviso_salida` | Espera de animación | Se abre el reparto |
 | Revelación y mano siguiente | `PAYOUT` | Con revelación, 6 + 2 s: la red de la celebración más la lectura. Sin revelación, 4 s desde el cierre de la mano. **provisional · se cierra con los teléfonos** | Si la mano lleva anuncio, `pausa_anuncio`. Si no, asientos que salen y `startHand` (`gameEngine.js:502`). Con ≤1 vivo, `GAME_OVER` (`:522`). El dinero y los puntos de la mano ya se escribieron al cerrarla (§7) |
-| Pausa de anuncio · `pausa_anuncio` | Vence la mano siguiente de una mano con anuncio | 45 s, o hasta que todos vuelvan | Asientos que salen y `startHand`. Ver «Publicidad» |
+| Pausa de anuncio · `pausa_anuncio` | Vence la mano siguiente de una mano con anuncio | 45 s, o hasta que todos vuelvan | Asientos que salen y `startHand`. Ver «Publicidad». v1.3 · con alguien decidiendo, lo de «La recarga», abajo |
+| Retención de la oferta · `oferta_recarga`, v1.3 | Vence la pausa entre manos con alguien decidiendo y sin él quedaría uno solo con fichas (R2) | **15 s, provisional · se cierra con los teléfonos** (P-3; `esperas.js:67`). La misma cifra que la pregunta de REC-1 contra las IAS | Quien no decidió sale con su residuo, y `startHand` cierra la partida. **No cuenta para la ausencia** (D7) |
+
+### La recarga (v1.3)
+
+Reglas de APU-1 v1.9 §8.1, con P-2, P-3, P-5, P-6 y D7. Solo en una partida con `estado.entrada`: sin él (una partida de la v1.2 o la v1.3-a, R-4), la recarga queda apagada y todo va como antes.
+
+| Punto | Regla |
+|---|---|
+| La oferta | Al cerrarse la mano, quien no cubre el ante de la siguiente decide: `fuera = 'oferta'`. No sale ni cobra (`partida.js:213`) |
+| El pedido | Se aplica en la jugada que cierra la mano, venga de quien venga (no hace falta que su cliente esté despierto): la pila vuelve a la entrada. Se cancela en silencio si la pila ya no está por debajo de la entrada o si la partida termina en esa jugada; con `cancelada` si el saldo no alcanza (`partida.js:191`) |
+| Vence la pausa entre manos | Si la mesa sigue sin él (2 o más cubren el ante): la primera vez **se salta la mano sentado fuera** (`fuera = 'mano'`); la segunda, sale y cobra su residuo **como quebrado y cobrado, no como abandonado** («Te quedaste sin fichas», §8.3 fila 2). Si no: la retención `oferta_recarga` (`partida.js:355`) |
+| Sentado fuera | El motor lo lleva `eliminated`: no paga el ante, no recibe cartas ni turno y la rotación lo salta (`gameEngine.js:509-517`). Conserva su residuo: `empezarMano` no lo liquida (`partida.js:299`) y `sentados()` lo cuenta para R2 (`partida.js:100`). Al recargar, vuelve con la entrada antes del siguiente `startHand`. El motor no se abre: `aplicarRecarga` de `gameEngine.js` no se usa |
+| La retención | Si recarga, se juega la mano siguiente en la misma jugada; si nadie recarga, salen y la partida termina (`partida.js:372`) |
+| Con la pausa de anuncio | La oferta sigue viva en ella (que no la ve: `veAnuncio` exige cubrir el ante) y quien decide no cobra al abrirse. Al acabar, quien no decidió pasa a sentado fuera |
+| Al abandonar | Un pedido o una oferta abiertos se limpian; cobra su pila o su residuo por la ruta de siempre (`partida.js:720`) |
+| Sin saldo al guardar | Si el saldo bajó entre la lectura y la escritura, `aplicar_efectos` lanza `saldo_insuficiente`, la jugada entera se deshace y la función la repite **una** vez con saldos frescos: el árbitro cancela entonces con `'saldo'` (`nucleo.js:285`) |
+
+### La reposición uno a uno · pendiente de la sub-tanda 5 (Contrato v1.4)
+
+Sigue en paralelo (la fila «Reposición» de arriba). La sub-tanda 5 la cambia **a la vez en el árbitro y en el cliente**, con un deploy propio:
+
+- **La fórmula** (informe de la Fase 0, §B): `R = 100 + f · Σ por asiento [n = 0 → 750 ; n ≥ 1 → 2.175 + 412,5 · (n − 1)] + 500` ms, en orden de Mano a Pie y solo con los no retirados.
+- **Rápido escala ×0,5 en todo** (P-4): las pausas y los vuelos de 750 ms.
+- **Las constantes `D_*`** de `GameTable.jsx:263-269` se mudan a `esperas.js`. Toca la mesa contra las IAS: pide su control.
 
 **`TURN_TIME` no está exportado:** vive dentro del componente de mesa. La 1b lo lleva a donde el árbitro lo lea, sin cambiar la cifra.
 
@@ -350,9 +433,10 @@ Las constantes viven en `src/config/esperas.js`. Las de la 1b salen de lo que ya
 | Mano siguiente | En PvP no hay botón: arranca sola. **Con revelación, 6.000 + 2.000 ms:** la red de la celebración más la lectura. **Sin revelación** (ganan por retirada de los demás), **4.000 ms** desde el cierre de la mano. **provisional · se cierra con los teléfonos**. Contra las IAS sigue siendo un botón, con 300 ms tras tocarlo (`GameTable.jsx:2716-2726`) | No |
 | Reposición | 120 + mayor descarte × 595 + 400 ms; sin descartes, 600 ms. **provisional · se cierra con los teléfonos**: la animación en paralelo nace en MES-PvP y debe caber aquí | No |
 | Aviso de salida | 3.000 ms. **provisional · se cierra con los teléfonos** | No |
-| Volteo del sorteo | 4.000 ms. **provisional · se cierra con los teléfonos** | No |
+| Volteo del sorteo | v1.3 · 5.000 ms (Reglas v1.9 §8) | No |
 | Pausa de anuncio | Tope de 45.000 ms | No |
-| Reparto del sorteo | Cinco oleadas, cada una de un vuelo: 120 + 5 × 297,5 + 400 = 2.008 ms, con cualquier número de asientos (`reloj.js`) | Siempre rápido |
+| Reparto del sorteo | v1.3 · cinco cartas a cada participante, de una en una: `120 + 5 · p · 297,5 + 400` ms, con `p` los que participan en la ronda (`esperas.js:42`) | Siempre rápido |
+| Retención de la oferta | v1.3 · 15.000 ms. **provisional · se cierra con los teléfonos** | No |
 
 ### Reloj sin congelar
 
@@ -366,8 +450,8 @@ Sustituye a la «gracia de reconexión». No se distingue a quien no está de qu
 
 | Punto | Regla |
 |---|---|
-| Qué cuenta | Cada vencimiento propio resuelto por el reloj: turno de apuesta o descarte. Da igual qué cliente lo reclame. Agotar la pausa de anuncio no cuenta, y tampoco la elección del sorteo: quien no elige recibe la posición 0, sin falta |
-| Qué pone a 0 la cuenta | Cualquier acción propia: `apostar`, `descartar`, `elegir_carta_sorteo` o `volver_anuncio` |
+| Qué cuenta | Cada vencimiento propio resuelto por el reloj: turno de apuesta o descarte. Da igual qué cliente lo reclame. Agotar la pausa de anuncio no cuenta, y tampoco la elección del sorteo: quien no elige recibe la posición 0, sin falta. v1.3 · tampoco la oferta de recarga: tiene su salida en dos pasos (sentado fuera y luego sale) |
+| Qué pone a 0 la cuenta | Cualquier acción propia: `apostar`, `descartar`, `elegir_carta_sorteo`, `volver_anuncio` y, desde la v1.3, las tres de la recarga |
 | `ausente` | `true` en la vista desde el 2.º vencimiento seguido |
 | Abandono | Al llegar a **`N_AUSENCIA` = 3** vencimientos seguidos, **provisional · se cierra con los teléfonos**. El árbitro lo abandona por la misma ruta que `abandonarPorServidor`, y el §7 dice qué pasa con su dinero. Ese 3.er vencimiento lo retira, en su turno de apuesta o en el descarte, como a cualquier abandonado (C-8) |
 | Lo que ve el que vuelve | MES-PvP, sub-tanda 6 |
@@ -382,7 +466,7 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 | Cuándo | Al vencer la mano siguiente, **antes de `startHand`**. La fase sigue en `PAYOUT`: no se reparte nada, y quien sale no paga el ante |
 | Quién sigue | Los vivos, no abandonados, con pila ≥ ante. Si son ≤1, no hay pausa: `startHand` termina la partida |
 | Quién lo ve | Los que siguen, salvo `asientos[i].sinAnuncio`: gancho de Premium, hoy siempre `false` (Tienda §5). Si nadie lo ve, no hay pausa |
-| Quien no cubre el ante | Cobra al abrirse la pausa (§7) |
+| Quien no cubre el ante | Cobra al abrirse la pausa (§7). v1.3 · con la recarga encendida, no: decide durante la pausa (arriba, «La recarga») |
 | Fin de la pausa | Todos volvieron (`volver_anuncio`), vencen los 45 s, o quedan ≤1 que sigan porque los demás abandonaron. Entonces sale `enAnuncio` de todos y se llama a `startHand` |
 | Quien sigue en su anuncio al arrancar la mano | Nada especial: su ante se cobra y sus relojes corren, como los de cualquiera |
 
@@ -397,6 +481,7 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 | Al **sentarse** | `garantia_pvp` | −entrada | `aplicar_movimiento` (`eco1a:420`) · tipos en `eco1a:179` |
 | Al **salir** | `liberacion_pvp` | +pila, con el residuo menor que la unidad (K-10) | El mismo |
 | Al cerrar cada mano | **Ninguno** | Las pilas de todos los asientos se reescriben en SQL, en una sola transacción | Paso 2 del §5 |
+| Al **recargar** (v1.3) | `recarga_pvp`, **nuevo** (P-5) | −monto, con la clave `recarga_pvp:<sala>:<uid>:<mano>`: un asiento recarga a lo sumo una vez por pausa, y la misma recarga no se cobra dos veces | El efecto `recarga { asiento, monto, mano }` en `aplicar_efectos`, **después** de `mano_cerrada`: sube `entrada` y `pila` del asiento en lo mismo (`v13_recarga:150`) |
 
 | Regla | Detalle |
 |---|---|
@@ -407,7 +492,10 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 | `resultado_pvp` | Queda sin escritor: con dos movimientos no hace falta (`eco1a:179`) |
 | El dinero | Nunca vive en el cliente |
 | Residuo | El motor elimina a quien no cubre el ante y le deja las fichas (`gameEngine.js:511, :515`). Vuelven a su saldo al salir |
-| Quien no cubre el ante en una mano con anuncio | Cobra al abrirse la pausa, no a los 45 s. No cambia el dinero: `startHand` lo iba a eliminar igual |
+| Quien no cubre el ante en una mano con anuncio | Cobra al abrirse la pausa, no a los 45 s. No cambia el dinero: `startHand` lo iba a eliminar igual. v1.3 · con la recarga encendida, decide y no cobra hasta que salga (§6) |
+| El cuadre con recargas, v1.3 | En el árbitro, pilas + pozo + cobrado es constante **más lo recargado**. En SQL, `mesa_cuadra` (Σ(pila + liberado) = Σ entrada) sigue igual porque la recarga sube `entrada` y `pila` a la vez, y `neto_jugador_mesa` y `neto_mesa` cuentan `recarga_pvp` (`v13_recarga:41-71`): al terminar, `neto_mesa` vale 0 |
+| El resultado de la pantalla final, v1.3 | `cobrado − (entrada + recargas)`, con `entrada` **la de la mesa** (la de la sala, `vistaAMesa.js:88`) y `recargas` de la vista privada (`vistaAMesa.js:100`, `vozHumanos.js:135`). La base sube `partida_asientos.entrada` con cada recarga: usar esa contaría lo recargado dos veces |
+| Ni tope ni válvula, v1.3 | `limite_dinero()` no encaja (lee `auth.uid()`, y las RPC del árbitro no lo leen); el freno lo da el árbitro: un pedido por pausa y nunca por encima de la entrada. La válvula de ECO-1 no aplica a PvP |
 
 ### Qué debe cumplir la 1d-ii
 
@@ -438,7 +526,7 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Qué pasa en la mano (regla C-8, v1.2) | **Se retira en el acto, en cualquier fase**: en la apuesta (le toque o no; en su turno, por el motor), en el descarte, en la reposición, y en el barajado y el reparto de una mano con el ante cobrado. También en all-in. Pierde lo que puso y no es elegible en ninguna capa. Si queda uno solo en la mano, cobra el pozo por la ruta de los retiros (el resultado de `resolveWinner`, `gameEngine.js:198-207`, con `ganadoresPorCapa` y `repartirCapas`); si quedan dos o más, la mano sigue sin él. Si se van a la vez todos los que seguían en la mano (varios terceros vencimientos en el mismo descarte), el más cercano a la Mano no se retira y cobra el pozo, como el último en pie del motor |
 | En el descarte | No descarta: está retirado. Si era el último que faltaba, la fase se aplica en el acto |
 | En la reposición | Lo calculado (la apuesta 3 o el showdown) se recalcula sin él, con las cartas nuevas ya repuestas |
-| Fin de partida (R2) | Con menos de 2 sentados (ni abandonados ni eliminados), la partida termina **en la misma jugada**, sin empezar otra mano: el estado final y el dinero quedan resueltos ahí. Si la mano se cerró en esa jugada, el fin conserva sus contribuciones y la vista publica su `resultado` (§4) |
+| Fin de partida (R2) | Con menos de 2 sentados (ni abandonados ni eliminados; v1.3 · quien está sentado fuera cuenta como sentado), la partida termina **en la misma jugada**, sin empezar otra mano: el estado final y el dinero quedan resueltos ahí. Si la mano se cerró en esa jugada, el fin conserva sus contribuciones y la vista publica su `resultado` (§4) |
 | En el sorteo | Elige al instante la posición 0, al abandonar o al abrirse la elección, también en las rondas de desempate. Si era el último que faltaba, voltea en el acto. Si gana, la Mano pasa al siguiente vivo |
 | Qué cobra | **Su pila al irse, nunca más** (R3): con mano en curso, al cerrarse esa mano y sin nada del pozo; sin mano en curso, en el acto. Lo que nadie igualó le vuelve, como a cualquiera que se retira (D-7). **La pausa de anuncio es «sin mano en curso»:** quien abandona en ella cobra en el acto y no paga el ante. Sale de `enAnuncio`, y si era el último que faltaba, la mano arranca |
 | Lo que ya puso en el pozo | Lo pierde: se retiró (C-8). Antes de la v1.2 lo seguía disputando y podía ganarlo |
@@ -532,6 +620,8 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | `vuelo` sin semilla | `diagDSK.mjs`, modo `vuelo` | Ninguna: MOT-1 no lo toca |
 | Reglas v1.4: motivos con otro nombre y «`pozos.js` no protegido» | Reglas v1.4 `:143` | Hecho: Reglas v1.5, MES-PvP 0 |
 | Protegidos §7.1, fila E-4: dice que el pozo deja de ser escalar | Protegidos §7.1 · `pozos.js:243` | Hecho: MES-PvP 0 |
+| **La reposición uno a uno** (árbitro y cliente), con Rápido ×0,5 en todo, y la mudanza de las `D_*` a `esperas.js` | `reloj.js` · `GameTable.jsx:263-269, :1670-1724` | MES-PvP 5, con un deploy propio y el control de las IAS (§6) |
+| Dos matices de las Reglas v1.9 frente al código, **anotados sin corregir** (A2 de la Fase 0 del v1.3): el código llama `{n}` a lo que las Reglas llaman `{N}` (§8.4 y §8.6), con el mismo texto visible; y en la mesa de 2 contra las IAS la pastilla dice «Es Mano IA», sin número (`engine/entrada.js:110`), cuando las Reglas solo dan la forma con `{k}` | `lib/transicionCore.js:27-28` | Ninguna: se dejan así |
 
 ---
 
