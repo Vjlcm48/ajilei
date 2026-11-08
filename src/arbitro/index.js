@@ -15,7 +15,7 @@ export {
   partidaTerminada, sorteoAbierto,
 } from './partida.js'
 export {
-  CLASES, ESPERA_REPARTO_SORTEO_MS, RITMOS, esperaManoSiguiente, esperaPrimerReparto, esperaReposicion, esperaSegundoReparto,
+  CLASES, RITMOS, esperaManoSiguiente, esperaPrimerReparto, esperaRepartoSorteo, esperaReposicion, esperaSegundoReparto,
   factorDe, llevaAnuncio,
 } from './reloj.js'
 export { CARTAS_POR_ASIENTO, ETAPAS, TOPE_RONDAS } from './sorteo.js'

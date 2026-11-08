@@ -6,9 +6,12 @@ import {
   ANTES_DEL_REPARTO_MS, AVISO_SALIDA_MS, BARAJADO_MS, ELECCION_SORTEO_MS, FACTOR_RAPIDA,
   FIN_SEGUNDO_REPARTO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, PAUSA_ANUNCIO_MS,
   RED_REVELACION_MS, REPOSICION_SIN_CARTAS_MS, TRAS_PRIMER_REPARTO_MS, TURN_TIME, VOLTEO_SORTEO_MS,
-  VUELO_REPARTO_MS,
+  VUELO_REPARTO_MS, esperaRepartoSorteo,
 } from '../config/esperas.js'
-import { CARTAS_POR_ASIENTO } from './sorteo.js'
+
+// v1.3 · el reparto del sorteo depende de cuántos participan en la ronda (la fórmula vive en
+// `config/esperas.js`, la misma que pinta la capa).
+export { esperaRepartoSorteo }
 
 export const CLASES = Object.freeze({
   BARAJADO_SORTEO: 'barajado_sorteo',
@@ -47,9 +50,6 @@ export const esperaReposicion = (mayorDescarte) => (
 // Contrato §6, «Publicidad»: las manos 5, 11, 16, 22, 27, 33, 38, 44…
 export const llevaAnuncio = (mano) => mano % 11 === 5 || mano % 11 === 0
 
-// El sorteo se reparte por oleadas, una carta a cada asiento a la vez: cinco vuelos, sean
-// cuantos sean los asientos, y siempre con el factor rápido.
-export const ESPERA_REPARTO_SORTEO_MS = reparto(CARTAS_POR_ASIENTO, FACTOR_RAPIDA, TRAS_PRIMER_REPARTO_MS)
 export const ESPERA_TURNO_MS = TURN_TIME * 1000
 export const ESPERA_BARAJADO_MS = BARAJADO_MS
 export const ESPERA_ELECCION_MS = ELECCION_SORTEO_MS

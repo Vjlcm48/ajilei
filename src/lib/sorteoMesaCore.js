@@ -2,24 +2,18 @@
 // Ficha AJILEI_MES-PvP_LM-1_v1.0.md §2 y las decisiones de los STOP-L2 y L3; informe en
 // docs/reportes/AJILEI_MES-PvP_LM-1_Informe_v1.0.md. La línea de tiempo, el mensaje y la geometría medida de la mesa; la capa
 // (`screens/SorteoMesa.jsx`) solo pinta.
-import { ANTES_DEL_REPARTO_MS, FACTOR_RAPIDA, TRAS_PRIMER_REPARTO_MS, VUELO_REPARTO_MS } from '../config/esperas'
+import { ANTES_DEL_REPARTO_MS, CARTAS_SORTEO, PASO_SORTEO_MS, esperaRepartoSorteo } from '../config/esperas'
 import { aPropios, escalaActual } from './escala'
 
 export const ETAPA = Object.freeze({ BARAJADO: 'barajado', REPARTO: 'reparto', ELECCION: 'eleccion', VOLTEO: 'volteo' })
-export const CARTAS_SORTEO = 5
 
 // 3.ª vuelta · el sorteo va SIEMPRE a la velocidad del reparto rápido del juego, elija lo que
 // elija el anfitrión para la partida: un vuelo de 0,595 s × 0,5, de uno en uno, como
-// `GameTable.launchFlyingCard` (cada carta sale cuando aterriza la anterior).
-export const PASO_MS = VUELO_REPARTO_MS * FACTOR_RAPIDA   // 297,5
+// `GameTable.launchFlyingCard` (cada carta sale cuando aterriza la anterior). Árbitro v1.3 · la
+// fórmula de cuánto dura vive en `config/esperas.js`: el árbitro espera exactamente lo mismo.
+export { CARTAS_SORTEO, esperaRepartoSorteo }
+export const PASO_MS = PASO_SORTEO_MS                     // 297,5
 const PRIMERA_MS = ANTES_DEL_REPARTO_MS                    // 120 · el respiro antes de la primera
-// Lo que dura el reparto del sorteo con `participantes` jugadores: 5 cartas a cada uno, de una
-// en una, y el cierre del primer reparto. El árbitro real reparte por oleadas (5 vuelos,
-// `reloj.ESPERA_REPARTO_SORTEO_MS`); con este reparto su espera pasa a depender de cuántos
-// participan: es del Contrato v1.3. La lámina la alarga en el imitado.
-export const esperaRepartoSorteo = (participantes) => Math.round(
-  PRIMERA_MS + CARTAS_SORTEO * participantes * PASO_MS + TRAS_PRIMER_REPARTO_MS,
-)
 
 const GIRO_MS = 350            // las elegidas se voltean tras salir las no elegidas
 const CARA_MS = GIRO_MS + 300  // ya están boca arriba (el giro dura 300 ms en `pvp.css`)

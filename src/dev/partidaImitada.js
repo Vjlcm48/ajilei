@@ -23,8 +23,6 @@ import { AUSENTE_DESDE, ELECCION_SORTEO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIG
 import {
   CLASES, ETAPAS, MOTIVOS, aplicarAccion, crearPartida, huboRevelacion, partidaTerminada, vistaDe,
 } from '../arbitro/index.js'
-import { ESPERA_REPARTO_SORTEO_MS } from '../arbitro/reloj.js'
-import { esperaRepartoSorteo } from '../lib/sorteoMesaCore.js'
 import { REACCIONES, codepointDe } from '../config/reacciones.js'
 import { rechazoDeMensaje } from '../lib/mensajesMesaCore.js'
 import { lecturaDeMano } from '../hooks/manoCore.js'
@@ -184,7 +182,8 @@ const enVolteo = (e) => e.sorteo.etapa === ETAPAS.VOLTEO
 // dónde se congela (`llega`) y en qué momento de la etapa (`momento`, ms): la capa del sorteo
 // pinta ese instante, sin animar. Con `&ver=vivo` la misma semilla y el mismo guion se juegan
 // desde el barajado de la ronda 1, a la hora real, hasta el primer turno.
-export const VOLTEO_LAMINA_MS = 5000   // lo sellado (§2.5); el árbitro real sigue en 4 s hasta la v1.3
+// Árbitro v1.3 · el volteo de 5 s y el reparto según los participantes ya los lleva el árbitro
+// (`config/esperas.js`): la lámina no alarga nada.
 
 // Gana `quien(m)`: elige su carta más alta y los demás la más baja; si no basta, otra semilla.
 function cartaParaGanar(quien) {
@@ -246,7 +245,7 @@ const SORTEO_LAMINA = {
     momento: 1500,
   },
   // Las cartas volviendo al mazo, con «… es Mano» en el óvalo.
-  'sorteo-vuelta': { guion: () => ({ carta: cartaParaGanar((m) => m.otro) }), llega: volteoDeRonda(1, (r, m) => r.mano === m.otro), momento: VOLTEO_LAMINA_MS - 600 },
+  'sorteo-vuelta': { guion: () => ({ carta: cartaParaGanar((m) => m.otro) }), llega: volteoDeRonda(1, (r, m) => r.mano === m.otro), momento: VOLTEO_SORTEO_MS - 600 },
 }
 const escenaDeLamina = ({ guion, llega, luego, minimo, momento }) => ({
   minimo,
@@ -814,11 +813,9 @@ export function crearPartidaImitada({
         }
       })
     }
-    // El volteo dura lo sellado de la lámina; el reparto del sorteo, lo de repartir de una en
-    // una a quienes participan (3.ª vuelta; el árbitro real reparte por oleadas hasta la v1.3).
-    const extra = v.clase === CLASES.VOLTEO_SORTEO ? VOLTEO_LAMINA_MS - VOLTEO_SORTEO_MS
-      : v.clase === CLASES.REPARTO_SORTEO ? esperaRepartoSorteo(sorteo.participan.length) - ESPERA_REPARTO_SORTEO_MS : 0
-    if (!cambio && m.e.vencimiento === v && m.t >= v.hora + extra) {
+    // Árbitro v1.3 · el volteo (5 s) y el reparto del sorteo (según los participantes) ya vencen
+    // a su hora en el árbitro: nada que alargar.
+    if (!cambio && m.e.vencimiento === v && m.t >= v.hora) {
       m.t = Math.max(m.t, v.hora)
       pide(m, m.e.asientos.findIndex((a) => !a.abandonado), 'reclamar_vencimiento')
       cambio = true
@@ -905,7 +902,7 @@ export function crearPartidaImitada({
     sala: { id: `imitada-${escena}`, apuesta: APUESTA, jugadores: n, entrada: 'corta', ritmo: 'normal', corteVoz: corte },
     // L-M 1 · lo que la capa del sorteo lee de la lámina.
     lamina: Object.freeze({
-      corte, volteoMs: VOLTEO_LAMINA_MS,
+      corte,
       momento: vivo || !deLamina ? null : (momento ?? ESCENAS[escena].momento ?? null),
       // L-M 2 · las burbujas congeladas en su ms `msjMs`.
       msjMs: msj && !vivo ? msjMs : null,

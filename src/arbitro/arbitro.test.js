@@ -7,10 +7,10 @@ import { resetRng, setRng } from '../engine/deck.js'
 import { MOTIVOS as MOTIVOS_POZOS } from '../engine/pozos.js'
 import { PHASES, applyDiscard, createInitialState, makeHandRules, startHand } from '../engine/gameEngine.js'
 import { ajileiDe as ajileiDelCliente } from '../lib/puntos.js'
-import { BARAJADO_MS } from '../config/esperas.js'
+import { BARAJADO_MS, VOLTEO_SORTEO_MS } from '../config/esperas.js'
 import {
-  CLASES, ESPERA_REPARTO_SORTEO_MS, ETAPAS, FASE_SORTEO, MOTIVOS, MOTIVOS_ARBITRO, abandonarPorServidor, ajileiDe, aplicarAccion, ganadorDeMano,
-  azarSeguro, compactarAsientos, crearPartida, partidaTerminada, vistaDe,
+  CLASES, ETAPAS, FASE_SORTEO, MOTIVOS, MOTIVOS_ARBITRO, abandonarPorServidor, ajileiDe, aplicarAccion, ganadorDeMano,
+  azarSeguro, compactarAsientos, crearPartida, esperaRepartoSorteo, partidaTerminada, vistaDe,
 } from './index.js'
 
 const M = MOTIVOS
@@ -324,7 +324,7 @@ describe('MOT-1 1b · el sorteo', () => {
     expect(e.sorteo.cartas[0]).toHaveLength(5)
     e = reclama(e)
     expect(e.sorteo.etapa).toBe(ETAPAS.REPARTO)
-    expect(e.vencimiento).toEqual({ clase: CLASES.REPARTO_SORTEO, hora: hora + BARAJADO_MS + ESPERA_REPARTO_SORTEO_MS })
+    expect(e.vencimiento).toEqual({ clase: CLASES.REPARTO_SORTEO, hora: hora + BARAJADO_MS + esperaRepartoSorteo(2) })
     e = reclama(e)
     expect(pide(e, 1, 'elegir_carta_sorteo', { ronda: 2, carta: 0 }, 0).respuesta.motivo).toBe(M.NO_PARTICIPA)
   })
@@ -738,7 +738,7 @@ describe('MOT-1 1b · el abandono', () => {
     const r = pide(elige(elige(abierto, 0), 1), 2, 'abandonar', {}, 500)
     expect(r.efectos).toEqual([{ tipo: 'salida', asiento: 2, monto: 1500 }])
     expect(r.estado.sorteo.etapa).toBe(ETAPAS.VOLTEO)
-    expect(r.estado.vencimiento).toEqual({ clase: CLASES.VOLTEO_SORTEO, hora: 500 + 4000 })
+    expect(r.estado.vencimiento).toEqual({ clase: CLASES.VOLTEO_SORTEO, hora: 500 + VOLTEO_SORTEO_MS })
     expect(r.estado.sorteo.rondas[0].volteo[2].carta).toEqual(abierto.sorteo.cartas[2][0])
 
     // Si abandona antes del reparto, elige al abrirse la elección.
@@ -1474,5 +1474,68 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       const pausa = vieja(jugarHasta(crearLlena(2), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE))
       expect(reclama(pausa).asientos.map((x) => x.enAnuncio)).toEqual([true, true])
     })
+  })
+})
+
+// ── MES-PvP · árbitro v1.3-a ────────────────────────────────────────────────
+// Ficha AJILEI_MES-PvP_Arbitro-v1.3a_v1.0.md §2.2 y §2.3.
+describe('v1.3-a · el sorteo sobre la mesa', () => {
+  const abierto = (n) => reclama(reclama(crear(n)))
+  const elige = (e, i, carta) => pide(e, i, 'elegir_carta_sorteo', { ronda: e.sorteo.ronda, carta }, 0).estado
+  const conValores = (e, valores) => ({
+    ...e, sorteo: { ...e.sorteo, cartas: e.sorteo.cartas.map((c, i) => (c ? c.map(() => carta(valores[i])) : c)) },
+  })
+
+  it('el reparto espera según quienes participan: la ronda 1 con todos, el desempate con los empatados', () => {
+    for (const n of [2, 3, 4, 5]) {
+      const barajado = crear(n)
+      const reparto = reclama(barajado)
+      expect(reparto.vencimiento).toEqual({ clase: CLASES.REPARTO_SORTEO, hora: barajado.vencimiento.hora + esperaRepartoSorteo(n) })
+    }
+    // Mesa de 5 con tres empatados en el Rey: la ronda 2 reparte a 3.
+    let e = abierto(5)
+    e = [0, 1, 2, 3, 4].reduce((x, i) => elige(x, i, 0), conValores(e, [12, 3, 12, 5, 12]))
+    expect(e.sorteo.etapa).toBe(ETAPAS.VOLTEO)
+    e = reclama(e)
+    expect(e.vencimiento.clase).toBe(CLASES.BARAJADO_SORTEO)
+    expect(e.sorteo.participan).toEqual([0, 2, 4])
+    expect(reclama(e).vencimiento).toEqual({ clase: CLASES.REPARTO_SORTEO, hora: e.vencimiento.hora + esperaRepartoSorteo(3) })
+  })
+
+  it('el volteo dura 5 s', () => {
+    const e = [0, 1].reduce((x, i) => elige(x, i, 0), conValores(abierto(2), [12, 3]))
+    expect(e.vencimiento.clase).toBe(CLASES.VOLTEO_SORTEO)
+    expect(VOLTEO_SORTEO_MS).toBe(5000)
+    expect(e.vencimiento.hora).toBe(0 + 5000)
+  })
+
+  it('la vista publica qué posición eligió cada uno, nunca su valor antes del volteo', () => {
+    const e = elige(elige(abierto(3), 0, 3), 2, 1)
+    for (const yo of [0, 1, 2]) {
+      const s = vistaDe(e, yo).sorteo
+      expect(s.elegidas).toEqual([3, null, 1])
+      expect(s.yaEligieron).toEqual([0, 2])
+      expect(JSON.stringify(s)).not.toContain('"value"')
+    }
+    // En el volteo, el valor llega por `rondas`, y la posición sigue siendo la misma.
+    const volteo = elige(e, 1, 4)
+    const s = vistaDe(volteo, 1).sorteo
+    expect(s.elegidas).toEqual([3, 4, 1])
+    expect(s.rondas[0].volteo.map((v) => v.posicion)).toEqual([3, 4, 1])
+  })
+
+  it('R-4 · una partida guardada con la v1.2, a mitad del sorteo, se sigue jugando', () => {
+    const vieja = (x) => {
+      const copia = JSON.parse(JSON.stringify(x))
+      copia.asientos.forEach((a) => { delete a.vencidos; delete a.enAnuncio; delete a.sinAnuncio })
+      return copia
+    }
+    const e = vieja(elige(abierto(3), 0, 2))
+    expect(vistaDe(e, 1).sorteo.elegidas).toEqual([2, null, null])
+    const volteo = elige(elige(conValores(e, [12, 3, 5]), 1, 0), 2, 0)
+    expect(volteo.sorteo.etapa).toBe(ETAPAS.VOLTEO)
+    const mano = reclama(volteo)
+    expect(mano.motor.manoIndex).toBe(0)
+    expect(mano.sorteo.etapa).toBe(ETAPAS.CERRADO)
   })
 })

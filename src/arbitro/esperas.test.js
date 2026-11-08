@@ -10,9 +10,10 @@ import {
 } from '../config/esperas.js'
 import { FACTOR_RAPIDA as FACTOR_DE_SU_SITIO } from '../lib/partidaRapida.js'
 import {
-  CLASES, ESPERA_REPARTO_SORTEO_MS, aplicarAccion, crearPartida, esperaManoSiguiente, esperaPrimerReparto, esperaReposicion,
+  CLASES, aplicarAccion, crearPartida, esperaManoSiguiente, esperaPrimerReparto, esperaRepartoSorteo, esperaReposicion,
   esperaSegundoReparto, llevaAnuncio,
 } from './index.js'
+import { esperaRepartoSorteo as deLaCapa } from '../lib/sorteoMesaCore.js'
 
 const SILLAS = [0, 1, 2].map((asiento) => ({ asiento, uid: `u${asiento}` }))
 
@@ -73,20 +74,24 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
     }
   })
 
-  it('el sorteo va por oleadas y siempre rápido: la espera no depende del ritmo ni de los asientos', () => {
-    expect(ESPERA_REPARTO_SORTEO_MS).toBe(Math.round(120 + 5 * 595 * FACTOR_RAPIDA + 400))
+  // Árbitro v1.3 · de una en una y siempre en Rápido: la espera depende de cuántos participan,
+  // y es la misma cifra que pinta la capa (una sola fuente, `config/esperas.js`).
+  it('v1.3 · el reparto del sorteo dura según los participantes, en los dos ritmos', () => {
+    expect([2, 3, 4, 5].map(esperaRepartoSorteo)).toEqual([3495, 4983, 6470, 7958])
+    expect(esperaRepartoSorteo(3)).toBe(Math.round(120 + 5 * 3 * 595 * FACTOR_RAPIDA + 400))
+    expect(deLaCapa).toBe(esperaRepartoSorteo)
     for (const ritmo of ['normal', 'rapido']) {
       for (const n of [2, 3, 4, 5]) {
         const sillas = Array.from({ length: n }, (_, asiento) => ({ asiento, uid: `u${asiento}` }))
         const partida = crearPartida({ apuesta: 100, entrada: 'corta', ritmo }, sillas, 0)
         expect(partida.vencimiento).toEqual({ clase: CLASES.BARAJADO_SORTEO, hora: BARAJADO_MS })
-        expect(dura(partida)).toBe(ESPERA_REPARTO_SORTEO_MS)
+        expect(dura(partida)).toBe(esperaRepartoSorteo(n))
       }
     }
   })
 
   it('las cifras nuevas: reposición, aviso, pausa y ausencia', () => {
-    expect(VOLTEO_SORTEO_MS).toBe(4000)
+    expect(VOLTEO_SORTEO_MS).toBe(5000)
     expect(MANO_SIGUIENTE_MS).toBe(4000)
     expect(LECTURA_TRAS_REVELACION_MS).toBe(2000)
     expect(AVISO_SALIDA_MS).toBe(3000)

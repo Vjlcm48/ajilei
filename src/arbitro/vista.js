@@ -4,7 +4,8 @@
 // del motor para que el cliente pueda consultar `pozos.esLegal` sobre la vista.
 //
 // R-4: una partida guardada antes de la v1.1 no trae `enAnuncio`, `vencidos`,
-// `ultimaAccion` ni `posicion`. Se leen con su valor por defecto.
+// `ultimaAccion` ni `posicion`. Se leen con su valor por defecto. `elegidas` (v1.3) sale de
+// `sorteo.elecciones`, que está desde la v1.0.
 
 import { AUSENTE_DESDE } from '../config/esperas.js'
 import { PHASES } from '../engine/gameEngine.js'
@@ -43,6 +44,9 @@ function sorteoVisto({ sorteo }, asiento) {
       ? Array.from({ length: CARTAS_POR_ASIENTO }, (_, i) => i)
       : [],
     yaEligieron: sorteo.elecciones.flatMap((e, i) => (e === null ? [] : [i])),
+    // v1.3 · QUÉ POSICIÓN eligió cada asiento (0…4, o null), sin el valor: la carta elegida se
+    // adelanta también en los asientos ajenos (Reglas v1.9 §8.4). El valor llega en el volteo.
+    elegidas: sorteo.elecciones.map((e) => e ?? null),
     rondas: sorteo.rondas.map((r) => ({
       ...r,
       volteo: r.volteo.map((v) => ({ ...v, posicion: v.posicion ?? null })),

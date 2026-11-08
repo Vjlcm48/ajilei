@@ -7,7 +7,9 @@
 // las dos copias. El reparto y su escala los calcula `src/arbitro/reloj.js`.
 
 // El único que hay: el factor no se duplica, y `partidaRapida.js` no importa nada.
-export { FACTOR_RAPIDA } from '../lib/partidaRapida.js'
+import { FACTOR_RAPIDA } from '../lib/partidaRapida.js'
+
+export { FACTOR_RAPIDA }
 
 // El reloj de turno y el de descarte, en SEGUNDOS: así lo cuenta la mesa.
 export const TURN_TIME = 20
@@ -26,8 +28,20 @@ export const FIN_SEGUNDO_REPARTO_MS = 2000
 // La elección del sorteo, por ronda (contrato §6).
 export const ELECCION_SORTEO_MS = 10000
 
-// provisional · se cierra con los teléfonos. El volteo y el resultado de cada ronda.
-export const VOLTEO_SORTEO_MS = 4000
+// Árbitro v1.3 · el volteo y el resultado de cada ronda: 5 s (Reglas de APU-1 v1.9 §8). Lo leen
+// el árbitro (`arbitro/reloj.js`) y la capa del sorteo (`screens/SorteoMesa.jsx`).
+export const VOLTEO_SORTEO_MS = 5000
+
+// Árbitro v1.3 · el reparto del sorteo sobre la mesa (Reglas v1.9 §8.4): 5 cartas a cada
+// participante, de una en una y SIEMPRE en Rápido (cada carta sale cuando aterriza la
+// anterior), con el respiro de antes y el cierre del primer reparto. Dura según cuántos
+// participan en la ronda: 3.495 · 4.983 · 6.470 · 7.958 ms con 2…5. Una sola fuente: la leen
+// el árbitro (`arbitro/reloj.js`) y la capa (`lib/sorteoMesaCore.js`).
+export const CARTAS_SORTEO = 5
+export const PASO_SORTEO_MS = VUELO_REPARTO_MS * FACTOR_RAPIDA   // 297,5
+export const esperaRepartoSorteo = (participantes) => Math.round(
+  ANTES_DEL_REPARTO_MS + CARTAS_SORTEO * participantes * PASO_SORTEO_MS + TRAS_PRIMER_REPARTO_MS,
+)
 
 // provisional · se cierra con los teléfonos. La mano siguiente con revelación: el tope
 // de red de la celebración (`mesaCore.js`), porque el cambio de fase la apaga, y la

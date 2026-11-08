@@ -39,8 +39,8 @@ import {
 } from './sorteo.js'
 import {
   CLASES, ESPERA_AVISO_SALIDA_MS, ESPERA_BARAJADO_MS, ESPERA_ELECCION_MS, ESPERA_PAUSA_ANUNCIO_MS,
-  ESPERA_REPARTO_SORTEO_MS, ESPERA_TURNO_MS, ESPERA_VOLTEO_MS, RITMOS, esperaManoSiguiente,
-  esperaPrimerReparto, esperaReposicion, esperaSegundoReparto, llevaAnuncio,
+  ESPERA_TURNO_MS, ESPERA_VOLTEO_MS, RITMOS, esperaManoSiguiente, esperaPrimerReparto, esperaRepartoSorteo,
+  esperaReposicion, esperaSegundoReparto, llevaAnuncio,
 } from './reloj.js'
 
 export const ENTRADAS = Object.freeze({ corta: 15, llena: 50 })
@@ -395,11 +395,13 @@ function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
 
   switch (v.clase) {
     case CLASES.BARAJADO_SORTEO:
+      // v1.3 · se reparte de una en una a quienes participan en la ronda (en un desempate,
+      // solo los empatados): la espera depende de cuántos son.
       return {
         estado: {
           ...estado,
           sorteo: { ...sorteo, etapa: ETAPAS.REPARTO },
-          vencimiento: en(CLASES.REPARTO_SORTEO, ahora + ESPERA_REPARTO_SORTEO_MS),
+          vencimiento: en(CLASES.REPARTO_SORTEO, ahora + esperaRepartoSorteo(sorteo.participan.length)),
         },
         efectos: [],
       }
