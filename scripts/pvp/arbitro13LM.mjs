@@ -1,5 +1,5 @@
-// ── MES-PvP · árbitro v1.3-a · dos varas, como celdas de `diagDSK pvp` ───────
-// Ficha AJILEI_MES-PvP_Arbitro-v1.3a_v1.0.md §3. Contra 5173 con bypass (`?pvp=`, el árbitro
+// ── MES-PvP · árbitro v1.3 · tres varas, como celdas de `diagDSK pvp` ───────
+// Fichas AJILEI_MES-PvP_Arbitro-v1.3a_v1.0.md §3 (1 y 2) y v1.3b §3 (3). Contra 5173 con bypass (`?pvp=`, el árbitro
 // imitado, que ya publica la vista del árbitro real). Cada celda lleva su control rojo: una
 // celda es verde si la medida pasa Y el control falla.
 //   1 · las posiciones del sorteo (`sorteo-elige&ver=vivo`, mesas 2 y 5, dos pantallas): con los
@@ -13,6 +13,12 @@
 //       de `config/mensajes.js` y la burbuja del rival pinta su frase. Control: las mismas
 //       claves reescritas al código del emoji (la clave de antes de la v1.3) y la mesa repintada:
 //       no debe quedar ninguna burbuja ajena.
+//   3 · la recarga, leída de la vista real (v1.3-b): en las escenas de la recarga (la burbuja, la
+//       tarjeta con pila 0 y sin saldo, sentado fuera, el pedido y la retención de la mesa de 2), lo
+//       que pinta la capa casa con `recargaDeVista` sobre la vista del árbitro (la del imitado es la
+//       del árbitro real): burbuja, sentado fuera, frase de la tarjeta, marca del pedido y «Esperando
+//       a…». Control: la misma comparación contra esa vista sin su recarga (una partida R-4): no
+//       casa en ninguna fila.
 
 const PANTALLAS = [[412, 915], [1920, 1080]]
 const id = ([w, h]) => `${w}x${h}`
@@ -122,9 +128,62 @@ async function varaMensaje(browser, base) {
   return { celda: 'v13·mensaje-id', ok: medida && control.rojo, medida, filas, control }
 }
 
+// ── 3 · La recarga, leída de la vista real ──────────────────────────────────
+const CASOS_RECARGA = [
+  ['recarga-ofrecida', 2, ''],
+  ['recarga-ofrecida', 2, '&abierta=1'],
+  ['recarga-sinsaldo', 2, ''],
+  ['recarga-fuera', 5, ''],
+  ['recarga-pedida', 2, ''],
+  ['recarga-rival', 2, ''],
+]
+
+const MEDIR_RECARGA = async () => {
+  const { recargaDeVista, textoTarjeta } = await import('/src/lib/entreManosCore.js')
+  const p = window.__pvpImitada
+  const vista = p.foto().vista
+  const q = (s) => document.querySelector(s)
+  const pintado = {
+    burbuja: !!q('[data-pvp-recarga="burbuja"]'),
+    fuera: q('[data-pvp-recarga="burbuja"]')?.dataset.fuera === '1',
+    tarjeta: q('[data-pvp-recarga="tarjeta"] [data-accion="recarga-sub"]')?.textContent.trim() ?? null,
+    pedida: !!q('[data-pvp-recarga="punto"]'),
+    espera: q('[data-pvp-recarga="espera"]')?.textContent.trim() ?? null,
+  }
+  // Lo que la vista dice que se tiene que ver (la tarjeta, si la escena la abre al llegar).
+  const dice = (v) => {
+    const rec = recargaDeVista(v, { saldo: p.lamina.saldo(), entrada: 1500 })
+    const abierta = !!rec?.oferta && !!p.lamina.abierta
+    return {
+      burbuja: rec?.oferta?.tipo === 'ofrecida' && !abierta,
+      fuera: !!rec?.fuera && rec?.oferta?.tipo === 'ofrecida' && !abierta,
+      tarjeta: abierta ? textoTarjeta(rec.oferta) : null,
+      pedida: !!rec?.pedida,
+      espera: rec?.espera && !rec.oferta ? `Esperando a ${rec.espera}…` : null,
+    }
+  }
+  return { pintado, vistaDice: dice(vista), sinRecarga: dice({ ...vista, recarga: null }) }
+}
+
+async function varaRecarga(browser, base) {
+  const vp = [412, 915]
+  const filas = []
+  for (const [escena, n, extra] of CASOS_RECARGA) {
+    const m = await enPagina(browser, vp, `${base}/?pvp=${escena}&n=${n}${extra}`, (p) => p.evaluate(MEDIR_RECARGA))
+    filas.push({
+      n, vp: `${escena}${extra}`, ...m,
+      ok: !m.error && igual(m.pintado, m.vistaDice),
+      controlRojo: !m.error && !igual(m.pintado, m.sinRecarga),
+    })
+  }
+  const control = { caso: 'la misma vista sin su recarga (R-4)', rojas: filas.filter((f) => f.controlRojo).length, rojo: filas.every((f) => f.controlRojo) }
+  const medida = filas.every((f) => f.ok)
+  return { celda: 'v13·recarga-vista', ok: medida && control.rojo, medida, filas, control }
+}
+
 export async function runArbitro13LM(browser, base) {
   const celdas = []
-  for (const vara of [varaPosiciones, varaMensaje]) {
+  for (const vara of [varaPosiciones, varaMensaje, varaRecarga]) {
     const c = await vara(browser, base)
     celdas.push(c)
     const malas = c.filas.filter((f) => !f.ok).map((f) => `m${f.n} ${f.vp}${f.error ? ` ${f.error}` : ''}`)
