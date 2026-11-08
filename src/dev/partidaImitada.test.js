@@ -65,6 +65,19 @@ const ESPERADO = {
   'ausente-yo': ['mesa', (v) => propio(v).ausente && clase(v) === 'turno' && v.activePlayerIndex === v.asiento],
   'ausencia-tercero': ['mesa', (v) => v.players.some((p, i) => i !== v.asiento && p.abandonado) && v.phase !== 'GAME_OVER'],
   'ausencia-fuera': ['final', (v) => propio(v).abandonado],
+  // L-M 3 · entre una mano y otra (lámina): la pausa entre manos, la recarga y el anuncio.
+  'entre-manos': ['mesa', (v) => v.phase === 'PAYOUT' && clase(v) === 'mano_siguiente' && !v.resultado.revelacion],
+  'recarga-ofrecida': ['mesa', (v) => clase(v) === 'mano_siguiente' && propio(v).chips === 0 && propio(v).recarga === 'decide'],
+  'recarga-voluntaria': ['mesa', (v) => clase(v) === 'mano_siguiente' && propio(v).chips >= 100 && propio(v).chips < 1500 && !propio(v).recarga],
+  'recarga-pedida': ['mesa', (v) => clase(v) === 'turno' && v.activePlayerIndex !== v.asiento && propio(v).chips < 1500 && !propio(v).folded],
+  'recarga-sinsaldo': ['mesa', (v) => clase(v) === 'mano_siguiente' && propio(v).chips === 0 && propio(v).recarga === 'decide'],
+  'recarga-fuera': ['mesa', (v) => clase(v) === 'turno' && propio(v).recarga === 'fuera' && propio(v).folded && !propio(v).eliminated],
+  'recarga-ajena': ['mesa', (v) => clase(v) === 'mano_siguiente' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'decide')],
+  'recarga-ajena-fuera': ['mesa', (v) => clase(v) === 'turno' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'fuera' && !p.eliminated)],
+  'recarga-rival': ['mesa', (v) => clase(v) === 'mano_siguiente' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'decide')],
+  'anuncio-premium': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
+  'anuncio-cierre': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
+  'anuncio-vence': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
 }
 
 const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
@@ -72,7 +85,7 @@ const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
 describe('MES-PvP 2 · las escenas', () => {
   it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, `descarte-propio` (MES-PvP 3) y los tres fines de la 3-A', () => {
     expect([...ESCENAS_PVP].sort()).toEqual(Object.keys(ESPERADO).sort())
-    expect(ESCENAS_PVP).toHaveLength(43)
+    expect(ESCENAS_PVP).toHaveLength(55)
     expect(mesasDe('abandono')).toEqual([3, 4, 5])
     expect(mesasDe('aviso-salida')).toEqual([3, 4, 5])
     expect(mesasDe('sorteo-empate-3')).toEqual([3, 4, 5])
@@ -209,16 +222,48 @@ describe('MES-PvP 2 · la misma forma que el cliente', () => {
 describe('MES-PvP 2 · el mando', () => {
   afterEach(() => { vi.unstubAllEnvs() })
 
+  // L-M 3 · la voluntaria pedida durante la mano (Victor, STOP-L): queda pedida, se puede anular,
+  // y en la mano la oferta es siempre voluntaria.
+  it('`recarga-pedida`: la voluntaria queda pedida en la mano y se anula', () => {
+    const partida = crearPartidaImitada({ escena: 'recarga-pedida', n: 3, asiento: 1 })
+    const rec = () => partida.foto().recargaLamina
+    expect(rec()).toMatchObject({ pedida: true, enMano: true, pausa: false })
+    expect(rec().oferta.tipo).toBe('voluntaria')
+    partida.recarga.anular()
+    expect(rec().pedida).toBe(false)
+    partida.recarga.pedir()
+    expect(rec()).toMatchObject({ pedida: true, abierta: false })
+  })
+
+  // L-M 3 · el pedido que se cancela al abrirse la pausa porque el saldo no alcanza lo dice: se
+  // abre la tarjeta, que pinta «Tu saldo no alcanza para recargar.» (Victor, STOP-L).
+  it('`recarga-pedida` sin saldo: al abrirse la pausa se cancela y la tarjeta lo dice', async () => {
+    vi.useFakeTimers()
+    try {
+      const partida = crearPartidaImitada({ escena: 'recarga-pedida', n: 2, asiento: 0, vivo: true, saldo: 100, ahora: () => Date.now() })
+      await partida.iniciar()
+      const rec = () => partida.foto().recargaLamina
+      for (let k = 0; k < 1200 && !(rec().pausa && !rec().pedida); k++) vi.advanceTimersByTime(100)
+      expect(rec()).toMatchObject({ pausa: true, pedida: false, abierta: true })
+      expect(rec().oferta.alcanza).toBe(false)
+      partida.parar()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('con la puerta abierta, lee la escena y sus datos, y corrige lo que no vale', () => {
     vi.stubEnv('VITE_AUTH_BYPASS', '1')
     // L-M 1 · y los mandos de la lámina, con sus valores por defecto.
-    const lamina = { vivo: false, corte: null, momento: null, msj: null, msjMs: 1200 }
+    const lamina = { vivo: false, corte: null, momento: null, msj: null, msjMs: 1200, abierta: null, premium: null, saldo: null }
     expect(leerMandoPvP('?pvp=revelacion&n=4&asiento=3&nombres=largo')).toEqual({ escena: 'revelacion', n: 4, asiento: 3, nombres: 'largo', ...lamina })
     expect(leerMandoPvP('?pvp=revelacion')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })
     expect(leerMandoPvP('?pvp=revelacion&n=9&asiento=7')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })
     expect(leerMandoPvP('?pvp=sorteo-elige&ver=vivo&corte=0&momento=900')).toMatchObject({ vivo: true, corte: 0, momento: 900 })
     expect(leerMandoPvP('?pvp=sorteo-elige&corte=12')).toMatchObject({ corte: null })
-    expect(leerMandoPvP('?pvp=sorteo-elige&var=b')).not.toHaveProperty('variante')
+    // L-M 3 · `abierta`, `premium` y `saldo`; las variantes (`var`) se retiraron en el STOP-L.
+    expect(leerMandoPvP('?pvp=recarga-voluntaria&var=b&abierta=1&saldo=900')).toMatchObject({ abierta: true, saldo: 900 })
+    expect(leerMandoPvP('?pvp=recarga-voluntaria&var=b')).not.toHaveProperty('variante')
     // L-M 2 · los mensajes de la lámina.
     expect(leerMandoPvP('?pvp=turno-ajeno&msj=todos&msjms=800')).toMatchObject({ msj: 'todos', msjMs: 800 })
     expect(leerMandoPvP('?pvp=turno-ajeno&msj=otro')).toMatchObject({ msj: null })
