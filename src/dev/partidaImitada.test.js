@@ -47,7 +47,9 @@ const ESPERADO = {
   'sorteo-reparto': ['sorteo', (v) => v.sorteo.etapa === 'reparto' && v.sorteo.ronda === 1],
   'sorteo-elige': ['sorteo', (v) => v.sorteo.etapa === 'eleccion' && v.sorteo.yaEligieron.length === 0],
   'sorteo-elige-algunos': ['sorteo', (v) => v.sorteo.etapa === 'eleccion' && v.sorteo.yaEligieron.includes(v.asiento)
-    && v.sorteo.yaEligieron.length === Math.min(2, v.players.length - 1)],
+    && v.sorteo.yaEligieron.length === Math.min(2, v.players.length - 1)
+    // Árbitro v1.3 · la vista dice la posición de quien eligió, y de nadie más.
+    && v.sorteo.elegidas.every((p, i) => (v.sorteo.yaEligieron.includes(i) ? Number.isInteger(p) && p >= 0 && p < 5 : p === null))],
   'sorteo-volteo-propio': ['sorteo', (v) => v.sorteo.etapa === 'volteo' && v.sorteo.ronda === 1 && v.sorteo.rondas.at(-1).mano === v.asiento],
   'sorteo-volteo-ajeno': ['sorteo', (v) => v.sorteo.etapa === 'volteo' && v.sorteo.ronda === 1 && ![null, v.asiento].includes(v.sorteo.rondas.at(-1).mano)],
   'sorteo-empate': ['sorteo', (v) => v.sorteo.etapa === 'volteo' && v.sorteo.rondas.at(-1).mano === null && v.sorteo.rondas.at(-1).empatados.includes(v.asiento)],
@@ -281,5 +283,24 @@ describe('MES-PvP 2 · el mando', () => {
     vi.stubEnv('VITE_AUTH_BYPASS', '1')
     vi.stubEnv('DEV', false)
     expect(leerMandoPvP('?pvp=revelacion')).toBeNull()
+  })
+})
+
+// ── Árbitro v1.3-a · el mensaje, con las comprobaciones del árbitro real ─────
+describe('v1.3-a · el mensaje del imitado', () => {
+  it('pasa con un id fijo; rechaza una clave de emoji, al abandonado y a quien está en su anuncio', () => {
+    vi.stubEnv('VITE_AUTH_BYPASS', '1')
+    const viva = crearPartidaImitada({ escena: 'turno-ajeno', n: 3 })
+    expect(viva.mensajes.enviar('2660_fe0f')).toEqual({ ok: false, motivo: 'clave_desconocida' })
+    expect(viva.mensajes.enviar('que_va')).toEqual({ ok: true })
+    expect(viva.mensajes.lista().at(-1)).toMatchObject({ asiento: 0, clave: 'que_va' })
+    expect(viva.mensajes.enviar('ajilei')).toEqual({ ok: false, motivo: 'freno' })
+
+    const anuncio = crearPartidaImitada({ escena: 'anuncio-yo', n: 2 })
+    expect(anuncio.mensajes.enviar('ajilei')).toEqual({ ok: false, motivo: 'en_anuncio' })
+
+    const fuera = crearPartidaImitada({ escena: 'turno-ajeno', n: 3 })
+    fuera.enviar('abandonar')
+    expect(fuera.mensajes.enviar('ajilei')).toEqual({ ok: false, motivo: 'asiento_abandonado' })
   })
 })

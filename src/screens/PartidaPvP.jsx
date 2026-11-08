@@ -157,8 +157,9 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
         <EsperaAnuncio game={game} premiumInicial={!!lamina?.premium} />
       )}
       {partida?.recarga && escena === 'mesa' && <RecargaPvP partida={partida} desfase={desfase} />}
-      {/* L-M 2 · §2 · los mensajes; durante tu pausa de anuncio no se pintan (propuesta). */}
-      <MensajesMesa partida={partida} oculta={escena === 'anuncio'} />
+      {/* L-M 2 · §2 · los mensajes; durante tu pausa de anuncio no se pintan (Reglas v1.9 §8.6).
+          v1.3 · en la mesa real llegan por la foto (`partidaCliente.mensajes`). */}
+      <MensajesMesa partida={partida ?? foto} oculta={escena === 'anuncio'} />
     </Suspense>
   )
 }

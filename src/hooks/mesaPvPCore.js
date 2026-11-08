@@ -83,6 +83,8 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     corteVoz: corte,
     // L-M 1 · el anfitrión (asiento real 0) en la mesa rotada: junto a él va el mazo del sorteo.
     anfitrion: 0,
+    // Árbitro v1.3 · los mensajes de la mesa (`partidaCliente.mensajes`, o los del imitado).
+    mensajes: partida.mensajes ?? null,
   })
   const oyentes = new Set()
   const publicar = (cambios) => {

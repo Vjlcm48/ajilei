@@ -2,7 +2,7 @@
 // Normativo: docs/AJILEI_MOT-1_Contrato_v1.0.md §2 y §5. Ficha: AJILEI_MOT-1_Fase1f_v1.0.md §2.
 //
 // Tres cosas y nada más: mandar una acción a la función `partida`, leer la vista
-// propia y escuchar el canal privado de la mesa. No decide reglas ni guarda dinero:
+// propia y escuchar el canal privado de la mesa (desde el árbitro v1.3, también sus mensajes). No decide reglas ni guarda dinero:
 // el servidor manda, y aquí solo se le pregunta. Nace en el trozo de la partida
 // (`trozos.partidaPvP`), nunca en la entrada (INV-84).
 //
@@ -21,11 +21,18 @@
 // y no se abre ningún socket.
 
 import { MOTIVOS as M } from '../arbitro/motivos.js'
+import { esClaveMensaje } from '../config/mensajes.js'
 
 export const FUNCION_PARTIDA = 'partida'
 // Literales de contrato, sin importarlos: `supabase/functions/partida/nucleo.js` y
 // `arbitro/vista.js` arrastran el motor. `partidaCliente.test.js` comprueba que coinciden.
 export const EVENTO_AVISO = 'version'
+// Árbitro v1.3 · el mensaje de la mesa, `{ asiento, clave }`: la excepción escrita a «por el
+// canal solo versiones» (contenido público y efímero, no estado).
+export const EVENTO_MENSAJE = 'mensaje'
+export const ACCION_MENSAJE = 'mensaje'
+// Lo que se guarda de los mensajes: una burbuja dura 3 s y el freno 10; lo más viejo sobra.
+export const MEMORIA_MENSAJES_MS = 15000
 export const FASE_SORTEO = 'SORTEO'
 export const FASE_DESCARTE = 'DISCARD'
 export const FASE_FIN = 'GAME_OVER'
@@ -73,6 +80,7 @@ export const desfaseDe = (muestras) => (
  *   iniciar: () => Promise<void>, parar: () => void, revisar: () => void,
  *   enviar: (accion: string, campos?: object) => Promise<object>, releer: () => Promise<void>,
  *   suscribir: (avisar: () => void) => () => void, foto: () => object,
+ *   mensajes: { lista: () => object[], enviar: (clave: string) => Promise<object>, suscribir: Function },
  * }}
  */
 export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento = globalThis.document ?? null }) {
@@ -102,6 +110,18 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
   let ecoPendiente = null
   let muestras = []
   let terminada = false
+
+  // ── Los mensajes (v1.3) ──
+  // `[{ id, asiento, clave, hora }]`, con el asiento ya rotado (0 = el propio) y la hora de
+  // este reloj: la forma que pinta `screens/MensajesMesa.jsx`, la misma del árbitro imitado.
+  let mensajes = []
+  let idMensaje = 0
+  const oyentesMensajes = new Set()
+  const anotarMensaje = (asiento, clave) => {
+    const hora = ahora()
+    mensajes = [...mensajes.filter((m) => hora - m.hora < MEMORIA_MENSAJES_MS), { id: ++idMensaje, asiento, clave, hora }]
+    oyentesMensajes.forEach((o) => o())
+  }
 
   // ── Leer ──
   // Una lectura a la vez. Lo que se pida mientras tanto repite al acabar: el aviso de
@@ -229,6 +249,26 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
     leer()
   }
 
+  // El de otro asiento llega por el canal. El propio no: se anota con la respuesta aceptada
+  // del servidor, que es cuando arranca el freno que se ve. Durante tu anuncio no se pinta
+  // ninguno y al volver no hay cola (Reglas v1.9 §8.6): se descarta al llegar.
+  function alMensaje(carga) {
+    const vista = foto.vista
+    const real = carga?.asiento
+    if (!vista || !Number.isInteger(real) || !esClaveMensaje(carga.clave)) return
+    const n = vista.players.length
+    if (real < 0 || real >= n || real === vista.asiento) return
+    if (vista.players[vista.asiento]?.enAnuncio) return
+    anotarMensaje((real - vista.asiento + n) % n, carga.clave)
+  }
+
+  /** v1.3 · manda un mensaje. Un rechazo (`freno` incluido) no pinta nada ni toca la foto. */
+  async function mandarMensaje(clave) {
+    const r = await llamar({ accion: ACCION_MENSAJE, clave })
+    if (r.ok) anotarMensaje(0, clave)
+    return r
+  }
+
   const alVolver = () => {
     if (documento?.visibilityState !== 'visible') return
     leer()
@@ -247,6 +287,7 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
       canal = cliente
         .channel(`partida:${mesa}`, { config: { private: true } })
         .on('broadcast', { event: EVENTO_AVISO }, ({ payload }) => alAviso(payload?.version))
+        .on('broadcast', { event: EVENTO_MENSAJE }, ({ payload }) => alMensaje(payload))
         .subscribe((estado, error) => {
           if (yo !== generacion) return
           if (error) console.warn('MOT-1 1f: el canal —', estado, String(error?.message ?? error))
@@ -331,5 +372,14 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
       return () => oyentes.delete(avisar)
     },
     foto: () => foto,
+    // v1.3 · lo que lee `MensajesMesa`, con la forma del árbitro imitado.
+    mensajes: {
+      lista: () => mensajes,
+      enviar: mandarMensaje,
+      suscribir: (avisar) => {
+        oyentesMensajes.add(avisar)
+        return () => oyentesMensajes.delete(avisar)
+      },
+    },
   }
 }

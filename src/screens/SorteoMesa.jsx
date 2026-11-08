@@ -62,7 +62,8 @@ function useTiempoDeEtapa(clave, momento) {
 
 export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, lamina = null }) {
   const { sorteo, numPlayers } = game
-  const volteoMs = lamina?.volteoMs ?? VOLTEO_SORTEO_MS
+  // Árbitro v1.3 · el volteo dura lo mismo aquí que en el árbitro (`config/esperas.js`).
+  const volteoMs = VOLTEO_SORTEO_MS
   const momento = lamina?.momento ?? null
   const geo = useGeometria(numPlayers)
   const t = useTiempoDeEtapa(`${sorteo.ronda}:${sorteo.etapa}`, momento)
@@ -98,7 +99,8 @@ export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, lamina 
     if (seat === 0 && elegida?.ronda === sorteo.ronda) return elegida.p
     if (ronda) return ronda.volteo.find((v) => v.asiento === seat)?.posicion ?? null
     if (!sorteo.yaEligieron.includes(seat)) return null
-    return sorteo.eligioLamina?.[seat] ?? (seat * 2 + sorteo.ronda) % 5
+    // Árbitro v1.3 · la posición de verdad, que publica la vista (`sorteo.elegidas`).
+    return sorteo.elegidas?.[seat] ?? null
   }
   const cartaVolteada = (seat) => ronda?.volteo.find((v) => v.asiento === seat)?.carta ?? null
   const mano = manoALaVista(sorteo, t)

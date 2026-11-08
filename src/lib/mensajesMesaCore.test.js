@@ -14,6 +14,18 @@ describe('L-M 2 · los mensajes de la mesa', () => {
     expect(fraseDeClave('nada')).toBeNull()
   })
 
+  // Árbitro v1.3 · la clave es un id fijo (`config/mensajes.js`), no el código del emoji.
+  it('v1.3 · los 12 ids fijos, sin repetir, casan una a una con las frases y no son el emoji', () => {
+    expect(CLAVES_MENSAJE).toHaveLength(12)
+    expect(REACCIONES).toHaveLength(CLAVES_MENSAJE.length)
+    expect(new Set(CLAVES_MENSAJE).size).toBe(12)
+    CLAVES_MENSAJE.forEach((id) => expect(id).toMatch(/^[a-z_]+$/))
+    expect(fraseDeClave('ajilei')).toBe('¡Ajilei! ♠️')
+    expect(fraseDeClave('que_va')).toBe('¡Qué va! 🙄')
+    expect(fraseDeClave('no_me_hagas')).toBe('No me hagas eso, pana 😅')
+    expect(fraseDeClave('2660_fe0f')).toBeNull()
+  })
+
   it('una burbuja viva por asiento, la última, mientras dura su ciclo', () => {
     const [a, b] = CLAVES_MENSAJE
     const lista = [

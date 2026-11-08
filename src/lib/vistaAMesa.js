@@ -137,6 +137,8 @@ export function vistaAMesa(vista, previa, sala) {
       ...vista.sorteo,
       participan: vista.sorteo.participan.map(rotar),
       yaEligieron: vista.sorteo.yaEligieron.map(rotar),
+      // Árbitro v1.3 · la posición que eligió cada asiento, sin el valor (lista por asiento).
+      elegidas: rotarLista(vista.sorteo.elegidas ?? vista.players.map(() => null)),
       rondas: vista.sorteo.rondas.map((r) => ({
         ...r,
         volteo: r.volteo.map((v) => ({ ...v, asiento: rotar(v.asiento) })),

@@ -5,10 +5,11 @@ import { CLASES } from '../arbitro/reloj.js'
 import { ETAPAS } from '../arbitro/sorteo.js'
 import { FASE_SORTEO as SORTEO_ARBITRO } from '../arbitro/vista.js'
 import { PHASES } from '../engine/gameEngine.js'
-import { EVENTO_AVISO as AVISO_FUNCION } from '../../supabase/functions/partida/nucleo.js'
+import { EVENTO_AVISO as AVISO_FUNCION, EVENTO_MENSAJE as MENSAJE_FUNCION } from '../../supabase/functions/partida/nucleo.js'
 import {
   CLASE_AVISO_SALIDA, CLASE_BARAJADO, CLASE_MANO_SIGUIENTE, CLASE_DESCARTE, CLASE_ELECCION, CLASE_REPOSICION, CLASE_PAUSA_ANUNCIO, CLASE_TURNO, ESCALON_RECLAMO_MS, ETAPA_ELECCION, EVENTO_AVISO, FASE_DESCARTE, FASE_FIN,
   FASE_SORTEO, MARGEN_VENCIMIENTO_MS, REINTENTO_RECLAMO_MS, RELECTURA_MS, REVISION_MS, VENTANA_DESFASE, crearClientePartida, desfaseDe,
+  EVENTO_MENSAJE, MEMORIA_MENSAJES_MS,
 } from './partidaCliente'
 
 const MESA = '11111111-1111-4111-8111-111111111111'
@@ -29,7 +30,8 @@ function doble({ fila = filaDe(1), responder = () => ({ ok: true, version: 2 }) 
   d.eq = vi.fn(() => ({ maybeSingle: d.maybeSingle }))
   d.invoke = vi.fn(async (_nombre, { body }) => ({ data: responder(body), error: null }))
   const canal = {
-    on: vi.fn((_tipo, _filtro, cb) => { d.aviso = cb; return canal }),
+    // Un oyente por evento: `version` (el aviso) y, desde la v1.3, `mensaje`.
+    on: vi.fn((_tipo, filtro, cb) => { if (filtro.event === 'mensaje') d.mensaje = cb; else d.aviso = cb; return canal }),
     subscribe: vi.fn((cb) => { d.orden.push('subscribe'); d.alEstado = cb; return canal }),
   }
   d.canal = canal
@@ -663,6 +665,78 @@ describe('MOT-1 1f · parar', () => {
     await Promise.all([primero, c.iniciar()])
     await reposar()
     expect(d.cliente.channel).toHaveBeenCalledTimes(1)
+    c.parar()
+  })
+})
+
+// ── Árbitro v1.3-a · los mensajes de la mesa ────────────────────────────────
+describe('v1.3-a · los mensajes de la mesa', () => {
+  // Una mesa de 3 vista desde el asiento real 1.
+  const filaDeTres = (propio = {}) => ({
+    version: 1,
+    asiento: 1,
+    vista: { version: 1, asiento: 1, vencimiento: null, players: [{}, { abandonado: false, ...propio }, {}] },
+  })
+
+  it('escucha el evento `mensaje` de la función en el mismo canal', async () => {
+    const { d, c } = await arrancado()
+    expect(EVENTO_MENSAJE).toBe(MENSAJE_FUNCION)
+    expect(d.canal.on).toHaveBeenCalledWith('broadcast', { event: 'mensaje' }, expect.any(Function))
+    c.parar()
+  })
+
+  it('el de otro asiento llega rotado (0 = el propio), con la hora de este reloj; avisa a la capa', async () => {
+    const { d, c } = await arrancado({ fila: filaDeTres() })
+    const avisos = vi.fn()
+    c.mensajes.suscribir(avisos)
+    d.mensaje({ payload: { asiento: 0, clave: 'que_va' } })
+    d.mensaje({ payload: { asiento: 2, clave: 'ajilei' } })
+    expect(c.mensajes.lista().map(({ asiento, clave }) => `${asiento}:${clave}`)).toEqual(['2:que_va', '1:ajilei'])
+    expect(c.mensajes.lista()[0].hora).toBe(Date.now())
+    expect(avisos).toHaveBeenCalledTimes(2)
+    // No toca la vista ni relee.
+    expect(d.maybeSingle).not.toHaveBeenCalled()
+    c.parar()
+  })
+
+  it('descarta el propio que vuelve por el canal, una clave desconocida, un asiento fuera de la mesa', async () => {
+    const { d, c } = await arrancado({ fila: filaDeTres() })
+    d.mensaje({ payload: { asiento: 1, clave: 'ajilei' } })
+    d.mensaje({ payload: { asiento: 2, clave: '2660_fe0f' } })
+    d.mensaje({ payload: { asiento: 5, clave: 'ajilei' } })
+    d.mensaje({ payload: { clave: 'ajilei' } })
+    d.mensaje({})
+    expect(c.mensajes.lista()).toEqual([])
+    c.parar()
+  })
+
+  it('durante tu anuncio no se guarda ninguno: al volver no hay cola', async () => {
+    const { d, c } = await arrancado({ fila: filaDeTres({ enAnuncio: true }) })
+    d.mensaje({ payload: { asiento: 0, clave: 'que_va' } })
+    expect(c.mensajes.lista()).toEqual([])
+    c.parar()
+  })
+
+  it('el propio se anota con la respuesta aceptada (arranca el freno); un `freno` del servidor no pinta nada', async () => {
+    let respuesta = { ok: true, version: 1 }
+    const { d, c } = await arrancado({ fila: filaDeTres(), responder: () => respuesta })
+    const r = await c.mensajes.enviar('suerte')
+    expect(r.ok).toBe(true)
+    expect(d.invoke.mock.calls.at(-1)[1].body).toEqual({ mesa: MESA, accion: 'mensaje', clave: 'suerte' })
+    expect(c.mensajes.lista().map(({ asiento, clave }) => `${asiento}:${clave}`)).toEqual(['0:suerte'])
+    respuesta = { ok: false, motivo: M.FRENO, version: 1 }
+    expect((await c.mensajes.enviar('ajilei')).motivo).toBe(M.FRENO)
+    expect(c.mensajes.lista()).toHaveLength(1)
+    expect(c.foto().rechazo).toBe(null)
+    c.parar()
+  })
+
+  it('se olvida lo que tiene más de 15 s', async () => {
+    const { d, c } = await arrancado({ fila: filaDeTres() })
+    d.mensaje({ payload: { asiento: 0, clave: 'que_va' } })
+    await vi.advanceTimersByTimeAsync(MEMORIA_MENSAJES_MS)
+    d.mensaje({ payload: { asiento: 2, clave: 'ajilei' } })
+    expect(c.mensajes.lista().map((m) => m.clave)).toEqual(['ajilei'])
     c.parar()
   })
 })

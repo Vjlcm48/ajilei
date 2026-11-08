@@ -4,20 +4,22 @@
 //
 // Lo sellado por Victor (2026-11-05/06):
 //   · son las 12 frases de `config/reacciones.js`, sin texto libre;
-//   · viajan como CLAVE y cada pantalla las pinta en su idioma. La clave sale del emoji de la
-//     frase (`codepointDe`), la misma derivación que ya nombra el recurso de Noto: ninguna
-//     lista paralela que se desincronice al primer retoque de redacción;
+//   · viajan como CLAVE y cada pantalla las pinta en su idioma. Desde el árbitro v1.3 la clave
+//     es un id fijo propio (`config/mensajes.js`, en el orden de `REACCIONES`), no el código
+//     de su emoji: el servidor la valida y un retoque de la frase no puede cambiarla;
 //   · freno de 10 s POR JUGADOR, contado desde que se publica su mensaje; no limita a los
 //     demás, y puede haber una burbuja viva por jugador.
 // Contra las IAS no cambia nada: el freno de allí («una a la vez» + 5 s) vive en
 // `hooks/useReacciones.js` y esto no lo importa.
-import { REACCIONES, REACCION_TOTAL_MS, codepointDe } from '../config/reacciones'
+import { CLAVES_MENSAJE } from '../config/mensajes'
+import { REACCIONES, REACCION_TOTAL_MS } from '../config/reacciones'
 
 export const FRENO_MENSAJE_MS = 10000
 
-export const claveDeFrase = (frase) => (REACCIONES.includes(frase) ? codepointDe(frase) : null)
-export const fraseDeClave = (clave) => REACCIONES.find((f) => codepointDe(f) === clave) ?? null
-export const CLAVES_MENSAJE = Object.freeze(REACCIONES.map(codepointDe))
+export { CLAVES_MENSAJE }
+
+export const claveDeFrase = (frase) => CLAVES_MENSAJE[REACCIONES.indexOf(frase)] ?? null
+export const fraseDeClave = (clave) => REACCIONES[CLAVES_MENSAJE.indexOf(clave)] ?? null
 
 // Las burbujas vivas a la hora `ahora`: la última publicada de cada asiento, mientras dura su
 // ciclo (0,3 + 2,4 + 0,3 s). `lista` = [{ asiento, clave, hora, id }], asientos ya rotados.
@@ -41,8 +43,9 @@ export function frenoRestante(lista, asiento, ahora) {
   return Math.max(0, FRENO_MENSAJE_MS - (ahora - ultima))
 }
 
-// La regla, del lado de quien publica (el árbitro, en la sub-tanda 5): una clave conocida y el
-// freno del que la manda. Devuelve el motivo del rechazo o null.
+// La regla, del lado de quien publica (en la mesa real la impone el servidor: `arbitro/mensaje.js`
+// y `anotar_mensaje`; aquí, el árbitro imitado): una clave conocida y el freno del que la
+// manda. Devuelve el motivo del rechazo o null.
 export function rechazoDeMensaje(lista, asiento, clave, ahora) {
   if (!fraseDeClave(clave)) return 'clave_desconocida'
   if (frenoRestante(lista, asiento, ahora) > 0) return 'freno'

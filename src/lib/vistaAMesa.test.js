@@ -109,6 +109,8 @@ describe('MES-PvP 2 · propiedades, en partidas completas', () => {
           expect(game.descarte.yaDescartaron.map(atras)).toEqual(vista.descarte.yaDescartaron)
           expect(game.sorteo.participan.map(atras)).toEqual(vista.sorteo.participan)
           expect(game.sorteo.yaEligieron.map(atras)).toEqual(vista.sorteo.yaEligieron)
+          // Árbitro v1.3 · la posición elegida de cada asiento, rotada como los jugadores.
+          game.sorteo.elegidas.forEach((pos, k) => expect(pos).toBe(vista.sorteo.elegidas[atras(k)]))
           game.sorteo.rondas.forEach((r, k) => {
             expect(r.volteo.map((v) => atras(v.asiento))).toEqual(vista.sorteo.rondas[k].volteo.map((v) => v.asiento))
             expect(atras(r.mano)).toBe(vista.sorteo.rondas[k].mano)

@@ -21,10 +21,10 @@ import { PHASES } from '../engine/gameEngine.js'
 import { esLegal } from '../engine/pozos.js'
 import { AUSENTE_DESDE, ELECCION_SORTEO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, VOLTEO_SORTEO_MS } from '../config/esperas.js'
 import {
-  CLASES, ETAPAS, MOTIVOS, aplicarAccion, crearPartida, huboRevelacion, partidaTerminada, vistaDe,
+  CLASES, ETAPAS, MOTIVOS, aplicarAccion, crearPartida, huboRevelacion, partidaTerminada, puedeMandarMensaje, vistaDe,
 } from '../arbitro/index.js'
-import { REACCIONES, codepointDe } from '../config/reacciones.js'
-import { rechazoDeMensaje } from '../lib/mensajesMesaCore.js'
+import { REACCIONES } from '../config/reacciones.js'
+import { CLAVES_MENSAJE, claveDeFrase, rechazoDeMensaje } from '../lib/mensajesMesaCore.js'
 import { lecturaDeMano } from '../hooks/manoCore.js'
 import { CANCELA_PEDIDO, RECARGA_PVP, pedidoEnLaPausa, recargaPvP } from '../lib/entreManosCore.js'
 
@@ -721,7 +721,7 @@ export function crearPartidaImitada({
   const mensajes = []
   let idMsj = 0
   const LARGAS = [...REACCIONES].sort((a, b) => b.length - a.length)
-  const publica = (k, frase, hora) => mensajes.push({ id: ++idMsj, asiento: k, clave: codepointDe(frase), hora })
+  const publica = (k, frase, hora) => mensajes.push({ id: ++idMsj, asiento: k, clave: claveDeFrase(frase), hora })
   if (msj && !vivo) {
     const t0 = ahora() - msjMs
     if (msj === 'uno') publica(1, REACCIONES[4], t0)
@@ -749,15 +749,8 @@ export function crearPartidaImitada({
 
   const oyentes = new Set()
   const desfaseDeAhora = () => m.t - ahora()
-  // L-M 1 · qué carta eligió cada uno, ya rotado (índice 0 = el propio). La vista del contrato
-  // solo dice quién eligió; la lámina lo enseña con la carta de verdad (pide el Contrato v1.3).
-  const conEleccion = (vista) => {
-    const elecciones = m.e.sorteo?.elecciones
-    if (!elecciones || vista.phase !== 'SORTEO') return vista
-    return { ...vista, sorteo: { ...vista.sorteo, eligioLamina: elecciones.map((_x, k) => elecciones[(k + asiento) % n]) } }
-  }
   const fotoDe = (cambios = {}) => Object.freeze({
-    vista: conRecarga(conEleccion(JSON.parse(JSON.stringify(vistaDe(m.e, asiento))))),
+    vista: conRecarga(JSON.parse(JSON.stringify(vistaDe(m.e, asiento)))),
     recargaLamina: recargaDe(),
     version: m.e.version,
     canal: 'SUBSCRIBED',
@@ -928,10 +921,14 @@ export function crearPartidaImitada({
     },
     mensajes: {
       lista: () => mensajes,
+      // v1.3 · las comprobaciones del árbitro real (`puedeMandarMensaje`: asiento, abandonado,
+      // clave, en su anuncio) y el freno de la lámina, en vez del de `anotar_mensaje`.
       enviar: (clave) => {
+        const puede = puedeMandarMensaje(m.e, m.e.asientos[asiento].uid, clave)
+        if (!puede.ok) return { ok: false, motivo: puede.motivo }
         const motivo = rechazoDeMensaje(mensajes, 0, clave, ahora())
         if (motivo) return { ok: false, motivo }
-        publica(0, REACCIONES.find((f) => codepointDe(f) === clave), ahora())
+        publica(0, REACCIONES[CLAVES_MENSAJE.indexOf(clave)], ahora())
         poner()
         return { ok: true }
       },
