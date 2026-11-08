@@ -23,6 +23,7 @@ import { mkdirSync } from 'node:fs'
 import { PISO_WCAG, TEXTOS, fotosTinta, peorFondo } from '../arnes/tinta.mjs'
 import { runVarasLM } from './varasLM.mjs'
 import { runMensajesLM } from './mensajesLM.mjs'
+import { runEntreManosLM } from './entreManosLM.mjs'
 
 const VIEWPORTS = [
   { id: '412x915', w: 412, h: 915, movil: true },
@@ -217,7 +218,10 @@ const ESCENAS = ['sorteo-baraja', 'sorteo-oleadas', 'sorteo-eleccion', 'sorteo-e
   'sorteo-reparto', 'sorteo-elige', 'sorteo-elige-algunos', 'sorteo-volteo-propio', 'sorteo-volteo-ajeno', 'sorteo-empate',
   'sorteo-desempate', 'sorteo-desempate-fuera', 'sorteo-azar-propio', 'sorteo-azar-ajeno', 'sorteo-vuelta',
   // L-M 2 · la mesa de 5 de punta a punta y la ausencia (lámina).
-  'mano-reparto', 'ultima-accion', 'allin-rival', 'pago-capas', 'ausente-yo', 'ausencia-tercero', 'ausencia-fuera']
+  'mano-reparto', 'ultima-accion', 'allin-rival', 'pago-capas', 'ausente-yo', 'ausencia-tercero', 'ausencia-fuera',
+  // L-M 3 · entre una mano y otra (lámina): la recarga, la transición y el anuncio.
+  'entre-manos', 'recarga-ofrecida', 'recarga-voluntaria', 'recarga-pedida', 'recarga-sinsaldo', 'recarga-fuera', 'recarga-ajena',
+  'recarga-ajena-fuera', 'recarga-rival', 'anuncio-premium', 'anuncio-cierre', 'anuncio-vence']
 
 async function escenas(browser, base) {
   const out = []
@@ -290,8 +294,8 @@ const SELECTOR_LLUVIA = '.cel-lluvia'
 const FINES = [
   // escena, captura, lo que debe dar
   ['final-negativo', 'pvp_fin_negativo_412x915.png', (f) => f.pantalla === 'fin' && f.tono === 'sobrio' && f.caso === '3'
-    && f.frase === 'Te quedaste solo: Beto abandonó la mesa' && /^−/.test(f.cifra) && f.color === ROJO_PERDIDA && !f.lluvia],
-  ['final-gana', 'pvp_fin_positivo_412x915.png', (f) => f.pantalla === 'victoria' && f.frase === 'Te quedaste solo: Beto abandonó la mesa' && f.lluvia],
+    && f.frase === 'Te quedaste solo en la mesa' && /^−/.test(f.cifra) && f.color === ROJO_PERDIDA && !f.lluvia],
+  ['final-gana', 'pvp_fin_positivo_412x915.png', (f) => f.pantalla === 'victoria' && f.frase === 'Te quedaste solo en la mesa' && f.lluvia],
   ['final-cero', 'pvp_fin_cero_412x915.png', (f) => f.pantalla === 'fin' && f.tono === 'neutro' && f.cifra === '0 Heptacoins'
     && f.color !== ROJO_PERDIDA && !f.lluvia],
   ['final-pierde', null, (f) => f.pantalla === 'fin' && f.caso === '2' && f.frase === 'Te quedaste sin fichas' && f.tono === 'sobrio' && !f.lluvia],
@@ -379,6 +383,12 @@ export async function runPvp(browser, { base, mesas = MESAS }) {
     varas.push(...lm2.celdas)
     for (const c of lm2.celdas) console.log(`pvp·${c.celda} · ${c.ok ? 'OK' : 'FALLA'} · ${JSON.stringify(c)}`)
     console.log(`pvp·lm·msj control · ${lm2.control.rojo ? 'ROJO (mide)' : 'NO MIDE'} · capturas fallidas ${lm2.fallosCaptura}`)
+    // L-M 3 · la recarga, la transición y el anuncio (con sus controles rojos); y las capturas.
+    const lm3 = await runEntreManosLM(browser, base)
+    varas.push(...lm3.celdas)
+    for (const c of lm3.celdas) console.log(`pvp·${c.celda} · ${c.ok ? 'OK' : 'FALLA'} · ${JSON.stringify(c)}`)
+    for (const c of lm3.controles) console.log(`pvp·${c.celda} · ${c.rojo ? 'ROJO (mide)' : 'NO MIDE'} · ${JSON.stringify(c)}`)
+    console.log(`pvp·lm3 capturas fallidas ${lm3.fallosCaptura}`)
   }
   const largos = await nombresLargos(browser, base)
   for (const l of largos) console.log(`pvp·15W ${l.vp} mesa ${l.n} ${l.que} · ${JSON.stringify(l)}`)
