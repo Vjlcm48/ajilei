@@ -7,6 +7,8 @@ import {
   CORTE_PASTILLA, ESPERA_SIGUIENTE_HOY_MS, RECOGE_MS, esperaSiguienteMano, recogerEnPvP, textoPastilla,
 } from './transicionCore'
 import '../lib/vistaAMesa'   // suma los textos `pvp.` al diccionario
+import { MARGEN_VENCIMIENTO_MS } from './partidaCliente'
+import { OFERTA_RECARGA_MS } from '../config/esperas'
 
 // MES-PvP L-M 3 · entre una mano y otra (ficha LM-3 §1–§3, con las decisiones del STOP-L).
 describe('L-M 3 · entre una mano y otra', () => {
@@ -58,10 +60,11 @@ describe('L-M 3 · entre una mano y otra', () => {
     })
     expect(RECARGA_VISTA.DECIDE).toBe('decide')
     const privada = (cambios) => ({ monto: 1500, oferta: true, pedida: false, cancelada: null, recargas: 0, ...cambios })
-    const jugador = (cambios) => ({ name: 'Ana', abandonado: false, eliminated: false, cobrado: null, folded: false, numCartas: 5, recarga: null, ...cambios })
-    const vista = ({ clase = CLASES.MANO_SIGUIENTE, phase = PHASES.PAYOUT, yo = {}, otro = {}, recarga = privada() } = {}) => ({
-      asiento: 0, phase, handCount: 4, vencimiento: { clase, hora: 9000 }, resultado: { revelacion: [{}] },
-      players: [jugador({ recarga: 'decide', ...yo }), jugador({ name: 'Beto', ...otro })], recarga,
+    const jugador = (cambios) => ({ name: 'Ana', abandonado: false, eliminated: false, cobrado: null, folded: false, numCartas: 5, recarga: null, chips: 1500, ...cambios })
+    // La mesa de 3 (dos cubren el ante sin el propio: no hay retención); `resto: []`, la de 2.
+    const vista = ({ clase = CLASES.MANO_SIGUIENTE, phase = PHASES.PAYOUT, yo = {}, otro = {}, recarga = privada(), resto = [jugador({ name: 'Caro' })], revelacion = [{}] } = {}) => ({
+      asiento: 0, phase, handCount: 4, unit: 100, vencimiento: { clase, hora: 9000 }, resultado: { revelacion },
+      players: [jugador({ recarga: 'decide', chips: 0, ...yo }), jugador({ name: 'Beto', ...otro }), ...resto], recarga,
     })
     const leer = (v, saldo = 2400) => recargaDeVista(v, { saldo, entrada: 1500 })
 
@@ -90,6 +93,27 @@ describe('L-M 3 · entre una mano y otra', () => {
     expect(leer(vista({ yo: { cobrado: 40 } }))).toBeNull()
     expect(leer(vista({ phase: 'SORTEO' }))).toBeNull()
     expect(leer(vista({ phase: PHASES.GAME_OVER }))).toBeNull()
+
+    // Túnel del v1.3 · UN SOLO ANILLO. En la mesa de 2 la retención se ve venir en la pausa: el
+    // anillo va hasta su final (la pausa, el reclamo del primer teléfono y los 15 s) y sigue igual
+    // en ella. Con revelación, desde la lectura (2 s); sin ella, desde la pausa entera (4 s).
+    const tras = MARGEN_VENCIMIENTO_MS + OFERTA_RECARGA_MS
+    const dos = { resto: [] }
+    expect(leer(vista(dos))).toMatchObject({ retencion: true, anillo: true, finPausa: 9000, vence: 9000 + tras, totalSeg: 18 })
+    expect(leer(vista({ ...dos, revelacion: null }))).toMatchObject({ retencion: true, vence: 9000 + tras, totalSeg: 20 })
+    expect(leer(vista({ ...dos, clase: CLASES.OFERTA_RECARGA }))).toMatchObject({ retencion: true, finPausa: 9000, vence: 9000, totalSeg: 18 })
+    // Mesa de 3: retiene solo si, sin el propio, cubren el ante menos de 2 (como `resolverOfertas`).
+    expect(leer(vista())).toMatchObject({ retencion: false, vence: 9000, totalSeg: 4 })
+    expect(leer(vista({ resto: [jugador({ name: 'Caro', abandonado: true })] })).retencion).toBe(true)
+    expect(leer(vista({ resto: [jugador({ name: 'Caro', eliminated: true })] })).retencion).toBe(true)
+    expect(leer(vista({ resto: [jugador({ name: 'Caro', chips: 99 })] })).retencion).toBe(true)
+    expect(leer(vista({ resto: [jugador({ name: 'Caro', chips: 100 })] })).retencion).toBe(false)
+    // Quien espera (no decide) no tiene anillo único: los 15 s de siempre.
+    expect(leer(vista({ ...dos, clase: CLASES.OFERTA_RECARGA, yo: { recarga: null, chips: 1500 }, otro: { recarga: 'decide', chips: 0 }, recarga: privada({ monto: 0, oferta: false }) })))
+      .toMatchObject({ retencion: false, totalSeg: 15 })
+    // La pausa de anuncio (mesas de 3 o más): la burbuja sin anillo.
+    expect(leer(vista({ clase: CLASES.PAUSA_ANUNCIO }))).toMatchObject({ anillo: false, retencion: false })
+    expect(leer(vista()).anillo).toBe(true)
   })
 
   it('quien volvió antes del anuncio lee cuántos siguen en él, sin contarse', () => {

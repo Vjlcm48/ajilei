@@ -33,6 +33,10 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 //     pila; sin saldo, lo dice y no hay tienda (INV-76).
 //   · La retención (sin quien decide quedaría uno solo): «Esperando a {nombre}…» en la caja de las
 //     acciones.
+// Túnel del v1.3 (Victor):
+//   · Un solo anillo para quien decide y va a ser retenido: desde que aparece la burbuja hasta el
+//     final real (`recargaDeVista`, `retencion`); la cuenta nunca sube cuando llega la hora real
+//     de la retención, que cae unos rtt/2 después de la prevista. En la pausa de anuncio, sin anillo.
 
 const caja = (sel) => {
   const el = document.querySelector(sel)
@@ -64,6 +68,7 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
   const rec = recargaDeVista(foto.vista, { saldo: lamina?.saldo?.() ?? saldo, entrada })
   const [ahora, setAhora] = useState(() => Date.now())
   const [ancla, setAncla] = useState(null)
+  const [tope, setTope] = useState(null)   // { mano, seg }: lo último que contó el anillo único
   const [panel, setPanel] = useState(null)
   const [disparador, setDisparador] = useState(null)
   const [abiertaEn, setAbiertaEn] = useState(() => (lamina?.abierta && rec ? momentoDe(rec) : null))
@@ -89,11 +94,19 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
   const abierta = !!oferta && (abiertaEn === momentoDe(rec) || (rec.cancelada !== null && rec.cancelada !== acusada))
   const fija = lamina?.fija ?? null
   const restaMs = rec.vence === null ? null : rec.vence - (ahora + desfase)
+  const restaPausaMs = rec.finPausa === null ? null : rec.finPausa - (ahora + desfase)
   const ofrecida = oferta?.tipo === RECARGA_PVP.OFRECIDA
   // §5.5.1 · al terminar la revelación (queda la lectura); sin revelación, en el acto.
-  const trasRevelacion = fija !== null || !rec.revelacion || (restaMs !== null && restaMs <= rec.lecturaMs)
-  const total = rec.revelacion ? Math.round(rec.lecturaMs / 1000) : rec.totalSeg
-  const seg = fija ?? (restaMs === null ? null : Math.max(0, Math.ceil(restaMs / 1000)))
+  const trasRevelacion = fija !== null || !rec.revelacion || (restaPausaMs !== null && restaPausaMs <= rec.lecturaMs)
+  const total = rec.revelacion && !rec.retencion ? Math.round(rec.lecturaMs / 1000) : rec.totalSeg
+  const cuenta = fija ?? (restaMs === null ? null : Math.max(0, Math.ceil(restaMs / 1000)))
+  // El anillo único no sube: si la hora real de la retención cae después de la prevista, se
+  // queda en lo último que contó hasta que la cuenta real lo alcanza.
+  let seg = cuenta
+  if (rec.retencion && fija === null && cuenta !== null) {
+    if (tope?.mano === rec.mano && tope.seg < cuenta) seg = tope.seg
+    else if (tope?.mano !== rec.mano || tope.seg !== cuenta) setTope({ mano: rec.mano, seg: cuenta })
+  }
   const verBurbuja = ofrecida && !abierta && (rec.fuera || (rec.pausa && trasRevelacion))
   const espera = !oferta ? rec.espera : null
   const estilo = ancla ? { left: ancla.x, top: ancla.y } : { visibility: 'hidden' }
@@ -135,7 +148,7 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
       {createPortal(
         <>
           {verBurbuja && (
-            <div className="pvp-rec-ancla" data-pvp-recarga="burbuja" data-fuera={rec.fuera ? '1' : '0'} style={estilo}>
+            <div className="pvp-rec-ancla" data-pvp-recarga="burbuja" data-fuera={rec.fuera ? '1' : '0'} data-anillo={rec.anillo ? '1' : '0'} style={estilo}>
               <BurbujaRecarga
                 motivo={RECARGA.FORZOSA}
                 seg={rec.fuera ? total : seg ?? total}

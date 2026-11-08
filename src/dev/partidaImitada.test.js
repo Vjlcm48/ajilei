@@ -292,6 +292,24 @@ describe('MES-PvP 2 · el mando', () => {
     expect(voluntaria.oferta).toMatchObject({ tipo: 'voluntaria', monto: 1500 - voluntaria.oferta.pila })
   })
 
+  // Túnel del v1.3 · el anillo único: lo que la capa prevé en la pausa es lo que hace el árbitro
+  // al vencerla (mesa de 2: la retención; mesa de 3: la mesa sigue sin él).
+  it('la retención que la capa ve venir en la pausa es la que abre el árbitro al vencerla', async () => {
+    for (const [n, retiene] of [[2, true], [3, false]]) {
+      let t = 0
+      const partida = crearPartidaImitada({ escena: 'recarga-ofrecida', n, ahora: () => t })
+      const enPausa = recDe(partida)
+      expect(enPausa).toMatchObject({ pausa: true, retencion: retiene, finPausa: partida.foto().vista.vencimiento.hora })
+      if (retiene) expect(enPausa.vence).toBe(enPausa.finPausa + 300 + 15000)
+      else expect(enPausa.vence).toBe(enPausa.finPausa)
+      t += 30000
+      const r = await partida.enviar('reclamar_vencimiento')
+      expect(r.ok).toBe(true)
+      expect(clase(partida.foto().vista) === 'oferta_recarga').toBe(retiene)
+      if (retiene) expect(recDe(partida)).toMatchObject({ retencion: true, totalSeg: enPausa.totalSeg })
+    }
+  })
+
   it('recargar en la pausa: el árbitro devuelve la pila a la entrada y el saldo de la escena baja', async () => {
     const partida = crearPartidaImitada({ escena: 'recarga-ofrecida', n: 2 })
     const r = await partida.enviar('recargar', { mano: partida.foto().vista.handCount })
