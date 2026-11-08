@@ -144,7 +144,8 @@ export function finDePartida(game) {
   const frase = {
     1: t('pvp.fin.saliste'),
     2: t('pvp.fin.sinfichas'),
-    3: t('pvp.fin.solo.uno', { nombre: fueron[0]?.name }),
+    // L-M 3 · Victor (STOP-L): los casos 3 y 4 se funden en una frase sin nombre (Reglas v1.9).
+    3: t('pvp.fin.solo'),
     4: t('pvp.fin.solo'),
     5: tono === TONOS_FIN.CELEBRACION ? null : t('pvp.fin.solo'),
   }[caso]

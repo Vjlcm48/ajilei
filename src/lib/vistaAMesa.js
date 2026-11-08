@@ -169,6 +169,10 @@ const CLAVES_ACCION = { pasar: 'pvp.asiento.paso', apostar: 'pvp.asiento.aposto'
 export function estadoDeAsiento(seat) {
   if (seat.abandonado) return { tipo: 'abandono', texto: t('pvp.asiento.abandono') }
   if (seat.enAnuncio) return { tipo: 'anuncio', texto: t('pvp.asiento.anuncio') }
+  // L-M 3 · §1 · la recarga PvP (lámina): decide en la pausa, o se salta la mano sentado fuera.
+  // Va antes de «retirado»: quien está fuera de la mano no se retiró.
+  if (seat.recarga === 'fuera') return { tipo: 'fuera', texto: t('pvp.asiento.fuera') }
+  if (seat.recarga === 'decide') return { tipo: 'recarga', texto: t('pvp.asiento.recarga') }
   if (seat.folded) return { tipo: 'retirado', texto: t('pvp.asiento.retirado') }
   if (seat.allIn) return { tipo: 'allin', texto: t('ia.mesa.marca.allin') }
   if (seat.ausente) return { tipo: 'ausente', texto: t('pvp.asiento.ausente') }

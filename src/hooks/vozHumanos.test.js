@@ -262,9 +262,9 @@ describe('MES-PvP 3-A · la pantalla final: el tono por el resultado, la frase p
     [1, { abandonado: true, eliminated: true }, [{ eliminated: false }], 200, TONOS_FIN.SOBRIO, 'Saliste de la mesa'],
     [2, { eliminated: true }, [{ eliminated: false }], 0, TONOS_FIN.SOBRIO, 'Te quedaste sin fichas'],
     [2, { eliminated: true }, [{ eliminated: false }, SE_FUE], 40, TONOS_FIN.SOBRIO, 'Te quedaste sin fichas'],
-    [3, {}, [SE_FUE], 200, TONOS_FIN.SOBRIO, 'Te quedaste solo: Ana abandonó la mesa'],
-    [3, {}, [SE_FUE], 1500, TONOS_FIN.NEUTRO, 'Te quedaste solo: Ana abandonó la mesa'],
-    [3, {}, [QUEBRO, SE_FUE], 2900, TONOS_FIN.CELEBRACION, 'Te quedaste solo: Beto abandonó la mesa'],
+    [3, {}, [SE_FUE], 200, TONOS_FIN.SOBRIO, 'Te quedaste solo en la mesa'],
+    [3, {}, [SE_FUE], 1500, TONOS_FIN.NEUTRO, 'Te quedaste solo en la mesa'],
+    [3, {}, [QUEBRO, SE_FUE], 2900, TONOS_FIN.CELEBRACION, 'Te quedaste solo en la mesa'],
     [4, {}, [SE_FUE, SE_FUE], 1000, TONOS_FIN.SOBRIO, 'Te quedaste solo en la mesa'],
     [4, {}, [SE_FUE, SE_FUE, QUEBRO], 1500, TONOS_FIN.NEUTRO, 'Te quedaste solo en la mesa'],
     [4, {}, [SE_FUE, QUEBRO, SE_FUE], 3100, TONOS_FIN.CELEBRACION, 'Te quedaste solo en la mesa'],
@@ -291,7 +291,7 @@ describe('MES-PvP 3-A · la pantalla final: el tono por el resultado, la frase p
   it('el caso de Victor: solo, con −1.300, no celebra ni dice «Arrasaste»', () => {
     const r = finDePartida(fin({ chips: 200 }, [{ ...SE_FUE, name: 'ticotest2022' }]))
     expect(r.tono).toBe(TONOS_FIN.SOBRIO)
-    expect(r.frase).toBe('Te quedaste solo: ticotest2022 abandonó la mesa')
+    expect(r.frase).toBe('Te quedaste solo en la mesa')
     expect(FRASES_VICTORIA).not.toContain(r.frase)
   })
 })

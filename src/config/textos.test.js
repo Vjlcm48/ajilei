@@ -443,9 +443,9 @@ describe('MES-PvP 3 · los textos que viajan con la partida (INV-84)', () => {
 
   it('sin sumar no existen (⟦⟧); sumados, `t()` los resuelve con sus huecos', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(t('pvp.fin.solo.uno', { nombre: 'Ana' })).toBe('⟦pvp.fin.solo.uno⟧')
+    expect(t('pvp.recarga.espera', { nombre: 'Ana' })).toBe('⟦pvp.recarga.espera⟧')
     sumarTextos('es', TEXTOS_PVP_ES)
-    expect(t('pvp.fin.solo.uno', { nombre: 'Ana' })).toBe('Te quedaste solo: Ana abandonó la mesa')
+    expect(t('pvp.recarga.espera', { nombre: 'Ana' })).toBe('Esperando a Ana…')
     expect(clavesDe('es').some((c) => c.startsWith('pvp.'))).toBe(false)
     // Como la entrada: con sus huecos llenos, ninguno queda sin llenar.
     for (const [clave, crudo] of Object.entries(TEXTOS_PVP_ES)) {

@@ -262,7 +262,7 @@ describe('MES-PvP 3-A · el fin con un abandono', () => {
     f = nucleo.foto()
     expect(f.escena).toBe('final')
     expect(f.game.phase).toBe('GAME_OVER')
-    expect(f.fin).toMatchObject({ caso: 3, tono: 'celebracion', frase: 'Te quedaste solo: B abandonó la mesa', cifra: '+300 Heptacoins' })
+    expect(f.fin).toMatchObject({ caso: 3, tono: 'celebracion', frase: 'Te quedaste solo en la mesa', cifra: '+300 Heptacoins' })
     nucleo.parar()
   })
 

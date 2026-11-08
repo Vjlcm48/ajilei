@@ -38,10 +38,28 @@ export const TEXTOS_PVP_ES = {
   'pvp.abandono.termina.varios': '{lista} abandonaron la mesa. La partida termina.',
   'pvp.fin.saliste':             'Saliste de la mesa',
   'pvp.fin.sinfichas':           'Te quedaste sin fichas',
-  'pvp.fin.solo.uno':            'Te quedaste solo: {nombre} abandonó la mesa',
   'pvp.fin.solo':                'Te quedaste solo en la mesa',
   'pvp.fin.resultado':           '{cifra} Heptacoins',
 
   // ── L-M 2 · El aviso de ausencia (texto de Victor; se sella en las Reglas de APU-1 v1.9) ──
   'pvp.ausente.aviso':           '1 turno más y saldrás de la mesa',
+
+  // ── L-M 3 · Entre una mano y otra (sellados por Victor en la lámina; van a las Reglas de APU-1 v1.9) ──
+  'pvp.recarga.tarjeta':         'Recargar {monto} HC para volver a {entrada} HC. Te quedarán {saldo} HC.',
+  // Victor (STOP-L): con la pila en 0, la tarjeta dice «para seguir en la mesa».
+  'pvp.recarga.tarjeta.cero':    'Recargar {monto} HC para seguir en la mesa. Te quedarán {saldo} HC.',
+  // La voluntaria pedida durante la mano (se aplica en la pausa siguiente): el ⋮ la muestra y la anula.
+  'pvp.recarga.anular':          'Anular la recarga pedida',
+  'pvp.recarga.no':              'Ahora no',
+  'pvp.recarga.sinsaldo':        'Tu saldo no alcanza para recargar.',
+  'pvp.asiento.recarga':         'Recargando',
+  'pvp.asiento.fuera':           'Fuera de esta mano',
+  // La mesa de 2 mientras el rival decide: en la caja de las acciones (propuesta de la lámina).
+  'pvp.recarga.espera':          'Esperando a {nombre}…',
+  'pvp.anuncio.publicidad':      'Publicidad',
+  'pvp.anuncio.frase':           'La publicidad ayuda a mantener el juego, gracias por tu comprensión',
+  'pvp.anuncio.quitar':          'Quitar publicidad',
+  'pvp.anuncio.premium':         'Premium · Pronto',
+  'pvp.anuncio.uno':             '{nombre} sigue en el anuncio',
+  'pvp.anuncio.varios':          '{n} jugadores siguen en el anuncio',
 }
