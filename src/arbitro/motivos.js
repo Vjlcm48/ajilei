@@ -24,6 +24,12 @@ export const MOTIVOS_ARBITRO = Object.freeze({
   CLAVE_DESCONOCIDA:       'clave_desconocida',
   EN_ANUNCIO:              'en_anuncio',
   FRENO:                   'freno',
+  // v1.3 · la recarga PvP (`recargar`, `pedir_recarga`, `anular_recarga`). La `mano` equivocada,
+  // o un `recargar` dentro de la mano sin estar sentado fuera, es `fase`.
+  SIN_RECARGA:             'sin_recarga',
+  SALDO_INSUFICIENTE:      'saldo_insuficiente',
+  YA_PEDIDA:               'ya_pedida',
+  SIN_PEDIDO:              'sin_pedido',
 })
 
 export const MOTIVOS = Object.freeze({ ...MOTIVOS_APUESTA, ...MOTIVOS_ARBITRO })

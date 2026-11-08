@@ -5,32 +5,57 @@
 //
 // R-4: una partida guardada antes de la v1.1 no trae `enAnuncio`, `vencidos`,
 // `ultimaAccion` ni `posicion`. Se leen con su valor por defecto. `elegidas` (v1.3) sale de
-// `sorteo.elecciones`, que está desde la v1.0.
+// `sorteo.elecciones`, que está desde la v1.0. La recarga (v1.3) se lee con `fuera = null` y,
+// sin `estado.entrada`, la vista privada lleva `recarga: null`.
 
 import { AUSENTE_DESDE } from '../config/esperas.js'
 import { PHASES } from '../engine/gameEngine.js'
 import { capasDe } from '../engine/pozos.js'
 import { ganadorDeMano, ganadoresDeCapas, huboRevelacion } from './ganador.js'
-import { sorteoAbierto } from './partida.js'
+import { FUERA, enPausaEntreManos, recargaActiva, sorteoAbierto } from './partida.js'
 import { CARTAS_POR_ASIENTO, ETAPAS } from './sorteo.js'
 
 export const FASE_SORTEO = 'SORTEO'
 
-function asientoVisto(p, { abandonado, cobrado, enAnuncio, vencidos }, propio) {
+// v1.3 · la marca pública de la recarga: decide en la pausa («Recargando»), o se salta la mano
+// («Fuera de esta mano»).
+export const RECARGA_VISTA = Object.freeze({ DECIDE: 'decide', FUERA: 'fuera' })
+
+function asientoVisto(p, { abandonado, cobrado, enAnuncio, vencidos, fuera = null }, propio, pausa) {
+  // Sentado fuera, el motor lo lleva eliminado; la mesa lo ve sentado, retirado y sin cartas. Es
+  // obligatorio por el cliente ya publicado, que con `eliminated` enseña la pantalla final.
+  const saltaMano = fuera === FUERA.MANO
   return {
     name: p.name,
     chips: p.chips,
     contrib: p.contrib,
     contribMano: p.contribMano,
-    folded: p.folded,
+    folded: saltaMano ? true : p.folded,
     allIn: p.allIn,
-    eliminated: p.eliminated,
+    eliminated: saltaMano ? false : p.eliminated,
     abandonado,
     cobrado,
     enAnuncio: enAnuncio ?? false,
     ausente: (vencidos ?? 0) >= AUSENTE_DESDE,
-    numCartas: p.cards.length,
-    ...(propio ? { cards: p.cards } : {}),
+    numCartas: saltaMano ? 0 : p.cards.length,
+    recarga: fuera === null ? null : pausa ? RECARGA_VISTA.DECIDE : RECARGA_VISTA.FUERA,
+    ...(propio ? { cards: saltaMano ? [] : p.cards } : {}),
+  }
+}
+
+// v1.3 · lo privado de la recarga: solo el asiento propio. `monto = entrada − pila`; el saldo no
+// va en la vista (D6). Sin `estado.entrada` (R-4), `null`. Quien ya cobró conserva `recargas`,
+// que la pantalla final necesita.
+function recargaVista(estado, asiento) {
+  if (!recargaActiva(estado)) return null
+  const a = estado.asientos[asiento]
+  const vivo = a.cobrado === null && !a.abandonado
+  return {
+    monto: vivo ? Math.max(0, estado.entrada - estado.motor.players[asiento].chips) : 0,
+    oferta: vivo && (a.fuera ?? null) !== null,
+    pedida: a.pedida ?? false,
+    cancelada: a.cancelada ?? null,
+    recargas: a.recargas ?? 0,
   }
 }
 
@@ -75,11 +100,12 @@ function resultadoVisto(motor) {
 export function vistaDe(estado, asiento) {
   const { motor, asientos, vencimiento, descarte, descartaron, version, ultimaAccion } = estado
   const abierto = sorteoAbierto(estado)
+  const pausa = enPausaEntreManos(estado)
   return {
     version,
     asiento,
     phase: abierto ? FASE_SORTEO : motor.phase,
-    players: motor.players.map((p, i) => asientoVisto(p, asientos[i], i === asiento)),
+    players: motor.players.map((p, i) => asientoVisto(p, asientos[i], i === asiento, pausa)),
     currentBet: motor.currentBet,
     unit: motor.unit,
     pot: motor.pot,
@@ -97,5 +123,6 @@ export function vistaDe(estado, asiento) {
     sorteo: sorteoVisto(estado, asiento),
     resultado: resultadoVisto(motor),
     ultimaAccion: ultimaAccion ?? null,
+    recarga: recargaVista(estado, asiento),
   }
 }

@@ -92,6 +92,16 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
     })
   }
 
+  // v1.3 · la recarga y los saldos tiran de su propio azar (`azarR`): así el resto de la secuencia
+  // es la de siempre, y el sorteo, donde no hay recarga, se juega igual que antes de la v1.3.
+  function recargaAlAzar(e, azarR) {
+    if (e.sorteo.etapa !== ETAPAS.CERRADO || azarR() >= 0.08) return null
+    const i = Math.floor(azarR() * e.asientos.length)
+    const mano = e.motor.handCount - (azarR() < 0.1 ? 1 : 0)
+    const accion = e.motor.phase === PHASES.PAYOUT ? 'recargar' : ['pedir_recarga', 'anular_recarga', 'recargar'][Math.floor(azarR() * 3)]
+    return { uid: `u${i}`, version: e.version, accion, mano }
+  }
+
   function accionAlAzar(e, azar) {
     const i = Math.floor(azar() * e.asientos.length)
     const uno = (lista) => lista[Math.floor(azar() * lista.length)]
@@ -121,14 +131,16 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
   }
 
   const clasesVistas = new Set()
+  let recargas = 0
 
   for (const n of [2, 3, 4, 5]) {
     it(`mesa de ${n}: dinero, versión, rechazos y secretos en cada paso, y siempre termina`, () => {
       for (const s of [11, 23, 37]) {
         const azar = semilla(s * 1000 + n)
+        const azarR = semilla(s * 7919 + n)
         setRng(semilla(s))
         let e = crear(n)
-        const total = sumaDinero(e)
+        let total = sumaDinero(e)
         let ahora = 0
         const cobros = new Map()
         let pasos = 0
@@ -139,9 +151,11 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
           // Como la tabla de partida: el estado sale de la base en JSON.
           const antes = JSON.stringify(e)
           e = JSON.parse(antes)
-          const peticion = accionAlAzar(e, azar)
+          const peticion = recargaAlAzar(e, azarR) ?? accionAlAzar(e, azar)
           if (peticion.accion === 'reclamar_vencimiento' && azar() < 0.9) ahora = Math.max(ahora, e.vencimiento.hora)
-          const r = aplicarAccion(e, peticion, { ahora })
+          // El saldo de cada asiento, como lo leería la función: a veces no alcanza.
+          const saldos = e.asientos.map(() => [0, 800, 5000, 5000][Math.floor(azarR() * 4)])
+          const r = aplicarAccion(e, peticion, { ahora, saldos })
           if (r.respuesta.ok) {
             expect(r.estado.version).toBe(e.version + 1)
             expect(r.respuesta.version).toBe(r.estado.version)
@@ -163,8 +177,19 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
               expect([0, despues.find((x) => x.asiento === i)?.monto ?? 0], 'pila de un cobrado').toContain(ef.pilas[i])
             })
             const doble = suma(despues.map((x) => ef.pilas[x.asiento]))
+            // Las pilas del cierre van sin la recarga de esta misma jugada, que va después.
             expect(suma(ef.pilas) + cobrado(r.estado) - doble).toBe(total)
           })
+          // v1.3 · lo que entra es lo recargado: el total crece con cada efecto `recarga`, que
+          // siempre deja la pila en la entrada y nunca llega en una partida terminada.
+          for (const ef of r.efectos) {
+            if (ef.tipo !== 'recarga') continue
+            expect(ef.monto).toBeGreaterThan(0)
+            expect(ef.mano).toBe(r.estado.motor.handCount - (r.estado.motor.phase === PHASES.PAYOUT ? 0 : 1))
+            expect(r.efectos.some((x) => x.tipo === 'partida_terminada')).toBe(false)
+            total += ef.monto
+            recargas++
+          }
           for (const ef of r.efectos) {
             if (ef.tipo !== 'salida') continue
             expect(cobros.has(ef.asiento), 'nada se cobra dos veces').toBe(false)
@@ -202,6 +227,8 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
 
   it('que no sea una prueba vacía: entre las cuatro mesas, el azar pasó por todos los relojes', () => {
     expect([...clasesVistas].sort()).toEqual(Object.values(CLASES).sort())
+    // v1.3 · y recargó de verdad.
+    expect(recargas).toBeGreaterThan(0)
   })
 
   it('es puro y nadie del cliente lo importa', () => {
@@ -233,9 +260,9 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
     expect(a({ uid: 'u0', accion: 'constructor' })).toBe(M.DESCONOCIDA)
   })
 
-  it('los motivos: los once de `pozos.js`, tal cual, y los quince del árbitro (v1.3: tres del mensaje)', () => {
+  it('los motivos: los once de `pozos.js`, tal cual, y los diecinueve del árbitro (v1.3: tres del mensaje y cuatro de la recarga)', () => {
     expect(Object.keys(MOTIVOS_POZOS)).toHaveLength(11)
-    expect(Object.keys(MOTIVOS_ARBITRO)).toHaveLength(15)
+    expect(Object.keys(MOTIVOS_ARBITRO)).toHaveLength(19)
     for (const [k, v] of Object.entries(MOTIVOS_POZOS)) expect(M[k]).toBe(v)
   })
 
@@ -584,7 +611,12 @@ describe('MOT-1 1b · los vencimientos', () => {
     e = pide(e, activo, 'apostar', { tipo: 'retirarse' }, 0).estado
     e = conJugador(e, 0, { chips: 50 })
     e = conJugador(e, 1, { chips: 2950 })
-    const r = pide(e, 1, 'reclamar_vencimiento')
+    // v1.3 · quien no cubre el ante decide, y sin él quedaría uno solo: la mesa espera la
+    // retención de la oferta (15 s) sin mover dinero, y al vencer sale con su residuo.
+    const retenida = pide(e, 1, 'reclamar_vencimiento')
+    expect(retenida.estado.vencimiento.clase).toBe(CLASES.OFERTA_RECARGA)
+    expect(retenida.efectos).toEqual([])
+    const r = pide(retenida.estado, 1, 'reclamar_vencimiento')
     expect(r.estado.motor.phase).toBe(PHASES.GAME_OVER)
     expect(r.estado.vencimiento).toBe(null)
     expect(r.efectos.at(-1)).toEqual({ tipo: 'partida_terminada', ganador: 1 })
@@ -1559,5 +1591,245 @@ describe('v1.3-a · el sorteo sobre la mesa y el mensaje', () => {
     const mano = reclama(volteo)
     expect(mano.motor.manoIndex).toBe(0)
     expect(mano.sorteo.etapa).toBe(ETAPAS.CERRADO)
+  })
+})
+
+// ── MES-PvP · árbitro v1.3-b · la recarga PvP ───────────────────────────────
+// Reglas de APU-1 v1.9 §8.1-§8.3 y el bloque D del informe de la Fase 0, con P-2, P-3, P-5, P-6
+// y D7. Entrada corta de 100: 1.500 HC.
+describe('v1.3-b · la recarga PvP', () => {
+  const RICO = [5000, 5000, 5000, 5000, 5000]
+  const conSaldo = (e, i, accion, campos = {}, saldos = RICO) => (
+    aplicarAccion(e, { uid: `u${i}`, version: e.version, accion, ...campos }, { ahora: e.vencimiento?.hora ?? 0, saldos })
+  )
+  const mano = (e) => ({ mano: e.motor.handCount })
+  const recargas = (r) => r.efectos.filter((x) => x.tipo === 'recarga')
+
+  // La mano en curso hasta su cierre: todos se retiran ante `ganador`, que pasa o iguala. Devuelve
+  // la jugada que la cierra.
+  function cerrarLaMano(e, ganador, saldos = RICO) {
+    let r = { estado: e, efectos: [] }
+    for (let k = 0; k < 30 && r.estado.motor.phase !== PHASES.PAYOUT; k++) {
+      const x = r.estado
+      const a = x.motor.activePlayerIndex
+      r = conSaldo(x, a, 'apostar', { tipo: a === ganador ? 'pasar' : 'retirarse' }, saldos)
+      if (!r.respuesta.ok) r = conSaldo(x, a, 'apostar', { tipo: 'igualar' }, saldos)
+      expect(r.respuesta.ok).toBe(true)
+    }
+    expect(r.estado.motor.phase).toBe(PHASES.PAYOUT)
+    return r
+  }
+
+  // La mano 1 hasta su pausa, con las pilas puestas a mano tras el ante.
+  function pausaCon(n, { pilas = {}, ganador = 1, saldos = RICO, antes = (e) => e } = {}) {
+    let e = hastaFase(hastaLaMano(n), PHASES.BET_1)
+    for (const [i, c] of Object.entries(pilas)) e = conJugador(e, Number(i), { chips: c })
+    return cerrarLaMano(antes(e), ganador, saldos)
+  }
+
+  it('la partida nace con la entrada y cada asiento sin recarga', () => {
+    const e = crear(3)
+    expect(e.entrada).toBe(1500)
+    expect(e.asientos.map((a) => [a.pedida, a.fuera, a.recargas, a.cancelada])).toEqual(Array(3).fill([false, null, 0, null]))
+    expect(vistaDe(e, 0).recarga).toEqual({ monto: 0, oferta: false, pedida: false, cancelada: null, recargas: 0 })
+  })
+
+  it('el pedido: se aplica al cerrarse la mano, se cancela en silencio sin necesidad y con `cancelada` sin saldo (D5)', () => {
+    const r = pausaCon(3, {
+      pilas: { 0: 700, 1: 1300, 2: 700 },
+      saldos: [5000, 5000, 100],
+      antes: (x) => [0, 1, 2].reduce((y, i) => conSaldo(y, i, 'pedir_recarga', mano(y)).estado, x),
+    })
+    const e = r.estado
+    const h = e.motor.handCount
+    expect(e.vencimiento.clase).toBe(CLASES.MANO_SIGUIENTE)
+    // Las pilas del cierre van sin la recarga; el efecto, después.
+    const k = r.efectos.findIndex((x) => x.tipo === 'mano_cerrada')
+    expect(r.efectos[k].pilas).toEqual([700, 1600, 700])
+    expect(r.efectos.slice(k + 1)).toEqual([{ tipo: 'recarga', asiento: 0, monto: 800, mano: h }])
+    expect(e.motor.players.map((p) => p.chips)).toEqual([1500, 1600, 700])
+    expect(e.asientos.map((a) => [a.pedida, a.recargas, a.cancelada])).toEqual([
+      [false, 800, null], [false, 0, null], [false, 0, { motivo: 'saldo', mano: h }],
+    ])
+    expect(vistaDe(e, 2).recarga).toEqual({ monto: 800, oferta: false, pedida: false, cancelada: { motivo: 'saldo', mano: h }, recargas: 0 })
+    expect(vistaDe(e, 0).recarga.recargas).toBe(800)
+    // En la pausa, la voluntaria recarga en el acto; la segunda vez ya no hay nada que recargar.
+    const voluntaria = conSaldo(e, 2, 'recargar', mano(e))
+    expect(recargas(voluntaria)).toEqual([{ tipo: 'recarga', asiento: 2, monto: 800, mano: h }])
+    expect(conSaldo(voluntaria.estado, 2, 'recargar', mano(e)).respuesta.motivo).toBe(M.SIN_RECARGA)
+    expect(conSaldo(e, 2, 'recargar', mano(e), [0, 0, 799]).respuesta.motivo).toBe(M.SALDO_INSUFICIENTE)
+  })
+
+  it('pedir y anular durante la mano: idempotentes, contra la `mano` y sin mover dinero', () => {
+    let e = conJugador(hastaFase(hastaLaMano(3), PHASES.BET_1), 0, { chips: 700 })
+    const pedida = conSaldo(e, 0, 'pedir_recarga', mano(e))
+    expect(pedida.efectos).toEqual([])
+    expect(pedida.estado.version).toBe(e.version + 1)
+    e = pedida.estado
+    expect(conSaldo(e, 0, 'pedir_recarga', mano(e)).respuesta.motivo).toBe(M.YA_PEDIDA)
+    expect(conSaldo(e, 0, 'pedir_recarga', { mano: e.motor.handCount - 1 }).respuesta.motivo).toBe(M.FASE)
+    // Dentro de la mano, sin estar fuera, `recargar` es `fase`.
+    expect(conSaldo(e, 0, 'recargar', mano(e)).respuesta.motivo).toBe(M.FASE)
+    // Con la pila en la entrada no hay nada que pedir.
+    expect(conSaldo(conJugador(e, 1, { chips: 1500 }), 1, 'pedir_recarga', mano(e)).respuesta.motivo).toBe(M.SIN_RECARGA)
+    // Va contra la mano, no contra la versión: otro jugó entretanto.
+    const vieja = aplicarAccion(e, { uid: 'u0', version: e.version - 3, accion: 'anular_recarga', ...mano(e) }, { ahora: 0 })
+    expect(vieja.respuesta.ok).toBe(true)
+    expect(vieja.estado.asientos[0].pedida).toBe(false)
+    expect(conSaldo(vieja.estado, 0, 'anular_recarga', mano(e)).respuesta.motivo).toBe(M.SIN_PEDIDO)
+    // Pone a 0 la cuenta de ausencia, como toda acción propia.
+    const ausente = { ...e, asientos: e.asientos.map((a, i) => (i === 0 ? { ...a, vencidos: 2 } : a)) }
+    expect(conSaldo(ausente, 0, 'anular_recarga', mano(e)).estado.asientos[0].vencidos).toBe(0)
+  })
+
+  it('la oferta: quien quiebra decide, se salta una mano sentado fuera y su recarga queda pedida para la pausa siguiente (P-6)', () => {
+    const r = pausaCon(3, { pilas: { 0: 40 } })
+    let e = r.estado
+    expect(e.asientos[0].fuera).toBe('oferta')
+    expect(r.efectos.filter((x) => x.tipo === 'salida')).toEqual([])
+    expect(vistaDe(e, 0).recarga).toMatchObject({ monto: 1460, oferta: true })
+    expect(vistaDe(e, 1).players[0].recarga).toBe('decide')
+    expect(vistaDe(e, 1).recarga.oferta).toBe(false)
+
+    // Vence la pausa: la mesa sigue sin él, que conserva su residuo y no sale.
+    const fuera = pide(e, 1, 'reclamar_vencimiento')
+    e = fuera.estado
+    expect(fuera.efectos).toEqual([])
+    expect(e.vencimiento.clase).toBe(CLASES.BARAJADO)
+    expect(e.asientos[0]).toMatchObject({ fuera: 'mano', cobrado: null, abandonado: false })
+    expect(e.motor.players[0]).toMatchObject({ eliminated: true, chips: 40 })
+    // La vista lo da sentado: el cliente publicado enseñaría la pantalla final con `eliminated`.
+    expect(vistaDe(e, 0).players[0]).toMatchObject({ eliminated: false, folded: true, numCartas: 0, recarga: 'fuera', cards: [] })
+    expect(vistaDe(e, 2).players[0]).toMatchObject({ eliminated: false, folded: true, numCartas: 0, recarga: 'fuera' })
+
+    // Sentado fuera, `recargar` la deja pedida: el dinero nunca se mueve dentro de una mano.
+    const pedida = conSaldo(e, 0, 'recargar', mano(e))
+    expect(pedida.efectos).toEqual([])
+    e = pedida.estado
+    expect(e.asientos[0].pedida).toBe(true)
+    expect(conSaldo(e, 0, 'recargar', mano(e)).respuesta.motivo).toBe(M.YA_PEDIDA)
+
+    // La mano se juega sin él; al cerrarse, la recarga lo devuelve a la mesa.
+    const cierre = cerrarLaMano(hastaFase(e, PHASES.BET_1), 2)
+    e = cierre.estado
+    expect(recargas(cierre)).toEqual([{ tipo: 'recarga', asiento: 0, monto: 1460, mano: e.motor.handCount }])
+    expect(e.asientos[0]).toMatchObject({ fuera: null, pedida: false, recargas: 1460 })
+    expect(e.motor.players[0]).toMatchObject({ eliminated: false, chips: 1500 })
+    expect(vistaDe(e, 1).players[0].recarga).toBe(null)
+    // Y juega la siguiente.
+    const sigue = hastaFase(e, PHASES.BET_1)
+    expect(sigue.motor.players[0]).toMatchObject({ eliminated: false, folded: false })
+  })
+
+  it('sin decidir, a la segunda pausa sale con su residuo: quebrado y cobrado, no abandonado (§8.3, fila 2)', () => {
+    let e = pide(pausaCon(3, { pilas: { 0: 40 } }).estado, 1, 'reclamar_vencimiento').estado
+    e = cerrarLaMano(hastaFase(e, PHASES.BET_1), 2).estado
+    expect(e.asientos[0].fuera).toBe('mano')
+    expect(vistaDe(e, 1).players[0].recarga).toBe('decide')
+    expect(vistaDe(e, 0).recarga).toMatchObject({ oferta: true, monto: 1460 })
+    const sale = pide(e, 1, 'reclamar_vencimiento')
+    expect(sale.efectos).toContainEqual({ tipo: 'salida', asiento: 0, monto: 40 })
+    expect(sale.estado.vencimiento.clase).toBe(CLASES.AVISO_SALIDA)
+    expect(sale.estado.asientos[0]).toMatchObject({ abandonado: false, cobrado: 40, fuera: null })
+    expect(vistaDe(sale.estado, 0).players[0]).toMatchObject({ eliminated: true, abandonado: false, cobrado: 40, recarga: null })
+  })
+
+  it('la mesa de 2 retiene la oferta 15 s: recargando se juega la mano siguiente; sin recargar, sale y termina (P-3)', () => {
+    const r = pausaCon(2, { pilas: { 0: 0 } })
+    const ret = pide(r.estado, 1, 'reclamar_vencimiento')
+    expect(ret.estado.vencimiento).toEqual({ clase: CLASES.OFERTA_RECARGA, hora: r.estado.vencimiento.hora + 15000 })
+    expect(ret.efectos).toEqual([])
+    // El vencimiento de la oferta no cuenta para la ausencia (D7).
+    expect(ret.estado.asientos.map((a) => a.vencidos)).toEqual(r.estado.asientos.map((a) => a.vencidos))
+    const e = ret.estado
+    expect(vistaDe(e, 1).players[0].recarga).toBe('decide')
+    expect(conSaldo(e, 0, 'recargar', mano(e), [1499, 0]).respuesta.motivo).toBe(M.SALDO_INSUFICIENTE)
+
+    const vuelve = conSaldo(e, 0, 'recargar', mano(e), [1500, 0])
+    expect(vuelve.efectos[0]).toEqual({ tipo: 'recarga', asiento: 0, monto: 1500, mano: e.motor.handCount })
+    expect(vuelve.estado.motor.handCount).toBe(e.motor.handCount + 1)
+    expect(vuelve.estado.vencimiento.clase).toBe(CLASES.BARAJADO)
+    expect(conSaldo(vuelve.estado, 0, 'recargar', mano(vuelve.estado)).respuesta.motivo).toBe(M.FASE)
+
+    const vencida = pide(e, 1, 'reclamar_vencimiento')
+    expect(partidaTerminada(vencida.estado)).toBe(true)
+    expect(vencida.efectos).toContainEqual({ tipo: 'salida', asiento: 0, monto: 0 })
+    expect(vencida.estado.asientos[0]).toMatchObject({ abandonado: false, cobrado: 0 })
+    expect(vencida.estado.motor.winner).toBe(1)
+  })
+
+  it('la oferta sigue viva en la pausa de anuncio; quien no decidió, al acabarse, se sienta fuera (D7)', () => {
+    const r = pausaCon(3, { pilas: { 0: 0 }, antes: (x) => conMotor(x, { handCount: 5 }) })
+    const anuncio = pide(r.estado, 1, 'reclamar_vencimiento')
+    const e = anuncio.estado
+    expect(e.vencimiento.clase).toBe(CLASES.PAUSA_ANUNCIO)
+    expect(anuncio.efectos).toEqual([])
+    expect(e.asientos[0]).toMatchObject({ fuera: 'oferta', enAnuncio: false, cobrado: null })
+    expect(vistaDe(e, 1).players[0].recarga).toBe('decide')
+    // Recarga dentro de la pausa de anuncio, que sigue.
+    const rec = conSaldo(e, 0, 'recargar', mano(e))
+    expect(recargas(rec)).toEqual([{ tipo: 'recarga', asiento: 0, monto: 1500, mano: 5 }])
+    expect(rec.estado.vencimiento.clase).toBe(CLASES.PAUSA_ANUNCIO)
+    // Sin decidir: los demás vuelven, la pausa se acaba y se sienta fuera.
+    let x = e
+    for (const i of [1, 2]) x = pide(x, i, 'volver_anuncio', mano(x)).estado
+    expect(x.motor.handCount).toBe(6)
+    expect(x.asientos[0]).toMatchObject({ fuera: 'mano', cobrado: null })
+  })
+
+  it('abandonar con un pedido o con una oferta los limpia y cobra por la ruta de siempre (D7)', () => {
+    let e = conJugador(hastaFase(hastaLaMano(3), PHASES.BET_1), 0, { chips: 700 })
+    e = conSaldo(e, 0, 'pedir_recarga', mano(e)).estado
+    e = pide(e, 0, 'abandonar', {}, 0).estado
+    expect(e.asientos[0].pedida).toBe(false)
+    const cierre = cerrarLaMano(e, 1)
+    expect(recargas(cierre)).toEqual([])
+    expect(cierre.efectos).toContainEqual({ tipo: 'salida', asiento: 0, monto: 700 })
+
+    const p = pausaCon(3, { pilas: { 0: 40 } })
+    const ab = pide(p.estado, 0, 'abandonar', {}, 0)
+    expect(ab.efectos).toEqual([{ tipo: 'salida', asiento: 0, monto: 40 }])
+    expect(ab.estado.asientos[0]).toMatchObject({ fuera: null, pedida: false, abandonado: true, cobrado: 40 })
+  })
+
+  it('R2 cuenta a quien está sentado fuera: la mesa no termina, y en la pausa le espera la retención', () => {
+    let e = pide(pausaCon(3, { pilas: { 0: 40 } }).estado, 1, 'reclamar_vencimiento').estado
+    e = hastaFase(e, PHASES.BET_1)
+    e = pide(e, 2, 'abandonar', {}, 0).estado
+    expect(partidaTerminada(e)).toBe(false)
+    expect(e.vencimiento.clase).toBe(CLASES.MANO_SIGUIENTE)
+    expect(pide(e, 1, 'reclamar_vencimiento').estado.vencimiento.clase).toBe(CLASES.OFERTA_RECARGA)
+  })
+
+  it('el saldo entra con la llamada y nunca se guarda', () => {
+    const r = pausaCon(3, { pilas: { 0: 40 } })
+    const hecho = conSaldo(r.estado, 0, 'recargar', mano(r.estado), [4321, 4321, 4321])
+    expect(hecho.respuesta.ok).toBe(true)
+    expect('saldos' in hecho.estado).toBe(false)
+    expect(JSON.stringify(hecho.estado)).not.toContain('4321')
+  })
+
+  it('R-4 · una partida de la v1.3-a o de la v1.2 (sin `entrada` ni campos de recarga) va como antes', () => {
+    const vieja = (x) => {
+      const c = JSON.parse(JSON.stringify(x))
+      delete c.entrada
+      c.asientos.forEach((a) => { delete a.pedida; delete a.fuera; delete a.recargas; delete a.cancelada })
+      return c
+    }
+    // v1.3-a, guardada a mitad de la mano 1 en la mesa de 3: quien quiebra sale como siempre.
+    const e = conJugador(vieja(hastaFase(hastaLaMano(3), PHASES.BET_1)), 0, { chips: 40 })
+    expect(conSaldo(e, 0, 'pedir_recarga', mano(e)).respuesta.motivo).toBe(M.SIN_RECARGA)
+    const cierre = cerrarLaMano(e, 1)
+    expect(cierre.estado.asientos[0].fuera ?? null).toBe(null)
+    expect(vistaDe(cierre.estado, 0).recarga).toBe(null)
+    expect(vistaDe(cierre.estado, 1).players[0].recarga).toBe(null)
+    expect(conSaldo(cierre.estado, 0, 'recargar', mano(cierre.estado)).respuesta.motivo).toBe(M.SIN_RECARGA)
+    const sale = pide(cierre.estado, 1, 'reclamar_vencimiento')
+    expect(sale.efectos).toContainEqual({ tipo: 'salida', asiento: 0, monto: 40 })
+    expect(sale.estado.vencimiento.clase).toBe(CLASES.AVISO_SALIDA)
+    // v1.2, en la mesa de 2: la quiebra termina la partida sin retención.
+    const dos = conJugador(vieja(hastaFase(hastaLaMano(2), PHASES.BET_1)), 0, { chips: 0 })
+    const fin = pide(cerrarLaMano(dos, 1).estado, 1, 'reclamar_vencimiento')
+    expect(partidaTerminada(fin.estado)).toBe(true)
   })
 })

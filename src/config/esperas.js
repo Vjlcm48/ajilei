@@ -60,6 +60,12 @@ export const AVISO_SALIDA_MS = 3000
 // El tope de la pausa de anuncio (contrato §6, «Publicidad»).
 export const PAUSA_ANUNCIO_MS = 45000
 
+// provisional · se cierra con los teléfonos. Árbitro v1.3 · la retención de la oferta de recarga
+// (Reglas de APU-1 v1.9 §8.1, «Fin de partida»; decisión P-3 de Victor): sin quien quebró quedaría
+// uno solo con fichas, y la mesa le espera esto desde que vence la pausa entre manos. La misma
+// cifra que la pregunta de REC-1 contra las IAS (Reglas §10).
+export const OFERTA_RECARGA_MS = 15000
+
 // provisional · se cierra con los teléfonos. Vencimientos propios seguidos de apuesta o
 // descarte resueltos por el reloj: desde `AUSENTE_DESDE` la mesa lo ve ausente, y en
 // `N_AUSENCIA` el árbitro lo abandona (contrato §6, «Ausencia»).

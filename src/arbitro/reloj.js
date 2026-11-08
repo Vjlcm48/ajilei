@@ -4,7 +4,7 @@
 
 import {
   ANTES_DEL_REPARTO_MS, AVISO_SALIDA_MS, BARAJADO_MS, ELECCION_SORTEO_MS, FACTOR_RAPIDA,
-  FIN_SEGUNDO_REPARTO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, PAUSA_ANUNCIO_MS,
+  FIN_SEGUNDO_REPARTO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, OFERTA_RECARGA_MS, PAUSA_ANUNCIO_MS,
   RED_REVELACION_MS, REPOSICION_SIN_CARTAS_MS, TRAS_PRIMER_REPARTO_MS, TURN_TIME, VOLTEO_SORTEO_MS,
   VUELO_REPARTO_MS, esperaRepartoSorteo,
 } from '../config/esperas.js'
@@ -26,6 +26,8 @@ export const CLASES = Object.freeze({
   AVISO_SALIDA:    'aviso_salida',
   MANO_SIGUIENTE:  'mano_siguiente',
   PAUSA_ANUNCIO:   'pausa_anuncio',
+  // v1.3 · la retención de la oferta de recarga: sin quien quebró quedaría uno solo con fichas.
+  OFERTA_RECARGA:  'oferta_recarga',
 })
 
 export const RITMOS = Object.freeze({ NORMAL: 'normal', RAPIDO: 'rapido' })
@@ -56,3 +58,4 @@ export const ESPERA_ELECCION_MS = ELECCION_SORTEO_MS
 export const ESPERA_VOLTEO_MS = VOLTEO_SORTEO_MS
 export const ESPERA_AVISO_SALIDA_MS = AVISO_SALIDA_MS
 export const ESPERA_PAUSA_ANUNCIO_MS = PAUSA_ANUNCIO_MS
+export const ESPERA_OFERTA_RECARGA_MS = OFERTA_RECARGA_MS

@@ -25,6 +25,21 @@
 // retirarse en el acto, en cualquier fase de la mano, y con menos de 2 sentados la partida
 // termina en la misma jugada. Las tres vías (la ✕, el 3.er vencimiento y otra mesa) pasan
 // por `retirarEnMano` y `terminarSiQuedaUno`.
+//
+// v1.3 (la recarga PvP, Reglas de APU-1 v1.9 §8.1 · bloque D del informe de la Fase 0):
+//   · `estado.entrada` es la pila de entrada; sin él (una partida de la v1.2 o la v1.3-a, R-4) la
+//     recarga queda apagada en esa partida y todo va como antes.
+//   · Cada asiento lleva `pedida`, `fuera` (`null` · `'oferta'`, quebró en esta pausa · `'mano'`,
+//     se salta la mano), `recargas` (la suma en HC) y `cancelada` (`null`, o el pedido cancelado por
+//     saldo con la MANO en que se canceló: la versión no sirve, porque `jugar` de la función la
+//     reescribe cuando aplica abandonos en la misma llamada).
+//   · Sentado fuera, el motor lo lleva `eliminated` (no paga el ante, no recibe cartas ni turno y la
+//     rotación lo salta) y conserva su residuo: `empezarMano` no lo liquida y `sentados()` lo cuenta
+//     (R2). La vista lo publica `eliminated: false`, `folded: true` y sin cartas.
+//   · El saldo no está en el estado: llega con la llamada (`{ ahora, saldos }`) y nunca se guarda.
+//   · El dinero: pilas + pozo + cobrado es constante MÁS lo recargado. Cada recarga emite el efecto
+//     `recarga { asiento, monto, mano }`, que la base aplica después de `mano_cerrada` con la clave
+//     `recarga_pvp:<sala>:<uid>:<mano>`: un asiento recarga a lo sumo una vez por pausa.
 
 import {
   PHASES, advanceFromDeal, applyBetAction, applyDiscard, createInitialState, startHand,
@@ -38,7 +53,7 @@ import {
   CARTAS_POR_ASIENTO, ETAPAS, abrirRonda, cerrar, eligieronTodos, siguienteRonda, voltear,
 } from './sorteo.js'
 import {
-  CLASES, ESPERA_AVISO_SALIDA_MS, ESPERA_BARAJADO_MS, ESPERA_ELECCION_MS, ESPERA_PAUSA_ANUNCIO_MS,
+  CLASES, ESPERA_AVISO_SALIDA_MS, ESPERA_BARAJADO_MS, ESPERA_ELECCION_MS, ESPERA_OFERTA_RECARGA_MS, ESPERA_PAUSA_ANUNCIO_MS,
   ESPERA_TURNO_MS, ESPERA_VOLTEO_MS, RITMOS, esperaManoSiguiente, esperaPrimerReparto, esperaRepartoSorteo,
   esperaReposicion, esperaSegundoReparto, llevaAnuncio,
 } from './reloj.js'
@@ -49,13 +64,21 @@ export const APUESTAS = Object.freeze([50, 100, 200, 500, 1000, 2000, 5000])
 
 export const ACCIONES_ARBITRO = Object.freeze([
   'elegir_carta_sorteo', 'apostar', 'descartar', 'reclamar_vencimiento', 'abandonar', 'volver_anuncio',
+  'recargar', 'pedir_recarga', 'anular_recarga',
 ])
 
-// C-4: éstas se validan contra la ronda o la fase abierta, no contra la versión.
-const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar', 'volver_anuncio']
+const RECARGAS = ['recargar', 'pedir_recarga', 'anular_recarga']
+
+// C-4: éstas se validan contra la ronda o la fase abierta, no contra la versión. La recarga se
+// valida contra la `mano`: durante la mano la versión cambia sin parar.
+const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar', 'volver_anuncio', ...RECARGAS]
 
 // Las que dicen que el asiento está: ponen a 0 su cuenta de ausencia (contrato §6).
-const PROPIAS = ['elegir_carta_sorteo', 'apostar', 'descartar', 'volver_anuncio']
+const PROPIAS = ['elegir_carta_sorteo', 'apostar', 'descartar', 'volver_anuncio', ...RECARGAS]
+
+// v1.3 · dónde está un asiento respecto a la recarga.
+export const FUERA = Object.freeze({ OFERTA: 'oferta', MANO: 'mano' })
+export const CANCELADA_SALDO = 'saldo'
 
 const nulos = (n) => Array(n).fill(null)
 
@@ -69,9 +92,14 @@ const cuantosNoRetirados = (motor) => motor.players.filter((p) => !p.folded).len
 
 const FASES_APUESTA = [PHASES.BET_1, PHASES.BET_2, PHASES.BET_3]
 
+const fueraDe = (a) => a.fuera ?? null
+
 // R2 · sentado es quien no abandonó ni quedó eliminado. Quien quebró en la mano que se
-// acaba de cerrar sigue sentado hasta que `startHand` lo elimina.
-const sentados = ({ motor, asientos }) => asientos.filter((a, i) => !a.abandonado && !motor.players[i].eliminated).length
+// acaba de cerrar sigue sentado hasta que `startHand` lo elimina. v1.3 · quien está sentado
+// fuera (el motor lo lleva eliminado) sigue sentado: decide en la pausa (Reglas v1.9 §8.2).
+const sentados = ({ motor, asientos }) => asientos.filter((a, i) => (
+  !a.abandonado && (!motor.players[i].eliminated || fueraDe(a) !== null)
+)).length
 
 const rechazo = (estado, motivo) => ({
   estado,
@@ -93,7 +121,8 @@ function liquidar(estado, sale) {
     if (a.cobrado !== null || !sale(a, i)) return a
     const monto = estado.motor.players[i].chips
     efectos.push({ tipo: 'salida', asiento: i, monto })
-    return { ...a, cobrado: monto }
+    // v1.3 · quien cobra ya no decide ni tiene nada pedido.
+    return { ...a, cobrado: monto, ...(fueraDe(a) !== null || a.pedida ? { fuera: null, pedida: false } : {}) }
   })
   const players = estado.motor.players.map((p, i) => (asientos[i].cobrado === null ? p : { ...p, chips: 0 }))
   return { estado: { ...estado, asientos, motor: { ...estado.motor, players } }, efectos }
@@ -123,23 +152,96 @@ const contarVencidos = (estado, vencidos) => ({
   }),
 })
 
+// ── La recarga PvP (v1.3) ───────────────────────────────────────────────────
+
+export const recargaActiva = (estado) => Number.isInteger(estado.entrada) && estado.entrada > 0
+
+const PAUSAS_ENTRE_MANOS = [CLASES.MANO_SIGUIENTE, CLASES.PAUSA_ANUNCIO, CLASES.OFERTA_RECARGA]
+
+/** Entre una mano y otra: la mano cerrada y su pausa, la de anuncio o la retención de la oferta. */
+export const enPausaEntreManos = (estado) => (
+  !sorteoAbierto(estado) && estado.motor.phase === PHASES.PAYOUT && PAUSAS_ENTRE_MANOS.includes(estado.vencimiento?.clase)
+)
+
+// El saldo llega con la llamada, nunca en el estado. Sin él, no alcanza.
+const saldoDe = (estado, i) => {
+  const s = Number(estado.saldos?.[i])
+  return Number.isFinite(s) ? s : 0
+}
+
+const conAsiento = (estado, i, cambios) => ({
+  ...estado,
+  asientos: estado.asientos.map((a, j) => (j === i ? { ...a, ...cambios } : a)),
+})
+
+// La pila vuelve a la entrada. Sentado fuera, vuelve a la mesa (el motor deja de darlo por
+// eliminado antes del siguiente `startHand`). `aplicarRecarga` del motor no se usa (D2).
+function aplicarRecarga(estado, i) {
+  const monto = estado.entrada - estado.motor.players[i].chips
+  const players = estado.motor.players.map((p, j) => (j === i ? { ...p, chips: estado.entrada, eliminated: false } : p))
+  const recargado = conAsiento({ ...estado, motor: { ...estado.motor, players } }, i, {
+    fuera: null, pedida: false, recargas: (estado.asientos[i].recargas ?? 0) + monto,
+  })
+  return { estado: recargado, efecto: { tipo: 'recarga', asiento: i, monto, mano: estado.motor.handCount } }
+}
+
+// D5 · el pedido se aplica al cerrarse la mano, en la misma jugada. Se cancela en silencio si la
+// pila ya no está por debajo de la entrada o si la partida termina en esta jugada (R2); con
+// `cancelada` si el saldo no alcanza.
+function resolverPedidos(estado) {
+  if (!recargaActiva(estado)) return { estado, efectos: [] }
+  const quedan = sentados(estado) >= 2
+  let actual = estado
+  const efectos = []
+  estado.asientos.forEach((a, i) => {
+    if (!a.pedida) return
+    const monto = actual.entrada - actual.motor.players[i].chips
+    if (a.cobrado !== null || a.abandonado || !quedan || monto <= 0) {
+      actual = conAsiento(actual, i, { pedida: false })
+    } else if (saldoDe(actual, i) < monto) {
+      actual = conAsiento(actual, i, { pedida: false, cancelada: { motivo: CANCELADA_SALDO, mano: actual.motor.handCount } })
+    } else {
+      const hecho = aplicarRecarga(actual, i)
+      actual = hecho.estado
+      efectos.push(hecho.efecto)
+    }
+  })
+  return { estado: actual, efectos }
+}
+
+// Quien no cubre el ante de la mano siguiente decide: la oferta (§8.1).
+const abrirOfertas = (estado) => (!recargaActiva(estado) ? estado : {
+  ...estado,
+  asientos: estado.asientos.map((a, i) => {
+    const p = estado.motor.players[i]
+    const quebro = a.cobrado === null && !a.abandonado && !p.eliminated && fueraDe(a) === null && p.chips < estado.motor.unit
+    return quebro ? { ...a, fuera: FUERA.OFERTA } : a
+  }),
+})
+
+const indecisos = (estado) => estado.asientos.flatMap((a, i) => (
+  fueraDe(a) !== null && a.cobrado === null && !a.abandonado ? [i] : []
+))
+
 // ── La mano, por fases ──────────────────────────────────────────────────────
 
 function cerrarMano(estado, ahora) {
   const { motor } = estado
   const ganador = ganadorDeMano(motor)
-  const { estado: fuera, efectos } = sacarAbandonados(estado)
+  const { estado: liquidado, efectos } = sacarAbandonados(estado)
   const cierre = {
     tipo: 'mano_cerrada',
     mano: motor.handCount,
     ganador,
     sentados: motor.handRules.ruleN,
     ajilei: ajileiDe(motor.players[ganador].cards, motor.handRules),
-    pilas: fuera.motor.players.map((p) => p.chips),
+    pilas: liquidado.motor.players.map((p) => p.chips),
   }
+  // v1.3 · las pilas del cierre van sin la recarga: el efecto `recarga` la suma después.
+  const { estado: recargado, efectos: recargas } = resolverPedidos(liquidado)
   return {
-    estado: { ...fuera, vencimiento: en(CLASES.MANO_SIGUIENTE, ahora + esperaManoSiguiente(huboRevelacion(motor))) },
-    efectos: [cierre, ...efectos],
+    estado: { ...abrirOfertas(recargado), vencimiento: en(CLASES.MANO_SIGUIENTE, ahora + esperaManoSiguiente(huboRevelacion(motor))) },
+    efectos: [cierre, ...efectos, ...recargas],
   }
 }
 
@@ -193,8 +295,10 @@ function empezarMano(estado, motorPrevio, ahora) {
       efectos: [...efectos, { tipo: 'partida_terminada', ganador: motor.winner }],
     }
   }
-  const { estado: conEliminados, efectos } = liquidar(base, (_a, i) => motor.players[i].eliminated)
-  const salenAhora = motor.players.some((p, i) => p.eliminated && !motorPrevio.players[i].eliminated)
+  // v1.3 · quien se salta la mano sentado fuera no sale: conserva su residuo.
+  const sentadoFuera = (i) => fueraDe(estado.asientos[i]) === FUERA.MANO
+  const { estado: conEliminados, efectos } = liquidar(base, (_a, i) => motor.players[i].eliminated && !sentadoFuera(i))
+  const salenAhora = motor.players.some((p, i) => p.eliminated && !motorPrevio.players[i].eliminated && !sentadoFuera(i))
   const vencimiento = salenAhora
     ? en(CLASES.AVISO_SALIDA, ahora + ESPERA_AVISO_SALIDA_MS)
     : en(CLASES.BARAJADO, ahora + ESPERA_BARAJADO_MS)
@@ -220,9 +324,10 @@ function trasManoSiguiente(estado, ahora) {
   const hayPausa = llevaAnuncio(motor.handCount)
     && cuantosSiguen(estado) > 1
     && estado.asientos.some((_a, i) => veAnuncio(estado, i))
-  if (!hayPausa) return empezarMano(estado, motor, ahora)
+  if (!hayPausa) return resolverOfertas(estado, ahora)
 
-  const noCubre = (_a, i) => !motor.players[i].eliminated && motor.players[i].chips < motor.unit
+  // v1.3 · la oferta sigue viva en la pausa de anuncio (D7): quien decide no sale aquí.
+  const noCubre = (a, i) => !motor.players[i].eliminated && motor.players[i].chips < motor.unit && fueraDe(a) === null
   const { estado: liquidado, efectos } = liquidar(estado, noCubre)
   return {
     estado: {
@@ -236,8 +341,36 @@ function trasManoSiguiente(estado, ahora) {
 
 function cerrarPausa(estado, ahora) {
   const asientos = estado.asientos.map((a) => ({ ...a, enAnuncio: false }))
-  return empezarMano({ ...estado, asientos }, estado.motor, ahora)
+  return resolverOfertas({ ...estado, asientos }, ahora)
 }
+
+// v1.3 · D8 · vence la pausa entre manos (o la de anuncio) con alguien decidiendo.
+//   · Si la mesa sigue sin él (2 o más cubren el ante): la primera vez se salta la mano sentado
+//     fuera; la segunda, sale y cobra su residuo, como quebrado y no como abandonado («Te quedaste
+//     sin fichas», §8.3 fila 2).
+//   · Si no (R2, retención): la mesa espera `oferta_recarga`; al vencer, salen todos los que no
+//     decidieron y `startHand` cierra la partida. Ese vencimiento no cuenta para la ausencia (D7).
+// Quien sale vuelve a la mano sin fuera y sin el `eliminated` del motor: `startHand` lo elimina
+// por no cubrir el ante, `empezarMano` le paga el residuo y hay aviso de salida, como siempre.
+function resolverOfertas(estado, ahora) {
+  const quienes = indecisos(estado)
+  if (quienes.length === 0) return empezarMano(estado, estado.motor, ahora)
+  const juegan = cuantosSiguen(estado)
+  if (juegan < 2 && estado.vencimiento?.clase !== CLASES.OFERTA_RECARGA) {
+    return { estado: { ...estado, vencimiento: en(CLASES.OFERTA_RECARGA, ahora + ESPERA_OFERTA_RECARGA_MS) }, efectos: [] }
+  }
+  const asientos = estado.asientos.map((a, i) => {
+    if (!quienes.includes(i)) return a
+    return juegan >= 2 && fueraDe(a) === FUERA.OFERTA ? { ...a, fuera: FUERA.MANO } : { ...a, fuera: null, pedida: false }
+  })
+  const players = estado.motor.players.map((p, i) => (quienes.includes(i) && asientos[i].fuera === null ? { ...p, eliminated: false } : p))
+  return empezarMano({ ...estado, asientos }, { ...estado.motor, players }, ahora)
+}
+
+// En la retención, quien recarga la resuelve si ya no queda nadie decidiendo o si la mesa ya
+// puede seguir: se juega la mano siguiente en la misma jugada.
+const retencionResuelta = (estado) => estado.vencimiento?.clase === CLASES.OFERTA_RECARGA
+  && (indecisos(estado).length === 0 || cuantosSiguen(estado) >= 2)
 
 // Se acaba sola cuando ya no queda a quién esperar, o nadie con quien jugar.
 function seguirPausa(estado, ahora) {
@@ -370,6 +503,45 @@ function volverAnuncio(estado, asiento, peticion, ahora) {
   return seguirPausa({ ...estado, asientos }, ahora)
 }
 
+// v1.3 · D3 · en la pausa entre manos, con la oferta o la voluntaria, se aplica en el acto.
+// Sentado fuera durante la mano, queda PEDIDA para la pausa siguiente (P-6): el dinero nunca se
+// mueve dentro de una mano. Dentro de la mano, sin estar fuera, es `pedir_recarga`.
+function recargar(estado, asiento, peticion, ahora) {
+  if (sorteoAbierto(estado) || peticion.mano !== estado.motor.handCount) return M.FASE
+  if (!recargaActiva(estado)) return M.SIN_RECARGA
+  const a = estado.asientos[asiento]
+  if (a.cobrado !== null) return M.SIN_RECARGA
+  if (manoEnCurso(estado)) {
+    if (fueraDe(a) !== FUERA.MANO) return M.FASE
+    if (a.pedida) return M.YA_PEDIDA
+    return { estado: conAsiento(estado, asiento, { pedida: true }), efectos: [] }
+  }
+  if (!enPausaEntreManos(estado)) return M.FASE
+  const monto = estado.entrada - estado.motor.players[asiento].chips
+  if (monto <= 0) return M.SIN_RECARGA
+  if (saldoDe(estado, asiento) < monto) return M.SALDO_INSUFICIENTE
+  const { estado: recargado, efecto } = aplicarRecarga(estado, asiento)
+  if (!retencionResuelta(recargado)) return { estado: recargado, efectos: [efecto] }
+  const sigue = resolverOfertas(recargado, ahora)
+  return { estado: sigue.estado, efectos: [efecto, ...sigue.efectos] }
+}
+
+// Durante la mano, con la pila por debajo de la entrada: se aplica al cerrarse (D5).
+function pedirRecarga(estado, asiento, peticion) {
+  if (!manoEnCurso(estado) || peticion.mano !== estado.motor.handCount) return M.FASE
+  const a = estado.asientos[asiento]
+  if (!recargaActiva(estado) || a.cobrado !== null) return M.SIN_RECARGA
+  if (a.pedida) return M.YA_PEDIDA
+  if (estado.motor.players[asiento].chips >= estado.entrada) return M.SIN_RECARGA
+  return { estado: conAsiento(estado, asiento, { pedida: true }), efectos: [] }
+}
+
+function anularRecarga(estado, asiento, peticion) {
+  if (!manoEnCurso(estado) || peticion.mano !== estado.motor.handCount) return M.FASE
+  if (!estado.asientos[asiento].pedida) return M.SIN_PEDIDO
+  return { estado: conAsiento(estado, asiento, { pedida: false }), efectos: [] }
+}
+
 function alVencerTurno(estado, ahora) {
   const { motor } = estado
   const asiento = motor.activePlayerIndex
@@ -441,6 +613,9 @@ function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
       return trasManoSiguiente(estado, ahora)
     case CLASES.PAUSA_ANUNCIO:
       return cerrarPausa(estado, ahora)
+    case CLASES.OFERTA_RECARGA:
+      // No cuenta para la ausencia (D7): quien no decidió sale con su residuo.
+      return resolverOfertas(estado, ahora)
     default:
       throw new Error(`MOT-1 · vencimiento desconocido: ${v.clase}`)
   }
@@ -527,7 +702,7 @@ function retirarEnMano(estado, ahora) {
 function terminarSiQuedaUno({ estado, efectos }) {
   if (estado.motor.phase !== PHASES.PAYOUT || pausaAbierta(estado) || sentados(estado) >= 2) return { estado, efectos }
   const { motor, asientos } = estado
-  const ganador = motor.players.findIndex((p, i) => !p.eliminated && !asientos[i].abandonado)
+  const ganador = motor.players.findIndex((p, i) => (!p.eliminated || fueraDe(asientos[i]) !== null) && !asientos[i].abandonado)
   const fin = {
     ...estado,
     motor: { ...motor, phase: PHASES.GAME_OVER, winner: ganador >= 0 ? ganador : null, aliveCount: ganador >= 0 ? 1 : 0 },
@@ -540,9 +715,12 @@ function terminarSiQuedaUno({ estado, efectos }) {
   }
 }
 
-// Con mano, se retira y cobra al cerrarse. Sin mano, sale ya.
+// Con mano, se retira y cobra al cerrarse. Sin mano, sale ya. v1.3 · D7 · un pedido o una oferta
+// abiertos se limpian: el pedido no movió dinero, y cobra su pila o su residuo por la ruta de siempre.
 function marcarAbandono(estado, asiento, ahora) {
-  const asientos = estado.asientos.map((a, i) => (i === asiento ? { ...a, abandonado: true, enAnuncio: false } : a))
+  const asientos = estado.asientos.map((a, i) => (i !== asiento ? a : {
+    ...a, abandonado: true, enAnuncio: false, ...(fueraDe(a) !== null || a.pedida ? { fuera: null, pedida: false } : {}),
+  }))
   const marcado = { ...estado, asientos }
   if (manoEnCurso(marcado)) return terminarSiQuedaUno(retirarEnMano(marcado, ahora))
 
@@ -569,6 +747,18 @@ const MANEJADORES = {
   reclamar_vencimiento: reclamarVencimiento,
   abandonar: (estado, asiento, _peticion, ahora) => marcarAbandono(estado, asiento, ahora),
   volver_anuncio: volverAnuncio,
+  recargar,
+  pedir_recarga: pedirRecarga,
+  anular_recarga: anularRecarga,
+}
+
+// El saldo leído entra con la llamada y sale antes de guardar: el estado nunca lo lleva.
+const conSaldos = (estado, saldos) => (saldos ? { ...estado, saldos } : estado)
+function sinSaldos(hecho) {
+  if (!('saldos' in hecho.estado)) return hecho
+  const estado = { ...hecho.estado }
+  delete estado.saldos
+  return { ...hecho, estado }
 }
 
 function cuentaACero(hecho, asiento) {
@@ -584,9 +774,10 @@ function cuentaACero(hecho, asiento) {
  *
  * @param {object} estado el de `crearPartida`, o el que devolvió la llamada anterior
  * @param {{ uid: string|null, version: number, accion: string }} peticion y los campos de cada acción
- * @param {{ ahora: number }} reloj la hora del servidor, en ms
+ * @param {{ ahora: number, saldos?: number[] }} reloj la hora del servidor, en ms, y (v1.3) el saldo
+ *   de cada asiento según `leer_partida`, para la recarga. No se guarda.
  */
-export function aplicarAccion(estado, peticion, { ahora }) {
+export function aplicarAccion(estado, peticion, { ahora, saldos = null }) {
   const { uid, version, accion } = peticion
   if (!uid) return rechazo(estado, M.NO_AUTENTICADO)
   const asiento = estado.asientos.findIndex((a) => a.uid === uid)
@@ -596,21 +787,21 @@ export function aplicarAccion(estado, peticion, { ahora }) {
   if (!SIMULTANEAS.includes(accion) && version !== estado.version) return rechazo(estado, M.VERSION_VIEJA)
   if (!ACCIONES_ARBITRO.includes(accion)) return rechazo(estado, M.DESCONOCIDA)
 
-  const hecho = MANEJADORES[accion](estado, asiento, peticion, ahora)
+  const hecho = MANEJADORES[accion](conSaldos(estado, saldos), asiento, peticion, ahora)
   if (typeof hecho === 'string') return rechazo(estado, hecho)
-  return confirmar(PROPIAS.includes(accion) ? cuentaACero(hecho, asiento) : hecho)
+  return confirmar(sinSaldos(PROPIAS.includes(accion) ? cuentaACero(hecho, asiento) : hecho))
 }
 
 /**
  * El abandono por la regla de una partida por cuenta (§7). Lo marca el servidor, sin
  * versión del cliente, así que no puede chocar con ella.
  */
-export function abandonarPorServidor(estado, uid, { ahora }) {
+export function abandonarPorServidor(estado, uid, { ahora, saldos = null }) {
   const asiento = estado.asientos.findIndex((a) => a.uid === uid)
   if (asiento < 0) return rechazo(estado, M.NO_ES_DE_ESTA_MESA)
   if (partidaTerminada(estado)) return rechazo(estado, M.PARTIDA_TERMINADA)
   if (estado.asientos[asiento].abandonado) return rechazo(estado, M.ASIENTO_ABANDONADO)
-  return confirmar(marcarAbandono(estado, asiento, ahora))
+  return confirmar(sinSaldos(marcarAbandono(conSaldos(estado, saldos), asiento, ahora)))
 }
 
 /**
@@ -638,8 +829,11 @@ export function crearPartida({ apuesta, entrada, ritmo }, sillas, ahora) {
   return {
     version: 0,
     ritmo,
+    // v1.3 · la pila de entrada: con ella, la recarga está encendida en esta partida.
+    entrada: ENTRADAS[entrada] * apuesta,
     asientos: compactos.map((a) => ({
       ...a, abandonado: false, cobrado: null, vencidos: 0, enAnuncio: false, sinAnuncio: false,
+      pedida: false, fuera: null, recargas: 0, cancelada: null,
     })),
     sorteo,
     motor,

@@ -12,12 +12,12 @@ export { ajileiDe, ganadorDeMano, huboRevelacion } from './ganador.js'
 export { CLAVES_MENSAJE, puedeMandarMensaje } from './mensaje.js'
 export { MOTIVOS, MOTIVOS_APUESTA, MOTIVOS_ARBITRO } from './motivos.js'
 export {
-  ACCIONES_ARBITRO, APUESTAS, ENTRADAS, abandonarPorServidor, aplicarAccion, crearPartida,
-  partidaTerminada, sorteoAbierto,
+  ACCIONES_ARBITRO, APUESTAS, CANCELADA_SALDO, ENTRADAS, FUERA, abandonarPorServidor, aplicarAccion, crearPartida,
+  enPausaEntreManos, partidaTerminada, recargaActiva, sorteoAbierto,
 } from './partida.js'
 export {
   CLASES, RITMOS, esperaManoSiguiente, esperaPrimerReparto, esperaRepartoSorteo, esperaReposicion, esperaSegundoReparto,
   factorDe, llevaAnuncio,
 } from './reloj.js'
 export { CARTAS_POR_ASIENTO, ETAPAS, TOPE_RONDAS } from './sorteo.js'
-export { FASE_SORTEO, vistaDe } from './vista.js'
+export { FASE_SORTEO, RECARGA_VISTA, vistaDe } from './vista.js'
