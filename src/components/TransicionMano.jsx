@@ -36,8 +36,11 @@ export default function TransicionMano({ game, recoger = false, recogerA = null 
   }, [recogerA])
   const activa = recoger || (recogerA !== null && recogidaA === recogerA)
 
+  // Túnel del v1.3 · UNA recogida por mano. Un desfase nuevo (otra muestra de la red, justo al
+  // reclamar el vencimiento) mueve `recogerA` cuando las cartas ya se fueron: sin esto, la recogida
+  // se volvía a lanzar desde opacidad 1 y las cartas reaparecían un instante.
   useLayoutEffect(() => {
-    if (!activa) return
+    if (!activa || animadas.current.length > 0) return
     const m = marca('seat-badge-gold')
     antes.current = m && caja(m)
     for (const el of document.querySelectorAll('.game-table-screen .card-slot-wrapper')) {
