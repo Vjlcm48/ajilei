@@ -24,6 +24,7 @@ import { PISO_WCAG, TEXTOS, fotosTinta, peorFondo } from '../arnes/tinta.mjs'
 import { runVarasLM } from './varasLM.mjs'
 import { runMensajesLM } from './mensajesLM.mjs'
 import { runEntreManosLM } from './entreManosLM.mjs'
+import { runArbitro13LM } from './arbitro13LM.mjs'
 
 const VIEWPORTS = [
   { id: '412x915', w: 412, h: 915, movil: true },
@@ -389,6 +390,8 @@ export async function runPvp(browser, { base, mesas = MESAS }) {
     for (const c of lm3.celdas) console.log(`pvp·${c.celda} · ${c.ok ? 'OK' : 'FALLA'} · ${JSON.stringify(c)}`)
     for (const c of lm3.controles) console.log(`pvp·${c.celda} · ${c.rojo ? 'ROJO (mide)' : 'NO MIDE'} · ${JSON.stringify(c)}`)
     console.log(`pvp·lm3 capturas fallidas ${lm3.fallosCaptura}`)
+    // Árbitro v1.3-a · las posiciones del sorteo y el mensaje con id fijo (con sus controles rojos).
+    varas.push(...(await runArbitro13LM(browser, base)).celdas)
   }
   const largos = await nombresLargos(browser, base)
   for (const l of largos) console.log(`pvp·15W ${l.vp} mesa ${l.n} ${l.que} · ${JSON.stringify(l)}`)
