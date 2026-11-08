@@ -9,7 +9,8 @@ import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify } fro
 import { resetRng, setRng } from '../src/engine/deck.js'
 import { CLASES, ETAPAS, MOTIVOS as M, abandonarPorServidor, aplicarAccion, crearPartida, vistaDe } from '../src/arbitro/index.js'
 import {
-  ALGORITMOS_TOKEN, EVENTO_AVISO, INTENTOS_SIMULTANEAS, cabecerasCors, crearEmisor, crearManejador, crearVerificador, sillaDeFila,
+  ALGORITMOS_TOKEN, EVENTO_AVISO, EVENTO_MENSAJE, INTENTOS_SIMULTANEAS, cabecerasCors, crearEmisor, crearEmisorMensaje, crearManejador,
+  crearVerificador, sillaDeFila,
 } from '../supabase/functions/partida/nucleo.js'
 
 const MESA = '11111111-2222-4333-8444-555555555555'
@@ -40,6 +41,10 @@ function montar({ n = 2, sala = SALA, sillas = SILLAS.slice(0, n), sinPartida = 
     abandonos: [],
     registros: [],
     fila: null,
+    // v1.3 · el freno de `anotar_mensaje`, por uid, y lo que se emitió por el canal.
+    ultimoMensaje: new Map(),
+    mensajes: [],
+    frenoMs: 10000,
   }
   const rpc = vi.fn(async (nombre, args) => {
     b.orden.push(nombre)
@@ -67,11 +72,24 @@ function montar({ n = 2, sala = SALA, sillas = SILLAS.slice(0, n), sinPartida = 
       b.guardados.push(args)
       return { ok: true, version: b.fila.version }
     }
+    if (nombre === 'anotar_mensaje') {
+      // La copia de lo que hace el SQL: asiento vivo de la mesa y freno de 10 s, atómico.
+      const a = b.fila?.estado.asientos.find((x) => x.uid === args.p_uid)
+      if (!a || a.cobrado !== null) return { ok: false, motivo: 'no_es_de_esta_mesa' }
+      const ultima = b.ultimoMensaje.get(args.p_uid)
+      if (ultima !== undefined && b.hora - ultima < b.frenoMs) return { ok: false, motivo: 'freno' }
+      b.ultimoMensaje.set(args.p_uid, b.hora)
+      return { ok: true }
+    }
     throw new Error(`rpc desconocida: ${nombre}`)
   })
   const emitir = vi.fn(async (mesa, version) => {
     b.orden.push('emitir')
     b.avisos.push({ mesa, version })
+  })
+  const emitirMensaje = vi.fn(async (mesa, mensaje) => {
+    b.orden.push('emitirMensaje')
+    b.mensajes.push({ mesa, ...mensaje })
   })
   const leerSala = vi.fn(async () => sala)
   const leerSillas = vi.fn(async () => sillas)
@@ -81,6 +99,7 @@ function montar({ n = 2, sala = SALA, sillas = SILLAS.slice(0, n), sinPartida = 
     leerSala,
     leerSillas,
     emitir,
+    emitirMensaje,
     ahora: () => b.hora,
     azar,
     registrar: (...cosas) => b.registros.push(cosas.join(' ')),
@@ -100,7 +119,7 @@ function montar({ n = 2, sala = SALA, sillas = SILLAS.slice(0, n), sinPartida = 
     const estado = crearPartida(sala, sillas, b.hora)
     b.fila = { estado, version: estado.version }
   }
-  return { b, rpc, emitir, leerSala, leerSillas, manejar, pedir }
+  return { b, rpc, emitir, emitirMensaje, leerSala, leerSillas, manejar, pedir }
 }
 
 // Reclama vencimientos, adelantando el reloj, hasta que `llego` lo diga.
@@ -877,5 +896,92 @@ describe('MOT-1 1e · la función de verdad', () => {
   it('el árbitro no se entera: `aplicarAccion` sigue rechazando la versión que no toca', () => {
     const e = crearPartida(SALA, SILLAS.slice(0, 2), 0)
     expect(aplicarAccion(e, { uid: 'A', version: 5, accion: 'abandonar' }, { ahora: 0 }).respuesta.motivo).toBe(M.VERSION_VIEJA)
+  })
+})
+
+// ── 11 · El mensaje (árbitro v1.3, ruta B) ──────────────────────────────────
+// Ficha AJILEI_MES-PvP_Arbitro-v1.3a_v1.0.md §2.3.
+describe('v1.3-a · el mensaje de la mesa', () => {
+  const enMano = (e) => e.motor.phase === 'BET_1' && e.vencimiento?.clase === CLASES.TURNO
+
+  it('pasa: anota el freno, emite `{ asiento, clave }` y no guarda ni sube la versión', async () => {
+    const m = montar({ n: 3 })
+    await hasta(m, enMano)
+    const v = m.b.fila.version
+    const r = await m.pedir('C', { version: v, accion: 'mensaje', clave: 'que_va' })
+    expect(r).toEqual({ status: 200, ok: true, version: v })
+    expect(m.b.fila.version).toBe(v)
+    expect(m.b.guardados).toEqual([])
+    expect(m.b.avisos).toEqual([])
+    expect(m.b.mensajes).toEqual([{ mesa: MESA, asiento: 2, clave: 'que_va' }])
+    expect(m.b.orden).toEqual(['leer_partida', 'anotar_mensaje', 'emitirMensaje'])
+  })
+
+  it('el asiento sale del uid del token: el del cuerpo no cuenta', async () => {
+    const m = montar({ n: 3 })
+    await hasta(m, enMano)
+    await m.pedir('B', { accion: 'mensaje', clave: 'ajilei', asiento: 0, uid: 'A' })
+    expect(m.b.mensajes.map((x) => x.asiento)).toEqual([1])
+    expect([...m.b.ultimoMensaje.keys()]).toEqual(['B'])
+  })
+
+  it('el freno de 10 s por jugador: el segundo rebota, y no limita a los demás', async () => {
+    const m = montar({ n: 3 })
+    await hasta(m, enMano)
+    expect((await m.pedir('A', { accion: 'mensaje', clave: 'ajilei' })).ok).toBe(true)
+    m.b.hora += 9999
+    const r = await m.pedir('A', { accion: 'mensaje', clave: 'suerte' })
+    expect(r.motivo).toBe(M.FRENO)
+    expect((await m.pedir('B', { accion: 'mensaje', clave: 'suerte' })).ok).toBe(true)
+    m.b.hora += 1
+    expect((await m.pedir('A', { accion: 'mensaje', clave: 'suerte' })).ok).toBe(true)
+    expect(m.b.mensajes.map((x) => `${x.asiento}:${x.clave}`)).toEqual(['0:ajilei', '1:suerte', '0:suerte'])
+  })
+
+  it('clave desconocida, abandonado, en su anuncio o sin asiento: rechazo sin anotar ni emitir', async () => {
+    const m = montar({ n: 3 })
+    await hasta(m, enMano)
+    const motivo = async (uid, clave = 'ajilei') => (await m.pedir(uid, { accion: 'mensaje', clave })).motivo
+    expect(await motivo('A', '2660_fe0f')).toBe(M.CLAVE_DESCONOCIDA)
+    expect(await motivo('A', null)).toBe(M.CLAVE_DESCONOCIDA)
+    expect(await motivo('Z')).toBe(M.NO_ES_DE_ESTA_MESA)
+    const { estado } = m.b.fila
+    m.b.fila.estado = {
+      ...estado,
+      asientos: estado.asientos.map((a, i) => (i === 1 ? { ...a, abandonado: true } : i === 2 ? { ...a, enAnuncio: true } : a)),
+    }
+    expect(await motivo('B')).toBe(M.ASIENTO_ABANDONADO)
+    expect(await motivo('C')).toBe(M.EN_ANUNCIO)
+    expect(m.b.ultimoMensaje.size).toBe(0)
+    expect(m.b.mensajes).toEqual([])
+    expect(m.rpc.mock.calls.filter(([n]) => n === 'anotar_mensaje')).toEqual([])
+  })
+
+  it('sin partida todavía: `no_es_de_esta_mesa`, sin arrancarla', async () => {
+    const m = montar({ n: 2, sinPartida: true })
+    const r = await m.pedir('A', { accion: 'mensaje', clave: 'ajilei' })
+    expect(r.motivo).toBe(M.NO_ES_DE_ESTA_MESA)
+    expect(m.b.fila).toBe(null)
+    expect(m.leerSala).not.toHaveBeenCalled()
+  })
+
+  it('si el canal falla: `ok` igual, el freno queda anotado y el fallo, en el registro', async () => {
+    const m = montar({ n: 2 })
+    await hasta(m, enMano)
+    m.emitirMensaje.mockRejectedValueOnce(new Error('Broadcast contestó 500'))
+    const r = await m.pedir('A', { accion: 'mensaje', clave: 'ajilei' })
+    expect(r.ok).toBe(true)
+    expect(m.b.ultimoMensaje.has('A')).toBe(true)
+    expect(m.b.registros.join(' | ')).toMatch(/mensaje.*500/)
+  })
+
+  it('el emisor del mensaje: al canal de la mesa, evento `mensaje`, con asiento y clave y nada más', async () => {
+    const pedir = vi.fn(async () => ({ ok: true, status: 202 }))
+    const emitir = crearEmisorMensaje({ base: 'https://p.supabase.co', secreta: 'sb_secret_x', fetch: pedir })
+    await emitir(MESA, { asiento: 3, clave: 'te_miro', extra: 'no' })
+    expect(EVENTO_MENSAJE).toBe('mensaje')
+    expect(JSON.parse(pedir.mock.calls[0][1].body)).toEqual({
+      messages: [{ topic: `partida:${MESA}`, event: 'mensaje', payload: { asiento: 3, clave: 'te_miro' }, private: true }],
+    })
   })
 })

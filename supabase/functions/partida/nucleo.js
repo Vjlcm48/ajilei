@@ -4,6 +4,8 @@
 // probarlo en vitest sin Deno ni Supabase (`scripts/testFuncionPartida.test.js`).
 //
 // cliente → token → leer_partida → árbitro → guardar_jugada → Broadcast { version }
+// v1.3 · el mensaje: cliente → token → leer_partida → puedeMandarMensaje → anotar_mensaje →
+// Broadcast `mensaje` { asiento, clave }, sin tocar el estado (`mandarMensaje`).
 //
 // UNA VERSIÓN POR LLAMADA. `guardar_jugada` solo admite un estado con la versión leída
 // + 1, y `abandonarPorServidor` y `aplicarAccion` suben una cada uno. Si en la misma
@@ -11,7 +13,7 @@
 // versión sube una sola vez: `jugar` la deja en la leída + 1.
 
 import {
-  MOTIVOS as M, abandonarPorServidor, aplicarAccion, azarSeguro, crearPartida, partidaTerminada, vistaDe,
+  MOTIVOS as M, abandonarPorServidor, aplicarAccion, azarSeguro, crearPartida, partidaTerminada, puedeMandarMensaje, vistaDe,
 } from '../../../src/arbitro/index.js'
 import { setRng } from '../../../src/engine/deck.js'
 
@@ -89,26 +91,43 @@ export function crearVerificador({ jwks, createLocalJWKSet, jwtVerify }) {
 }
 
 // ── El aviso ────────────────────────────────────────────────────────────────
-// El camino de la sonda (llave de servicio, 202) con la marca de canal privado. Solo
+// El camino de la sonda (llave de servicio, 202) con la marca de canal privado. El aviso solo
 // lleva la versión (contrato §5). El tope es para que un Realtime colgado no retenga la
 // respuesta de una jugada ya guardada.
+//
+// v1.3 · por el mismo canal viaja también el MENSAJE de la mesa, `{ asiento, clave }`: la
+// excepción escrita a «por el canal solo versiones» (decisión P-1 de Victor). Es contenido
+// público y efímero, no estado: nadie lo reconcilia y perderlo no rompe nada.
 export const EVENTO_AVISO = 'version'
+export const EVENTO_MENSAJE = 'mensaje'
 const TOPE_AVISO_MS = 3000
 
-export function crearEmisor({ base, secreta, fetch: pedir = fetch }) {
-  return async (mesa, version) => {
+/** Lo común: un evento con su carga al canal privado `partida:<mesa>`. */
+export function crearDifusor({ base, secreta, fetch: pedir = fetch }) {
+  return async (mesa, evento, payload) => {
     const cabeceras = { apikey: secreta, 'Content-Type': 'application/json' }
     if (!secreta.startsWith('sb_')) cabeceras.Authorization = `Bearer ${secreta}`
     const r = await pedir(`${base}/realtime/v1/api/broadcast`, {
       method: 'POST',
       headers: cabeceras,
       body: JSON.stringify({
-        messages: [{ topic: `partida:${mesa}`, event: EVENTO_AVISO, payload: { version }, private: true }],
+        messages: [{ topic: `partida:${mesa}`, event: evento, payload, private: true }],
       }),
       signal: AbortSignal.timeout(TOPE_AVISO_MS),
     })
     if (!r.ok) throw new Error(`Broadcast contestó ${r.status}`)
   }
+}
+
+export function crearEmisor(partes) {
+  const difundir = crearDifusor(partes)
+  return (mesa, version) => difundir(mesa, EVENTO_AVISO, { version })
+}
+
+/** v1.3 · el mensaje: el asiento (índice de la mesa) y la clave, y nada más. */
+export function crearEmisorMensaje(partes) {
+  const difundir = crearDifusor(partes)
+  return (mesa, { asiento, clave }) => difundir(mesa, EVENTO_MENSAJE, { asiento, clave })
 }
 
 // ── Las sillas ──────────────────────────────────────────────────────────────
@@ -214,9 +233,30 @@ function guardar(deps, mesa, versionLeida, jugada) {
   })
 }
 
+// ── El mensaje (v1.3, ruta B) ───────────────────────────────────────────────
+// No pasa por `jugar`: no es una acción del árbitro, no escribe el estado ni sube la versión.
+// El asiento sale del uid del token (`puedeMandarMensaje`); el freno de 10 s lo impone
+// `anotar_mensaje`, atómico en SQL. Si el aviso falla, el mensaje se pierde y el freno queda
+// anotado: es efímero, como el que se pierde quien se reconecta.
+async function mandarMensaje(deps, mesa, uid, clave) {
+  const [fila] = await deps.rpc('leer_partida', { p_sala: mesa })
+  if (!fila) return rechazo(M.NO_ES_DE_ESTA_MESA)
+  const puede = puedeMandarMensaje(fila.estado, uid, clave)
+  if (!puede.ok) return rechazo(puede.motivo, fila.version)
+  const anotado = await deps.rpc('anotar_mensaje', { p_sala: mesa, p_uid: uid })
+  if (!anotado?.ok) return rechazo(anotado?.motivo ?? M.NO_ES_DE_ESTA_MESA, fila.version)
+  try {
+    await deps.emitirMensaje(mesa, { asiento: puede.asiento, clave })
+  } catch (e) {
+    deps.registrar(`MES-PvP v1.3: el mensaje de la mesa ${mesa}, asiento ${puede.asiento}, falló —`, err(e))
+  }
+  return { ok: true, version: fila.version }
+}
+
 async function recorrer(deps, uid, cuerpo) {
   const { mesa, ...campos } = cuerpo
   if (typeof mesa !== 'string' || !UUID.test(mesa)) return rechazo(M.NO_ES_DE_ESTA_MESA)
+  if (campos.accion === 'mensaje') return mandarMensaje(deps, mesa, uid, campos.clave)
   // El `uid` del token, el último: si el cuerpo trae otro, no cuenta.
   const peticion = { ...campos, uid }
 
@@ -260,6 +300,7 @@ const cuerpoDe = async (req) => {
  *   leerSala: (mesa: string) => Promise<{ estado: string, apuesta: number, entrada: string, ritmo: string }|null>,
  *   leerSillas: (mesa: string) => Promise<{ asiento: number, uid: string, nombre: string|null }[]>,
  *   emitir: (mesa: string, version: number) => Promise<void>,
+ *   emitirMensaje: (mesa: string, mensaje: { asiento: number, clave: string }) => Promise<void>,
  *   registrar?: (...cosas: unknown[]) => void,
  *   ahora?: () => number,
  *   azar?: () => number,

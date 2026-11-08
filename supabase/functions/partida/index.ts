@@ -12,7 +12,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2.112.4'
 import { createLocalJWKSet, jwtVerify } from 'npm:jose@6.2.12'
-import { crearEmisor, crearManejador, crearVerificador, sillaDeFila } from './nucleo.js'
+import { crearEmisor, crearEmisorMensaje, crearManejador, crearVerificador, sillaDeFila } from './nucleo.js'
 
 const env = (k: string): string | null => {
   try { return Deno.env.get(k) ?? null } catch { return null }
@@ -46,6 +46,13 @@ function datos({ data, error }: { data: unknown, error: { code?: string, message
   return data
 }
 
+function difusion() {
+  const base = env('SUPABASE_URL')
+  const secreta = llaveSecreta()
+  if (!base || !secreta) throw new Error('faltan variables para el aviso')
+  return { base, secreta }
+}
+
 Deno.serve(crearManejador({
   verificarToken: crearVerificador({ jwks: env('SUPABASE_JWKS'), createLocalJWKSet, jwtVerify }),
 
@@ -61,10 +68,8 @@ Deno.serve(crearManejador({
     'sala_jugadores',
   ) as Parameters<typeof sillaDeFila>[0][]).map(sillaDeFila),
 
-  emitir: (mesa: string, version: number) => {
-    const base = env('SUPABASE_URL')
-    const secreta = llaveSecreta()
-    if (!base || !secreta) throw new Error('faltan variables para el aviso')
-    return crearEmisor({ base, secreta })(mesa, version)
-  },
+  emitir: (mesa: string, version: number) => crearEmisor(difusion())(mesa, version),
+
+  // v1.3 · el mensaje de la mesa, por el mismo canal (ruta B).
+  emitirMensaje: (mesa: string, mensaje: { asiento: number, clave: string }) => crearEmisorMensaje(difusion())(mesa, mensaje),
 }))

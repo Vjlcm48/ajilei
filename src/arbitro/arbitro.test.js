@@ -10,7 +10,7 @@ import { ajileiDe as ajileiDelCliente } from '../lib/puntos.js'
 import { BARAJADO_MS, VOLTEO_SORTEO_MS } from '../config/esperas.js'
 import {
   CLASES, ETAPAS, FASE_SORTEO, MOTIVOS, MOTIVOS_ARBITRO, abandonarPorServidor, ajileiDe, aplicarAccion, ganadorDeMano,
-  azarSeguro, compactarAsientos, crearPartida, esperaRepartoSorteo, partidaTerminada, vistaDe,
+  azarSeguro, compactarAsientos, crearPartida, esperaRepartoSorteo, partidaTerminada, puedeMandarMensaje, vistaDe,
 } from './index.js'
 
 const M = MOTIVOS
@@ -233,9 +233,9 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
     expect(a({ uid: 'u0', accion: 'constructor' })).toBe(M.DESCONOCIDA)
   })
 
-  it('los motivos: los once de `pozos.js`, tal cual, y los doce del árbitro', () => {
+  it('los motivos: los once de `pozos.js`, tal cual, y los quince del árbitro (v1.3: tres del mensaje)', () => {
     expect(Object.keys(MOTIVOS_POZOS)).toHaveLength(11)
-    expect(Object.keys(MOTIVOS_ARBITRO)).toHaveLength(12)
+    expect(Object.keys(MOTIVOS_ARBITRO)).toHaveLength(15)
     for (const [k, v] of Object.entries(MOTIVOS_POZOS)) expect(M[k]).toBe(v)
   })
 
@@ -1479,7 +1479,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
 
 // ── MES-PvP · árbitro v1.3-a ────────────────────────────────────────────────
 // Ficha AJILEI_MES-PvP_Arbitro-v1.3a_v1.0.md §2.2 y §2.3.
-describe('v1.3-a · el sorteo sobre la mesa', () => {
+describe('v1.3-a · el sorteo sobre la mesa y el mensaje', () => {
   const abierto = (n) => reclama(reclama(crear(n)))
   const elige = (e, i, carta) => pide(e, i, 'elegir_carta_sorteo', { ronda: e.sorteo.ronda, carta }, 0).estado
   const conValores = (e, valores) => ({
@@ -1524,6 +1524,27 @@ describe('v1.3-a · el sorteo sobre la mesa', () => {
     expect(s.rondas[0].volteo.map((v) => v.posicion)).toEqual([3, 4, 1])
   })
 
+  it('puedeMandarMensaje: el asiento sale del uid, y sus cinco rechazos', () => {
+    const e = hastaFase(hastaLaMano(3), PHASES.BET_1)
+    const antes = JSON.stringify(e)
+    expect(puedeMandarMensaje(e, 'u2', 'ajilei')).toEqual({ ok: true, asiento: 2 })
+    expect(puedeMandarMensaje(e, 'otro', 'ajilei')).toEqual({ ok: false, motivo: M.NO_ES_DE_ESTA_MESA })
+    expect(puedeMandarMensaje(e, 'u1', 'texto libre')).toEqual({ ok: false, motivo: M.CLAVE_DESCONOCIDA })
+    expect(puedeMandarMensaje(e, 'u1', '2660_fe0f')).toEqual({ ok: false, motivo: M.CLAVE_DESCONOCIDA })
+    const fuera = pide(e, 1, 'abandonar', {}, 0).estado
+    expect(puedeMandarMensaje(fuera, 'u1', 'ajilei')).toEqual({ ok: false, motivo: M.ASIENTO_ABANDONADO })
+    const enAnuncio = { ...e, asientos: e.asientos.map((a, i) => (i === 0 ? { ...a, enAnuncio: true } : a)) }
+    expect(puedeMandarMensaje(enAnuncio, 'u0', 'ajilei')).toEqual({ ok: false, motivo: M.EN_ANUNCIO })
+    expect(puedeMandarMensaje(enAnuncio, 'u1', 'ajilei').ok).toBe(true)
+    const fin = conMotor(e, { phase: PHASES.GAME_OVER })
+    expect(puedeMandarMensaje(fin, 'u0', 'ajilei')).toEqual({ ok: false, motivo: M.PARTIDA_TERMINADA })
+    // Quien ya cobró salió de la mesa.
+    const cobro = { ...e, asientos: e.asientos.map((a, i) => (i === 2 ? { ...a, cobrado: 300 } : a)) }
+    expect(puedeMandarMensaje(cobro, 'u2', 'ajilei')).toEqual({ ok: false, motivo: M.NO_ES_DE_ESTA_MESA })
+    // No toca el estado.
+    expect(JSON.stringify(e)).toBe(antes)
+  })
+
   it('R-4 · una partida guardada con la v1.2, a mitad del sorteo, se sigue jugando', () => {
     const vieja = (x) => {
       const copia = JSON.parse(JSON.stringify(x))
@@ -1532,6 +1553,7 @@ describe('v1.3-a · el sorteo sobre la mesa', () => {
     }
     const e = vieja(elige(abierto(3), 0, 2))
     expect(vistaDe(e, 1).sorteo.elegidas).toEqual([2, null, null])
+    expect(puedeMandarMensaje(e, 'u1', 'que_va')).toEqual({ ok: true, asiento: 1 })
     const volteo = elige(elige(conValores(e, [12, 3, 5]), 1, 0), 2, 0)
     expect(volteo.sorteo.etapa).toBe(ETAPAS.VOLTEO)
     const mano = reclama(volteo)

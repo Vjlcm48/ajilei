@@ -20,6 +20,10 @@ export const MOTIVOS_ARBITRO = Object.freeze({
   YA_DESCARTO:             'ya_descarto',
   DESCARTE_INVALIDO:       'descarte_invalido',
   YA_VOLVIO:               'ya_volvio',
+  // v1.3 · el mensaje de la mesa (ruta B: fuera de `ACCIONES_ARBITRO`, `arbitro/mensaje.js`).
+  CLAVE_DESCONOCIDA:       'clave_desconocida',
+  EN_ANUNCIO:              'en_anuncio',
+  FRENO:                   'freno',
 })
 
 export const MOTIVOS = Object.freeze({ ...MOTIVOS_APUESTA, ...MOTIVOS_ARBITRO })

@@ -9,6 +9,7 @@
 export { compactarAsientos } from './asientos.js'
 export { azarSeguro } from './azar.js'
 export { ajileiDe, ganadorDeMano, huboRevelacion } from './ganador.js'
+export { CLAVES_MENSAJE, puedeMandarMensaje } from './mensaje.js'
 export { MOTIVOS, MOTIVOS_APUESTA, MOTIVOS_ARBITRO } from './motivos.js'
 export {
   ACCIONES_ARBITRO, APUESTAS, ENTRADAS, abandonarPorServidor, aplicarAccion, crearPartida,
