@@ -2,8 +2,10 @@
 // desde cada asiento. Quien la pinta es la sub-tanda 3: aquí se mira la vista y lo que
 // hace de ella el puente.
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
 import { creaMesaPvP } from '../hooks/mesaPvPCore'
 import { vistaAMesa } from '../lib/vistaAMesa'
+import { recargaDeVista } from '../lib/entreManosCore'
 import { ESCENAS_PVP, MARCA_PARTIDA_IMITADA, crearPartidaImitada, escenaCabeEn, leerMandoPvP } from './partidaImitada'
 
 const clase = (v) => v.vencimiento?.clase
@@ -76,7 +78,7 @@ const ESPERADO = {
   'recarga-fuera': ['mesa', (v) => clase(v) === 'turno' && propio(v).recarga === 'fuera' && propio(v).folded && !propio(v).eliminated],
   'recarga-ajena': ['mesa', (v) => clase(v) === 'mano_siguiente' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'decide')],
   'recarga-ajena-fuera': ['mesa', (v) => clase(v) === 'turno' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'fuera' && !p.eliminated)],
-  'recarga-rival': ['mesa', (v) => clase(v) === 'mano_siguiente' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'decide')],
+  'recarga-rival': ['mesa', (v) => clase(v) === 'oferta_recarga' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'decide')],
   'anuncio-premium': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
   'anuncio-cierre': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
   'anuncio-vence': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
@@ -224,34 +226,93 @@ describe('MES-PvP 2 · la misma forma que el cliente', () => {
 describe('MES-PvP 2 · el mando', () => {
   afterEach(() => { vi.unstubAllEnvs() })
 
+  // v1.3-b · la recarga es la del árbitro real: la capa la lee de la vista (`recargaDeVista`).
+  const recDe = (partida) => recargaDeVista(partida.foto().vista, { saldo: partida.lamina.saldo(), entrada: 1500 })
+
   // L-M 3 · la voluntaria pedida durante la mano (Victor, STOP-L): queda pedida, se puede anular,
   // y en la mano la oferta es siempre voluntaria.
-  it('`recarga-pedida`: la voluntaria queda pedida en la mano y se anula', () => {
+  it('`recarga-pedida`: la voluntaria queda pedida en la mano y se anula, en el árbitro', async () => {
     const partida = crearPartidaImitada({ escena: 'recarga-pedida', n: 3, asiento: 1 })
-    const rec = () => partida.foto().recargaLamina
-    expect(rec()).toMatchObject({ pedida: true, enMano: true, pausa: false })
-    expect(rec().oferta.tipo).toBe('voluntaria')
-    partida.recarga.anular()
-    expect(rec().pedida).toBe(false)
-    partida.recarga.pedir()
-    expect(rec()).toMatchObject({ pedida: true, abierta: false })
+    expect(recDe(partida)).toMatchObject({ pedida: true, enMano: true, pausa: false })
+    expect(recDe(partida).oferta.tipo).toBe('voluntaria')
+    const mano = partida.foto().vista.handCount
+    expect((await partida.enviar('anular_recarga', { mano })).ok).toBe(true)
+    expect(recDe(partida).pedida).toBe(false)
+    expect((await partida.enviar('pedir_recarga', { mano })).ok).toBe(true)
+    expect(recDe(partida).pedida).toBe(true)
   })
 
-  // L-M 3 · el pedido que se cancela al abrirse la pausa porque el saldo no alcanza lo dice: se
-  // abre la tarjeta, que pinta «Tu saldo no alcanza para recargar.» (Victor, STOP-L).
-  it('`recarga-pedida` sin saldo: al abrirse la pausa se cancela y la tarjeta lo dice', async () => {
+  // L-M 3 · el pedido que se cancela porque el saldo no alcanza lo dice: la vista trae la
+  // cancelación, y la capa abre la tarjeta, que pinta «Tu saldo no alcanza para recargar.».
+  it('`recarga-pedida` sin saldo: al cerrarse la mano el árbitro la cancela y la tarjeta lo dice', async () => {
     vi.useFakeTimers()
     try {
       const partida = crearPartidaImitada({ escena: 'recarga-pedida', n: 2, asiento: 0, vivo: true, saldo: 100, ahora: () => Date.now() })
       await partida.iniciar()
-      const rec = () => partida.foto().recargaLamina
-      for (let k = 0; k < 1200 && !(rec().pausa && !rec().pedida); k++) vi.advanceTimersByTime(100)
-      expect(rec()).toMatchObject({ pausa: true, pedida: false, abierta: true })
-      expect(rec().oferta.alcanza).toBe(false)
+      const vista = () => partida.foto().vista
+      for (let k = 0; k < 1200 && !vista().recarga.cancelada; k++) vi.advanceTimersByTime(100)
+      expect(vista().recarga).toMatchObject({ pedida: false, cancelada: { motivo: 'saldo' }, recargas: 0 })
+      expect(recDe(partida).cancelada).toMatch(/^saldo:\d+$/)
+      expect(recDe(partida).oferta.alcanza).toBe(false)
       partida.parar()
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('`recarga-pedida` con saldo, en vivo: al cerrarse la mano el árbitro la aplica y el saldo de la escena baja', async () => {
+    vi.useFakeTimers()
+    try {
+      const partida = crearPartidaImitada({ escena: 'recarga-pedida', n: 2, asiento: 0, vivo: true, ahora: () => Date.now() })
+      await partida.iniciar()
+      const vista = () => partida.foto().vista
+      for (let k = 0; k < 1200 && !vista().recarga.recargas; k++) vi.advanceTimersByTime(100)
+      const { recargas } = vista().recarga
+      expect(recargas).toBeGreaterThan(0)
+      expect(vista().recarga).toMatchObject({ pedida: false, cancelada: null })
+      expect(partida.lamina.saldo()).toBe(2400 - recargas)
+      partida.parar()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('las escenas de la recarga, leídas como las lee la capa', () => {
+    const ofrecida = recDe(crearPartidaImitada({ escena: 'recarga-ofrecida', n: 2 }))
+    expect(ofrecida).toMatchObject({ pausa: true, fuera: false, enMano: false, espera: null })
+    expect(ofrecida.oferta).toMatchObject({ tipo: 'ofrecida', pila: 0, monto: 1500, alcanza: true, saldoDespues: 900 })
+    const fuera = recDe(crearPartidaImitada({ escena: 'recarga-fuera', n: 3 }))
+    expect(fuera).toMatchObject({ pausa: false, fuera: true, enMano: false })
+    expect(fuera.oferta.tipo).toBe('ofrecida')
+    const rival = recDe(crearPartidaImitada({ escena: 'recarga-rival', n: 2 }))
+    expect(rival).toMatchObject({ pausa: true, oferta: null, espera: 'Beto', totalSeg: 15 })
+    const sinSaldo = recDe(crearPartidaImitada({ escena: 'recarga-sinsaldo', n: 2 }))
+    expect(sinSaldo.oferta.alcanza).toBe(false)
+    const voluntaria = recDe(crearPartidaImitada({ escena: 'recarga-voluntaria', n: 2 }))
+    expect(voluntaria.oferta).toMatchObject({ tipo: 'voluntaria', monto: 1500 - voluntaria.oferta.pila })
+  })
+
+  it('recargar en la pausa: el árbitro devuelve la pila a la entrada y el saldo de la escena baja', async () => {
+    const partida = crearPartidaImitada({ escena: 'recarga-ofrecida', n: 2 })
+    const r = await partida.enviar('recargar', { mano: partida.foto().vista.handCount })
+    expect(r.ok).toBe(true)
+    expect(propio(partida.foto().vista)).toMatchObject({ chips: 1500, recarga: null })
+    expect(partida.foto().vista.recarga.recargas).toBe(1500)
+    expect(partida.lamina.saldo()).toBe(900)
+  })
+
+  // §2.3 · la base sube `entrada` con cada recarga; la pantalla final usa la de la MESA
+  // (`vistaAMesa`, de la sala) y le suma `recargas`: lo recargado se resta una sola vez.
+  it('la pantalla final resta lo recargado una sola vez: recarga 1.500 y se va con 1.500 → −1.500', async () => {
+    const partida = crearPartidaImitada({ escena: 'recarga-ofrecida', n: 2 })
+    expect((await partida.enviar('recargar', { mano: partida.foto().vista.handCount })).ok).toBe(true)
+    expect((await partida.enviar('abandonar')).ok).toBe(true)
+    const nucleo = creaMesaPvP({ partida, sala: partida.sala })
+    nucleo.iniciar()
+    const { fin, game } = nucleo.foto()
+    nucleo.parar()
+    expect(game.players[0]).toMatchObject({ chips: 1500, entrada: 1500, recargas: 1500 })
+    expect(fin).toMatchObject({ caso: 1, neta: -1500, tono: 'sobrio', cifra: '−1.500 Heptacoins' })
   })
 
   it('con la puerta abierta, lee la escena y sus datos, y corrige lo que no vale', () => {
@@ -270,6 +331,9 @@ describe('MES-PvP 2 · el mando', () => {
     expect(leerMandoPvP('?pvp=turno-ajeno&msj=todos&msjms=800')).toMatchObject({ msj: 'todos', msjMs: 800 })
     expect(leerMandoPvP('?pvp=turno-ajeno&msj=otro')).toMatchObject({ msj: null })
     expect(leerMandoPvP('?pvp=revelacion&n=3&asiento=3')).toMatchObject({ n: 3, asiento: 0 })
+    // v1.3-b · la mesa, dentro de las que caben en la escena.
+    expect(leerMandoPvP('?pvp=recarga-rival&n=3&asiento=1')).toMatchObject({ n: 2, asiento: 1 })
+    expect(leerMandoPvP('?pvp=recarga-fuera&n=2')).toMatchObject({ n: 3 })
     expect(leerMandoPvP('?pvp=inventada')).toBeNull()
     expect(leerMandoPvP('')).toBeNull()
   })
@@ -302,5 +366,34 @@ describe('v1.3-a · el mensaje del imitado', () => {
     const fuera = crearPartidaImitada({ escena: 'turno-ajeno', n: 3 })
     fuera.enviar('abandonar')
     expect(fuera.mensajes.enviar('ajilei')).toEqual({ ok: false, motivo: 'asiento_abandonado' })
+  })
+})
+
+// ── Árbitro v1.3-b · la recarga de la lámina, solo detrás de la puerta DEV ──────────────
+// Ficha AJILEI_MES-PvP_Arbitro-v1.3b_v1.0.md §2.3. El cliente real lee la recarga de la vista
+// (`recargaDeVista`) y la manda por `enviar`; lo de la lámina (la recarga del imitado, su saldo)
+// no se lee fuera de `src/dev/`. La única puerta es `lamina`, que solo trae el imitado.
+describe('v1.3-b · la recarga de la lámina solo vive detrás de la puerta DEV', () => {
+  // La API de la recarga del imitado se reconoce por la llamada (las claves de texto `ia.recarga.pedir`
+  // no la llevan) o por `partida.recarga`.
+  const LAMINA = /recargaLamina|saldoLamina|\.recarga\.(abrir|cerrar|recargar|pedir|anular)\(|partida\??\.recarga\b/
+  const fuentes = (dir) => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true }).flatMap((d) => (
+    d.isDirectory() ? fuentes(`${dir}${d.name}/`) : /\.jsx?$/.test(d.name) && !/\.test\./.test(d.name) ? [`${dir}${d.name}`] : []
+  ))
+
+  it('ningún archivo fuera de `src/dev/` la lee, y la capa lee la vista real', () => {
+    const fuera = fuentes('../').filter((f) => !f.startsWith('../dev/'))
+    expect(fuera.length).toBeGreaterThan(100)
+    for (const f of fuera) expect(readFileSync(new URL(f, import.meta.url), 'utf8'), f).not.toMatch(LAMINA)
+    const capa = readFileSync(new URL('../screens/RecargaPvP.jsx', import.meta.url), 'utf8')
+    expect(capa).toMatch(/recargaDeVista\(foto\.vista,/)
+    expect(capa).toMatch(/foto\.enviar\(accion/)
+  })
+
+  it('control rojo: la capa de la L-M 3 (8b89eb9) cae', () => {
+    // `screens/RecargaPvP.jsx:46` y `screens/PartidaPvP.jsx:159` de 8b89eb9, tal cual.
+    expect('  const rec = foto.recargaLamina').toMatch(LAMINA)
+    expect("      {partida?.recarga && escena === 'mesa' && <RecargaPvP partida={partida} desfase={desfase} />}").toMatch(LAMINA)
+    expect('    if (rec.pedida) partida.recarga.anular()').toMatch(LAMINA)
   })
 })

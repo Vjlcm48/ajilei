@@ -122,7 +122,7 @@ export function avisoDeAbandono(nombres, termina) {
 }
 
 // ── MES-PvP 3-A · La pantalla final (Reglas v1.7 §8.3) ─────────────────────────
-// Cada uno la suya. El TONO lo pone el resultado, `cobrado − entrada` (en el fin,
+// Cada uno la suya. El TONO lo pone el resultado, `cobrado − (entrada + recargas)` (en el fin,
 // `vistaAMesa` pone lo cobrado en `chips`; quien se fue con la mano en curso aún no cobró, y su
 // pila es la de irse). La FRASE la pone cómo terminó, en este orden. Ganar la mesa no se
 // decide por `winner`: las frases de victoria solo cuando todos los rivales quebraron.
@@ -130,7 +130,9 @@ export const TONOS_FIN = Object.freeze({ CELEBRACION: 'celebracion', NEUTRO: 'ne
 
 export function finDePartida(game) {
   const yo = game.players[0]
-  const neta = yo.chips - yo.entrada
+  // v1.3-b · `entrada` es la de la mesa (`vistaAMesa`, de la sala), no la de `partida_asientos`,
+  // que la base sube con cada recarga: así lo recargado se resta una sola vez (Reglas v1.9 §8.3).
+  const neta = yo.chips - (yo.entrada + (yo.recargas ?? 0))
   const tono = neta > 0 ? TONOS_FIN.CELEBRACION : neta < 0 ? TONOS_FIN.SOBRIO : TONOS_FIN.NEUTRO
   const fueron = game.players.filter((p, i) => i !== 0 && p.abandonado)
   let caso

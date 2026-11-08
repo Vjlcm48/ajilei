@@ -94,7 +94,7 @@ const MEDIR_MENSAJE = async (conEmoji) => {
   const lista = p.mensajes.lista()
   if (conEmoji) {
     for (const m of lista) m.clave = codepointDe(REACCIONES[CLAVES_MENSAJE.indexOf(m.clave)])
-    p.recarga.cerrar()   // repinta la mesa (la lámina congelada no tiene reloj que lo haga)
+    p.repintar()   // repinta la mesa (la lámina congelada no tiene reloj que lo haga)
     await new Promise((r) => setTimeout(r, 400))
   }
   const ajenas = [...document.querySelectorAll('.pvp-msj-ajena')]

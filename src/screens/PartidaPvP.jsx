@@ -123,7 +123,7 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   const cronicaAusente = yoAusente ? t('pvp.ausente.aviso') : null
   // L-M 3 · §2 · la transición la monta `GameTable` (su núcleo vive solo en el trozo de la mesa):
   // aquí solo va el desfase con la hora del árbitro, para que la recogida caiga a su hora.
-  const desfase = partida?.foto?.().desfase ?? 0
+  const desfase = partida?.foto?.().desfase ?? foto.desfase ?? 0
   const partidaMesa = useMemo(() => ({
     ...foto,
     desfase,
@@ -152,11 +152,14 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
       />
       {enSorteo && <SorteoMesa game={game} reloj={reloj} enviar={foto.enviar} anfitrion={foto.anfitrion} lamina={partida?.lamina ?? null} />}
       {escena === 'anuncio' && <AnuncioSimulado game={game} enviar={foto.enviar} />}
-      {/* L-M 3 · §3 · quien volvió antes (centrada con velo); §1 · la recarga (solo la lámina). */}
+      {/* L-M 3 · §3 · quien volvió antes (centrada con velo); §1 · la recarga. */}
       {escena === 'mesa' && game.vencimiento?.clase === CLASE_PAUSA_ANUNCIO && (
         <EsperaAnuncio game={game} premiumInicial={!!lamina?.premium} />
       )}
-      {partida?.recarga && escena === 'mesa' && <RecargaPvP partida={partida} desfase={desfase} />}
+      {/* v1.3-b · la recarga lee la vista del árbitro real (o la del imitado, con su misma forma). */}
+      {escena === 'mesa' && foto.vista?.recarga && (
+        <RecargaPvP foto={foto} saldo={billetera?.saldo ?? 0} lamina={lamina} desfase={desfase} alRecargar={billetera?.refrescar ?? null} />
+      )}
       {/* L-M 2 · §2 · los mensajes; durante tu pausa de anuncio no se pintan (Reglas v1.9 §8.6).
           v1.3 · en la mesa real llegan por la foto (`partidaCliente.mensajes`). */}
       <MensajesMesa partida={partida ?? foto} oculta={escena === 'anuncio'} />

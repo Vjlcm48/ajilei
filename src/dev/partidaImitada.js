@@ -19,14 +19,13 @@
 import { drawRank, resetRng, setRng } from '../engine/deck.js'
 import { PHASES } from '../engine/gameEngine.js'
 import { esLegal } from '../engine/pozos.js'
-import { AUSENTE_DESDE, ELECCION_SORTEO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, VOLTEO_SORTEO_MS } from '../config/esperas.js'
+import { AUSENTE_DESDE, ELECCION_SORTEO_MS, VOLTEO_SORTEO_MS } from '../config/esperas.js'
 import {
   CLASES, ETAPAS, MOTIVOS, aplicarAccion, crearPartida, huboRevelacion, partidaTerminada, puedeMandarMensaje, vistaDe,
 } from '../arbitro/index.js'
 import { REACCIONES } from '../config/reacciones.js'
 import { CLAVES_MENSAJE, claveDeFrase, rechazoDeMensaje } from '../lib/mensajesMesaCore.js'
 import { lecturaDeMano } from '../hooks/manoCore.js'
-import { CANCELA_PEDIDO, RECARGA_PVP, pedidoEnLaPausa, recargaPvP } from '../lib/entreManosCore.js'
 
 export const MARCA_PARTIDA_IMITADA = 'ajilei:partida-imitada'
 export const PARAM_PVP = 'pvp'
@@ -34,9 +33,11 @@ export const PARAM_PVP = 'pvp'
 const NOMBRES = ['Ana', 'Beto', 'Caro', 'Dani', 'Eli']
 const NOMBRE_LARGO = 'W'.repeat(15)
 const APUESTA = 100
-// L-M 3 · la entrada corta de la mesa (`vistaAMesa.VECES_ENTRADA`) y el saldo de la lámina.
+// L-M 3 · la entrada corta de la mesa (`vistaAMesa.VECES_ENTRADA`) y el saldo de la lámina. Los
+// rivales siempre pueden recargar.
 const ENTRADA = 15 * APUESTA
 const SALDO_LAMINA = 2400
+const SALDO_RIVAL = 99999
 const TOPE_PASOS = 3000
 const TOPE_SEMILLAS = 400
 
@@ -57,7 +58,7 @@ function mulberry32(s) {
 
 // ── La mesa de guion ────────────────────────────────────────────────────────
 
-function nuevaMesa({ n, asiento, nombres, ahora }) {
+function nuevaMesa({ n, asiento, nombres, ahora, saldo = SALDO_LAMINA }) {
   const sillas = Array.from({ length: n }, (_, i) => ({
     asiento: i, uid: `imitado-${i}`, nombre: nombres === 'largo' ? NOMBRE_LARGO : NOMBRES[i],
   }))
@@ -67,16 +68,30 @@ function nuevaMesa({ n, asiento, nombres, ahora }) {
     otro: (asiento + 1) % n,
     t: ahora,
     muerta: false,
-    fuera: new Map(),
+    // v1.3-b · el saldo de cada asiento, el que la función leería con `leer_partida`.
+    saldos: Array.from({ length: n }, (_, i) => (i === asiento ? saldo : SALDO_RIVAL)),
     e: crearPartida({ apuesta: APUESTA, entrada: 'corta', ritmo: 'normal' }, sillas, ahora),
   }
 }
 
-function pide(m, i, accion, campos = {}) {
+// v1.3-b · lo que la base haría con el efecto `recarga`: el saldo baja en lo recargado.
+function cobrarRecargas(m, efectos) {
+  for (const x of efectos) if (x.tipo === 'recarga') m.saldos[x.asiento] -= x.monto
+}
+
+function intenta(m, i, accion, campos = {}) {
   const peticion = { uid: `imitado-${i}`, version: m.e.version, accion, ...campos }
-  const r = aplicarAccion(m.e, peticion, { ahora: m.t })
-  if (!r.respuesta.ok) throw new Error(`MES-PvP 2 · el guion pide lo ilegal: ${accion} del asiento ${i} → ${r.respuesta.motivo}`)
-  m.e = r.estado
+  const r = aplicarAccion(m.e, peticion, { ahora: m.t, saldos: m.saldos })
+  if (r.respuesta.ok) {
+    m.e = r.estado
+    cobrarRecargas(m, r.efectos)
+  }
+  return r.respuesta
+}
+
+function pide(m, i, accion, campos = {}) {
+  const r = intenta(m, i, accion, campos)
+  if (!r.ok) throw new Error(`MES-PvP 2 · el guion pide lo ilegal: ${accion} del asiento ${i} → ${r.motivo}`)
 }
 
 function reclama(m) {
@@ -384,29 +399,21 @@ for (const e of Object.values(ESCENAS_LM2)) {
 }
 
 // ── L-M 3 · Entre una mano y otra ───────────────────────────────────────────
-// Ficha AJILEI_MES-PvP_LM-3_v1.0.md. La recarga PvP no existe en el árbitro real (Reglas v1.8
-// §8.1; pide el Contrato v1.3): aquí la lleva la lámina, ENCIMA del árbitro, con tres piezas:
-//   · la oferta: quien no cubre el ante en la pausa entre manos (`MANO_SIGUIENTE`) decide;
-//   · `m.fuera`: quien no decidió a tiempo se salta la mano sentado fuera. El árbitro lo da por
-//     quebrado (`startHand` lo elimina); la vista lo devuelve sentado, retirado y sin cartas;
-//   · recargar: la pila vuelve a la entrada (`pila`), y si ya estaba fuera, revive retirado
-//     hasta la mano siguiente.
-// En la mesa de 2 la quiebra dejaría a uno solo: la pausa espera la decisión (§8.1, «Fin de
-// partida»), hasta `ESPERA_OFERTA_2_MS` en la lámina; el plazo es del Contrato v1.3.
-const ESPERA_OFERTA_2_MS = 15000
+// Ficha AJILEI_MES-PvP_LM-3_v1.0.md. Árbitro v1.3-b: la recarga PvP ya es del árbitro real (la
+// oferta, sentado fuera, el pedido, la retención de 15 s): el imitado solo le pasa los saldos y
+// los rivales que deciden recargan a los `RIVAL_DECIDE_MS`. Así la lámina y `diagDSK pvp` miden
+// la vista que se publica.
 const RIVAL_DECIDE_MS = 10000
 const ESPERA_TURNO_LAMINA = 20000   // `TURN_TIME` (contrato §6): el turno y el descarte
-const enPausaMano = (e) => e.vencimiento?.clase === CLASES.MANO_SIGUIENTE
 // Entra con una sola apuesta: el ante se la lleva entera (all-in) y pierde en la revelación.
 const quiebra = (quien) => (m) => {
   pila(m, quien(m), APUESTA)
   hasta(m, enPago)
   exige(m.e.motor.players[quien(m)].chips === 0)
 }
-// El que quebró se salta la mano: llega al primer turno de la mano siguiente.
+// El que quebró no decide a tiempo y se salta la mano: llega al primer turno de la mano siguiente.
 const sentadoFuera = (quien) => (m) => {
   quiebra(quien)(m)
-  m.fuera.set(quien(m), { recargado: false })
   reclama(m)
   hasta(m, turnoDe)
 }
@@ -429,14 +436,14 @@ const ESCENAS_LM3 = {
     },
   },
   // §1 · la voluntaria pedida durante la mano (b): el ⋮ la muestra y la puede anular; en vivo se
-  // aplica al abrirse la pausa.
+  // aplica al cerrarse la mano.
   'recarga-pedida': {
     jugar: (m) => {
       pila(m, m.yo, 1000)
       hastaTurnoAjeno(m)
       exige(m.e.motor.players[m.yo].chips < ENTRADA && !m.e.motor.players[m.yo].folded)
+      pide(m, m.yo, 'pedir_recarga', { mano: m.e.motor.handCount })
     },
-    pedida: true,
   },
   // §1 · el saldo no alcanza (900 HC para 1.500): la tarjeta lo dice, sin tienda.
   'recarga-sinsaldo': { jugar: quiebra((m) => m.yo), saldo: 900, abierta: true },
@@ -446,8 +453,9 @@ const ESCENAS_LM3 = {
   'recarga-ajena': { minimo: 3, jugar: quiebra((m) => m.otro) },
   // … y se salta la mano siguiente («Fuera de esta mano»).
   'recarga-ajena-fuera': { minimo: 3, jugar: sentadoFuera((m) => m.otro) },
-  // §1 · la mesa de 2: el rival quebró y la partida espera su decisión.
-  'recarga-rival': { jugar: quiebra((m) => m.otro) },
+  // §1 · la mesa de 2: el rival quebró, venció la pausa y la partida le retiene (`oferta_recarga`).
+  // Solo en la de 2: con más, la mesa sigue sin él y se sienta fuera (`recarga-ajena-fuera`).
+  'recarga-rival': { maximo: 2, jugar: (m) => { quiebra((x) => x.otro)(m); reclama(m) } },
   // §3 · la pausa de anuncio: «Premium · Pronto» abierta sobre la tarjeta de quien volvió antes.
   'anuncio-premium': { jugar: (m) => hasta(m, (e) => enPausa(e) && !e.asientos[m.yo].enAnuncio && e.asientos.some((a) => a.enAnuncio)), premium: true },
   // §3 · el cierre: en vivo, los demás vuelven del anuncio a los 3 s y la mano sigue…
@@ -582,7 +590,7 @@ const ESCENAS = {
 }
 
 export const ESCENAS_PVP = Object.freeze(Object.keys(ESCENAS))
-export const escenaCabeEn = (escena, n) => n >= (ESCENAS[escena].minimo ?? 2)
+export const escenaCabeEn = (escena, n) => n >= (ESCENAS[escena].minimo ?? 2) && n <= (ESCENAS[escena].maximo ?? 5)
 
 // ── El cliente imitado ──────────────────────────────────────────────────────
 
@@ -598,6 +606,8 @@ export function crearPartidaImitada({
   if (!ESCENAS[escena]) throw new Error(`MES-PvP 2 · escena desconocida: ${escena}`)
   if (!escenaCabeEn(escena, n)) throw new Error(`MES-PvP 2 · «${escena}» no cabe en una mesa de ${n}`)
 
+  // v1.3-b · el saldo propio de la escena (el de los rivales siempre alcanza).
+  const saldoPropio = saldo ?? ESCENAS[escena].saldo ?? SALDO_LAMINA
   // El azar del árbitro es global (`setRng`): se fija para llegar y al arrancar, y se suelta al parar.
   let m = null
   let rng = null
@@ -605,7 +615,7 @@ export function crearPartidaImitada({
   for (let s = semilla; s < semilla + TOPE_SEMILLAS && !m; s++) {
     rng = mulberry32(s)
     setRng(rng)
-    const intento = nuevaMesa({ n, asiento, nombres, ahora: ahora() })
+    const intento = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio })
     try {
       ESCENAS[escena].jugar(intento)
       m = intento
@@ -624,7 +634,7 @@ export function crearPartidaImitada({
   if (vivo && deLamina) {
     rng = mulberry32(semillaBuena)
     setRng(rng)
-    m = nuevaMesa({ n, asiento, nombres, ahora: ahora() })
+    m = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio })
     guionVivo = ESCENAS[escena].guion?.(m) ?? {}
     resetRng()
   }
@@ -635,7 +645,7 @@ export function crearPartidaImitada({
   if (golpe || enPasos) {
     rng = mulberry32(semillaBuena)
     setRng(rng)
-    m = nuevaMesa({ n, asiento, nombres, ahora: ahora() })
+    m = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio })
     ESCENAS[escena].antes(m)
     resetRng()
   }
@@ -644,71 +654,12 @@ export function crearPartidaImitada({
   // ── L-M 3 · La recarga PvP, el anuncio y la transición ───────────────────
   const def = ESCENAS[escena]
   const esLM3 = !!ESCENAS_LM3[escena]
-  let saldoLamina = saldo ?? def.saldo ?? SALDO_LAMINA
-  let tarjetaAbierta = abierta ?? def.abierta ?? false
-  // La voluntaria pedida durante la mano (variante b, Victor): se aplica en la pausa siguiente.
-  let pedida = def.pedida ?? false
+  // v1.3-b · de la recarga solo quedan los mandos de la lámina: la tarjeta abierta al llegar
+  // (`abierta`), el anillo congelado y el saldo de la escena. Todo lo demás es del árbitro.
+  const tarjetaAbierta = abierta ?? def.abierta ?? false
   const premiumAbierta = premium ?? def.premium ?? false
   if (def.deUnaVez) m.t = m.e.vencimiento.hora - GOLPE_VIVO_MS
   const handLlegada = m.e.motor.handCount
-  // ¿Decide `i`? En la pausa entre manos sin cubrir el ante, o sentado fuera sin recargar.
-  const ofertaDe = (i) => {
-    if (m.e.asientos[i].abandonado || partidaTerminada(m.e)) return false
-    const f = m.fuera.get(i)
-    if (f) return !f.recargado
-    const p = m.e.motor.players[i]
-    return enPausaMano(m.e) && !p.eliminated && p.chips < m.e.motor.unit
-  }
-  // Recargar estando fuera: el asiento vuelve con la entrada, retirado hasta la mano siguiente.
-  const recargarAsiento = (i) => {
-    const f = m.fuera.get(i)
-    if (f) {
-      const players = m.e.motor.players.map((p, j) => (j === i ? { ...p, eliminated: false, chips: ENTRADA, folded: true, allIn: false } : p))
-      const asientos = m.e.asientos.map((a, j) => (j === i ? { ...a, cobrado: null } : a))
-      m.e = { ...m.e, asientos, motor: { ...m.e.motor, players } }
-      f.recargado = true
-    } else {
-      pila(m, i, ENTRADA)
-    }
-  }
-  const recargaDe = () => {
-    const pausa = enPausaMano(m.e)
-    const f = m.fuera.get(asiento)
-    const fuera = !!f && !f.recargado
-    const p = m.e.motor.players[asiento]
-    const sigue = !m.e.asientos[asiento].abandonado && !partidaTerminada(m.e) && !p.eliminated
-    // Durante la mano solo hay voluntaria (se pide y se aplica en la pausa siguiente).
-    const enMano = !pausa && !fuera && sigue && m.e.motor.handCount > 0
-    const cruda = (pausa || fuera) && (sigue || fuera) ? recargaPvP({ pila: fuera ? 0 : p.chips, entrada: ENTRADA, ante: m.e.motor.unit, saldo: saldoLamina })
-      : enMano ? recargaPvP({ pila: p.chips, entrada: ENTRADA, ante: 0, saldo: saldoLamina }) : null
-    const oferta = cruda && enMano ? { ...cruda, tipo: RECARGA_PVP.VOLUNTARIA } : cruda
-    return Object.freeze({
-      oferta, fuera, pausa, enMano, pedida,
-      abierta: tarjetaAbierta && !!oferta,
-      vence: pausa ? m.e.vencimiento.hora : null,
-      revelacion: pausa && huboRevelacion(m.e.motor),
-      // Congelada, el anillo se queda en 3 de 4 s; en vivo cuenta la pausa de verdad.
-      fija: vivo ? null : 3,
-      totalSeg: Math.round(MANO_SIGUIENTE_MS / 1000),
-      lecturaMs: LECTURA_TRAS_REVELACION_MS,
-      // La mesa de 2 espera: el rival quebrado decide y nadie más juega (el óvalo lo dice).
-      espera: pausa && m.n === 2 ? m.e.asientos.findIndex((_a, i) => i !== asiento && ofertaDe(i)) : -1,
-    })
-  }
-  // La vista con la recarga encima: «Recargando» en la pausa, «Fuera de esta mano» en la mano.
-  const conRecarga = (vista) => {
-    const pausa = enPausaMano(m.e)
-    if (!m.fuera.size && !pausa) return vista
-    const players = vista.players.map((p, i) => {
-      const f = m.fuera.get(i)
-      if (f && !(pausa && f.recargado)) {
-        return { ...p, eliminated: false, folded: true, cobrado: null, numCartas: 0, ...(i === asiento ? { cards: [] } : {}),
-          recarga: pausa ? 'decide' : 'fuera' }
-      }
-      return ofertaDe(i) ? { ...p, recarga: 'decide' } : p
-    })
-    return { ...vista, players }
-  }
 
   // ── L-M 2 · Los mensajes de la mesa ──────────────────────────────────────
   // Viajan aparte de la vista (la sub-tanda 5 dirá por dónde): [{ id, asiento, clave, hora }],
@@ -750,8 +701,7 @@ export function crearPartidaImitada({
   const oyentes = new Set()
   const desfaseDeAhora = () => m.t - ahora()
   const fotoDe = (cambios = {}) => Object.freeze({
-    vista: conRecarga(JSON.parse(JSON.stringify(vistaDe(m.e, asiento)))),
-    recargaLamina: recargaDe(),
+    vista: JSON.parse(JSON.stringify(vistaDe(m.e, asiento))),
     version: m.e.version,
     canal: 'SUBSCRIBED',
     avisos: 0,
@@ -833,22 +783,15 @@ export function crearPartidaImitada({
     if (!v || partidaTerminada(e)) { pararLM3(); return }
     if (!vivo && turnoDe(e) && e.motor.handCount > handLlegada) { pararLM3(); return }
     let cambio = false
-    // La voluntaria pedida durante la mano se aplica al abrirse la pausa. Si la pila ya no está
-    // por debajo de la entrada, se cancela en silencio; si el saldo no alcanza, se cancela y se
-    // abre la tarjeta, que lo dice («Tu saldo no alcanza para recargar.»).
-    if (pedida && enPausaMano(e)) {
-      const { aplica, monto, motivo } = pedidoEnLaPausa({ pila: e.motor.players[m.yo].chips, entrada: ENTRADA, ante: 0, saldo: saldoLamina })
-      if (aplica) { pila(m, m.yo, ENTRADA); saldoLamina -= monto }
-      if (motivo === CANCELA_PEDIDO.SALDO) tarjetaAbierta = true
-      pedida = false
-      cambio = true
-    }
-    // Los rivales con oferta recargan a los `RIVAL_DECIDE_MS`: si antes vence la pausa, se saltan
-    // la mano.
-    e.asientos.forEach((_a, i) => {
-      if (i === m.yo || !ofertaDe(i)) { ofertaDesde.delete(i); return }
+    // Los rivales que deciden (quebraron, o están sentados fuera) recargan a los `RIVAL_DECIDE_MS`:
+    // si antes vence la pausa, el árbitro los sienta fuera (o los retiene, en la mesa de 2).
+    e.asientos.forEach((a, i) => {
+      if (i === m.yo || (a.fuera ?? null) === null || a.pedida) { ofertaDesde.delete(i); return }
       if (!ofertaDesde.has(i)) ofertaDesde.set(i, m.t)
-      else if (m.t - ofertaDesde.get(i) >= RIVAL_DECIDE_MS) { recargarAsiento(i); ofertaDesde.delete(i); cambio = true }
+      else if (m.t - ofertaDesde.get(i) >= RIVAL_DECIDE_MS && intenta(m, i, 'recargar', { mano: e.motor.handCount }).ok) {
+        ofertaDesde.delete(i)
+        cambio = true
+      }
     })
     const desde = (ms) => m.t >= v.hora - ESPERA_TURNO_LAMINA + ms
     if (!cambio) {
@@ -869,20 +812,6 @@ export function crearPartidaImitada({
       }
     }
     if (!cambio && m.t >= v.hora) {
-      if (v.clase === CLASES.MANO_SIGUIENTE) {
-        const todos = e.asientos.map((_a, i) => i)
-        const conOferta = todos.filter(ofertaDe)
-        const juegan = todos.filter((i) => !e.asientos[i].abandonado && !e.motor.players[i].eliminated
-          && e.motor.players[i].chips >= e.motor.unit && !(m.fuera.get(i) && !m.fuera.get(i).recargado))
-        // La mesa de 2 espera la decisión (§8.1, «Fin de partida»), hasta el plazo de la lámina.
-        if (conOferta.length && juegan.length < 2 && m.t < v.hora + ESPERA_OFERTA_2_MS) return
-        for (const [i, f] of [...m.fuera]) if (f.recargado) m.fuera.delete(i)
-        for (const i of conOferta) {
-          if (m.fuera.has(i)) m.fuera.delete(i)   // la 2.ª vez sin decidir: sale y cobra su residuo
-          else if (juegan.length >= 2) m.fuera.set(i, { recargado: false })
-        }
-        tarjetaAbierta = false
-      }
       reclama(m)
       if (m.e.vencimiento?.clase === CLASES.PAUSA_ANUNCIO) llegada = m.t
       cambio = true
@@ -901,24 +830,13 @@ export function crearPartidaImitada({
       msjMs: msj && !vivo ? msjMs : null,
       // L-M 3 · la tarjeta «Premium · Pronto» abierta.
       premium: premiumAbierta,
+      // v1.3-b · la recarga: la tarjeta abierta al llegar, el anillo congelado en 3 s (en vivo
+      // cuenta la pausa de verdad) y el saldo propio de la escena, que baja con cada recarga.
+      abierta: tarjetaAbierta,
+      fija: vivo ? null : 3,
+      saldo: () => m.saldos[asiento],
       entreManos: esLM3,
     }),
-    // L-M 3 · §1 · la recarga, del lado de la lámina (el árbitro real no la tiene todavía).
-    recarga: {
-      recargar: () => {
-        const o = recargaDe().oferta
-        if (!o || !o.alcanza) return
-        recargarAsiento(asiento)
-        saldoLamina -= o.monto
-        tarjetaAbierta = false
-        poner()
-      },
-      abrir: () => { tarjetaAbierta = true; poner() },
-      cerrar: () => { tarjetaAbierta = false; poner() },
-      // Durante la mano: queda pedida (el ⋮ lo muestra) y se aplica en la pausa siguiente.
-      pedir: () => { pedida = true; tarjetaAbierta = false; poner() },
-      anular: () => { pedida = false; poner() },
-    },
     mensajes: {
       lista: () => mensajes,
       // v1.3 · las comprobaciones del árbitro real (`puedeMandarMensaje`: asiento, abandonado,
@@ -979,11 +897,15 @@ export function crearPartidaImitada({
         return { ok: false, motivo: MOTIVOS.PARTIDA_TERMINADA, version: m.e.version, ahora: m.t }
       }
       m.t = Math.max(m.t, ahora() + foto.desfase)
-      const r = aplicarAccion(m.e, { uid: `imitado-${asiento}`, version: foto.version, accion, ...campos }, { ahora: m.t })
+      const r = aplicarAccion(m.e, { uid: `imitado-${asiento}`, version: foto.version, accion, ...campos }, { ahora: m.t, saldos: m.saldos })
       m.e = r.estado
+      cobrarRecargas(m, r.efectos)
       poner(r.respuesta.ok ? {} : { rechazo: { accion, motivo: r.respuesta.motivo } })
       return { ...r.respuesta, ahora: m.t }
     },
+    // v1.3-b · para el arnés: vuelve a publicar la foto (la lámina congelada no tiene reloj que lo
+    // haga). Antes lo hacía, de rebote, `recarga.cerrar()`.
+    repintar: () => poner(),
     avanzar() {
       if (!partidaTerminada(m.e)) paso(m)
       poner()
@@ -1001,7 +923,9 @@ export function leerMandoPvP(search = globalThis.location?.search ?? '') {
   const escena = q.get(PARAM_PVP)
   if (!ESCENAS_PVP.includes(escena)) return null
   const pedido = Number(q.get('n'))
-  const n = pedido >= 2 && pedido <= 5 && Number.isInteger(pedido) ? pedido : 2
+  // v1.3-b · y dentro de las mesas donde cabe la escena (`recarga-rival`, solo en la de 2).
+  const valido = pedido >= 2 && pedido <= 5 && Number.isInteger(pedido) ? pedido : 2
+  const n = Math.min(Math.max(valido, ESCENAS[escena].minimo ?? 2), ESCENAS[escena].maximo ?? 5)
   const elegido = Number(q.get('asiento'))
   const asiento = Number.isInteger(elegido) && elegido >= 0 && elegido < n ? elegido : 0
   // L-M 1 · `ver=vivo` · `corte=0` (sin el corte de 10, para comparar) · `momento=<ms>` (congela

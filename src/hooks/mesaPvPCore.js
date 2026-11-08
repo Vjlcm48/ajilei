@@ -85,6 +85,11 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     anfitrion: 0,
     // Árbitro v1.3 · los mensajes de la mesa (`partidaCliente.mensajes`, o los del imitado).
     mensajes: partida.mensajes ?? null,
+    // Árbitro v1.3-b · la vista del árbitro tal cual, sin rotar: la capa de la recarga lee de ella
+    // lo privado (`vista.recarga`) con `entreManosCore.recargaDeVista`.
+    vista: null,
+    // …y el desfase con la hora del árbitro, para que su anillo cuente con ella.
+    desfase: 0,
   })
   const oyentes = new Set()
   const publicar = (cambios) => {
@@ -102,6 +107,7 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
   }
   let version = null
   let cobrado = null
+  let recargas = 0
   let alCobrar = () => {}
   let reloj = null
   let soltar = null
@@ -143,9 +149,14 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
       version = vista.version
       const anfitrion = (vista.players.length - vista.asiento) % vista.players.length
       if (anfitrion !== foto.anfitrion) cambios.anfitrion = anfitrion
+      cambios.vista = vista
       const propio = vista.players[vista.asiento].cobrado
-      cobro = propio !== cobrado
+      // v1.3-b · la billetera también cambia con cada recarga, aunque la aplique el árbitro al
+      // cerrarse la mano (el pedido): se relee igual que al cobrar.
+      const recargado = vista.recarga?.recargas ?? 0
+      cobro = propio !== cobrado || recargado !== recargas
       cobrado = propio
+      recargas = recargado
       // La pantalla final no cambia una vez puesta (Reglas v1.7 §8.2); el cobro sí se avisa.
       if (foto.escena !== 'final' && !espera) {
         const previa = foto.game
@@ -172,6 +183,7 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
       Object.assign(cambios, espera.final)
       espera = null
     }
+    if (desfase !== foto.desfase) cambios.desfase = desfase
     const nuevo = relojDe(vista?.vencimiento ?? null, ahora() + desfase)
     if (nuevo.clase !== foto.reloj.clase || nuevo.timeLeft !== foto.reloj.timeLeft) cambios.reloj = nuevo
     // La escena final solo la pone `finalDe`; mientras se ve el pago, la mesa se queda.

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CANCELA_PEDIDO, RECARGA_PVP, pedidoEnLaPausa, recargaPvP, textoEnAnuncio, textoTarjeta } from './entreManosCore'
+import { CLASES, RECARGA_VISTA } from '../arbitro/index.js'
+import { PHASES } from '../engine/gameEngine'
+import { CLASES_PAUSA_RECARGA, RECARGA_PVP, recargaDeVista, recargaPvP, textoEnAnuncio, textoTarjeta } from './entreManosCore'
 import { CORTE_VOZ } from './corteVoz'
 import {
   CORTE_PASTILLA, ESPERA_SIGUIENTE_HOY_MS, RECOGE_MS, esperaSiguienteMano, recogerEnPvP, textoPastilla,
@@ -48,12 +50,46 @@ describe('L-M 3 · entre una mano y otra', () => {
     expect(textoTarjeta(recargaPvP({ pila: 0, entrada: 1500, ante: 100, saldo: 900 }))).toBe('Tu saldo no alcanza para recargar.')
   })
 
-  it('la voluntaria pedida en la mano se aplica en la pausa con el monto de ese momento, o se cancela sola', () => {
-    expect(pedidoEnLaPausa({ pila: 700, entrada: 1500, ante: 0, saldo: 2400 })).toEqual({ aplica: true, monto: 800, motivo: null })
-    // Ya no hace falta: en silencio. Sin saldo: se dice.
-    expect(pedidoEnLaPausa({ pila: 1500, entrada: 1500, ante: 0, saldo: 2400 })).toEqual({ aplica: false, monto: 0, motivo: CANCELA_PEDIDO.PILA })
-    expect(pedidoEnLaPausa({ pila: 1900, entrada: 1500, ante: 0, saldo: 2400 })).toEqual({ aplica: false, monto: 0, motivo: CANCELA_PEDIDO.PILA })
-    expect(pedidoEnLaPausa({ pila: 200, entrada: 1500, ante: 0, saldo: 900 })).toEqual({ aplica: false, monto: 0, motivo: CANCELA_PEDIDO.SALDO })
+  // v1.3-b · la capa lee la vista del árbitro. Los literales de la vista (fases, clases, la marca
+  // pública) se anclan contra el árbitro de verdad.
+  it('recargaDeVista: oferta en la pausa, sentado fuera, voluntaria en la mano, retención y cancelación', () => {
+    expect(CLASES_PAUSA_RECARGA).toEqual({
+      MANO_SIGUIENTE: CLASES.MANO_SIGUIENTE, PAUSA_ANUNCIO: CLASES.PAUSA_ANUNCIO, OFERTA_RECARGA: CLASES.OFERTA_RECARGA,
+    })
+    expect(RECARGA_VISTA.DECIDE).toBe('decide')
+    const privada = (cambios) => ({ monto: 1500, oferta: true, pedida: false, cancelada: null, recargas: 0, ...cambios })
+    const jugador = (cambios) => ({ name: 'Ana', abandonado: false, eliminated: false, cobrado: null, folded: false, numCartas: 5, recarga: null, ...cambios })
+    const vista = ({ clase = CLASES.MANO_SIGUIENTE, phase = PHASES.PAYOUT, yo = {}, otro = {}, recarga = privada() } = {}) => ({
+      asiento: 0, phase, handCount: 4, vencimiento: { clase, hora: 9000 }, resultado: { revelacion: [{}] },
+      players: [jugador({ recarga: 'decide', ...yo }), jugador({ name: 'Beto', ...otro })], recarga,
+    })
+    const leer = (v, saldo = 2400) => recargaDeVista(v, { saldo, entrada: 1500 })
+
+    // Quebró: la oferta en la pausa, con la lectura de la revelación.
+    expect(leer(vista())).toMatchObject({
+      pausa: true, fuera: false, enMano: false, vence: 9000, revelacion: true, totalSeg: 4, espera: null, mano: 4, cancelada: null,
+    })
+    expect(leer(vista()).oferta).toEqual({ tipo: 'ofrecida', pila: 0, monto: 1500, entrada: 1500, saldo: 2400, alcanza: true, saldoDespues: 900 })
+    // Sentado fuera, durante la mano: sin cartas, la oferta sigue y «Recargar» la deja pedida.
+    const fuera = leer(vista({ clase: CLASES.TURNO, phase: PHASES.BET_1, yo: { recarga: 'fuera', folded: true, numCartas: 0 } }))
+    expect(fuera).toMatchObject({ pausa: false, fuera: true, enMano: false, vence: null })
+    expect(fuera.oferta.tipo).toBe('ofrecida')
+    // Voluntaria en la mano: se pide.
+    const mano = leer(vista({ clase: CLASES.TURNO, phase: PHASES.BET_1, yo: { recarga: null }, recarga: privada({ monto: 600, oferta: false, pedida: true }) }))
+    expect(mano).toMatchObject({ enMano: true, pedida: true })
+    expect(mano.oferta).toMatchObject({ tipo: 'voluntaria', pila: 900, monto: 600 })
+    // La retención: la mesa espera a quien decide, con el anillo de 15 s.
+    const espera = leer(vista({ clase: CLASES.OFERTA_RECARGA, yo: { recarga: null }, otro: { recarga: 'decide' }, recarga: privada({ monto: 0, oferta: false }) }))
+    expect(espera).toMatchObject({ pausa: true, oferta: null, espera: 'Beto', totalSeg: 15 })
+    // La cancelación por saldo: una clave por mano, y la tarjeta dice que no alcanza.
+    const cancelada = leer(vista({ yo: { recarga: null }, recarga: privada({ monto: 800, oferta: false, cancelada: { motivo: 'saldo', mano: 4 } }) }), 100)
+    expect(cancelada.cancelada).toBe('saldo:4')
+    expect(textoTarjeta(cancelada.oferta)).toBe('Tu saldo no alcanza para recargar.')
+    // R-4 (sin recarga en la vista), quien ya cobró, el sorteo y el fin: nada.
+    expect(leer(vista({ recarga: null }))).toBeNull()
+    expect(leer(vista({ yo: { cobrado: 40 } }))).toBeNull()
+    expect(leer(vista({ phase: 'SORTEO' }))).toBeNull()
+    expect(leer(vista({ phase: PHASES.GAME_OVER }))).toBeNull()
   })
 
   it('quien volvió antes del anuncio lee cuántos siguen en él, sin contarse', () => {

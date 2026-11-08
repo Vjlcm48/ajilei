@@ -95,6 +95,9 @@ export function vistaAMesa(vista, previa, sala) {
       ...p,
       id,
       entrada,
+      // v1.3-b · lo recargado por el propio (su vista privada): la pantalla final lo resta, con
+      // `entrada` la de la mesa y no la de la base, que crece con cada recarga.
+      ...(id === 0 ? { recargas: vista.recarga?.recargas ?? 0 } : {}),
       cards: p.cards ?? revelado?.cards ?? dorsos(real, p.numCartas),
       score: revelado?.score ?? null,
       chips: sigueEnPago || (enFin && p.cobrado !== null) ? p.cobrado : p.chips,

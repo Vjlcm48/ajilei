@@ -1,17 +1,21 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import BurbujaRecarga from '../components/BurbujaRecarga'
 import { SoundButton } from '../components/SoundButton'
 import { RECARGA } from '../hooks/mesaCore'
+import { MOTIVOS } from '../arbitro/motivos.js'
 import { t } from '../config/textos'
 import { aPropios, escalaActual } from '../lib/escala'
-import { RECARGA_PVP, textoTarjeta } from '../lib/entreManosCore'
+import { RECARGA_PVP, recargaDeVista, textoTarjeta } from '../lib/entreManosCore'
 import { CORTE_VOZ, recortaNombre } from '../lib/corteVoz'
 import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 
 // ── MES-PvP L-M 3 · §1 · La recarga PvP ─────────────────────────────
-// Reglas de APU-1 v1.8 §8.1 y las decisiones de Victor en el STOP-L. El árbitro real no la tiene
-// todavía: la lleva el imitado (`partida.recarga`, `foto().recargaLamina`). El molde es la burbuja
+// Reglas de APU-1 v1.9 §8.1 y las decisiones de Victor en el STOP-L. Árbitro v1.3-b: lee la VISTA
+// del árbitro (la del imitado tiene su misma forma) con `recargaDeVista`, el saldo de la billetera
+// y manda `recargar` · `pedir_recarga` · `anular_recarga` por `foto.enviar`. Lo único de la lámina
+// (`lamina`, solo con el imitado, detrás de la puerta DEV): la tarjeta abierta al llegar, el anillo
+// congelado y el saldo de la escena. El molde es la burbuja
 // de REC-1 (§5.5), sin tocar la de las IAS: el mismo componente y las mismas clases, montados
 // encima de la mesa, `fixed` y en portal a `.game-table-screen` (Δ = 0 de layout).
 //   · Ofrecida (quebraste): la burbuja con el triángulo en la ranura de las acciones, al terminar
@@ -20,10 +24,15 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 //   · Voluntaria (pila bajo la entrada): la moneda del ⋮ (variante b). En la pausa abre la tarjeta
 //     y recarga en el acto; durante la mano, la tarjeta la deja PEDIDA y se aplica en la pausa
 //     siguiente (si la pila ya no está por debajo de la entrada, el pedido se cancela solo).
-//     Pedida, la moneda lleva su marca y otro toque la anula.
+//     Pedida, la moneda lleva su marca y otro toque la anula. Sentado fuera, «Recargar» también la
+//     deja pedida (P-6): el dinero nunca se mueve dentro de una mano.
+//   · «Ahora no» solo cierra la tarjeta (P-2): la oferta sigue hasta su plazo.
+//   · El pedido cancelado por saldo abre la tarjeta una vez por cancelación; un `recargar` rechazado
+//     con `saldo_insuficiente` la deja abierta y relee la billetera, y entonces dice que no alcanza.
 //   · La tarjeta: «… para seguir en la mesa» con la pila en 0; «… para volver a {entrada} HC» con
 //     pila; sin saldo, lo dice y no hay tienda (INV-76).
-//   · La mesa de 2 espera al rival: «Esperando a {nombre}…» en la caja de las acciones.
+//   · La retención (sin quien decide quedaría uno solo): «Esperando a {nombre}…» en la caja de las
+//     acciones.
 
 const caja = (sel) => {
   const el = document.querySelector(sel)
@@ -41,13 +50,25 @@ function anclaDe(fuera) {
   return { x: centro ? centro.left + centro.width / 2 : barra.left + barra.width / 2, y: barra.top + barra.height / 2 }
 }
 
-export default function RecargaPvP({ partida, desfase = 0 }) {
-  const foto = useSyncExternalStore(partida.suscribir, partida.foto)
-  const rec = foto.recargaLamina
+// La tarjeta abierta vale para el momento en que se abrió: al cambiar de mano, de pausa a mano o
+// al sentarse fuera, se cierra sola.
+const momentoDe = (rec) => `${rec.mano}:${rec.pausa}:${rec.fuera}`
+
+/**
+ * @param {{ foto: object, saldo: number, lamina?: object|null, desfase?: number, alRecargar?: Function|null }} props
+ *   `foto` la de la mesa (`useMesaPvP`: `vista`, `game`, `enviar`); `saldo` el de la billetera;
+ *   `alRecargar` relee la billetera.
+ */
+export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, alRecargar = null }) {
+  const entrada = foto.game?.players[0]?.entrada ?? 0
+  const rec = recargaDeVista(foto.vista, { saldo: lamina?.saldo?.() ?? saldo, entrada })
   const [ahora, setAhora] = useState(() => Date.now())
   const [ancla, setAncla] = useState(null)
   const [panel, setPanel] = useState(null)
   const [disparador, setDisparador] = useState(null)
+  const [abiertaEn, setAbiertaEn] = useState(() => (lamina?.abierta && rec ? momentoDe(rec) : null))
+  // La última cancelación por saldo que ya se enseñó (y se cerró).
+  const [acusada, setAcusada] = useState(null)
 
   // Un reloj de 250 ms: el anillo, el ancla y el ⋮ (que se abre y se cierra por su cuenta).
   useEffect(() => {
@@ -65,26 +86,49 @@ export default function RecargaPvP({ partida, desfase = 0 }) {
   const raiz = document.querySelector('.game-table-screen')
   if (!rec || !raiz) return null
   const { oferta } = rec
+  const abierta = !!oferta && (abiertaEn === momentoDe(rec) || (rec.cancelada !== null && rec.cancelada !== acusada))
+  const fija = lamina?.fija ?? null
   const restaMs = rec.vence === null ? null : rec.vence - (ahora + desfase)
   const ofrecida = oferta?.tipo === RECARGA_PVP.OFRECIDA
   // §5.5.1 · al terminar la revelación (queda la lectura); sin revelación, en el acto.
-  const trasRevelacion = rec.fija !== null || !rec.revelacion || (restaMs !== null && restaMs <= rec.lecturaMs)
+  const trasRevelacion = fija !== null || !rec.revelacion || (restaMs !== null && restaMs <= rec.lecturaMs)
   const total = rec.revelacion ? Math.round(rec.lecturaMs / 1000) : rec.totalSeg
-  const seg = rec.fija ?? (restaMs === null ? null : Math.max(0, Math.ceil(restaMs / 1000)))
-  const verBurbuja = ofrecida && !rec.abierta && (rec.fuera || (rec.pausa && trasRevelacion))
-  const espera = rec.espera >= 0 && !oferta ? foto.vista.players[rec.espera]?.name : null
+  const seg = fija ?? (restaMs === null ? null : Math.max(0, Math.ceil(restaMs / 1000)))
+  const verBurbuja = ofrecida && !abierta && (rec.fuera || (rec.pausa && trasRevelacion))
+  const espera = !oferta ? rec.espera : null
   const estilo = ancla ? { left: ancla.x, top: ancla.y } : { visibility: 'hidden' }
+
+  const abrir = () => setAbiertaEn(momentoDe(rec))
+  const cerrar = () => { setAbiertaEn(null); setAcusada(rec.cancelada) }
+  const mandar = async (accion) => {
+    const r = await foto.enviar(accion, { mano: rec.mano })
+    if (r?.ok || r?.motivo === MOTIVOS.YA_PEDIDA) {
+      cerrar()
+      if (accion === 'recargar') alRecargar?.()
+    } else if (r?.motivo === MOTIVOS.SALDO_INSUFICIENTE) {
+      // La tarjeta sigue abierta: con el saldo releído dirá que no alcanza.
+      alRecargar?.()
+    }
+  }
+  const partida = {
+    abrir,
+    cerrar,
+    recargar: () => mandar('recargar'),
+    pedir: () => mandar('pedir_recarga'),
+    anular: () => mandar('anular_recarga'),
+  }
 
   // La moneda del ⋮: viva con una voluntaria (en la pausa o en la mano) o con un pedido que anular.
   const cerrarMenu = () => document.querySelector('.game-table-screen .utilities-trigger')?.click()
   const voluntaria = !!oferta && !ofrecida
   const tocarMoneda = () => {
     cerrarMenu()
-    if (rec.pedida) partida.recarga.anular()
-    else partida.recarga.abrir()
+    if (rec.pedida) partida.anular()
+    else partida.abrir()
   }
-  // En la mano, «Recargar» la deja pedida; en la pausa, recarga en el acto.
-  const confirmar = rec.enMano ? partida.recarga.pedir : partida.recarga.recargar
+  // En la mano, «Recargar» la deja pedida (sentado fuera también, en el árbitro); en la pausa,
+  // recarga en el acto.
+  const confirmar = rec.enMano ? partida.pedir : partida.recargar
 
   return (
     <>
@@ -96,11 +140,11 @@ export default function RecargaPvP({ partida, desfase = 0 }) {
                 motivo={RECARGA.FORZOSA}
                 seg={rec.fuera ? total : seg ?? total}
                 total={total}
-                onAbrir={partida.recarga.abrir}
+                onAbrir={partida.abrir}
               />
             </div>
           )}
-          {espera && (rec.fija !== null || (restaMs !== null && restaMs <= 0)) && (
+          {espera && (
             <div className="pvp-rec-ancla pvp-rec-espera" data-pvp-recarga="espera" style={estilo}>
               {t('pvp.recarga.espera', { nombre: recortaNombre(espera, CORTE_VOZ) })}
             </div>
@@ -110,7 +154,7 @@ export default function RecargaPvP({ partida, desfase = 0 }) {
             <span className="pvp-rec-punto" data-pvp-recarga="punto" aria-hidden="true"
               style={{ left: disparador.right - 4, top: disparador.top + 4 }} />
           )}
-          {rec.abierta && oferta && (
+          {abierta && (
             <div className="bankrupt-overlay apu-suave pvp-rec-tarjeta" data-accion="recarga" data-pvp-recarga="tarjeta" data-tipo={oferta.tipo} data-en-mano={rec.enMano ? '1' : '0'}>
               <div className="bankrupt-modal apu-recarga">
                 <p className="bankrupt-sub" data-accion="recarga-sub">{textoTarjeta(oferta)}</p>
@@ -120,7 +164,7 @@ export default function RecargaPvP({ partida, desfase = 0 }) {
                       {t('ia.recarga.pedir')}
                     </SoundButton>
                   )}
-                  <SoundButton className="btn btn-pass" data-accion="recarga-no" onClick={partida.recarga.cerrar}>
+                  <SoundButton className="btn btn-pass" data-accion="recarga-no" onClick={partida.cerrar}>
                     {t('pvp.recarga.no')}
                   </SoundButton>
                 </div>

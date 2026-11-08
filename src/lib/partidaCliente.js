@@ -45,6 +45,8 @@ export const CLASE_BARAJADO = 'barajado'
 export const CLASE_REPOSICION = 'reposicion'
 export const CLASE_AVISO_SALIDA = 'aviso_salida'
 export const CLASE_MANO_SIGUIENTE = 'mano_siguiente'
+// Árbitro v1.3 · la retención de la oferta de recarga.
+export const CLASE_OFERTA_RECARGA = 'oferta_recarga'
 
 export const MARGEN_VENCIMIENTO_MS = 300
 export const ESCALON_RECLAMO_MS = 200
