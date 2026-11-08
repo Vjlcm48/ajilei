@@ -292,6 +292,30 @@ describe('MES-PvP 2 · el mando', () => {
     expect(voluntaria.oferta).toMatchObject({ tipo: 'voluntaria', monto: 1500 - voluntaria.oferta.pila })
   })
 
+  // Túnel del v1.3 · sentado fuera, «Recargar» dos veces (la burbuja seguía ahí): el segundo es
+  // `ya_pedida`, y al cerrarse la mano se cobra una sola vez.
+  it('sentado fuera, dos «Recargar»: el segundo es ya_pedida y el cobro es uno', async () => {
+    vi.useFakeTimers()
+    try {
+      const partida = crearPartidaImitada({ escena: 'recarga-fuera', n: 3, vivo: true, ahora: () => Date.now() })
+      const mano = partida.foto().vista.handCount
+      const r1 = await partida.enviar('recargar', { mano })
+      const r2 = await partida.enviar('recargar', { mano })
+      expect(r1.ok).toBe(true)
+      expect(r2).toMatchObject({ ok: false, motivo: 'ya_pedida' })
+      expect(recDe(partida)).toMatchObject({ fuera: true, pedida: true })
+      expect(partida.lamina.saldo()).toBe(2400)
+      await partida.iniciar()
+      const vista = () => partida.foto().vista
+      for (let k = 0; k < 1200 && !vista().recarga.recargas; k++) vi.advanceTimersByTime(100)
+      expect(vista().recarga).toMatchObject({ recargas: 1500, pedida: false })
+      expect(partida.lamina.saldo()).toBe(2400 - 1500)
+      partida.parar()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // Túnel del v1.3 · el anillo único: lo que la capa prevé en la pausa es lo que hace el árbitro
   // al vencerla (mesa de 2: la retención; mesa de 3: la mesa sigue sin él).
   it('la retención que la capa ve venir en la pausa es la que abre el árbitro al vencerla', async () => {

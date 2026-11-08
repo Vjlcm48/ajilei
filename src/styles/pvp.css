@@ -243,6 +243,15 @@ body.pvp-freno .util-item-reacciones .util-ico::after {
 }
 /* Túnel del v1.3 · en la pausa de anuncio (mesas de 3 o más) la burbuja va sin anillo. */
 .pvp-rec-ancla[data-anillo='0'] .rec-anillo { display: none; }
+/* Túnel del v1.3 · sentado fuera con la recarga pedida: «Entras en la próxima mano». La frase
+   de la mesa («Fuera de esta mano») se oculta sin mover nada y la capa pinta encima la suya, con
+   la letra de la mesa (`.thinking`). */
+.game-table-screen[data-pvp-entra='1'] .player-bar-center > .action-area.thinking { visibility: hidden; }
+.pvp-rec-entra {
+  pointer-events: none;
+  width: max-content;
+  text-align: center;
+}
 /* La tarjeta es la suave de las IAS (`apu.css`), apoyada abajo y sin velo. */
 .pvp-rec-tarjeta .bankrupt-sub { max-width: 34ch; margin-inline: auto; }
 

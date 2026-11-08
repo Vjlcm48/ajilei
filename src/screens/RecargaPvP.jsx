@@ -8,6 +8,7 @@ import { t } from '../config/textos'
 import { aPropios, escalaActual } from '../lib/escala'
 import { RECARGA_PVP, recargaDeVista, textoTarjeta } from '../lib/entreManosCore'
 import { CORTE_VOZ, recortaNombre } from '../lib/corteVoz'
+import { FASES_APUESTA } from '../lib/vistaAMesa'
 import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 
 // ── MES-PvP L-M 3 · §1 · La recarga PvP ─────────────────────────────
@@ -37,6 +38,9 @@ import heptacoinUrl from '../assets/heptacoin.svg?no-inline'
 //   · Un solo anillo para quien decide y va a ser retenido: desde que aparece la burbuja hasta el
 //     final real (`recargaDeVista`, `retencion`); la cuenta nunca sube cuando llega la hora real
 //     de la retención, que cae unos rtt/2 después de la prevista. En la pausa de anuncio, sin anillo.
+//   · Sentado fuera con la recarga pedida: la burbuja se va (el ⋮ lleva su ✓ y la anula) y la caja
+//     de las acciones dice «Entras en la próxima mano» en vez de «Fuera de esta mano». La frase de
+//     la mesa se oculta sin mover nada (`data-pvp-entra`, `pvp.css`) y esta capa pinta la suya.
 
 const caja = (sel) => {
   const el = document.querySelector(sel)
@@ -54,6 +58,18 @@ function anclaDe(fuera) {
   return { x: centro ? centro.left + centro.width / 2 : barra.left + barra.width / 2, y: barra.top + barra.height / 2 }
 }
 
+// «Entras en la próxima mano» va en el centro de la caja de la mesa que tapa (oculta, conserva su
+// sitio), y no más ancha que lo que deja la zona del jugador a cada lado: en el teléfono apaisado
+// esa caja mide 150 px y la frase se parte en dos líneas.
+function lugarDeLaCaja() {
+  const area = caja('.game-table-screen .player-bar-center > .action-area.thinking')
+  if (!area) return null
+  const x = area.left + area.width / 2
+  const zona = caja('.game-table-screen .player-zone')
+  const ancho = zona ? 2 * Math.min(x - zona.left, zona.left + zona.width - x) - 16 : null
+  return { x, y: area.top + area.height / 2, ancho }
+}
+
 // La tarjeta abierta vale para el momento en que se abrió: al cambiar de mano, de pausa a mano o
 // al sentarse fuera, se cierra sola.
 const momentoDe = (rec) => `${rec.mano}:${rec.pausa}:${rec.fuera}`
@@ -68,6 +84,7 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
   const rec = recargaDeVista(foto.vista, { saldo: lamina?.saldo?.() ?? saldo, entrada })
   const [ahora, setAhora] = useState(() => Date.now())
   const [ancla, setAncla] = useState(null)
+  const [lugar, setLugar] = useState(null)
   const [tope, setTope] = useState(null)   // { mano, seg }: lo último que contó el anillo único
   const [panel, setPanel] = useState(null)
   const [disparador, setDisparador] = useState(null)
@@ -80,6 +97,7 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
     const tic = () => {
       setAhora(Date.now())
       setAncla(anclaDe(!!rec?.fuera))
+      setLugar(lugarDeLaCaja())
       setPanel(document.querySelector('.game-table-screen .utilities-panel'))
       setDisparador(caja('.game-table-screen .utilities-trigger'))
     }
@@ -87,6 +105,16 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
     const primero = requestAnimationFrame(tic)
     return () => { clearInterval(id); cancelAnimationFrame(primero) }
   }, [rec?.fuera])
+
+  // Sentado fuera con la recarga pedida, mientras la mesa dice «Fuera de esta mano» (las rondas de
+  // apuesta, `GameTable`): la caja de las acciones dirá que entras en la próxima.
+  const entra = !!rec?.fuera && !!rec.pedida && FASES_APUESTA.includes(foto.game?.phase)
+  useEffect(() => {
+    if (!entra) return undefined
+    const pantalla = document.querySelector('.game-table-screen')
+    pantalla?.setAttribute('data-pvp-entra', '1')
+    return () => pantalla?.removeAttribute('data-pvp-entra')
+  }, [entra])
 
   const raiz = document.querySelector('.game-table-screen')
   if (!rec || !raiz) return null
@@ -107,9 +135,10 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
     if (tope?.mano === rec.mano && tope.seg < cuenta) seg = tope.seg
     else if (tope?.mano !== rec.mano || tope.seg !== cuenta) setTope({ mano: rec.mano, seg: cuenta })
   }
-  const verBurbuja = ofrecida && !abierta && (rec.fuera || (rec.pausa && trasRevelacion))
+  const verBurbuja = ofrecida && !abierta && !rec.pedida && (rec.fuera || (rec.pausa && trasRevelacion))
   const espera = !oferta ? rec.espera : null
   const estilo = ancla ? { left: ancla.x, top: ancla.y } : { visibility: 'hidden' }
+  const estiloEntra = lugar ? { left: lugar.x, top: lugar.y, maxWidth: lugar.ancho ?? undefined } : { visibility: 'hidden' }
 
   const abrir = () => setAbiertaEn(momentoDe(rec))
   const cerrar = () => { setAbiertaEn(null); setAcusada(rec.cancelada) }
@@ -162,6 +191,11 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
               {t('pvp.recarga.espera', { nombre: recortaNombre(espera, CORTE_VOZ) })}
             </div>
           )}
+          {entra && (
+            <div className="pvp-rec-ancla pvp-rec-entra thinking" data-pvp-recarga="entra" style={estiloEntra}>
+              {t('pvp.asiento.entra')}
+            </div>
+          )}
           {/* Pedida: un punto dorado sobre el ⋮ cerrado, para que no se olvide. */}
           {rec.pedida && disparador && (
             <span className="pvp-rec-punto" data-pvp-recarga="punto" aria-hidden="true"
@@ -178,7 +212,7 @@ export default function RecargaPvP({ foto, saldo, lamina = null, desfase = 0, al
                     </SoundButton>
                   )}
                   <SoundButton className="btn btn-pass" data-accion="recarga-no" onClick={partida.cerrar}>
-                    {t('pvp.recarga.no')}
+                    {t(oferta.alcanza ? 'pvp.recarga.no' : 'pvp.recarga.entendido')}
                   </SoundButton>
                 </div>
               </div>

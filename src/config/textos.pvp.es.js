@@ -49,9 +49,13 @@ export const TEXTOS_PVP_ES = {
   // La voluntaria pedida durante la mano (se aplica en la pausa siguiente): el ⋮ la muestra y la anula.
   'pvp.recarga.anular':          'Anular la recarga pedida',
   'pvp.recarga.no':              'Ahora no',
+  // Túnel del v1.3 (Victor) · en la tarjeta de saldo insuficiente no hay nada que posponer.
+  'pvp.recarga.entendido':       'Entendido',
   'pvp.recarga.sinsaldo':        'Tu saldo no alcanza para recargar.',
   'pvp.asiento.recarga':         'Recargando',
   'pvp.asiento.fuera':           'Fuera de esta mano',
+  // Túnel del v1.3 · sentado fuera con la recarga pedida, en la caja de las acciones propia.
+  'pvp.asiento.entra':           'Entras en la próxima mano',
   // La mesa de 2 mientras el rival decide: en la caja de las acciones (propuesta de la lámina).
   'pvp.recarga.espera':          'Esperando a {nombre}…',
   'pvp.anuncio.publicidad':      'Publicidad',
