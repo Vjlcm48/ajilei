@@ -48,7 +48,10 @@ function montar({ n = 2, sala = SALA, sillas = SILLAS.slice(0, n), sinPartida = 
   }
   const rpc = vi.fn(async (nombre, args) => {
     b.orden.push(nombre)
-    if (nombre === 'leer_partida') return b.fila ? [{ ...b.fila, abandonos: b.abandonos }] : []
+    // v1.3 · con el saldo de cada asiento, como `leer_partida` de la segunda migración.
+    if (nombre === 'leer_partida') {
+      return b.fila ? [{ ...b.fila, abandonos: b.abandonos, saldos: b.saldos ?? b.fila.estado.asientos.map(() => 5000) }] : []
+    }
     if (nombre === 'crear_partida') {
       if (b.fila) return { ok: true, creada: false, version: b.fila.version }
       b.fila = { estado: args.p_estado, version: args.p_estado.version }
@@ -58,6 +61,13 @@ function montar({ n = 2, sala = SALA, sillas = SILLAS.slice(0, n), sinPartida = 
     if (nombre === 'guardar_jugada') {
       if (args.p_estado.version !== args.p_version_leida + 1) throw new Error('estado_incoherente')
       if (args.p_vistas.length !== b.fila.estado.asientos.length) throw new Error('vistas_incompletas')
+      // v1.3 · la copia de `aplicar_efectos`: el libro no cobra una recarga que el saldo de AHORA
+      // no cubre, y la jugada entera se deshace. Quien relee ya ve ese saldo.
+      const corta = args.p_efectos.find((x) => x.tipo === 'recarga' && x.monto > (b.saldoReal?.[x.asiento] ?? Infinity))
+      if (corta) {
+        b.saldos = b.saldoReal
+        throw new Error('guardar_jugada: P0001 saldo_insuficiente')
+      }
       if (b.choques > 0) {
         b.choques -= 1
         return { ok: false, motivo: 'version_vieja', version: b.fila.version }
@@ -983,5 +993,87 @@ describe('v1.3-a · el mensaje de la mesa', () => {
     expect(JSON.parse(pedir.mock.calls[0][1].body)).toEqual({
       messages: [{ topic: `partida:${MESA}`, event: 'mensaje', payload: { asiento: 3, clave: 'te_miro' }, private: true }],
     })
+  })
+})
+
+// ── 12 · La recarga (árbitro v1.3-b) ────────────────────────────────────────
+// Ficha AJILEI_MES-PvP_Arbitro-v1.3b_v1.0.md §2.2: los saldos de `leer_partida` llegan al árbitro
+// con la hora, y si el saldo bajó al guardar, la jugada se repite UNA vez con saldos frescos.
+describe('v1.3-b · la recarga en la función', () => {
+  const enPausa = (e) => e.vencimiento?.clase === CLASES.MANO_SIGUIENTE
+  const enTurno = (e) => e.motor.phase === 'BET_1' && e.vencimiento?.clase === CLASES.TURNO
+  const tocar = (m, i, cambios, pila = null) => {
+    const { estado } = m.b.fila
+    m.b.fila.estado = {
+      ...estado,
+      asientos: estado.asientos.map((a, j) => (j === i ? { ...a, ...cambios } : a)),
+      motor: { ...estado.motor, players: estado.motor.players.map((p, j) => (j === i && pila !== null ? { ...p, chips: pila } : p)) },
+    }
+  }
+
+  it('el saldo de `leer_partida` llega al árbitro: recarga si alcanza, `saldo_insuficiente` si no, y nunca se guarda', async () => {
+    const m = montar({ n: 2 })
+    await hasta(m, enPausa)
+    tocar(m, 0, {}, 700)
+    const mano = m.b.fila.estado.motor.handCount
+    m.b.saldos = [799, 5000]
+    const corto = await m.pedir('A', { accion: 'recargar', mano })
+    expect(corto.motivo).toBe(M.SALDO_INSUFICIENTE)
+    expect(m.b.guardados).toEqual([])
+    m.b.saldos = [800, 5000]
+    const r = await m.pedir('A', { accion: 'recargar', mano })
+    expect(r.ok).toBe(true)
+    expect(m.b.guardados[0].p_efectos).toEqual([{ tipo: 'recarga', asiento: 0, monto: 800, mano }])
+    expect(JSON.stringify(m.b.guardados[0].p_estado)).not.toMatch(/saldos/)
+    expect(m.b.fila.estado.motor.players[0].chips).toBe(1500)
+  })
+
+  it('va contra la `mano` y reintenta al chocar, como las simultáneas', async () => {
+    const m = montar({ n: 2 })
+    await hasta(m, enTurno)
+    tocar(m, 1, {}, 700)
+    m.b.choques = 2
+    const r = await m.pedir('B', { version: 0, accion: 'pedir_recarga', mano: m.b.fila.estado.motor.handCount })
+    expect(r.ok).toBe(true)
+    expect(m.b.fila.estado.asientos[1].pedida).toBe(true)
+    expect(m.b.orden.filter((x) => x === 'guardar_jugada')).toHaveLength(3)
+  })
+
+  it('si el saldo bajó entre la lectura y la escritura: relee UNA vez y la recarga se cancela con `saldo`', async () => {
+    const m = montar({ n: 2 })
+    await hasta(m, enTurno)
+    tocar(m, 0, { pedida: true }, 700)
+    m.b.saldos = [5000, 5000]
+    m.b.saldoReal = [100, 5000]
+    const activo = m.b.fila.estado.motor.activePlayerIndex
+    const r = await m.pedir(['A', 'B'][activo], { version: m.b.fila.version, accion: 'apostar', tipo: 'retirarse' })
+    expect(r.ok).toBe(true)
+    expect(m.b.orden).toEqual(['leer_partida', 'guardar_jugada', 'leer_partida', 'guardar_jugada', 'emitir'])
+    const [guardado] = m.b.guardados
+    expect(guardado.p_efectos.filter((x) => x.tipo === 'recarga')).toEqual([])
+    expect(m.b.fila.estado.asientos[0]).toMatchObject({ pedida: false, cancelada: { motivo: 'saldo', mano: m.b.fila.estado.motor.handCount } })
+    expect(m.b.registros.join(' | ')).toMatch(/no alcanzó al guardar/)
+  })
+
+  it('el reintento es uno solo: si vuelve a faltar, 500 sin guardar nada', async () => {
+    const m = montar({ n: 2 })
+    await hasta(m, enTurno)
+    tocar(m, 0, { pedida: true }, 700)
+    m.b.saldos = [5000, 5000]
+    m.b.saldoReal = [100, 5000]
+    // Otra pestaña sigue gastando: lo que se relee vuelve a ser más de lo que hay.
+    m.rpc.mockImplementation(async (nombre, args) => {
+      if (nombre === 'leer_partida') return [{ ...m.b.fila, abandonos: [], saldos: [5000, 5000] }]
+      if (nombre === 'guardar_jugada') {
+        m.b.orden.push(nombre)
+        throw new Error('guardar_jugada: P0001 saldo_insuficiente')
+      }
+      throw new Error(`rpc inesperada: ${nombre} ${JSON.stringify(args).slice(0, 40)}`)
+    })
+    const activo = m.b.fila.estado.motor.activePlayerIndex
+    const r = await m.pedir(['A', 'B'][activo], { version: m.b.fila.version, accion: 'apostar', tipo: 'retirarse' })
+    expect(r.status).toBe(500)
+    expect(m.b.orden.filter((x) => x === 'guardar_jugada')).toHaveLength(2)
+    expect(m.b.guardados).toEqual([])
   })
 })

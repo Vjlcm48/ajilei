@@ -6,6 +6,10 @@
 // cliente → token → leer_partida → árbitro → guardar_jugada → Broadcast { version }
 // v1.3 · el mensaje: cliente → token → leer_partida → puedeMandarMensaje → anotar_mensaje →
 // Broadcast `mensaje` { asiento, clave }, sin tocar el estado (`mandarMensaje`).
+// v1.3 · la recarga: `leer_partida` trae el saldo de cada asiento, que va al árbitro con la hora
+// (`{ ahora, saldos }`) y nunca se guarda. Si el saldo bajó entre la lectura y la escritura,
+// `aplicar_efectos` lanza `saldo_insuficiente`, la jugada entera se deshace y se repite UNA vez con
+// saldos frescos: el árbitro cancela entonces la recarga con `'saldo'`.
 //
 // UNA VERSIÓN POR LLAMADA. `guardar_jugada` solo admite un estado con la versión leída
 // + 1, y `abandonarPorServidor` y `aplicarAccion` suben una cada uno. Si en la misma
@@ -20,8 +24,11 @@ import { setRng } from '../../../src/engine/deck.js'
 // C-4: las únicas que reintentan al chocar con otra escritura (contrato §5, paso 3). Con
 // 5 asientos a la vez, el último choca hasta 4 veces y acierta en la quinta: nadie recibe
 // `version_vieja` por elegir, descartar o volver del anuncio a la vez que otro (§2).
-const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar', 'volver_anuncio']
+const SIMULTANEAS = ['elegir_carta_sorteo', 'descartar', 'volver_anuncio', 'recargar', 'pedir_recarga', 'anular_recarga']
 export const INTENTOS_SIMULTANEAS = 5
+
+// La huella de `aplicar_efectos` cuando el libro no deja cobrar la recarga.
+const sinSaldo = (e) => /\bsaldo_insuficiente\b/.test(err(e))
 
 // Lo que `abandonarPorServidor` puede responder sin que nada vaya mal: el asiento sigue
 // en `abandonos` hasta que cobra (informe 1d-ii §7), y un abandono anterior de la misma
@@ -143,12 +150,12 @@ const vistasDe = (estado) => estado.asientos.map((_, asiento) => ({ asiento, vis
 const horaDe = (vencimiento) => (vencimiento ? new Date(vencimiento.hora).toISOString() : null)
 
 // Quien llama no es de la mesa: «no se aplica nada» (§2), tampoco los abandonos de los demás.
-function aplicarAbandonos(estado, { uid }, abandonos, ahora) {
+function aplicarAbandonos(estado, { uid }, abandonos, reloj) {
   const efectos = []
   if (!estado.asientos.some((a) => a.uid === uid)) return { estado, efectos }
   let actual = estado
   for (const asiento of abandonos ?? []) {
-    const hecho = abandonarPorServidor(actual, actual.asientos[asiento]?.uid, { ahora })
+    const hecho = abandonarPorServidor(actual, actual.asientos[asiento]?.uid, reloj)
     if (hecho.respuesta.ok) {
       actual = hecho.estado
       efectos.push(...hecho.efectos)
@@ -165,11 +172,11 @@ function aplicarAbandonos(estado, { uid }, abandonos, ahora) {
 // El cliente dice qué versión cree vigente, y esa es la leída: los abandonos que se
 // aplican aquí no se la pueden dejar vieja.
 function jugar(fila, peticion, { ahora, azar }) {
-  const hora = ahora()
+  const reloj = { ahora: ahora(), saldos: fila.saldos ?? null }
   setRng(azar)
-  const previo = aplicarAbandonos(fila.estado, peticion, fila.abandonos, hora)
+  const previo = aplicarAbandonos(fila.estado, peticion, fila.abandonos, reloj)
   const version = peticion.version === fila.version ? previo.estado.version : null
-  const accion = aplicarAccion(previo.estado, { ...peticion, version }, { ahora: hora })
+  const accion = aplicarAccion(previo.estado, { ...peticion, version }, reloj)
 
   if (accion.estado === fila.estado) return { aplicada: false, respuesta: accion.respuesta }
   const nueva = fila.version + 1
@@ -260,6 +267,7 @@ async function recorrer(deps, uid, cuerpo) {
   // El `uid` del token, el último: si el cuerpo trae otro, no cuenta.
   const peticion = { ...campos, uid }
 
+  let reintentoDeSaldo = false
   for (let intento = 1; ; intento += 1) {
     const [fila] = await deps.rpc('leer_partida', { p_sala: mesa })
     if (!fila) return arrancar(deps, mesa, peticion)
@@ -267,7 +275,17 @@ async function recorrer(deps, uid, cuerpo) {
     const jugada = jugar(fila, peticion, deps)
     if (!jugada.estado) return jugada.respuesta
 
-    const guardado = await guardar(deps, mesa, fila.version, jugada)
+    let guardado
+    try {
+      guardado = await guardar(deps, mesa, fila.version, jugada)
+    } catch (e) {
+      // v1.3 · el saldo bajó entre la lectura y la escritura (otra pestaña compró en la tienda):
+      // nada se guardó. Se relee una vez, y con el saldo de ahora el árbitro cancela la recarga.
+      if (reintentoDeSaldo || !sinSaldo(e)) throw e
+      reintentoDeSaldo = true
+      deps.registrar(`MES-PvP v1.3: la recarga de la mesa ${mesa} no alcanzó al guardar; se relee el saldo —`, err(e))
+      continue
+    }
     if (guardado.ok) {
       await avisar(deps, mesa, guardado.version)
       return jugada.respuesta

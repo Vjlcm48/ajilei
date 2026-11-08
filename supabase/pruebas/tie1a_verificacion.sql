@@ -96,7 +96,9 @@ declare
   L  constant uuid := 'f1e1a000-0000-4000-8000-00000000000c';
   TIPOS constant text[] := array['bono_bienvenida', 'constancia', 'video', 'entrada_ia', 'recarga_ia',
                                  'salida_ia', 'abandono_ia', 'compra', 'ajuste_admin', 'garantia_pvp',
-                                 'liberacion_pvp', 'resultado_pvp', 'consulta'];
+                                 'liberacion_pvp', 'resultado_pvp', 'consulta',
+                                 -- MES-PvP v1.3-b · la recarga PvP (`20261108120000_mespvp_v13_recarga.sql`).
+                                 'recarga_pvp'];
 
   v_o numeric[] := '{}';
   v_p text[]    := '{}';
@@ -147,9 +149,9 @@ begin
      where conrelid = 'public.movimientos'::regclass and conname = 'movimientos_tipo_chk';
     select count(*) into n1 from unnest(TIPOS) as x(tipo) where t1 like '%''' || x.tipo || '''%';
     select count(*) into n2 from regexp_matches(coalesce(t1, ''), '''[a-z_]+''', 'g');
-    v_o := v_o || 2; v_p := v_p || 'A2 · movimientos_tipo_chk: los 13 tipos de siempre (compra incluido), ninguno más'::text;
-    v_r := v_r || case when n1 = 13 and n2 = 13 and t1 like '%''compra''%' then 'PASA' else 'FALLA' end;
-    v_d := v_d || format('de la lista=%s de 13 · literales en la restricción=%s', n1, n2);
+    v_o := v_o || 2; v_p := v_p || 'A2 · movimientos_tipo_chk: los 13 tipos de siempre (compra incluido) y recarga_pvp (v1.3), ninguno más'::text;
+    v_r := v_r || case when n1 = 14 and n2 = 14 and t1 like '%''compra''%' then 'PASA' else 'FALLA' end;
+    v_d := v_d || format('de la lista=%s de 14 · literales en la restricción=%s', n1, n2);
 
     -- ── A3 · el catálogo ─────────────────────────────────────────────────
     t1 := concat_ws('/', public.precio_articulo('tapete', 'grafito'), public.precio_articulo('tapete', 'azul'),
