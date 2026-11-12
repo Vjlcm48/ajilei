@@ -18,7 +18,7 @@ import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore
 import { conNivel } from '../hooks/nivelCore'
 import { puntosDeMano } from '../lib/puntos'
 import { claseTono, vozResto } from '../hooks/resultadoCore'
-import { componeCronica, componeCapas } from '../hooks/cronicaCore'
+import { componeCronica, componeCapas, nombreEnVoz } from '../hooks/cronicaCore'
 import { lecturaDeMano, resultadoDeMano } from '../hooks/manoCore'
 import { useVoz2Recorte } from '../hooks/useVoz2Recorte'
 import { Voz2Capa } from './Voz2Capa'
@@ -1754,7 +1754,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // nadie haya arreglado nada es una vara que hay que ir a mirar.
   const capasPozo  = isPayoutPhase ? repartoPorCapas(game) : []
   // VOZ-3 · la cola sale de la lectura: lo de los demás y las devoluciones (D5–D8).
-  const capasTexto = isPayoutPhase ? componeCapas(lectura, game.players) : null
+  const capasTexto = isPayoutPhase ? componeCapas(lectura, game.players, game.voz) : null
 
   // ── Showdown winner emphasis ──────────────────────────────────────────────
   // Active until "Siguiente mano" (isClearing). Only when the hand reached
@@ -2696,6 +2696,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 </div>
               )}
 
+              {/* 5a · D.2 · O1 · en el sorteo de la Mano (solo entre personas: contra las IAS la fase
+                  'SORTEO' no existe y `partida` es nula) la barra no montaba ninguna caja y el óvalo
+                  saltaba al llegar la primera mano. Se reserva la de «Barajando…», la que monta la
+                  primera mano, oculta. 'SORTEO' es literal de contrato (`partidaCliente.FASE_SORTEO`). */}
+              {partida && phase === 'SORTEO' && (
+                <div className="action-area thinking" aria-hidden="true" style={{ visibility: 'hidden' }}>Barajando…</div>
+              )}
+
               {isShuffling && (
                 <div className="action-area thinking">Barajando…</div>
               )}
@@ -2721,7 +2729,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               {isBetPhase && !marcadoAllIn(human) && !humanIsTurn && !human.folded && !game.players[game.activePlayerIndex].folded && (
                 <div className="action-area thinking">
                   {partida
-                    ? t('pvp.mesa.pensando', { nombre: game.players[game.activePlayerIndex].name })
+                    ? t('pvp.mesa.pensando', { nombre: nombreEnVoz(game.players[game.activePlayerIndex]) })
                     : numPlayers === 2
                       ? 'La IA está pensando…'
                       : `${game.players[game.activePlayerIndex].name} está pensando…`}
@@ -2768,7 +2776,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               )}
 
               {isBetPhase && human.folded && (
-                <div className="action-area thinking">{partida ? t(human.recarga === 'fuera' ? 'pvp.asiento.fuera' : 'pvp.mesa.retirado') : 'Te retiraste — los rivales siguen jugando…'}</div>
+                <div className="action-area thinking">{partida ? t(human.recarga === 'fuera' ? (partida.vista?.recarga?.pedida ? 'pvp.asiento.entra' : 'pvp.asiento.fuera') : 'pvp.mesa.retirado') : 'Te retiraste — los rivales siguen jugando…'}</div>
               )}
 
               {isDiscardPhase && !discardAnim && !human.folded && !yaDescarte && (
@@ -2880,8 +2888,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   ranura: la barra del jugador la perdía entera y todo lo de al
                   lado se movía justo cuando el dedo va hacia los botones del
                   panel. Es la misma regla que ya cubría el barajado y la
-                  ceremonia de eliminación, con un caso más. */}
-              {((isPayoutPhase && isClearing) || ceremony || !!recarga) && (
+                  ceremonia de eliminación, con un caso más. MES-PvP 5a · D.1 · y
+                  entre personas en todo el pago: allí «Siguiente mano» no se monta
+                  (`!partida`) y la caja de «Tú» saltaba al entrar en el pago. */}
+              {((isPayoutPhase && (isClearing || !!partida)) || ceremony || !!recarga) && (
                 <div className="action-area rec-ranura">
                   {/* REC-1 · la burbuja vive DENTRO de la ranura que O1 ya
                       reservaba, en absoluto (rec.css): la ranura no cambia de

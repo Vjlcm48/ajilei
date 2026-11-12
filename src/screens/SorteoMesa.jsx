@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import CardImage from '../components/CardImage'
-import { VOLTEO_SORTEO_MS } from '../config/esperas'
+import { ANTES_DEL_REPARTO_MS, BARAJADO_MS, PASO_SORTEO_MS, VOLTEO_SORTEO_MS } from '../config/esperas'
 import {
-  AVISO_RELOJ_S, CARTAS_SORTEO, ETAPA, adelantada, estadoCarta, lugarDeLaFranja, lugarDeLaMarca,
-  lugarDelMazo, lugarDelReloj, manoALaVista, medirMesa, mensajeDelSorteo, ordenDeReparto,
+  AVISO_RELOJ_S, CARTAS_SORTEO, ETAPA, adelantada, estadoCarta, avanzaSorteo, lugarDeLaFranja,
+  lugarDeLaMarca, lugarDelMazo, lugarDelReloj, manoALaVista, medirMesa, mensajeDelSorteo, ordenDeReparto,
 } from '../lib/sorteoMesaCore'
+import { cortarSonido, useSounds } from '../hooks/useSounds'
 import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
 import reversoUrl from '../assets/cards/reverso_carta_mesa.svg?no-inline'
 
@@ -47,26 +48,47 @@ function useGeometria(numPlayers) {
 // del reparto «ya habían llegado» y se pintaban en los huecos, y un fotograma después, con
 // `t = 0`, volaban de vuelta al mazo. Ahora el `t` va con su etapa: si la clave no es la de
 // este render, la etapa acaba de empezar y `t` es 0.
-function useTiempoDeEtapa(clave, momento) {
-  const [medido, setMedido] = useState({ clave: null, t: 0 })
-  const desde = useRef({ clave: null, hora: 0 })
-  useEffect(() => {
+// 5a · L2 · LO QUE SE VE (`avanzaSorteo`): la etapa y sus ms, juntos (el «salto raro» de
+// L-M 1 era el `t` de una etapa pintado con la siguiente). Se mide antes de pintar
+// (`useLayoutEffect`) y cada 50 ms. La lámina congelada (`momento`) pinta la vista tal cual.
+function useSorteoMostrado(sorteo, vencimiento, desfase, momento) {
+  const [visto, setVisto] = useState(null)
+  const clave = JSON.stringify({ ronda: sorteo.ronda, etapa: sorteo.etapa, participantes: sorteo.participan.length, vencimiento, desfase })
+  useLayoutEffect(() => {
     if (momento !== null) return undefined
-    desde.current = { clave, hora: performance.now() }
-    const id = setInterval(() => setMedido({ clave, t: performance.now() - desde.current.hora }), 50)
+    const entrada = JSON.parse(clave)
+    const medir = () => setVisto((previo) => avanzaSorteo(previo, entrada, Date.now()))
+    medir()
+    const id = setInterval(medir, 50)
     return () => { clearInterval(id) }
   }, [clave, momento])
-  if (momento !== null) return momento
-  return medido.clave === clave ? medido.t : 0
+  if (momento !== null || !visto) return { etapa: sorteo.etapa, t: momento ?? 0, barajadoMs: BARAJADO_MS }
+  return visto
 }
 
-export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, lamina = null }) {
+// 5a · L1 · el sonido del sorteo, por `useSounds` (el interruptor del ⚙ y el silencio con la
+// pantalla bloqueada valen aquí). Cada sonido, una vez por su clave: StrictMode corre los
+// efectos dos veces y la clave no cambia. La lámina congelada no suena.
+function useSonidoUnaVez(clave, nombre) {
+  const { play } = useSounds()
+  const ultimo = useRef(null)
+  useEffect(() => {
+    if (clave === null || ultimo.current === clave) return
+    ultimo.current = clave
+    play(nombre)
+  }, [clave, nombre, play])
+}
+
+export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, desfase = 0, lamina = null }) {
   const { sorteo, numPlayers } = game
   // Árbitro v1.3 · el volteo dura lo mismo aquí que en el árbitro (`config/esperas.js`).
   const volteoMs = VOLTEO_SORTEO_MS
   const momento = lamina?.momento ?? null
   const geo = useGeometria(numPlayers)
-  const t = useTiempoDeEtapa(`${sorteo.ronda}:${sorteo.etapa}`, momento)
+  const visto = useSorteoMostrado(sorteo, game.vencimiento, desfase, momento)
+  const { t } = visto
+  const etapa = visto.etapa
+  const mostrado = etapa === sorteo.etapa ? sorteo : { ...sorteo, etapa }
   const [elegida, setElegida] = useState(null)
 
   // Durante el sorteo no se ven «Pozo 0» ni «Comodín activo»: una marca en `body` que `pvp.css`
@@ -78,7 +100,7 @@ export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, lamina 
 
   const participo = sorteo.participan.includes(0)
   const yaElegi = sorteo.yaEligieron.includes(0) || elegida?.ronda === sorteo.ronda
-  const eligiendo = sorteo.etapa === ETAPA.ELECCION && participo && !yaElegi
+  const eligiendo = etapa === ETAPA.ELECCION && participo && !yaElegi
 
   const elegir = (p) => {
     if (!eligiendo) return
@@ -87,14 +109,36 @@ export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, lamina 
     enviar('elegir_carta_sorteo', { ronda: sorteo.ronda, carta: p })
   }
 
-  const etapa = sorteo.etapa
-  const mensaje = mensajeDelSorteo(sorteo, t)
+  const mensaje = mensajeDelSorteo(mostrado, t)
   const raiz = { 'data-pvp': 'sorteo', 'data-etapa': etapa, 'data-ronda': sorteo.ronda }
+
+  // 5a · L1 · el mapa del sonido (Fase 0, §F.3): el barajado al empezar cada ronda; un golpe de
+  // carta por cada carta que sale, con el mismo `t` que pinta el vuelo (el reparto va de una en
+  // una, así que las que ya salieron son las del turno de reparto cumplido); el volteo cuando
+  // las elegidas se ponen boca arriba. «¡Ya tenemos Mano!» va sin sonido propio (el volteo ya
+  // sonó: variante b, elegida por Victor en el STOP-L).
+  const suena = momento === null
+  const quienesSuenan = etapa === ETAPA.VOLTEO ? null : sorteo.participan.length
+  const volados = etapa === ETAPA.REPARTO && quienesSuenan
+    ? Math.min(CARTAS_SORTEO * quienesSuenan, Math.max(0, Math.floor((t - ANTES_DEL_REPARTO_MS) / PASO_SORTEO_MS) + 1))
+    : 0
+  const ronda = etapa === ETAPA.VOLTEO ? sorteo.rondas.find((r) => r.ronda === sorteo.ronda) ?? null : null
+  const boca = ronda !== null && estadoCarta({ etapa, t, k: 0, p: 0, volteoMs, vuelo: 0, orden: 0 }).cara
+  useSonidoUnaVez(suena && etapa === ETAPA.BARAJADO ? `${sorteo.ronda}` : null, 'cardShuffle')
+  // 2.ª vuelta · el barajado se corta, con su desvanecido, cuando termina el abanico: al pasar
+  // al reparto o, si la vista tarda y el mazo espera quieto, a los `barajadoMs` del abanico.
+  const abanico = etapa === ETAPA.BARAJADO && t < visto.barajadoMs
+  const barajaba = useRef(false)
+  useEffect(() => {
+    if (barajaba.current && !abanico) cortarSonido('cardShuffle')
+    barajaba.current = abanico
+  }, [abanico])
+  useSonidoUnaVez(suena && volados > 0 ? `${sorteo.ronda}:${volados}` : null, 'cardDeal')
+  useSonidoUnaVez(suena && boca ? `${sorteo.ronda}` : null, 'showdown')
   // El anfitrión es el asiento real 0 (§2.1); `anfitrion` es su índice en la mesa rotada.
   if (!geo || !geo.oval || !geo.asientos[anfitrion]) return <div className="pvp-sc-capa" aria-hidden="true" {...raiz} />
 
   const mazo = lugarDelMazo(geo.asientos[anfitrion], geo.oval)
-  const ronda = etapa === ETAPA.VOLTEO ? sorteo.rondas.find((r) => r.ronda === sorteo.ronda) ?? null : null
   const posicionDe = (seat) => {
     if (seat === 0 && elegida?.ronda === sorteo.ronda) return elegida.p
     if (ronda) return ronda.volteo.find((v) => v.asiento === seat)?.posicion ?? null
@@ -103,7 +147,7 @@ export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, lamina 
     return sorteo.elegidas?.[seat] ?? null
   }
   const cartaVolteada = (seat) => ronda?.volteo.find((v) => v.asiento === seat)?.carta ?? null
-  const mano = manoALaVista(sorteo, t)
+  const mano = manoALaVista(mostrado, t)
 
   // En el volteo, los que voltearon: con empate, `participan` ya es la ronda siguiente (solo los
   // empatados) y las cartas de los demás desaparecían justo cuando había que enseñarlas.
@@ -154,7 +198,7 @@ export default function SorteoMesa({ game, reloj, enviar, anfitrion = 0, lamina 
       <div className="pvp-sc-mazo deck-shuffle-wrapper" style={{ left: mazo.x, top: mazo.y, width: mazo.w, height: mazo.h }} data-pvp="sorteo-mazo">
         <div className="deck-pile pvp-sc-mazo-pila" />
         {etapa === ETAPA.BARAJADO && [-22, -11, 0, 11, 22].map((angle, i) => (
-          <div key={i} className="shuffle-fan-card" style={{ animationDelay: `${i * 25}ms`, '--fan-angle': `${angle}deg` }} />
+          <div key={i} className="shuffle-fan-card" style={{ animationDelay: `${i * 25}ms`, animationDuration: `${visto.barajadoMs}ms`, '--fan-angle': `${angle}deg` }} />
         ))}
       </div>
       {cartas}

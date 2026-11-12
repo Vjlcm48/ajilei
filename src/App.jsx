@@ -140,13 +140,16 @@ import { arranqueDeSesion } from './screens/salasCore'
 // pantallas. El patrón de la casa es un estado y una cascada de `if`; la puerta
 // habla ese idioma.
 // Las pantallas desde las que NO se va derecho a la mesa, y que por tanto no
-// pagan la precarga. El lobby estaba solo hasta SAL-B1; ahora le acompañan las
-// tres del PvP, que llevan a una partida que todavia no existe.
-// SAL-B2 F1b · y el stub de partida PvP, que todavia no reparte nada.
+// pagan la precarga. El lobby estaba solo hasta SAL-B1; le acompañan las dos
+// del PvP que aún no llevan a una partida.
 // RNK-1 1e · y el intersticial de SumaMente: mientras corre su video no se
 // baja la mesa (audio + baraja + chunk) por la misma red. Rankings, que viene
 // detrás, precarga como hasta hoy.
-const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sala-espera', 'partida-pvp', 'sumamente']
+// MES-PvP 5a · la Sala de espera y la partida salen de la lista: la sala ya
+// lleva a una partida de verdad, y dura lo bastante para bajar la mesa, sus
+// sonidos y las 40 caras antes del sorteo. La partida es la red de seguridad de
+// quien vuelve por `mi_sala` sin pasar por la sala.
+const SIN_PRECARGA = ['lobby', 'sala-opciones', 'armar-mesa', 'sumamente']
 
 // ── RNK-1 1e · PREMIUM, EL HUECO ─────────────────────────────────────────────
 // Rector RNK-1 1e §0: el video de SumaMente nunca sale para Premium, y Premium

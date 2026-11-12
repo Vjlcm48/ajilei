@@ -14,6 +14,7 @@ import MensajesMesa from './MensajesMesa'
 import { AVISO_RELOJ_S } from '../lib/sorteoMesaCore'
 import RecargaPvP from './RecargaPvP'
 import { AnuncioSimulado, EsperaAnuncio } from './AnuncioPvP'
+import { marcar, midiendo } from '../dev/medirArranque'
 
 // ── MES-PvP 3 · La partida entre personas ───────────────────────────────────
 // Ficha: AJILEI_MES-PvP_Fase1-3_v1.0.md §3. Diagnóstico: informe de la Fase 0, §B y §D.
@@ -30,6 +31,18 @@ import { AnuncioSimulado, EsperaAnuncio } from './AnuncioPvP'
 // `import()` dentro de ella: en producción la rama es falsa y el módulo no se empaqueta.
 
 const GameTable = lazy(fabricaMesa)
+
+// 5a · A3 · `?medir=arranque` (solo de desarrollo; en producción, `null` y sin trozo): el panel de
+// las marcas y la del primer cuadro con mesa, que se monta junto a `GameTable` dentro del mismo
+// `Suspense` y por eso entra en el mismo commit.
+const PanelArranque = import.meta.env.DEV ? lazy(() => import('../dev/PanelArranque')) : null
+function MarcaPrimerCuadro() {
+  useEffect(() => {
+    const id = requestAnimationFrame(() => marcar('mesa-1'))
+    return () => cancelAnimationFrame(id)
+  }, [])
+  return null
+}
 
 // ── El sorteo, sobre la mesa (lámina L-M 1) ─────────────────────────────────
 // La capa del centro se fue: la mesa se monta ya en el sorteo y `SorteoMesa` pinta encima el
@@ -54,10 +67,11 @@ function Traje({ sala, t, children }) {
   )
 }
 
-function Aviso({ texto, onLobby, t, pvp }) {
+// 5a · sin texto de espera: lo que se ve mientras no hay mesa es el traje, sin «Arrancando».
+function Aviso({ texto = null, onLobby, t, pvp }) {
   return (
     <div className="sal-cuerpo sal-partida" data-pvp={pvp}>
-      <p className="sal-partida-pronto" role="status">{texto}</p>
+      {texto && <p className="sal-partida-pronto" role="status">{texto}</p>}
       {onLobby && (
         <section className="sal-accion">
           <button type="button" className="sal-cta" data-accion="cta" onClick={onLobby}>{t('sal.partida.volver')}</button>
@@ -74,6 +88,8 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   const { game, escena, reloj } = foto
 
   useEffect(() => { cargarMesa().catch(() => {}) }, [])
+  useEffect(() => { if (import.meta.env.DEV) marcar('pantalla') }, [])
+  const [medir] = useState(() => import.meta.env.DEV && midiendo())
 
   // §3.3 · quien vuelve a una partida en la que ya abandonó no tiene nada que ver: al lobby.
   // Solo en la primera lectura; si abandona aquí, ve su pantalla final (MES-PvP 3-A).
@@ -131,8 +147,10 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   }), [foto, desfase, enSorteo, cronicaAusente])
   const lamina = partida?.lamina ?? null
 
+  // 5a · sin mesa todavía (quien vuelve por `mi_sala`, sin las sillas de la sala): el traje,
+  // sin texto, hasta la primera vista. Quien llega de la sala ya tiene la mesa provisional.
   if (escena === 'arrancando' || !game) {
-    return <Traje sala={sala} t={t}><Aviso texto={t('pvp.arrancando')} t={t} pvp="arrancando" /></Traje>
+    return <Traje sala={sala} t={t}><Aviso t={t} pvp="arrancando" /></Traje>
   }
   if (escena === 'muerta') {
     return <Traje sala={sala} t={t}><Aviso texto={t('pvp.muerta')} onLobby={onLobby} t={t} pvp="muerta" /></Traje>
@@ -140,7 +158,7 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
 
   // sorteo · mesa · anuncio · final: la misma mesa, montada una sola vez.
   return (
-    <Suspense fallback={<Traje sala={sala} t={t}><Aviso texto={t('pvp.arrancando')} t={t} pvp="arrancando" /></Traje>}>
+    <Suspense fallback={<Traje sala={sala} t={t}><Aviso t={t} pvp="arrancando" /></Traje>}>
       <GameTable
         stake={game.unit}
         numPlayers={game.numPlayers}
@@ -150,7 +168,7 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
         partida={partidaMesa}
         onLeave={onLobby}
       />
-      {enSorteo && <SorteoMesa game={game} reloj={reloj} enviar={foto.enviar} anfitrion={foto.anfitrion} lamina={partida?.lamina ?? null} />}
+      {enSorteo && <SorteoMesa game={game} reloj={reloj} enviar={foto.enviar} anfitrion={foto.anfitrion} desfase={desfase} lamina={partida?.lamina ?? null} />}
       {escena === 'anuncio' && <AnuncioSimulado game={game} enviar={foto.enviar} />}
       {/* L-M 3 · §3 · quien volvió antes (centrada con velo); §1 · la recarga. */}
       {escena === 'mesa' && game.vencimiento?.clase === CLASE_PAUSA_ANUNCIO && (
@@ -163,6 +181,8 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
       {/* L-M 2 · §2 · los mensajes; durante tu pausa de anuncio no se pintan (Reglas v1.9 §8.6).
           v1.3 · en la mesa real llegan por la foto (`partidaCliente.mensajes`). */}
       <MensajesMesa partida={partida ?? foto} oculta={escena === 'anuncio'} />
+      {import.meta.env.DEV && medir && <MarcaPrimerCuadro />}
+      {import.meta.env.DEV && medir && <Suspense fallback={null}><PanelArranque desfase={desfase} /></Suspense>}
     </Suspense>
   )
 }
@@ -185,21 +205,26 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, tape
     // La condición es constante en producción (`DEV` es `false`): la rama y su `import()` no se
     // empaquetan, y `testDistSinMoldes` lo comprueba sobre `dist/`.
     if (import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS && mando !== null) {
-      import('../dev/partidaImitada').then(({ crearPartidaImitada, leerMandoPvP }) => {
+      // 5a · y la mesa ya bajada, como la deja la sala de espera con su precarga: la partida
+      // nace con la mesa lista (la vara del arranque de `pvp.mesa` lo mide así).
+      Promise.all([import('../dev/partidaImitada'), cargarMesa()]).then(([{ crearPartidaImitada, leerMandoPvP }]) => {
         const pedido = leerMandoPvP(mando)
         if (!vivo || !pedido) return
-        const p = crearPartidaImitada(pedido)
-        window.__pvpImitada = p   // el arnés (`diagDSK pvp`) avanza el guion desde aquí
-        setImitada(p)
+        setImitada(crearPartidaImitada(pedido))
       })
     }
     return () => { vivo = false }
   }, [mando])
+  // El arnés (`diagDSK pvp`) avanza el guion desde aquí. 5a · se publica tras el commit: desde
+  // entonces la partida ya está en pantalla (la vara del arranque cuenta desde ahí).
+  useEffect(() => {
+    if (import.meta.env.DEV && imitada) window.__pvpImitada = imitada
+  }, [imitada])
 
   if (conMando) {
-    if (!imitada) return <Traje sala={null} t={t}><Aviso texto={t('pvp.arrancando')} t={t} pvp="arrancando" /></Traje>
+    if (!imitada) return <Traje sala={null} t={t}><Aviso t={t} pvp="arrancando" /></Traje>
     return <MesaViva sala={imitada.sala} partida={imitada} cuenta={cuenta} billetera={billetera} tapetes={tapetes} onLobby={onLobby} />
   }
-  if (!sala) return <Traje sala={null} t={t}><Aviso texto={t('pvp.arrancando')} onLobby={onLobby} t={t} pvp="arrancando" /></Traje>
+  if (!sala) return <Traje sala={null} t={t}><Aviso onLobby={onLobby} t={t} pvp="arrancando" /></Traje>
   return <MesaViva sala={sala} partida={null} cuenta={cuenta} billetera={billetera} tapetes={tapetes} onLobby={onLobby} />
 }

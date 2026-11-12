@@ -12,12 +12,14 @@ import { useSounds, precargarSonidos, SONIDOS_SALAS } from '../hooks/useSounds'
 import { useCronometroSala } from '../hooks/useCronometroSala'
 import { montoTexto } from '../config/tapetes'
 import { claveDeError, esMesa } from '../lib/salasApi'
+import { marcar } from '../dev/medirArranque'
 import {
   enlaceDeSala,
   finDe,
   posicionSilla,
   resumenDe,
   siguienteConsejo,
+  salaParaPartida,
   sillasDe,
   urge,
 } from './salaEsperaCore'
@@ -125,7 +127,18 @@ export default function SalaEspera({
   // devuelve un hook sin memoizar (`play`, `t`) se leen desde aquí para que los
   // efectos con dependencias estables no se vuelvan a montar por ellas.
   const fns = useRef({})
-  useEffect(() => { fns.current = { play, t, onSalir, onLobby, onPartida } })
+  // 5a · la partida nace con las sillas de la sala: la mesa provisional las pinta desde el primer
+  // cuadro (`mesaPvPCore.vistaProvisional`), sin «Arrancando la partida…». Solo si este teléfono
+  // vio la sala esperando (`enVivo`, abajo): quien vuelve con la partida en curso, sin sillas.
+  const enVivo = useRef(false)
+  const aPartida = () => {
+    if (import.meta.env.DEV) {   // 5a · `?medir=arranque`, solo de desarrollo
+      const s = sillasDe(sala, asientos ?? [], uid)
+      marcar('resuelta', { anfitrion: s.find((x) => x.esAnfitrion)?.asiento, propia: s.find((x) => x.esTu)?.asiento })
+    }
+    onPartida?.(salaParaPartida(sala, asientos, uid, enVivo.current))
+  }
+  useEffect(() => { fns.current = { play, t, onSalir, onLobby, aPartida } })
 
   const salaId = sala?.id ?? null
 
@@ -139,7 +152,8 @@ export default function SalaEspera({
   // montaba el cliente y su sorteo vencía con la posición 0 (Fase 0, §B.9). El CTA se queda
   // por si el efecto no llegara a correr.
   useEffect(() => {
-    if (fin === 'activa') fns.current.onPartida?.(sala)
+    if (fin === null && sala?.estado === 'esperando') enVivo.current = true
+    if (fin === 'activa') fns.current.aPartida()
   }, [fin, sala])
   const sillas = sillasDe(sala, asientos ?? [], uid)
   const abierta = sala?.tipo === 'abierta'
@@ -155,9 +169,8 @@ export default function SalaEspera({
 
   useEffect(() => {
     montado.current = true
-    // `App` no precarga para las pantallas de salas (SIN_PRECARGA); la sala de
-    // espera pide sus tres al montar, que es el momento en que se sabe que van
-    // a sonar (SAL-A §5.3).
+    // Los tres de la sala, al montar (SAL-A §5.3). Desde MES-PvP 5a, `App`
+    // precarga aquí además la mesa, sus sonidos y la baraja (SIN_PRECARGA).
     precargarSonidos(SONIDOS_SALAS)
     const r = relojes.current
     return () => {
@@ -236,6 +249,7 @@ export default function SalaEspera({
     if (!salaId || fin !== null || sala?.estado !== 'esperando' || reloj.segundos !== 0) return
     if (resolviendo.current) return
     resolviendo.current = true
+    if (import.meta.env.DEV) marcar('sala-cero')   // 5a · `?medir=arranque`, solo de desarrollo
     api.resolverSala(salaId).then(({ data }) => {
       resolviendo.current = false
       if (!montado.current || !esMesa(data)) return
@@ -394,7 +408,7 @@ export default function SalaEspera({
 
   // La salida de un final: la mesa está muerta (o arrancó); no hay `salir_sala`.
   const salirDelFinal = () => {
-    if (fin === 'activa') onPartida?.(sala)
+    if (fin === 'activa') aPartida()
     else onSalir?.()
   }
 
@@ -438,7 +452,7 @@ export default function SalaEspera({
   if (fin === 'activa') {
     accion = (
       <>
-        <button type="button" className="sal-cta" data-accion="cta" onClick={() => onPartida?.(sala)}>
+        <button type="button" className="sal-cta" data-accion="cta" onClick={aPartida}>
           {t('sal.espera.fin.entrar')}
         </button>
         <small data-accion="cta-nota"> </small>
