@@ -22,6 +22,7 @@
 
 import { MOTIVOS as M } from '../arbitro/motivos.js'
 import { esClaveMensaje } from '../config/mensajes.js'
+import { marcar } from '../dev/medirArranque.js'
 
 export const FUNCION_PARTIDA = 'partida'
 // Literales de contrato, sin importarlos: `supabase/functions/partida/nucleo.js` y
@@ -132,6 +133,8 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
     leida = true
     const cambios = {}
     if (fila && fila.version > (foto.version ?? -1)) {
+      // 5a · `?medir=arranque`, solo de desarrollo.
+      if (import.meta.env.DEV && !foto.vista) marcar('vista-1', fila.vista)
       cambios.version = fila.version
       cambios.vista = fila.vista
     }
@@ -208,7 +211,10 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
     reclamando = true
     proximoReclamo = ahora() + REINTENTO_RECLAMO_MS
     const yo = generacion
+    const arranque = import.meta.env.DEV && !foto.vista
+    if (import.meta.env.DEV && arranque) marcar('reclamo-enviado')
     const r = await llamar({ accion: 'reclamar_vencimiento', version: foto.version ?? 0 })
+    if (import.meta.env.DEV && arranque) marcar('reclamo-respuesta')
     if (yo !== generacion) return
     reclamando = false
     if (!r.ok && !TOLERADOS.includes(r.motivo)) {

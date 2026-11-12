@@ -21,7 +21,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 // audio a node; las aserciones no lo usan: cada caso pasa su propio `sonido`.
 vi.mock('howler', () => ({ Howl: class {}, Howler: { mute: () => {} } }))
 
-const { reproducir, STRUM_CORTE_MS, STRUM_FADE_MS, SONIDOS_PORTADA } = await import('./useSounds')
+const { cortarSonido, reproducir, STRUM_CORTE_MS, STRUM_FADE_MS, SONIDOS_PORTADA } = await import('./useSounds')
 
 // Un `Howl` falso que apunta lo que le piden.
 function sonidoFalso({ duracion = 0 } = {}) {
@@ -33,6 +33,7 @@ function sonidoFalso({ duracion = 0 } = {}) {
     volume() { return 0.8 },
     fade(...a) { s.llamadas.push(['fade', ...a]) },
     stop(id) { s.llamadas.push(['stop', id]) },
+    playing() { return true },
   }
   return s
 }
@@ -94,6 +95,20 @@ describe('BIE-1 · reproducir', () => {
     expect(s.llamadas.some(([q]) => q === 'fade')).toBe(false)
     vi.advanceTimersByTime(3)
     expect(s.llamadas.some(([q]) => q === 'fade')).toBe(true)
+  })
+
+  test('5a · el sorteo corta el barajado al terminar su etapa, con su desvanecido y sin el recorte', () => {
+    const s = sonidoFalso()   // sin duración: el archivo aún no había llegado, no hay recorte
+    reproducir('cardShuffle', true, () => s)
+    vi.advanceTimersByTime(1000)
+    cortarSonido('cardShuffle')
+    expect(s.llamadas).toContainEqual(['fade', 0.8, 0, 130, 1])
+    vi.advanceTimersByTime(130)
+    expect(s.llamadas).toContainEqual(['stop', 1])
+    const antes = s.llamadas.length
+    vi.advanceTimersByTime(5000)
+    cortarSonido('cardShuffle')   // ya cortado: nada más
+    expect(s.llamadas).toHaveLength(antes)
   })
 
   test('la Portada precarga el clic y no el rasgueo (D2/D9 de BIE-1)', () => {

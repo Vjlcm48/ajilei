@@ -460,6 +460,18 @@ const ESCENAS_LM3 = {
   'anuncio-premium': { jugar: (m) => hasta(m, (e) => enPausa(e) && !e.asientos[m.yo].enAnuncio && e.asientos.some((a) => a.enAnuncio)), premium: true },
   // §3 · el cierre: en vivo, los demás vuelven del anuncio a los 3 s y la mano sigue…
   'anuncio-cierre': { jugar: (m) => hasta(m, (e) => enPausa(e) && !e.asientos[m.yo].enAnuncio && e.asientos.some((a) => a.enAnuncio)) },
+  // 5a · H.2 · quiebras en una mano de anuncio (la 5): la oferta sigue viva en la pausa de
+  // anuncio, con la burbuja sin anillo (su final no se sabe).
+  'recarga-anuncio': {
+    minimo: 3,
+    jugar: (m) => {
+      hasta(m, (e) => e.motor.handCount === 4 && enPago(e), retiradaRapida)
+      pila(m, m.yo, APUESTA)
+      hasta(m, (e) => e.motor.handCount === 5 && enPago(e))
+      exige(m.e.motor.players[m.yo].chips === 0)
+      hasta(m, enPausa)
+    },
+  },
   // … o nadie vuelve y vencen los 45 s (la escena llega con 6 s por delante).
   'anuncio-vence': {
     jugar: (m) => {
@@ -601,7 +613,7 @@ export const escenaCabeEn = (escena, n) => n >= (ESCENAS[escena].minimo ?? 2) &&
  */
 export function crearPartidaImitada({
   escena, n = 2, asiento = 0, nombres = null, semilla = 1, ahora = Date.now, vivo = false, corte = null, momento = null,
-  msj = null, msjMs = 1200, abierta = null, premium = null, saldo = null,
+  msj = null, msjMs = 1200, abierta = null, premium = null, saldo = null, lento = null,
 }) {
   if (!ESCENAS[escena]) throw new Error(`MES-PvP 2 · escena desconocida: ${escena}`)
   if (!escenaCabeEn(escena, n)) throw new Error(`MES-PvP 2 · «${escena}» no cabe en una mesa de ${n}`)
@@ -700,8 +712,13 @@ export function crearPartidaImitada({
 
   const oyentes = new Set()
   const desfaseDeAhora = () => m.t - ahora()
+  // 5a · L2 · `lento=<ms>`: la primera vista llega tarde (la función en frío, la red lenta); el
+  // árbitro corre igual desde que nace. Mientras, la mesa provisional, con las sillas de la sala.
+  const nace = ahora()
+  const oculta = () => lento !== null && ahora() < nace + lento
+  let lentoId = null
   const fotoDe = (cambios = {}) => Object.freeze({
-    vista: JSON.parse(JSON.stringify(vistaDe(m.e, asiento))),
+    vista: oculta() ? null : JSON.parse(JSON.stringify(vistaDe(m.e, asiento))),
     version: m.e.version,
     canal: 'SUBSCRIBED',
     avisos: 0,
@@ -821,7 +838,11 @@ export function crearPartidaImitada({
 
   return {
     marca: MARCA_PARTIDA_IMITADA,
-    sala: { id: `imitada-${escena}`, apuesta: APUESTA, jugadores: n, entrada: 'corta', ritmo: 'normal', corteVoz: corte },
+    sala: {
+      id: `imitada-${escena}`, apuesta: APUESTA, jugadores: n, entrada: 'corta', ritmo: 'normal', corteVoz: corte,
+      // 5a · L2 · lo que `SalaEspera` le pasa a la partida (`salaParaPartida`): la mesa provisional.
+      ...(lento !== null ? { sillas: m.e.asientos.map((a, i) => ({ asiento: a.silla, nombre: a.nombre, tu: i === asiento })) } : {}),
+    },
     // L-M 1 · lo que la capa del sorteo lee de la lámina.
     lamina: Object.freeze({
       corte,
@@ -853,6 +874,7 @@ export function crearPartidaImitada({
     },
     iniciar: async () => {
       setRng(rng)
+      if (oculta() && lentoId === null) lentoId = setTimeout(() => poner(), nace + lento - ahora())
       if (guionVivo && !conductor) conductor = setInterval(conducir, 100)
       arrancarCharla()
       if (esLM3 && (vivo || def.deUnaVez) && !lm3) {
@@ -878,6 +900,7 @@ export function crearPartidaImitada({
       }
     },
     parar: () => {
+      clearTimeout(lentoId); lentoId = null
       clearInterval(conductor); conductor = null
       clearInterval(charla); charla = null
       pararLM3()
@@ -940,9 +963,12 @@ export function leerMandoPvP(search = globalThis.location?.search ?? '') {
   // lámina). Las variantes (`var`) se retiraron con las decisiones de Victor (STOP-L).
   const uno = (k) => (q.has(k) ? q.get(k) === '1' : null)
   const saldo = q.has('saldo') && Number.isFinite(Number(q.get('saldo'))) ? Number(q.get('saldo')) : null
+  // 5a · `lento=<ms>`: la primera vista llega tarde y, mientras, se ve la mesa provisional (la
+  // vara del arranque de `pvp.mesa` y la medida de quien llega tarde).
+  const lento = q.has('lento') && Number(q.get('lento')) >= 0 ? Number(q.get('lento')) : null
   return {
     escena, n, asiento, nombres: q.get('nombres') === 'largo' ? 'largo' : null,
     vivo: q.get('ver') === 'vivo', corte, momento, msj, msjMs,
-    abierta: uno('abierta'), premium: uno('premium'), saldo,
+    abierta: uno('abierta'), premium: uno('premium'), saldo, lento,
   }
 }

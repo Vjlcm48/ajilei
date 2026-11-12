@@ -79,6 +79,7 @@ const ESPERADO = {
   'recarga-ajena': ['mesa', (v) => clase(v) === 'mano_siguiente' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'decide')],
   'recarga-ajena-fuera': ['mesa', (v) => clase(v) === 'turno' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'fuera' && !p.eliminated)],
   'recarga-rival': ['mesa', (v) => clase(v) === 'oferta_recarga' && v.players.some((p, i) => i !== v.asiento && p.recarga === 'decide')],
+  'recarga-anuncio': ['mesa', (v) => clase(v) === 'pausa_anuncio' && v.handCount === 5 && propio(v).chips === 0 && propio(v).recarga === 'decide'],
   'anuncio-premium': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
   'anuncio-cierre': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
   'anuncio-vence': ['mesa', (v) => clase(v) === 'pausa_anuncio' && !propio(v).enAnuncio && v.players.some((p) => p.enAnuncio)],
@@ -89,7 +90,7 @@ const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
 describe('MES-PvP 2 · las escenas', () => {
   it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, `descarte-propio` (MES-PvP 3) y los tres fines de la 3-A', () => {
     expect([...ESCENAS_PVP].sort()).toEqual(Object.keys(ESPERADO).sort())
-    expect(ESCENAS_PVP).toHaveLength(55)
+    expect(ESCENAS_PVP).toHaveLength(56)
     expect(mesasDe('abandono')).toEqual([3, 4, 5])
     expect(mesasDe('aviso-salida')).toEqual([3, 4, 5])
     expect(mesasDe('sorteo-empate-3')).toEqual([3, 4, 5])
@@ -360,7 +361,7 @@ describe('MES-PvP 2 · el mando', () => {
   it('con la puerta abierta, lee la escena y sus datos, y corrige lo que no vale', () => {
     vi.stubEnv('VITE_AUTH_BYPASS', '1')
     // L-M 1 · y los mandos de la lámina, con sus valores por defecto.
-    const lamina = { vivo: false, corte: null, momento: null, msj: null, msjMs: 1200, abierta: null, premium: null, saldo: null }
+    const lamina = { vivo: false, corte: null, momento: null, msj: null, msjMs: 1200, abierta: null, premium: null, saldo: null, lento: null }
     expect(leerMandoPvP('?pvp=revelacion&n=4&asiento=3&nombres=largo')).toEqual({ escena: 'revelacion', n: 4, asiento: 3, nombres: 'largo', ...lamina })
     expect(leerMandoPvP('?pvp=revelacion')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })
     expect(leerMandoPvP('?pvp=revelacion&n=9&asiento=7')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })

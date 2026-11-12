@@ -209,6 +209,9 @@ function programaRecorte(nombre, sound, id, esperaMs, fadeMs) {
 // dibujo pero no el sonido. Una línea, aditiva: quien no lo usa —todas las
 // llamadas anteriores— no se entera.
 const enEspera = new Set()
+// 5a · cuántas veces se cortó cada sonido (`cortarSonido`), y la última instancia del barajado.
+const cortes = {}
+const enCurso = {}
 
 export function reproducir(soundName, activo, sonido = obtener) {
   if (!activo) return null
@@ -217,7 +220,9 @@ export function reproducir(soundName, activo, sonido = obtener) {
   if (sonido === obtener && !howlerYa()) {
     if (FUENTES[soundName] && !enEspera.has(soundName)) {
       enEspera.add(soundName)
-      conHowler(() => { enEspera.delete(soundName); reproducir(soundName, true) })
+      const marca = cortes[soundName] ?? 0
+      // 5a · lo cortado mientras esperaba al motor ya no suena al llegar.
+      conHowler(() => { enEspera.delete(soundName); if ((cortes[soundName] ?? 0) === marca) reproducir(soundName, true) })
     }
     return null
   }
@@ -232,6 +237,7 @@ export function reproducir(soundName, activo, sonido = obtener) {
 
   if (soundName === 'cardShuffle') {
     const id = sound.play()
+    enCurso[soundName] = { sound, id }
     // `duration()` es 0 mientras el archivo no ha llegado — y desde esta
     // tanda eso puede pasar de verdad en la PRIMERA reproducción, no sólo en
     // teoría. La guarda de `> 0` ya existía y ahora es la que trabaja: sin
@@ -247,6 +253,24 @@ export function reproducir(soundName, activo, sonido = obtener) {
   }
 
   return { sound, id: sound.play() }
+}
+
+// ── 5a · El corte a la hora de quien llama ─────────────────────────────────
+// El barajado del sorteo dura lo que dura su etapa, no el 49 % del archivo: al terminar, la
+// capa lo corta con el mismo desvanecido. Vale también la primera vez, cuando el archivo aún no
+// había llegado al sonar (sin `duration()` no hay recorte y sonaba entero, 5,2 s: lo que oía
+// Victor en la PC) y cuando la petición aún espera al motor. Solo lo llama el sorteo: la mesa
+// contra las IAS sigue con su recorte.
+export function cortarSonido(nombre, fadeMs = 130) {
+  cortes[nombre] = (cortes[nombre] ?? 0) + 1
+  const e = enCurso[nombre]
+  if (!e) return
+  enCurso[nombre] = null
+  const r = recortes[nombre]
+  if (r?.id === e.id) { clearTimeout(r.corte); clearTimeout(r.apagado); recortes[nombre] = null }
+  if (!e.sound.playing(e.id)) { e.sound.stop(e.id); return }
+  e.sound.fade(e.sound.volume(), 0, fadeMs, e.id)
+  setTimeout(() => e.sound.stop(e.id), fadeMs)
 }
 
 export function useSounds() {

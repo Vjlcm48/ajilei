@@ -15,6 +15,7 @@
 // añade `ajilei.partidaRapida` (local) y `ajilei.consultaConfirmada` (sesión): 17 claves, 14 accesores.
 // TIE-1 1a añade `ajilei.tapete.tono` (la copia del tono en uso) y deja `ajilei.tapetes.comprados`
 // como LEGADO: lo comprado vive en el servidor (INV-76) y la clave sólo se nombra para borrarla: 18 claves.
+// MES-PvP 5a añade `ajilei.medir` (sesión), el mando `?medir=arranque`, solo de desarrollo: 19 claves.
 // Fuera de alcance: la sesión de Supabase (`sb-…-auth-token`), que la escribe
 // la biblioteca y no el código de `src/`.
 import { describe, it, expect } from 'vitest'
@@ -38,6 +39,7 @@ const CLAVES = [
   { clave: 'ajilei.sumamente', almacen: 'local', fuente: 'RNK-1 Fase 1e · Rankings_v1.2 §6.7.1 · sumaContador.js · el contador del video de SumaMente, en el aparato' },
   { clave: 'ajilei.saldoOculto', almacen: 'local', fuente: 'CFG-1 Fase 1a · Configuracion_v1.1 §6 · saldoOculto.js · el ojito de la píldora del lobby, en el aparato' },
   { clave: 'ajilei.partidaRapida', almacen: 'local', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §2 · partidaRapida.js · el ritmo de la mesa contra las IAS, en el aparato (INV-70)' },
+  { clave: 'ajilei.medir', almacen: 'session', fuente: 'MES-PvP Sub5a §A3 · medirArranque.js · el mando `?medir=arranque` sobrevive al inicio de sesión; solo de desarrollo, no llega a dist/' },
   { clave: 'ajilei.consultaConfirmada', almacen: 'session', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §3 · consultaConfirmada.js · el primer cobro de Mano actual ya se confirmó en esta sesión' },
 ]
 
@@ -56,6 +58,7 @@ const ACCESORES = [
   'src/lib/saldoOculto.js',        // ajilei.saldoOculto (CFG-1 1a)
   'src/lib/partidaRapida.js',      // ajilei.partidaRapida (CFG-1 1e)
   'src/lib/consultaConfirmada.js', // ajilei.consultaConfirmada (CFG-1 1e, sessionStorage)
+  'src/dev/medirArranque.js',      // ajilei.medir (MES-PvP 5a, sessionStorage, solo de desarrollo)
   'src/lib/limpiarAparato.js',     // CFG-1 1c: borra TODAS las ajilei.* y vacía sessionStorage al eliminar la cuenta (no escribe ninguna)
 ]
 
@@ -94,6 +97,7 @@ describe('ARN-3e · el almacenamiento del navegador, censado', () => {
     // CFG-1 1c · `limpiarAparato` nombra `sessionStorage` sólo para vaciarlo
     // al eliminar la cuenta: no escribe ninguna clave.
     // CFG-1 1e · `consultaConfirmada` guarda una sola clave de sesión.
-    expect(conSesion).toEqual(['src/lib/consultaConfirmada.js', 'src/lib/limpiarAparato.js', 'src/main.jsx'])
+    // MES-PvP 5a · `medirArranque`, la del mando de desarrollo `?medir=arranque`.
+    expect(conSesion).toEqual(['src/dev/medirArranque.js', 'src/lib/consultaConfirmada.js', 'src/lib/limpiarAparato.js', 'src/main.jsx'])
   })
 })

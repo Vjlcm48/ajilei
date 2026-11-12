@@ -71,6 +71,11 @@ const PROHIBIDAS = [
   // de las tablas del banco imitado: ninguno de los dos llega a producción.
   'DevLocal',
   'Bachaquero_VE',
+  // MES-PvP 5a · A3 · las marcas del arranque (`?medir=arranque`, `src/dev/medirArranque.js`)
+  // y su panel: herramienta fija, solo de desarrollo.
+  'ajilei.medir',
+  'arranque:',
+  'reclamo-enviado',
 ]
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las
