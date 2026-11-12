@@ -8,7 +8,9 @@
 //       Control: la franja, puesta a mano encima del primer recuadro rival.
 //   2 · la crónica con 15 «W» y corte 10 (`turno-ajeno` + un paso: «… pasa.»), mesas 2 y 5: la
 //       tinta no sale del óvalo ni pisa el pozo, y el óvalo no crece. La base es la misma página con la frase cambiada por «x»
-//       (el óvalo de otra escena tiene otra caja: trampa de L-M 1). Control: `&corte=0`.
+//       (el óvalo de otra escena tiene otra caja: trampa de L-M 1). Control: la misma frase con el
+//       nombre entero puesta a mano (desde la 5a el corte vive en `nombreEnVoz` y `&corte=0` ya no
+//       lo quita).
 //   3 · el salto raro (`sorteo-desempate&ver=vivo`, 412×915, mesas 2 y 5): ningún fotograma con
 //       cartas en los huecos antes del primer vuelo del reparto (110 ms tras el barajado).
 //       Control: el mismo contador sobre `sorteo-elige` congelada, con las cartas ya repartidas.
@@ -103,11 +105,13 @@ async function varaFranja(browser, base) {
 }
 
 // ── 2 · La crónica con 15 «W» ───────────────────────────────────────────────
-const MEDIR_CRONICA = () => {
+// `sinCorte`: el control. Pone en la crónica la misma frase con el nombre entero (15 «W»).
+const MEDIR_CRONICA = (sinCorte) => {
   const R = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height } }
   const msg = document.querySelector('.game-message')
   const ovalEl = document.querySelector('.center-zone') ?? document.querySelector('.felt-oval.oval-right')
   if (!msg || !ovalEl) return { error: 'sin óvalo' }
+  if (sinCorte) msg.textContent = msg.textContent.replace(/W+…/g, 'W'.repeat(15))
   const rg = document.createRange()
   rg.selectNodeContents(msg)
   const t = R(rg)
@@ -144,17 +148,17 @@ const cronicaPasa = (m) => !m.error && /W/.test(m.frase) && m.seSale === 0 && !m
 
 async function varaCronica(browser, base) {
   const medir = (corte) => enPiscina(MESAS.flatMap(([n, asiento]) => PANTALLAS.map((vp) => async () => {
-    const m = await enPagina(browser, vp, { base, ruta: `?pvp=turno-ajeno&n=${n}&asiento=${asiento}&nombres=largo${corte ? '' : '&corte=0'}` }, async (p) => {
+    const m = await enPagina(browser, vp, { base, ruta: `?pvp=turno-ajeno&n=${n}&asiento=${asiento}&nombres=largo` }, async (p) => {
       await p.evaluate(() => window.__pvpImitada.avanzar())
       await p.waitForTimeout(700)
-      return p.evaluate(MEDIR_CRONICA)
+      return p.evaluate(MEDIR_CRONICA, !corte)
     })
     return { n, vp: id(vp), ...m, ok: cronicaPasa(m) }
   })))
   const filas = await medir(true)
   const sinCorte = await medir(false)
   const rojas = sinCorte.filter((f) => !f.ok && !f.error)
-  const control = { caso: '&corte=0', rojas: rojas.map((f) => `m${f.n} ${f.vp} «${f.frase}» ${f.lineas} lín · sale ${f.seSale} · crece ${f.crece} · pisa el pozo ${f.pisaPozo}`), rojo: rojas.length > 0 }
+  const control = { caso: 'la frase con el nombre entero, puesta a mano', rojas: rojas.map((f) => `m${f.n} ${f.vp} «${f.frase}» ${f.lineas} lín · sale ${f.seSale} · crece ${f.crece} · pisa el pozo ${f.pisaPozo}`), rojo: rojas.length > 0 }
   const medida = filas.every((f) => f.ok)
   return { celda: 'lm·cronica-15W', ok: medida && control.rojo, medida, filas, control }
 }

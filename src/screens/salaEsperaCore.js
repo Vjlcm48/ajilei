@@ -61,6 +61,16 @@ export function sillasDe(sala, asientos, uid) {
   })
 }
 
+// 5a · la fila de la sala con sus sillas sentadas, para la mesa provisional de la partida
+// (`mesaPvPCore.vistaProvisional`): asiento, nombre y cuál es la propia. Solo para quien vio la
+// sala arrancar (`enVivo`: la vio esperando y luego activa): quien vuelve con la partida ya en
+// curso no lleva sillas y ve la mesa sin texto hasta la vista real, sin un barajado que ya pasó.
+export function salaParaPartida(sala, asientos, uid, enVivo) {
+  if (!enVivo) return sala
+  const sillas = sillasDe(sala, asientos ?? [], uid).filter((s) => !s.vacia)
+  return { ...sala, sillas: sillas.map((s) => ({ asiento: s.asiento, nombre: s.username, tu: s.esTu })) }
+}
+
 // ── El resumen que gobierna la acción ───────────────────────────────────────
 // `puedeJugarYa` reúne las tres condiciones de la lámina y de `jugar_ya`
 // (SAL-A §12): ser el anfitrión, tener al menos dos sentados, y que la mesa NO

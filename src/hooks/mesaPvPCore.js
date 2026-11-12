@@ -6,7 +6,7 @@
 // una foto: `{ game, cronica, enviar, reloj, escena, mesa, ritmo, alternarDescarte, fin }`. La foto solo cambia si
 // cambia algo que se pinta: el reloj se revisa cuatro veces por segundo, y la mesa se
 // repinta una, cuando cambia el segundo.
-import { PHASES, toggleDiscard } from '../engine/gameEngine'
+import { PHASES, makeHandRules, toggleDiscard } from '../engine/gameEngine'
 import {
   ELECCION_SORTEO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, PAUSA_ANUNCIO_MS, RED_REVELACION_MS, TURN_TIME,
 } from '../config/esperas'
@@ -14,7 +14,7 @@ import {
   CLASE_DESCARTE, CLASE_ELECCION, CLASE_MANO_SIGUIENTE, CLASE_PAUSA_ANUNCIO, CLASE_TURNO, FASE_FIN, FASE_SORTEO, REVISION_MS,
 } from '../lib/partidaCliente'
 import { FACTOR_RAPIDA } from '../lib/partidaRapida'
-import { FASE_PAGO, vistaAMesa } from '../lib/vistaAMesa'
+import { FASE_PAGO, VECES_ENTRADA, vistaAMesa } from '../lib/vistaAMesa'
 import { avisoDeAbandono, cronicaDe, finDePartida, nuevosAbandonos } from './vozHumanos'
 import { CORTE_VOZ, conNombresDeVoz } from '../lib/corteVoz'
 
@@ -59,6 +59,47 @@ export function escenaDe(vista, muerta) {
   return 'mesa'
 }
 
+// ── Sub-tanda 5a · La mesa provisional (Fase 0, §C.3 a) ─────────────────────
+// Lo que se pinta desde el primer cuadro, antes de la primera vista: la vista que el árbitro
+// publicará al crear la partida (`crearPartida` + `vistaDe`, en el barajado del sorteo), sacada
+// de las sillas de la sala. Sin vencimiento, porque aún no hay hora del árbitro: el barajado es
+// local hasta que llega la vista. `mesaPvPCore.test.js` la confronta con la del árbitro.
+// `sala.sillas`: [{ asiento, nombre, tu }], las sentadas; sin ellas (quien vuelve por
+// `mi_sala` a una partida que ya corre), no hay provisional.
+export function vistaProvisional({ sillas, apuesta, entrada = 'corta' }) {
+  const orden = [...(sillas ?? [])].sort((a, b) => a.asiento - b.asiento)
+  const n = orden.length
+  const asiento = orden.findIndex((s) => s.tu)
+  if (n < 2 || n > 5 || asiento < 0) return null
+  const chips = VECES_ENTRADA[entrada] * apuesta
+  const todos = orden.map((_, i) => i)
+  return {
+    version: -1,
+    asiento,
+    phase: FASE_SORTEO,
+    players: orden.map((s, i) => ({
+      name: s.nombre ?? `Asiento ${i + 1}`, chips, contrib: 0, contribMano: 0, folded: false, allIn: false,
+      eliminated: false, abandonado: false, cobrado: null, enAnuncio: false, ausente: false, numCartas: 0, recarga: null,
+      ...(i === asiento ? { cards: [] } : {}),
+    })),
+    currentBet: 0,
+    unit: apuesta,
+    pot: 0,
+    capas: [],
+    activePlayerIndex: null,
+    manoIndex: null,
+    pieIndex: null,
+    handRules: makeHandRules(n),
+    handCount: 0,
+    vencimiento: null,
+    descarte: { yaDescartaron: [], cuantas: null },
+    sorteo: { ronda: 1, etapa: 'barajado', participan: todos, posiciones: [], yaEligieron: [], elegidas: todos.map(() => null), rondas: [] },
+    resultado: null,
+    ultimaAccion: null,
+    recarga: { monto: 0, oferta: false, pedida: false, cancelada: null, recargas: 0 },
+  }
+}
+
 /**
  * @param {{ partida: object, sala: { id: string, ritmo?: string, entrada?: string },
  *   ahora?: () => number }} partes
@@ -68,12 +109,15 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
   // (la lámina, `&corte=0`, sin corte).
   const corte = sala.corteVoz ?? CORTE_VOZ
   const voz = (g) => conNombresDeVoz(g, corte)
+  // 5a · la mesa provisional: escena `sorteo` desde el primer cuadro, sin «Arrancando».
+  const provisional = sala.sillas ? vistaProvisional(sala) : null
+  const nProvisional = provisional?.players.length ?? 1
   let foto = Object.freeze({
-    game: null,
+    game: provisional ? vistaAMesa(provisional, null, sala) : null,
     cronica: '',
     enviar: partida.enviar,
     reloj: relojDe(null, 0),
-    escena: 'arrancando',
+    escena: provisional ? 'sorteo' : 'arrancando',
     mesa: sala.id,
     ritmo: sala.ritmo ?? null,
     alternarDescarte: (i) => alternarDescarte(i),
@@ -82,7 +126,7 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     fin: null,
     corteVoz: corte,
     // L-M 1 · el anfitrión (asiento real 0) en la mesa rotada: junto a él va el mazo del sorteo.
-    anfitrion: 0,
+    anfitrion: provisional ? (nProvisional - provisional.asiento) % nProvisional : 0,
     // Árbitro v1.3 · los mensajes de la mesa (`partidaCliente.mensajes`, o los del imitado).
     mensajes: partida.mensajes ?? null,
     // Árbitro v1.3-b · la vista del árbitro tal cual, sin rotar: la capa de la recarga lee de ella
@@ -187,7 +231,7 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     const nuevo = relojDe(vista?.vencimiento ?? null, ahora() + desfase)
     if (nuevo.clase !== foto.reloj.clase || nuevo.timeLeft !== foto.reloj.timeLeft) cambios.reloj = nuevo
     // La escena final solo la pone `finalDe`; mientras se ve el pago, la mesa se queda.
-    const escena = escenaDe(vista, muerta)
+    const escena = escenaDe(vista ?? provisional, muerta)
     if (foto.escena !== 'final' && !espera && !cambios.escena && escena !== 'final' && escena !== foto.escena) cambios.escena = escena
     if (Object.keys(cambios).length > 0) publicar(cambios)
     // La píldora no relee sola: quien monta la mesa refresca el saldo cuando se cobra.

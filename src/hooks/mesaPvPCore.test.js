@@ -1,7 +1,8 @@
 // MES-PvP 2 §3 · El controlador de la mesa, con una `partida` doble y relojes falsos, sin
 // `@testing-library`: la receta de la casa para los hooks.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AVISO_FIN_MS, RITMO_RAPIDO, TOPE_RELOJ_MS, creaMesaPvP, escenaDe, relojDe } from './mesaPvPCore'
+import { AVISO_FIN_MS, RITMO_RAPIDO, TOPE_RELOJ_MS, creaMesaPvP, escenaDe, relojDe, vistaProvisional } from './mesaPvPCore'
+import { crearPartida, vistaDe } from '../arbitro/index.js'
 import { MANO_SIGUIENTE_MS } from '../config/esperas'
 
 const asiento = (extra = {}) => ({
@@ -329,5 +330,39 @@ describe('MES-PvP 3-A · el fin con un abandono', () => {
     expect(nucleo.foto().cronica).toBe('B abandonó la mesa.')
     expect(nucleo.foto().game.players.find((p) => p.name === 'B').estado.texto).toBe('Abandonó')
     nucleo.parar()
+  })
+})
+
+describe('5a · la mesa provisional', () => {
+  const sillas = [{ asiento: 3, nombre: 'Caro' }, { asiento: 0, nombre: 'Ana' }, { asiento: 1, nombre: null, tu: true }]
+  const fila = { id: 'm', apuesta: 200, jugadores: 4, entrada: 'llena', ritmo: 'normal' }
+
+  it('es la vista que el árbitro publica al crear la partida, sin su hora', () => {
+    const real = vistaDe(crearPartida(fila, sillas.map((s, i) => ({ ...s, uid: `u${i}` })), 1000), 1)
+    expect(vistaProvisional({ ...fila, sillas })).toEqual({ ...real, version: -1, vencimiento: null })
+  })
+
+  it('sin las sillas, o sin la propia, no hay provisional', () => {
+    expect(vistaProvisional({ ...fila, sillas: undefined })).toBeNull()
+    expect(vistaProvisional({ ...fila, sillas: sillas.map((s) => ({ ...s, tu: false })) })).toBeNull()
+  })
+
+  it('con las sillas, el sorteo desde la primera foto; la primera vista la releva', () => {
+    const p = doble()
+    const mesa = creaMesaPvP({ partida: p, sala: { ...fila, sillas } })
+    expect(mesa.foto().escena).toBe('sorteo')
+    expect(mesa.foto().game.players.map((x) => x.name)).toEqual(['Asiento 2', 'Caro', 'Ana'])
+    expect(mesa.foto().anfitrion).toBe(2)
+    mesa.iniciar()
+    expect(mesa.foto().escena).toBe('sorteo')
+    p.poner({ vista: { ...vistaProvisional({ ...fila, sillas }), version: 0, vencimiento: { clase: 'barajado_sorteo', hora: 3000 } } })
+    expect(mesa.foto().game.version).toBe(0)
+    expect(mesa.foto().reloj.clase).toBe('barajado_sorteo')
+    mesa.parar()
+  })
+
+  it('sin sillas, como hasta hoy: arrancando hasta la primera vista', () => {
+    const mesa = creaMesaPvP({ partida: doble(), sala: fila })
+    expect(mesa.foto()).toMatchObject({ escena: 'arrancando', game: null })
   })
 })

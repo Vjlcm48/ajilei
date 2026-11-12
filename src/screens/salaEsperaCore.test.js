@@ -7,6 +7,7 @@ import {
   inicialDe,
   posicionSilla,
   resumenDe,
+  salaParaPartida,
   siguienteConsejo,
   sillasDe,
   urge,
@@ -271,6 +272,22 @@ describe('SAL-B2 · siguienteConsejo', () => {
   it('con un índice raro arranca del primero', () => {
     expect(siguienteConsejo(undefined, 5)).toBe(1)
     expect(siguienteConsejo(-1, 5)).toBe(0)
+  })
+})
+
+describe('MES-PvP 5a · salaParaPartida', () => {
+  it('quien vio arrancar la sala lleva las sillas sentadas a la mesa provisional', () => {
+    const s = salaParaPartida(sala({ estado: 'activa' }), asientos(), INV, true)
+    expect(s).toMatchObject({ id: 'u1', apuesta: 200, estado: 'activa' })
+    expect(s.sillas).toEqual([
+      { asiento: 0, nombre: 'carlos_vzla', tu: false },
+      { asiento: 1, nombre: 'maria_ccs', tu: true },
+    ])
+  })
+
+  it('quien vuelve con la partida ya en curso, sin sillas: la mesa sin texto hasta la vista real', () => {
+    const s = salaParaPartida(sala({ estado: 'activa' }), asientos(), INV, false)
+    expect(s).toEqual(sala({ estado: 'activa' }))
   })
 })
 

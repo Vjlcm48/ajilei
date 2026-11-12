@@ -210,6 +210,50 @@ describe('MES-PvP 2 · el resultado y las capas', () => {
   })
 })
 
+// MES-PvP 5a · E.3 · la voz del pago entre personas, por el mismo camino que `GameTable`: la
+// lectura de la mano, `resultadoDeMano(game, lectura)` y `componeCapas(lectura, game.players,
+// game.voz)`, con un rival de nombre largo. Los cuatro casos del informe de la Fase 0 (§E.3).
+describe('MES-PvP 5a · la voz del pago, por el camino de la mesa', () => {
+  const LARGO = ['Yo', 'Maximiliano Rodríguez', 'Beto']
+  const pago = (n, contrib, puntos, winner, allIn) => ({
+    voz: VOZ.HUMANOS,
+    phase: PHASES.PAYOUT,
+    numPlayers: n,
+    handRules: { ruleN: n, maxDiscard: 3 },
+    manoIndex: 0,
+    winner,
+    players: LARGO.slice(0, n).map((name, id) => ({
+      id, name, eliminated: false, folded: false, chips: 0, contribMano: contrib[id], allIn: allIn.includes(id),
+      score: { palo: 'Copas', points: puntos[id], suitScores: { Copas: puntos[id] } }, cards: [],
+    })),
+  })
+  const enLaMesa = (game) => {
+    const lectura = lecturaDeMano(game)
+    return [resultadoDeMano(game, lectura).texto, componeCapas(lectura, game.players, game.voz)]
+  }
+  const CASOS = [
+    ['mesa de 2 · gano yo con all-in corto; al rival le vuelve', [2, [1200, 3000], [41, 30], 0, [0]],
+      ['¡Ganas con Copas, 41 pts!', 'A Maximilian… se le devuelven 1.800 Heptacoins.']],
+    ['mesa de 2 · gana el rival con all-in corto; me vuelve', [2, [3000, 1200], [30, 41], 1, [1]],
+      ['Maximilian… gana con Copas, 41 pts.', 'Se te devuelven 1.800 Heptacoins.']],
+    ['mesa de 3 · gana Maximiliano con all-in corto; Beto se lleva la capa 2; me vuelve', [3, [5000, 1200, 2600], [30, 41, 35], 1, [1, 2]],
+      ['Maximilian… gana con Copas, 41 pts.', 'El pozo se partió: Beto se lleva 2.800. Se te devuelven 2.400 Heptacoins.']],
+    ['mesa de 3 · gano yo; la capa 2 a Maximiliano; a Beto le vuelve', [3, [1200, 2600, 5000], [41, 35, 30], 0, [0, 1]],
+      ['¡Ganas con Copas, 41 pts!', 'El pozo se partió: Maximilian… se lleva 2.800. A Beto se le devuelven 2.400 Heptacoins.']],
+  ]
+  it.each(CASOS)('%s', (_caso, mesaDelCaso, frases) => {
+    expect(enLaMesa(pago(...mesaDelCaso))).toEqual(frases)
+  })
+
+  it('contra las IAS (`voz` indefinida), las capas y el titular de siempre: «la IA», sin punto y sin corte', () => {
+    const ias = (i) => enLaMesa({ ...pago(...CASOS[i][1]), voz: undefined })
+    expect(ias(0)[1]).toBe('A la IA se le devuelven 1800 Heptacoins.')
+    expect(ias(1)).toEqual(['La IA gana con Copas, 41 pts.', 'Se te devuelven 1800 Heptacoins.'])
+    expect(ias(2)[1]).toBe('El pozo se partió: Beto se lleva 2800. Se te devuelven 2400 Heptacoins.')
+    expect(ias(3)[1]).toBe('El pozo se partió: Maximiliano Rodríguez se lleva 2800. A Beto se le devuelven 2400 Heptacoins.')
+  })
+})
+
 describe('MES-PvP 2 · sonidoDe', () => {
   it.each([
     [accion(1, 'pasar'), null],

@@ -2,7 +2,9 @@
 // Ficha AJILEI_MES-PvP_LM-1_v1.0.md §2 y las decisiones de los STOP-L2 y L3; informe en
 // docs/reportes/AJILEI_MES-PvP_LM-1_Informe_v1.0.md. La línea de tiempo, el mensaje y la geometría medida de la mesa; la capa
 // (`screens/SorteoMesa.jsx`) solo pinta.
-import { ANTES_DEL_REPARTO_MS, CARTAS_SORTEO, PASO_SORTEO_MS, esperaRepartoSorteo } from '../config/esperas'
+import {
+  ANTES_DEL_REPARTO_MS, BARAJADO_MS, CARTAS_SORTEO, ELECCION_SORTEO_MS, PASO_SORTEO_MS, VOLTEO_SORTEO_MS, esperaRepartoSorteo,
+} from '../config/esperas'
 import { aPropios, escalaActual } from './escala'
 
 export const ETAPA = Object.freeze({ BARAJADO: 'barajado', REPARTO: 'reparto', ELECCION: 'eleccion', VOLTEO: 'volteo' })
@@ -37,8 +39,11 @@ const FRANJA_AIRE = 8
 // respecto al centro de `.cards-row` propia, y su borde de arriba respecto al pie de la fila.
 // En apaisado de teléfono (`.player-bar` en `display: contents`) es el `.ls-timer` del carril
 // izquierdo de `.player-zone`.
+// 5a · L3 · vueltos a medir con la caja reservada (`.action-area` oculta en `SORTEO`), contra el
+// `.timer-display` de `turno-propio` de hoy: el teléfono no cambia (−103 / 7,4 en 412×915); el
+// escritorio pasa de −153,5 / 22 a −118,7 / 17,9 (1366×768).
 const RELOJ_TELEFONO = Object.freeze({ dx: -103, dy: 7 })
-const RELOJ_ESCRITORIO = Object.freeze({ dx: -153.5, dy: 22 })
+const RELOJ_ESCRITORIO = Object.freeze({ dx: -118.7, dy: 17.9 })
 const RELOJ_CARRIL = Object.freeze({ dx: 3, dy: 1 })
 const MQ_ESCRITORIO = '(orientation: landscape) and (min-height: 601px)'   // GameTable.DESKTOP_TABLE_MQ
 const HUECO_MARCA = 5          // escritorio: la «M» va delante de la «T» reservada
@@ -85,6 +90,61 @@ export function manoALaVista(sorteo, t) {
   if (!r || r.mano === null) return null
   const desde = r.azar ? AZAR_MS : CARA_MS
   return t >= desde ? { seat: r.mano, desliza: t >= desde + MARCA_DESLIZA_MS } : null
+}
+
+// ── 5a · La etapa, en la hora del árbitro ───────────────────────────────────
+// Cuándo empezó la etapa en curso, en la hora del árbitro: su vencimiento menos lo que dura
+// (`arbitro/partida.js`, que pone cada vencimiento a `ahora + espera` al entrar en la etapa).
+// Con él, quien llega tarde (la función en frío, la red lenta) entra en la etapa en su punto:
+// las cartas que ya salieron están en su hueco. Sin vencimiento (la mesa provisional), `null`:
+// el barajado corre en local.
+const DURA_ETAPA = Object.freeze({
+  barajado_sorteo: () => BARAJADO_MS,
+  reparto_sorteo: (participan) => esperaRepartoSorteo(participan),
+  eleccion_sorteo: () => ELECCION_SORTEO_MS,
+  volteo_sorteo: () => VOLTEO_SORTEO_MS,
+})
+export function inicioDeEtapa(vencimiento, participan) {
+  const dura = DURA_ETAPA[vencimiento?.clase]
+  return dura ? vencimiento.hora - dura(participan) : null
+}
+
+// ── 5a · L2 · 2.ª vuelta · Lo que se ve: la ceremonia entera, a tiempo ────────
+// Decisión de Victor (STOP-L): el teléfono que llega tarde NUNCA entra con cartas ya en su
+// hueco. Ve la ceremonia completa: el barajado (al menos `BARAJADO_MIN_MS`) y el reparto
+// desde la primera carta, acelerado para acabar cuando el árbitro abre la elección; nunca más
+// rápido que `PASO_MIN_MS` por carta. Si ni así cabe, el reparto termina dentro de la
+// elección, con su reloj ya corriendo: lo que se coma son segundos de elegir. Si llega ya en el
+// volteo, se ve la vista tal cual.
+//
+// Puro: `previo` es lo que devolvió la llamada anterior (`null` al montar), `entrada` lo que
+// dice la vista y `ahora` la hora local. Devuelve `{ etapa, t, barajadoMs, … }`: la etapa que se
+// pinta, sus ms y lo que dura el abanico del barajado.
+export const BARAJADO_MIN_MS = 1000
+export const PASO_MIN_MS = 150
+const ACELERA_MAX = PASO_SORTEO_MS / PASO_MIN_MS
+
+export function avanzaSorteo(previo, { ronda, etapa, participantes, vencimiento, desfase = 0 }, ahora) {
+  let s = previo?.ronda === ronda ? previo : { ronda, desde: ahora, reparto: null, barajadoMs: BARAJADO_MS }
+  const ver = (et, t) => ({ ...s, etapa: et, t })
+  if (etapa === ETAPA.BARAJADO) return ver(etapa, ahora - s.desde)
+  if (!s.reparto && (etapa === ETAPA.REPARTO || etapa === ETAPA.ELECCION)) {
+    // El fin del reparto en el árbitro, en la hora local.
+    const fin = (etapa === ETAPA.REPARTO ? vencimiento.hora : inicioDeEtapa(vencimiento, participantes)) - desfase
+    const dura = esperaRepartoSorteo(participantes)
+    const desde = Math.max(ahora, s.desde + BARAJADO_MIN_MS)
+    const acelera = Math.min(ACELERA_MAX, Math.max(1, dura / Math.max(1, fin - desde)))
+    s = { ...s, reparto: { desde, acelera, dura }, barajadoMs: Math.min(BARAJADO_MS, desde - s.desde) }
+  }
+  if (s.reparto && etapa !== ETAPA.VOLTEO) {
+    if (ahora < s.reparto.desde) return ver(ETAPA.BARAJADO, ahora - s.desde)
+    const t = (ahora - s.reparto.desde) * s.reparto.acelera
+    if (etapa === ETAPA.REPARTO || t < s.reparto.dura) return ver(ETAPA.REPARTO, t)
+    return ver(ETAPA.ELECCION, t - s.reparto.dura)
+  }
+  // El volteo (o lo que llega sin reparto que enseñar): en la hora del árbitro.
+  const inicio = inicioDeEtapa(vencimiento, participantes)
+  return ver(etapa, inicio === null ? 0 : Math.max(0, ahora + desfase - inicio))
 }
 
 // ── El reparto, de uno en uno ───────────────────────────────────────────────
@@ -199,6 +259,9 @@ export function adelantada(hueco, recuadro, oval) {
 // 3.ª vuelta · si un recuadro tapa el propio centro (la mesa de 2 acostada: el de Beto baja
 // hasta los óvalos), la franja no cabe sobre la mesa: el mensaje va DENTRO del óvalo de la
 // crónica (`cronica`, la caja de `.game-message`), encima y sin cambiar su tamaño.
+// 5a · L3 · con tope arriba: la franja no sale por encima del óvalo (la mesa de 5 en 915×412
+// asomaba 0,7 px). `y` es su centro (`translateY(-50%)` en `pvp.css`). El tope va al final: la
+// banda que decide si choca con un recuadro es la de siempre.
 export function lugarDeLaFranja(oval, recuadros, cronica = null) {
   const C = centro(oval)
   const y = C.y - oval.h * FRANJA_SOBRE_CENTRO
@@ -213,7 +276,7 @@ export function lugarDeLaFranja(oval, recuadros, cronica = null) {
   }
   if (choca && cronica) return { x: cronica.texto.x, y: cronica.oval.y + cronica.oval.h / 2, w: cronica.texto.w, enCronica: true }
   const medio = Math.min(C.x - izq, der - C.x)
-  return { x: C.x - medio, y, w: medio * 2, enCronica: false }
+  return { x: C.x - medio, y: Math.max(y, oval.y + FRANJA_MEDIO_ALTO), w: medio * 2, enCronica: false }
 }
 
 // El cronómetro propio, en el sitio natural del del turno (esquina de arriba a la izquierda).

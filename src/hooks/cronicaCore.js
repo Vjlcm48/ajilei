@@ -23,6 +23,7 @@
 // ser la voz y esto es un adorno. Todo sale del ESTADO y de la TRANSICIÓN.
 import { PHASES } from '../engine/gameEngine'
 import { montoTexto } from '../config/tapetes'
+import { CORTE_VOZ, recortaNombre } from '../lib/corteVoz'
 
 // La marca. Vive aquí y no en el motor: ése es el punto entero de REN-2.
 export const MONEDA = 'Heptacoins'
@@ -35,9 +36,10 @@ export const MONEDA_UNA = 'Heptacoin'
 // personas vive en `vozHumanos.js`.
 export const VOZ = Object.freeze({ IAS: 'ias', HUMANOS: 'humanos' })
 
-// El único sitio por donde pasa un nombre en la voz entre personas. Hoy no recorta: la
-// medida de los 15 «W» en el óvalo es de la sub-tanda 3, y si no cabe se recorta aquí.
-export const nombreEnVoz = (p) => p.name
+// El único sitio por donde pasa un nombre en la voz entre personas. MES-PvP 5a · E.2 · corta a
+// `CORTE_VOZ` con la regla de `recortaNombre` (L-M 1 §4): la crónica, «{nombre} está pensando…»,
+// los titulares y las capas del pago. Contra las IAS no se llama.
+export const nombreEnVoz = (p) => recortaNombre(p.name, CORTE_VOZ)
 
 // ── Verbo de la acción, deducido de la transición ───────────────────────────
 // Mismo método que `inferAction` en GameTable (que rotula el panel del rival):
