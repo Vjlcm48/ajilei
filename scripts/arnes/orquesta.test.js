@@ -48,6 +48,13 @@ describe('A4 · el contrato: ningún modo sin declarar', () => {
     const partidas = completo.filter((v) => v.id.startsWith('tab.')).flatMap((v) => v.args.slice(2).filter((a) => a !== '--sin-build'))
     expect(partidas.sort()).toEqual(reales.sort())
   })
+  it('MES-PvP 5a · `pvp` partida lleva sus dos partes, y el arnés las entiende', () => {
+    const partes = completo.filter((v) => v.id.startsWith('pvp.')).map((v) => v.args[2])
+    expect(partes).toEqual(['mesa', 'lm'])
+    const reales = readFileSync(join(RAIZ, 'scripts/pvp/pvp.mjs'), 'utf8').match(/PARTES_PVP = Object\.freeze\(\[([^\]]*)\]/)?.[1] ?? ''
+    expect([...reales.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual(partes)
+    expect(ids(completo)).not.toContain('pvp')
+  })
   it('ARN-4d · los modos partidos por mesas llevan todas las mesas del arnés', () => {
     const mesasDe = (nombre) => [...(fuenteDSK.match(new RegExp(`const ${nombre} = \\[([^\\]]*)\\]`))?.[1] ?? '').matchAll(/\d+/g)].map((m) => Number(m[0]))
     for (const nombre of ['H1_TABLES', 'M1_TABLES', 'A1_TABLES']) expect(mesasDe(nombre), nombre).toEqual([...MESAS_PARTIDAS])
@@ -60,9 +67,9 @@ describe('A4 · el contrato: ningún modo sin declarar', () => {
 })
 
 describe('A4 · los perfiles', () => {
-  it('`rapido` son las cuatro varas de la ficha, y `commit` añade el peso, la espera, `pvp` (MES-PvP 3) y humo', () => {
+  it('`rapido` son las cuatro varas de la ficha, y `commit` añade el peso, la espera, `pvp` (MES-PvP 3, en dos desde la 5a) y humo', () => {
     expect(ids(rapido)).toEqual(['eslint', 'vitest', 'build', 'guiones'])
-    expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'pue.espera', 'pvp', 'humo'])
+    expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'pue.espera', 'pvp.mesa', 'pvp.lm', 'humo'])
     expect(ids(completo)).toContain('1.8b')
   })
   it('vitest pasa por el lanzador', () => {
@@ -105,6 +112,7 @@ describe('A4 · --solo', () => {
   })
   it('un grupo se abre en sus partes', () => {
     expect(ids(varasDeSolo(['tab'], opciones).varas)).toEqual(['build', 'tab.frase', 'tab.resto'])
+    expect(ids(varasDeSolo(['pvp'], opciones).varas)).toEqual(['build', 'pvp.mesa', 'pvp.lm'])
     expect(ids(varasDeSolo(['apu'], opciones).varas)).toHaveLength(10)
   })
   it('sin nada que mida dist/ no compila, y --sin-build lo quita', () => {

@@ -136,7 +136,10 @@ const CASOS_RECARGA = [
   ['recarga-fuera', 5, ''],
   ['recarga-pedida', 2, ''],
   ['recarga-rival', 2, ''],
+  // 5a · H.2 · quiebra en una mano de anuncio: la burbuja, en la pausa de anuncio y sin anillo.
+  ['recarga-anuncio', 3, ''],
 ]
+const SIN_ANILLO = ['recarga-anuncio']
 
 const MEDIR_RECARGA = async () => {
   const { recargaDeVista, textoTarjeta } = await import('/src/lib/entreManosCore.js')
@@ -146,6 +149,7 @@ const MEDIR_RECARGA = async () => {
   const pintado = {
     burbuja: !!q('[data-pvp-recarga="burbuja"]'),
     fuera: q('[data-pvp-recarga="burbuja"]')?.dataset.fuera === '1',
+    anillo: q('[data-pvp-recarga="burbuja"]')?.dataset.anillo ?? null,
     tarjeta: q('[data-pvp-recarga="tarjeta"] [data-accion="recarga-sub"]')?.textContent.trim() ?? null,
     pedida: !!q('[data-pvp-recarga="punto"]'),
     espera: q('[data-pvp-recarga="espera"]')?.textContent.trim() ?? null,
@@ -154,9 +158,11 @@ const MEDIR_RECARGA = async () => {
   const dice = (v) => {
     const rec = recargaDeVista(v, { saldo: p.lamina.saldo(), entrada: 1500 })
     const abierta = !!rec?.oferta && !!p.lamina.abierta
+    const burbuja = rec?.oferta?.tipo === 'ofrecida' && !abierta
     return {
-      burbuja: rec?.oferta?.tipo === 'ofrecida' && !abierta,
+      burbuja,
       fuera: !!rec?.fuera && rec?.oferta?.tipo === 'ofrecida' && !abierta,
+      anillo: burbuja ? (rec.anillo ? '1' : '0') : null,
       tarjeta: abierta ? textoTarjeta(rec.oferta) : null,
       pedida: !!rec?.pedida,
       espera: rec?.espera && !rec.oferta ? `Esperando a ${rec.espera}…` : null,
@@ -172,7 +178,7 @@ async function varaRecarga(browser, base) {
     const m = await enPagina(browser, vp, `${base}/?pvp=${escena}&n=${n}${extra}`, (p) => p.evaluate(MEDIR_RECARGA))
     filas.push({
       n, vp: `${escena}${extra}`, ...m,
-      ok: !m.error && igual(m.pintado, m.vistaDice),
+      ok: !m.error && igual(m.pintado, m.vistaDice) && (!SIN_ANILLO.includes(escena) || m.pintado.anillo === '0'),
       controlRojo: !m.error && !igual(m.pintado, m.sinRecarga),
     })
   }

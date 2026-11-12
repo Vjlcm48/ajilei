@@ -353,7 +353,7 @@ import { runSuma } from './suma/suma.mjs'
 import { runCfg } from './cfg/cfg.mjs'
 import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, tintaConRepeticion, peorFondo as tintaPeor } from './arnes/tinta.mjs'
 import { runTienda } from './tie/tienda.mjs'
-import { runPvp } from './pvp/pvp.mjs'
+import { PARTES_PVP, runPvp } from './pvp/pvp.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -15478,8 +15478,11 @@ try {
   // MES-PvP 3 · `pvp`: la mesa contra personas sobre el árbitro imitado (`?pvp=`, DEV y
   // bypass, así que 5173): rotación, O1, piso de 40, tinta, ⟦⟧ y `data-clavada`, por mesas
   // 2–5 y cinco tamaños, más la medida de los 15 «W» (`scripts/pvp/pvp.mjs`). `pvp <n>`, una mesa.
+  // MES-PvP 5a · `pvp mesa` y `pvp lm`, sus dos partes (`PARTES_PVP`); sin nada, las dos.
   if (MODE === 'pvp') {
-    report.pvp = await runPvp(browser, { base: BASE, ...(process.argv[3] ? { mesas: [Number(process.argv[3])] } : {}) })
+    const arg = process.argv[3]
+    const parte = PARTES_PVP.includes(arg) ? { partes: [arg] } : arg ? { mesas: [Number(arg)] } : {}
+    report.pvp = await runPvp(browser, { base: BASE, ...parte })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

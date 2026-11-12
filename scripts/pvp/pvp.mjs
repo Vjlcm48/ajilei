@@ -25,6 +25,12 @@ import { runVarasLM } from './varasLM.mjs'
 import { runMensajesLM } from './mensajesLM.mjs'
 import { runEntreManosLM } from './entreManosLM.mjs'
 import { runArbitro13LM } from './arbitro13LM.mjs'
+import { runSub5aMesa } from './sub5aMesa.mjs'
+
+// MES-PvP 5a · H.1 · el modo va en dos partes (`orquestaCore`: `pvp.mesa` y `pvp.lm`), porque
+// entero pasaba del tope. `mesa`: las celdas, las escenas, los 15 «W» y las varas de la 5a;
+// `lm`: las varas de las láminas L-M 1 a 3 y del árbitro v1.3. Sin parte, las dos.
+export const PARTES_PVP = Object.freeze(['mesa', 'lm'])
 
 const VIEWPORTS = [
   { id: '412x915', w: 412, h: 915, movil: true },
@@ -365,21 +371,25 @@ async function reposicionDesdeMesa(browser, base) {
   }
 }
 
-export async function runPvp(browser, { base, mesas = MESAS }) {
+export async function runPvp(browser, { base, mesas = MESAS, partes = PARTES_PVP }) {
   const celdas = []
-  for (const n of mesas) {
+  const enMesa = partes.includes('mesa')
+  const enteras = mesas.length === MESAS.length
+  for (const n of enMesa ? mesas : []) {
     for (const vp of VIEWPORTS) {
       const c = await celda(browser, base, vp, n)
       celdas.push(c)
       console.log(`pvp·${c.celda} · ${c.ok ? 'OK' : 'FALLA'} · rotación ${c.rotacion} · táctil ${c.tactil}${c.bajos?.length ? ` (${c.bajos.map((b) => `${b.txt} ${Math.round(b.w)}×${Math.round(b.h)}`).join(', ')})` : ''} · tinta ${c.tintaOk}${c.tinta?.filter((t) => t.contraste !== null && t.contraste < PISO_WCAG).map((t) => ` «${t.txt}» ${t.contraste}`).join('') ?? ''} · O1 ${c.o1}${c.movidas?.length ? ` (${c.movidas.join(', ')})` : ''} · clavada ${c.clavada}${c.error ? ` · ${c.error}` : ''}`)
     }
   }
-  const vistas = mesas.length === MESAS.length ? await escenas(browser, base) : []
+  const vistas = enMesa && enteras ? await escenas(browser, base) : []
   for (const v of vistas) console.log(`pvp·escena ${v.escena} · ${v.ok ? 'OK' : 'FALLA'}${v.ok ? '' : ` · ${JSON.stringify(v)}`}`)
+  // 5a · el óvalo entre el sorteo y la mano, el área de «Tú» en el pago y el arranque.
+  const varas = enMesa && enteras ? (await runSub5aMesa(browser, base)).celdas : []
   // L-M 2 · §1.3 · las tres varas de la tanda 1 de la lámina, cada una con su control rojo.
-  const varas = mesas.length === MESAS.length ? (await runVarasLM(browser, base)).celdas : []
+  if (partes.includes('lm') && enteras) varas.push(...(await runVarasLM(browser, base)).celdas)
   // L-M 2 · §2–§4 · los mensajes (con su control rojo) y el aviso de ausencia; y las capturas.
-  if (mesas.length === MESAS.length) {
+  if (partes.includes('lm') && enteras) {
     const lm2 = await runMensajesLM(browser, base)
     varas.push(...lm2.celdas)
     for (const c of lm2.celdas) console.log(`pvp·${c.celda} · ${c.ok ? 'OK' : 'FALLA'} · ${JSON.stringify(c)}`)
@@ -393,9 +403,10 @@ export async function runPvp(browser, { base, mesas = MESAS }) {
     // Árbitro v1.3-a · las posiciones del sorteo y el mensaje con id fijo (con sus controles rojos).
     varas.push(...(await runArbitro13LM(browser, base)).celdas)
   }
-  const largos = await nombresLargos(browser, base)
+  const largos = enMesa ? await nombresLargos(browser, base) : []
   for (const l of largos) console.log(`pvp·15W ${l.vp} mesa ${l.n} ${l.que} · ${JSON.stringify(l)}`)
-  const verde = celdas.length > 0 && celdas.every((c) => c.ok) && vistas.every((v) => v.ok) && varas.every((v) => v.ok)
+  const verde = (celdas.length > 0 || !enMesa) && varas.length + celdas.length > 0
+    && celdas.every((c) => c.ok) && vistas.every((v) => v.ok) && varas.every((v) => v.ok)
   console.log(`── PVP · ${celdas.filter((c) => c.ok).length}/${celdas.length} celdas · ${vistas.filter((v) => v.ok).length}/${vistas.length} escenas · ${varas.filter((v) => v.ok).length}/${varas.length} varas LM · ${verde ? 'VERDE' : 'ROJO'}`)
   return { verde, celdas, escenas: vistas, varas, largos }
 }

@@ -69,8 +69,13 @@ const PESO = { id: '1.8b', args: ['scripts/arnes/peso.mjs', '--sin-build'], tope
 const PUE_ESPERA = diag('diagPUE', 'pue.espera', 'espera', 5)
 
 // MES-PvP 3 · la mesa contra personas sobre el árbitro imitado, en `commit` (cierre de la
-// sub-tanda 3): unos 2 min 30 s. Si un día no cabe, va por mesas (`diagDSK pvp <n>`).
-const PVP = diag('diagDSK', 'pvp', 'pvp', 10)
+// sub-tanda 3). MES-PvP 5a (H.1) · entera pasaba de su tope de 10 (11 min 06 s): va en dos, con
+// el patrón de `tab`. `pvp.mesa`: celdas, escenas, 15 «W» y las varas de la 5a; `pvp.lm`: las
+// varas de las láminas L-M 1 a 3 y del árbitro v1.3.
+const PVP = [
+  diag('diagDSK', 'pvp.mesa', 'pvp', 10, ['mesa']),
+  diag('diagDSK', 'pvp.lm', 'pvp', 15, ['lm']),
+]
 
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
@@ -90,6 +95,7 @@ export const EXCLUIDOS_DSK = Object.freeze({
   h1: 'corre partida por mesas: `h1.<mesa>`',
   m1: 'corre partida por mesas: `m1.<mesa>`',
   a1: 'corre partida por mesas: `a1.<mesa>`',
+  pvp: 'corre partida en dos: `pvp.mesa` y `pvp.lm`',
 })
 export const EXCLUIDOS_PUE = Object.freeze({
   puerta: EN_TODO, '1.1': EN_TODO, '1.2': EN_TODO, '1.3': EN_TODO, '1.4': EN_TODO, '1.5': EN_TODO, '1.6': EN_TODO, '1.7': EN_TODO, '1.8': EN_TODO, '1.9': EN_TODO,
@@ -109,8 +115,8 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
-  commit: [...BASE, PESO, PUE_ESPERA, PVP, HUMO],
-  completo: [...BASE, PESO, PUE_ESPERA, PVP, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
+  commit: [...BASE, PESO, PUE_ESPERA, ...PVP, HUMO],
+  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]
