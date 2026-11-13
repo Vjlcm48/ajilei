@@ -7,6 +7,8 @@ import { resetRng, setRng } from '../engine/deck.js'
 import { MOTIVOS as MOTIVOS_POZOS } from '../engine/pozos.js'
 import { PHASES, applyDiscard, createInitialState, makeHandRules, startHand } from '../engine/gameEngine.js'
 import { ajileiDe as ajileiDelCliente } from '../lib/puntos.js'
+import { vistaAMesa } from '../lib/vistaAMesa.js'
+import { calendarioReposicion, planReposicionPvP } from '../lib/reposicionCore.js'
 import { BARAJADO_MS, VOLTEO_SORTEO_MS } from '../config/esperas.js'
 import {
   CLASES, ETAPAS, FASE_SORTEO, MOTIVOS, MOTIVOS_ARBITRO, abandonarPorServidor, ajileiDe, aplicarAccion, ganadorDeMano,
@@ -1191,15 +1193,32 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       (x, indices, i) => pide(x, i, 'descartar', { mano: x.motor.handCount, indices }, ahora).estado, e,
     )
 
-    it('dura la tanda de quien más descartó, y 600 ms si nadie; el turno no corre', () => {
+    // 5b · uno a uno (contrato §6): 3 cartas = 2.175 + 2 × 412,5; 1 = 2.175; 0 = 750. Más el
+    // arranque de 100 y el cierre de 500.
+    it('dura lo que el cliente tarda uno a uno, según el ritmo; el turno no corre', () => {
       const uno = descartan(enDescarte(3), [[0, 1, 2], [0], []])
-      expect(uno.vencimiento).toEqual({ clase: CLASES.REPOSICION, hora: 1000 + 120 + 3 * 595 + 400 })
+      expect(uno.vencimiento).toEqual({ clase: CLASES.REPOSICION, hora: 1000 + 100 + 3000 + 2175 + 750 + 500 })
       expect(uno.motor.phase).toBe(PHASES.DISCARD)
+      const rapido = descartan(hastaFase(hastaLaMano(3, 0, 'rapido'), PHASES.DISCARD), [[0, 1, 2], [0], []])
+      expect(rapido.vencimiento.hora).toBe(1000 + Math.round(100 + 0.5 * (3000 + 2175 + 750) + 500))
       const nadie = descartan(enDescarte(3), [[], [], []])
-      expect(nadie.vencimiento).toEqual({ clase: CLASES.REPOSICION, hora: 1000 + 600 })
+      expect(nadie.vencimiento).toEqual({ clase: CLASES.REPOSICION, hora: 1000 + 100 + 3 * 750 + 500 })
       const trasVencer = pide(nadie, 0, 'reclamar_vencimiento', {}, 5000).estado
       expect(trasVencer.motor.phase).toBe(PHASES.BET_3)
       expect(trasVencer.vencimiento).toEqual({ clase: CLASES.TURNO, hora: 5000 + 20000 })
+    })
+
+    it('5b · desde cada asiento, el plan del cliente sobre su vista dura lo que espera el árbitro', () => {
+      for (const ritmo of ['normal', 'rapido']) {
+        // Un retirado (su descarte se rechaza y el árbitro no se lo cuenta) y los demás con 2, 0 y 3.
+        const e = descartan(conJugador(hastaFase(hastaLaMano(4, 1, ritmo), PHASES.DISCARD), 2, { folded: true }), [[0, 1], [], [], [0, 2, 4]])
+        expect(e.descartaron).toEqual([2, 0, null, 3])
+        for (let asiento = 0; asiento < 4; asiento++) {
+          const game = vistaAMesa(vistaDe(e, asiento), null, { entrada: 'corta', ritmo })
+          const f = ritmo === 'rapido' ? 0.5 : 1
+          expect(calendarioReposicion(planReposicionPvP(game), f).espera).toBe(e.vencimiento.hora - 1000)
+        }
+      }
     })
 
     it('la vista lleva las cartas nuevas de cada uno y nada más; apostar da `fase` y descartar `ya_descarto`', () => {

@@ -3,6 +3,7 @@
 // `7a8c7c1`), la espera del árbitro es la duración del plan del cliente, y los vuelos entre
 // personas duran lo mismo que los de las IAS escalados por el ritmo.
 import { describe, expect, it } from 'vitest'
+import { esperaReposicion } from '../arbitro/index.js'
 import { D_IN, D_OUT } from '../config/esperas.js'
 import { anclarReposicion, calendarioReposicion, planReposicionPvP, vueloDescarte } from './reposicionCore.js'
 
@@ -66,6 +67,35 @@ describe('5b · contra las IAS, el calendario es el de 7a8c7c1', () => {
     expect([2, 3, 4, 5].map((N) => espera(N, 3, 0.5))).toEqual([3600, 5100, 6600, 8100])
     expect([2, 3, 4, 5].map((N) => espera(N, 0, 1))).toEqual([2100, 2850, 3600, 4350])
   })
+})
+
+describe('5b · la espera del árbitro es la duración del plan del cliente', () => {
+  // `null`: retirado, abandonado o sentado fuera (el árbitro no le cuenta descarte); 0: el ausente,
+  // al que el reloj descarta vacío; 1…5: lo que repone. Todas las mesas, todas las Manos, desde
+  // cada asiento, en Normal y en Rápido.
+  const VALORES = [null, 0, 1, 2, 3, 5]
+  const combinaciones = (N) => (N === 0 ? [[]] : combinaciones(N - 1).flatMap((c) => VALORES.map((v) => [...c, v])))
+  const rotar = (lista, asiento) => lista.map((_, id) => lista[(id + asiento) % lista.length])
+
+  for (const ritmo of ['normal', 'rapido']) {
+    it(`en ${ritmo}`, () => {
+      const f = ritmo === 'rapido' ? 0.5 : 1
+      let casos = 0
+      for (const N of [2, 3, 4, 5]) {
+        for (const descartaron of combinaciones(N)) {
+          if (descartaron.filter((v) => v !== null).length < 2) continue
+          for (let manoReal = 0; manoReal < N; manoReal++) {
+            for (let asiento = 0; asiento < N; asiento++) {
+              const game = mesa(rotar(descartaron, asiento), (manoReal - asiento + N) % N)
+              expect(calendarioReposicion(planReposicionPvP(game), f).espera).toBe(esperaReposicion(descartaron, ritmo))
+              casos++
+            }
+          }
+        }
+      }
+      expect(casos).toBeGreaterThan(30000)
+    })
+  }
 })
 
 describe('5b · el plan entre personas', () => {

@@ -50,13 +50,10 @@ export const RED_REVELACION_MS = 6000
 export const LECTURA_TRAS_REVELACION_MS = 2000
 export const MANO_SIGUIENTE_MS = 4000
 
-// provisional · la animación en paralelo nace en la sub-tanda 3 y debe caber aquí. La
-// reposición usa la fórmula del reparto (`reloj.js`); ésta es la de nadie descartó.
-export const REPOSICION_SIN_CARTAS_MS = 600
-
 // MES-PvP 5b · la reposición uno a uno (Reglas v1.11 §8.7): las pausas del descarte de la mesa
 // contra las IAS, con su valor efectivo (el ×1,25 de `AI_SPEED_FACTOR` ya aplicado). Los vuelos
-// son los de `FlyingCard` (0,75 s). Las lee el calendario del cliente (`lib/reposicionCore.js`).
+// son los de `FlyingCard` (0,75 s). Las leen el calendario del cliente (`lib/reposicionCore.js`)
+// y la espera del árbitro (`arbitro/reloj.js`, `esperaReposicion`).
 export const D_OUT = 750         // vuelo carta → mazo
 export const D_OUT_STAG = 187.5  // entre una carta que sale y la siguiente
 export const D_PAUSE = 375       // las ranuras vacías un instante

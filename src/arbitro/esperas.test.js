@@ -5,7 +5,7 @@ import { resetRng, setRng } from '../engine/deck.js'
 import { PHASES } from '../engine/gameEngine.js'
 import {
   ANTES_DEL_REPARTO_MS, AUSENTE_DESDE, AVISO_SALIDA_MS, BARAJADO_MS, FACTOR_RAPIDA, FIN_SEGUNDO_REPARTO_MS,
-  LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, N_AUSENCIA, PAUSA_ANUNCIO_MS, RED_REVELACION_MS, REPOSICION_SIN_CARTAS_MS,
+  LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, N_AUSENCIA, PAUSA_ANUNCIO_MS, RED_REVELACION_MS,
   TRAS_PRIMER_REPARTO_MS, TURN_TIME, VOLTEOS_SEGUNDO_REPARTO_MS, VOLTEO_SORTEO_MS, VUELO_REPARTO_MS,
 } from '../config/esperas.js'
 import { FACTOR_RAPIDA as FACTOR_DE_SU_SITIO } from '../lib/partidaRapida.js'
@@ -98,9 +98,10 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
     expect(PAUSA_ANUNCIO_MS).toBe(45000)
     expect(N_AUSENCIA).toBe(3)
     expect(AUSENTE_DESDE).toBe(2)
-    expect(esperaReposicion(0)).toBe(REPOSICION_SIN_CARTAS_MS)
-    expect(REPOSICION_SIN_CARTAS_MS).toBe(600)
-    expect(esperaReposicion(5)).toBe(120 + 5 * 595 + 400)
+    // 5b · uno a uno: nadie descartó en la mesa de 3 (Normal) y una carta cada uno en la de 2 (Rápido).
+    expect(esperaReposicion([0, 0, 0], 'normal')).toBe(100 + 3 * 750 + 500)
+    expect(esperaReposicion([1, 1], 'rapido')).toBe(100 + 0.5 * 2 * 2175 + 500)
+    expect(esperaReposicion([null, 1, null], 'normal')).toBe(100 + 2175 + 500)
   })
 
   it('el anuncio va en las manos 5, 11, 16, 22, 27, 33, 38 y 44', () => {

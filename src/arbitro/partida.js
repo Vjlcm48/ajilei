@@ -400,7 +400,7 @@ function aplicarDescartes(estado, ahora) {
       motorTrasDescarte,
       descarte: motor.players.map((p, i) => (p.folded ? null : porAsiento[i])),
       descartaron,
-      vencimiento: en(CLASES.REPOSICION, ahora + esperaReposicion(Math.max(0, ...descartaron))),
+      vencimiento: en(CLASES.REPOSICION, ahora + esperaReposicion(descartaron, estado.ritmo)),
     },
     efectos: [],
   }

@@ -1,12 +1,12 @@
 // ── MOT-1 1b · Cuánto dura cada espera ──────────────────────────────────────
-// Normativo: contrato §6. El ritmo escala el vuelo del reparto y las esperas del
-// segundo reparto, y nada más. La reposición, el aviso y las pausas no los escala.
+// Normativo: contrato §6. El ritmo escala el vuelo del reparto, las esperas del segundo
+// reparto y la reposición (salvo su arranque y su cierre). El aviso y las pausas, no.
 
 import {
-  ANTES_DEL_REPARTO_MS, AVISO_SALIDA_MS, BARAJADO_MS, ELECCION_SORTEO_MS, FACTOR_RAPIDA,
-  FIN_SEGUNDO_REPARTO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, OFERTA_RECARGA_MS, PAUSA_ANUNCIO_MS,
-  RED_REVELACION_MS, REPOSICION_SIN_CARTAS_MS, TRAS_PRIMER_REPARTO_MS, TURN_TIME, VOLTEO_SORTEO_MS,
-  VUELO_REPARTO_MS, esperaRepartoSorteo,
+  ANTES_DEL_REPARTO_MS, AVISO_SALIDA_MS, BARAJADO_MS, D_IN, D_IN_STAG, D_OUT, D_OUT_STAG, D_PAUSE, D_SEAT_GAP,
+  D_SKIP, ELECCION_SORTEO_MS, FACTOR_RAPIDA, FIN_SEGUNDO_REPARTO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS,
+  OFERTA_RECARGA_MS, PAUSA_ANUNCIO_MS, RED_REVELACION_MS, REPOSICION_ARRANQUE_MS, REPOSICION_CIERRE_MS,
+  TRAS_PRIMER_REPARTO_MS, TURN_TIME, VOLTEO_SORTEO_MS, VUELO_REPARTO_MS, esperaRepartoSorteo,
 } from '../config/esperas.js'
 
 // v1.3 · el reparto del sorteo depende de cuántos participan en la ronda (la fórmula vive en
@@ -44,9 +44,16 @@ export const esperaManoSiguiente = (conRevelacion) => (
   conRevelacion ? RED_REVELACION_MS + LECTURA_TRAS_REVELACION_MS : MANO_SIGUIENTE_MS
 )
 
-// Todos reponen a la vez: la duran las cartas de quien más descartó (contrato §6).
-export const esperaReposicion = (mayorDescarte) => (
-  mayorDescarte > 0 ? reparto(mayorDescarte, 1, TRAS_PRIMER_REPARTO_MS) : REPOSICION_SIN_CARTAS_MS
+// MES-PvP 5b · uno a uno, de la Mano al Pie (contrato §6): lo que dura en el cliente cada asiento
+// que sigue en la mano. El ritmo escala pausas y vuelos; el arranque y el cierre no, y el cierre es
+// siempre el del volteo propio, el peor caso. Los retirados (`null`) no cuentan; el ausente, con 0.
+const reponerAsiento = (n) => (n === 0
+  ? D_SKIP
+  : D_OUT + D_PAUSE + D_IN + D_SEAT_GAP + (n - 1) * (D_OUT_STAG + D_IN_STAG))
+export const esperaReposicion = (descartaron, ritmo) => Math.round(
+  REPOSICION_ARRANQUE_MS
+  + factorDe(ritmo) * descartaron.reduce((suma, n) => (n === null ? suma : suma + reponerAsiento(n)), 0)
+  + REPOSICION_CIERRE_MS,
 )
 
 // Contrato §6, «Publicidad»: las manos 5, 11, 16, 22, 27, 33, 38, 44…
