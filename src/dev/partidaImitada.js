@@ -617,7 +617,7 @@ export const escenaCabeEn = (escena, n) => n >= (ESCENAS[escena].minimo ?? 2) &&
 export function crearPartidaImitada({
   escena, n = 2, asiento = 0, nombres = null, semilla = 1, ahora = Date.now, vivo = false, corte = null, momento = null,
   msj = null, msjMs = 1200, abierta = null, premium = null, saldo = null, lento = null,
-  ritmo = 'normal', desc = null, descyo = null, tarde = null,
+  ritmo = 'normal', desc = null, descyo = null, tarde = null, retira = null,
 }) {
   if (!ESCENAS[escena]) throw new Error(`MES-PvP 2 · escena desconocida: ${escena}`)
   if (!escenaCabeEn(escena, n)) throw new Error(`MES-PvP 2 · «${escena}» no cabe en una mesa de ${n}`)
@@ -837,7 +837,10 @@ export function crearPartidaImitada({
     if (!cambio) {
       if (v.clase === CLASES.TURNO) {
         const i = e.motor.activePlayerIndex
-        if (desde(i === m.yo ? 6000 : 1200)) { pide(m, i, 'apostar', apuestaPrudente(m, i)); cambio = true }
+        // 7a · `retira=<k>`: el asiento real k se retira en su turno de `BET_1` (la mesa de 3 con un
+        // retirado de la vara `7a·segundo-reparto`).
+        const jugada = i === retira && e.motor.phase === PHASES.BET_1 ? { tipo: 'retirarse' } : apuestaPrudente(m, i)
+        if (desde(i === m.yo ? 6000 : 1200)) { pide(m, i, 'apostar', jugada); cambio = true }
       } else if (v.clase === CLASES.DESCARTE) {
         const i = e.asientos.findIndex((_a, k) => !e.motor.players[k].folded && e.descarte[k] === null && desde(k === m.yo ? 6000 : 900 + 300 * k))
         if (i >= 0) { pide(m, i, 'descartar', { mano: e.motor.handCount, indices: descarteDe(i) }); cambio = true }
@@ -998,5 +1001,7 @@ export function leerMandoPvP(search = globalThis.location?.search ?? '') {
     vivo: q.get('ver') === 'vivo', corte, momento, msj, msjMs,
     abierta: uno('abierta'), premium: uno('premium'), saldo, lento,
     ritmo: q.get('ritmo') === 'rapido' ? 'rapido' : 'normal', desc: entero('desc'), descyo: entero('descyo'), tarde: entero('tarde'),
+    // 7a · `retira=<k>`: el asiento real k se retira en `BET_1` (en vivo).
+    retira: entero('retira'),
   }
 }

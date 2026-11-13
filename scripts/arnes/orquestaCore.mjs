@@ -70,8 +70,8 @@ const PUE_ESPERA = diag('diagPUE', 'pue.espera', 'espera', 5)
 
 // MES-PvP 3 · la mesa contra personas sobre el árbitro imitado, en `commit` (cierre de la
 // sub-tanda 3). MES-PvP 5a (H.1) · entera pasaba de su tope de 10 (11 min 06 s): va en dos, con
-// el patrón de `tab`. `pvp.mesa`: celdas, escenas, 15 «W» y las varas de la 5a; `pvp.lm`: las
-// varas de las láminas L-M 1 a 3 y del árbitro v1.3.
+// el patrón de `tab`. `pvp.mesa`: celdas, escenas, 15 «W» y las varas de la 5a, la 5b y la 7a;
+// `pvp.lm`: las varas de las láminas L-M 1 a 3 y del árbitro v1.3.
 const PVP = [
   diag('diagDSK', 'pvp.mesa', 'pvp', 10, ['mesa']),
   diag('diagDSK', 'pvp.lm', 'pvp', 15, ['lm']),

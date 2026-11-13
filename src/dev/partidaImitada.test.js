@@ -364,7 +364,7 @@ describe('MES-PvP 2 · el mando', () => {
     // L-M 1 · y los mandos de la lámina, con sus valores por defecto.
     const lamina = {
       vivo: false, corte: null, momento: null, msj: null, msjMs: 1200, abierta: null, premium: null, saldo: null, lento: null,
-      ritmo: 'normal', desc: null, descyo: null, tarde: null,
+      ritmo: 'normal', desc: null, descyo: null, tarde: null, retira: null,
     }
     expect(leerMandoPvP('?pvp=revelacion&n=4&asiento=3&nombres=largo')).toEqual({ escena: 'revelacion', n: 4, asiento: 3, nombres: 'largo', ...lamina })
     expect(leerMandoPvP('?pvp=revelacion')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })

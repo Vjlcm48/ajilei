@@ -95,7 +95,7 @@ const ESTADOS = [
   { id: 'espera-llena',           pantalla: 'espera',   nota: '5/5 · reloj en oro ≤ 0:10 · sin «Jugar ya»' },
   { id: 'espera-fin-cancelada',   pantalla: 'espera',   nota: 'invitado · «El anfitrión cerró la mesa» · «Buscar otra mesa»' },
   { id: 'espera-fin-vencida',     pantalla: 'espera',   nota: 'anfitrión solo · reloj a 0 → resolver → «no llegó gente a tiempo»' },
-  { id: 'espera-fin-activa',      pantalla: 'espera',   nota: 'dos sentados · reloj a 0 → resolver → «¡Arranca la partida!» · «Entrar a la mesa»' },
+  { id: 'espera-fin-activa',      pantalla: 'espera',   nota: 'dos sentados · reloj a 0 → resolver → la mesa se abre sola (MES-PvP 3 §3.3)' },
   // A2 · pantalla 'opciones' porque es donde la app DEBE quedarse: la mesa que
   // el fixture trae es la fila de nulos y la sala no puede pintarse con ella.
   { id: 'espera-fantasma',        pantalla: 'opciones', nota: 'mi_sala devuelve la fila de nulos · la sala NO se pinta' },
@@ -169,6 +169,23 @@ async function medirCelda(browser, estado, vp) {
   const c = { estado: estado.id, vp: `${vp.w}x${vp.h}`, note: vp.note }
 
   await page.goto(`${BASE}/?sal=${estado.id}`)
+  // MES-PvP 7a · desde MES-PvP 3 §3.3 la mesa que arranca se abre sola (`SalaEspera`, el efecto
+  // de `fin === 'activa'`): «¡Arranca la partida!» ya no se queda en pantalla y no hay nada que
+  // medir en ella. La celda comprueba eso: que, resuelta la sala, se monta la partida. La celda
+  // medía la pantalla vieja y desde entonces tiraba el arnés (`main.sal` desaparecía a mitad, o ni
+  // llegaba a verse).
+  if (estado.id === 'espera-fin-activa') {
+    const entra = await page.waitForSelector('.game-table-screen', { timeout: 15000 }).then(() => true, () => false)
+    const punto = { ok: entra, nota: entra ? 'la partida se abre sola' : 'la partida no se abrió en 15 s' }
+    for (const k of PUNTOS) c[k] = punto
+    c.consola = consola
+    c.ok = entra
+    mkdirSync(OUT_DIR, { recursive: true })
+    c.shot = `${OUT_DIR}/${estado.id}_${vp.w}x${vp.h}.png`
+    await page.screenshot({ path: c.shot })
+    await page.close()
+    return c
+  }
   await page.waitForSelector('main.sal', { timeout: 10000 })
   await page.evaluate(LECTOR_TOKENS)
   // Que asiente el primer fotograma: los chips llevan transición de color y la
@@ -631,13 +648,13 @@ async function medirEstado(page, estado) {
 // mide, y el veredicto del estado es la conjunción. Los textos esperados son
 // los del `DICC` de la lámina v1.5, tal como `textos.es.js` los trae.
 const ESPERA = {
-  'espera-anfitrion':     { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Jugar ya', ctaVivo: true, privada: true },
+  'espera-anfitrion':     { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: 0, accion: 'cta', cta: 'Jugar ya', ctaVivo: true, privada: true },
   'espera-invitado':      { sillas: 4, ocupadas: 2, iniciales: ['C', 'D'], tagAnf: 0, tagTu: 1, accion: 'espera', espera: 'Esperando al anfitrión…', privada: true },
-  'espera-abierta':       { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Jugar ya', ctaVivo: true, privada: false },
-  'espera-llena':         { sillas: 5, ocupadas: 5, iniciales: ['D', 'M', 'J', 'A', 'L'], tagAnf: 0, tagTu: null, accion: 'espera', espera: '¡Mesa completa! Arranca sola', privada: true, llena: true },
+  'espera-abierta':       { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: 0, accion: 'cta', cta: 'Jugar ya', ctaVivo: true, privada: false },
+  'espera-llena':         { sillas: 5, ocupadas: 5, iniciales: ['D', 'M', 'J', 'A', 'L'], tagAnf: 0, tagTu: 0, accion: 'espera', espera: '¡Mesa completa! Arranca sola', privada: true, llena: true },
   'espera-fin-cancelada': { sillas: 4, ocupadas: 2, iniciales: ['C', 'D'], tagAnf: 0, tagTu: 1, accion: 'cta', cta: 'Buscar otra mesa', ctaVivo: true, privada: true, fin: 'cancelada', finTexto: 'El anfitrión cerró la mesa' },
-  'espera-fin-vencida':   { sillas: 4, ocupadas: 1, iniciales: ['D'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Buscar otra mesa', ctaVivo: true, privada: true, fin: 'vencida', finTexto: 'La mesa se cerró: no llegó gente a tiempo' },
-  'espera-fin-activa':    { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: null, accion: 'cta', cta: 'Entrar a la mesa', ctaVivo: true, privada: true, fin: 'activa', finTexto: '¡Arranca la partida!' },
+  'espera-fin-vencida':   { sillas: 4, ocupadas: 1, iniciales: ['D'], tagAnf: 0, tagTu: 0, accion: 'cta', cta: 'Buscar otra mesa', ctaVivo: true, privada: true, fin: 'vencida', finTexto: 'La mesa se cerró: no llegó gente a tiempo' },
+  'espera-fin-activa':    { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: 0, accion: 'cta', cta: 'Entrar a la mesa', ctaVivo: true, privada: true, fin: 'activa', finTexto: '¡Arranca la partida!' },
 }
 
 // La foto de la pantalla que los siete puntos comparten. Se lee en una sola
@@ -760,7 +777,8 @@ async function medirEspera(page, id) {
   const f = await page.evaluate(LEER_ESPERA)
   const puntos = {}
 
-  const tagEsperado = (i) => (i === esp.tagAnf ? 'Anfitrión' : i === esp.tagTu ? 'Tú' : '')
+  // MES-PvP 7a · P-4 · la silla propia dice siempre «Tú», también la del anfitrión que mira.
+  const tagEsperado = (i) => (i === esp.tagTu ? 'Tú' : i === esp.tagAnf ? 'Anfitrión' : '')
   puntos['esp.sillas'] = {
     ...f.sillas,
     ok: f.sillas.total === esp.sillas && f.sillas.ocupadas === esp.ocupadas

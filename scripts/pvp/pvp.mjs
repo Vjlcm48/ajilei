@@ -27,10 +27,11 @@ import { runEntreManosLM } from './entreManosLM.mjs'
 import { runArbitro13LM } from './arbitro13LM.mjs'
 import { runSub5aMesa } from './sub5aMesa.mjs'
 import { runSub5bMesa } from './sub5bMesa.mjs'
+import { runSub7aMesa } from './sub7aMesa.mjs'
 
 // MES-PvP 5a · H.1 · el modo va en dos partes (`orquestaCore`: `pvp.mesa` y `pvp.lm`), porque
-// entero pasaba del tope. `mesa`: las celdas, las escenas, los 15 «W» y las varas de la 5a;
-// `lm`: las varas de las láminas L-M 1 a 3 y del árbitro v1.3. Sin parte, las dos.
+// entero pasaba del tope. `mesa`: las celdas, las escenas, los 15 «W» y las varas de la 5a, la 5b
+// y la 7a; `lm`: las varas de las láminas L-M 1 a 3 y del árbitro v1.3. Sin parte, las dos.
 export const PARTES_PVP = Object.freeze(['mesa', 'lm'])
 
 const VIEWPORTS = [
@@ -389,6 +390,8 @@ export async function runPvp(browser, { base, mesas = MESAS, partes = PARTES_PVP
   const varas = enMesa && enteras ? (await runSub5aMesa(browser, base)).celdas : []
   // 5b · la reposición uno a uno y el teléfono tardío.
   if (enMesa && enteras) varas.push(...(await runSub5bMesa(browser, base)).celdas)
+  // 7a · el segundo reparto, uno a uno como el primero.
+  if (enMesa && enteras) varas.push(...(await runSub7aMesa(browser, base)).celdas)
   // L-M 2 · §1.3 · las tres varas de la tanda 1 de la lámina, cada una con su control rojo.
   if (partes.includes('lm') && enteras) varas.push(...(await runVarasLM(browser, base)).celdas)
   // L-M 2 · §2–§4 · los mensajes (con su control rojo) y el aviso de ausencia; y las capturas.
