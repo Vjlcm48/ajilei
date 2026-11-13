@@ -1,4 +1,4 @@
-# AJILEI · MOT-1 · Contrato del árbitro · v1.3
+# AJILEI · MOT-1 · Contrato del árbitro · v1.4
 
 - **Normativo de MOT-1.** Las fichas 1b–1f se escriben contra este documento: lo que no esté aquí no se construye.
 - **Base:** `main` en `1f5cb14`. Toda cita `archivo:líneas` es de ese árbol.
@@ -12,6 +12,7 @@
 - **Al día con MES-PvP, sub-tanda 0 (2026-11-05):** v1.1. El §2, el §3, el §4, el §6, el §7, el §9 y el §11 recogen lo que necesita la mesa real, con las decisiones del rector y de Victor sobre la Fase 0 de MES-PvP. Lo normativo para MES-PvP es este mismo archivo. Las citas de lo nuevo son del árbol `de468b3`.
 - **Al día con MES-PvP, sub-tanda 3-A (2026-11-06):** v1.2, la del árbitro que se despliega con ella. La **regla C-8** (el abandono, §7) se reescribe según las Reglas v1.7 §8.2: abandonar es retirarse en el acto, en cualquier fase; si queda uno solo en la mano, cobra el pozo; con menos de 2 sentados la partida termina en la misma jugada; quien se va cobra su pila al irse, y con mano en curso al cerrarse esa mano; el showdown ya calculado se recalcula sin él; las tres vías siguen el mismo camino. El §2, el §4 y el §6 se ponen al día con ella. **Renumeración:** lo que la v1.1 dejaba para el árbitro y el Contrato «v1.2» (la recarga PvP, la reposición uno a uno y el volteo de 5 s del sorteo, en el informe de la sub-tanda 3) pasa a la **v1.3**. Las citas de lo nuevo son del árbol `db0313b`.
 - **Al día con MES-PvP, árbitro v1.3 (2026-11-08):** v1.3, la del árbitro que se despliega con las sub-tandas v1.3-a y v1.3-b. Recoge el sorteo sobre la mesa (el reparto según los participantes, el volteo de 5 s y las posiciones elegidas en la vista), el **mensaje de la mesa** (la excepción escrita a «por el canal solo versiones», §5) y la **recarga PvP** entera (§2, §3, §4, §6 y §7), según las Reglas de APU-1 v1.9 §8 y el informe de la Fase 0 del árbitro v1.3 (`docs/reportes/AJILEI_MES-PvP_Arbitro-v1.3_Fase0_Informe_v1.0.md`). La **reposición uno a uno** queda para la sub-tanda 5, con el Contrato v1.4 (§6). Las citas de lo nuevo son del árbol del STOP-C del v1.3-b.
+- **Al día con MES-PvP, sub-tanda 5b (2026-11-12):** v1.4, la del árbitro que se despliega con ella (solo la función `partida`, sin migración). Recoge la **reposición uno a uno** de las Reglas de APU-1 v1.11 §8.7: el árbitro espera lo que dura en el cliente, según el ritmo (§6, «Los vencimientos», «La reposición uno a uno», «El ritmo» y «Las esperas base»); la vista no cambia (§4). Las cifras salen del informe de la Fase 0 de la sub-tanda 5 (§B). Las citas de lo nuevo son del árbol del STOP-C de la 5b.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -282,7 +283,7 @@ La arma `vistaDe(estado, asiento)` en la 1b. Lo que no esté en la primera tabla
 | Vencimiento | Hora y clase del pendiente | No: árbitro |
 | Versión | Entero | No: árbitro |
 | Mano | Su número: lo que `descartar` manda en `mano` | Sí: `handCount` (`gameEngine.js:598`) |
-| Descarte | Quién ya descartó, y cuántas tras aplicarse | No: árbitro. `applyDiscard` lo cuenta y no lo guarda (`gameEngine.js:688, :700`) |
+| Descarte | Quién ya descartó, y cuántas tras aplicarse (`descarte.cuantas`: `null` para quien no sigue en la mano). **v1.4:** con `manoIndex`, es todo lo que el cliente necesita para la reposición uno a uno: el orden y cuántas repone cada asiento. Sin campo nuevo: de un rival se mueven sus primeras cartas | No: árbitro. `applyDiscard` lo cuenta y no lo guarda (`gameEngine.js:688, :700`) |
 | Sorteo | La ronda abierta, las cinco posiciones propias sin valor y quién ya eligió; tras el volteo, la carta elegida de cada participante en cada ronda y su posición (`rondas[].volteo[].posicion`). **v1.3 · `sorteo.elegidas`:** qué posición (0..4) eligió cada asiento, o `null`, **nunca su valor** antes del volteo: la carta elegida se adelanta también en los asientos ajenos (Reglas v1.9 §8.4) (`vista.js:74`) | No: árbitro |
 | Revelación, solo en `PAYOUT` por showdown | Cartas y `score` de los no retirados; ganadores por capa | Datos sí (`gameEngine.js:238-241`, `pozos.js:311`). El filtro es de `vistaDe` |
 | `resultado` en el fin, desde la v1.2 | Si la partida termina en la misma jugada que cierra una mano (C-8, R2), la vista del fin publica el `resultado` de esa mano, con la forma del pago. En los demás fines vale `null`. Es lo que deja al cliente enseñar el pago antes de la pantalla final. No es un campo nuevo | No: árbitro (`vista.js`, `finConPago`) |
@@ -358,7 +359,7 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 | Volteo del sorteo · `volteo_sorteo` | Voltean las elegidas | v1.3 · **5 s** (Reglas v1.9 §8; `esperas.js:33`) | La Mano queda fijada y arranca la primera mano, o se abre la ronda siguiente |
 | Turno | Le toca a un asiento en `BET_*` | `TURN_TIME` = 20 s (`GameTable.jsx:87`) | `pasar` si es legal; si no, `retirarse` (`GameTable.jsx:913-914`). El abandonado no llega a vencer: se retira en el acto (§7) |
 | Descarte | Se abre `DISCARD` | `TURN_TIME` = 20 s (`GameTable.jsx:890`) | Descarte vacío para quien falte (`GameTable.jsx:917`) y aplica. El abandonado no descarta: está retirado desde que abandonó (C-8, §7) |
-| Reposición · `reposicion` | Se aplica el descarte | Una sola tanda de vuelos a la vez: todos reponen en paralelo, con la fórmula del reparto sobre el mayor descarte (120 + mayor × 595 + 400 ms). Si nadie descartó, 600 ms. **provisional · se cierra con los teléfonos** | El motor sale de `DISCARD`: se abre `BET_3` y su turno, o lo que toque. Ver abajo |
+| Reposición · `reposicion` | Se aplica el descarte | v1.4 · **uno a uno**, de la Mano al Pie: `100 + f · Σ por asiento [n = 0 → 750 ; n ≥ 1 → 2.175 + 412,5 · (n − 1)] + 500` ms, redondeado al ms, con `f` el del ritmo (`reloj.js`, `esperaReposicion`). Si nadie descartó, cada asiento cuenta 750 | El motor sale de `DISCARD`: se abre `BET_3` y su turno, o lo que toque. Ver abajo |
 | Reparto | `DEAL_2` o `DEAL_3` | Espera de animación | `advanceFromDeal` (`gameEngine.js:603`) |
 | Aviso de salida · `aviso_salida` | `startHand` deja eliminados nuevos y la partida sigue | 3 s, **provisional · se cierra con los teléfonos** | Empieza el barajado |
 | Barajado | `startHand`, o termina `aviso_salida` | Espera de animación | Se abre el reparto |
@@ -381,17 +382,25 @@ Reglas de APU-1 v1.9 §8.1, con P-2, P-3, P-5, P-6 y D7. Solo en una partida con
 | Al abandonar | Un pedido o una oferta abiertos se limpian; cobra su pila o su residuo por la ruta de siempre (`partida.js:720`) |
 | Sin saldo al guardar | Si el saldo bajó entre la lectura y la escritura, `aplicar_efectos` lanza `saldo_insuficiente`, la jugada entera se deshace y la función la repite **una** vez con saldos frescos: el árbitro cancela entonces con `'saldo'` (`nucleo.js:285`) |
 
-### La reposición uno a uno · pendiente de la sub-tanda 5 (Contrato v1.4)
+### La reposición uno a uno (v1.4)
 
-Sigue en paralelo (la fila «Reposición» de arriba). La sub-tanda 5 la cambia **a la vez en el árbitro y en el cliente**, con un deploy propio:
+Reglas de APU-1 v1.11 §8.7. El árbitro y el cliente hacen la misma cuenta; `reposicionCore.test.js` las ata en todas las mesas, desde cada asiento y en los dos ritmos.
 
-- **La fórmula** (informe de la Fase 0, §B): `R = 100 + f · Σ por asiento [n = 0 → 750 ; n ≥ 1 → 2.175 + 412,5 · (n − 1)] + 500` ms, en orden de Mano a Pie y solo con los no retirados.
-- **Rápido escala ×0,5 en todo** (P-4): las pausas y los vuelos de 750 ms.
-- **Las constantes `D_*`** de `GameTable.jsx:263-269` se mudan a `esperas.js`. Toca la mesa contra las IAS: pide su control.
+| Punto | Regla |
+|---|---|
+| La fórmula | `R = 100 + f · Σ por asiento [n = 0 → 750 ; n ≥ 1 → 2.175 + 412,5 · (n − 1)] + 500` ms, redondeado al ms (informe de la Fase 0 de la sub-tanda 5, §B.2). Solo cuentan los que siguen en la mano: los retirados, abandonados y sentados fuera llegan a `descartaron` como `null`; el ausente, con 0 (el reloj descarta por él) |
+| El ritmo | `f = 1` en Normal y `0,5` en Rápido: escala las pausas y los vuelos. **El arranque de 100 ms y el cierre de 500 no escalan** (el cierre es el volteo de la carta propia) |
+| El cierre | El árbitro usa siempre 500 ms, el peor caso: cada teléfono cierra a los 500 si descartó y a los 200 si no |
+| Las constantes | Las siete `D_*` viven en `src/config/esperas.js` con su valor efectivo (750 · 187,5 · 375 · 750 · 225 · 300 · 750), más el arranque y los dos cierres. Las leen el árbitro (`reloj.js`) y el calendario del cliente (`lib/reposicionCore.js`), que comparten la mesa contra las IAS (`f = 1`, los mismos instantes que antes) y la mesa entre personas |
+| El orden | De la Mano al Pie, sobre la vista rotada de cada teléfono: la misma vuelta da el mismo orden en todos. El árbitro no lo necesita: la suma solo depende de cuántas repone cada asiento |
+| Las cartas de los rivales | Las primeras de su mano, tantas como descartó: el dorso no deja ver cuáles salieron. Sin `descarte.posiciones` (P-4) |
+| El teléfono tardío | El cliente **ancla** la secuencia a la hora del árbitro: empieza en `vencimiento.hora − R − desfase` (o al llegar la vista, si eso es antes). Los pasos ya vencidos se aplican sin vuelo, y termina a la vez que los demás |
+| El corte | Si la vista sale de `reponiendo` con la secuencia viva (se abre `BET_3`, se cierra la mano o termina la partida), el cliente la corta: quita sus vuelos y pinta la vista tal cual. Ninguna ranura queda vacía con el reloj de `BET_3` corriendo |
+| Sin colchón | El árbitro no añade margen: los 300 ms del reclamo (`MARGEN_VENCIMIENTO_MS`) ya lo son |
 
 **`TURN_TIME` no está exportado:** vive dentro del componente de mesa. La 1b lo lleva a donde el árbitro lo lea, sin cambiar la cifra.
 
-**Durante la reposición, la mano sigue en `DISCARD`.** La vista ya lleva las cartas nuevas de cada asiento y `descarte.cuantas`, y `vencimiento.clase` dice `reposicion`. El motor no abre `BET_3`, no llega al showdown ni paga hasta que vence: nadie ve el resultado antes de ver reponer, y ningún reloj de turno corre durante la animación. Una `apostar` recibe `fase`, y una `descartar`, `ya_descarto`. Quien abandona en la reposición se retira en el acto (C-8, §7): lo calculado para la apuesta 3 o el showdown se recalcula sin él, y si queda uno solo, cobra el pozo.
+**Durante la reposición, la mano sigue en `DISCARD`.** La vista ya lleva las cartas nuevas de cada asiento y `descarte.cuantas`, y `vencimiento.clase` dice `reposicion`. El motor no abre `BET_3`, no llega al showdown ni paga hasta que vence: nadie ve el resultado antes de ver reponer, y ningún reloj de turno corre durante la animación. Una `apostar` recibe `fase`, y una `descartar`, `ya_descarto`. Quien abandona en la reposición se retira en el acto (C-8, §7): lo calculado para la apuesta 3 o el showdown se recalcula sin él, y si queda uno solo, cobra el pozo. **v1.4:** la espera de la reposición no se recalcula, y el plan que cada teléfono ya está pintando tampoco cambia; si la mano se cierra, el cliente corta (ver «La reposición uno a uno»).
 
 ### El sorteo
 
@@ -414,8 +423,8 @@ Sigue en paralelo (la fila «Reposición» de arriba). La sub-tanda 5 la cambia 
 
 | Punto | Regla |
 |---|---|
-| Qué escala | Exactamente lo que hoy escala «Partida rápida» contra las IAS: el vuelo del reparto y las esperas del segundo reparto (`GameTable.jsx:829, :847`) |
-| Qué no escala | El barajado, la revelación, la pausa de mano siguiente, la reposición, el aviso de salida y la pausa de anuncio. Tampoco el reloj de turno, el de descarte y el de sorteo: iguales en los dos ritmos |
+| Qué escala | Lo que escala «Partida rápida» contra las IAS: el vuelo del reparto y las esperas del segundo reparto (`GameTable.jsx:829, :847`). **v1.4, solo entre personas:** la reposición entera, pausas y vuelos, salvo su arranque y su cierre (P-4). Contra las IAS la reposición sigue sin escalar |
+| Qué no escala | El barajado, la revelación, la pausa de mano siguiente, el aviso de salida y la pausa de anuncio. Tampoco el reloj de turno, el de descarte y el de sorteo: iguales en los dos ritmos |
 | El reparto del sorteo | Siempre con `FACTOR_RAPIDA`, sea cual sea el ritmo |
 | Factor | `FACTOR_RAPIDA = 0.5` (`partidaRapida.js:20`). Ninguna cifra nueva |
 | Lo que no se usa | `factorDeMano` da siempre 1 fuera de la mesa contra IAS (`partidaRapida.js:42` · su prueba, `partidaRapida.test.js:43`) |
@@ -431,7 +440,7 @@ Las constantes viven en `src/config/esperas.js`. Las de la 1b salen de lo que ya
 | Segundo reparto | 300 · 600 · 900 ms (`GameTable.jsx:848-850`) | Sí (`:847`) |
 | Revelación | `REVEAL_CHOREO` (`GameTable.jsx:132-134`) y su coreografía · tope de red `RED_REVELACION_MS = 6000` (`mesaCore.js:395`). El cambio de fase apaga la celebración: por eso la espera cubre la red entera | No |
 | Mano siguiente | En PvP no hay botón: arranca sola. **Con revelación, 6.000 + 2.000 ms:** la red de la celebración más la lectura. **Sin revelación** (ganan por retirada de los demás), **4.000 ms** desde el cierre de la mano. **provisional · se cierra con los teléfonos**. Contra las IAS sigue siendo un botón, con 300 ms tras tocarlo (`GameTable.jsx:2716-2726`) | No |
-| Reposición | 120 + mayor descarte × 595 + 400 ms; sin descartes, 600 ms. **provisional · se cierra con los teléfonos**: la animación en paralelo nace en MES-PvP y debe caber aquí | No |
+| Reposición | v1.4 · uno a uno: `100 + f · Σ [n = 0 → D_SKIP ; n ≥ 1 → D_OUT + D_PAUSE + D_IN + D_SEAT_GAP + (n − 1) · (D_OUT_STAG + D_IN_STAG)] + 500` ms, con las `D_*` de `esperas.js` (ver «La reposición uno a uno»). De 2.100 ms (mesa de 2, nadie descarta) a 15.600 (mesa de 5, todos 3) en Normal | **Sí, ×0,5**, salvo el arranque y el cierre. Contra las IAS, no |
 | Aviso de salida | 3.000 ms. **provisional · se cierra con los teléfonos** | No |
 | Volteo del sorteo | v1.3 · 5.000 ms (Reglas v1.9 §8) | No |
 | Pausa de anuncio | Tope de 45.000 ms | No |
@@ -620,7 +629,7 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | `vuelo` sin semilla | `diagDSK.mjs`, modo `vuelo` | Ninguna: MOT-1 no lo toca |
 | Reglas v1.4: motivos con otro nombre y «`pozos.js` no protegido» | Reglas v1.4 `:143` | Hecho: Reglas v1.5, MES-PvP 0 |
 | Protegidos §7.1, fila E-4: dice que el pozo deja de ser escalar | Protegidos §7.1 · `pozos.js:243` | Hecho: MES-PvP 0 |
-| **La reposición uno a uno** (árbitro y cliente), con Rápido ×0,5 en todo, y la mudanza de las `D_*` a `esperas.js` | `reloj.js` · `GameTable.jsx:263-269, :1670-1724` | MES-PvP 5, con un deploy propio y el control de las IAS (§6) |
+| **La reposición uno a uno** (árbitro y cliente), con Rápido ×0,5 en todo, y la mudanza de las `D_*` a `esperas.js` | `reloj.js` · `lib/reposicionCore.js` · `GameTable.jsx` | Hecho: MES-PvP 5b (Contrato v1.4), con su deploy y el control de las IAS |
 | Dos matices de las Reglas v1.9 frente al código, **anotados sin corregir** (A2 de la Fase 0 del v1.3): el código llama `{n}` a lo que las Reglas llaman `{N}` (§8.4 y §8.6), con el mismo texto visible; y en la mesa de 2 contra las IAS la pastilla dice «Es Mano IA», sin número (`engine/entrada.js:110`), cuando las Reglas solo dan la forma con `{k}` | `lib/transicionCore.js:27-28` | Ninguna: se dejan así |
 
 ---
