@@ -18,6 +18,7 @@ import {
   finDe,
   posicionSilla,
   resumenDe,
+  rotuloSilla,
   siguienteConsejo,
   salaParaPartida,
   sillasDe,
@@ -625,7 +626,7 @@ export default function SalaEspera({
                 </div>
                 <div className="sal-esp-n">{s.vacia ? t('sal.espera.vacia') : s.username ?? '?'}</div>
                 <div className="sal-esp-tag">
-                  {s.esAnfitrion ? t('sal.espera.anfitrion') : s.esTu ? t('sal.espera.tu') : ' '}
+                  {rotuloSilla(s) ? t(rotuloSilla(s)) : ' '}
                 </div>
               </div>
             )
@@ -698,13 +699,15 @@ export default function SalaEspera({
           `.sal-cuerpo`, hija directa de `main.sal`: su velo (z 6) y ella (z 7)
           quedan por encima del cuerpo (z 1), y con él del velo y el diálogo de
           «Cancelar», que viven DENTRO del cuerpo y no se tocan. «Cerrar
-          sesión» desde aquí sale como desde el lobby; la mesa en espera queda
-          a cargo del barrido del servidor (MES-PvP). */}
+          sesión» desde aquí sale como desde el lobby, y desde MES-PvP 7a se
+          levanta antes de la mesa en espera (`App.cerrarSesion`). MES-PvP 7a ·
+          INV-76 · con la entrada cobrada, la fila «Tapetes» no abre la tienda:
+          se queda apagada y avisa (`tiendaCore.filaTapetes`). */}
       <HojaConfiguracion
         abierta={hojaAbierta}
         onCerrar={() => setHojaAbierta(false)}
         ajustesRef={ajustesRef}
-        cuenta={cuenta}
+        cuenta={cuenta && { ...cuenta, tapetesApagados: true }}
       />
     </main>
   )

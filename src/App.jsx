@@ -95,7 +95,7 @@ import {
   consumir as consumirSalaPendiente,
   borrar as borrarSalaPendiente,
 } from './config/salaPendiente'
-import { salasApi, esMesa } from './lib/salasApi'
+import { salasApi, esMesa, salirDeSalaEnEspera } from './lib/salasApi'
 // El unico punto por donde algo simulado puede entrar. En produccion devuelve
 // `null` en su primera linea y el minificador se lleva el archivo entero.
 import { apiSinMesa, simulacionSalas } from './dev/salasFixtures'
@@ -302,11 +302,15 @@ function App() {
   // volver a entrar se aterrizaba en la pantalla de la que se salió (Retar,
   // Rankings…). Después del `signOut` y no antes: antes, el lobby asomaría
   // mientras la salida viaja; después, la Portada ya tapa el cambio.
+  // MES-PvP 7a · B.3 · y antes, se levanta de la mesa que espera (`salirDeSalaEnEspera`: el
+  // anfitrión la cancela para todos, P-5). Con la sesión aún viva, que `salir_sala` la necesita;
+  // con un tope de 2 s y sin bloquear la salida si falla.
   const cerrarSesion = useCallback(async () => {
+    await salirDeSalaEnEspera(api)
     saldoRecordado.borrar()
     await cerrarSesionDeAuth()
     setScreen('lobby')
-  }, [cerrarSesionDeAuth])
+  }, [api, cerrarSesionDeAuth])
   useEffect(() => {
     if (auth.estado === SIN_SESION) saldoRecordado.borrar()
   }, [auth.estado])

@@ -126,3 +126,8 @@
 @media (prefers-reduced-motion: reduce) {
   :is(.lobby, .sal) .cfg-toast { transition: none; }
 }
+
+/* MES-PvP 7a · INV-76 · la fila «Tapetes» dentro de la sala de espera: en su sitio y del mismo
+   tamaño (O1), apagada como un chip que no alcanza (`.sal-chip[disabled]`); al tocarla avisa. */
+:is(.lobby, .sal) .tie-cfg-fila[aria-disabled="true"] > * { opacity: 0.4; }
+:is(.lobby, .sal) .tie-cfg-fila[aria-disabled="true"] { cursor: default; }

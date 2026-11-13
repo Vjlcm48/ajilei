@@ -373,4 +373,18 @@ describe('10. MES-PvP 7a · INV-76 · la fila «Tapetes» del ⚙ dentro de la s
     expect(filaTapetes({})).toEqual({ apagada: false, aviso: 'lob.toast.pronto' })
     expect(filaTapetes(null)).toEqual({ apagada: false, aviso: 'lob.toast.pronto' })
   })
+
+  it('solo la sala de espera la apaga: ninguna otra pantalla pasa `tapetesApagados`', () => {
+    const raiz = join(RAIZ, 'src')
+    const quien = []
+    const recorre = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const ruta = join(dir, e.name)
+        if (e.isDirectory()) recorre(ruta)
+        else if (/\.jsx?$/.test(e.name) && !/\.test\./.test(e.name) && /tapetesApagados: true/.test(readFileSync(ruta, 'utf8'))) quien.push(e.name)
+      }
+    }
+    recorre(raiz)
+    expect(quien).toEqual(['SalaEspera.jsx'])
+  })
 })

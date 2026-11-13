@@ -842,8 +842,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   }
 
   useEffect(() => {
+    // MES-PvP 7a · al salir del reparto, el paso vuelve a 0. Contra personas el reparto acaba sin
+    // ponerlo a 0 (`if (partida) return`, abajo), y `DEAL_3` no tiene barajado que lo tape: su
+    // primer cuadro pintaba las cartas de `2·n` pasos en todos a la vez y dejaba un vuelo de más.
+    // Contra las IAS aquí ya vale 0 (se pone antes de `advanceFromDeal`): no cambia nada.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- MOT-1 reescribe este flujo
-    if (!isDealPhase) { setFlyingCards([]); return }
+    if (!isDealPhase) { setFlyingCards([]); setDealStep(0); return }
     if (isShuffling) return   // C4.4.1: ante ya descontado; repartir solo al terminar el barajado
     if (dealStep >= dealTotal) {
       if (phase === PHASES.DEAL_3) {

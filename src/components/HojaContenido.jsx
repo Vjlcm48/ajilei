@@ -8,7 +8,7 @@ import Bandera from './Bandera'
 import Vitrina from './Vitrina'
 import { tapetePorId } from '../config/tapetes'
 import { useTapetes } from '../hooks/useTapetes'
-import { enUsoFila } from '../hooks/tiendaCore'
+import { enUsoFila, filaTapetes } from '../hooks/tiendaCore'
 import { CREDITOS_EMOJI, AUTORES_PIXABAY, LICENCIA_PIXABAY } from '../config/creditos'
 import { CORREO_SOPORTE } from '../config/soporte'
 import { VERSION, COMMIT } from '../config/version'
@@ -100,6 +100,8 @@ export default function HojaContenido({ abierta, onCerrar, avisar, cuenta, onCer
   useEffect(() => { if (sugAbierta) sugRef.current?.scrollIntoView({ block: 'nearest' }) }, [sugAbierta])
 
   const pronto = () => avisar('lob.toast.pronto')
+  // MES-PvP 7a · INV-76 · en la sala de espera, apagada y con su aviso (`filaTapetes`).
+  const filaTap = filaTapetes(cuenta)
 
   const cerrarSesion = () => {
     onCerrar?.()
@@ -184,7 +186,8 @@ export default function HojaContenido({ abierta, onCerrar, avisar, cuenta, onCer
           <SoundButton
             className="lob-fila tie-cfg-fila"
             data-accion="cfg-tapetes"
-            onClick={cuenta?.abrirTapetes ? () => { onCerrar?.(); cuenta.abrirTapetes() } : pronto}
+            aria-disabled={filaTap.apagada ? 'true' : undefined}
+            onClick={filaTap.aviso ? () => avisar(filaTap.aviso) : () => { onCerrar?.(); cuenta.abrirTapetes() }}
           >
             <span className="tie-cfg-txt">
               <span>{t('tie.estante.tapetes')}</span>
