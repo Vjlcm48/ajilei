@@ -612,7 +612,7 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | `REGLA_ASIENTO` pasa a 15 (la Corta, entrada por defecto), con sus pruebas, para que el cliente no ofrezca mesas que el servidor rechaza | `salas.js:57` · `salas.test.js:42-44` | 1d-ii: la única excepción a «la 1d solo toca SQL» |
 | Espejo del cliente: `APUESTAS_PVP` | `salas.js:41` · `salas.test.js:29, :36` | MES-PvP 7: `ArmarMesa.jsx:282` pinta lo que diga la lista, y el chip de 50 es de esa campaña |
 | **Pantalla de armar mesa:** fila Entrada, chip de 50, control de ritmo del anfitrión | `ArmarMesa.jsx` | MES-PvP 7 |
-| **Reloj de la sala:** 5:00 en mesas privadas, 3:00 en públicas | SQL de salas | MES-PvP 7 |
+| **Reloj de la sala:** 5:00 en mesas privadas, 3:00 en públicas | SQL de salas | MES-PvP 7 · **hecho en la 7a**: `duracion_sala(tipo)` en `20261113150000_mespvp_sub7a_duracion_sala.sql` (la escriben `crear_sala` y la restitución de `salir_sala`), con el espejo `duracionSala` en `salas.js` |
 | `salas_abiertas` con `entrada`, y el texto del tope de 10 sentadas por minuto | `sal_b2:228-250` · `salasCore.js:132-135` · `textos.es.js:251` | MES-PvP 7 |
 | Sala de espera: sentido y mini-perfil | `salaEsperaCore.js:141` · `MiniPerfil.jsx` | MES-PvP 7 |
 | **El árbitro v1.1:** `volver_anuncio`, `ahora`, los campos del §4, los vencimientos nuevos, la ausencia y la pausa de anuncio | `src/arbitro/` · `supabase/functions/partida/` | MES-PvP 1 |
