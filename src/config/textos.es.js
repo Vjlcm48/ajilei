@@ -710,6 +710,8 @@ export const TEXTOS_ES = {
   'tie.listo':              '¡Listo! {nombre} es tu tapete',
   'tie.cambio.error':       'No se pudo cambiar. Inténtalo de nuevo.',
   'tie.cfg.valor':          '{nombre} · {tono}',
+  // MES-PvP 7a · INV-76 · la fila «Tapetes» del ⚙ dentro de la sala de espera.
+  'tie.cfg.fuera':          'Disponible fuera de la mesa',
 }
 
 export default TEXTOS_ES

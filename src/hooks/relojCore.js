@@ -7,7 +7,7 @@
 // módulo puro, la infraestructura en el hook.
 //
 // Que el núcleo no llame a `Date.now()` no es purismo: es lo que permite probar
-// el vencimiento de un cronómetro de tres minutos sin esperar tres minutos, y
+// el vencimiento de un cronómetro de cinco minutos sin esperar cinco minutos, y
 // probar un reloj adelantado sin tocar el reloj de la máquina.
 //
 // ── POR QUÉ EL CLIENTE NO PUEDE CONTAR SOLO ─────────────────────────────────
@@ -44,7 +44,7 @@
  * lleva ese error dentro y el reloj local queda ligeramente ATRASADO respecto al
  * real. Se acepta a propósito: corregirlo bien exige medir ida y vuelta (media
  * de varias muestras, estilo NTP) y aquí se está contando una cuenta atrás de
- * tres minutos que se muestra en segundos enteros. Un error de 200 ms no lo ve
+ * tres o cinco minutos que se muestra en segundos enteros. Un error de 200 ms no lo ve
  * nadie, y el vencimiento de verdad lo decide el servidor —`resolver_sala`—, no
  * este número.
  *
@@ -93,9 +93,9 @@ export function ahoraServidor(ahoraLocal, desfase = 0) {
  * cero, no a −60. La pantalla que lo pinta no tiene que acordarse de recortar, y
  * `restante(x) === 0` es la única condición de vencimiento que hay que escribir.
  *
- * Redondea HACIA ARRIBA, que es lo que hace que la cuenta empiece diciendo «3:00»
- * y no «2:59»: en el instante de crearse la sala faltan 180 000 ms exactos, y con
- * `floor` el primer fotograma ya enseñaría 179. También significa que el «0»
+ * Redondea HACIA ARRIBA, que es lo que hace que la cuenta empiece diciendo «5:00»
+ * y no «4:59»: en el instante de crearse una privada faltan 300 000 ms exactos
+ * (180 000 una abierta), y con `floor` el primer fotograma ya enseñaría 299. También significa que el «0»
  * aparece justo cuando se agota y no un segundo antes.
  *
  * @param {string|number|Date} expiraEn  el `expira_en` de la sala

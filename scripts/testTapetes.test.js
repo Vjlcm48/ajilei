@@ -21,7 +21,8 @@ import {
 import { crearAlmacenTapetes } from '../src/hooks/useTapetes.js'
 import { crearControlTapetes } from '../src/lib/controlTapetes.js'
 import { crearTiendaApi, traducirInventario, traducirMotivo } from '../src/lib/tiendaApi.js'
-import { vistaArticulo, trasCompra, teQuedaran, normalizarEstante, enUsoFila, ESTANTES } from '../src/hooks/tiendaCore.js'
+import { vistaArticulo, trasCompra, teQuedaran, normalizarEstante, enUsoFila, filaTapetes, ESTANTES } from '../src/hooks/tiendaCore.js'
+import TEXTOS_ES from '../src/config/textos.es.js'
 import { crearBanco, PRECIOS_ARTICULO_SQL, CON_TONOS_SQL, LIMITE_COMPRA_SQL } from '../src/dev/bancoImitado.js'
 import { RAIZ } from './arnes/fuente.mjs'
 
@@ -359,5 +360,17 @@ describe('9. TIE-1 1a · ningún código lee lo «comprado» en el aparato', () 
     expect(tapetePorId('grafito').nombre).toBe('Negro grafito')
     expect(TAPETE_POR_DEFECTO).toBe('verde')
     expect(montoTexto(25000)).toBe('25.000')
+  })
+})
+
+describe('10. MES-PvP 7a · INV-76 · la fila «Tapetes» del ⚙ dentro de la sala de espera', () => {
+  const lobby = { abrirTapetes: () => {} }
+  it('en el lobby abre la tienda; en la sala, apagada y con «Disponible fuera de la mesa»', () => {
+    expect(filaTapetes(lobby)).toEqual({ apagada: false, aviso: null })
+    expect(filaTapetes({ ...lobby, tapetesApagados: true })).toEqual({ apagada: true, aviso: 'tie.cfg.fuera' })
+    expect(TEXTOS_ES['tie.cfg.fuera']).toBe('Disponible fuera de la mesa')
+    // Sin la puerta, «Pronto», como antes.
+    expect(filaTapetes({})).toEqual({ apagada: false, aviso: 'lob.toast.pronto' })
+    expect(filaTapetes(null)).toEqual({ apagada: false, aviso: 'lob.toast.pronto' })
   })
 })

@@ -30,6 +30,17 @@ export function enUsoFila(foto) {
   return { id, tono: normalizarTono(id, foto?.tono) }
 }
 
+// MES-PvP 7a · INV-76 · qué hace la fila al tocarla. En la sala de espera la entrada ya está
+// cobrada y el reloj corre (y con la mesa llena son 10 s): ir a la tienda desmontaba la sala y la
+// mesa arrancaba sin el jugador. Ahí la fila se queda en su sitio, apagada, y avisa
+// (`cuenta.tapetesApagados`, lo pone `SalaEspera`). Fuera, abre la tienda; sin la puerta, «Pronto».
+//   { apagada, aviso }: `aviso` es la clave del toast, o `null` si abre la tienda.
+export function filaTapetes(cuenta) {
+  if (cuenta?.tapetesApagados) return { apagada: true, aviso: 'tie.cfg.fuera' }
+  if (cuenta?.abrirTapetes) return { apagada: false, aviso: null }
+  return { apagada: false, aviso: 'lob.toast.pronto' }
+}
+
 // ── La vista de un artículo (V4-A) ───────────────────────────────────────────
 // `foto` es la del canal (`lib/controlTapetes`); `saldo`, el de la billetera
 // (`null` mientras no se sabe); `previa`, el tono que el jugador tocó en un

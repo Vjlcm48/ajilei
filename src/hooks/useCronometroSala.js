@@ -119,7 +119,7 @@ export function creaCronometro(api, expiraEn, deps = {}) {
  */
 export function useCronometroSala(api, expiraEn) {
   // El primer render ya enseña la cuenta con el reloj local sin corregir: un
-  // «3:00» honesto en vez de un «0:00» de un fotograma. Es una lectura de un
+  // «5:00» (o «3:00») honesto en vez de un «0:00» de un fotograma. Es una lectura de un
   // solo uso en el inicializador, como la de la URL en `App`.
   const [estado, setEstado] = useState(() => creaCronometro(api, expiraEn).estado())
   const ctrlRef = useRef(null)

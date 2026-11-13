@@ -61,6 +61,15 @@ export function sillasDe(sala, asientos, uid) {
   })
 }
 
+// MES-PvP 7a · el rótulo bajo el nombre (decisión de Victor, P-4): la silla propia dice
+// SIEMPRE «Tú», también si eres el anfitrión; la del anfitrión ajeno, «Anfitrión». Las demás,
+// nada (`null`: la pantalla pinta un espacio, la caja se queda).
+export function rotuloSilla(silla) {
+  if (silla?.esTu) return 'sal.espera.tu'
+  if (silla?.esAnfitrion) return 'sal.espera.anfitrion'
+  return null
+}
+
 // 5a · la fila de la sala con sus sillas sentadas, para la mesa provisional de la partida
 // (`mesaPvPCore.vistaProvisional`): asiento, nombre y cuál es la propia. Solo para quien vio la
 // sala arrancar (`enVivo`: la vio esperando y luego activa): quien vuelve con la partida ya en

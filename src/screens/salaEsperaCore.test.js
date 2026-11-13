@@ -7,13 +7,14 @@ import {
   inicialDe,
   posicionSilla,
   resumenDe,
+  rotuloSilla,
   salaParaPartida,
   siguienteConsejo,
   sillasDe,
   urge,
 } from './salaEsperaCore.js'
 import { PARAM_SALA } from '../config/salaPendiente.js'
-import { LLENA_SEG, DURACION_SALA_SEG } from '../config/salas.js'
+import { LLENA_SEG, duracionSala } from '../config/salas.js'
 
 // ── SAL-B2 · La semántica de la sala de espera ──────────────────────────────
 // Rector: AJILEI_SAL-B2_Fase1a_v1.0.md §6. Se prueba el NÚCLEO y no la
@@ -97,6 +98,19 @@ describe('SAL-B2 · sillasDe', () => {
   it('las mesas de 2 y de 5 tienen exactamente sus sillas', () => {
     expect(sillasDe(sala({ jugadores: 2 }), asientos(), ANF)).toHaveLength(2)
     expect(sillasDe(sala({ jugadores: 5 }), asientos(), ANF)).toHaveLength(5)
+  })
+})
+
+describe('MES-PvP 7a · rotuloSilla', () => {
+  it('la silla propia dice «Tú» también siendo el anfitrión; la del anfitrión ajeno, «Anfitrión»', () => {
+    const vistaDelAnfitrion = sillasDe(sala(), asientos(), ANF)
+    expect(vistaDelAnfitrion[0]).toMatchObject({ esAnfitrion: true, esTu: true })
+    expect(rotuloSilla(vistaDelAnfitrion[0])).toBe('sal.espera.tu')
+    expect(rotuloSilla(vistaDelAnfitrion[1])).toBeNull()
+    const vistaDelInvitado = sillasDe(sala(), asientos(), INV)
+    expect(rotuloSilla(vistaDelInvitado[0])).toBe('sal.espera.anfitrion')
+    expect(rotuloSilla(vistaDelInvitado[1])).toBe('sal.espera.tu')
+    expect(rotuloSilla({ vacia: true, esTu: false, esAnfitrion: false })).toBeNull()
   })
 })
 
@@ -252,7 +266,7 @@ describe('SAL-B2 · urge', () => {
   })
 
   it('el umbral está por debajo de la cuenta entera y por encima de la corta', () => {
-    expect(URGE_SEG).toBeLessThan(DURACION_SALA_SEG)
+    expect(URGE_SEG).toBeLessThan(duracionSala('abierta'))
     expect(URGE_SEG).toBeGreaterThan(LLENA_SEG)
   })
 })

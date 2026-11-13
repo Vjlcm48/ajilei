@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { creaCronometro } from './useCronometroSala.js'
-import { DURACION_SALA_SEG, LLENA_SEG } from '../config/salas.js'
+import { duracionSala, LLENA_SEG } from '../config/salas.js'
 
 // ── SAL-B2 · El cronómetro de la sala ───────────────────────────────────────
 // Rector: AJILEI_SAL-B2_Fase1a_v1.0.md §7.
@@ -33,7 +33,7 @@ function apiFalsa({ servidor = null, error = null, tarda = 0 } = {}) {
 }
 
 // Monta el controlador como lo hace el hook: aviso enganchado y arrancado.
-function monta({ expiraEn = iso(T0 + DURACION_SALA_SEG * 1000), ...opciones } = {}) {
+function monta({ expiraEn = iso(T0 + duracionSala('abierta') * 1000), ...opciones } = {}) {
   const api = apiFalsa(opciones)
   const ctrl = creaCronometro(api, expiraEn)
   const vistos = []
@@ -163,7 +163,7 @@ describe('SAL-B2 · creaCronometro · la mesa llena', () => {
     const { ultimo, ctrl } = monta({ expiraEn: iso(T0 + LLENA_SEG * 1000) })
     await vi.advanceTimersByTimeAsync(3_000)
     expect(ultimo().segundos).toBe(7)
-    ctrl.cambiaExpira(iso(T0 + DURACION_SALA_SEG * 1000))
+    ctrl.cambiaExpira(iso(T0 + duracionSala('abierta') * 1000))
     expect(ultimo().segundos).toBe(177)
     ctrl.para()
   })

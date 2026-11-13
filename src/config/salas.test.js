@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
 import {
   APUESTAS_PVP,
   BONO_BIENVENIDA,
@@ -6,7 +7,7 @@ import {
   ALCANCE_NUEVOS,
   ALFABETO_CODIGO,
   CODIGO_REGEX,
-  DURACION_SALA_SEG,
+  duracionSala,
   JUGADORES_PVP,
   saldoMinimo,
   apuestasAlAlcance,
@@ -168,8 +169,25 @@ describe('SAL-A · normalizarCodigo', () => {
 })
 
 describe('SAL-A · el resto de las cifras', () => {
-  it('la sala vive tres minutos', () => {
-    expect(DURACION_SALA_SEG).toBe(180)
+  it('MES-PvP 7a · la privada vive 5:00 y la abierta 3:00; otro tipo, lo del defecto de la columna', () => {
+    expect(duracionSala('privada')).toBe(300)
+    expect(duracionSala('abierta')).toBe(180)
+    expect(duracionSala('otra')).toBe(180)
+    expect(duracionSala(undefined)).toBe(180)
+  })
+
+  // El espejo: la última `duracion_sala` de las migraciones, leída del SQL, dice lo mismo.
+  it('MES-PvP 7a · duracionSala es el espejo de duracion_sala(tipo) en SQL', () => {
+    const dir = new URL('../../supabase/migrations/', import.meta.url)
+    const conFuncion = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
+      .map((f) => readFileSync(new URL(f, dir), 'utf8'))
+      .filter((sql) => /create or replace function public\.duracion_sala\(/.test(sql))
+    expect(conFuncion.length).toBeGreaterThan(0)
+    const sql = conFuncion.at(-1)
+    const cuerpo = sql.slice(sql.indexOf('function public.duracion_sala('), sql.indexOf('$fn$;', sql.indexOf('function public.duracion_sala(')))
+    const minutos = Object.fromEntries([...cuerpo.matchAll(/when '(\w+)' then interval '(\d+) minutes'/g)].map(([, tipo, m]) => [tipo, Number(m)]))
+    expect(minutos).toEqual({ privada: 5, abierta: 3 })
+    for (const [tipo, m] of Object.entries(minutos)) expect(duracionSala(tipo)).toBe(m * 60)
   })
 
   it('las mesas PvP son de 2 a 5 y se derivan del config del juego', () => {

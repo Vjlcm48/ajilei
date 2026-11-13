@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // propio cliente falso y se lo pasa a `crearSalasApi`.
 vi.mock('./supabase', () => ({ supabase: { rpc: () => {}, channel: () => {}, removeChannel: () => {} } }))
 
-const { crearSalasApi, CLAVES_ERROR, ERROR_INESPERADO } = await import('./salasApi.js')
+const { crearSalasApi, CLAVES_ERROR, ERROR_INESPERADO, salirDeSalaEnEspera, TOPE_SALIDA_MS } = await import('./salasApi.js')
 
 // ── El cliente falso ────────────────────────────────────────────────────────
 // Registra lo que se le pidió y devuelve lo que el caso quiera. No simula
@@ -524,5 +524,57 @@ describe('SAL-B2 · leerSala', () => {
     const c = clienteConSalas({ data: null, error: { code: '42501', message: 'permission denied' } })
     await expect(crearSalasApi(c).leerSala('u1')).resolves.toEqual({ data: null, error: ERROR_INESPERADO })
     expect(avisos).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── MES-PvP 7a · cerrar sesión con una mesa en espera (B.3, P-5) ─────────────
+describe('MES-PvP 7a · salirDeSalaEnEspera', () => {
+  const ANF = 'aaaaaaaa-0000-4000-8000-000000000001'
+  const INV = 'aaaaaaaa-0000-4000-8000-000000000002'
+  const mesa = (estado = 'esperando') => ({ id: 'sala-1', estado, anfitrion_id: ANF, jugadores: 2, apuesta: 100 })
+  // El mock de `salasApi`: lo que devuelve `mi_sala` y lo que `salir_sala` contesta, con su registro.
+  const apiFalsa = ({ mia = { data: mesa(), error: null }, salir = { data: null, error: null } } = {}) => {
+    const llamadas = []
+    return {
+      llamadas,
+      miSala: async () => { llamadas.push('miSala'); return typeof mia === 'function' ? mia() : mia },
+      salirSala: async (id) => { llamadas.push(`salirSala:${id}`); return typeof salir === 'function' ? salir() : salir },
+    }
+  }
+  const nunca = () => new Promise(() => {})
+
+  it('el tope es de 2 s', () => { expect(TOPE_SALIDA_MS).toBe(2000) })
+
+  it('invitado o anfitrión con la mesa esperando: se levanta (el servidor decide si cancela)', async () => {
+    // `salir_sala` es la misma llamada para los dos: al anfitrión el servidor le cancela la mesa
+    // para todos (`levantarse_de_sala`), al invitado le libera la silla. Lo prueba el Grupo B.
+    for (const quien of [INV, ANF]) {
+      const api = apiFalsa({ mia: { data: { ...mesa(), yo: quien }, error: null } })
+      expect(await salirDeSalaEnEspera(api)).toBe('salio')
+      expect(api.llamadas).toEqual(['miSala', 'salirSala:sala-1'])
+    }
+  })
+
+  it('sin mesa, con la fila de nulos o con la partida ya en marcha: no llama a salir_sala', async () => {
+    for (const mia of [{ data: null, error: null }, { data: { id: null }, error: null }, { data: mesa('activa'), error: null }]) {
+      const api = apiFalsa({ mia })
+      expect(await salirDeSalaEnEspera(api)).toBe('sin-sala')
+      expect(api.llamadas).toEqual(['miSala'])
+    }
+  })
+
+  it('la salida no se bloquea si algo falla: error de mi_sala, error o excepción de salir_sala', async () => {
+    expect(await salirDeSalaEnEspera(apiFalsa({ mia: { data: null, error: 'red' } }))).toBe('sin-sala')
+    expect(await salirDeSalaEnEspera(apiFalsa({ salir: { data: null, error: 'error_inesperado' } }))).toBe('error')
+    expect(await salirDeSalaEnEspera(apiFalsa({ salir: () => { throw new Error('caída') } }))).toBe('error')
+    expect(await salirDeSalaEnEspera(apiFalsa({ mia: () => { throw new Error('caída') } }))).toBe('error')
+  })
+
+  it('si el servidor no contesta, sigue a los 2 s', async () => {
+    const pedidos = []
+    const esperar = (ms) => { pedidos.push(ms); return Promise.resolve() }
+    expect(await salirDeSalaEnEspera(apiFalsa({ mia: nunca }), { esperar })).toBe('tope')
+    expect(await salirDeSalaEnEspera(apiFalsa({ salir: nunca }), { esperar })).toBe('tope')
+    expect(pedidos).toEqual([2000, 2000])
   })
 })

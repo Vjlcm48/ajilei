@@ -21,7 +21,8 @@
 // Estas mismas cifras están del otro lado, en `check` de columna y en las
 // funciones de la migración `<timestamp>_sal_a_salas.sql`: las seis apuestas en
 // `salas.apuesta`, la entrada en `entrada_de` (`<timestamp>_mot1_dinero.sql`), el
-// alfabeto en `salas_codigo_formato_chk`, los 180 s en el defecto de `expira_en`.
+// alfabeto en `salas_codigo_formato_chk`, la vida de la sala en `duracion_sala`
+// (`<timestamp>_mespvp_sub7a_duracion_sala.sql`).
 //
 // LA DUPLICACIÓN ES DELIBERADA Y NO ES UNA FUENTE DE VERDAD PARTIDA. El cliente
 // no valida: decide qué botón enseñar apagado para no gastar un viaje de red en
@@ -83,7 +84,7 @@ export const ALCANCE_NUEVOS = apuestasAlAlcance(BONO_BIENVENIDA)
 // dos pares que se confunden a la vista salen de la baraja y con ellos toda una
 // clase de fallo que, si no, aparece como «el código no funciona» sin que nadie
 // sepa por qué. Quedan 32 símbolos → 32⁴ = 1 048 576 combinaciones, de sobra
-// para una beta cerrada donde además el código sólo vive tres minutos.
+// para una beta cerrada donde además el código sólo vive cinco minutos.
 //
 // ESTA CADENA Y EL `check` DE LA BASE SON EL MISMO ALFABETO escrito de dos
 // maneras: aquí en extenso, allí como rango `[A-HJ-NP-Z2-9]`. El test compara
@@ -130,20 +131,27 @@ export function normalizarCodigo(texto) {
   return `AJ-${cuerpo}`
 }
 
-// ── Los tres minutos ────────────────────────────────────────────────────────
-// El cronómetro de la sala de espera. Vive aquí en SEGUNDOS porque es lo que la
-// pantalla cuenta; la base lo escribe como `now() + interval '3 minutes'` en el
-// defecto de `expira_en`, y el test que compara los dos números no existe —no
-// hay forma de leer el defecto de una columna desde Vitest—, así que este
-// comentario es el enlace: si uno cambia, el otro se cambia a mano.
-export const DURACION_SALA_SEG = 180
+// ── Cuánto vive una sala ────────────────────────────────────────────────────
+// MES-PvP 7a · 5:00 la privada (hay que pasar el código) y 3:00 la abierta. El
+// cronómetro de la sala de espera cuenta desde el `expira_en` de la fila, así que
+// la pantalla no usa esta cifra: es el ESPEJO de `duracion_sala(tipo)` (migración
+// `<timestamp>_mespvp_sub7a_duracion_sala.sql`), que `crear_sala` escribe y la
+// restitución de `salir_sala` repite. `salas.test.js` lee esa función del SQL y la
+// compara con ésta. Un tipo que no es ninguno de los dos vale lo que el defecto de
+// la columna, que se quedó en 3 minutos de respaldo.
+const DURACIONES_SALA_SEG = Object.freeze({ privada: 300, abierta: 180 })
+
+/** Segundos que vive una sala de este tipo (`'privada'` | `'abierta'`). */
+export function duracionSala(tipo) {
+  return DURACIONES_SALA_SEG[tipo] ?? DURACIONES_SALA_SEG.abierta
+}
 
 // ── SAL-B2 · Los diez segundos de la mesa llena ─────────────────────────────
 // Rector: AJILEI_SAL-B2_Fase1a_v1.0.md §5. Cuando se ocupa la última silla,
 // `unirse_sala` (migración `<timestamp>_sal_b2.sql`) acorta `expira_en` a
 // `now() + interval '10 seconds'`: los que ya están no esperan a un reloj que
 // ya no espera a nadie. Esta constante es el ESPEJO de ese `interval`, con el
-// mismo trato que `DURACION_SALA_SEG`: la cifra que decide vive en SQL, ésta
+// mismo trato que `duracionSala`: la cifra que decide vive en SQL, ésta
 // sólo sirve para enseñar y para que las fixtures del arnés fabriquen una mesa
 // llena coherente. Si cambia uno, el otro se cambia a mano.
 export const LLENA_SEG = 10
@@ -187,10 +195,10 @@ export const CLAVE_CONFIG_SALA = 'ajilei.salaConfig'
 // Los minutos que una `activa` sin `estado_partida` puede vivir desde que
 // arrancó antes de que `barrer_salas()` la cancele. La cifra viaja COPIADA al
 // SQL de la migración `<timestamp>_sal_b1_ajuste.sql` con un comentario que
-// apunta aquí, igual que `DURACION_SALA_SEG`: no hay forma de leer un
-// `interval` de una función desde Vitest, así que si una cambia, la otra se
-// cambia a mano. El cliente NO la usa para decidir nada —el barrido es del
-// servidor—; vive aquí para que la cifra tenga un dueño con nombre.
+// apunta aquí y ninguna prueba las compara (la vida de la sala sí, desde MES-PvP
+// 7a, leyendo la migración): si una cambia, la otra se cambia a mano. El
+// cliente NO la usa para decidir nada —el barrido es del servidor—; vive aquí
+// para que la cifra tenga un dueño con nombre.
 //
 // MES-PvP, cuando exista la partida, reescribe el ciclo de vida de `activa` y
 // esta constante se retira con la rama del barrido que la cita.

@@ -352,6 +352,28 @@ export function crearSalasApi(cliente = supabase) {
 /** La instancia de la casa, contra el cliente singleton. */
 export const salasApi = crearSalasApi()
 
+// ── MES-PvP 7a · Cerrar sesión con una mesa en espera ───────────────────────
+// Ficha AJILEI_MES-PvP_Sub7a_v1.0.md §1.2 (B.3), decisión de Victor P-5. Antes del `signOut`,
+// `cerrarSesion` (App) se levanta de la mesa que espera: el invitado deja libre su silla y
+// recupera la entrada; el anfitrión la cancela para todos, sin confirmación, como su «Salir».
+// Sin esto la silla seguía ocupada y, si la mesa arrancaba, jugaba ausente y perdía fichas.
+// Una mesa con partida (`activa`) no se toca: de ahí se sale con «abandonar».
+//
+// Nunca bloquea la salida: con un error, o si no contesta en `tope` ms, se sigue igual (el
+// mismo criterio que `salirDeVerdad` en la sala) y el barrido del servidor hace el resto.
+// Devuelve qué pasó, para las pruebas: 'sin-sala' · 'salio' · 'error' · 'tope'.
+export const TOPE_SALIDA_MS = 2000
+
+export async function salirDeSalaEnEspera(api, { tope = TOPE_SALIDA_MS, esperar = (ms) => new Promise((r) => { setTimeout(r, ms) }) } = {}) {
+  const intento = (async () => {
+    const { data, error } = (await api.miSala()) ?? {}
+    if (error || !esMesa(data) || data.estado !== 'esperando') return 'sin-sala'
+    const salida = await api.salirSala(data.id)
+    return salida?.error ? 'error' : 'salio'
+  })().catch(() => 'error')
+  return Promise.race([intento, esperar(tope).then(() => 'tope')])
+}
+
 // ── SAL-B1 · De la clave de error a la clave de texto ───────────────────────
 // Rector: AJILEI_SAL-B1_Fase1_v1.0.md §6.3 y §2 («si `salasApi.js` no expone
 // algo que una pantalla necesita, se añade una función NUEVA»). Es lo único que

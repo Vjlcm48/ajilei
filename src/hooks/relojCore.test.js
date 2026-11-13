@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { calcularDesfase, ahoraServidor, restante, comoReloj } from './relojCore.js'
-import { DURACION_SALA_SEG } from '../config/salas.js'
+import { duracionSala } from '../config/salas.js'
 
 // ── SAL-A · El reloj del servidor ───────────────────────────────────────────
 // Rector: AJILEI_SALA_Fase1_v1.0.md §5.1.
@@ -72,12 +72,12 @@ describe('SAL-A · ahoraServidor', () => {
 })
 
 describe('SAL-A · restante', () => {
-  const expira = new Date(T0 + DURACION_SALA_SEG * 1000).toISOString()
+  const expira = new Date(T0 + duracionSala('abierta') * 1000).toISOString()
 
   it('una sala recién creada muestra los tres minutos enteros', () => {
     // El redondeo hacia arriba es lo que hace que el primer fotograma diga 180 y
     // no 179. Con `floor` la cuenta empezaría en «2:59» y parecería rota.
-    expect(restante(expira, T0)).toBe(DURACION_SALA_SEG)
+    expect(restante(expira, T0)).toBe(duracionSala('abierta'))
   })
 
   it('cuenta hacia abajo', () => {
