@@ -54,6 +54,22 @@ export const MANO_SIGUIENTE_MS = 4000
 // reposición usa la fórmula del reparto (`reloj.js`); ésta es la de nadie descartó.
 export const REPOSICION_SIN_CARTAS_MS = 600
 
+// MES-PvP 5b · la reposición uno a uno (Reglas v1.11 §8.7): las pausas del descarte de la mesa
+// contra las IAS, con su valor efectivo (el ×1,25 de `AI_SPEED_FACTOR` ya aplicado). Los vuelos
+// son los de `FlyingCard` (0,75 s). Las lee el calendario del cliente (`lib/reposicionCore.js`).
+export const D_OUT = 750         // vuelo carta → mazo
+export const D_OUT_STAG = 187.5  // entre una carta que sale y la siguiente
+export const D_PAUSE = 375       // las ranuras vacías un instante
+export const D_IN = 750          // vuelo mazo → ranura
+export const D_IN_STAG = 225     // entre una carta que entra y la siguiente
+export const D_SEAT_GAP = 300    // el respiro entre un asiento y el siguiente
+export const D_SKIP = 750        // la pausa del «no descarta»
+// El arranque y el cierre no los escala el ritmo: el cierre es el volteo de la carta propia
+// (350 ms) y su respiro; quien no descartó cierra a los 200.
+export const REPOSICION_ARRANQUE_MS = 100
+export const REPOSICION_CIERRE_MS = 500
+export const REPOSICION_CIERRE_SIN_VOLTEO_MS = 200
+
 // provisional · se cierra con los teléfonos. Quién sale antes del barajado.
 export const AVISO_SALIDA_MS = 3000
 
