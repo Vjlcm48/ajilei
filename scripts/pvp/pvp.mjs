@@ -26,6 +26,7 @@ import { runMensajesLM } from './mensajesLM.mjs'
 import { runEntreManosLM } from './entreManosLM.mjs'
 import { runArbitro13LM } from './arbitro13LM.mjs'
 import { runSub5aMesa } from './sub5aMesa.mjs'
+import { runSub5bMesa } from './sub5bMesa.mjs'
 
 // MES-PvP 5a · H.1 · el modo va en dos partes (`orquestaCore`: `pvp.mesa` y `pvp.lm`), porque
 // entero pasaba del tope. `mesa`: las celdas, las escenas, los 15 «W» y las varas de la 5a;
@@ -386,6 +387,8 @@ export async function runPvp(browser, { base, mesas = MESAS, partes = PARTES_PVP
   for (const v of vistas) console.log(`pvp·escena ${v.escena} · ${v.ok ? 'OK' : 'FALLA'}${v.ok ? '' : ` · ${JSON.stringify(v)}`}`)
   // 5a · el óvalo entre el sorteo y la mano, el área de «Tú» en el pago y el arranque.
   const varas = enMesa && enteras ? (await runSub5aMesa(browser, base)).celdas : []
+  // 5b · la reposición uno a uno y el teléfono tardío.
+  if (enMesa && enteras) varas.push(...(await runSub5bMesa(browser, base)).celdas)
   // L-M 2 · §1.3 · las tres varas de la tanda 1 de la lámina, cada una con su control rojo.
   if (partes.includes('lm') && enteras) varas.push(...(await runVarasLM(browser, base)).celdas)
   // L-M 2 · §2–§4 · los mensajes (con su control rojo) y el aviso de ausencia; y las capturas.

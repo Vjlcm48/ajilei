@@ -17,7 +17,7 @@
 
 const TOL = 0.5
 
-async function enPiscina(tareas, n = 4) {
+export async function enPiscina(tareas, n = 4) {
   const res = []
   let i = 0
   await Promise.all(Array.from({ length: n }, async () => {
@@ -26,7 +26,7 @@ async function enPiscina(tareas, n = 4) {
   return res
 }
 
-const pagina = (browser, [w, h]) => browser.newPage({ viewport: { width: w, height: h }, ...(w < 1024 ? { hasTouch: true, isMobile: true } : {}) })
+export const pagina = (browser, [w, h]) => browser.newPage({ viewport: { width: w, height: h }, ...(w < 1024 ? { hasTouch: true, isMobile: true } : {}) })
 const quitar = (page, regla) => page.addInitScript((css) => {
   document.addEventListener('DOMContentLoaded', () => {
     const s = document.createElement('style')
