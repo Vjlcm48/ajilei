@@ -76,6 +76,9 @@ const PROHIBIDAS = [
   'ajilei.medir',
   'arranque:',
   'reclamo-enviado',
+  // MES-PvP 5b · B4 · la puerta `?ritmo=rapido` de `salasApi.crearSala`: el único que manda
+  // `p_ritmo` es ella, y solo en desarrollo.
+  'p_ritmo',
 ]
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las

@@ -7,7 +7,8 @@ import { VOZ, componeCapas } from './cronicaCore'
 import { lecturaDeMano, resultadoDeMano } from './manoCore'
 import { composeResultado } from './resultadoCore'
 import {
-  TONOS_FIN, avisoDeAbandono, cronicaDe, faseHumanos, finDePartida, fraseDeAccion, listaDeNombres, nuevosAbandonos, sonidoDe,
+  TONOS_FIN, avisoDeAbandono, cronicaDe, faseHumanos, finDePartida, fraseDeAccion, fraseDeReposicion, listaDeNombres, nuevosAbandonos,
+  sonidoDe,
 } from './vozHumanos'
 import { FRASES_VICTORIA } from '../config/frasesVictoria'
 
@@ -90,6 +91,18 @@ describe('MES-PvP 2 · la línea de una fase', () => {
     expect(faseHumanos(mesa(2, { phase: PHASES.DEAL_2 }))).toBe('Repartiendo...')
   })
 
+  it('5b · la voz de la reposición uno a uno, al byte con las Reglas v1.11 §8.7', () => {
+    const g = mesa(5)
+    g.players[3].name = 'ticotest2022'
+    expect(fraseDeReposicion(1, 2, g)).toBe('Ana descarta 2 cartas.')
+    expect(fraseDeReposicion(1, 1, g)).toBe('Ana descarta 1 carta.')
+    expect(fraseDeReposicion(2, 0, g)).toBe('Beto no descarta.')
+    expect(fraseDeReposicion(0, 2, g)).toBe('Descartas 2 cartas.')
+    expect(fraseDeReposicion(0, 0, g)).toBe('No descartas.')
+    // El nombre, cortado como en toda la voz entre personas.
+    expect(fraseDeReposicion(3, 3, g)).toBe('ticotest20… descarta 3 cartas.')
+  })
+
   it('el descarte: elegir, esperar, retirado y reposición', () => {
     expect(faseHumanos(mesa(5, { phase: PHASES.DISCARD }))).toBe('Selecciona hasta 3 cartas a descartar.')
     expect(faseHumanos(mesa(5, { phase: PHASES.DISCARD, descarte: { yaDescartaron: [0], cuantas: null } }))).toBe('Esperando el descarte de la mesa.')
@@ -97,8 +110,8 @@ describe('MES-PvP 2 · la línea de una fase', () => {
     retirado.players[0].folded = true
     expect(faseHumanos(retirado)).toBe('La mesa descarta.')
     const repone = { phase: PHASES.DISCARD, vencimiento: { clase: 'reposicion', hora: 0 }, descarte: { yaDescartaron: [0, 1], cuantas: [2, 1] } }
-    expect(faseHumanos(mesa(2, repone))).toBe('Descartaste 2, Ana descartó 1.')
-    expect(faseHumanos(mesa(5, repone))).toBe('Descarte completado.')
+    expect(faseHumanos(mesa(2, repone))).toBe('Esperando el descarte de la mesa.')
+    expect(faseHumanos(mesa(5, repone))).toBe('Esperando el descarte de la mesa.')
   })
 
   it('al descarte', () => {

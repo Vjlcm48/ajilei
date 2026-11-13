@@ -58,7 +58,7 @@ function mulberry32(s) {
 
 // ── La mesa de guion ────────────────────────────────────────────────────────
 
-function nuevaMesa({ n, asiento, nombres, ahora, saldo = SALDO_LAMINA }) {
+function nuevaMesa({ n, asiento, nombres, ahora, saldo = SALDO_LAMINA, ritmo = 'normal' }) {
   const sillas = Array.from({ length: n }, (_, i) => ({
     asiento: i, uid: `imitado-${i}`, nombre: nombres === 'largo' ? NOMBRE_LARGO : NOMBRES[i],
   }))
@@ -70,7 +70,7 @@ function nuevaMesa({ n, asiento, nombres, ahora, saldo = SALDO_LAMINA }) {
     muerta: false,
     // v1.3-b · el saldo de cada asiento, el que la función leería con `leer_partida`.
     saldos: Array.from({ length: n }, (_, i) => (i === asiento ? saldo : SALDO_RIVAL)),
-    e: crearPartida({ apuesta: APUESTA, entrada: 'corta', ritmo: 'normal' }, sillas, ahora),
+    e: crearPartida({ apuesta: APUESTA, entrada: 'corta', ritmo }, sillas, ahora),
   }
 }
 
@@ -421,6 +421,9 @@ const sentadoFuera = (quien) => (m) => {
 const retiradaRapida = { apuesta: ({ e }) => (e.motor.currentBet === 0 ? { tipo: 'apostar', k: 1 } : { tipo: 'retirarse' }) }
 
 const ESCENAS_LM3 = {
+  // 5b · lámina · el descarte de la primera mano recién abierto. Con `&ver=vivo` se juegan manos
+  // seguidas, con la reposición uno a uno de cada una (`desc`, `descyo`, `ritmo` y `tarde`).
+  reponer: { jugar: (m) => hasta(m, (e) => e.vencimiento?.clase === CLASES.DESCARTE) },
   // §2 · la pausa tras la mano 1, a 2,5 s de vencer: la recogida, la mano 2 y la pastilla caen
   // solas (`deUnaVez`), y la escena se queda en el primer turno de la mano 2.
   'entre-manos': { jugar: (m) => hasta(m, enPago, retiradaRapida), deUnaVez: true },
@@ -614,6 +617,7 @@ export const escenaCabeEn = (escena, n) => n >= (ESCENAS[escena].minimo ?? 2) &&
 export function crearPartidaImitada({
   escena, n = 2, asiento = 0, nombres = null, semilla = 1, ahora = Date.now, vivo = false, corte = null, momento = null,
   msj = null, msjMs = 1200, abierta = null, premium = null, saldo = null, lento = null,
+  ritmo = 'normal', desc = null, descyo = null, tarde = null,
 }) {
   if (!ESCENAS[escena]) throw new Error(`MES-PvP 2 · escena desconocida: ${escena}`)
   if (!escenaCabeEn(escena, n)) throw new Error(`MES-PvP 2 · «${escena}» no cabe en una mesa de ${n}`)
@@ -627,7 +631,7 @@ export function crearPartidaImitada({
   for (let s = semilla; s < semilla + TOPE_SEMILLAS && !m; s++) {
     rng = mulberry32(s)
     setRng(rng)
-    const intento = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio })
+    const intento = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio, ritmo })
     try {
       ESCENAS[escena].jugar(intento)
       m = intento
@@ -646,7 +650,7 @@ export function crearPartidaImitada({
   if (vivo && deLamina) {
     rng = mulberry32(semillaBuena)
     setRng(rng)
-    m = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio })
+    m = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio, ritmo })
     guionVivo = ESCENAS[escena].guion?.(m) ?? {}
     resetRng()
   }
@@ -657,7 +661,7 @@ export function crearPartidaImitada({
   if (golpe || enPasos) {
     rng = mulberry32(semillaBuena)
     setRng(rng)
-    m = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio })
+    m = nuevaMesa({ n, asiento, nombres, ahora: ahora(), saldo: saldoPropio, ritmo })
     ESCENAS[escena].antes(m)
     resetRng()
   }
@@ -731,7 +735,20 @@ export function crearPartidaImitada({
     ...cambios,
   })
   let foto = fotoDe()
+  // 5b · `tarde=<ms>`: la vista `reponiendo` llega tarde a este teléfono (el Motorola).
+  let tardeDe = null
+  let tardeHasta = 0
+  let tardeId = null
   const poner = (cambios) => {
+    if (tarde !== null && m.e.vencimiento?.clase === CLASES.REPOSICION) {
+      if (tardeDe !== m.e.vencimiento) {
+        tardeDe = m.e.vencimiento
+        tardeHasta = ahora() + tarde
+        clearTimeout(tardeId)
+        tardeId = setTimeout(() => poner(), tarde)
+      }
+      if (ahora() < tardeHasta) return
+    }
     foto = fotoDe(cambios)
     oyentes.forEach((o) => o())
   }
@@ -791,6 +808,12 @@ export function crearPartidaImitada({
   const ofertaDesde = new Map()
   let llegada = null
   const pararLM3 = () => { clearInterval(lm3); lm3 = null }
+  // 5b · `desc=<k>`: cuántas descarta cada asiento en vivo (las primeras, hasta el tope de la mano);
+  // `descyo=<k>`, el propio si no tocó nada a los 6 s. Sin `desc`, nadie descarta.
+  const descarteDe = (i) => {
+    const k = Math.min((i === m.yo ? descyo ?? desc : desc) ?? 0, m.e.motor.handRules.maxDiscard)
+    return Array.from({ length: k }, (_x, j) => j)
+  }
   const conducirLM3 = () => {
     setRng(rng)
     m.t = ahora() + base
@@ -817,7 +840,7 @@ export function crearPartidaImitada({
         if (desde(i === m.yo ? 6000 : 1200)) { pide(m, i, 'apostar', apuestaPrudente(m, i)); cambio = true }
       } else if (v.clase === CLASES.DESCARTE) {
         const i = e.asientos.findIndex((_a, k) => !e.motor.players[k].folded && e.descarte[k] === null && desde(k === m.yo ? 6000 : 900 + 300 * k))
-        if (i >= 0) { pide(m, i, 'descartar', { mano: e.motor.handCount, indices: [] }); cambio = true }
+        if (i >= 0) { pide(m, i, 'descartar', { mano: e.motor.handCount, indices: descarteDe(i) }); cambio = true }
       } else if (v.clase === CLASES.PAUSA_ANUNCIO && !def.nadieVuelve) {
         // Los rivales vuelven del anuncio de uno en uno: a los 3 s de llegar y luego cada 1,5 s.
         const rivales = e.asientos.map((_a, k) => k).filter((k) => k !== m.yo && e.asientos[k].enAnuncio)
@@ -839,7 +862,7 @@ export function crearPartidaImitada({
   return {
     marca: MARCA_PARTIDA_IMITADA,
     sala: {
-      id: `imitada-${escena}`, apuesta: APUESTA, jugadores: n, entrada: 'corta', ritmo: 'normal', corteVoz: corte,
+      id: `imitada-${escena}`, apuesta: APUESTA, jugadores: n, entrada: 'corta', ritmo, corteVoz: corte,
       // 5a · L2 · lo que `SalaEspera` le pasa a la partida (`salaParaPartida`): la mesa provisional.
       ...(lento !== null ? { sillas: m.e.asientos.map((a, i) => ({ asiento: a.silla, nombre: a.nombre, tu: i === asiento })) } : {}),
     },
@@ -901,6 +924,7 @@ export function crearPartidaImitada({
     },
     parar: () => {
       clearTimeout(lentoId); lentoId = null
+      clearTimeout(tardeId); tardeId = null
       clearInterval(conductor); conductor = null
       clearInterval(charla); charla = null
       pararLM3()
@@ -966,9 +990,13 @@ export function leerMandoPvP(search = globalThis.location?.search ?? '') {
   // 5a · `lento=<ms>`: la primera vista llega tarde y, mientras, se ve la mesa provisional (la
   // vara del arranque de `pvp.mesa` y la medida de quien llega tarde).
   const lento = q.has('lento') && Number(q.get('lento')) >= 0 ? Number(q.get('lento')) : null
+  // 5b · `ritmo=rapido` (la sala en Rápido), `desc=<k>` y `descyo=<k>` (cuántas descarta cada uno
+  // en vivo) y `tarde=<ms>` (la vista `reponiendo` llega tarde a este teléfono).
+  const entero = (k) => (q.has(k) && Number.isInteger(Number(q.get(k))) && Number(q.get(k)) >= 0 ? Number(q.get(k)) : null)
   return {
     escena, n, asiento, nombres: q.get('nombres') === 'largo' ? 'largo' : null,
     vivo: q.get('ver') === 'vivo', corte, momento, msj, msjMs,
     abierta: uno('abierta'), premium: uno('premium'), saldo, lento,
+    ritmo: q.get('ritmo') === 'rapido' ? 'rapido' : 'normal', desc: entero('desc'), descyo: entero('descyo'), tarde: entero('tarde'),
   }
 }

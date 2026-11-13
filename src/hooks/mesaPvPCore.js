@@ -15,7 +15,7 @@ import {
 } from '../lib/partidaCliente'
 import { FACTOR_RAPIDA } from '../lib/partidaRapida'
 import { FASE_PAGO, VECES_ENTRADA, vistaAMesa } from '../lib/vistaAMesa'
-import { avisoDeAbandono, cronicaDe, finDePartida, nuevosAbandonos } from './vozHumanos'
+import { avisoDeAbandono, cronicaDe, finDePartida, fraseDeReposicion, nuevosAbandonos } from './vozHumanos'
 import { CORTE_VOZ, conNombresDeVoz } from '../lib/corteVoz'
 
 // MES-PvP 3-A · sin pozo que pagar, la pantalla final llega tras el aviso del óvalo (Reglas
@@ -122,6 +122,9 @@ export function creaMesaPvP({ partida, sala, ahora = Date.now }) {
     ritmo: sala.ritmo ?? null,
     alternarDescarte: (i) => alternarDescarte(i),
     factorReparto: sala.ritmo === RITMO_RAPIDO ? FACTOR_RAPIDA : 1,
+    // MES-PvP 5b · la voz de la reposición uno a uno; viaja aquí para que la mesa no cargue la
+    // voz entre personas (`vozHumanos`) en su trozo.
+    fraseReposicion: fraseDeReposicion,
     // MES-PvP 3-A · el tono y la frase de la pantalla final (`vozHumanos.finDePartida`).
     fin: null,
     corteVoz: corte,

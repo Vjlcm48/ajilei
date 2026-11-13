@@ -141,7 +141,15 @@ export function crearSalasApi(cliente = supabase) {
      * y no aquí porque entre la consulta y la creación cabe otro jugador.
      */
     crearSala: (tipo, jugadores, apuesta) =>
-      mesaOpcional('crear_sala', { p_tipo: tipo, p_jugadores: jugadores, p_apuesta: apuesta }),
+      mesaOpcional('crear_sala', {
+        p_tipo: tipo, p_jugadores: jugadores, p_apuesta: apuesta,
+        // MES-PvP 5b · B4 · solo en desarrollo: `?ritmo=rapido` arma la mesa en Rápido, para
+        // probarlo contra el servidor real por el túnel (sin bypass). Bajo `vite build` la rama
+        // desaparece entera; lo vigila `testDistSinMoldes` (la huella `p_ritmo`).
+        ...(import.meta.env.DEV && new URLSearchParams(globalThis.location?.search ?? '').get('ritmo') === 'rapido'
+          ? { p_ritmo: 'rapido' }
+          : {}),
+      }),
 
     /**
      * Se sienta en una sala, por código o por id.

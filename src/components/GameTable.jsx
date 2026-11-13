@@ -56,6 +56,7 @@ import ChipToken from './ChipToken'
 import BurbujaRecarga from './BurbujaRecarga'
 import TransicionMano from './TransicionMano'
 import { esperaSiguienteMano, recogerEnPvP } from '../lib/transicionCore'
+import { anclarReposicion, calendarioReposicion, planReposicionPvP, vueloDescarte } from '../lib/reposicionCore'
 import { Wordmark } from './Wordmark'
 import { effectiveLayout, livingRivalsInDisplayOrder } from '../config/seatLayouts'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
@@ -256,17 +257,9 @@ function discardNarration(seat, n, g) {
   return n === 0 ? `${name} no descarta.` : `${name} descarta ${n} ${cartas}.`
 }
 
-// Sequential discard pacing (ms) — tempo ×3 (ajuste Tanda 1.2: el ritmo
-// original se sentía "disparado"); la secuencia Mano→Pie no cambia.
-// Tanda C3.1: las PAUSAS escalan con AI_SPEED_FACTOR; los vuelos (D_OUT/D_IN)
-// no, porque deben coincidir con la duración real de FlyingCard (0.75s)
-const D_OUT      = 750   // vuelo carta→mazo
-const D_OUT_STAG = 150 * AI_SPEED_FACTOR
-const D_PAUSE    = 300 * AI_SPEED_FACTOR   // slots vacíos un instante
-const D_IN       = 750   // vuelo mazo→slot
-const D_IN_STAG  = 180 * AI_SPEED_FACTOR
-const D_SEAT_GAP = 240 * AI_SPEED_FACTOR   // respiro entre jugadores
-const D_SKIP     = 600 * AI_SPEED_FACTOR   // pausa del "no descarta"
+// Sequential discard pacing — MES-PvP 5b: las `D_*` viven en `config/esperas.js`
+// con su valor efectivo, y el calendario Mano→Pie en `lib/reposicionCore.js`,
+// compartido con la reposición entre personas.
 
 // ── ShuffleDeck ───────────────────────────────────────────────────────────────
 function ShuffleDeck() {
@@ -286,10 +279,13 @@ function ShuffleDeck() {
 
 // ── FlyingCard ────────────────────────────────────────────────────────────────
 // CFG-1 1e · el vuelo de una carta del reparto, en s. «Partida rápida» lo
-// multiplica por 0,5 (`factorManoRef`); el del descarte (0,75, `fast`) no se toca.
+// multiplica por 0,5 (`factorManoRef`); el del descarte (0,75, `vueloDescarte`) no se toca
+// contra las IAS (MES-PvP 5b: entre personas lo escala el ritmo de la sala).
 const VUELO_REPARTO_S = 0.595
 
-function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, onDone }) {
+// MES-PvP 5b · `vuelo`: solo entre personas, el id del vuelo en `data-vuelo` (la vara `5b·uno-a-uno`
+// lee de qué asiento es cada carta en el aire). Contra las IAS no se pasa y el DOM no cambia.
+function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, onDone, vuelo }) {
   const [moved, setMoved] = useState(false)
 
   useEffect(() => {
@@ -300,6 +296,7 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, 
   return (
     <div
       className="flying-card"
+      data-vuelo={vuelo}
       style={{
         left: fromX,
         top:  fromY,
@@ -1585,7 +1582,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       // Regla universal: tamaño del DESTINO. Descarte saliente slot→mazo → destino
       // = mazo (dr).
       w: dr.width, h: dr.height,
-      fast: true, isDiscardOut: true,
+      dur: vueloDescarte(), isDiscardOut: true,
     }])
   }
 
@@ -1605,7 +1602,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       // Regla universal: tamaño del DESTINO. Descarte entrante mazo→slot → destino
       // = slot (sr).
       w: sr.width, h: sr.height,
-      fast: true, isDiscardIn: true, seat, slotIdx: idx,
+      dur: vueloDescarte(), isDiscardIn: true, seat, slotIdx: idx,
     }])
   }
 
@@ -1635,29 +1632,21 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const allKeys  = new Set(plan.flatMap(p => p.indices.map(i => `${p.seat}:${i}`)))
     setDiscardAnim({ nextGame, allKeys, emptied: new Set(), refilled: new Set(), revealed: new Set() })
 
-    const timers = []
-    let t = 100
-    plan.forEach(({ seat, indices }) => {
-      const n = indices.length
-      timers.push(setTimeout(() => {
+    // MES-PvP 5b · el calendario compartido, con `f = 1`: el de siempre, instante a instante.
+    const { pasos, fin } = calendarioReposicion(plan)
+    const timers = pasos.map(({ t, tipo, seat, n, idx }) => setTimeout(() => {
+      if (tipo === 'narra') {
         if (seat !== 0) setLastActions(la => ({ ...la, [seat]: `Descartó ${n}` }))
         setDiscardMsg(discardNarration(seat, n, g))
-      }, t))
-      if (n === 0) { t += D_SKIP; return }
-      indices.forEach((idx, k) =>
-        timers.push(setTimeout(() => launchDiscardOut(seat, idx), t + k * D_OUT_STAG)))
-      const outEnd = t + (n - 1) * D_OUT_STAG + D_OUT
-      indices.forEach((idx, k) =>
-        timers.push(setTimeout(() => launchDiscardIn(seat, idx), outEnd + D_PAUSE + k * D_IN_STAG)))
-      t = outEnd + D_PAUSE + (n - 1) * D_IN_STAG + D_IN + D_SEAT_GAP
-    })
+      } else if (tipo === 'sale') launchDiscardOut(seat, idx)
+      else launchDiscardIn(seat, idx)
+    }, t))
     // margen extra si el humano descartó (su flip de revelado tarda 350ms más)
-    const humanDiscarded = plan.some(p => p.seat === 0 && p.indices.length > 0)
     timers.push(setTimeout(() => {
       setGame(nextGame)
       setDiscardAnim(null)
       setDiscardMsg(null)
-    }, t + (humanDiscarded ? 500 : 200)))
+    }, fin))
     discardTimersRef.current = timers
   }
 
@@ -1667,33 +1656,39 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     startDiscardAnim(game, [...game.selectedDiscards])
   }
 
-  // ── MES-PvP 3 · La reposición en paralelo (P-3) ───────────────────────────
-  // Contra personas el servidor ya repuso: la vista trae las cartas nuevas y cuántas
-  // descartó cada uno, y espera `esperaReposicion` (120 + mayor × 595 + 400 ms) a que
-  // se vea. Todos reponen a la vez y con vuelos cortos: la secuencia de las IAS, asiento
-  // por asiento, no cabe ni con una carta. Salen las cartas de la vista anterior, con su
-  // selección (la nueva ya llega vacía, `vistaAMesa`); de un rival solo se sabe cuántas,
-  // así que salen sus primeras. Al acabar no se toca el
-  // estado: ya es el del servidor. Una carta: 1.100 ms contra 1.115 de espera.
+  // ── MES-PvP 5b · La reposición uno a uno (Reglas v1.11 §8.7) ────────────────
+  // Contra personas el servidor ya repuso: la vista trae las cartas nuevas y cuántas descartó
+  // cada uno (`descarte.cuantas`). Se pinta con el calendario de las IAS (`reposicionCore`), de
+  // la Mano al Pie y escalado por el ritmo de la sala, y ANCLADO a la hora del árbitro: empieza
+  // en `vencimiento − R − desfase`, así que el teléfono que recibe la vista tarde aplica sin vuelo
+  // los pasos ya vencidos y termina a la vez que los demás. De un rival solo se sabe cuántas, así
+  // que salen sus primeras. No se toca el estado (ya es el del servidor), y la secuencia y su voz
+  // siguen hasta que la vista sale de `reponiendo`: ahí se corta (`cortarReposicionPvP`).
   function startReposicionPvP(previa, next) {
-    const cuantas = next.descarte.cuantas ?? []
     const propias = [...previa.selectedDiscards].sort((a, b) => a - b)
-    const indicesDe = (seat) => (seat === 0 && propias.length === (cuantas[0] ?? 0)
-      ? propias
-      : Array.from({ length: cuantas[seat] ?? 0 }, (_, k) => k))
-    const plan = next.players.map((_, seat) => ({ seat, indices: indicesDe(seat) })).filter(p => p.indices.length > 0)
+    const plan = planReposicionPvP(next, propias)
     if (plan.length === 0) return
+    const f = partida.factorReparto
     discardNextRef.current = next
     refillTimersRef.current.forEach(clearTimeout)
     refillTimersRef.current = []
-    const allKeys = new Set(plan.flatMap(p => p.indices.map(i => `${p.seat}:${i}`)))
-    setDiscardAnim({ nextGame: next, oldGame: previa, allKeys, emptied: new Set(), refilled: new Set(), revealed: new Set() })
-    const SALE_MS = 250, SALE_PASO = 40, PAUSA = 50, ENTRA_MS = 400, ENTRA_PASO = 120
-    const mayor = Math.max(...plan.map(p => p.indices.length))
-    const entra = (mayor - 1) * SALE_PASO + SALE_MS + PAUSA
-    // Los vuelos son los del descarte (`launchDiscardOut` / `launchDiscardIn`) con su duración;
-    // se crean aquí y no llamándolas: con la llamada, el compilador de `react-hooks` dejaba de
-    // ver el acceso adelantado a `startDiscardAnim` del reloj de turno (STOP-V).
+    const calendario = calendarioReposicion(plan, f)
+    const pasos = anclarReposicion(calendario.pasos, next.vencimiento.hora - (partida.desfase ?? 0) - calendario.espera)
+    const vencido = (p) => p.en <= 0
+    const claves = (tipo) => pasos.filter(p => p.tipo === tipo && vencido(p)).map(p => `${p.seat}:${p.idx}`)
+    const refilled = new Set(claves('entra'))
+    const narradas = pasos.filter(p => p.tipo === 'narra' && vencido(p))
+    setDiscardAnim({
+      nextGame: next, oldGame: previa,
+      allKeys: new Set(plan.flatMap(p => p.indices.map(i => `${p.seat}:${i}`))),
+      emptied: new Set(claves('sale')), refilled, revealed: new Set([...refilled].filter(k => k.startsWith('0:'))),
+      narrados: new Set(narradas.map(p => p.seat)),
+    })
+    const voz = narradas.at(-1)
+    if (voz) setDiscardMsg(partida.fraseReposicion(voz.seat, voz.n, next))
+    // Los vuelos son los del descarte (`launchDiscardOut` / `launchDiscardIn`) con la duración del
+    // ritmo; se crean aquí y no llamándolas: con la llamada, el compilador de `react-hooks` deja de
+    // ver el acceso adelantado a `startDiscardAnim` del reloj de turno (STOP-V de la sub-tanda 2).
     const vuela = (seat, idx, sale) => {
       const slotEl = slotRefs[seat][idx]?.current
       const deckEl = deckRefs[gameRef.current.pieIndex]?.current
@@ -1702,29 +1697,35 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         if (!sale) setDiscardAnim(prev => prev && ({ ...prev, refilled: new Set(prev.refilled).add(`${seat}:${idx}`) }))
         return
       }
-      const f = escalaActual()
-      const sr = aPropios(slotEl.getBoundingClientRect(), f)
-      const dr = aPropios(deckEl.getBoundingClientRect(), f)
+      const e = escalaActual()
+      const sr = aPropios(slotEl.getBoundingClientRect(), e)
+      const dr = aPropios(deckEl.getBoundingClientRect(), e)
       const [desde, hasta] = sale ? [sr, dr] : [dr, sr]
       play('cardDeal')
       setFlyingCards(prev => [...prev, {
-        id: `${sale ? 'rout' : 'rin'}-${seat}-${idx}`,
+        id: `${sale ? 'dout' : 'din'}-${seat}-${idx}`,
         fromX: desde.left, fromY: desde.top, toX: hasta.left, toY: hasta.top, w: hasta.width, h: hasta.height,
-        dur: (sale ? SALE_MS : ENTRA_MS) / 1000,
+        dur: vueloDescarte(f),
         ...(sale ? { isDiscardOut: true } : { isDiscardIn: true, seat, slotIdx: idx }),
       }])
     }
-    const timers = []
-    plan.forEach(({ seat, indices }) => indices.forEach((idx, k) => {
-      timers.push(setTimeout(() => vuela(seat, idx, true), k * SALE_PASO))
-      timers.push(setTimeout(() => vuela(seat, idx, false), entra + k * ENTRA_PASO))
-    }))
-    const propio = plan.some(p => p.seat === 0)
-    timers.push(setTimeout(() => setDiscardAnim(null), entra + (mayor - 1) * ENTRA_PASO + ENTRA_MS + (propio ? 350 : 0) + 50))
-    discardTimersRef.current = timers
+    discardTimersRef.current = pasos.filter(p => !vencido(p)).map(({ en, tipo, seat, n, idx }) => setTimeout(() => {
+      if (tipo === 'narra') {
+        setDiscardAnim(prev => prev && ({ ...prev, narrados: new Set(prev.narrados).add(seat) }))
+        setDiscardMsg(partida.fraseReposicion(seat, n, next))
+      } else vuela(seat, idx, tipo === 'sale')
+    }, en))
   }
 
-  // La vista anterior, para saber qué cartas salen y cuándo empieza la reposición. Aquí
+  function cortarReposicionPvP() {
+    discardTimersRef.current.forEach(clearTimeout)
+    discardTimersRef.current = []
+    setFlyingCards(prev => prev.filter(c => !c.isDiscardOut && !c.isDiscardIn))
+    setDiscardAnim(null)
+    setDiscardMsg(null)
+  }
+
+  // La vista anterior, para saber qué cartas salen y cuándo empieza y acaba la reposición. Aquí
   // se fija también el ritmo de la mesa, que escala el reparto como «Partida rápida».
   const previaPvPRef = useRef(null)
   useEffect(() => {
@@ -1732,8 +1733,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const previa = previaPvPRef.current
     previaPvPRef.current = game
     factorManoRef.current = partida.factorReparto
+    if (previa?.reponiendo && (!game.reponiendo || previa.handCount !== game.handCount)) cortarReposicionPvP()
     if (game.reponiendo && previa && !previa.reponiendo && previa.handCount === game.handCount) startReposicionPvP(previa, game)
   }, [game]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 5b · el rótulo de un rival en PvP: durante la reposición, su «Descartó n» llega con su voz; hasta
+  // entonces, el de la vista anterior (contra las IAS, `lastActions` hace lo mismo).
+  const estadoVisto = (seat) => (discardAnim?.narrados && !discardAnim.narrados.has(seat) ? discardAnim.oldGame : game).players[seat].estado
 
   const isDiscardPhase = phase === PHASES.DISCARD
   const isPayoutPhase  = phase === PHASES.PAYOUT
@@ -2199,7 +2205,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             {inReset || (isPayoutPhase && rival.score && !(partida && ['anuncio', 'abandono', 'recarga'].includes(rival.estado.tipo)))
               ? ' '
               : partida
-                ? (rival.estado.texto || ' ')
+                ? (estadoVisto(seat).texto || ' ')
                 : rival.folded
                 ? 'Se retiró'
                 : marcadoAllIn(rival)
@@ -2259,7 +2265,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         isChipOpen={openChipSeat === seat}
         onChipTap={() => handleChipTap(seat)}
         lastAction={lastActions[seat]}
-        rotulo={partida ? game.players[seat].estado : null}
+        rotulo={partida ? estadoVisto(seat) : null}
         renderCard={i => renderOpponentCard(seat, i)}
         score={game.players[seat].score}
         showScore={isPayoutPhase && !inReset}
@@ -2943,7 +2949,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           fromX={fc.fromX} fromY={fc.fromY}
           toX={fc.toX}     toY={fc.toY}
           w={fc.w}         h={fc.h}
-          duration={fc.fast ? 0.75 : (fc.dur ?? VUELO_REPARTO_S)}
+          duration={fc.dur ?? VUELO_REPARTO_S}
+          vuelo={partida ? fc.id : undefined}
           onDone={() => {
             setFlyingCards(prev => prev.filter(c => c.id !== fc.id))
             if (fc.isDiscardIn) markRefilled(fc.seat, fc.slotIdx)

@@ -60,6 +60,14 @@ describe('SAL-A · las RPC y sus argumentos', () => {
     ])
   })
 
+  it('5b · en desarrollo, `?ritmo=rapido` arma la mesa en Rápido (en `dist/` no existe: testDistSinMoldes)', () => {
+    vi.stubGlobal('location', { search: '?ritmo=rapido' })
+    const c = clienteFalso()
+    crearSalasApi(c).crearSala('abierta', 3, 100)
+    vi.unstubAllGlobals()
+    expect(c.registro.rpc[0].args).toEqual({ p_tipo: 'abierta', p_jugadores: 3, p_apuesta: 100, p_ritmo: 'rapido' })
+  })
+
   it('unirseSala manda los dos huecos, uno en null', () => {
     const c = clienteFalso()
     const api = crearSalasApi(c)

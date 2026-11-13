@@ -71,6 +71,7 @@ const ESPERADO = {
   'ausencia-fuera': ['final', (v) => propio(v).abandonado],
   // L-M 3 · entre una mano y otra (lámina): la pausa entre manos, la recarga y el anuncio.
   'entre-manos': ['mesa', (v) => v.phase === 'PAYOUT' && clase(v) === 'mano_siguiente' && !v.resultado.revelacion],
+  reponer: ['mesa', (v) => v.phase === 'DISCARD' && clase(v) === 'descarte' && v.descarte.yaDescartaron.length === 0],
   'recarga-ofrecida': ['mesa', (v) => clase(v) === 'mano_siguiente' && propio(v).chips === 0 && propio(v).recarga === 'decide'],
   'recarga-voluntaria': ['mesa', (v) => clase(v) === 'mano_siguiente' && propio(v).chips >= 100 && propio(v).chips < 1500 && !propio(v).recarga],
   'recarga-pedida': ['mesa', (v) => clase(v) === 'turno' && v.activePlayerIndex !== v.asiento && propio(v).chips < 1500 && !propio(v).folded],
@@ -90,7 +91,7 @@ const mesasDe = (escena) => [2, 3, 4, 5].filter((n) => escenaCabeEn(escena, n))
 describe('MES-PvP 2 · las escenas', () => {
   it('la lista es la del §I.2, con `reposicion` y `aviso-salida`, `descarte-propio` (MES-PvP 3) y los tres fines de la 3-A', () => {
     expect([...ESCENAS_PVP].sort()).toEqual(Object.keys(ESPERADO).sort())
-    expect(ESCENAS_PVP).toHaveLength(56)
+    expect(ESCENAS_PVP).toHaveLength(57)
     expect(mesasDe('abandono')).toEqual([3, 4, 5])
     expect(mesasDe('aviso-salida')).toEqual([3, 4, 5])
     expect(mesasDe('sorteo-empate-3')).toEqual([3, 4, 5])
@@ -361,7 +362,10 @@ describe('MES-PvP 2 · el mando', () => {
   it('con la puerta abierta, lee la escena y sus datos, y corrige lo que no vale', () => {
     vi.stubEnv('VITE_AUTH_BYPASS', '1')
     // L-M 1 · y los mandos de la lámina, con sus valores por defecto.
-    const lamina = { vivo: false, corte: null, momento: null, msj: null, msjMs: 1200, abierta: null, premium: null, saldo: null, lento: null }
+    const lamina = {
+      vivo: false, corte: null, momento: null, msj: null, msjMs: 1200, abierta: null, premium: null, saldo: null, lento: null,
+      ritmo: 'normal', desc: null, descyo: null, tarde: null,
+    }
     expect(leerMandoPvP('?pvp=revelacion&n=4&asiento=3&nombres=largo')).toEqual({ escena: 'revelacion', n: 4, asiento: 3, nombres: 'largo', ...lamina })
     expect(leerMandoPvP('?pvp=revelacion')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })
     expect(leerMandoPvP('?pvp=revelacion&n=9&asiento=7')).toEqual({ escena: 'revelacion', n: 2, asiento: 0, nombres: null, ...lamina })
@@ -377,6 +381,9 @@ describe('MES-PvP 2 · el mando', () => {
     // v1.3-b · la mesa, dentro de las que caben en la escena.
     expect(leerMandoPvP('?pvp=recarga-rival&n=3&asiento=1')).toMatchObject({ n: 2, asiento: 1 })
     expect(leerMandoPvP('?pvp=recarga-fuera&n=2')).toMatchObject({ n: 3 })
+    // 5b · la reposición uno a uno: el ritmo, cuántas descarta cada uno y la vista tardía.
+    expect(leerMandoPvP('?pvp=reponer&ritmo=rapido&desc=3&descyo=0&tarde=1500')).toMatchObject({ ritmo: 'rapido', desc: 3, descyo: 0, tarde: 1500 })
+    expect(leerMandoPvP('?pvp=reponer&ritmo=x&desc=-1&tarde=y')).toMatchObject({ ritmo: 'normal', desc: null, tarde: null })
     expect(leerMandoPvP('?pvp=inventada')).toBeNull()
     expect(leerMandoPvP('')).toBeNull()
   })

@@ -3,6 +3,7 @@
 // `7a8c7c1`), la espera del árbitro es la duración del plan del cliente, y los vuelos entre
 // personas duran lo mismo que los de las IAS escalados por el ritmo.
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { esperaReposicion } from '../arbitro/index.js'
 import { D_IN, D_OUT } from '../config/esperas.js'
 import { anclarReposicion, calendarioReposicion, planReposicionPvP, vueloDescarte } from './reposicionCore.js'
@@ -125,4 +126,18 @@ describe('5b · los vuelos entre personas duran lo que los de las IAS (decisión
     expect(D_IN).toBe(vueloDescarte() * 1000)
   })
 
+  it('los tres vuelos del descarte de la mesa (IAS: salida y entrada; PvP: los dos) toman su duración de `vueloDescarte`', () => {
+    const mesaFuente = readFileSync(new URL('../components/GameTable.jsx', import.meta.url), 'utf8')
+    expect(mesaFuente.match(/dur: vueloDescarte\(\), isDiscardOut: true/g)).toHaveLength(1)
+    expect(mesaFuente.match(/dur: vueloDescarte\(\), isDiscardIn: true/g)).toHaveLength(1)
+    // `startReposicionPvP` crea los suyos dentro (STOP-L, cambio 3), con el factor del ritmo.
+    const pvp = mesaFuente.slice(mesaFuente.indexOf('function startReposicionPvP'), mesaFuente.indexOf('function cortarReposicionPvP'))
+    expect(pvp).toContain('dur: vueloDescarte(f),')
+    expect(pvp).toContain('isDiscardOut: true')
+    expect(pvp).toContain('isDiscardIn: true')
+    expect(pvp.match(/\bdur:/g)).toHaveLength(1)
+    // Y `FlyingCard` dura lo que diga `dur`: ningún atajo de duración fija.
+    expect(mesaFuente).toContain('duration={fc.dur ?? VUELO_REPARTO_S}')
+    expect(mesaFuente).not.toMatch(/\bfast: true\b/)
+  })
 })

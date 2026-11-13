@@ -13,7 +13,7 @@ import { montoTexto } from '../config/tapetes'
 import { t } from '../config/textos'
 import { PHASES } from '../engine/gameEngine'
 import { MONEDA, nombreEnVoz } from './cronicaCore'
-import { CLASE_AVISO_SALIDA, CLASE_REPOSICION } from '../lib/partidaCliente'
+import { CLASE_AVISO_SALIDA } from '../lib/partidaCliente'
 import { mismaAccion } from '../lib/vistaAMesa'
 
 // La línea de una jugada. Las cifras con su punto de millar, como en la pantalla.
@@ -48,6 +48,15 @@ export function fraseDeAccion(accion, game) {
   }
 }
 
+// MES-PvP 5b · la voz de la reposición uno a uno, asiento a asiento (Reglas v1.10 §8.7): la misma
+// frase que contra las IAS (`discardNarration`, GameTable), con el nombre cortado.
+export function fraseDeReposicion(seat, n, game) {
+  const cartas = n === 1 ? 'carta' : 'cartas'
+  if (seat === 0) return n === 0 ? 'No descartas.' : `Descartas ${n} ${cartas}.`
+  const nombre = nombreEnVoz(game.players[seat])
+  return n === 0 ? `${nombre} no descarta.` : `${nombre} descarta ${n} ${cartas}.`
+}
+
 // ── La línea de una fase ────────────────────────────────────────────────────
 const quienAbre = ({ activePlayerIndex: a, players }) => (a === 0 ? 'Tu turno.' : `${nombreEnVoz(players[a])} abre.`)
 
@@ -80,7 +89,8 @@ export function faseHumanos(game) {
     case PHASES.BET_1:   return `A las 2 — ${quienAbre(game)}`
     case PHASES.BET_2:   return `A las 3 — ${quienAbre(game)}`
     case PHASES.DISCARD:
-      if (game.vencimiento?.clase === CLASE_REPOSICION) return resumenDescarte(game)
+      // 5b · en la reposición habla la mesa, asiento a asiento (`fraseDeReposicion`); antes de la
+      // primera voz y al acabar sigue la espera, y el resumen llega con `BET_3`.
       if (yo.folded) return 'La mesa descarta.'
       if (game.descarte.yaDescartaron.includes(0)) return 'Esperando el descarte de la mesa.'
       return `Selecciona hasta ${game.handRules.maxDiscard} cartas a descartar.`

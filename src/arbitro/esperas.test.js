@@ -4,8 +4,9 @@ import { readFileSync } from 'node:fs'
 import { resetRng, setRng } from '../engine/deck.js'
 import { PHASES } from '../engine/gameEngine.js'
 import {
-  ANTES_DEL_REPARTO_MS, AUSENTE_DESDE, AVISO_SALIDA_MS, BARAJADO_MS, FACTOR_RAPIDA, FIN_SEGUNDO_REPARTO_MS,
-  LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, N_AUSENCIA, PAUSA_ANUNCIO_MS, RED_REVELACION_MS,
+  ANTES_DEL_REPARTO_MS, AUSENTE_DESDE, AVISO_SALIDA_MS, BARAJADO_MS, D_IN, D_IN_STAG, D_OUT, D_OUT_STAG, D_PAUSE,
+  D_SEAT_GAP, D_SKIP, FACTOR_RAPIDA, FIN_SEGUNDO_REPARTO_MS, LECTURA_TRAS_REVELACION_MS, MANO_SIGUIENTE_MS, N_AUSENCIA,
+  PAUSA_ANUNCIO_MS, RED_REVELACION_MS, REPOSICION_ARRANQUE_MS, REPOSICION_CIERRE_MS, REPOSICION_CIERRE_SIN_VOLTEO_MS,
   TRAS_PRIMER_REPARTO_MS, TURN_TIME, VOLTEOS_SEGUNDO_REPARTO_MS, VOLTEO_SORTEO_MS, VUELO_REPARTO_MS,
 } from '../config/esperas.js'
 import { FACTOR_RAPIDA as FACTOR_DE_SU_SITIO } from '../lib/partidaRapida.js'
@@ -102,6 +103,19 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
     expect(esperaReposicion([0, 0, 0], 'normal')).toBe(100 + 3 * 750 + 500)
     expect(esperaReposicion([1, 1], 'rapido')).toBe(100 + 0.5 * 2 * 2175 + 500)
     expect(esperaReposicion([null, 1, null], 'normal')).toBe(100 + 2175 + 500)
+  })
+
+  it('5b · las siete pausas del descarte, con su valor efectivo, y la mesa ya no las declara', () => {
+    // Las de `GameTable.jsx` en `7a8c7c1`: los vuelos de 750 y las pausas × `AI_SPEED_FACTOR` (1,25).
+    expect([D_OUT, D_OUT_STAG, D_PAUSE, D_IN, D_IN_STAG, D_SEAT_GAP, D_SKIP])
+      .toEqual([750, 150 * 1.25, 300 * 1.25, 750, 180 * 1.25, 240 * 1.25, 600 * 1.25])
+    expect([REPOSICION_ARRANQUE_MS, REPOSICION_CIERRE_MS, REPOSICION_CIERRE_SIN_VOLTEO_MS]).toEqual([100, 500, 200])
+    const mesa = readFileSync(new URL('../components/GameTable.jsx', import.meta.url), 'utf8')
+    expect(mesa).not.toMatch(/const D_(OUT|OUT_STAG|PAUSE|IN|IN_STAG|SEAT_GAP|SKIP)\b/)
+    expect(mesa).toContain("from '../lib/reposicionCore'")
+    const nucleo = readFileSync(new URL('../lib/reposicionCore.js', import.meta.url), 'utf8')
+    expect(nucleo).toContain("} from '../config/esperas.js'")
+    expect(nucleo).not.toMatch(/const D_/)
   })
 
   it('el anuncio va en las manos 5, 11, 16, 22, 27, 33, 38 y 44', () => {
