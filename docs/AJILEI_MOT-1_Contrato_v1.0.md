@@ -610,11 +610,11 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Motor en el trozo de la mesa (PES-1) | `cargarMesa.js:124` · `trozos.js:28, :32` · `testEntradaLigera.test.js:34` | 1e y 1f: lo nuevo nace en `trozos.partidaPvP` |
 | Limpiar la sonda | `sonda_mot1/` · `.gitignore:127-129` | 1e |
 | `REGLA_ASIENTO` pasa a 15 (la Corta, entrada por defecto), con sus pruebas, para que el cliente no ofrezca mesas que el servidor rechaza | `salas.js:57` · `salas.test.js:42-44` | 1d-ii: la única excepción a «la 1d solo toca SQL» |
-| Espejo del cliente: `APUESTAS_PVP` | `salas.js:41` · `salas.test.js:29, :36` | MES-PvP 7: `ArmarMesa.jsx:282` pinta lo que diga la lista, y el chip de 50 es de esa campaña |
-| **Pantalla de armar mesa:** fila Entrada, chip de 50, control de ritmo del anfitrión | `ArmarMesa.jsx` | MES-PvP 7 |
+| Espejo del cliente: `APUESTAS_PVP` | `salas.js:41` · `salas.test.js:29, :36` | MES-PvP 7: `ArmarMesa.jsx:282` pinta lo que diga la lista, y el chip de 50 es de esa campaña · **hecho en la 7b**: el 50 entra en `APUESTAS_PVP`, con el espejo del `check` de `salas.apuesta` en `salas.test.js` |
+| **Pantalla de armar mesa:** fila Entrada, chip de 50, control de ritmo del anfitrión | `ArmarMesa.jsx` | MES-PvP 7 · **hecho en la 7b**: las filas Entrada (Corta 15× · Llena 50×, `ENTRADAS_PVP` en `salas.js`) y Ritmo, y el chip de 50; `crearSala` manda siempre `p_ritmo` y `p_entrada` |
 | **Reloj de la sala:** 5:00 en mesas privadas, 3:00 en públicas | SQL de salas | MES-PvP 7 · **hecho en la 7a**: `duracion_sala(tipo)` en `20261113150000_mespvp_sub7a_duracion_sala.sql` (la escriben `crear_sala` y la restitución de `salir_sala`), con el espejo `duracionSala` en `salas.js` |
-| `salas_abiertas` con `entrada`, y el texto del tope de 10 sentadas por minuto | `sal_b2:228-250` · `salasCore.js:132-135` · `textos.es.js:251` | MES-PvP 7 |
-| Sala de espera: sentido y mini-perfil | `salaEsperaCore.js:141` · `MiniPerfil.jsx` | MES-PvP 7 |
+| `salas_abiertas` con `entrada`, y el texto del tope de 10 sentadas por minuto | `sal_b2:228-250` · `salasCore.js:132-135` · `textos.es.js:251` | MES-PvP 7 · **la entrada, hecha en la 7b sin migración**: `salasAbiertas` la lee de `salas` por `id` (la política `salas_select_visibles` ya lo permite). El texto del tope de 10 por minuto sigue pendiente |
+| Sala de espera: sentido y mini-perfil | `salaEsperaCore.js:141` · `MiniPerfil.jsx` | MES-PvP 7 · **el mini-perfil, hecho en la 7b**: la silla ocupada lo abre; el propio con «Editar» apagado |
 | **El árbitro v1.1:** `volver_anuncio`, `ahora`, los campos del §4, los vencimientos nuevos, la ausencia y la pausa de anuncio | `src/arbitro/` · `supabase/functions/partida/` | MES-PvP 1 |
 | Cada cliente se ve abajo: la rotación vive fuera de `seatLayouts.js` | El adaptador de la vista | MES-PvP 2 |
 | Escalonar los reclamos y corregir el desfase con `ahora` | `partidaCliente.js` | MES-PvP 2 |
