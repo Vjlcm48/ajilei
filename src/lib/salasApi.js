@@ -136,19 +136,18 @@ export function crearSalasApi(cliente = supabase) {
 
     /**
      * Abre una mesa. Si es `abierta` y ya existe una esperando con la misma
-     * combinación jugadores × apuesta, la base NO crea una segunda: une a ésa y
-     * la devuelve. Es la regla sellada de «abrir se vuelve unirme», y vive allí
-     * y no aquí porque entre la consulta y la creación cabe otro jugador.
+     * identidad jugadores × apuesta × entrada, la base NO crea una segunda: une
+     * a ésa y la devuelve. Es la regla sellada de «abrir se vuelve unirme», y
+     * vive allí y no aquí porque entre la consulta y la creación cabe otro
+     * jugador.
+     *
+     * MES-PvP 7b · el ritmo (`'normal'` | `'rapido'`) y la entrada (`'corta'` |
+     * `'llena'`) viajan SIEMPRE, con los valores del `check` de `salas`. La
+     * puerta de desarrollo `?ritmo=rapido` de la 5b se retiró: sobra con la fila.
      */
-    crearSala: (tipo, jugadores, apuesta) =>
+    crearSala: (tipo, jugadores, apuesta, ritmo = 'normal', entrada = 'corta') =>
       mesaOpcional('crear_sala', {
-        p_tipo: tipo, p_jugadores: jugadores, p_apuesta: apuesta,
-        // MES-PvP 5b · B4 · solo en desarrollo: `?ritmo=rapido` arma la mesa en Rápido, para
-        // probarlo contra el servidor real por el túnel (sin bypass). Bajo `vite build` la rama
-        // desaparece entera; lo vigila `testDistSinMoldes` (la huella `p_ritmo`).
-        ...(import.meta.env.DEV && new URLSearchParams(globalThis.location?.search ?? '').get('ritmo') === 'rapido'
-          ? { p_ritmo: 'rapido' }
-          : {}),
+        p_tipo: tipo, p_jugadores: jugadores, p_apuesta: apuesta, p_ritmo: ritmo, p_entrada: entrada,
       }),
 
     /**
@@ -192,8 +191,27 @@ export function crearSalasApi(cliente = supabase) {
      */
     resolverSala: (salaId) => mesaOpcional('resolver_sala', { p_sala: salaId }),
 
-    /** Las mesas abiertas en espera, con su recuento de sentados. Pinta SAL-1. */
-    salasAbiertas: () => llamar('salas_abiertas'),
+    /**
+     * Las mesas abiertas en espera, con su recuento de sentados. Pinta SAL-1.
+     *
+     * MES-PvP 7b · y con su ENTRADA, que es identidad de la mesa pública y
+     * `salas_abiertas()` no devuelve. Sin migración: la política de lectura de
+     * `salas` ya deja ver las abiertas que esperan (`salas_select_visibles`), y
+     * `leerSala` lee la tabla igual. Si esa segunda lectura falla, las filas se
+     * quedan sin entrada y cuentan como Cortas, que es lo que eran hasta la 7b:
+     * quien decide al unirse sigue siendo `crear_sala`.
+     */
+    salasAbiertas: () =>
+      llamar('salas_abiertas').then(async (r) => {
+        if (r.error !== null || !Array.isArray(r.data) || r.data.length === 0) return r
+        let data = null
+        try {
+          ({ data } = await cliente.from('salas').select('id, entrada').in('id', r.data.map((f) => f.id)))
+        } catch { /* sin entradas: las filas cuentan como Cortas */ }
+        if (!Array.isArray(data)) return r
+        const entradas = new Map(data.map((f) => [f.id, f.entrada]))
+        return { ...r, data: r.data.map((f) => (entradas.has(f.id) ? { ...f, entrada: entradas.get(f.id) } : f)) }
+      }),
 
     /** La sala en la que este jugador está, o `null`. Para reanudar tras recargar. */
     miSala: () => mesaOpcional('mi_sala'),

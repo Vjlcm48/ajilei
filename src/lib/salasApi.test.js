@@ -24,12 +24,28 @@ const { crearSalasApi, CLAVES_ERROR, ERROR_INESPERADO, salirDeSalaEnEspera, TOPE
 // argumentos, y en qué se convierte lo que vuelve—, no las reglas de la base,
 // que viven en SQL y se prueban en SQL.
 function clienteFalso(respuestas = {}) {
-  const registro = { rpc: [], canales: [], bajas: [] }
+  const registro = { rpc: [], canales: [], bajas: [], lecturas: [] }
   return {
     registro,
     rpc(nombre, args) {
       registro.rpc.push({ nombre, args })
       return Promise.resolve(respuestas[nombre] ?? { data: null, error: null })
+    },
+    // MES-PvP 7b · la lectura directa de una tabla (`from().select().in()`):
+    // `respuestas['from:<tabla>']` es lo que vuelve; un `Error` ahí, que lanza.
+    from(tabla) {
+      return {
+        select(columnas) {
+          return {
+            in(columna, valores) {
+              registro.lecturas.push({ tabla, columnas, columna, valores })
+              const r = respuestas[`from:${tabla}`]
+              if (r instanceof Error) throw r
+              return Promise.resolve(r ?? { data: null, error: null })
+            },
+          }
+        },
+      }
     },
     channel(nombre) {
       const canal = { nombre, escuchas: [] }
@@ -49,23 +65,51 @@ beforeEach(() => { avisos = vi.spyOn(console, 'warn').mockImplementation(() => {
 afterEach(() => { vi.restoreAllMocks() })
 
 describe('SAL-A · las RPC y sus argumentos', () => {
-  it('crearSala manda los tres parámetros con los nombres de la base', () => {
-    // Los nombres `p_tipo`/`p_jugadores`/`p_apuesta` son CONTRATO con la
-    // migración: PostgREST resuelve la función por sus argumentos con nombre, y
-    // uno mal escrito no da un error de tipo — da un 404 «no such function».
+  it('crearSala manda los CINCO parámetros con los nombres de la base, siempre', () => {
+    // Los nombres `p_tipo`/`p_jugadores`/`p_apuesta`/`p_ritmo`/`p_entrada` son
+    // CONTRATO con la migración: PostgREST resuelve la función por sus
+    // argumentos con nombre, y uno mal escrito no da un error de tipo — da un
+    // 404 «no such function». MES-PvP 7b · el ritmo y la entrada van en TODA
+    // llamada; sin decirlos, los defectos de la firma (`normal`, `corta`).
     const c = clienteFalso()
-    crearSalasApi(c).crearSala('abierta', 4, 500)
+    const api = crearSalasApi(c)
+    api.crearSala('abierta', 4, 500)
+    api.crearSala('privada', 2, 50, 'rapido', 'llena')
     expect(c.registro.rpc).toEqual([
-      { nombre: 'crear_sala', args: { p_tipo: 'abierta', p_jugadores: 4, p_apuesta: 500 } },
+      { nombre: 'crear_sala', args: { p_tipo: 'abierta', p_jugadores: 4, p_apuesta: 500, p_ritmo: 'normal', p_entrada: 'corta' } },
+      { nombre: 'crear_sala', args: { p_tipo: 'privada', p_jugadores: 2, p_apuesta: 50, p_ritmo: 'rapido', p_entrada: 'llena' } },
     ])
   })
 
-  it('5b · en desarrollo, `?ritmo=rapido` arma la mesa en Rápido (en `dist/` no existe: testDistSinMoldes)', () => {
+  it('MES-PvP 7b · la puerta `?ritmo=rapido` de la 5b se retiró: la URL no cambia el ritmo', () => {
     vi.stubGlobal('location', { search: '?ritmo=rapido' })
     const c = clienteFalso()
     crearSalasApi(c).crearSala('abierta', 3, 100)
     vi.unstubAllGlobals()
-    expect(c.registro.rpc[0].args).toEqual({ p_tipo: 'abierta', p_jugadores: 3, p_apuesta: 100, p_ritmo: 'rapido' })
+    expect(c.registro.rpc[0].args).toEqual({ p_tipo: 'abierta', p_jugadores: 3, p_apuesta: 100, p_ritmo: 'normal', p_entrada: 'corta' })
+  })
+
+  it('MES-PvP 7b · salasAbiertas trae la entrada de cada mesa, leída de `salas`', async () => {
+    // `salas_abiertas()` no la devuelve; la RLS deja leerla de la tabla para las
+    // abiertas que esperan. Una fila sin la suya se queda sin ella (Corta).
+    const c = clienteFalso({
+      salas_abiertas: { data: [{ id: 'a', apuesta: 100 }, { id: 'b', apuesta: 200 }], error: null },
+      'from:salas': { data: [{ id: 'a', entrada: 'llena' }], error: null },
+    })
+    const r = await crearSalasApi(c).salasAbiertas()
+    expect(c.registro.lecturas).toEqual([{ tabla: 'salas', columnas: 'id, entrada', columna: 'id', valores: ['a', 'b'] }])
+    expect(r).toEqual({ data: [{ id: 'a', apuesta: 100, entrada: 'llena' }, { id: 'b', apuesta: 200 }], error: null })
+  })
+
+  it('MES-PvP 7b · si esa lectura falla o lanza, el listado llega igual (todas Cortas); sin mesas, no se lee', async () => {
+    const filas = { data: [{ id: 'a', apuesta: 100 }], error: null }
+    const conError = clienteFalso({ salas_abiertas: filas, 'from:salas': { data: null, error: { message: 'x' } } })
+    expect(await crearSalasApi(conError).salasAbiertas()).toEqual(filas)
+    const lanza = clienteFalso({ salas_abiertas: filas, 'from:salas': new Error('red') })
+    expect(await crearSalasApi(lanza).salasAbiertas()).toEqual(filas)
+    const vacio = clienteFalso({ salas_abiertas: { data: [], error: null } })
+    await crearSalasApi(vacio).salasAbiertas()
+    expect(vacio.registro.lecturas).toEqual([])
   })
 
   it('unirseSala manda los dos huecos, uno en null', () => {

@@ -76,9 +76,9 @@ const PROHIBIDAS = [
   'ajilei.medir',
   'arranque:',
   'reclamo-enviado',
-  // MES-PvP 5b · B4 · la puerta `?ritmo=rapido` de `salasApi.crearSala`: el único que manda
-  // `p_ritmo` es ella, y solo en desarrollo.
-  'p_ritmo',
+  // MES-PvP 7b · A2 · la puerta `?ritmo=rapido` de `salasApi.crearSala` (5b) se retiró: la
+  // fila Ritmo de Armar mesa la sustituye y `p_ritmo` va ya de verdad (en OBLIGATORIAS).
+  'ritmo=rapido',
 ]
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las
@@ -92,6 +92,8 @@ const OBLIGATORIAS = [
   // RNK-1 1e · y el video de SumaMente de verdad (el mp4 de `public/`, no el
   // WebM de prueba del arnés).
   'sumamente_promo_es.mp4',
+  // MES-PvP 7b · A2 · `crearSala` manda siempre el ritmo y la entrada.
+  'p_ritmo', 'p_entrada',
 ]
 
 let carpeta = null
