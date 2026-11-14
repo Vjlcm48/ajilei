@@ -54,6 +54,9 @@ export const ESTADOS_SAL = [
   // intento automático, fallo, foco) — la secuencia con la que el Motorola
   // escondió la primera letra.
   'opciones-codigo-lleno',
+  // MES-PvP 7b · dos mesas Llenas (una a mi alcance y otra no) y una Corta: el
+  // rótulo «Entrada … HC» y el «Te faltan» con la entrada de cada mesa.
+  'opciones-llena',
   'armar',
   'armar-aviso',
   'armar-unirme',
@@ -65,6 +68,9 @@ export const ESTADOS_SAL = [
   'espera-fin-cancelada',
   'espera-fin-vencida',
   'espera-fin-activa',
+  // MES-PvP 7b · 3 de 5 con nombres largos del banco imitado: la sala anclada,
+  // la silla que abre el mini-perfil (ajeno y propio) y el diálogo «Cancelar».
+  'espera-nombres',
   // A2 §3 · la prueba NEGATIVA: `mi_sala()` devuelve la fila de nulos de
   // PostgREST y la sala NO debe pintarse.
   'espera-fantasma',
@@ -167,13 +173,16 @@ const UID_DEV = '00000000-0000-4000-8000-000000000000'
 // una sala viva —o en el pasado, para los finales que el reloj decide—.
 const enUnRato = (seg) => new Date(Date.now() + seg * 1000).toISOString()
 
-function mesa(n, jugadores, apuesta, sentados, seg = 150) {
+// MES-PvP 7b · `entrada` NO viaja en `salas_abiertas()`: la sirve `from('salas')`
+// cuando `salasApi` la pide por `id` (ver `clienteDe`).
+function mesa(n, jugadores, apuesta, sentados, seg = 150, entrada = 'corta') {
   return {
     id: uuid(n),
     jugadores,
     apuesta,
     sentados,
     expira_en: enUnRato(seg),
+    entrada,
   }
 }
 
@@ -207,6 +216,18 @@ function abiertasDe(estado) {
     case 'opciones-codigo-lleno':
       return [mesa(1, 4, 200, 3)]
 
+    // 7b · con el saldo del bypass (5.000): la Llena de 100 pide 5.000 y alcanza;
+    // la de 3 a 200 pide 10.000 y faltan 5.000 (con la regla de la Corta
+    // alcanzaría: es la que separa las dos reglas); la de 5 a 5.000 pide 250.000
+    // y es el PEOR caso de la línea 2 («Te faltan 245.000 HC · Entrada 250.000
+    // HC», cinco sillas), la que obliga a apretar. Cuatro mesas: la lista
+    // desplaza por dentro, como con `opciones-mas`.
+    case 'opciones-llena':
+      return [
+        mesa(1, 4, 100, 2, 150, 'llena'), mesa(2, 3, 200, 1, 150, 'llena'),
+        mesa(3, 5, 5000, 1, 150, 'llena'), mesa(4, 2, 100, 1),
+      ]
+
     // La combinación 4×200 existe: es lo que convierte «Abrir mesa» en
     // «Unirme a esa mesa» con su nota.
     case 'armar-unirme':
@@ -222,11 +243,12 @@ function abiertasDe(estado) {
 }
 
 function configDe(estado) {
-  // 1.000 HC: 5×1.000 = 5.000 > 2.500 de bono, así que el aviso al anfitrión se
-  // enciende. Es la frontera exacta que §4.2 describe. ECO-1b (B4) la movió de
-  // 500 a 1.000: con el bono en 2.500, la mesa de 500 ya está al alcance de un
-  // invitado nuevo (5×500 = 2.500) y el aviso no saldría.
-  if (estado === 'armar-aviso') return { jugadores: 4, apuesta: 1000, tipo: 'privada' }
+  // 200 HC: 15×200 = 3.000 > 2.500 de bono, así que el aviso al anfitrión se
+  // enciende. Es la frontera exacta que §4.2 describe. ECO-1b (B4) la había
+  // movido a 1.000 con el 5×; con el 15× de MOT-1 la mesa de 1.000 ya no alcanza
+  // al saldo del bypass (5.000) y la pantalla la caía a 100 (MES-PvP 7b). Con
+  // 200, además, la Llena (50×200 = 10.000) se ve apagada.
+  if (estado === 'armar-aviso') return { jugadores: 4, apuesta: 200, tipo: 'privada' }
   // Abierta y con la combinación que sí existe en el listado.
   if (estado === 'armar-unirme') return { jugadores: 4, apuesta: 200, tipo: 'abierta' }
   if (estado.startsWith('armar')) return { jugadores: 4, apuesta: 100, tipo: 'privada' }
@@ -306,6 +328,13 @@ function datosDe(estado) {
       return { sala: salaFalsa({ expiraEn: enUnRato(-5) }), asientos: [ANFITRION_DEV, INVITADOS[0]] }
     case 'espera-fantasma':
       return { sala: filaDeNulos(), asientos: [] }
+    // 7b · los nombres son del banco imitado (`sembradosRanking.js`), para que
+    // el mini-perfil los encuentre; el de 15 caracteres es el más largo.
+    case 'espera-nombres':
+      return {
+        sala: salaFalsa({ jugadores: 5 }),
+        asientos: [ANFITRION_DEV, silla(1, uuid(15), 'MaracuchaBrava_'), silla(2, uuid(16), 'Cocuy_Pecayero')],
+      }
     default:
       return { sala: null, asientos: [] }
   }
@@ -342,7 +371,8 @@ function clienteDe(estado, datos) {
   const rpc = (nombre, args = {}) => {
     switch (nombre) {
       case 'ahora':         return fila(new Date().toISOString())
-      case 'salas_abiertas': return fila(abiertas)
+      // 7b · sin `entrada`, como la función de verdad.
+      case 'salas_abiertas': return fila(abiertas.map((m) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== 'entrada'))))
       case 'unirse_sala':
         return sinMesa
           ? fila(filaDeNulos())
@@ -369,7 +399,12 @@ function clienteDe(estado, datos) {
   // `contarSentados` cuando el `select` pide `head: true`.
   const from = (tabla) => {
     let soloCuenta = false
+    let porIds = null
     const responder = () => {
+      // 7b · la entrada de las abiertas, pedida por `id` (`salasApi.salasAbiertas`).
+      if (tabla === 'salas' && porIds) {
+        return { data: abiertas.filter((m) => porIds.includes(m.id)).map((m) => ({ id: m.id, entrada: m.entrada })), error: null }
+      }
       if (tabla === 'salas') return { data: hayMesa() ? datos.sala : null, error: null }
       if (soloCuenta) return { count: datos.asientos.length, error: null }
       return {
@@ -380,6 +415,7 @@ function clienteDe(estado, datos) {
     const cadena = {
       select(columnas, opciones) { soloCuenta = Boolean(opciones?.head); return cadena },
       eq() { return cadena },
+      in(columna, valores) { porIds = valores; return cadena },
       order() { return cadena },
       maybeSingle() { return cadena },
       then(fn) { return Promise.resolve(responder()).then(fn) },

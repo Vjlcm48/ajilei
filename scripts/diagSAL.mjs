@@ -3,7 +3,7 @@
 // Rector: AJILEI_SAL-B1_Fase1_v1.0.md §8. Autoridad visual: láminas SAL-1 v1.2
 // y SAL-2 v1.2.
 //
-//   node scripts/diagSAL.mjs sal            → los 11 estados × 6 viewports
+//   node scripts/diagSAL.mjs sal            → los 19 estados × 6 viewports (114 celdas)
 //   node scripts/diagSAL.mjs sal <estado>   → un solo estado, para depurar
 //
 // ARN-3c (A-3 de ARN-3a) · `shots` se retiró: la cabecera prometía «solo
@@ -36,6 +36,10 @@
 // Mide GEOMETRÍA y silencio: que nada desborde, que la ventanilla sean tres
 // tarjetas, que los CTA lleguen al piso táctil, que los iconos midan `--ico`,
 // que la consola calle y que no haya un solo `⟦`.
+//
+// MES-PvP 7b · las cifras de dinero son las de la regla de 15× (Corta) y 50×
+// (Llena) de `config/salas.js`; las 18 celdas que esperaban la de 5× (rojas
+// desde `342dbc7`) se rehicieron con la pantalla nueva.
 //
 // NO mide las reglas del servidor. La regla 5×, el límite de cinco intentos por
 // minuto y el índice parcial viven en SQL y se comprueban con dos teléfonos
@@ -85,9 +89,11 @@ const ESTADOS = [
   { id: 'opciones-fuera-alcance', pantalla: 'opciones', nota: 'mesa de 5000 atenuada y al final' },
   { id: 'opciones-error',         pantalla: 'opciones', nota: 'código rechazado' },
   { id: 'opciones-codigo-lleno',  pantalla: 'opciones', nota: 'campo lleno LHQH + error · la primera letra visible' },
-  { id: 'armar',                  pantalla: 'armar',    nota: 'estado base' },
-  { id: 'armar-aviso',            pantalla: 'armar',    nota: 'apuesta 1000 · aviso al anfitrión' },
-  { id: 'armar-unirme',           pantalla: 'armar',    nota: 'combinación existente · CTA cambiado' },
+  // MES-PvP 7b · dos Llenas (una a mi alcance, otra no) y una Corta.
+  { id: 'opciones-llena',         pantalla: 'opciones', nota: 'mesas Llenas · «Entrada … HC» y «Te faltan» con la entrada de cada mesa' },
+  { id: 'armar',                  pantalla: 'armar',    nota: 'estado base · 7 apuestas, Entrada y Ritmo · Llena apagada y vuelta a Corta' },
+  { id: 'armar-aviso',            pantalla: 'armar',    nota: 'apuesta 200 · aviso al anfitrión' },
+  { id: 'armar-unirme',           pantalla: 'armar',    nota: 'combinación existente · CTA cambiado · Ritmo apagado' },
   // ── SAL-B2 F1b · la sala de espera real, un estado por vista de la lámina ──
   { id: 'espera-anfitrion',       pantalla: 'espera',   nota: 'anfitrión · 2/4 · «Jugar ya» · llegada, salida y cancelación por Realtime' },
   { id: 'espera-invitado',        pantalla: 'espera',   nota: 'invitado · «Esperando al anfitrión…» · Tú en la silla 1' },
@@ -96,6 +102,8 @@ const ESTADOS = [
   { id: 'espera-fin-cancelada',   pantalla: 'espera',   nota: 'invitado · «El anfitrión cerró la mesa» · «Buscar otra mesa»' },
   { id: 'espera-fin-vencida',     pantalla: 'espera',   nota: 'anfitrión solo · reloj a 0 → resolver → «no llegó gente a tiempo»' },
   { id: 'espera-fin-activa',      pantalla: 'espera',   nota: 'dos sentados · reloj a 0 → resolver → la mesa se abre sola (MES-PvP 3 §3.3)' },
+  // MES-PvP 7b · 3 de 5, nombres largos: el mini-perfil y la pasada de 44.
+  { id: 'espera-nombres',         pantalla: 'espera',   nota: '3/5 · nombres largos · mini-perfil ajeno y propio · avatar apagado · pasada de 44' },
   // A2 · pantalla 'opciones' porque es donde la app DEBE quedarse: la mesa que
   // el fixture trae es la fila de nulos y la sala no puede pintarse con ella.
   { id: 'espera-fantasma',        pantalla: 'opciones', nota: 'mi_sala devuelve la fila de nulos · la sala NO se pinta' },
@@ -424,8 +432,9 @@ async function medirEstado(page, estado) {
 
     case 'opciones-fuera-alcance': {
       // La cifra de §8.3, palabra por palabra: saldo 5.000, mesa de 5.000, y la
-      // resta que el jugador lee es 20.000. Se comprueba el TEXTO, porque es lo
-      // que el jugador ve; el cálculo ya lo sella `salasCore.test.js`.
+      // resta que el jugador lee es 70.000 (15 × 5.000 − 5.000; MES-PvP 7b,
+      // era 20.000 con la regla de 5×). Se comprueba el TEXTO, porque es lo que
+      // el jugador ve; el cálculo ya lo sella `salasCore.test.js`.
       const r = await page.evaluate(() => {
         const fuera = document.querySelector('.sal-mesa.is-fuera')
         const todas = [...document.querySelectorAll('.sal-mesa')]
@@ -448,7 +457,53 @@ async function medirEstado(page, estado) {
       return {
         ...r,
         ok: r.hay && r.ultima && r.botonApagado && r.mismaAltura && r.atenuada
-          && r.l2.includes('20.000'),
+          && r.l2.includes('70.000') && !r.l2.includes('Entrada'),
+      }
+    }
+
+    case 'opciones-llena': {
+      // MES-PvP 7b · saldo 5.000. La Llena de 4×100 pide 5.000 y alcanza. La de
+      // 3×200 pide 10.000: atenuada y «Te faltan 5.000 HC» (con la regla de la
+      // Corta estaría viva). La de 5×5.000 pide 250.000: «Te faltan 245.000 HC»,
+      // el peor caso de la línea. La Corta no dice nada. Las cuatro miden lo
+      // mismo (O1), las de fuera van al final y ninguna línea se corta: la que
+      // no cabe se aprieta (`letra` es su tamaño entre el de la Corta).
+      const r = await page.evaluate(() => {
+        const todas = [...document.querySelectorAll('.sal-mesa')]
+        const l2 = (m) => m.querySelector('.sal-mesa-l2')
+        return {
+          l1: todas.map((m) => m.querySelector('.sal-mesa-l1').textContent.trim()),
+          l2: todas.map((m) => l2(m).textContent.trim()),
+          fuera: todas.map((m) => m.classList.contains('is-fuera')),
+          unirVivos: todas.map((m) => !m.querySelector('.sal-unir').disabled),
+          cortadas: todas.filter((m) => l2(m).scrollWidth > l2(m).clientWidth + 1).length,
+          alturas: todas.map((m) => m.getBoundingClientRect().height),
+          letra: (() => {
+            const corta = todas.find((m) => !m.classList.contains('es-llena'))
+            const base = corta ? parseFloat(getComputedStyle(l2(corta)).fontSize) : NaN
+            return todas.map((m) => Math.round(parseFloat(getComputedStyle(l2(m)).fontSize) / base * 100) / 100)
+          })(),
+        }
+      })
+      // Cada tarjeta por su línea 1, no por su sitio: el orden lo sella `opciones-mas`.
+      const de = (l1) => {
+        const i = r.l1.findIndex((t) => t.startsWith(l1))
+        return i < 0 ? null : { i, l2: r.l2[i], viva: r.unirVivos[i], fuera: r.fuera[i] }
+      }
+      const m4 = de('Mesa de 4 · 100 HC')
+      const m3 = de('Mesa de 3 · 200 HC')
+      const m5 = de('Mesa de 5 · 5.000 HC')
+      const m2 = de('Mesa de 2 · 100 HC')
+      return {
+        ...r,
+        ok: r.l2.length === 4 && !!m4 && !!m3 && !!m5 && !!m2
+          && m4.l2 === '2/4 sentados · Entrada 5.000 HC' && m4.viva && !m4.fuera
+          && m2.l2 === '1/2 sentados' && m2.viva && !m2.fuera
+          && m3.l2 === 'Te faltan 5.000 HC · Entrada 10.000 HC' && !m3.viva && m3.fuera
+          && m5.l2 === 'Te faltan 245.000 HC · Entrada 250.000 HC' && !m5.viva && m5.fuera
+          && Math.min(m3.i, m5.i) > Math.max(m4.i, m2.i)
+          && r.cortadas === 0
+          && Math.max(...r.alturas) - Math.min(...r.alturas) <= 1,
       }
     }
 
@@ -545,26 +600,67 @@ async function medirEstado(page, estado) {
       const r = await page.evaluate(() => ({
         chipsJug: document.querySelectorAll('.sal-chips.es-jugadores .sal-chip').length,
         chipsApu: document.querySelectorAll('[data-accion="apuesta"]').length,
-        // Saldo 5.000 → alcanzan 100/200/500/1000; 2.000 y 5.000 no.
+        // MES-PvP 7b · siete apuestas. Saldo 5.000 con la Corta (15×) → alcanzan
+        // 50/100/200; 500, 1.000, 2.000 y 5.000 no.
         apagados: [...document.querySelectorAll('[data-accion="apuesta"]')].filter((b) => b.disabled).length,
         cta: document.querySelector('[data-accion="cta"]')?.textContent?.trim() ?? '',
         avisoOn: document.querySelector('[data-accion="aviso-nuevos"]')?.classList.contains('is-on'),
         recuerdoOn: document.querySelector('[data-accion="recuerdo"]')?.classList.contains('is-on'),
         modoPrivada: document.querySelector('[data-accion="modo-privada"]')?.getAttribute('aria-pressed'),
       }))
+      // MES-PvP 7b · las filas Entrada y Ritmo (V-A: Apuesta · Entrada · Ritmo ·
+      // modos) y la regla del saldo de la Entrada: con 100, Llena (5.000) alcanza;
+      // elegida Llena, subir a 200 (10.000) la apaga y la Entrada vuelve SOLA a
+      // Corta. Después se deja otra vez en 100 para la captura.
+      const filas = () => page.evaluate(() => {
+        const chips = (a) => [...document.querySelectorAll(`[data-accion="${a}"]`)]
+          .map((b) => ({ t: b.textContent.trim(), on: b.getAttribute('aria-pressed') === 'true', off: b.disabled }))
+        const primero = (a) => document.querySelector(`[data-accion="${a}"]`)
+        const antes = (x, y) => !!x && !!y && Boolean(x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING)
+        return {
+          entrada: chips('entrada'),
+          ritmo: chips('ritmo'),
+          orden: antes(primero('apuesta'), primero('entrada')) && antes(primero('entrada'), primero('ritmo'))
+            && antes(primero('ritmo'), primero('modo-privada')),
+        }
+      })
+      const inicio = await filas()
+      const chipEntrada = page.locator('[data-accion="entrada"]')
+      const chipApuesta = (hc) => page.locator('[data-accion="apuesta"]', { hasText: new RegExp(`^${hc}$`) })
+      await chipEntrada.nth(1).click()
+      await page.waitForTimeout(150)
+      const conLlena = await filas()
+      await chipApuesta('200').click()
+      await page.waitForTimeout(150)
+      const subida = await filas()
+      await chipApuesta('100').click()
+      await page.waitForTimeout(150)
+      await page.mouse.move(2, 2)
+      const ver = (f) => f.entrada.map((c) => `${c.t}${c.on ? '*' : ''}${c.off ? '(off)' : ''}`).join(' | ')
+      const ritmoOk = inicio.ritmo.length === 2 && inicio.ritmo[0].t === 'Normal' && inicio.ritmo[1].t === 'Rápido'
+        && inicio.ritmo[0].on && !inicio.ritmo[1].on && inicio.ritmo.every((c) => !c.off)
       return {
         ...r,
-        ok: r.chipsJug === 4 && r.chipsApu === 6 && r.apagados === 2
+        orden: inicio.orden,
+        ritmo: inicio.ritmo.map((c) => `${c.t}${c.on ? '*' : ''}${c.off ? '(off)' : ''}`).join(' | '),
+        entrada: { inicio: ver(inicio), conLlena: ver(conLlena), subida: ver(subida) },
+        ok: r.chipsJug === 4 && r.chipsApu === 7 && r.apagados === 4
           && r.modoPrivada === 'true' && r.cta === 'Crear mesa privada'
-          && !r.avisoOn && !r.recuerdoOn,
+          && !r.avisoOn && !r.recuerdoOn
+          && inicio.orden && ritmoOk
+          && ver(inicio) === '1.500 HC* | 5.000 HC'
+          && ver(conLlena) === '1.500 HC | 5.000 HC*'
+          && ver(subida) === '3.000 HC* | 10.000 HC(off)',
       }
     }
 
     case 'armar-aviso': {
-      // 1.000 HC: 5 × 1.000 = 5.000 > 2.500 de bono, así que el aviso se
-      // enciende y nombra las apuestas que un invitado nuevo SÍ alcanza. Las
-      // cifras salen de `salas.js`, no del texto. ECO-1b (B4) re-sella: era la
-      // mesa de 500 con un bono de 1.200 y alcance «100 o 200».
+      // 200 HC: 15 × 200 = 3.000 > 2.500 de bono, así que el aviso se enciende
+      // y nombra las apuestas que un invitado nuevo SÍ alcanza. Las cifras salen
+      // de `salas.js`, no del texto. ECO-1b (B4) re-sella: era la mesa de 500
+      // con un bono de 1.200 y alcance «100 o 200». MES-PvP 7b: era la de 1.000
+      // con la regla de 5× («100, 200 o 500»); con 15× el saldo del bypass
+      // (5.000) no alcanza 1.000, así que el estado sube a 200 (STOP-L).
       const r = await page.evaluate(() => {
         const aviso = document.querySelector('[data-accion="aviso-nuevos"]')
         return {
@@ -576,8 +672,8 @@ async function medirEstado(page, estado) {
       })
       return {
         ...r,
-        ok: r.on && r.texto.includes('2.500') && r.texto.includes('Con 1.000 HC')
-          && r.texto.includes('100, 200 o 500') && !r.texto.includes('⟦'),
+        ok: r.on && r.texto.includes('2.500') && r.texto.includes('Con 200 HC')
+          && r.texto.includes('usa 50 o 100 HC') && !r.texto.includes('⟦'),
       }
     }
 
@@ -586,18 +682,21 @@ async function medirEstado(page, estado) {
       // «Unirme a esa mesa» con su nota. Y al cambiar a Privada, el CTA vuelve a
       // «Crear mesa privada» y aparece el recordatorio suave — que es la mitad
       // que la ficha describía y la lámina no.
-      const antes = await page.evaluate(() => ({
+      // MES-PvP 7b (P-2) · con «Unirme» la fila Ritmo se ve APAGADA y sin chip
+      // marcado: el ritmo lo eligió quien la armó. Con Privada vuelve, en Normal.
+      const leer = () => page.evaluate(() => ({
         cta: document.querySelector('[data-accion="cta"]')?.textContent?.trim() ?? '',
         nota: document.querySelector('[data-accion="cta-nota"]')?.textContent?.trim() ?? '',
-        recuerdoOn: document.querySelector('[data-accion="recuerdo"]')?.classList.contains('is-on'),
-      }))
-      await page.click('[data-accion="modo-privada"]')
-      await page.waitForTimeout(150)
-      const despues = await page.evaluate(() => ({
-        cta: document.querySelector('[data-accion="cta"]')?.textContent?.trim() ?? '',
         recuerdo: document.querySelector('[data-accion="recuerdo"]')?.textContent?.trim() ?? '',
         recuerdoOn: document.querySelector('[data-accion="recuerdo"]')?.classList.contains('is-on'),
+        ritmo: [...document.querySelectorAll('[data-accion="ritmo"]')]
+          .map((b) => `${b.textContent.trim()}${b.getAttribute('aria-pressed') === 'true' ? '*' : ''}${b.disabled ? '(off)' : ''}`)
+          .join(' | '),
       }))
+      const antes = await leer()
+      await page.click('[data-accion="modo-privada"]')
+      await page.waitForTimeout(150)
+      const despues = await leer()
       return {
         antes,
         despues,
@@ -606,7 +705,9 @@ async function medirEstado(page, estado) {
           && antes.recuerdoOn === false
           && despues.cta === 'Crear mesa privada'
           && despues.recuerdoOn === true
-          && despues.recuerdo.includes('200') && !despues.recuerdo.includes('⟦'),
+          && despues.recuerdo.includes('200') && !despues.recuerdo.includes('⟦')
+          && antes.ritmo === 'Normal(off) | Rápido(off)'
+          && despues.ritmo === 'Normal* | Rápido',
       }
     }
 
@@ -617,6 +718,7 @@ async function medirEstado(page, estado) {
     case 'espera-fin-cancelada':
     case 'espera-fin-vencida':
     case 'espera-fin-activa':
+    case 'espera-nombres':
       return medirEspera(page, estado.id)
 
     case 'espera-fantasma': {
@@ -655,6 +757,7 @@ const ESPERA = {
   'espera-fin-cancelada': { sillas: 4, ocupadas: 2, iniciales: ['C', 'D'], tagAnf: 0, tagTu: 1, accion: 'cta', cta: 'Buscar otra mesa', ctaVivo: true, privada: true, fin: 'cancelada', finTexto: 'El anfitrión cerró la mesa' },
   'espera-fin-vencida':   { sillas: 4, ocupadas: 1, iniciales: ['D'], tagAnf: 0, tagTu: 0, accion: 'cta', cta: 'Buscar otra mesa', ctaVivo: true, privada: true, fin: 'vencida', finTexto: 'La mesa se cerró: no llegó gente a tiempo' },
   'espera-fin-activa':    { sillas: 4, ocupadas: 2, iniciales: ['D', 'M'], tagAnf: 0, tagTu: 0, accion: 'cta', cta: 'Entrar a la mesa', ctaVivo: true, privada: true, fin: 'activa', finTexto: '¡Arranca la partida!' },
+  'espera-nombres':       { sillas: 5, ocupadas: 3, iniciales: ['D', 'M', 'C'], tagAnf: 0, tagTu: 0, accion: 'cta', cta: 'Jugar ya', ctaVivo: true, privada: true },
 }
 
 // La foto de la pantalla que los siete puntos comparten. Se lee en una sola
@@ -673,6 +776,8 @@ const LEER_ESPERA = () => {
   const salir = q('[data-accion="salir"]')
   const cta = q('[data-accion="cta"]')
   const espera = q('[data-accion="espera"]')
+  const caja = (cta ?? espera)?.getBoundingClientRect()
+  const zonaCuerpo = cuerpo?.getBoundingClientRect()
   const codigo = q('[data-accion="codigo-caja"]')
   const compartir = q('[data-accion="compartir"]')
   const u = window.__tokenPx('--u').h
@@ -711,28 +816,28 @@ const LEER_ESPERA = () => {
       estadoOculto: !!estado && getComputedStyle(estado).display === 'none',
       estadoTexto: estado?.textContent?.trim() ?? '',
     },
+    // MES-PvP 7b · LA ZONA ANCLADA. Desde la 7b la acción es la zona del pie
+    // (IOS-1 1e): el CTA o la caja punteada, su nota y «Salir de la mesa», que
+    // vive DENTRO de ella (debajo; a la izquierda del botón en el apaisado de
+    // ≤ 520). Se mide que la caja mida `--cta-h` y quede entera en pantalla, que
+    // la zona toque el pie del cuerpo y que «Salir» esté en su sitio. Que la
+    // zona mida lo MISMO en todas las variantes (O1) se compara entre estados,
+    // al final de la corrida (`compararZonas`).
     accion: {
       alto: accion?.getBoundingClientRect().height ?? 0,
-      // La caja de acción mide lo mismo en sus cuatro variantes (O1): CTA o
-      // caja punteada de `--cta-h`, hueco de 1.6u, nota de 1.4em a 2.9u.
-      esperado: ctaH + 1.6 * u + 1.4 * 2.9 * u,
+      cajaAlto: caja?.height ?? 0,
+      ctaH,
+      entera: !!caja && caja.top >= -1 && caja.bottom <= innerHeight + 1,
+      alPie: !!accion && !!zonaCuerpo && Math.abs(accion.getBoundingClientRect().bottom
+        - (zonaCuerpo.bottom - (parseFloat(getComputedStyle(cuerpo).paddingBottom) || 0))) <= 1.5,
+      salirDentro: !!accion && !!salir && accion.contains(salir),
+      salirSitio: !!caja && !!salir && (() => {
+        const b = salir.getBoundingClientRect()
+        return b.top >= caja.bottom - 1 || b.right <= caja.left + 1
+      })(),
       cta: cta?.textContent?.trim() ?? null,
       ctaVivo: !!cta && !cta.disabled,
       espera: espera?.textContent?.trim() ?? null,
-      // Ajustes · el BLOQUE de acción, que desde la lámina v1.6 termina en el
-      // botón de salir: de la cima de la caja al pie del botón. El aire entre
-      // filas lo reparte `align-content: space-evenly`, así que no se supone:
-      // se lee del hueco consejo → acción, que es el mismo, y se le suma el
-      // `margin-top: .4u` propio del botón y su alto. Así el punto sigue
-      // midiendo lo que dice —la columna no se mueve— con el botón dentro.
-      bloque: accion && salir
-        ? salir.getBoundingClientRect().bottom - accion.getBoundingClientRect().top
-        : 0,
-      esperadoBloque: accion && salir && cajaConsejo
-        ? ctaH + 1.6 * u + 1.4 * 2.9 * u
-          + (accion.getBoundingClientRect().top - cajaConsejo.bottom)
-          + 0.4 * u + salir.getBoundingClientRect().height
-        : 0,
     },
     salir: {
       hay: !!salir,
@@ -799,8 +904,8 @@ async function medirEspera(page, id) {
 
   puntos['esp.accion'] = {
     ...f.accion,
-    ok: Math.abs(f.accion.alto - f.accion.esperado) <= 1.5
-      && Math.abs(f.accion.bloque - f.accion.esperadoBloque) <= 1.5
+    ok: Math.abs(f.accion.cajaAlto - f.accion.ctaH) <= 1.5
+      && f.accion.entera && f.accion.alPie && f.accion.salirDentro && f.accion.salirSitio
       && (esp.accion === 'cta'
         ? f.accion.cta === esp.cta && f.accion.ctaVivo === esp.ctaVivo && f.accion.espera === null
         : f.accion.espera === esp.espera && f.accion.cta === null),
@@ -886,9 +991,145 @@ async function medirEspera(page, id) {
     }
   }
 
+  if (id === 'espera-nombres') {
+    // La pasada de 44 primero: el mini-perfil y el avatar son lo que podría sacar de la sala.
+    puntos['esp.tactil'] = await medirTactil(page)
+    puntos['esp.perfil'] = await medirPerfil(page)
+  }
+
   puntos.rotos = f.rotos
   puntos.ok = f.rotos === 0 && Object.values(puntos).every((p) => typeof p !== 'object' || p === null || p.ok !== false)
   return puntos
+}
+
+// ── MES-PvP 7b · esp.perfil · la silla abre el mini-perfil (B.2) ───────────
+// La silla OCUPADA es un botón; la vacía no. La ajena abre su mini-perfil sin
+// «Editar»; la propia, con «Editar» apagado: tocarlo cierra la tarjeta y dice
+// «Disponible fuera de la mesa». El avatar de la barra, apagado con el mismo
+// aviso, y la sala sigue en pantalla (el ⚙ no se toca aquí: lo mide `cfg`).
+async function medirPerfil(page) {
+  const AVISO = 'Disponible fuera de la mesa'
+  const toast = () => page.evaluate(() => {
+    const t = document.querySelector('main.sal .sal-toast')
+    return t?.classList.contains('is-on') ? t.textContent.trim() : ''
+  })
+  const sillas = await page.evaluate(() => [...document.querySelectorAll('[data-accion="silla"]')]
+    .map((s) => `${s.tagName === 'BUTTON' ? 'B' : 'd'}${s.classList.contains('is-vacia') ? '-' : '+'}`).join(''))
+  const tarjeta = () => page.evaluate(() => {
+    const v = document.querySelector('.mp-velo')
+    return v ? { texto: v.querySelector('.mp-tarjeta')?.textContent ?? '', editar: !!v.querySelector('[data-accion="mp-editar"]') } : null
+  })
+  // El avatar primero, y se espera a que su aviso se apague (2,6 s): «Editar»
+  // dice lo mismo y, con el aviso aún encendido, no se distinguiría quién habló.
+  await page.click('main.sal .lob-perfil')
+  await page.waitForTimeout(150)
+  const avatar = { toast: await toast(), sigueEnSala: await page.evaluate(() => !!document.querySelector('main.sal.es-espera')) }
+  // Si el avatar sacó de la sala, lo demás no se puede medir: rojo, sin caerse.
+  if (!avatar.sigueEnSala) return { avatar, ok: false }
+  await page.waitForFunction(() => !document.querySelector('main.sal .sal-toast')?.classList.contains('is-on'), null, { timeout: 5000 })
+  await page.click('[data-accion="silla"][data-asiento="1"]')
+  await page.waitForSelector('.mp-velo', { timeout: 3000 }).catch(() => {})
+  const ajena = await tarjeta()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  const cerradaAjena = (await tarjeta()) === null
+  await page.click('[data-accion="silla"][data-asiento="0"]')
+  await page.waitForSelector('.mp-velo', { timeout: 3000 }).catch(() => {})
+  const propia = await tarjeta()
+  if (propia?.editar) await page.click('[data-accion="mp-editar"]')
+  await page.waitForTimeout(150)
+  const trasEditar = { abierta: (await tarjeta()) !== null, toast: await toast() }
+  await page.mouse.move(2, 2)
+  return {
+    sillas,
+    ajena,
+    cerradaAjena,
+    propia,
+    trasEditar,
+    avatar,
+    ok: sillas === 'B+B+B+d-d-'
+      && !!ajena && ajena.texto.includes('MaracuchaBrava_') && !ajena.editar && cerradaAjena
+      && !!propia && propia.editar && !trasEditar.abierta && trasEditar.toast === AVISO
+      && avatar.toast === AVISO && avatar.sigueEnSala,
+  }
+}
+
+// ── MES-PvP 7b · esp.tactil · la pasada de 44, MEDIDA (B.3) ────────────────
+// La zona que el dedo alcanza de verdad: desde el centro de cada botón, el
+// punto más lejano que `elementFromPoint` aún le atribuye, empezando 1 px fuera
+// de su caja. Copiar, compartir, «Salir», los dos botones del diálogo
+// «Cancelar» y la silla tienen que llegar a 44 × 44; los del diálogo se miden
+// con él abierto y los demás con él cerrado (su velo los tapa). Flecha, casa y
+// barra se apuntan sin veredicto: son de la carcasa y no de esta tanda.
+const LEER_ZONAS = (sels) => {
+  const out = {}
+  for (const [n, s] of Object.entries(sels)) {
+    const el = document.querySelector(s)
+    if (!el) { out[n] = null; continue }
+    const b = el.getBoundingClientRect()
+    const cx = b.x + b.width / 2
+    const cy = b.y + b.height / 2
+    const alcance = (dx, dy) => {
+      let k = 1
+      for (; k <= 40; k++) {
+        const e = document.elementFromPoint(cx + dx * (b.width / 2 - 0.5 + k), cy + dy * (b.height / 2 - 0.5 + k))
+        if (!e || !(e === el || el.contains(e))) break
+      }
+      return k - 1
+    }
+    out[n] = { w: b.width + alcance(-1, 0) + alcance(1, 0), h: b.height + alcance(0, -1) + alcance(0, 1) }
+  }
+  return out
+}
+async function medirTactil(page) {
+  const fuera = await page.evaluate(LEER_ZONAS, {
+    copiar: '[data-accion="copiar"]',
+    compartir: '[data-accion="compartir"]',
+    salir: '[data-accion="salir"]',
+    silla: '[data-accion="silla"][data-asiento="1"]',
+    volver: '[data-accion="volver"]',
+    casa: '[data-accion="casa"]',
+    avatar: 'main.sal .lob-perfil',
+    ajustes: 'main.sal .lob-ajustes',
+  })
+  await page.click('[data-accion="salir"]')
+  await page.waitForTimeout(400)
+  const dialogo = await page.evaluate(LEER_ZONAS, {
+    'cancelar-no': '[data-accion="cancelar-no"]',
+    'cancelar-si': '[data-accion="cancelar-si"]',
+  })
+  await page.click('[data-accion="cancelar-no"]')
+  await page.waitForTimeout(400)
+  await page.mouse.move(2, 2)
+  const zonas = { ...fuera, ...dialogo }
+  const exigidas = ['copiar', 'compartir', 'salir', 'silla', 'cancelar-no', 'cancelar-si']
+  const cortas = exigidas.filter((n) => !zonas[n] || zonas[n].w < 44 - 0.5 || zonas[n].h < 44 - 0.5)
+  return { zonas, cortas, ok: cortas.length === 0 }
+}
+
+// ── MES-PvP 7b · O1 · la zona del pie mide lo mismo en todas las variantes ──
+// Por viewport: CTA vivo, caja punteada, final y mesa llena, con o sin
+// nombres largos. Una celda cuya zona se separe de la del resto en más de
+// 1,5 px pasa a rojo con el punto `esp.accion` y el motivo.
+function compararZonas(celdas) {
+  const porVp = {}
+  for (const c of celdas) {
+    const a = c['sal.6']?.['esp.accion']
+    if (a && typeof a.alto === 'number') (porVp[c.vp] ??= []).push([c, a])
+  }
+  for (const lista of Object.values(porVp)) {
+    const altos = lista.map(([, a]) => a.alto).sort((x, y) => x - y)
+    const mediana = altos[Math.floor(altos.length / 2)]
+    for (const [c, a] of lista) {
+      a.altoComun = mediana
+      if (Math.abs(a.alto - mediana) > 1.5) {
+        a.ok = false
+        a.o1 = `la zona mide ${round(a.alto)} y la del resto ${round(mediana)}`
+        c['sal.6'].ok = false
+        c.ok = false
+      }
+    }
+  }
 }
 
 // ── sal.0 · las dos listas de estados no se han separado ────────────────────
@@ -941,6 +1182,7 @@ try {
       celdas.push(await medirCelda(browser, estado, vp))
     }
   }
+  compararZonas(celdas)
   report.celdas = celdas
   report.ok = report['sal.0'].ok && celdas.every((c) => c.ok)
 
