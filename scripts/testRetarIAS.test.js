@@ -20,6 +20,7 @@ import {
 import { guardaDeSaldo } from '../src/screens/retarCore.js'
 import { CLAVE_CONFIG_SALA } from '../src/config/salas.js'
 import { normalizarConfig } from '../src/screens/salasCore.js'
+import { MEMORIA_PVP } from '../src/config/salaRecordada.js'
 import { pisoDe, medioDe, techoDe, pilaIA, MOTIVOS_ENTRADA } from '../src/engine/entrada.js'
 import { apuestasDe, NIVELES } from '../src/config/niveles.js'
 
@@ -52,17 +53,23 @@ describe('1. La política de memoria (§2.1 · L-6 / K-3a)', () => {
     expect(proyectar({ a: 1, b: null }, ['a', 'b', 'z'])).toEqual({ a: 1 })
   })
 
-  it('PvP recuerda las TRES decisiones', () => {
+  it('MES-PvP 7b · PvP recuerda las CUATRO decisiones (con el ritmo) — y JAMÁS la entrada', () => {
+    // Con los campos de la política DE VERDAD (`MEMORIA_PVP`), no con una copia.
+    expect(MEMORIA_PVP.campos).toEqual(['jugadores', 'apuesta', 'tipo', 'ritmo'])
     const almacen = almacenFalso()
     const memoria = crearMemoria({
       clave: CLAVE_CONFIG_SALA,
-      campos: ['jugadores', 'apuesta', 'tipo'],
+      campos: MEMORIA_PVP.campos,
       normalizar: normalizarConfig,
       almacen,
     })
-    memoria.guardar({ jugadores: 4, apuesta: 500, tipo: 'abierta' })
+    memoria.guardar({ jugadores: 4, apuesta: 500, tipo: 'abierta', ritmo: 'rapido', entrada: 'llena' })
     expect(JSON.parse(almacen.leer(CLAVE_CONFIG_SALA)))
-      .toEqual({ jugadores: 4, apuesta: 500, tipo: 'abierta' })
+      .toEqual({ jugadores: 4, apuesta: 500, tipo: 'abierta', ritmo: 'rapido' })
+    // Y al volver, el ritmo está y la entrada no: la pantalla la abre en Corta.
+    const leido = memoria.leer(Infinity)
+    expect(leido.ritmo).toBe('rapido')
+    expect(leido.entrada).toBeUndefined()
   })
 
   it('vs IAS recuerda reto, jugadores y apuesta — y JAMÁS la entrada', () => {

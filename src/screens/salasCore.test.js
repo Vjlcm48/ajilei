@@ -83,6 +83,26 @@ describe('SAL-B1 · la entrada Corta y el «Te faltan»', () => {
     expect(alcanza(100, 1499)).toBe(false)
     expect(alcanza(100, 1500)).toBe(true)   // el borde exacto entra
     expect(alcanza(100, 1501)).toBe(true)
+    expect(alcanza(100, 1500, 'corta')).toBe(true)
+  })
+
+  it('MES-PvP 7b · con la Llena, CINCUENTA veces; y el «Te faltan» cuenta con ella', () => {
+    expect(alcanza(100, 4999, 'llena')).toBe(false)
+    expect(alcanza(100, 5000, 'llena')).toBe(true)   // el borde exacto entra
+    expect(alcanza(5000, 75000, 'llena')).toBe(false) // lo que alcanza la Corta, no
+    expect(alcanza(5000, Infinity, 'llena')).toBe(true)
+    expect(faltanPara(200, 5000, 'llena')).toBe(5000)
+    expect(faltanPara(5000, 5000, 'llena')).toBe(245000)
+    expect(faltanPara(100, 5000, 'llena')).toBe(0)
+  })
+
+  it('MES-PvP 7b · el listado ordena cada mesa con SU entrada', () => {
+    // Saldo 5.000: la Llena de 200 (10.000) baja al final aunque la Corta de 200 (3.000) no.
+    const orden = ordenarMesas([
+      { id: 'llena', jugadores: 4, apuesta: 200, sentados: 3, entrada: 'llena' },
+      { id: 'corta', jugadores: 4, apuesta: 200, sentados: 1 },
+    ], 5000)
+    expect(orden.map((m) => m.id)).toEqual(['corta', 'llena'])
   })
 
   it('un saldo que no es número no alcanza nada', () => {
@@ -177,7 +197,18 @@ describe('SAL-B1 · el orden del listado', () => {
     // es lo que B2 necesita para el latido y perderlo aquí obligaría a B2 a
     // volver a tocar este archivo.
     expect(normalizarMesa({ id: 'u', jugadores: 4, apuesta: 200, sentados: 2, expira_en: 'X' }))
-      .toEqual({ id: 'u', jugadores: 4, apuesta: 200, sentados: 2, expiraEn: 'X' })
+      .toEqual({ id: 'u', jugadores: 4, apuesta: 200, sentados: 2, expiraEn: 'X', entrada: 'corta' })
+  })
+
+  it('MES-PvP 7b · normalizarMesa lleva la entrada; la que falta o no existe es Corta', () => {
+    // `salas_abiertas()` no la devuelve: `salasApi` la lee de `salas` y, si esa
+    // lectura falla, la mesa llega sin ella. Y una clave del prototipo no cuela.
+    const con = (entrada) => normalizarMesa({ id: 'u', jugadores: 2, apuesta: 100, sentados: 1, entrada }).entrada
+    expect(con('llena')).toBe('llena')
+    expect(con('corta')).toBe('corta')
+    expect(con(undefined)).toBe('corta')
+    expect(con('media')).toBe('corta')
+    expect(con('toString')).toBe('corta')
   })
 })
 
@@ -191,6 +222,20 @@ describe('SAL-B1 · lo que ArmarMesa le pregunta al listado', () => {
     expect(buscarCombinacion(mesas, 4, 200)?.id).toBe('a')
     expect(buscarCombinacion(mesas, 4, 100)).toBe(null)   // misma mesa, otra apuesta
     expect(buscarCombinacion(mesas, 5, 200)).toBe(null)   // misma apuesta, otra mesa
+  })
+
+  it('MES-PvP 7b · y la entrada: la identidad de una pública es jugadores × apuesta × entrada', () => {
+    const conLlena = ordenarMesas([
+      { id: 'c', jugadores: 4, apuesta: 200, sentados: 3, entrada: 'corta' },
+      { id: 'l', jugadores: 4, apuesta: 200, sentados: 1, entrada: 'llena' },
+    ], Infinity)
+    expect(buscarCombinacion(conLlena, 4, 200, 'corta')?.id).toBe('c')
+    expect(buscarCombinacion(conLlena, 4, 200, 'llena')?.id).toBe('l')
+    expect(buscarCombinacion(mesas, 4, 200, 'llena')).toBe(null)   // sólo hay una Corta igual
+    expect(buscarCombinacion(conLlena, 4, 200)?.id).toBe('c')      // sin decirla, Corta
+    // Y el recordatorio no señala como «otra» la mía con la misma entrada, pero sí la de la otra.
+    expect(otraMesaAlAlcance(conLlena, Infinity, 4, 200, 'corta')?.id).toBe('l')
+    expect(otraMesaAlAlcance(conLlena, Infinity, 4, 200, 'llena')?.id).toBe('c')
   })
 
   it('otraMesaAlAlcance excluye la mía y coge la más llena', () => {
@@ -235,15 +280,22 @@ describe('SAL-B1 · §4.4 · la guarda de la configuración recordada', () => {
     }
   })
 
-  it('el defecto es el de la lámina SAL-2', () => {
-    expect(CONFIG_POR_DEFECTO).toEqual({ jugadores: 4, apuesta: 100, tipo: 'privada' })
+  it('el defecto es el de la lámina SAL-2, y el ritmo Normal (MES-PvP 7b)', () => {
+    expect(CONFIG_POR_DEFECTO).toEqual({ jugadores: 4, apuesta: 100, tipo: 'privada', ritmo: 'normal' })
     expect(JUGADORES_PVP).toContain(CONFIG_POR_DEFECTO.jugadores)
     expect(APUESTAS_PVP).toContain(CONFIG_POR_DEFECTO.apuesta)
   })
 
   it('una configuración buena pasa entera', () => {
-    expect(normalizarConfig({ jugadores: 5, apuesta: 200, tipo: 'abierta' }, SALDO))
-      .toEqual({ jugadores: 5, apuesta: 200, tipo: 'abierta' })
+    expect(normalizarConfig({ jugadores: 5, apuesta: 200, tipo: 'abierta', ritmo: 'rapido' }, SALDO))
+      .toEqual({ jugadores: 5, apuesta: 200, tipo: 'abierta', ritmo: 'rapido' })
+  })
+
+  it('MES-PvP 7b · un ritmo desconocido o ausente cae a Normal, y la entrada no se conserva', () => {
+    expect(normalizarConfig({ jugadores: 5, apuesta: 200, tipo: 'abierta', ritmo: 'lento' }, SALDO).ritmo).toBe('normal')
+    expect(normalizarConfig({ jugadores: 5, apuesta: 200, tipo: 'abierta' }, SALDO).ritmo).toBe('normal')
+    expect(normalizarConfig({ jugadores: 5, apuesta: 200, tipo: 'abierta', ritmo: 'rapido', entrada: 'llena' }, SALDO))
+      .not.toHaveProperty('entrada')
   })
 
   it('un valor fuera de las listas selladas NO se aproxima: cae al defecto', () => {
@@ -257,12 +309,12 @@ describe('SAL-B1 · §4.4 · la guarda de la configuración recordada', () => {
   it('una apuesta que ya no alcanza cae SOLA, sin arrastrar lo demás', () => {
     // El caso real: el jugador se gastó el saldo entre dos sesiones. Perder
     // también «mesa de 5, abierta» sería castigarle dos veces por lo mismo.
-    expect(normalizarConfig({ jugadores: 5, apuesta: 5000, tipo: 'abierta' }, SALDO))
-      .toEqual({ jugadores: 5, apuesta: 100, tipo: 'abierta' })
+    expect(normalizarConfig({ jugadores: 5, apuesta: 5000, tipo: 'abierta', ritmo: 'rapido' }, SALDO))
+      .toEqual({ jugadores: 5, apuesta: 100, tipo: 'abierta', ritmo: 'rapido' })
   })
 
   it('la que la releva es la del defecto, no la mayor que alcance', () => {
-    // Con 5.000 de saldo alcanzan hasta 1.000. Elegir 1.000 por él sería decidir
+    // Con 5.000 de saldo alcanzan hasta 200. Elegir 200 por él sería decidir
     // cuánto se juega, que no es una decisión del programa.
     expect(normalizarConfig({ jugadores: 4, apuesta: 2000, tipo: 'privada' }, SALDO).apuesta)
       .toBe(CONFIG_POR_DEFECTO.apuesta)
@@ -270,7 +322,7 @@ describe('SAL-B1 · §4.4 · la guarda de la configuración recordada', () => {
 
   it('sin saldo conocido, la apuesta recordada no se conserva', () => {
     expect(normalizarConfig({ jugadores: 3, apuesta: 500, tipo: 'abierta' }, undefined))
-      .toEqual({ jugadores: 3, apuesta: 100, tipo: 'abierta' })
+      .toEqual({ jugadores: 3, apuesta: 100, tipo: 'abierta', ritmo: 'normal' })
   })
 })
 

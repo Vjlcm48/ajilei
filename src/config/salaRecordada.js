@@ -14,7 +14,7 @@
 // que se repetía es `config/memoriaChips.js`, y lo único que de verdad
 // distingue a las dos pantallas —QUÉ se recuerda— queda aquí en una línea:
 //
-//   PvP   → jugadores, apuesta, tipo     (las tres decisiones)
+//   PvP   → jugadores, apuesta, tipo, ritmo   (y JAMÁS la entrada, MES-PvP 7b)
 //   vs IA → reto, jugadores, apuesta     (y JAMÁS la entrada)
 //
 // ── POR QUÉ SIGUE SEPARADO DE `salaPendiente.js` ───────────────────────────
@@ -33,7 +33,8 @@ import { normalizarConfig } from '../screens/salasCore'
 import { crearMemoria } from './memoriaChips'
 
 /**
- * LA POLÍTICA del PvP: las tres decisiones, todas.
+ * LA POLÍTICA del PvP: jugadores, apuesta, tipo y ritmo. La entrada no: es la
+ * que gasta dinero (Reglas §7), y la pantalla la abre siempre en Corta.
  *
  * `leer(saldo)` siempre devuelve algo usable: si no hay nada guardado, si lo
  * guardado no parsea, o si la apuesta recordada ya no alcanza este saldo, sale
@@ -46,7 +47,7 @@ import { crearMemoria } from './memoriaChips'
  */
 export const MEMORIA_PVP = crearMemoria({
   clave: CLAVE_CONFIG_SALA,
-  campos: ['jugadores', 'apuesta', 'tipo'],
+  campos: ['jugadores', 'apuesta', 'tipo', 'ritmo'],
   normalizar: normalizarConfig,
 })
 

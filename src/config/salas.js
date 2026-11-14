@@ -19,7 +19,7 @@
 //
 // ── EL ESPEJO DEL SERVIDOR ──────────────────────────────────────────────────
 // Estas mismas cifras están del otro lado, en `check` de columna y en las
-// funciones de la migración `<timestamp>_sal_a_salas.sql`: las seis apuestas en
+// funciones de la migración `<timestamp>_sal_a_salas.sql`: las siete apuestas en
 // `salas.apuesta`, la entrada en `entrada_de` (`<timestamp>_mot1_dinero.sql`), el
 // alfabeto en `salas_codigo_formato_chk`, la vida de la sala en `duracion_sala`
 // (`<timestamp>_mespvp_sub7a_duracion_sala.sql`).
@@ -34,12 +34,13 @@
 
 import { AJILEI_CONFIG } from './ajileiConfig'
 
-// ── Las seis apuestas ───────────────────────────────────────────────────────
-// Selladas. NO son las de `niveles.js` ni las de `STAKE_OPTIONS`: aquéllas están
-// atadas a la dificultad de la IA, un concepto que en PvP no existe (Fase 0
-// §5.1). Que la lista esté ordenada de menor a mayor es contrato: la pantalla
-// las pinta en este orden y `apuestasAlAlcance` conserva el filtro estable.
-export const APUESTAS_PVP = [100, 200, 500, 1000, 2000, 5000]
+// ── Las siete apuestas ──────────────────────────────────────────────────────
+// Selladas (Reglas §8). NO son las de `niveles.js` ni las de `STAKE_OPTIONS`:
+// aquéllas están atadas a la dificultad de la IA, un concepto que en PvP no
+// existe (Fase 0 §5.1). Que la lista esté ordenada de menor a mayor es contrato:
+// la pantalla las pinta en este orden y `apuestasAlAlcance` conserva el filtro
+// estable. MES-PvP 7b · el 50, que el `check` de `salas` y el árbitro ya tenían.
+export const APUESTAS_PVP = [50, 100, 200, 500, 1000, 2000, 5000]
 
 // El bono con el que nace una cuenta. La Fase 0 §5.3 buscó un `1200` en todo el
 // árbol y no había ninguno: esta línea fue la primera vez que la cifra existió.
@@ -50,17 +51,26 @@ export const APUESTAS_PVP = [100, 200, 500, 1000, 2000, 5000]
 // cambia a mano: Vitest no puede leer una función SQL.
 export const BONO_BIENVENIDA = 2500
 
-// ── La entrada Corta ────────────────────────────────────────────────────────
+// ── La entrada: Corta y Llena ───────────────────────────────────────────────
 // MOT-1 (C-12) · Para sentarse hay que tener la entrada de la mesa, que sale del
-// saldo al sentarse. Hoy todas las mesas que arma el cliente son Cortas: 15 veces
-// la apuesta (`entrada_de` en la migración `mot1_dinero`). Con el 5× de antes,
-// `ArmarMesa` ofrecía mesas que el servidor rechaza. MES-PvP trae la fila Entrada.
-export const REGLA_ASIENTO = 15
+// saldo al sentarse: 15 veces la apuesta la Corta y 50 la Llena (`entrada_de` en
+// la migración `mot1_dinero`, Reglas §8). Con el 5× de antes, `ArmarMesa`
+// ofrecía mesas que el servidor rechaza. MES-PvP 7b trae la fila Entrada: las
+// claves son las de `salas.entrada` (`'corta'` | `'llena'`) y la Corta es la de
+// por defecto, también para las mesas que no dicen la suya.
+export const ENTRADAS_PVP = Object.freeze({ corta: 15, llena: 50 })
+export const ENTRADA_POR_DEFECTO = 'corta'
+export const REGLA_ASIENTO = ENTRADAS_PVP.corta
 
-/** Saldo mínimo para sentarse a una mesa de esta apuesta. */
-export function saldoMinimo(apuesta) {
-  return REGLA_ASIENTO * apuesta
+/** Saldo mínimo para sentarse a una mesa de esta apuesta y esta entrada. */
+export function saldoMinimo(apuesta, entrada = ENTRADA_POR_DEFECTO) {
+  return (ENTRADAS_PVP[entrada] ?? REGLA_ASIENTO) * apuesta
 }
+
+// ── El ritmo del reparto ────────────────────────────────────────────────────
+// MES-PvP 7b · Normal o Rápido, lo elige el anfitrión (Reglas §8). Son los
+// valores del `check` de `salas.ritmo` y del `p_ritmo` de `crear_sala`.
+export const RITMOS_PVP = ['normal', 'rapido']
 
 /**
  * Las apuestas que este saldo alcanza, en el orden sellado.
@@ -72,8 +82,8 @@ export function apuestasAlAlcance(saldo) {
   return APUESTAS_PVP.filter((apuesta) => saldoMinimo(apuesta) <= saldo)
 }
 
-// Lo que alcanza una cuenta recién nacida: [100] desde MOT-1 (15 × 100 = 1.500 cabe
-// en el bono de 2.500; 15 × 200 = 3.000, no). Se DERIVA en vez de
+// Lo que alcanza una cuenta recién nacida: [50, 100] desde MES-PvP 7b (15 × 100 =
+// 1.500 cabe en el bono de 2.500; 15 × 200 = 3.000, no). Se DERIVA en vez de
 // escribirse, para que el día que el bono o la regla cambien esta lista cambie
 // sola en vez de quedarse mintiendo.
 export const ALCANCE_NUEVOS = apuestasAlAlcance(BONO_BIENVENIDA)

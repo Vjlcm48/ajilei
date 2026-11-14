@@ -3,7 +3,10 @@ import { readFileSync, readdirSync } from 'node:fs'
 import {
   APUESTAS_PVP,
   BONO_BIENVENIDA,
+  ENTRADAS_PVP,
+  ENTRADA_POR_DEFECTO,
   REGLA_ASIENTO,
+  RITMOS_PVP,
   ALCANCE_NUEVOS,
   ALFABETO_CODIGO,
   CODIGO_REGEX,
@@ -22,38 +25,78 @@ import { AJILEI_CONFIG } from './ajileiConfig.js'
 // cifras sean "correctas" —eso lo selló Victor— sino que sigan SIENDO ésas y que
 // las dos formas del alfabeto (cadena y rango de la migración) no se separen.
 
-describe('SAL-A · las seis apuestas', () => {
+// MES-PvP 7b · las migraciones, en orden, como texto: los espejos de abajo leen
+// la ÚLTIMA definición de cada cifra que el servidor hace cumplir.
+const MIGRACIONES = (() => {
+  const dir = new URL('../../supabase/migrations/', import.meta.url)
+  return readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => readFileSync(new URL(f, dir), 'utf8'))
+})()
+
+describe('MES-PvP 7b · las siete apuestas', () => {
   it('son las selladas y en orden', () => {
     // Recordatorio deliberado, molde del test de IDIOMAS_DISPONIBLES: si alguien
     // añade o mueve una apuesta, esta línea sale roja y obliga a decidirlo a
-    // mano en vez de que la lista se deslice.
-    expect(APUESTAS_PVP).toEqual([100, 200, 500, 1000, 2000, 5000])
+    // mano en vez de que la lista se deslice. El 50 entra con la 7b (Reglas §8).
+    expect(APUESTAS_PVP).toEqual([50, 100, 200, 500, 1000, 2000, 5000])
   })
 
   it('no son las de vs-IA', () => {
     // La confusión que este test previene: `STAKE_OPTIONS` y las tablas de
     // `niveles.js` están atadas a la dificultad de la IA (Fase 0 §5.1), un
-    // concepto que en PvP no existe. Son seis y aquéllas cuatro.
-    expect(APUESTAS_PVP).toHaveLength(6)
+    // concepto que en PvP no existe. Son siete y aquéllas cuatro.
+    expect(APUESTAS_PVP).toHaveLength(7)
+  })
+
+  it('son el espejo del `check (apuesta in (…))` de `salas`', () => {
+    const listas = MIGRACIONES.flatMap((sql) => [...sql.matchAll(/check \(apuesta in \(([\d, ]+)\)\)/g)].map((m) => m[1]))
+    expect(listas.length).toBeGreaterThan(0)
+    expect(listas.at(-1).split(',').map(Number)).toEqual(APUESTAS_PVP)
   })
 })
 
-describe('MOT-1 · la entrada Corta', () => {
-  it('el saldo mínimo es quince veces la apuesta', () => {
+describe('MOT-1 · la entrada: Corta 15× y Llena 50×', () => {
+  it('el saldo mínimo es quince veces la apuesta con la Corta, que es la de por defecto', () => {
     expect(REGLA_ASIENTO).toBe(15)
+    expect(ENTRADA_POR_DEFECTO).toBe('corta')
+    expect(saldoMinimo(50)).toBe(750)
     expect(saldoMinimo(100)).toBe(1500)
     expect(saldoMinimo(5000)).toBe(75000)
+    expect(saldoMinimo(100, 'corta')).toBe(1500)
+  })
+
+  it('MES-PvP 7b · y cincuenta con la Llena; una entrada desconocida cuenta como Corta', () => {
+    expect(saldoMinimo(50, 'llena')).toBe(2500)
+    expect(saldoMinimo(100, 'llena')).toBe(5000)
+    expect(saldoMinimo(5000, 'llena')).toBe(250000)
+    expect(saldoMinimo(100, 'otra')).toBe(1500)
+  })
+
+  it('MES-PvP 7b · Corta y Llena son el espejo de `entrada_de` en SQL', () => {
+    const conFuncion = MIGRACIONES.filter((sql) => /function public\.entrada_de\(/.test(sql))
+    expect(conFuncion.length).toBeGreaterThan(0)
+    const sql = conFuncion.at(-1)
+    const desde = sql.indexOf('function public.entrada_de(')
+    const cuerpo = sql.slice(desde, sql.indexOf('$fn$;', desde))
+    const veces = Object.fromEntries([...cuerpo.matchAll(/when '(\w+)' then (\d+)/g)].map(([, e, n]) => [e, Number(n)]))
+    expect(veces).toEqual(ENTRADAS_PVP)
+  })
+
+  it('MES-PvP 7b · Normal y Rápido son el espejo del `check` de `salas.ritmo`', () => {
+    const checks = MIGRACIONES.flatMap((sql) => [...sql.matchAll(/check \(ritmo in \(([^)]*)\)\)/g)].map((m) => m[1]))
+    expect(checks.length).toBeGreaterThan(0)
+    expect([...checks.at(-1).matchAll(/'(\w+)'/g)].map((m) => m[1])).toEqual(RITMOS_PVP)
   })
 
   it('un saldo justo para el mínimo SÍ alcanza', () => {
-    // El borde: `>=`, no `>`. Con exactamente 1.500 se puede jugar la de 100.
-    expect(apuestasAlAlcance(1500)).toEqual([100])
-    expect(apuestasAlAlcance(1499)).toEqual([])
+    // El borde: `>=`, no `>`. Con exactamente 750 se puede jugar la de 50.
+    expect(apuestasAlAlcance(750)).toEqual([50])
+    expect(apuestasAlAlcance(749)).toEqual([])
+    expect(apuestasAlAlcance(1500)).toEqual([50, 100])
   })
 
   it('el alcance crece con el saldo y conserva el orden', () => {
     expect(apuestasAlAlcance(75000)).toEqual(APUESTAS_PVP)
-    expect(apuestasAlAlcance(7500)).toEqual([100, 200, 500])
+    expect(apuestasAlAlcance(7500)).toEqual([50, 100, 200, 500])
   })
 
   it('devuelve un array nuevo, no la lista sellada', () => {
@@ -62,7 +105,7 @@ describe('MOT-1 · la entrada Corta', () => {
     const alcance = apuestasAlAlcance(75000)
     expect(alcance).not.toBe(APUESTAS_PVP)
     alcance.reverse()
-    expect(APUESTAS_PVP[0]).toBe(100)
+    expect(APUESTAS_PVP[0]).toBe(50)
   })
 
   it('un saldo que no es número no alcanza nada, en vez de romper', () => {
@@ -79,9 +122,10 @@ describe('SAL-A · el bono de bienvenida', () => {
     expect(BONO_BIENVENIDA).toBe(2500)
   })
 
-  it('una cuenta nueva alcanza solo la primera mesa', () => {
-    // Con 2.500 se llega a la de 100 (15 × 100 = 1.500) y no a la de 200 (3.000).
-    expect(ALCANCE_NUEVOS).toEqual([100])
+  it('una cuenta nueva alcanza solo las dos primeras mesas', () => {
+    // Con 2.500 se llega a la de 50 (750) y a la de 100 (15 × 100 = 1.500), y no
+    // a la de 200 (3.000). MES-PvP 7b · el aviso a los nuevos dice «50 o 100».
+    expect(ALCANCE_NUEVOS).toEqual([50, 100])
   })
 
   it('el alcance de nuevos se DERIVA y no está escrito a mano', () => {

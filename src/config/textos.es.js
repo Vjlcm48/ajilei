@@ -123,6 +123,8 @@ export const TEXTOS_ES = {
   'sal.opciones.mesa.estado':     '{x}/{n} sentados',
   'sal.opciones.mesa.unirme':     'Unirme',
   'sal.opciones.mesa.faltan':     'Te faltan {hc} HC',
+  // MES-PvP 7b · el rótulo de una mesa Llena en la tarjeta; las Corta no llevan nada.
+  'sal.opciones.mesa.entrada':    'Entrada {hc} HC',
   'sal.opciones.mesas.vacio':     'Nadie está armando mesa ahora',
   'sal.opciones.mesas.vacio.sub': 'Arma la tuya y comparte el código',
   'sal.opciones.armar':           'Armar una mesa',
@@ -133,6 +135,13 @@ export const TEXTOS_ES = {
   'sal.armar.jugadores':     'Jugadores',
   'sal.armar.apuesta':       'Apuesta HC por mano',
   'sal.armar.como':          '¿Cómo la llenamos?',
+  // MES-PvP 7b · las filas Ritmo y Entrada (Reglas §8). Los chips de Entrada dicen
+  // solo el monto («1.500 HC»); Corta y Llena no salen en pantalla (STOP-L).
+  'sal.armar.ritmo':          'Ritmo',
+  'sal.armar.ritmo.normal':   'Normal',
+  'sal.armar.ritmo.rapido':   'Rápido',
+  'sal.armar.entrada':        'Entrada',
+  'sal.armar.entrada.monto':  '{hc} HC',
   'sal.armar.privada':       'Privada',
   'sal.armar.privada.d':     'Con código para compartir. Solo entra quien lo tenga.',
   'sal.armar.abierta':       'Abierta',

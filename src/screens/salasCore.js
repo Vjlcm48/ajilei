@@ -15,7 +15,10 @@
 import {
   ALFABETO_CODIGO,
   APUESTAS_PVP,
+  ENTRADA_POR_DEFECTO,
+  ENTRADAS_PVP,
   JUGADORES_PVP,
+  RITMOS_PVP,
   saldoMinimo,
 } from '../config/salas'
 
@@ -66,9 +69,10 @@ export function codigoListo(cuerpo) {
 // que NO es un número —`null`, `undefined`, `NaN`— sigue sin alcanzar nada:
 // eso es un fallo de quien llama, no un saldo por llegar.
 
-export function alcanza(apuesta, saldo) {
+// MES-PvP 7b · con la entrada: sin ella, la Corta (15×), que es la de siempre.
+export function alcanza(apuesta, saldo, entrada = ENTRADA_POR_DEFECTO) {
   if (saldo === Infinity) return true
-  return Number.isFinite(saldo) && saldo >= saldoMinimo(apuesta)
+  return Number.isFinite(saldo) && saldo >= saldoMinimo(apuesta, entrada)
 }
 
 /**
@@ -77,9 +81,9 @@ export function alcanza(apuesta, saldo) {
  * Es la cifra del «Te faltan {hc} HC» de la lámina, y se calcula y no se guarda:
  * el día que ECO-1 mueva el saldo, el número cambia solo.
  */
-export function faltanPara(apuesta, saldo) {
+export function faltanPara(apuesta, saldo, entrada = ENTRADA_POR_DEFECTO) {
   if (saldo === Infinity) return 0
-  const falta = saldoMinimo(apuesta) - (Number.isFinite(saldo) ? saldo : 0)
+  const falta = saldoMinimo(apuesta, entrada) - (Number.isFinite(saldo) ? saldo : 0)
   return falta > 0 ? falta : 0
 }
 
@@ -108,6 +112,9 @@ export function normalizarMesa(fila) {
     apuesta: Number(fila?.apuesta),
     sentados: Number(fila?.sentados ?? 0),
     expiraEn: fila?.expira_en ?? null,
+    // MES-PvP 7b · la entrada es identidad de la mesa (Reglas §8). Una fila que
+    // no la trae es Corta: es lo único que el cliente armaba hasta la 7b.
+    entrada: Object.hasOwn(ENTRADAS_PVP, fila?.entrada ?? '') ? fila.entrada : ENTRADA_POR_DEFECTO,
   }
 }
 
@@ -117,8 +124,8 @@ export function ordenarMesas(filas, saldo) {
 
   const porLlenado = (a, b) => (b.sentados - a.sentados) || (a.apuesta - b.apuesta)
 
-  const dentro = mesas.filter((m) => alcanza(m.apuesta, saldo)).sort(porLlenado)
-  const fuera = mesas.filter((m) => !alcanza(m.apuesta, saldo)).sort(porLlenado)
+  const dentro = mesas.filter((m) => alcanza(m.apuesta, saldo, m.entrada)).sort(porLlenado)
+  const fuera = mesas.filter((m) => !alcanza(m.apuesta, saldo, m.entrada)).sort(porLlenado)
   return [...dentro, ...fuera]
 }
 
@@ -128,10 +135,15 @@ export function ordenarMesas(filas, saldo) {
 // Se filtra en cliente sobre `salas_abiertas()`, que es la otra vía que la
 // propia ficha autoriza. Queda anotado en el informe.
 
-/** La mesa abierta con EXACTAMENTE esta combinación, o `null`. */
-export function buscarCombinacion(mesas, jugadores, apuesta) {
+/**
+ * La mesa abierta con EXACTAMENTE esta identidad, o `null`. MES-PvP 7b · la
+ * identidad es jugadores × apuesta × entrada (Reglas §8, el índice
+ * `salas_abierta_unica_idx`); el ritmo no entra.
+ */
+export function buscarCombinacion(mesas, jugadores, apuesta, entrada = ENTRADA_POR_DEFECTO) {
   if (!Array.isArray(mesas)) return null
-  return mesas.find((m) => m.jugadores === jugadores && m.apuesta === apuesta) ?? null
+  return mesas.find((m) => m.jugadores === jugadores && m.apuesta === apuesta
+    && (m.entrada ?? ENTRADA_POR_DEFECTO) === entrada) ?? null
 }
 
 /**
@@ -142,10 +154,11 @@ export function buscarCombinacion(mesas, jugadores, apuesta) {
  * Se toma la primera del listado ya ordenado, que por §3.3 es la más llena: la
  * que antes va a arrancar, que es la que merece la pena señalar.
  */
-export function otraMesaAlAlcance(mesas, saldo, jugadores, apuesta) {
+export function otraMesaAlAlcance(mesas, saldo, jugadores, apuesta, entrada = ENTRADA_POR_DEFECTO) {
   if (!Array.isArray(mesas)) return null
   return mesas.find(
-    (m) => alcanza(m.apuesta, saldo) && !(m.jugadores === jugadores && m.apuesta === apuesta)
+    (m) => alcanza(m.apuesta, saldo, m.entrada)
+      && !(m.jugadores === jugadores && m.apuesta === apuesta && (m.entrada ?? ENTRADA_POR_DEFECTO) === entrada)
   ) ?? null
 }
 
@@ -154,7 +167,9 @@ export function otraMesaAlAlcance(mesas, saldo, jugadores, apuesta) {
 // modo: 'privada' }`. Se escribe con los nombres del contrato de la base
 // (`jugadores`, `apuesta`, `tipo`) y no con los de la lámina, para que lo que se
 // recuerda tenga la misma forma que lo que se envía.
-export const CONFIG_POR_DEFECTO = { jugadores: 4, apuesta: 100, tipo: 'privada' }
+// MES-PvP 7b · y el ritmo, Normal la primera vez. La entrada NO está: no se
+// recuerda (Reglas §7) y la pantalla la abre siempre en Corta.
+export const CONFIG_POR_DEFECTO = { jugadores: 4, apuesta: 100, tipo: 'privada', ritmo: 'normal' }
 
 export const TIPOS_SALA = ['privada', 'abierta']
 
@@ -185,13 +200,16 @@ export function normalizarConfig(crudo, saldo) {
     : CONFIG_POR_DEFECTO.jugadores
 
   const tipo = TIPOS_SALA.includes(crudo.tipo) ? crudo.tipo : CONFIG_POR_DEFECTO.tipo
+  // MES-PvP 7b · un ritmo desconocido (o el de una memoria anterior a la 7b,
+  // que no lo tenía) cae a Normal SOLO él, como la apuesta.
+  const ritmo = RITMOS_PVP.includes(crudo.ritmo) ? crudo.ritmo : CONFIG_POR_DEFECTO.ritmo
 
   const apuestaValida = APUESTAS_PVP.includes(crudo.apuesta)
   const apuesta = apuestaValida && alcanza(crudo.apuesta, saldo)
     ? crudo.apuesta
     : CONFIG_POR_DEFECTO.apuesta
 
-  return { jugadores, apuesta, tipo }
+  return { jugadores, apuesta, tipo, ritmo }
 }
 
 // ── El aviso al anfitrión · §4.2 ────────────────────────────────────────────

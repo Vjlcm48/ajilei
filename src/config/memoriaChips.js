@@ -4,7 +4,8 @@
 // «Retar a las IAS» y «Armar una mesa» comparten carcasa y filas de chips, pero
 // NO comparten qué se recuerda, y ésa es la única diferencia real entre las dos:
 //
-//   · PvP   recuerda las TRES decisiones (jugadores, apuesta, tipo).
+//   · PvP   recuerda jugadores, apuesta, tipo y ritmo — y JAMÁS la entrada
+//           (MES-PvP 7b: la Corta o la Llena se eligen cada vez).
 //   · vs IA recuerda reto, jugadores y apuesta — y JAMÁS la entrada.
 //
 // La entrada no se recuerda por la misma razón por la que `salaRecordada` no
