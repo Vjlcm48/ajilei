@@ -1016,6 +1016,7 @@ function App() {
         cuenta={cuenta}
         billetera={billetera}
         salaInicial={sala}
+        apiRanking={apiRanking}
         // Salir devuelve a `SalaOpciones` y no al lobby (§7): quien acaba de
         // dejar una mesa casi siempre quiere otra, y el listado esta ahi.
         onSalir={() => { setSala(null); refrescarSaldo?.(); setScreen('sala-opciones') }}

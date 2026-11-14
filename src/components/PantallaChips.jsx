@@ -58,8 +58,8 @@ import { useIdioma } from '../hooks/useIdioma'
 // La casa sube a la cabecera, a la derecha de la flecha (el pie es del botón),
 // y el «Pronto» vive dentro de la zona, apoyado justo encima de ella.
 //
-// `SalaOpciones` repite este marcado a mano (no usa esta carcasa): un cambio
-// aquí se hace también allí.
+// MES-PvP 7b · `SalaOpciones` ya no repite este marcado a mano: monta esta
+// carcasa (Fase 0 de la sub-tanda 7, bloque C), con Δ 0 px en `diagSAL`.
 //
 // ── RNK-1c · UNA PANTALLA SIN BOTÓN DORADO Y CON LA LISTA POR DENTRO ────────
 // Rector: AJILEI_RNK-1_Fase1c-i_v1.0.md §2.2 (camino (a) de la lámina 1-L).
@@ -81,6 +81,10 @@ import { useIdioma } from '../hooks/useIdioma'
 // (lo pone `App`) el avatar de la barra lleva al perfil; sin él, «Pronto».
 // `avisar(clave, vars)` acepta las variables del texto («Listo: ahora eres
 // {nombre}», de la pantalla de perfil).
+//
+// ── MES-PvP 7b · EL `data-accion` DEL BOTÓN DORADO ──────────────────────────
+// `cta.accion` cambia el `data-accion` del botón; sin él es `cta`, como siempre.
+// Salas lo pone en `armar`, que es el contrato que leen sus guiones.
 
 export default function PantallaChips({
   titulo,
@@ -193,7 +197,7 @@ export default function PantallaChips({
             <button
               type="button"
               className={`sal-cta${cta?.clase ? ` ${cta.clase}` : ''}`}
-              data-accion="cta"
+              data-accion={cta?.accion ?? 'cta'}
               disabled={Boolean(cta?.disabled)}
               onClick={cta?.onClick}
             >

@@ -1254,39 +1254,18 @@ body.sal-activa #root {
    IOS-1 1e (decisión 9 de Victor, 2026-10-16): en Retar, Salas y Armar mesa
    (`.sal.es-anclada`, §16) ese parche y el traje acostado SE QUITAN: el botón
    va anclado al pie y lo que no cabe son las filas, que desplazan dentro del
-   cuerpo. Los dos bloques siguen aquí acotados con `:not(.es-anclada)` porque
-   la sala de espera y la partida comparten `.sal` y están fuera de la 1e. */
+   cuerpo. Los dos bloques siguieron aquí acotados con `:not(.es-anclada)` para
+   la sala de espera y la partida, que compartían `.sal` sin anclar.
+
+   MES-PvP 7b (A6): la sala de espera y la partida ya van ancladas y ningún
+   `.sal` queda sin `.es-anclada`, así que el traje acostado y el parche de la
+   1b se RETIRAN. Aquí queda sólo el apretado de 660. */
 @media (max-height: 660px) {
   .sal-cab { margin-top: calc(var(--u) * 1.5); }
   .sal-cuerpo { row-gap: calc(var(--u) * 2.2); padding-top: calc(var(--u) * 1.5); }
   .sal-cuerpo.es-armar { row-gap: calc(var(--u) * 1.6); padding-top: calc(var(--u) * 1); }
   .sal-bloque h2 { margin-bottom: calc(var(--u) * 1); }
   .sal-aviso { min-height: 1.4em; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  /* Misma columna; la pantalla desplaza. La tercera fila deja de ser `1fr`
-     porque en este traje el cuerpo mide lo que mide y es el contenedor quien
-     scrollea. */
-  .sal:not(.es-anclada) { grid-template-rows: auto auto auto; overflow: auto; }
-  .sal:not(.es-anclada) .sal-cuerpo { align-content: start; row-gap: calc(var(--u) * 3); }
-  /* La ventanilla sigue siendo de tres tarjetas: la promesa es de la lista, no
-     del viewport, y aquí es cuando más falta hace que la caja no crezca. */
-  .sal:not(.es-anclada) .sal-casa { position: fixed; }
-}
-/* IOS-1 1b · la excepción de arriba. Ni filas ni medidas: `overflow-y: auto`
-   solo crea desplazamiento si el contenido YA desborda (hoy se recortaba), así
-   que donde cabe no cambia nada. El cuerpo no pierde su parte de arriba:
-   `space-evenly` cae a `start` al desbordar y el sobrante va todo hacia abajo.
-   La casa se queda en su esquina mientras el contenido pasa: `fixed`, con el
-   `left` que tendría dentro de `.sal` —que se centra con `margin: auto` bajo su
-   `max-width` (§1)—, para que caiga en el mismo píxel que hoy en cualquier
-   ancho. */
-@media (orientation: landscape) and (min-height: 521px) and (max-height: 830px) {
-  .sal:not(.es-anclada) { overflow-y: auto; }
-  .sal:not(.es-anclada) .sal-casa {
-    position: fixed;
-    left: calc(max(0px, (100% - var(--u) * 213) / 2) + env(safe-area-inset-left, 0px) + var(--pad));
-  }
 }
 
 /* ══ 14 · LA MONEDA BAJO `.sal`═════════════════════════════════════════════
@@ -1815,3 +1794,127 @@ body.sal-activa #root {
 .sal-saldo .sal-saldo-cta:disabled { opacity: 0.4; cursor: default; }
 .sal-saldo .sal-saldo-cta:disabled:hover { background: transparent; }
 .sal-saldo .sal-saldo-cta:disabled:active { transform: none; }
+
+/* ══ 18 · MES-PvP 7b · ARMAR MESA CON RITMO Y ENTRADA; LA SALA Y LA PARTIDA, ANCLADAS ══
+   Rector: AJILEI_MES-PvP_Sub7b_v1.0.md. Aditivo: nada de §1–§17 cambia.
+
+   ARMAR MESA EN DOS COLUMNAS (B). Cinco bloques desde la 7b: a la izquierda
+   jugadores, apuesta y «¿Cómo la llenamos?»; a la derecha las dos filas nuevas
+   (en el orden de V-A) encima de la zona, para que la mano que elige la entrada
+   acabe encima del botón, como en Retar. */
+@media (orientation: landscape) and (min-width: 900px) and (max-height: 830px) {
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(3) { grid-area: 1 / 2; }
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(4) { grid-area: 2 / 2; }
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(5) { grid-area: 3 / 1 / 5 / 2; align-self: start; }
+}
+
+/* ARMAR MESA EN UNA COLUMNA ANCHA (STOP-A, opción (a) de Victor). Desde 700 px
+   de ancho y fuera de la variante B, Entrada y Ritmo van LADO A LADO y las siete
+   apuestas en UNA fila: con las dos filas nuevas, en tableta y en escritorio
+   alto la columna ya no cabía (`tam.8`: 135 px en 1366×917). El cuerpo sigue
+   siendo flex —no una rejilla de dos columnas, que es la variante B y la frontera
+   de `tam.9`—, ahora en fila y con salto: cada bloque ocupa su línea entera
+   salvo Entrada y Ritmo, que la comparten. Las líneas se estiran como antes con
+   los márgenes automáticos de §16 y la zona queda al pie. Para que quepan las
+   siete apuestas y una Entrada de «250.000 HC» en media columna, los chips de
+   esta pantalla llevan aquí la mitad de relleno lateral; las apuestas crecen
+   hasta llenar la fila y nunca encogen: donde no quepan, saltan a dos. Con
+   la mitad de relleno, «50» no llegaba a 44 en 832×390 (`tam.10`): mínimo 44. La media query es la
+   lista «≥ 700 y no B», escrita a mano (la B es apaisado ≥ 900 y ≤ 830 de alto).
+   Retar (`.es-retar`) no entra. */
+@media (orientation: portrait) and (min-width: 700px),
+  (orientation: landscape) and (min-width: 700px) and (max-width: 899px),
+  (orientation: landscape) and (min-width: 900px) and (min-height: 831px) {
+  .sal.es-anclada .sal-cuerpo.es-armar {
+    flex-flow: row wrap;
+    align-content: stretch;
+    column-gap: calc(var(--u) * 4);
+  }
+  .sal.es-anclada .sal-cuerpo.es-armar > * { flex: 0 0 100%; min-width: 0; }
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(3),
+  .sal.es-anclada .sal-cuerpo.es-armar > :nth-child(4) { flex: 1 1 0; }
+  .sal.es-anclada .sal-cuerpo.es-armar .sal-chip { padding: 0 calc(var(--u) * 2); }
+  .sal.es-anclada .sal-cuerpo.es-armar .sal-chips.es-apuesta .sal-chip { flex: 1 0 auto; min-width: 44px; }
+}
+/* Y en el teléfono vertical más chato (440×763, el iPhone en Safari: 9 px de
+   filas bajo el botón) se quita el aire justo: el hueco entre filas baja de
+   2,5u a 2u. La banda empieza en 4:7, así que 360×640 (más alargado) no cambia. */
+@media (orientation: portrait) and (max-width: 699px) and (min-aspect-ratio: 4/7) {
+  .sal.es-anclada .sal-cuerpo.es-armar { row-gap: calc(var(--u) * 2); }
+}
+
+/* LA SALA DE ESPERA Y LA PARTIDA (arrancando, muerta), ANCLADAS. La columna de
+   §16 (flex, el cuerpo desplaza por dentro, la zona `sticky` al pie) con los
+   bloques centrados, como los centraba la rejilla de §12. En B siguen en UNA
+   columna de 110u: la rejilla de dos columnas de §16 es de las pantallas de
+   chips. Con esto el traje acostado (≤ 520) y el parche de la 1b dejaron de
+   aplicarles, y al final del tramo A se retiraron (§13). */
+.sal.es-anclada .sal-cuerpo:is(.sal-esp, .sal-partida) { align-items: center; }
+.sal.es-anclada .sal-cuerpo:is(.sal-esp, .sal-partida) > .sal-accion { align-self: stretch; }
+/* «Salir de la mesa» es lo último del pie y su zona de 44 (abajo) sobresale lo
+   que le falte al botón (`max(40px, 9u)`): MEDIDO en 360×640, 2 px que hacían
+   desplazar el cuerpo. El pie reserva justo eso debajo. */
+.sal.es-anclada .sal-cuerpo.sal-esp > .sal-accion {
+  padding-bottom: max(0px, calc(22px - max(20px, calc(var(--u) * 4.5))));
+}
+@media (orientation: landscape) and (min-width: 900px) and (max-height: 830px) {
+  .sal.es-anclada:is(.es-espera, .es-partida) { --col: min(100%, calc(var(--u) * 110)); }
+  .sal.es-anclada .sal-cuerpo:is(.sal-esp, .sal-partida) { display: flex; }
+}
+
+/* La zona de la sala en el apaisado bajo: «Salir de la mesa» a la izquierda del
+   CTA y no debajo, para que la mesa no quede tapada por un pie de tres pisos. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sal.es-anclada .sal-esp-accion {
+    grid-template-columns: auto min(calc(var(--u) * 64), 60%);
+    justify-content: center;
+    align-items: center;
+    column-gap: calc(var(--u) * 3);
+  }
+  .sal.es-anclada .sal-esp-accion > :is(.sal-cta, .sal-esp-espera) { grid-area: 1 / 2; }
+  .sal.es-anclada .sal-esp-accion > small { grid-area: 2 / 1 / 3 / 3; }
+  .sal.es-anclada .sal-esp-accion > .sal-esp-salir { grid-area: 1 / 1; margin-top: 0; }
+}
+
+/* La tarjeta de Salas de una mesa Llena: «Entrada 5.000 HC» en la línea 2, que
+   en ella va en UNA línea para que la tarjeta mida lo mismo que las demás (O1).
+   Si no cabe, `SalaOpciones` (`useEncajeLlena`) le baja la letra lo justo; el
+   «…» queda sólo de red. Las Corta no cambian. */
+.sal-mesa.es-llena .sal-mesa-l2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sal-mesa-entrada { color: var(--text-secondary); }
+
+/* La silla OCUPADA es un botón (abre el mini-perfil): sin el traje del botón. */
+button.sal-esp-silla {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button.sal-esp-silla:focus-visible { outline: none; }
+button.sal-esp-silla:focus-visible .sal-esp-av { outline: 2px solid var(--gold-brand-hi); outline-offset: 2px; }
+
+/* LA PASADA DE 44 (B.3), el camino Z de `tactilLobby.css` §3: la flecha y la
+   casa lo heredan de `.sal.es-anclada`; copiar, compartir, salir y los dos
+   botones del diálogo «Cancelar» llevan el suyo. Solo crece lo que falta
+   hasta 44; lo que se ve no se mueve. */
+.sal.es-anclada :is(.sal-copiar, .sal-esp-compartir, .sal-esp-salir, .sal-esp-dialogo .sal-secundario) {
+  position: relative;
+}
+.sal.es-anclada :is(.sal-copiar, .sal-esp-compartir, .sal-esp-salir, .sal-esp-dialogo .sal-secundario)::after {
+  content: "";
+  position: absolute;
+  inset: min(0px, calc(50% - 22px));
+}
+
+/* El mini-perfil PROPIO desde la sala: «Editar» apagado (al tocarlo, «Disponible
+   fuera de la mesa»). El mini-perfil es un portal sobre `body`; `sal-esp-activa`
+   la pone `SalaEspera` mientras está montada. Es el aspecto apagado de
+   `miniPerfil.css`, que no se toca: la mesa contra las IAS lo monta. */
+body.sal-esp-activa .mp-velo .mp-editar {
+  color: var(--text-muted);
+  border-color: rgba(var(--text-primary-rgb), 0.14);
+  cursor: default;
+}
+body.sal-esp-activa .mp-velo .mp-editar:hover { background: none; }

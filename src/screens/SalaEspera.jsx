@@ -4,12 +4,14 @@ import reversoUrl from '../assets/cards/reverso_carta.svg?no-inline'
 
 import BarraSuperior from '../components/BarraSuperior'
 import HojaConfiguracion from '../components/HojaConfiguracion'
+import MiniPerfil from '../components/MiniPerfil'
 import {
   IconoVolver, IconoCasa, IconoCopiar, IconoCheck, IconoGlobo, IconoCompartir,
 } from '../components/IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
 import { useSounds, precargarSonidos, SONIDOS_SALAS } from '../hooks/useSounds'
 import { useCronometroSala } from '../hooks/useCronometroSala'
+import { useDesborde } from '../hooks/useDesborde'
 import { montoTexto } from '../config/tapetes'
 import { claveDeError, esMesa } from '../lib/salasApi'
 import { marcar } from '../dev/medirArranque'
@@ -91,6 +93,9 @@ export default function SalaEspera({
   // píldora.
   billetera = null,
   salaInicial = null,
+  // MES-PvP 7b · la API de los rankings (`App`), la misma de Rankings y de la
+  // victoria: con ella la silla ocupada abre el mini-perfil.
+  apiRanking = null,
   onSalir,
   onLobby,
   onPartida,
@@ -116,12 +121,19 @@ export default function SalaEspera({
   const [consejo, setConsejo] = useState(0)
   const [consejoFuera, setConsejoFuera] = useState(false)
   const [barajando, setBarajando] = useState(false)
+  // MES-PvP 7b · el mini-perfil de la silla tocada: { username, inicial, propio } o null.
+  const [perfil, setPerfil] = useState(null)
 
   // ── Refs: lo que los efectos y los handlers leen sin provocar renders ─────
   const montado = useRef(true)
   const relojes = useRef({ toast: null, copia: null, llega: null })
   const previos = useRef(null)          // Set de jugadorId de la última lectura, o null
   const resolviendo = useRef(false)
+  const releerRef = useRef(null)        // 7b · la relectura de la sala, para «Jugador no encontrado»
+  // 7b · el cuerpo anclado: con la mesa pasando por debajo, la zona del pie lleva su fondo
+  // (`data-desborda`, como en la carcasa de chips).
+  const cuerpoRef = useRef(null)
+  useDesborde(cuerpoRef)
   const mesaRef = useRef(null)
   const ovaloRef = useRef(null)
   // Las funciones que cambian en cada render de `App` (los callbacks) y las que
@@ -163,9 +175,11 @@ export default function SalaEspera({
   const urgeReloj = urge(reloj.segundos, resumen.llena) && fin === null
 
   // ── Montaje: la jaula, la precarga, el desmontaje ─────────────────────────
+  // 7b · `sal-esp-activa`: el mini-perfil es un portal sobre `body`, y es la
+  // marca con la que `salas.css` apaga su «Editar» solo aquí.
   useEffect(() => {
-    document.body.classList.add('sal-activa')
-    return () => { document.body.classList.remove('sal-activa') }
+    document.body.classList.add('sal-activa', 'sal-esp-activa')
+    return () => { document.body.classList.remove('sal-activa', 'sal-esp-activa') }
   }, [])
 
   useEffect(() => {
@@ -236,8 +250,9 @@ export default function SalaEspera({
       })
     }
     releer()
+    releerRef.current = releer
     const baja = api.suscribirSala(salaId, releer)
-    return () => { vivo = false; baja() }
+    return () => { vivo = false; releerRef.current = null; baja() }
   }, [api, salaId, recibirAsientos])
 
   // ── El reloj a cero: resolver UNA vez ─────────────────────────────────────
@@ -500,7 +515,7 @@ export default function SalaEspera({
   }
 
   return (
-    <main className="sal">
+    <main className="sal es-anclada es-espera">
       <div className="sal-fondo" aria-hidden="true" />
 
       <BarraSuperior
@@ -509,7 +524,9 @@ export default function SalaEspera({
         estadoSaldo={billetera?.estado}
         recordado={billetera?.recordado ?? null}
         cobrando={billetera?.pendiente === true}
-        onPerfil={cuenta?.abrirPerfil ?? (() => avisar('lob.toast.pronto'))}
+        // 7b · el avatar de la barra apagado dentro de la sala: el Perfil saca de
+        // ella con el reloj corriendo (como la tienda, INV-76). El ⚙ sigue.
+        onPerfil={() => avisar('tie.cfg.fuera')}
         onAjustes={() => setHojaAbierta(true)}
         ajustesRef={ajustesRef}
         ajustesExpandido={hojaAbierta}
@@ -532,9 +549,20 @@ export default function SalaEspera({
           </h1>
           <span className="sal-esp-sub" data-accion="sub">{subtitulo}</span>
         </div>
+        {/* MES-PvP 7b · la casa sube a la cabecera, como en la carcasa anclada
+            (IOS-1 1e): el pie es del bloque de acción. */}
+        <button
+          type="button"
+          className="sal-casa"
+          data-accion="casa"
+          aria-label={t('sal.casa.aria')}
+          onClick={casa}
+        >
+          <IconoCasa />
+        </button>
       </div>
 
-      <div className={clasesCuerpo} data-accion="espera-cuerpo">
+      <div ref={cuerpoRef} className={clasesCuerpo} data-accion="espera-cuerpo">
 
         {/* ── El código (privada) o el rótulo (abierta): la misma caja, O1 ── */}
         <section className={`sal-esp-codigo${abierta ? ' is-abierta' : ''}`} data-accion="codigo-caja">
@@ -619,8 +647,8 @@ export default function SalaEspera({
               s.esTu ? 'is-tu' : '',
               llegadas.has(s.asiento) ? 'is-llega' : '',
             ].filter(Boolean).join(' ')
-            return (
-              <div key={s.asiento} className={clases} style={style} data-accion="silla" data-asiento={s.asiento}>
+            const dentro = (
+              <>
                 <div className="sal-esp-av">
                   {s.vacia ? null : <span className="sal-esp-ini" aria-hidden="true">{s.inicial}</span>}
                 </div>
@@ -628,7 +656,25 @@ export default function SalaEspera({
                 <div className="sal-esp-tag">
                   {rotuloSilla(s) ? t(rotuloSilla(s)) : ' '}
                 </div>
-              </div>
+              </>
+            )
+            // MES-PvP 7b · la silla OCUPADA es un botón que abre el mini-perfil
+            // (B.2); la vacía no, y en un final tampoco: la mesa manda.
+            if (s.vacia || !s.username || !apiRanking || fin !== null) {
+              return <div key={s.asiento} className={clases} style={style} data-accion="silla" data-asiento={s.asiento}>{dentro}</div>
+            }
+            return (
+              <button
+                key={s.asiento}
+                type="button"
+                className={clases}
+                style={style}
+                data-accion="silla"
+                data-asiento={s.asiento}
+                onClick={() => setPerfil({ username: s.username, inicial: s.inicial, propio: s.esTu })}
+              >
+                {dentro}
+              </button>
             )
           })}
         </section>
@@ -639,25 +685,27 @@ export default function SalaEspera({
         </p>
 
         {/* ── La acción, siempre en la misma caja ──────────────────────────── */}
+        {/* MES-PvP 7b · la zona anclada al pie (IOS-1 1e): el CTA o la caja
+            punteada, su nota y «Salir de la mesa» debajo. */}
         <section className="sal-accion sal-esp-accion" data-accion="accion">
           {accion}
-        </section>
 
-        {/* ── Ajustes (lámina v1.6) · «Salir de la mesa» ───────────────────
-            FUERA del nodo que la acción repinta y justo debajo, como sella la
-            lámina. Hace exactamente lo que la flecha «Volver»: el anfitrión
-            confirma, el invitado sale. En los tres finales el CSS lo apaga con
-            `visibility` y le conserva la caja: el CTA del final ya es la salida
-            y la columna no debe moverse al terminar la mesa (O1). */}
-        <button
-          type="button"
-          className="sal-esp-salir"
-          data-accion="salir"
-          disabled={ocupado}
-          onClick={salir}
-        >
-          {t('sal.espera.salir')}
-        </button>
+          {/* ── Ajustes (lámina v1.6) · «Salir de la mesa» ─────────────────
+              Justo debajo de la acción, como sella la lámina. Hace exactamente
+              lo que la flecha «Volver»: el anfitrión confirma, el invitado
+              sale. En los tres finales el CSS lo apaga con `visibility` y le
+              conserva la caja: el CTA del final ya es la salida y la columna no
+              debe moverse al terminar la mesa (O1). */}
+          <button
+            type="button"
+            className="sal-esp-salir"
+            data-accion="salir"
+            disabled={ocupado}
+            onClick={salir}
+          >
+            {t('sal.espera.salir')}
+          </button>
+        </section>
 
         {/* ── La confirmación del anfitrión ────────────────────────────────── */}
         <div className={`sal-esp-velo${confirmando ? ' is-on' : ''}`} onClick={() => setConfirmando(false)} aria-hidden="true" />
@@ -682,16 +730,6 @@ export default function SalaEspera({
         </div>
       </div>
 
-      <button
-        type="button"
-        className="sal-casa"
-        data-accion="casa"
-        aria-label={t('sal.casa.aria')}
-        onClick={casa}
-      >
-        <IconoCasa />
-      </button>
-
       <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
         {toast !== null ? t(toast.clave, toast.vars) : ' '}
       </div>
@@ -709,6 +747,24 @@ export default function SalaEspera({
         ajustesRef={ajustesRef}
         cuenta={cuenta && { ...cuenta, tapetesApagados: true }}
       />
+      {/* MES-PvP 7b · el mini-perfil de la silla, por portal (como en
+          Rankings). El propio lleva «Editar» apagado: editar saca de la sala con
+          el reloj corriendo, como la tienda (INV-76). Al tocarlo se cierra y
+          dice «Disponible fuera de la mesa» (el toast de la sala queda debajo
+          del velo del mini-perfil). Con un final, la mesa manda: se cierra. */}
+      {perfil && fin === null && apiRanking && (
+        <MiniPerfil
+          key={perfil.username}
+          api={apiRanking}
+          username={perfil.username}
+          inicial={perfil.inicial}
+          propio={perfil.propio}
+          correo={perfil.propio ? (cuenta?.correo ?? '') : ''}
+          onCerrar={() => setPerfil(null)}
+          onNoHay={() => { setPerfil(null); avisar('rnk.perfil.nohay'); releerRef.current?.() }}
+          onEditar={perfil.propio ? () => { setPerfil(null); avisar('tie.cfg.fuera') } : undefined}
+        />
+      )}
     </main>
   )
 }

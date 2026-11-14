@@ -1,6 +1,9 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../styles/salas.css'
 import '../styles/pvp.css'
+
+import BarraSuperior from '../components/BarraSuperior'
+import HojaConfiguracion from '../components/HojaConfiguracion'
 
 import { useIdioma } from '../hooks/useIdioma'
 import { useMesaPvP } from '../hooks/useMesaPvP'
@@ -51,18 +54,53 @@ function MarcaPrimerCuadro() {
 // ── La pausa de anuncio: la forma de la lámina L-M 3 (`AnuncioPvP.jsx`) ─────
 
 // Las pantallas en el traje de las salas: arrancar, salir con la mesa viva y la mesa muerta.
-function Traje({ sala, t, children }) {
+//
+// MES-PvP 7b (E) · anclado como la sala de espera (IOS-1 1e): la barra arriba, con la píldora
+// a la vista —«Tu pila volvió a tu saldo» se tiene que poder ver— y el CTA al pie. Con la mesa
+// muerta (`libre`) el avatar y el ⚙ son los de siempre; arrancando, el asiento está vivo y el
+// reloj corre, así que el avatar no saca de aquí y la hoja lleva «Tapetes» apagada (INV-76),
+// con el mismo aviso: «Disponible fuera de la mesa».
+function Traje({ sala, t, cuenta = null, billetera = null, libre = false, children }) {
+  const [hojaAbierta, setHojaAbierta] = useState(false)
+  const ajustesRef = useRef(null)
+  const [toast, setToast] = useState(null)
+  const relojToast = useRef(null)
   useEffect(() => {
     document.body.classList.add('sal-activa')
-    return () => { document.body.classList.remove('sal-activa') }
+    return () => { document.body.classList.remove('sal-activa'); clearTimeout(relojToast.current) }
+  }, [])
+  const avisar = useCallback((clave) => {
+    setToast(clave)
+    clearTimeout(relojToast.current)
+    relojToast.current = setTimeout(() => setToast(null), 2600)
   }, [])
   return (
-    <main className="sal">
+    <main className="sal es-anclada es-partida">
       <div className="sal-fondo" aria-hidden="true" />
+      <BarraSuperior
+        usuario={cuenta?.username ?? ''}
+        saldo={billetera?.saldo ?? null}
+        estadoSaldo={billetera?.estado}
+        recordado={billetera?.recordado ?? null}
+        cobrando={billetera?.pendiente === true}
+        onPerfil={libre && cuenta?.abrirPerfil ? cuenta.abrirPerfil : () => avisar('tie.cfg.fuera')}
+        onAjustes={() => setHojaAbierta(true)}
+        ajustesRef={ajustesRef}
+        ajustesExpandido={hojaAbierta}
+      />
       <div className="sal-cab">
         <h1>{sala ? t('sal.espera.titulo', { n: sala.jugadores, hc: montoTexto(sala.apuesta) }) : ' '}</h1>
       </div>
       {children}
+      <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
+        {toast !== null ? t(toast) : ' '}
+      </div>
+      <HojaConfiguracion
+        abierta={hojaAbierta}
+        onCerrar={() => setHojaAbierta(false)}
+        ajustesRef={ajustesRef}
+        cuenta={cuenta && (libre ? cuenta : { ...cuenta, tapetesApagados: true })}
+      />
     </main>
   )
 }
@@ -150,15 +188,19 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
   // 5a · sin mesa todavía (quien vuelve por `mi_sala`, sin las sillas de la sala): el traje,
   // sin texto, hasta la primera vista. Quien llega de la sala ya tiene la mesa provisional.
   if (escena === 'arrancando' || !game) {
-    return <Traje sala={sala} t={t}><Aviso t={t} pvp="arrancando" /></Traje>
+    return <Traje sala={sala} t={t} cuenta={cuenta} billetera={billetera}><Aviso t={t} pvp="arrancando" /></Traje>
   }
   if (escena === 'muerta') {
-    return <Traje sala={sala} t={t}><Aviso texto={t('pvp.muerta')} onLobby={onLobby} t={t} pvp="muerta" /></Traje>
+    return (
+      <Traje sala={sala} t={t} cuenta={cuenta} billetera={billetera} libre>
+        <Aviso texto={t('pvp.muerta')} onLobby={onLobby} t={t} pvp="muerta" />
+      </Traje>
+    )
   }
 
   // sorteo · mesa · anuncio · final: la misma mesa, montada una sola vez.
   return (
-    <Suspense fallback={<Traje sala={sala} t={t}><Aviso t={t} pvp="arrancando" /></Traje>}>
+    <Suspense fallback={<Traje sala={sala} t={t} cuenta={cuenta} billetera={billetera}><Aviso t={t} pvp="arrancando" /></Traje>}>
       <GameTable
         stake={game.unit}
         numPlayers={game.numPlayers}
@@ -222,9 +264,9 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, tape
   }, [imitada])
 
   if (conMando) {
-    if (!imitada) return <Traje sala={null} t={t}><Aviso t={t} pvp="arrancando" /></Traje>
+    if (!imitada) return <Traje sala={null} t={t} cuenta={cuenta} billetera={billetera}><Aviso t={t} pvp="arrancando" /></Traje>
     return <MesaViva sala={imitada.sala} partida={imitada} cuenta={cuenta} billetera={billetera} tapetes={tapetes} onLobby={onLobby} />
   }
-  if (!sala) return <Traje sala={null} t={t}><Aviso onLobby={onLobby} t={t} pvp="arrancando" /></Traje>
+  if (!sala) return <Traje sala={null} t={t} cuenta={cuenta} billetera={billetera} libre><Aviso onLobby={onLobby} t={t} pvp="arrancando" /></Traje>
   return <MesaViva sala={sala} partida={null} cuenta={cuenta} billetera={billetera} tapetes={tapetes} onLobby={onLobby} />
 }

@@ -10,7 +10,10 @@ import {
   ALCANCE_NUEVOS,
   APUESTAS_PVP,
   BONO_BIENVENIDA,
+  ENTRADA_POR_DEFECTO,
+  ENTRADAS_PVP,
   JUGADORES_PVP,
+  RITMOS_PVP,
   saldoMinimo,
 } from '../config/salas'
 import { MEMORIA_PVP } from '../config/salaRecordada'
@@ -105,7 +108,17 @@ export default function ArmarMesa({
     () => (configInicial ? normalizarConfig(configInicial, juicio) : MEMORIA_PVP.leer(juicio))
   )
   const config = normalizarConfig(configCruda, juicio)
-  const { jugadores, apuesta, tipo } = config
+  const { jugadores, apuesta, tipo, ritmo } = config
+
+  // ── MES-PvP 7b · La entrada: Corta cada vez (Reglas §7, no se recuerda) ──
+  // La Llena se apaga si el saldo no llega a 50× la apuesta elegida; si estaba
+  // elegida y la apuesta cambia a una que no la alcanza, vuelve a Corta (en
+  // `elegir`, para que no reaparezca sola al bajar). La lectura de abajo cubre
+  // además el saldo que baja con la pantalla abierta.
+  const [entradaCruda, setEntrada] = useState(
+    () => (Object.hasOwn(ENTRADAS_PVP, configInicial?.entrada ?? '') ? configInicial.entrada : ENTRADA_POR_DEFECTO)
+  )
+  const entrada = alcanza(apuesta, juicio, entradaCruda) ? entradaCruda : ENTRADA_POR_DEFECTO
 
   // ECO-1b · filas crudas; el orden se calcula al pintar (ver `SalaOpciones`).
   const [filas, setFilas] = useState([])
@@ -115,7 +128,7 @@ export default function ArmarMesa({
   // billetera se relee, y si la cifra nueva ya no alcanza esa mesa la guarda de
   // saldo la cae al defecto: la nota tiene que seguir hablando de la mesa que
   // el servidor rechazó, no de la que quedó marcada después.
-  const [apuestaIntentada, setApuestaIntentada] = useState(null)
+  const [intento, setIntento] = useState(null)   // { apuesta, entrada } del último rechazo
   const [ocupado, setOcupado] = useState(false)
 
   // ── Qué mesas abiertas hay ───────────────────────────────────────────────
@@ -139,13 +152,14 @@ export default function ArmarMesa({
 
   const elegir = (cambio) => {
     setConfig((previa) => ({ ...previa, ...cambio }))
+    if (cambio.apuesta !== undefined && !alcanza(cambio.apuesta, juicio, entradaCruda)) setEntrada(ENTRADA_POR_DEFECTO)
     // Cambiar de opción borra el error anterior: seguía hablando de una mesa que
     // ya no es la que está sobre la mesa.
     setError(null)
   }
 
   // ── Lo que las tres decisiones significan ────────────────────────────────
-  const existeMisma = buscarCombinacion(mesas, jugadores, apuesta)
+  const existeMisma = buscarCombinacion(mesas, jugadores, apuesta, entrada)
   const esUnirme = tipo === 'abierta' && existeMisma !== null
   const avisoNuevos = fueraDelAlcanceDeNuevos(apuesta, BONO_BIENVENIDA)
 
@@ -164,7 +178,7 @@ export default function ArmarMesa({
   // decir dos veces lo mismo en dos tonos distintos.
   const recuerdo = tipo === 'privada'
     ? existeMisma
-    : (existeMisma ? null : otraMesaAlAlcance(mesas, juicio, jugadores, apuesta))
+    : (existeMisma ? null : otraMesaAlAlcance(mesas, juicio, jugadores, apuesta, entrada))
 
   const rotuloCta = tipo === 'privada'
     ? 'sal.armar.cta.privada'
@@ -174,7 +188,7 @@ export default function ArmarMesa({
     setOcupado(true)
     const respuesta = esUnirme
       ? await api.unirseSala({ salaId: existeMisma.id })
-      : await api.crearSala(tipo, jugadores, apuesta)
+      : await api.crearSala(tipo, jugadores, apuesta, ritmo, entrada)
     setOcupado(false)
 
     if (!respuesta.error) {
@@ -186,7 +200,7 @@ export default function ArmarMesa({
     }
 
     setError(respuesta.error)
-    setApuestaIntentada(apuesta)
+    setIntento({ apuesta, entrada })
 
     // ECO-1b · el servidor sabe un saldo más bajo que el que enseñamos: se
     // vuelve a leer la billetera y la píldora y los chips se ponen al día.
@@ -217,8 +231,11 @@ export default function ArmarMesa({
   // la lámina.
   let notaCta = null
   if (error === 'saldo_insuficiente') {
-    const rechazada = apuestaIntentada ?? apuesta
-    notaCta = t('sal.armar.nota.5x', { min: montoTexto(saldoMinimo(rechazada)), hc: montoTexto(rechazada) })
+    const rechazada = intento ?? { apuesta, entrada }
+    notaCta = t('sal.armar.nota.5x', {
+      min: montoTexto(saldoMinimo(rechazada.apuesta, rechazada.entrada)),
+      hc: montoTexto(rechazada.apuesta),
+    })
   } else if (error) {
     notaCta = t(claveDeError(error))
   } else if (esUnirme) {
@@ -228,6 +245,40 @@ export default function ArmarMesa({
       x: existeMisma.sentados,
     })
   }
+
+  // ── MES-PvP 7b · Las dos filas nuevas ──────────────────────────────────
+  // Ritmo: lo elige quien ARMA. Con «Unirme» la mesa ya tiene el suyo y no se
+  // anuncia (P-2): la fila se ve apagada y sin ningún chip marcado.
+  const filaRitmo = (
+    <FilaChips
+      titulo={t('sal.armar.ritmo')}
+      accion="ritmo"
+      claseChips="es-ritmo"
+      opciones={RITMOS_PVP.map((r) => ({ id: r, etiqueta: t(`sal.armar.ritmo.${r}`) }))}
+      valor={esUnirme ? null : ritmo}
+      deshabilitada={esUnirme}
+      onChange={(r) => elegir({ ritmo: r })}
+    />
+  )
+  // Entrada: es identidad de la mesa pública, así que con «Unirme» sigue viva
+  // (cambiarla busca otra mesa). Los chips se apagan por el saldo (O1). Dicen
+  // SOLO el monto, que cambia con la apuesta («1.500 HC» · «5.000 HC»): Corta y
+  // Llena son vocabulario del código y de los documentos, no de la pantalla
+  // (Victor, STOP-L de la 7b).
+  const filaEntrada = (
+    <FilaChips
+      titulo={t('sal.armar.entrada')}
+      accion="entrada"
+      claseChips="es-entrada"
+      opciones={Object.keys(ENTRADAS_PVP).map((e) => ({
+        id: e,
+        etiqueta: t('sal.armar.entrada.monto', { hc: montoTexto(saldoMinimo(apuesta, e)) }),
+        disabled: !alcanza(apuesta, juicio, e),
+      }))}
+      valor={entrada}
+      onChange={(e) => { setEntrada(e); setError(null) }}
+    />
+  )
 
   return (
     <PantallaChips
@@ -279,6 +330,7 @@ export default function ArmarMesa({
       <FilaChips
         titulo={t('sal.armar.apuesta')}
         accion="apuesta"
+        claseChips="es-apuesta"
         opciones={APUESTAS_PVP.map((hc) => ({
           id: hc,
           etiqueta: montoTexto(hc),
@@ -303,6 +355,10 @@ export default function ArmarMesa({
             })
           : null}
       />
+
+      {/* ── MES-PvP 7b · Entrada y después Ritmo (V-A, STOP-L) ────────────── */}
+      {filaEntrada}
+      {filaRitmo}
 
       {/* ── ¿Cómo la llenamos? ───────────────────────────────────────────── */}
       <section className="sal-bloque">

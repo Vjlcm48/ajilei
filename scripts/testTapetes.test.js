@@ -374,7 +374,9 @@ describe('10. MES-PvP 7a · INV-76 · la fila «Tapetes» del ⚙ dentro de la s
     expect(filaTapetes(null)).toEqual({ apagada: false, aviso: 'lob.toast.pronto' })
   })
 
-  it('solo la sala de espera la apaga: ninguna otra pantalla pasa `tapetesApagados`', () => {
+  // MES-PvP 7b · y la partida PvP mientras arranca o sale (`PartidaPvP`, su `Traje` con la
+  // barra): el asiento está vivo igual que en la sala. En la muerta (`libre`) vuelve a abrir.
+  it('solo la sala de espera y la partida PvP la apagan: ninguna otra pantalla pasa `tapetesApagados`', () => {
     const raiz = join(RAIZ, 'src')
     const quien = []
     const recorre = (dir) => {
@@ -385,6 +387,6 @@ describe('10. MES-PvP 7a · INV-76 · la fila «Tapetes» del ⚙ dentro de la s
       }
     }
     recorre(raiz)
-    expect(quien).toEqual(['SalaEspera.jsx'])
+    expect(quien.sort()).toEqual(['PartidaPvP.jsx', 'SalaEspera.jsx'])
   })
 })

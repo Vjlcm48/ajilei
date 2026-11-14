@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import '../styles/salas.css'
 
-import BarraSuperior from '../components/BarraSuperior'
-import HojaConfiguracion from '../components/HojaConfiguracion'
-import CajaAccion from '../components/CajaAccion'
+import PantallaChips from '../components/PantallaChips'
 import { cajaDeAccion } from '../components/zonaAccionCore'
-import { useDesborde } from '../hooks/useDesborde'
-import { IconoVolver, IconoCasa } from '../components/IconosSalas'
 import { useIdioma } from '../hooks/useIdioma'
 import { montoTexto } from '../config/tapetes'
-import { normalizarCodigo } from '../config/salas'
+import { normalizarCodigo, saldoMinimo } from '../config/salas'
 import { saldoParaJuzgar } from '../hooks/billeteraCore'
 import { claveDeError } from '../lib/salasApi'
 import {
@@ -47,6 +43,13 @@ import {
 // resolvió Victor a favor de la ficha el 7-sep-2026 — `salas_abiertas()` ya
 // devuelve `expira_en` y `useReloj` ya sabe restar, así que lo que le falta a
 // B2 es el latido, no el dato.
+//
+// ── MES-PvP 7b · LA CARCASA COMÚN ───────────────────────────────────────────
+// Rector: AJILEI_MES-PvP_Sub7b_v1.0.md §3 A6 (Fase 0, bloque C). La barra, la
+// cabecera, la zona anclada, el toast y la hoja del ⚙ los pone `PantallaChips`;
+// esta pantalla deja de repetirlos a mano. La flecha y la casa van las dos al
+// lobby; el botón dorado conserva su `data-accion="armar"`; el toast de la
+// pantalla es el de la carcasa, por `avisoRef`. Δ 0 px en los `opciones-*`.
 
 export default function SalaOpciones({
   api,
@@ -63,9 +66,6 @@ export default function SalaOpciones({
   onLobby,
 }) {
   const { t } = useIdioma()
-  // CFG-1 1a · el ⚙ abre la hoja de configuración (antes, «Pronto»).
-  const [hojaAbierta, setHojaAbierta] = useState(false)
-  const ajustesRef = useRef(null)
   // ECO-1b · `saldo` es lo que se pinta (o `null` mientras no se sabe);
   // `juicio` es contra qué se atenúan las mesas: sin cifra, contra nada
   // (`SIN_JUICIO`), y decide el servidor.
@@ -84,33 +84,17 @@ export default function SalaOpciones({
   const [filas, setFilas] = useState([])
   const mesas = ordenarMesas(filas, juicio)
   const [ocupado, setOcupado] = useState(false)
-  const [toast, setToast] = useState(null)
 
   const campoRef = useRef(null)
-  // GT-HIG · TODO reloj lleva handle y se cancela. Ninguno nuevo se suma suelto
-  // al censo de nueve `setTimeout` de FRZ-1 §1.3.
-  const relojToast = useRef(null)
+  const listaRef = useRef(null)
+  useEncajeLlena(listaRef)
 
-  // ── La jaula de 1126px, exceptuada con alcance ────────────────────────────
-  // Molde de `Lobby.jsx` y `Portada.jsx`: la clase vive en el <body> mientras la
-  // pantalla vive, y `salas.css` declara la excepción con especificidad en vez
-  // de con `!important`.
-  useEffect(() => {
-    document.body.classList.add('sal-activa')
-    return () => { document.body.classList.remove('sal-activa') }
-  }, [])
-
-  useEffect(() => () => clearTimeout(relojToast.current), [])
-
-  // El toast guarda una CLAVE DE TEXTO, no un código de error: por él pasan las
-  // dos cosas —el fallo de unirse por tarjeta y el «Pronto» de los tres
-  // controles de la barra— y hacerle distinguir cuál es cuál al pintar sería
-  // reintroducir en la vista una decisión que `claveDeError` ya tomó.
-  const avisar = useCallback((claveTexto) => {
-    setToast(claveTexto)
-    clearTimeout(relojToast.current)
-    relojToast.current = setTimeout(() => setToast(null), 2600)
-  }, [])
+  // El toast es el de la carcasa (un aviso, un reloj) y guarda una CLAVE DE
+  // TEXTO, no un código de error: el fallo de unirse por tarjeta llega ya
+  // traducido por `claveDeError`. La clase `sal-activa` del <body> también la
+  // pone la carcasa.
+  const avisoRef = useRef(null)
+  const avisar = (claveTexto) => avisoRef.current?.avisar(claveTexto)
 
   // ── El listado ────────────────────────────────────────────────────────────
   // Una lectura al montar, y al volver a la pantalla es otra vez montar. SIN
@@ -235,195 +219,170 @@ export default function SalaOpciones({
     onEntrarSala?.(data)
   }
 
-  // IOS-1 1e · la zona anclada, igual que en `PantallaChips` (esta pantalla
-  // repite su marcado a mano): el cuerpo desplaza por dentro si no cabe, el
-  // botón queda al pie con su nota ENCIMA, la casa sube a la cabecera y el aviso
-  // flotante vive en la zona, apoyado encima de ella.
-  const cuerpoRef = useRef(null)
-  useDesborde(cuerpoRef)
-
   return (
-    <main className="sal es-anclada">
-      <div className="sal-fondo" aria-hidden="true" />
-
-      <BarraSuperior
-        usuario={cuenta?.username ?? ''}
-        saldo={saldo}
-        estadoSaldo={billetera?.estado}
-        recordado={billetera?.recordado ?? null}
-        cobrando={billetera?.pendiente === true}
-        onPerfil={cuenta?.abrirPerfil ?? (() => avisar('lob.toast.pronto'))}
-        onAjustes={() => setHojaAbierta(true)}
-        ajustesRef={ajustesRef}
-        ajustesExpandido={hojaAbierta}
-      />
-
-      <div className="sal-cab">
-        {/* La flecha vuelve al lobby, que es de donde se llega. En esta pantalla
-            coincide con la casa —las dos van al mismo sitio— y aun así están las
-            dos, porque la lámina las selló y porque en `ArmarMesa` dejan de
-            coincidir: allí la flecha deshace un paso y la casa salta al lobby. */}
-        <button
-          type="button"
-          className="sal-volver"
-          data-accion="volver"
-          aria-label={t('sal.volver.aria')}
-          onClick={() => onLobby?.()}
-        >
-          <IconoVolver />
-        </button>
-        <h1>{t('sal.opciones.titulo')}</h1>
-        <button
-          type="button"
-          className="sal-casa"
-          data-accion="casa"
-          aria-label={t('sal.casa.aria')}
-          onClick={() => onLobby?.()}
-        >
-          <IconoCasa />
-        </button>
-      </div>
-
-      <div ref={cuerpoRef} className="sal-cuerpo">
-
-        {/* ── Bloque 1 · ¿Te invitaron? ──────────────────────────────────── */}
-        <section className="sal-bloque">
-          <h2>{t('sal.opciones.codigo.titulo')}</h2>
-          <div className="sal-codigo">
-            <label className="sal-campo">
-              <span className="sal-pre" aria-hidden="true">AJ-</span>
-              <input
-                ref={campoRef}
-                value={cuerpo}
-                onChange={alTeclear}
-                onKeyDown={(e) => { if (e.key === 'Enter' && codigoListo(cuerpo)) entrar(cuerpo) }}
-                maxLength={LARGO_CODIGO}
-                autoComplete="off"
-                autoCapitalize="characters"
-                spellCheck="false"
-                placeholder="____"
-                data-accion="codigo"
-                aria-label={t('sal.opciones.codigo.aria')}
-                aria-invalid={errorCodigo ? 'true' : undefined}
-              />
-            </label>
-            <button
-              type="button"
-              className="sal-entrar"
-              data-accion="entrar"
-              disabled={!codigoListo(cuerpo) || ocupado}
-              onClick={() => entrar(cuerpo)}
-            >
-              {t('sal.opciones.codigo.entrar')}
-            </button>
-          </div>
-          {/* O1 · la caja del aviso está SIEMPRE, ocupando su alto; lo que
-              cambia es su visibilidad. Sin esto, equivocarse de código empujaría
-              el listado hacia abajo en el momento exacto en que el jugador mira
-              el campo. `role="alert"` lo anuncia sin que haya que mover el foco
-              a un párrafo. */}
-          <p className={`sal-aviso-error${errorCodigo ? ' is-on' : ''}`} role="alert">
-            {errorCodigo ? t(claveDeError(errorCodigo)) : ' '}
-          </p>
-        </section>
-
-        {/* ── Bloque 2 · Mesas formándose ahora ──────────────────────────── */}
-        <section className="sal-bloque">
-          <h2>{t('sal.opciones.mesas.titulo')}</h2>
-          {/* `es-vacia` no es cosmetica: hace que la caja punteada ocupe la
-              ventanilla entera en vez de encogerse a su texto, y con ella que la
-              pantalla mida lo mismo haya mesas o no. El porque esta en la hoja. */}
-          <div className={`sal-lista${mesas.length === 0 ? ' es-vacia' : ''}`} data-accion="lista">
-            {mesas.length === 0 ? (
-              <div className="sal-vacio">
-                {t('sal.opciones.mesas.vacio')}
-                <small>{t('sal.opciones.mesas.vacio.sub')}</small>
-              </div>
-            ) : (
-              mesas.map((mesa) => {
-                const aMiAlcance = alcanza(mesa.apuesta, juicio)
-                return (
-                  <div
-                    key={mesa.id}
-                    className={`sal-mesa${aMiAlcance ? '' : ' is-fuera'}`}
-                    data-accion="mesa"
-                  >
-                    {/* Las sillas dicen de un vistazo lo que el `x/N` dice con
-                        cifras. `aria-hidden` porque son redundantes para quien
-                        escucha: la línea 2 ya lo lee en palabras. */}
-                    <div className="sal-sillas" aria-hidden="true">
-                      {Array.from({ length: mesa.jugadores }, (_, i) => (
-                        <span key={i} className={`sal-silla${i < mesa.sentados ? ' is-ocupada' : ''}`} />
-                      ))}
-                    </div>
-                    <div className="sal-mesa-info">
-                      <div className="sal-mesa-l1">
-                        {t('sal.opciones.mesa.de', { n: mesa.jugadores })}
-                        {' · '}
-                        <b>{t('sal.opciones.mesa.apuesta', { hc: montoTexto(mesa.apuesta) })}</b>
-                      </div>
-                      {/* Fuera de alcance, la línea 2 dice lo que falta EN VEZ
-                          del recuento. Decisión de Victor (7-sep-2026) sobre la
-                          contradicción lámina/ficha: manda la lámina, y el botón
-                          se queda apagado en su sitio para que la tarjeta siga
-                          midiendo lo mismo que las demás. */}
-                      <div className="sal-mesa-l2">
-                        {aMiAlcance
-                          ? t('sal.opciones.mesa.estado', { x: mesa.sentados, n: mesa.jugadores })
-                          : t('sal.opciones.mesa.faltan', { hc: montoTexto(faltanPara(mesa.apuesta, juicio)) })}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="sal-unir"
-                      data-accion="unirme"
-                      disabled={!aMiAlcance || ocupado}
-                      onClick={() => unirmeA(mesa)}
-                    >
-                      {t('sal.opciones.mesa.unirme')}
-                    </button>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </section>
-
-        {/* ── Bloque 3 · Armar una mesa ──────────────────────────────────── */}
-        {/* SIEMPRE vivo (§3.4): no depende del saldo ni del listado. Quien no
-            alcanza ninguna apuesta se encontrará los chips apagados en la
-            pantalla siguiente, que es donde ese hecho se explica con cifras. */}
-        <section className="sal-bloque sal-accion">
-          <CajaAccion caja={cajaDeAccion({ aviso: t('sal.opciones.armar.nota') })} />
+    <PantallaChips
+      titulo={t('sal.opciones.titulo')}
+      cuenta={cuenta}
+      saldo={saldo}
+      estadoSaldo={billetera?.estado}
+      recordado={billetera?.recordado ?? null}
+      cobrando={billetera?.pendiente === true}
+      // La flecha vuelve al lobby, que es de donde se llega: aquí coincide con
+      // la casa y aun así están las dos (la lámina de SAL1 las selló).
+      onVolver={onLobby}
+      onLobby={onLobby}
+      avisoRef={avisoRef}
+      // ── Bloque 3 · Armar una mesa ── SIEMPRE vivo (§3.4): no depende del
+      // saldo ni del listado. Quien no alcanza ninguna apuesta se encontrará los
+      // chips apagados en la pantalla siguiente, donde eso se explica con cifras.
+      cta={{
+        clase: 'es-opciones',
+        accion: 'armar',
+        caja: cajaDeAccion({ aviso: t('sal.opciones.armar.nota') }),
+        etiqueta: t('sal.opciones.armar'),
+        onClick: () => onArmarMesa?.(),
+      }}
+    >
+      {/* ── Bloque 1 · ¿Te invitaron? ──────────────────────────────────── */}
+      <section className="sal-bloque">
+        <h2>{t('sal.opciones.codigo.titulo')}</h2>
+        <div className="sal-codigo">
+          <label className="sal-campo">
+            <span className="sal-pre" aria-hidden="true">AJ-</span>
+            <input
+              ref={campoRef}
+              value={cuerpo}
+              onChange={alTeclear}
+              onKeyDown={(e) => { if (e.key === 'Enter' && codigoListo(cuerpo)) entrar(cuerpo) }}
+              maxLength={LARGO_CODIGO}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck="false"
+              placeholder="____"
+              data-accion="codigo"
+              aria-label={t('sal.opciones.codigo.aria')}
+              aria-invalid={errorCodigo ? 'true' : undefined}
+            />
+          </label>
           <button
             type="button"
-            className="sal-cta es-opciones"
-            data-accion="armar"
-            onClick={() => onArmarMesa?.()}
+            className="sal-entrar"
+            data-accion="entrar"
+            disabled={!codigoListo(cuerpo) || ocupado}
+            onClick={() => entrar(cuerpo)}
           >
-            {t('sal.opciones.armar')}
+            {t('sal.opciones.codigo.entrar')}
           </button>
-          {/* El toast recoge lo que no cabe bajo el campo de código: el error de
-              unirse por tarjeta y los tres controles de la barra, que todavía no
-              llevan a ninguna parte. `role="status"` lo anuncia sin robar el
-              foco. La caja se reserva siempre y sólo se apaga con `visibility`
-              (O1). IOS-1 1e · vive en la zona y sale apoyado encima de ella. */}
-          <div className={`sal-toast${toast !== null ? ' is-on' : ''}`} role="status" aria-live="polite">
-            {toast !== null ? t(toast) : ' '}
-          </div>
-        </section>
+        </div>
+        {/* O1 · la caja del aviso está SIEMPRE, ocupando su alto; lo que
+            cambia es su visibilidad. Sin esto, equivocarse de código empujaría
+            el listado hacia abajo en el momento exacto en que el jugador mira
+            el campo. `role="alert"` lo anuncia sin que haya que mover el foco
+            a un párrafo. */}
+        <p className={`sal-aviso-error${errorCodigo ? ' is-on' : ''}`} role="alert">
+          {errorCodigo ? t(claveDeError(errorCodigo)) : ' '}
+        </p>
+      </section>
 
-      </div>
-      {/* CFG-1 1a · la hoja del ⚙, la misma del lobby (`HojaConfiguracion`),
-          hija directa de `main.sal` y anclada a su relleno. */}
-      <HojaConfiguracion
-        abierta={hojaAbierta}
-        onCerrar={() => setHojaAbierta(false)}
-        ajustesRef={ajustesRef}
-        cuenta={cuenta}
-      />
-    </main>
+      {/* ── Bloque 2 · Mesas formándose ahora ──────────────────────────── */}
+      <section className="sal-bloque">
+        <h2>{t('sal.opciones.mesas.titulo')}</h2>
+        {/* `es-vacia` no es cosmetica: hace que la caja punteada ocupe la
+            ventanilla entera en vez de encogerse a su texto, y con ella que la
+            pantalla mida lo mismo haya mesas o no. El porque esta en la hoja. */}
+        <div ref={listaRef} className={`sal-lista${mesas.length === 0 ? ' es-vacia' : ''}`} data-accion="lista">
+          {mesas.length === 0 ? (
+            <div className="sal-vacio">
+              {t('sal.opciones.mesas.vacio')}
+              <small>{t('sal.opciones.mesas.vacio.sub')}</small>
+            </div>
+          ) : (
+            mesas.map((mesa) => {
+              // MES-PvP 7b · cada mesa con SU entrada: una Llena pide 50×.
+              const aMiAlcance = alcanza(mesa.apuesta, juicio, mesa.entrada)
+              const llena = mesa.entrada === 'llena'
+              return (
+                <div
+                  key={mesa.id}
+                  className={`sal-mesa${aMiAlcance ? '' : ' is-fuera'}${llena ? ' es-llena' : ''}`}
+                  data-accion="mesa"
+                >
+                  {/* Las sillas dicen de un vistazo lo que el `x/N` dice con
+                      cifras. `aria-hidden` porque son redundantes para quien
+                      escucha: la línea 2 ya lo lee en palabras. */}
+                  <div className="sal-sillas" aria-hidden="true">
+                    {Array.from({ length: mesa.jugadores }, (_, i) => (
+                      <span key={i} className={`sal-silla${i < mesa.sentados ? ' is-ocupada' : ''}`} />
+                    ))}
+                  </div>
+                  <div className="sal-mesa-info">
+                    <div className="sal-mesa-l1">
+                      {t('sal.opciones.mesa.de', { n: mesa.jugadores })}
+                      {' · '}
+                      <b>{t('sal.opciones.mesa.apuesta', { hc: montoTexto(mesa.apuesta) })}</b>
+                    </div>
+                    {/* Fuera de alcance, la línea 2 dice lo que falta EN VEZ
+                        del recuento. Decisión de Victor (7-sep-2026) sobre la
+                        contradicción lámina/ficha: manda la lámina, y el botón
+                        se queda apagado en su sitio para que la tarjeta siga
+                        midiendo lo mismo que las demás. */}
+                    <div className="sal-mesa-l2">
+                      {aMiAlcance
+                        ? t('sal.opciones.mesa.estado', { x: mesa.sentados, n: mesa.jugadores })
+                        : t('sal.opciones.mesa.faltan', { hc: montoTexto(faltanPara(mesa.apuesta, juicio, mesa.entrada)) })}
+                      {/* 7b · la Llena dice su entrada en la misma línea (la
+                          tarjeta mide lo mismo, O1); las Corta, nada. */}
+                      {llena && (
+                        <span className="sal-mesa-entrada">
+                          {' · '}{t('sal.opciones.mesa.entrada', { hc: montoTexto(saldoMinimo(mesa.apuesta, 'llena')) })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="sal-unir"
+                    data-accion="unirme"
+                    disabled={!aMiAlcance || ocupado}
+                    onClick={() => unirmeA(mesa)}
+                  >
+                    {t('sal.opciones.mesa.unirme')}
+                  </button>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </section>
+    </PantallaChips>
   )
+}
+
+// ── MES-PvP 7b · la línea 2 de una Llena se APRIETA, no se corta ────────────
+// La tarjeta mide `--tarjeta-h` siempre (O1) y no tiene sitio para otra línea.
+// «Te faltan 245.000 HC · Entrada 250.000 HC» (una mesa de 5 a 5.000) no cabe
+// en un teléfono ni en la rejilla de dos columnas de 1024×768, y el «…» se
+// comería justo la cifra. Así que, sólo si no cabe, su letra baja lo justo para
+// caber (§13: «lo que no cabe se aprieta»); donde cabe no se toca. El tamaño se
+// escribe en el DOM y no en el estado, como `useDesborde`: es pintura, no
+// decisión. Antes de pintar, para que no se vea un fotograma cortado.
+function useEncajeLlena(ref) {
+  useLayoutEffect(() => {
+    const lista = ref.current
+    if (!lista || typeof ResizeObserver === 'undefined') return undefined
+    const encajar = () => {
+      for (const l2 of lista.querySelectorAll('.sal-mesa.es-llena .sal-mesa-l2')) {
+        l2.style.fontSize = ''
+        if (l2.scrollWidth <= l2.clientWidth + 0.5) continue
+        const letra = parseFloat(getComputedStyle(l2).fontSize)
+        l2.style.fontSize = `${Math.floor(letra * (l2.clientWidth / l2.scrollWidth) * 0.98 * 100) / 100}px`
+      }
+    }
+    const vigia = new ResizeObserver(encajar)
+    vigia.observe(lista)
+    encajar()
+    return () => vigia.disconnect()
+  })
 }
 
 // El código llega canónico (`AJ-7K2M`) y el campo sólo enseña el cuerpo.
