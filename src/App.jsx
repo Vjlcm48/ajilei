@@ -1046,6 +1046,8 @@ function App() {
           billetera={billetera}
           sala={sala}
           tapetes={tapetes}
+          apiRanking={apiRanking}
+          apiConsulta={apiConsulta}
           onLobby={() => { borrarSalaPendiente(); olvidarInvitacion(); setSala(null); refrescarSaldo?.(); setScreen('lobby') }}
         />
       </PantallaDiferida>

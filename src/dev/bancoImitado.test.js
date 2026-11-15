@@ -1079,6 +1079,19 @@ describe('CFG-1 1e · banco imitado · consultar_mano y mi_consulta (guion B2–
     expect(b.consultas).toBe(null)
   })
 
+  it('MES-PvP 8 · la sala del árbitro imitado: 500, el mismo contador y la clave con el uid', () => {
+    const { b, cons } = sentado('basico', 50)
+    expect(cons(1).resultado).toBe('gratis')
+    const sala = cons(1, 'imitada-mesa')
+    expect([sala.resultado, sala.precio, sala.gratis_restantes]).toEqual(['gratis', 500, 18])
+    for (let i = 2; i <= 19; i++) cons(i)
+    expect(b.consultas.usadas).toBe(20)
+    expect(cons(2, 'imitada-mesa').resultado).toBe('cobrada')
+    expect(cons(2, 'imitada-mesa').resultado).toBe('repetida')
+    expect(b.libro.filter((l) => l.tipo === 'consulta').map((l) => [l.monto, l.clave]))
+      .toEqual([[-500, `consulta:imitada-mesa:${b.perfil.id}:2`]])
+  })
+
   it('B13 · treinta en un minuto pasan; la 31.ª, límite, sin cobrar', () => {
     const { b, cons } = sentado('pro', 200)
     b.gastarConsultas(20)

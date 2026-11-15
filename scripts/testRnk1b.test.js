@@ -21,7 +21,7 @@ import { isAjilei } from '../src/engine/handEvaluator.js'
 import { esFaseDeApuesta } from '../src/hooks/mesaCore.js'
 import { lecturaDeMano } from '../src/hooks/manoCore.js'
 import { finDeMano } from '../src/hooks/mesaIACore.js'
-import { ajileiDe, puntosDeMano, EXTRA_AJILEI } from '../src/lib/puntos.js'
+import { ajileiDe, puntosDeMano, puntosDelFin, EXTRA_AJILEI } from '../src/lib/puntos.js'
 import { NIVELES } from '../src/config/niveles.js'
 
 const MAZO = Object.fromEntries(createDeck().map((c) => [c.id, c]))
@@ -162,6 +162,17 @@ function partida(N, azar, topeManos = 80) {
   }
   return pagos
 }
+
+describe('MES-PvP 8 · «Puntos obtenidos» de la mano, por mesa', () => {
+  it('la mesa de personas suma la tabla de humanos (ruleN + 3, con el extra); la de las IAS, la del reto', () => {
+    expect(puntosDelFin({ fin: { vivos: 3, ajilei: 0 }, nivel: undefined, contraHumanos: true })).toBe(6)
+    expect(puntosDelFin({ fin: { vivos: 2, ajilei: 51 }, contraHumanos: true })).toBe(6)
+    expect(puntosDelFin({ fin: { vivos: 5, ajilei: 52 }, contraHumanos: true })).toBe(10)
+    expect(puntosDelFin({ fin: { vivos: 3, ajilei: 0 }, nivel: 'pro' })).toBe(3)
+    expect(puntosDelFin({ fin: { vivos: 4, ajilei: 51 }, nivel: 'avanzado', contraHumanos: false })).toBe(3)
+    expect(puntosDelFin({ fin: null, nivel: 'pro', contraHumanos: true })).toBe(0)
+  })
+})
 
 describe('RNK-1b · el barrido: partidas enteras con el motor real', () => {
   const azar = generador(1976)

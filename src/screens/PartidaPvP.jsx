@@ -119,7 +119,7 @@ function Aviso({ texto = null, onLobby, t, pvp }) {
   )
 }
 
-function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
+function MesaViva({ sala, partida, cuenta, billetera, tapetes, apiRanking, apiConsulta, onLobby }) {
   const { t } = useIdioma()
   const { play } = useSounds()
   const foto = useMesaPvP({ sala, partida, alCobrar: billetera?.refrescar ?? null })
@@ -208,6 +208,9 @@ function MesaViva({ sala, partida, cuenta, billetera, tapetes, onLobby }) {
         saldo={billetera?.saldo ?? 0}
         tapetes={tapetes}
         partida={partidaMesa}
+        apiRanking={apiRanking}
+        apiConsulta={apiConsulta}
+        onSaldo={billetera?.tomar ?? null}
         onLeave={onLobby}
       />
       {enSorteo && <SorteoMesa game={game} reloj={reloj} enviar={foto.enviar} anfitrion={foto.anfitrion} desfase={desfase} lamina={partida?.lamina ?? null} />}
@@ -236,7 +239,7 @@ function leeMandoDev() {
   return new URLSearchParams(window.location.search).has('pvp') ? window.location.search : null
 }
 
-export default function PartidaPvP({ cuenta, billetera = null, sala = null, tapetes = null, onLobby }) {
+export default function PartidaPvP({ cuenta, billetera = null, sala = null, tapetes = null, apiRanking = null, apiConsulta = null, onLobby }) {
   const { t } = useIdioma()
   const [mando] = useState(leeMandoDev)
   const conMando = mando !== null
@@ -265,8 +268,8 @@ export default function PartidaPvP({ cuenta, billetera = null, sala = null, tape
 
   if (conMando) {
     if (!imitada) return <Traje sala={null} t={t} cuenta={cuenta} billetera={billetera}><Aviso t={t} pvp="arrancando" /></Traje>
-    return <MesaViva sala={imitada.sala} partida={imitada} cuenta={cuenta} billetera={billetera} tapetes={tapetes} onLobby={onLobby} />
+    return <MesaViva sala={imitada.sala} partida={imitada} cuenta={cuenta} billetera={billetera} tapetes={tapetes} apiRanking={apiRanking} apiConsulta={apiConsulta} onLobby={onLobby} />
   }
   if (!sala) return <Traje sala={null} t={t} cuenta={cuenta} billetera={billetera} libre><Aviso onLobby={onLobby} t={t} pvp="arrancando" /></Traje>
-  return <MesaViva sala={sala} partida={null} cuenta={cuenta} billetera={billetera} tapetes={tapetes} onLobby={onLobby} />
+  return <MesaViva sala={sala} partida={null} cuenta={cuenta} billetera={billetera} tapetes={tapetes} apiRanking={apiRanking} apiConsulta={apiConsulta} onLobby={onLobby} />
 }

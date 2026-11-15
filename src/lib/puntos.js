@@ -59,3 +59,14 @@ export function puntosDeMano({ origen, nivel, sentados, ajilei = 0 }) {
   const extra = EXTRA_AJILEI[ajilei] ?? 0
   return { base, extra, total: base + extra }
 }
+
+/**
+ * MES-PvP 8 · Los puntos que «Puntos obtenidos» suma por la mano ganada que dice
+ * `fin` (`mesaIACore.finDeMano`), o 0 sin fin. La mesa de personas puntúa con la
+ * tabla de humanos (`ruleN + 3`, Rankings v1.2 §2.2), la de las IAS con la del reto.
+ */
+export function puntosDelFin({ fin, nivel, contraHumanos = false }) {
+  return fin
+    ? puntosDeMano({ origen: contraHumanos ? 'humanos' : 'ias', nivel, sentados: fin.vivos, ajilei: fin.ajilei }).total
+    : 0
+}

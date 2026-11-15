@@ -16,7 +16,7 @@ import { useSesion } from '../hooks/useSesion'
 import { fichasNetas } from '../hooks/sesionCore'
 import { decideCelebracion, llevaViaje, VIAJE_N } from '../hooks/celebracionCore'
 import { conNivel } from '../hooks/nivelCore'
-import { puntosDeMano } from '../lib/puntos'
+import { puntosDelFin } from '../lib/puntos'
 import { claseTono, vozResto } from '../hooks/resultadoCore'
 import { componeCronica, componeCapas, nombreEnVoz } from '../hooks/cronicaCore'
 import { lecturaDeMano, resultadoDeMano } from '../hooks/manoCore'
@@ -523,15 +523,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // vez al entrar en el pago —memo por `handCount`— y lo usan las dos cosas que
   // dependen de él: el aviso de fin de mano a la cola del servidor (abajo) y
   // «Manos ganadas» / «Puntos obtenidos» de la sesión (`useSesion`). Así no
-  // pueden discrepar. Los puntos son `puntosDeMano`, espejo de la regla del
+  // pueden discrepar. Los puntos son `puntosDelFin` (`puntosDeMano`), espejo de la regla del
   // servidor (INV-65); al servidor nunca viaja la cifra, sólo el fin.
   const finMano = useMemo(
     () => (phase === PHASES.PAYOUT ? finDeMano(game) : null),
     [phase, game.handCount], // eslint-disable-line react-hooks/exhaustive-deps
   )
-  const puntosMano = finMano
-    ? puntosDeMano({ origen: 'ias', nivel: game.nivelIA, sentados: finMano.vivos, ajilei: finMano.ajilei }).total
-    : 0
+  const puntosMano = puntosDelFin({ fin: finMano, nivel: game.nivelIA, contraHumanos: !!partida })
 
   // ── APU-1 1e · SALIR DEVUELVE LAS FICHAS ─────────────────────────────────
   // Rector 1e §2.3. `onLeave` recibe con cuántas fichas se levanta el humano,
@@ -621,8 +619,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // por mano. No hay dos economías.
   // CFG-1 1e · el contador y el cobro viven en el servidor (INV-75): la mano es
   // (mesa del servidor, «Mano #N»), y el precio sale del nivel de la mesa.
-  const mesaServidor = control?.mesaId ?? null
-  const consultas = useConsultas({ api: apiConsulta, mesaId: mesaServidor, nivel, saldo, onSaldo })
+  // MES-PvP 8 · entre personas la mesa es la sala (`partida.mesa`, `mesaPvPCore`) y el precio, el
+  // de humanos: `consultar_mano` busca allí el asiento propio y la mano la dice el servidor.
+  const mesaServidor = control?.mesaId ?? partida?.mesa ?? null
+  const consultas = useConsultas({ api: apiConsulta, mesaId: mesaServidor, nivel: partida ? 'humanos' : nivel, saldo, onSaldo })
   // EMB-2 · Tapetes. Mismo gate y mismo molde de hermandad: el hook se llama
   // SIEMPRE (orden de hooks estable) y recibe el gate, así que fuera de
   // escritorio no hay panel, no hay atributo y el fieltro es el verde de

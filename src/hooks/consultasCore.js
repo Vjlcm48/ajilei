@@ -102,6 +102,8 @@ export function responderConsulta(estado, { mesa, mano }, r) {
   if (resultado === 'saldo_insuficiente') {
     return { estado: base, popup: { tipo: 'aviso', clave: 'ia.mesa.consulta.sin_saldo', vars: { hc: precio ?? '' } } }
   }
+  // El resto (`sin_sesion`, `mesa_invalida`, `limite` y, desde MES-PvP 8, `mano_distinta`: la mano
+  // de la mesa de personas ya no es la del servidor) dice «No se pudo consultar».
   return { estado: base, popup: { tipo: 'aviso', clave: 'ia.mesa.consulta.error', vars: {} } }
 }
 

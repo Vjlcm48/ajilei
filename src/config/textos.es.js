@@ -255,7 +255,7 @@ export const TEXTOS_ES = {
   'sal.error.saldo_insuficiente':  'No te alcanza para sentarte a esa mesa.',
   'sal.error.sala_no_disponible':  'Esa mesa ya no está. Puede que arrancara o que la cancelaran.',
   'sal.error.sala_llena':          'Esa mesa ya está llena. Prueba con otra.',
-  'sal.error.demasiados_intentos': 'Demasiados códigos seguidos. Espera un minuto y vuelve a probar.',
+  'sal.error.demasiados_intentos': 'Demasiados intentos seguidos. Espera un minuto y vuelve a probar.',
   'sal.error.no_eres_anfitrion':   'Solo quien armó la mesa puede hacer eso.',
   'sal.error.faltan_jugadores':    'Hace falta alguien más para arrancar.',
   // Verbatim de la lámina SAL-1 (`sal.codigo.invalido`): es el aviso que Victor

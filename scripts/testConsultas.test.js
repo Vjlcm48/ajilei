@@ -130,8 +130,8 @@ describe('CFG-1 1e · qué pintar con la respuesta', () => {
     expect(r.estado.ultima).toBe(null)
   })
 
-  it('sin respuesta, sin sesión, mesa inválida o límite: «No se pudo consultar»', () => {
-    for (const r of [null, { resultado: 'sin_sesion' }, { resultado: 'mesa_invalida', precio: 0 }, { resultado: 'limite', precio: 0 }]) {
+  it('sin respuesta, sin sesión, mesa inválida, otra mano (MES-PvP 8) o límite: «No se pudo consultar»', () => {
+    for (const r of [null, { resultado: 'sin_sesion' }, { resultado: 'mesa_invalida', precio: 0 }, { resultado: 'mano_distinta', precio: 0 }, { resultado: 'limite', precio: 0 }]) {
       expect(responderConsulta(base(), { mesa: M, mano: 2 }, r).popup.clave).toBe('ia.mesa.consulta.error')
     }
   })

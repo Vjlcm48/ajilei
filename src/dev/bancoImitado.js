@@ -539,6 +539,10 @@ export function crearBanco({
   // la última mano consultada ('repetida', sin tocar nada), una gratis, y el
   // cobro con la clave de la mano (una mano anterior ya cobrada: 'pagada').
   // El banco siempre tiene sesión: 'sin_sesion' no se da aquí.
+  // MES-PvP 8 · la sala del árbitro imitado (`imitada-<escena>`, `dev/partidaImitada`) es la mesa
+  // de personas del bypass: precio de humanos, el mismo contador y la clave con el uid. El banco
+  // no conoce la mano del árbitro: `mano_distinta` solo la da el SQL.
+  const esSalaImitada = (id) => typeof id === 'string' && id.startsWith('imitada-')
   const gratisQuedan = () => Math.max(CONSULTAS_GRATIS_SQL - (b.consultas?.usadas ?? 0), 0)
   const filaConsulta = (resultado, precio) => ({
     resultado, precio, gratis_restantes: gratisQuedan(), saldo: b.saldo,
@@ -547,8 +551,9 @@ export function crearBanco({
     if (!cabe('consultar_mano')) return filaConsulta('limite', 0)
     if (!p_mesa || !Number.isInteger(p_mano) || p_mano < 1) return filaConsulta('argumento_invalido', 0)
     const m = b.mesas.get(p_mesa)
-    if (!m || m.estado !== 'abierta') return filaConsulta('mesa_invalida', 0)
-    const precio = PRECIOS_CONSULTA_SQL[m.reto]
+    const deIA = !!m && m.estado === 'abierta'
+    if (!deIA && !esSalaImitada(p_mesa)) return filaConsulta('mesa_invalida', 0)
+    const precio = PRECIOS_CONSULTA_SQL[deIA ? m.reto : 'humanos']
     b.consultas ??= { usadas: 0, ultimaMesa: null, ultimaMano: null }
     const c = b.consultas
     if (c.ultimaMesa === p_mesa && c.ultimaMano === p_mano) return filaConsulta('repetida', precio)
@@ -558,7 +563,8 @@ export function crearBanco({
       c.ultimaMano = p_mano
       return filaConsulta('gratis', precio)
     }
-    const r = aplicar('consulta', -precio, `consulta:${p_mesa}:${p_mano}`, p_mesa)
+    const clave = deIA ? `consulta:${p_mesa}:${p_mano}` : `consulta:${p_mesa}:${b.perfil.id}:${p_mano}`
+    const r = aplicar('consulta', -precio, clave, p_mesa)
     if (r.motivo === 'aplicado') {
       c.ultimaMesa = p_mesa
       c.ultimaMano = p_mano
