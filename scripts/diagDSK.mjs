@@ -417,8 +417,8 @@ if (!EXTERNO) process.env.LUZ_BASE_PORTADA = process.env.REV_BASE_PORTADA = `htt
 // `.env.local` de la máquina (Fase 0 de ARN-3, B3). `humo` corre `lob`, así que
 // también levanta el preview, en `--puerto-aux=N` o 4173. `rec` y
 // `voz2.burbuja` se quedan en 5173 a propósito: `?apu=` solo existe en DEV.
-// ARN-4 A6 · en `apu` y `u3`, `--semilla=N` sustituye a las selladas: es como se
-// elige otra cuando una envejece (`arnes/siembra.mjs`).
+// ARN-4 A6 · en `apu`, `u3` y `vuelo` (MES-PvP 9), `--semilla=N` sustituye a las
+// selladas: es como se elige otra cuando una envejece (`arnes/siembra.mjs`).
 // `msg --semilla=azar` (o `--semilla=N`) es EXPLORACIÓN: juega otra población
 // de manos y anota la semilla en el JSON. No es la vara: la vara son las
 // semillas fijas de `MSG_SEMILLAS`. Se quita de la línea de órdenes aquí, antes
@@ -477,8 +477,8 @@ if (!MODOS_DSK.includes(MODE)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: ${MODOS_DSK.join(', ')}`))
 }
 // ARN-3c · D7 · `--semilla` se valida ANTES de levantar nada (un preview compila).
-if (MSG_SEMILLA_ARG && (!['msg', 'apu', 'u3'].includes(MODE) || MSG_SEMILLA_ARG.modo === 'invalida')) {
-  await fallarInstrumento(new ErrorInstrumento(`--semilla solo vale en «msg», «apu» y «u3», y como «azar» o un entero (recibido: ${JSON.stringify(MSG_SEMILLA_ARG)})`))
+if (MSG_SEMILLA_ARG && (!['msg', 'apu', 'u3', 'vuelo'].includes(MODE) || MSG_SEMILLA_ARG.modo === 'invalida')) {
+  await fallarInstrumento(new ErrorInstrumento(`--semilla solo vale en «msg», «apu», «u3» y «vuelo», y como «azar» o un entero (recibido: ${JSON.stringify(MSG_SEMILLA_ARG)})`))
 }
 const semillaDe = (sellada) => (MODE !== 'msg' && MSG_SEMILLA_ARG ? MSG_SEMILLA_ARG.base : sellada)
 
@@ -12432,6 +12432,15 @@ async function runTapetes(browser) {
 // `pointerdown` corta la celebración (VC v1.0 §6). En la victoria de IA se
 // comprueba el pozo, la ausencia de celebración, y que al ABRIR el toggle
 // DESPUÉS del vuelo el saldo ya está liberado.
+//
+// MES-PvP 9 · el azar va sembrado (INV-82), una semilla por escenario. Sin ella,
+// la victoria humana llegaba entre la mano 2 y la 12, y alguna vez no antes
+// del tope. Si una semilla deja de dar su escenario, la celda sale «sin
+// cobertura» y no roja: se elige otra con `vuelo --semilla=N`.
+// La 1 da la victoria humana en la mano 7 y la de la IA (la 4) en la 1.
+// ROJO CONOCIDO (INV-82, excepción de MES-PvP 9): `vuelo humano` cae en
+// `septimaEnDestino` por 10,44 px en x. Es del producto, no de la semilla.
+const VUELO_SEMILLAS = { humano: 1, ia: 1 }
 async function runVuelo(browser) {
   const { VIAJE_N } = await import('../src/hooks/celebracionCore.js')
   const VP = { w: 1920, h: 1080 }
@@ -12439,8 +12448,10 @@ async function runVuelo(browser) {
 
   for (const esc of [{ id: 'humano', quien: 'win', maxManos: 40 }, { id: 'ia', quien: 'lose', maxManos: 10 }]) {
     const page = await browser.newPage({ viewport: { width: VP.w, height: VP.h } })
-    const c = { escenario: esc.id, mesa: 5, vp: `${VP.w}x${VP.h}` }
+    const semilla = semillaDe(VUELO_SEMILLAS[esc.id])
+    const c = { escenario: esc.id, mesa: 5, vp: `${VP.w}x${VP.h}`, semilla }
     try {
+      await sembrarAzar(page, semilla)
       await gotoMesa(page, 5)
       await vcEspera(page, 400)
 
@@ -12551,7 +12562,7 @@ async function runVuelo(browser) {
         // No se aborta al primer tropiezo: se cuentan. Una mano que no cierra es
         // ruido del muestreador; tres seguidas ya son una mesa que no avanza.
         fallos = siguio ? 0 : fallos + 1
-        if (fallos >= 3) { c.abortadaEn = `mano ${mano}: 3 manos sin cerrar (${juego.sinCerrar.slice(-3).map(x => x.causa).join(', ') || 'cerraron, pero «Siguiente mano» no se pudo pulsar'})`; break }
+        if (fallos >= 3) { c.atascada = true; c.abortadaEn = `mano ${mano}: 3 manos sin cerrar (${juego.sinCerrar.slice(-3).map(x => x.causa).join(', ') || 'cerraron, pero «Siguiente mano» no se pudo pulsar'})`; break }
         await vcEspera(page, 400)
       }
       c.juego = resumenJuego(juego)
@@ -12652,7 +12663,9 @@ async function runVuelo(browser) {
         maxFichas: v.maxFichas, ganadorCorroborado: c.ganadorCorroborado,
         potAntes, potDurante, saldosConCapa, saldoFinal, saldoIALiberado,
         traza: v.traza.slice(-10) }
-      c.passed = Object.values(checks).every(Boolean)
+      // Sin el escenario, las demás puertas no tienen qué medir: queda la del turno fantasma.
+      if (!c.alcanzado && !c.atascada) c.sinCobertura = `vuelo ${esc.id} (la semilla ${semilla} no dio «${esc.quien}» en ${manos} manos: ${AVISO_SEMILLA})`
+      c.passed = c.sinCobertura ? checks.turnoFantasma : Object.values(checks).every(Boolean)
     } catch (e) {
       c.error = String(e && e.message || e).slice(0, 300)
       c.passed = false
@@ -12664,8 +12677,9 @@ async function runVuelo(browser) {
     await page.close()
   }
   const verde = cells.every(c => c.passed)
-  console.log(`── VUELO · ${verde ? 'VERDE' : 'ROJO'} (${cells.filter(c => c.passed).length}/${cells.length} escenarios) · N=${VIAJE_N}`)
-  return { cells, verde, VIAJE_N }
+  const sinCobertura = cells.map(c => c.sinCobertura).filter(Boolean)
+  console.log(`── VUELO · ${verde ? (sinCobertura.length ? `SIN COBERTURA: ${sinCobertura.join('; ')}` : 'VERDE') : 'ROJO'} (${cells.filter(c => c.passed).length}/${cells.length} escenarios) · N=${VIAJE_N} · semillas ${cells.map(c => `${c.escenario}=${c.semilla}`).join(' ')}`)
+  return { cells, verde, sinCobertura, VIAJE_N }
 }
 
 // ── LUZ-1 Fase 1 · modo `luz` · la hoja de luz, encendida y apagada ─────────
