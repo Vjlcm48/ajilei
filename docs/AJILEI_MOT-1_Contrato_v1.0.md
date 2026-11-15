@@ -1,4 +1,4 @@
-# AJILEI · MOT-1 · Contrato del árbitro · v1.4
+# AJILEI · MOT-1 · Contrato del árbitro · v1.5
 
 - **Normativo de MOT-1.** Las fichas 1b–1f se escriben contra este documento: lo que no esté aquí no se construye.
 - **Base:** `main` en `1f5cb14`. Toda cita `archivo:líneas` es de ese árbol.
@@ -13,6 +13,7 @@
 - **Al día con MES-PvP, sub-tanda 3-A (2026-11-06):** v1.2, la del árbitro que se despliega con ella. La **regla C-8** (el abandono, §7) se reescribe según las Reglas v1.7 §8.2: abandonar es retirarse en el acto, en cualquier fase; si queda uno solo en la mano, cobra el pozo; con menos de 2 sentados la partida termina en la misma jugada; quien se va cobra su pila al irse, y con mano en curso al cerrarse esa mano; el showdown ya calculado se recalcula sin él; las tres vías siguen el mismo camino. El §2, el §4 y el §6 se ponen al día con ella. **Renumeración:** lo que la v1.1 dejaba para el árbitro y el Contrato «v1.2» (la recarga PvP, la reposición uno a uno y el volteo de 5 s del sorteo, en el informe de la sub-tanda 3) pasa a la **v1.3**. Las citas de lo nuevo son del árbol `db0313b`.
 - **Al día con MES-PvP, árbitro v1.3 (2026-11-08):** v1.3, la del árbitro que se despliega con las sub-tandas v1.3-a y v1.3-b. Recoge el sorteo sobre la mesa (el reparto según los participantes, el volteo de 5 s y las posiciones elegidas en la vista), el **mensaje de la mesa** (la excepción escrita a «por el canal solo versiones», §5) y la **recarga PvP** entera (§2, §3, §4, §6 y §7), según las Reglas de APU-1 v1.9 §8 y el informe de la Fase 0 del árbitro v1.3 (`docs/reportes/AJILEI_MES-PvP_Arbitro-v1.3_Fase0_Informe_v1.0.md`). La **reposición uno a uno** queda para la sub-tanda 5, con el Contrato v1.4 (§6). Las citas de lo nuevo son del árbol del STOP-C del v1.3-b.
 - **Al día con MES-PvP, sub-tanda 5b (2026-11-12):** v1.4, la del árbitro que se despliega con ella (solo la función `partida`, sin migración). Recoge la **reposición uno a uno** de las Reglas de APU-1 v1.11 §8.7: el árbitro espera lo que dura en el cliente, según el ritmo (§6, «Los vencimientos», «La reposición uno a uno», «El ritmo» y «Las esperas base»); la vista no cambia (§4). Las cifras salen del informe de la Fase 0 de la sub-tanda 5 (§B). Las citas de lo nuevo son del árbol del STOP-C de la 5b.
+- **Al día con MES-PvP, sub-tanda 8 (2026-11-14):** v1.5, la del árbitro que se despliega con ella (la función `partida`) y la migración `sub8`. Recoge la **pausa de anuncio** de las Reglas de APU-1 v1.12 §8.6 (después de las manos 7, 15, 22, 30, 37…, hasta 30 s; §6), los **puntos contra humanos encendidos**, **«Mano actual» entre personas**, `partida_asientos.manos` y el **tope de las sentadas** (§7), y cierra las filas de la 7a, la 7b y la 8 (§9). Diseño: el informe de la Fase 0 de la sub-tanda 8 (`docs/reportes/AJILEI_MES-PvP_Sub8_Fase0_Informe_v1.0.md`). Las citas de lo nuevo son del árbol del STOP-C de la 8.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -32,6 +33,8 @@
 | `mot1_dinero` | `20261104170000_mot1_dinero.sql` |
 | `v13_mensaje` | `20261107200000_mespvp_v13_mensaje.sql` |
 | `v13_recarga` | `20261108120000_mespvp_v13_recarga.sql` |
+| `sub7a` | `20261113150000_mespvp_sub7a_duracion_sala.sql` |
+| `sub8` | `20261114120000_mespvp_sub8_consulta_pvp_manos.sql` |
 
 ---
 
@@ -364,7 +367,7 @@ Solo hay un vencimiento pendiente por mesa. Lo guarda el servidor y lo reclama c
 | Aviso de salida · `aviso_salida` | `startHand` deja eliminados nuevos y la partida sigue | 3 s, **provisional · se cierra con los teléfonos** | Empieza el barajado |
 | Barajado | `startHand`, o termina `aviso_salida` | Espera de animación | Se abre el reparto |
 | Revelación y mano siguiente | `PAYOUT` | Con revelación, 6 + 2 s: la red de la celebración más la lectura. Sin revelación, 4 s desde el cierre de la mano. **provisional · se cierra con los teléfonos** | Si la mano lleva anuncio, `pausa_anuncio`. Si no, asientos que salen y `startHand` (`gameEngine.js:502`). Con ≤1 vivo, `GAME_OVER` (`:522`). El dinero y los puntos de la mano ya se escribieron al cerrarla (§7) |
-| Pausa de anuncio · `pausa_anuncio` | Vence la mano siguiente de una mano con anuncio | 45 s, o hasta que todos vuelvan | Asientos que salen y `startHand`. Ver «Publicidad». v1.3 · con alguien decidiendo, lo de «La recarga», abajo |
+| Pausa de anuncio · `pausa_anuncio` | Vence la mano siguiente de una mano con anuncio | 30 s (v1.5; antes, 45), o hasta que todos vuelvan | Asientos que salen y `startHand`. Ver «Publicidad». v1.3 · con alguien decidiendo, lo de «La recarga», abajo |
 | Retención de la oferta · `oferta_recarga`, v1.3 | Vence la pausa entre manos con alguien decidiendo y sin él quedaría uno solo con fichas (R2) | **15 s, provisional · se cierra con los teléfonos** (P-3; `esperas.js:67`). La misma cifra que la pregunta de REC-1 contra las IAS | Quien no decidió sale con su residuo, y `startHand` cierra la partida. **No cuenta para la ausencia** (D7) |
 
 ### La recarga (v1.3)
@@ -471,12 +474,12 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 
 | Punto | Regla |
 |---|---|
-| Qué manos | `llevaAnuncio(mano)`: `mano % 11` es 5 o 0. Es decir, 5, 11, 16, 22, 27, 33, 38, 44… Sustituye a la regla de Tienda v1.3 §10.1 |
+| Qué manos | `llevaAnuncio(mano)`, con `mano` la que acaba de cerrarse: `mano % 15` es 7 o 0. Es decir, después de las manos 7, 15, 22, 30, 37, 45, 52, 60… (saltos alternos de 8 y 7; `reloj.js:60`). **v1.5**, Reglas de APU-1 v1.12 §8.6; hasta la v1.4, `mano % 11` era 5 o 0 (después de las manos 5, 11, 16, 22…). Sustituye a la regla de Tienda v1.3 §10.1 |
 | Cuándo | Al vencer la mano siguiente, **antes de `startHand`**. La fase sigue en `PAYOUT`: no se reparte nada, y quien sale no paga el ante |
 | Quién sigue | Los vivos, no abandonados, con pila ≥ ante. Si son ≤1, no hay pausa: `startHand` termina la partida |
 | Quién lo ve | Los que siguen, salvo `asientos[i].sinAnuncio`: gancho de Premium, hoy siempre `false` (Tienda §5). Si nadie lo ve, no hay pausa |
 | Quien no cubre el ante | Cobra al abrirse la pausa (§7). v1.3 · con la recarga encendida, no: decide durante la pausa (arriba, «La recarga») |
-| Fin de la pausa | Todos volvieron (`volver_anuncio`), vencen los 45 s, o quedan ≤1 que sigan porque los demás abandonaron. Entonces sale `enAnuncio` de todos y se llama a `startHand` |
+| Fin de la pausa | Todos volvieron (`volver_anuncio`), vencen los 30 s (`PAUSA_ANUNCIO_MS`, `esperas.js:74`; v1.5), o quedan ≤1 que sigan porque los demás abandonaron. Entonces sale `enAnuncio` de todos y se llama a `startHand` |
 | Quien sigue en su anuncio al arrancar la mano | Nada especial: su ante se cobra y sus relojes corren, como los de cualquiera |
 
 ---
@@ -491,6 +494,7 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 | Al **salir** | `liberacion_pvp` | +pila, con el residuo menor que la unidad (K-10) | El mismo |
 | Al cerrar cada mano | **Ninguno** | Las pilas de todos los asientos se reescriben en SQL, en una sola transacción | Paso 2 del §5 |
 | Al **recargar** (v1.3) | `recarga_pvp`, **nuevo** (P-5) | −monto, con la clave `recarga_pvp:<sala>:<uid>:<mano>`: un asiento recarga a lo sumo una vez por pausa, y la misma recarga no se cobra dos veces | El efecto `recarga { asiento, monto, mano }` en `aplicar_efectos`, **después** de `mano_cerrada`: sube `entrada` y `pila` del asiento en lo mismo (`v13_recarga:150`) |
+| Al **consultar la mano** (v1.5) | `consulta`, el de «Mano actual» contra las IAS | −500 (`precio_consulta('humanos')`), con la clave `consulta:<sala>:<uid>:<mano>`, y solo desde la consulta 21 de la cuenta: las 20 gratis son el mismo contador que contra las IAS (P-1 de la 8). **No es dinero de la mesa:** sale de la billetera, nunca de la pila, y `neto_mesa` no lo cuenta (P-2) | `consultar_mano` (`sub8`): el asiento propio sin cobrar en la sala, con la partida viva, y la mano que dice el servidor (`partidas.estado → motor → handCount`); otra es `mano_distinta`. No lee ni devuelve cartas: el desglose lo calcula el cliente con las suyas |
 
 | Regla | Detalle |
 |---|---|
@@ -501,10 +505,11 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 | `resultado_pvp` | Queda sin escritor: con dos movimientos no hace falta (`eco1a:179`) |
 | El dinero | Nunca vive en el cliente |
 | Residuo | El motor elimina a quien no cubre el ante y le deja las fichas (`gameEngine.js:511, :515`). Vuelven a su saldo al salir |
-| Quien no cubre el ante en una mano con anuncio | Cobra al abrirse la pausa, no a los 45 s. No cambia el dinero: `startHand` lo iba a eliminar igual. v1.3 · con la recarga encendida, decide y no cobra hasta que salga (§6) |
+| Quien no cubre el ante en una mano con anuncio | Cobra al abrirse la pausa, no a los 30 s. No cambia el dinero: `startHand` lo iba a eliminar igual. v1.3 · con la recarga encendida, decide y no cobra hasta que salga (§6) |
 | El cuadre con recargas, v1.3 | En el árbitro, pilas + pozo + cobrado es constante **más lo recargado**. En SQL, `mesa_cuadra` (Σ(pila + liberado) = Σ entrada) sigue igual porque la recarga sube `entrada` y `pila` a la vez, y `neto_jugador_mesa` y `neto_mesa` cuentan `recarga_pvp` (`v13_recarga:41-71`): al terminar, `neto_mesa` vale 0 |
 | El resultado de la pantalla final, v1.3 | `cobrado − (entrada + recargas)`, con `entrada` **la de la mesa** (la de la sala, `vistaAMesa.js:88`) y `recargas` de la vista privada (`vistaAMesa.js:100`, `vozHumanos.js:135`). La base sube `partida_asientos.entrada` con cada recarga: usar esa contaría lo recargado dos veces |
 | Ni tope ni válvula, v1.3 | `limite_dinero()` no encaja (lee `auth.uid()`, y las RPC del árbitro no lo leen); el freno lo da el árbitro: un pedido por pausa y nunca por encima de la entrada. La válvula de ECO-1 no aplica a PvP |
+| `partida_asientos.manos`, v1.5 | Cada `mano_cerrada` suma 1 a los asientos sin cobrar (`aplicar_efectos`, `sub8`). Todos arrancan juntos y en la mano 1 nadie está sentado fuera: dos asientos con `manos ≥ 1` en la misma sala jugaron juntos al menos una mano (AMI-1). Quien se sienta fuera de una mano también la suma |
 
 ### Qué debe cumplir la 1d-ii
 
@@ -515,6 +520,7 @@ Lo fija la 1d-ii: firmas, columnas y nombres.
 | Toda salida de la espera devuelve la entrada: `salir_sala`, sala cancelada por `barrer_salas` o `resolver_sala` | La entrada ya salió al sentarse | No mueven dinero (`sal_b2:186` · `sal_b1:93` · `sal_a:370`) |
 | Nada se cobra dos veces | Reintentos y dos clientes | `clave_idem` única (`eco1a:174`) |
 | Toda función que mueve dinero tiene su tope por minuto, y un tope nunca atrapa dinero | ECO v1.3 §7 | `limite_dinero` (`eco1g:100-113`) |
+| El tope de las sentadas, v1.5 | `crear_sala` y `unirse_sala` cuentan cada sentada que cobra, dentro de `cobrar_entrada`: 10 por minuto y por cuenta, cada una con su nombre en `limite_dinero()`. Solo cuentan las que salen bien (un rechazo posterior deshace su anotación) y la reentrada de quien ya es miembro no cuenta. La undécima lanza `demasiados_intentos` y no cobra nada: un tope nunca atrapa dinero. Si `crear_sala` encuentra una abierta compatible, cuenta como `unirse_sala`. Unirse por código tiene además su tope de 5 por minuto (`intentos_codigo`), con el mismo motivo. El cliente dice los dos con una sola frase, que no habla de códigos: «Demasiados intentos seguidos. Espera un minuto y vuelve a probar.» | `mot1_dinero:397-430, :707-717` · `sub7a:86-88, :113` · `textos.es.js:258` |
 | Los dos topes literales pasan a `limite_dinero()` | ARN-4 | `cfg1e:199` · `tie1a:162` |
 | Las piezas del árbitro llevan el uid por parámetro | N-1 | `contar_intento_dinero` lee `auth.uid()` (`eco1a:372-374`) |
 
@@ -548,7 +554,7 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 |---|---|---|
 | Tabla | `libro_puntos`, sin cambios | `rnk1a:112-142` |
 | Quién escribe | El árbitro. La función y la llamada son de la 1d-ii: la llamada vive en `guardar_jugada`, al procesar `mano_cerrada` | Rankings v1.2 `:143` |
-| Interruptor | La llamada queda detrás de un interruptor apagado, como la válvula de ECO-1, y se enciende en MES-PvP. El humo de la 1f no escribe en los rankings | `eco1d:229` |
+| Interruptor | La llamada queda detrás de un interruptor apagado, como la válvula de ECO-1, y se enciende en MES-PvP. El humo de la 1f no escribe en los rankings. **v1.5: encendido el 2026-11-14 desde el SQL Editor** (`select public.interruptor_puntos_humanos(true);`), con su rastro en `interruptor_cambios`. La llamada vive en `aplicar_efectos` (`v13_recarga:113-121`; `sub8` la copia tal cual) | `eco1d:229` · `mot1_dinero:1093-1139` · guion `mespvp8` B1–B4 |
 | Cuándo | Al cerrar la mano, en la misma transacción que las pilas | Paso 2 del §5 |
 | `origen` | `'humanos'` | `rnk1a:125-141` |
 | `nivel` | Nulo | `rnk1a:125-141` |
@@ -586,7 +592,7 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Pieza | Dónde está hoy | Sub-tanda |
 |---|---|---|
 | Árbitro decide por la capa principal (VOZ-3) | `manoCore.js:86` · `mesaIACore.js:188-190` · `gameEngine.js:285, :292` | 1b |
-| Respaldo `state.winner` (ARN-4) | `mesaIACore.js:189` · `manoCore.js:86` | 1b |
+| Respaldo `state.winner` (ARN-4) | `mesaIACore.js:189` · `manoCore.js:86` | Hecho: MOT-1 1b (`16f7045`). `finDeMano` usa solo la capa 0; la lectura de `manoCore.js:166` es la del fin de partida, legítima (Fase 0 de la 8, G.4) |
 | Sorteo de la Mano con `drawRank` | `deck.js:34` · `gameEngine.js:542-543` · Reglas v1.4 `:348` | 1b |
 | Semillas `apu` / `u3` (ARN-4d) | `diagDSK.mjs:1950-1958, :9402` · `siembra.mjs:8-10` | 1b: se comprueba si cambia el consumo de azar |
 | Comentario de la ruta del último en pie (VOZ-3) | `gameEngine.js:193-197` | 1b: autorizado en Protegidos v1.9 |
@@ -610,11 +616,11 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Motor en el trozo de la mesa (PES-1) | `cargarMesa.js:124` · `trozos.js:28, :32` · `testEntradaLigera.test.js:34` | 1e y 1f: lo nuevo nace en `trozos.partidaPvP` |
 | Limpiar la sonda | `sonda_mot1/` · `.gitignore:127-129` | 1e |
 | `REGLA_ASIENTO` pasa a 15 (la Corta, entrada por defecto), con sus pruebas, para que el cliente no ofrezca mesas que el servidor rechaza | `salas.js:57` · `salas.test.js:42-44` | 1d-ii: la única excepción a «la 1d solo toca SQL» |
-| Espejo del cliente: `APUESTAS_PVP` | `salas.js:41` · `salas.test.js:29, :36` | MES-PvP 7: `ArmarMesa.jsx:282` pinta lo que diga la lista, y el chip de 50 es de esa campaña · **hecho en la 7b**: el 50 entra en `APUESTAS_PVP`, con el espejo del `check` de `salas.apuesta` en `salas.test.js` |
-| **Pantalla de armar mesa:** fila Entrada, chip de 50, control de ritmo del anfitrión | `ArmarMesa.jsx` | MES-PvP 7 · **hecho en la 7b**: las filas Entrada (Corta 15× · Llena 50×, `ENTRADAS_PVP` en `salas.js`) y Ritmo, y el chip de 50; `crearSala` manda siempre `p_ritmo` y `p_entrada` |
-| **Reloj de la sala:** 5:00 en mesas privadas, 3:00 en públicas | SQL de salas | MES-PvP 7 · **hecho en la 7a**: `duracion_sala(tipo)` en `20261113150000_mespvp_sub7a_duracion_sala.sql` (la escriben `crear_sala` y la restitución de `salir_sala`), con el espejo `duracionSala` en `salas.js` |
-| `salas_abiertas` con `entrada`, y el texto del tope de 10 sentadas por minuto | `sal_b2:228-250` · `salasCore.js:132-135` · `textos.es.js:251` | MES-PvP 7 · **la entrada, hecha en la 7b sin migración**: `salasAbiertas` la lee de `salas` por `id` (la política `salas_select_visibles` ya lo permite). El texto del tope de 10 por minuto sigue pendiente |
-| Sala de espera: sentido y mini-perfil | `salaEsperaCore.js:141` · `MiniPerfil.jsx` | MES-PvP 7 · **el mini-perfil, hecho en la 7b**: la silla ocupada lo abre; el propio con «Editar» apagado |
+| Espejo del cliente: `APUESTAS_PVP` | `salas.js:41` · `salas.test.js:29, :36` | Hecho: MES-PvP 7b |
+| **Pantalla de armar mesa:** fila Entrada, chip de 50, control de ritmo del anfitrión | `ArmarMesa.jsx` | Hecho: MES-PvP 7b |
+| **Reloj de la sala:** 5:00 en mesas privadas, 3:00 en públicas | SQL de salas | Hecho: MES-PvP 7a (`sub7a`) |
+| `salas_abiertas` con `entrada`, y el texto del tope de 10 sentadas por minuto | `sal_b2:228-250` · `salasCore.js:132-135` · `textos.es.js:258` | Hecho: la entrada, MES-PvP 7b; el texto del tope, MES-PvP 8 (§7) |
+| Sala de espera: sentido y mini-perfil | `salaEsperaCore.js:141` · `MiniPerfil.jsx` | Hecho: MES-PvP 7b |
 | **El árbitro v1.1:** `volver_anuncio`, `ahora`, los campos del §4, los vencimientos nuevos, la ausencia y la pausa de anuncio | `src/arbitro/` · `supabase/functions/partida/` | MES-PvP 1 |
 | Cada cliente se ve abajo: la rotación vive fuera de `seatLayouts.js` | El adaptador de la vista | MES-PvP 2 |
 | Escalonar los reclamos y corregir el desfase con `ahora` | `partidaCliente.js` | MES-PvP 2 |
@@ -622,9 +628,10 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | El sorteo en pantalla, entero | `PartidaPvP.jsx` | MES-PvP 3 en forma mínima; 5 completo |
 | La pausa de anuncio en pantalla y la tarjeta «Premium · Pronto» | Tienda §10.1 | MES-PvP 5 |
 | Lo que ve el que vuelve, la partida muerta en el cliente y quien abandona en `mi_sala` | `partidaCliente.js:168-171` · `mot1_dinero:1019-1023` | MES-PvP 6 |
-| **«Mano actual · Humanos 500»** | `cfg1e:99-116, :212` · `consultas.js:15` | MES-PvP 8 |
-| **Encender los puntos contra humanos** | `mot1_dinero:1086-1092, :1325` | MES-PvP 8 |
-| Las cifras provisionales del §6 | `src/config/esperas.js` | MES-PvP 8, con los teléfonos |
+| **«Mano actual · Humanos 500»** | `cfg1e:99-116, :212` · `consultas.js:15` | Hecho: MES-PvP 8 (`sub8`; el cliente en `GameTable.jsx`, con la sala de `partida.mesa`) |
+| **Encender los puntos contra humanos** | `mot1_dinero:1086-1092, :1325` | Hecho: MES-PvP 8, el 2026-11-14 desde el SQL Editor; la victoria entre personas suma con la tabla de humanos (`lib/puntos.puntosDelFin`) |
+| **AMI-1:** borrar la cuenta del anfitrión se lleva en cascada la sala, la partida y los `partida_asientos` de todos (`salas.anfitrion_id on delete cascade`); el libro de puntos sobrevive (`mesa_id` sin FK) | `sal_a:90` · `mot1_esquema:62` · `mot1_dinero:300` | AMI-1 (Fase 0 de la 8, §D). No se arregla en MES-PvP |
+| Las cifras provisionales del §6 | `src/config/esperas.js` | La ola 0, con los teléfonos (P-6 de la 8) |
 | Modo guion | `gameEngine.js:560` · `deck.js:59` · `repartoGanador.js:143, :235-244` | Sin edición del motor; TUT-1/GUI-1 |
 | `vuelo` sin semilla | `diagDSK.mjs`, modo `vuelo` | Ninguna: MOT-1 no lo toca |
 | Reglas v1.4: motivos con otro nombre y «`pozos.js` no protegido» | Reglas v1.4 `:143` | Hecho: Reglas v1.5, MES-PvP 0 |
