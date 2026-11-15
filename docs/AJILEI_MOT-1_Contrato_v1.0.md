@@ -14,6 +14,7 @@
 - **Al día con MES-PvP, árbitro v1.3 (2026-11-08):** v1.3, la del árbitro que se despliega con las sub-tandas v1.3-a y v1.3-b. Recoge el sorteo sobre la mesa (el reparto según los participantes, el volteo de 5 s y las posiciones elegidas en la vista), el **mensaje de la mesa** (la excepción escrita a «por el canal solo versiones», §5) y la **recarga PvP** entera (§2, §3, §4, §6 y §7), según las Reglas de APU-1 v1.9 §8 y el informe de la Fase 0 del árbitro v1.3 (`docs/reportes/AJILEI_MES-PvP_Arbitro-v1.3_Fase0_Informe_v1.0.md`). La **reposición uno a uno** queda para la sub-tanda 5, con el Contrato v1.4 (§6). Las citas de lo nuevo son del árbol del STOP-C del v1.3-b.
 - **Al día con MES-PvP, sub-tanda 5b (2026-11-12):** v1.4, la del árbitro que se despliega con ella (solo la función `partida`, sin migración). Recoge la **reposición uno a uno** de las Reglas de APU-1 v1.11 §8.7: el árbitro espera lo que dura en el cliente, según el ritmo (§6, «Los vencimientos», «La reposición uno a uno», «El ritmo» y «Las esperas base»); la vista no cambia (§4). Las cifras salen del informe de la Fase 0 de la sub-tanda 5 (§B). Las citas de lo nuevo son del árbol del STOP-C de la 5b.
 - **Al día con MES-PvP, sub-tanda 8 (2026-11-14):** v1.5, la del árbitro que se despliega con ella (la función `partida`) y la migración `sub8`. Recoge la **pausa de anuncio** de las Reglas de APU-1 v1.12 §8.6 (después de las manos 7, 15, 22, 30, 37…, hasta 30 s; §6), los **puntos contra humanos encendidos**, **«Mano actual» entre personas**, `partida_asientos.manos` y el **tope de las sentadas** (§7), y cierra las filas de la 7a, la 7b y la 8 (§9). Diseño: el informe de la Fase 0 de la sub-tanda 8 (`docs/reportes/AJILEI_MES-PvP_Sub8_Fase0_Informe_v1.0.md`). Las citas de lo nuevo son del árbol del STOP-C de la 8.
+- **Al día con MES-PvP, sub-tanda 9 (2026-11-15):** sin versión nueva, porque el árbitro no cambia. El §9 cierra `vuelo` sin semilla.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -633,7 +634,7 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | **AMI-1:** borrar la cuenta del anfitrión se lleva en cascada la sala, la partida y los `partida_asientos` de todos (`salas.anfitrion_id on delete cascade`); el libro de puntos sobrevive (`mesa_id` sin FK) | `sal_a:90` · `mot1_esquema:62` · `mot1_dinero:300` | AMI-1 (Fase 0 de la 8, §D). No se arregla en MES-PvP |
 | Las cifras provisionales del §6 | `src/config/esperas.js` | La ola 0, con los teléfonos (P-6 de la 8) |
 | Modo guion | `gameEngine.js:560` · `deck.js:59` · `repartoGanador.js:143, :235-244` | Sin edición del motor; TUT-1/GUI-1 |
-| `vuelo` sin semilla | `diagDSK.mjs`, modo `vuelo` | Ninguna: MOT-1 no lo toca |
+| `vuelo` sin semilla | `diagDSK.mjs`, modo `vuelo` | Hecho: MES-PvP 9 (`VUELO_SEMILLAS`, INV-82) |
 | Reglas v1.4: motivos con otro nombre y «`pozos.js` no protegido» | Reglas v1.4 `:143` | Hecho: Reglas v1.5, MES-PvP 0 |
 | Protegidos §7.1, fila E-4: dice que el pozo deja de ser escalar | Protegidos §7.1 · `pozos.js:243` | Hecho: MES-PvP 0 |
 | **La reposición uno a uno** (árbitro y cliente), con Rápido ×0,5 en todo, y la mudanza de las `D_*` a `esperas.js` | `reloj.js` · `lib/reposicionCore.js` · `GameTable.jsx` | Hecho: MES-PvP 5b (Contrato v1.4), con su deploy y el control de las IAS |
