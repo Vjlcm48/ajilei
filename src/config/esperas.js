@@ -71,7 +71,7 @@ export const REPOSICION_CIERRE_SIN_VOLTEO_MS = 200
 export const AVISO_SALIDA_MS = 3000
 
 // El tope de la pausa de anuncio (contrato §6, «Publicidad»).
-export const PAUSA_ANUNCIO_MS = 45000
+export const PAUSA_ANUNCIO_MS = 30000
 
 // provisional · se cierra con los teléfonos. Árbitro v1.3 · la retención de la oferta de recarga
 // (Reglas de APU-1 v1.9 §8.1, «Fin de partida»; decisión P-3 de Victor): sin quien quebró quedaría

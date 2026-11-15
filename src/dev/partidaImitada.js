@@ -463,19 +463,19 @@ const ESCENAS_LM3 = {
   'anuncio-premium': { jugar: (m) => hasta(m, (e) => enPausa(e) && !e.asientos[m.yo].enAnuncio && e.asientos.some((a) => a.enAnuncio)), premium: true },
   // §3 · el cierre: en vivo, los demás vuelven del anuncio a los 3 s y la mano sigue…
   'anuncio-cierre': { jugar: (m) => hasta(m, (e) => enPausa(e) && !e.asientos[m.yo].enAnuncio && e.asientos.some((a) => a.enAnuncio)) },
-  // 5a · H.2 · quiebras en una mano de anuncio (la 5): la oferta sigue viva en la pausa de
+  // 5a · H.2 · quiebras en una mano de anuncio (la 7): la oferta sigue viva en la pausa de
   // anuncio, con la burbuja sin anillo (su final no se sabe).
   'recarga-anuncio': {
     minimo: 3,
     jugar: (m) => {
-      hasta(m, (e) => e.motor.handCount === 4 && enPago(e), retiradaRapida)
+      hasta(m, (e) => e.motor.handCount === 6 && enPago(e), retiradaRapida)
       pila(m, m.yo, APUESTA)
-      hasta(m, (e) => e.motor.handCount === 5 && enPago(e))
+      hasta(m, (e) => e.motor.handCount === 7 && enPago(e))
       exige(m.e.motor.players[m.yo].chips === 0)
       hasta(m, enPausa)
     },
   },
-  // … o nadie vuelve y vencen los 45 s (la escena llega con 6 s por delante).
+  // … o nadie vuelve y vencen los 30 s (la escena llega con 6 s por delante).
   'anuncio-vence': {
     jugar: (m) => {
       hasta(m, (e) => enPausa(e) && !e.asientos[m.yo].enAnuncio && e.asientos.some((a) => a.enAnuncio))

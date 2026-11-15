@@ -6,8 +6,8 @@ import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCor
 import { textoEnAnuncio } from '../lib/entreManosCore'
 
 // ── MES-PvP L-M 3 · §3 · La pausa de anuncio con su tarjeta ─────────
-// Sellado por Victor (2026-11-04 y 2026-11-05): la pausa cae antes de las manos 6, 12, 17, 23…
-// y dura hasta que todos vuelven o vencen 45 s.
+// Sellado por Victor (2026-11-04, 2026-11-05 y 2026-11-14): la pausa cae después de las manos 7, 15, 22, 30…
+// y dura hasta que todos vuelven o vencen 30 s.
 //   · Tu anuncio: simulado (todavía no hay red de anuncios), con «Omitir».
 //   · Si vuelves antes: una tarjeta que dice quién sigue en el anuncio, la frase sellada y
 //     «Quitar publicidad», que abre ahí mismo «Premium · Pronto», sin salir de la mesa.

@@ -56,8 +56,8 @@ export const esperaReposicion = (descartaron, ritmo) => Math.round(
   + REPOSICION_CIERRE_MS,
 )
 
-// Contrato §6, «Publicidad»: las manos 5, 11, 16, 22, 27, 33, 38, 44…
-export const llevaAnuncio = (mano) => mano % 11 === 5 || mano % 11 === 0
+// Contrato §6, «Publicidad» (v1.5): después de las manos 7, 15, 22, 30, 37, 45, 52, 60…
+export const llevaAnuncio = (mano) => mano % 15 === 7 || mano % 15 === 0
 
 export const ESPERA_TURNO_MS = TURN_TIME * 1000
 export const ESPERA_BARAJADO_MS = BARAJADO_MS

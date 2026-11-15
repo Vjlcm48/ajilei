@@ -96,7 +96,7 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
     expect(MANO_SIGUIENTE_MS).toBe(4000)
     expect(LECTURA_TRAS_REVELACION_MS).toBe(2000)
     expect(AVISO_SALIDA_MS).toBe(3000)
-    expect(PAUSA_ANUNCIO_MS).toBe(45000)
+    expect(PAUSA_ANUNCIO_MS).toBe(30000)
     expect(N_AUSENCIA).toBe(3)
     expect(AUSENTE_DESDE).toBe(2)
     // 5b · uno a uno: nadie descartó en la mesa de 3 (Normal) y una carta cada uno en la de 2 (Rápido).
@@ -118,9 +118,9 @@ describe('MOT-1 1b · las esperas y el ritmo', () => {
     expect(nucleo).not.toMatch(/const D_/)
   })
 
-  it('el anuncio va en las manos 5, 11, 16, 22, 27, 33, 38 y 44', () => {
-    const con = Array.from({ length: 45 }, (_, i) => i + 1).filter(llevaAnuncio)
-    expect(con).toEqual([5, 11, 16, 22, 27, 33, 38, 44])
+  it('el anuncio va después de las manos 7, 15, 22, 30, 37, 45, 52 y 60', () => {
+    const con = Array.from({ length: 60 }, (_, i) => i + 1).filter(llevaAnuncio)
+    expect(con).toEqual([7, 15, 22, 30, 37, 45, 52, 60])
   })
 
   it('las cifras son las que mide hoy la mesa, y el factor no se duplica', () => {

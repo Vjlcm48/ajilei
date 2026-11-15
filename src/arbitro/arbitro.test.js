@@ -863,7 +863,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
   const vuelve = (x, i, mano = x.motor.handCount) => pide(x, i, 'volver_anuncio', { mano }, 0)
 
   describe('la partida entera y sus pausas', () => {
-    it.each([2, 3, 5])('mesa de %i: solo en las manos 5 y 11, una con todos de vuelta y otra a los 45 s, y el dinero cuadra', (n) => {
+    it.each([2, 3, 5])('mesa de %i: solo en las manos 7 y 15, una con todos de vuelta y otra a los 30 s, y el dinero cuadra', (n) => {
       setRng(semilla(100 + n))
       let e = crearLlena(n)
       const total = sumaDinero(e)
@@ -874,30 +874,30 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
         if (enPausa(r.estado) && !enPausa(antes)) pausas.push(r.estado.motor.handCount)
       })
 
-      e = hacia(5)
+      e = hacia(7)
       expect(e.motor.phase).toBe(PHASES.PAYOUT)
       const cartas = JSON.stringify(e.motor.players.map((p) => p.cards))
       expect(vistaDe(e, 0).players.every((p) => p.enAnuncio)).toBe(true)
       for (let i = 0; i < n - 1; i++) {
         e = vuelve(e, i).estado
         expect(enPausa(e), 'falta alguien: la mano no arranca').toBe(true)
-        expect(e.motor.handCount).toBe(5)
+        expect(e.motor.handCount).toBe(7)
         expect(JSON.stringify(e.motor.players.map((p) => p.cards))).toBe(cartas)
         expect(vuelve(e, i).respuesta.motivo).toBe(M.YA_VOLVIO)
       }
       e = vuelve(e, n - 1).estado
-      expect(e.motor.handCount).toBe(6)
+      expect(e.motor.handCount).toBe(8)
       expect(e.motor.phase).toBe(PHASES.DEAL_2)
       expect(e.vencimiento.clase).toBe(CLASES.BARAJADO)
       expect(e.asientos.some((a) => a.enAnuncio)).toBe(false)
 
-      e = hacia(11)
+      e = hacia(15)
       const antes = e
       expect(pide(antes, 0, 'reclamar_vencimiento', {}, antes.vencimiento.hora - 1).respuesta.motivo).toBe(M.VENCIMIENTO_NO_CUMPLIDO)
       e = reclama(antes)
-      expect(e.motor.handCount).toBe(12)
+      expect(e.motor.handCount).toBe(16)
       expect(e.asientos.some((a) => a.enAnuncio)).toBe(false)
-      expect(pausas).toEqual([5, 11])
+      expect(pausas).toEqual([7, 15])
       expect(sumaDinero(e)).toBe(total)
 
       // Lo que entra es lo que sale: se levantan todos menos uno y la partida termina.
@@ -908,31 +908,31 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(suma(e.motor.players.map((p) => p.chips)) + e.motor.pot).toBe(0)
     })
 
-    it('la pausa dura 45 s desde que vence la mano siguiente', () => {
-      const e = jugarHasta(crearLlena(2), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+    it('la pausa dura 30 s desde que vence la mano siguiente', () => {
+      const e = jugarHasta(crearLlena(2), (x) => x.motor.handCount === 7 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
       const ahora = e.vencimiento.hora + 1234
       const r = pide(e, 0, 'reclamar_vencimiento', {}, ahora)
-      expect(r.estado.vencimiento).toEqual({ clase: CLASES.PAUSA_ANUNCIO, hora: ahora + 45000 })
+      expect(r.estado.vencimiento).toEqual({ clase: CLASES.PAUSA_ANUNCIO, hora: ahora + 30000 })
     })
 
     it('`fase` y `no_participa`: fuera de la pausa, con otra mano, y quien no sigue', () => {
       const fuera = hastaFase(hastaLaMano(2), PHASES.BET_1)
       expect(vuelve(fuera, 0).respuesta.motivo).toBe(M.FASE)
-      const e = pausaDeLaMano(crearLlena(3), 5)
-      expect(vuelve(e, 0, 4).respuesta.motivo).toBe(M.FASE)
+      const e = pausaDeLaMano(crearLlena(3), 7)
+      expect(vuelve(e, 0, 6).respuesta.motivo).toBe(M.FASE)
       expect(vuelve({ ...e, asientos: e.asientos.map((a, i) => (i === 1 ? { ...a, enAnuncio: false, sinAnuncio: true } : a)) }, 1).respuesta.motivo)
         .toBe(M.NO_PARTICIPA)
     })
 
     it('volver no choca con la versión de otro', () => {
-      const e = pausaDeLaMano(crearLlena(3), 5)
+      const e = pausaDeLaMano(crearLlena(3), 7)
       const una = vuelve(e, 0).estado
-      const r = aplicarAccion(una, { uid: 'u1', version: e.version, accion: 'volver_anuncio', mano: 5 }, { ahora: 0 })
+      const r = aplicarAccion(una, { uid: 'u1', version: e.version, accion: 'volver_anuncio', mano: 7 }, { ahora: 0 })
       expect(r.respuesta.ok).toBe(true)
     })
 
     it('quien no cubre el ante cobra al abrirse la pausa, una sola vez, y luego el aviso de salida', () => {
-      let e = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+      let e = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 7 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
       const total = sumaDinero(e)
       e = conJugador(conJugador(e, 0, { chips: e.motor.players[0].chips + e.motor.players[1].chips - 50 }), 1, { chips: 50 })
       expect(sumaDinero(e)).toBe(total)
@@ -958,7 +958,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
     describe('quien cobra al abrirse la pausa, hasta que `startHand` lo elimina', () => {
       // El asiento 1 no cubre el ante y está en medio: el turno tendría que saltarlo.
       function conCobrado() {
-        const e = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+        const e = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 7 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
         const antes = conJugador(conJugador(e, 0, { chips: e.motor.players[0].chips + e.motor.players[1].chips - 50 }), 1, { chips: 50 })
         return { antes, e: pide(antes, 0, 'reclamar_vencimiento').estado }
       }
@@ -968,14 +968,14 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
         expect(e.motor.players[1].eliminated).toBe(false)
         expect(e.asientos[1].cobrado).toBe(50)
         expect(e.motor.phase).toBe(PHASES.PAYOUT)
-        expect(e.motor.handCount).toBe(5)
+        expect(e.motor.handCount).toBe(7)
         expect(e.motor.players[1].cards).toEqual(antes.motor.players[1].cards)
 
         for (const [accion, campos, motivo] of [
           ['apostar', { tipo: 'pasar' }, M.FASE],
-          ['descartar', { mano: 5, indices: [] }, M.FASE],
+          ['descartar', { mano: 7, indices: [] }, M.FASE],
           ['elegir_carta_sorteo', { ronda: e.sorteo.ronda, carta: 0 }, M.FASE],
-          ['volver_anuncio', { mano: 5 }, M.NO_PARTICIPA],
+          ['volver_anuncio', { mano: 7 }, M.NO_PARTICIPA],
           ['reclamar_vencimiento', {}, M.VENCIMIENTO_NO_CUMPLIDO],
         ]) {
           const r = pide(e, 1, accion, campos, e.vencimiento.hora - 1)
@@ -996,11 +996,11 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
 
       it.each([
         ['vuelven los otros dos', (e) => vuelve(vuelve(e, 0).estado, 2).estado],
-        ['vencen los 45 s', (e) => reclama(e)],
+        ['vencen los 30 s', (e) => reclama(e)],
       ])('%s: la mano arranca sin él, el turno lo salta y el reloj no le cuenta', (_caso, cerrar) => {
         const { e } = conCobrado()
         const conAviso = cerrar(e)
-        expect(conAviso.motor.handCount).toBe(6)
+        expect(conAviso.motor.handCount).toBe(8)
         expect(conAviso.vencimiento.clase).toBe(CLASES.AVISO_SALIDA)
         expect(conAviso.motor.players[1]).toMatchObject({ eliminated: true, folded: true, cards: [], chips: 0, contribMano: 0 })
         expect(conAviso.motor.pot).toBe(2 * conAviso.motor.unit)
@@ -1014,7 +1014,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
         for (let i = 0; i < 60 && x.vencimiento.clase !== CLASES.MANO_SIGUIENTE; i++) {
           if (x.vencimiento.clase === CLASES.TURNO) turnos.add(x.motor.activePlayerIndex)
           expect(pide(x, 1, 'apostar', { tipo: 'pasar' }).respuesta.ok).toBe(false)
-          expect(pide(x, 1, 'descartar', { mano: 6, indices: [] }).respuesta.ok).toBe(false)
+          expect(pide(x, 1, 'descartar', { mano: 8, indices: [] }).respuesta.ok).toBe(false)
           expect(x.motor.players[1].cards).toEqual([])
           x = reclama(x)
           x.asientos.forEach((a, j) => { contados[j] += a.vencidos })
@@ -1029,7 +1029,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
     })
 
     it('un abandono dentro de la pausa cobra al instante y sin ante', () => {
-      const e = pausaDeLaMano(crearLlena(3), 5)
+      const e = pausaDeLaMano(crearLlena(3), 7)
       const total = sumaDinero(e)
       const pila = e.motor.players[2].chips
       const r = pide(e, 2, 'abandonar', {}, 0)
@@ -1039,36 +1039,36 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(sumaDinero(r.estado)).toBe(total)
       const uno = vuelve(r.estado, 0).estado
       const sigue = vuelve(uno, 1).estado
-      expect(sigue.motor.handCount).toBe(6)
+      expect(sigue.motor.handCount).toBe(8)
       expect(sigue.motor.players[2].contribMano).toBe(0)
       expect(sigue.vencimiento.clase).toBe(CLASES.BARAJADO)
     })
 
     it('si el abandono deja a alguien sin rivales, o era el último que faltaba, la pausa se cierra', () => {
-      const dos = pausaDeLaMano(crearLlena(2), 5)
+      const dos = pausaDeLaMano(crearLlena(2), 7)
       const r = pide(dos, 1, 'abandonar', {}, 0)
       expect(r.estado.motor.phase).toBe(PHASES.GAME_OVER)
       expect(r.efectos.at(-1).tipo).toBe('partida_terminada')
       expect(cobrado(r.estado)).toBe(sumaDinero(dos))
 
-      const tres = pausaDeLaMano(crearLlena(3), 5)
+      const tres = pausaDeLaMano(crearLlena(3), 7)
       const faltaUno = vuelve(vuelve(tres, 0).estado, 1).estado
       const ultimo = pide(faltaUno, 2, 'abandonar', {}, 0)
-      expect(ultimo.estado.motor.handCount).toBe(6)
+      expect(ultimo.estado.motor.handCount).toBe(8)
       expect(ultimo.efectos.filter((x) => x.tipo === 'salida').map((x) => x.asiento)).toEqual([2])
     })
 
     it('con un solo asiento que siga no hay pausa, y un Premium no entra en ella', () => {
-      let e = jugarHasta(crearLlena(2), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+      let e = jugarHasta(crearLlena(2), (x) => x.motor.handCount === 7 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
       e = conJugador(conJugador(e, 0, { chips: e.motor.players[0].chips + e.motor.players[1].chips - 50 }), 1, { chips: 50 })
       expect(reclama(e).motor.phase).toBe(PHASES.GAME_OVER)
 
-      const tres = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+      const tres = jugarHasta(crearLlena(3), (x) => x.motor.handCount === 7 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
       const conPremium = { ...tres, asientos: tres.asientos.map((a, i) => ({ ...a, sinAnuncio: i === 0 })) }
       expect(crearLlena(2).asientos.every((a) => a.sinAnuncio === false)).toBe(true)
       expect(reclama(conPremium).asientos.map((a) => a.enAnuncio)).toEqual([false, true, true])
       const todos = { ...tres, asientos: tres.asientos.map((a) => ({ ...a, sinAnuncio: true })) }
-      expect(reclama(todos).motor.handCount).toBe(6)
+      expect(reclama(todos).motor.handCount).toBe(8)
     })
   })
 
@@ -1132,7 +1132,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(jugo.estado.asientos[a].vencidos).toBe(0)
       expect(vistaDe(jugo.estado, 0).players[a].ausente).toBe(false)
 
-      const pausa = pausaDeLaMano(crearLlena(3), 5)
+      const pausa = pausaDeLaMano(crearLlena(3), 7)
       const enPausaConDos = { ...pausa, asientos: pausa.asientos.map((x) => ({ ...x, vencidos: 2 })) }
       expect(vuelve(enPausaConDos, 1).estado.asientos.map((x) => x.vencidos)).toEqual([2, 0, 2])
       expect(reclama(enPausaConDos).asientos.map((x) => x.vencidos)).toEqual([2, 2, 2])
@@ -1387,7 +1387,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
     })
 
     it('mesa de 2 · en la pausa de anuncio y en el sorteo: cobra sin ante y la partida termina', () => {
-      const pausa = pausaDeLaMano(crearLlena(2), 5)
+      const pausa = pausaDeLaMano(crearLlena(2), 7)
       terminaYCuadra(abandona(pausa, 1), 1, 0)
       const sorteo = abandona(crear(2), 1)
       terminaYCuadra(sorteo, 1, 0)
@@ -1522,7 +1522,7 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(vencido.asientos[a].vencidos).toBe(1)
       expect(vencido.ultimaAccion).toMatchObject({ asiento: a, porReloj: true })
 
-      const pausa = vieja(jugarHasta(crearLlena(2), (x) => x.motor.handCount === 5 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE))
+      const pausa = vieja(jugarHasta(crearLlena(2), (x) => x.motor.handCount === 7 && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE))
       expect(reclama(pausa).asientos.map((x) => x.enAnuncio)).toEqual([true, true])
     })
   })
@@ -1778,7 +1778,7 @@ describe('v1.3-b · la recarga PvP', () => {
   })
 
   it('la oferta sigue viva en la pausa de anuncio; quien no decidió, al acabarse, se sienta fuera (D7)', () => {
-    const r = pausaCon(3, { pilas: { 0: 0 }, antes: (x) => conMotor(x, { handCount: 5 }) })
+    const r = pausaCon(3, { pilas: { 0: 0 }, antes: (x) => conMotor(x, { handCount: 7 }) })
     const anuncio = pide(r.estado, 1, 'reclamar_vencimiento')
     const e = anuncio.estado
     expect(e.vencimiento.clase).toBe(CLASES.PAUSA_ANUNCIO)
@@ -1787,12 +1787,12 @@ describe('v1.3-b · la recarga PvP', () => {
     expect(vistaDe(e, 1).players[0].recarga).toBe('decide')
     // Recarga dentro de la pausa de anuncio, que sigue.
     const rec = conSaldo(e, 0, 'recargar', mano(e))
-    expect(recargas(rec)).toEqual([{ tipo: 'recarga', asiento: 0, monto: 1500, mano: 5 }])
+    expect(recargas(rec)).toEqual([{ tipo: 'recarga', asiento: 0, monto: 1500, mano: 7 }])
     expect(rec.estado.vencimiento.clase).toBe(CLASES.PAUSA_ANUNCIO)
     // Sin decidir: los demás vuelven, la pausa se acaba y se sienta fuera.
     let x = e
     for (const i of [1, 2]) x = pide(x, i, 'volver_anuncio', mano(x)).estado
-    expect(x.motor.handCount).toBe(6)
+    expect(x.motor.handCount).toBe(8)
     expect(x.asientos[0]).toMatchObject({ fuera: 'mano', cobrado: null })
   })
 

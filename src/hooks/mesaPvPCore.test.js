@@ -56,7 +56,7 @@ describe('MES-PvP 2 · el reloj', () => {
     expect(relojDe({ clase: 'turno', hora: 90_000 }, 0).timeLeft).toBe(20)
     expect(relojDe({ clase: 'descarte', hora: 90_000 }, 0).timeLeft).toBe(20)
     expect(relojDe({ clase: 'eleccion_sorteo', hora: 90_000 }, 0).timeLeft).toBe(10)
-    expect(relojDe({ clase: 'pausa_anuncio', hora: 90_000 }, 0).timeLeft).toBe(45)
+    expect(relojDe({ clase: 'pausa_anuncio', hora: 90_000 }, 0).timeLeft).toBe(30)
     expect(Object.keys(TOPE_RELOJ_MS)).toHaveLength(4)
   })
 
