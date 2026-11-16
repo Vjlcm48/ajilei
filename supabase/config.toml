@@ -21,6 +21,12 @@
 #
 # `supabase link` completa el resto en `supabase/.temp/`, que git ignora.
 #
+# CLI v3 (desde MED-1a, 2026-11): todo comando contra la nube lleva `--remote`
+# (`db push --remote`, `migration list --remote`) y pide confirmación, con «No»
+# por defecto; `--linked` y `--project-ref` siguen funcionando, con aviso. Sin
+# `--remote`, `db push` apunta a la pila local, que aquí no existe. El deploy
+# sigue siendo `functions deploy <nombre> --use-api --no-verify-jwt`.
+#
 # ── LO QUE NO ESTÁ AQUÍ ────────────────────────────────────────────────────
 # Ninguna credencial. Ni el `project-ref`, que va en la línea de comandos de
 # Victor; ni el token de acceso, que `supabase login` guarda en el perfil del
