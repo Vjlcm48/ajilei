@@ -15033,33 +15033,57 @@ async function runSaldo(browser) {
 
   // ── saldo.5 · `saldo_insuficiente` en Armar una mesa ───────────────────────
   {
+    // MED-1a T0-b · el chip se elige por su VALOR y la nota se deriva de la regla.
+    // Hasta aquí pulsaba `:nth-of-type(3)` y esperaba «2.500»: desde MES-PvP 7b-a la
+    // lista empieza en 50 (el tercero es el 200) y la Corta pide 15×, no 5×. Ahora
+    // la apuesta es la mayor que la cifra servida alcanza en la Corta y que 900 ya
+    // no alcanza (hoy, 200), y la siguiente nace apagada (hoy, 500): las dos salen de
+    // `APUESTAS_PVP` y `saldoMinimo`, las mismas fuentes que `ArmarMesa`.
+    const { APUESTAS_PVP, saldoMinimo } = await import('../src/config/salas.js')
+    const SALDO_TRAS = 900
+    const pulsada = APUESTAS_PVP.filter((hc) => saldoMinimo(hc) <= SALDO_SERVIDO).at(-1)
+    const apagada = APUESTAS_PVP.find((hc) => hc > pulsada)
+    if (!pulsada || !apagada || saldoMinimo(pulsada) <= SALDO_TRAS) {
+      throw new ErrorInstrumento(`saldo.5: con ${SALDO_SERVIDO} → ${SALDO_TRAS} no hay escenario (apuesta ${pulsada}, siguiente ${apagada})`)
+    }
+    const chip = (page, hc) => page.locator('[data-accion="apuesta"]', { hasText: new RegExp(`^${montoTexto(hc).replaceAll('.', '\\.')}$`) })
+    const chips = async (page) => ({
+      cuantos: await chip(page, pulsada).count(),
+      pulsadaApagada: await chip(page, pulsada).isDisabled(),
+      siguienteApagada: await chip(page, apagada).isDisabled(),
+    })
     const b = { saldo: SALDO_SERVIDO, errores: { crear_sala: 'saldo_insuficiente' } }
     const c = await saldoContexto(browser, b)
     await c.page.goto(BASE_PROD)
     await c.page.waitForSelector('main.lobby .lob-pildora[data-saldo="listo"]')
     await saldoIr.opciones(c.page)
     await saldoIr.armar(c.page)
-    await c.page.click('[data-accion="apuesta"]:nth-of-type(3)')        // 500
+    const chipsAntes = await chips(c.page)
+    await chip(c.page, pulsada).click()
     await c.page.waitForTimeout(120)
-    const antes = { pildora: await leerPildora(c.page), lecturas: b.lecturas ?? 0 }
+    const antes = { pildora: await leerPildora(c.page), lecturas: b.lecturas ?? 0, chips: chipsAntes }
     // El servidor sabe otra cosa: entre la lectura y el toque, el saldo bajó.
-    b.saldo = 900
+    b.saldo = SALDO_TRAS
     await c.page.click('[data-accion="cta"]')
-    await c.page.waitForFunction(() => document.querySelector('.lob-pildora .bd-num')?.textContent?.trim() === '900', null, { timeout: 10000 })
+    await c.page.waitForFunction((t) => document.querySelector('.lob-pildora .bd-num')?.textContent?.trim() === t,
+      saldoTexto(SALDO_TRAS), { timeout: 10000 })
     await c.page.waitForTimeout(120)
-    const despues = await c.page.evaluate(() => ({
-      nota: document.querySelector('[data-accion="cta-nota"]')?.textContent?.trim() ?? '',
-      chip500Apagado: document.querySelector('[data-accion="apuesta"]:nth-of-type(3)')?.disabled ?? null,
-    }))
+    const despues = {
+      nota: (await c.page.textContent('[data-accion="cta-nota"]'))?.trim() ?? '',
+      chips: await chips(c.page),
+    }
     const pildora = await leerPildora(c.page)
     await c.page.screenshot({ path: `${SALDO_OUT_DIR}/saldo5_insuficiente.png` })
     errores.push(...c.errores)
     await c.ctx.close()
+    const notaEsperada = { min: montoTexto(saldoMinimo(pulsada)), hc: montoTexto(pulsada) }
     puntos['saldo.5'] = {
-      antes, despues, pildora, lecturas: b.lecturas,
+      pulsada, apagada, notaEsperada, antes, despues, pildora, lecturas: b.lecturas,
       ok: antes.pildora?.texto === servida && antes.lecturas === 1
-        && b.lecturas === 2 && pildora?.texto === '900' && pildora.estado === 'listo'
-        && despues.nota.includes('2.500') && despues.chip500Apagado === true,
+        && chipsAntes.cuantos === 1 && chipsAntes.pulsadaApagada === false && chipsAntes.siguienteApagada === true
+        && b.lecturas === 2 && pildora?.texto === saldoTexto(SALDO_TRAS) && pildora.estado === 'listo'
+        && despues.nota.includes(`${notaEsperada.min} HC`) && despues.nota.endsWith(` ${notaEsperada.hc}`)
+        && despues.chips.pulsadaApagada === true && despues.chips.siguienteApagada === true,
     }
   }
 
