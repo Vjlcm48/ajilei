@@ -417,7 +417,7 @@ if (!EXTERNO) process.env.LUZ_BASE_PORTADA = process.env.REV_BASE_PORTADA = `htt
 // `.env.local` de la máquina (Fase 0 de ARN-3, B3). `humo` corre `lob`, así que
 // también levanta el preview, en `--puerto-aux=N` o 4173. `rec` y
 // `voz2.burbuja` se quedan en 5173 a propósito: `?apu=` solo existe en DEV.
-// ARN-4 A6 · en `apu`, `u3` y `vuelo` (MES-PvP 9), `--semilla=N` sustituye a las
+// ARN-4 A6 · en `apu`, `u3`, `vuelo` (MES-PvP 9), `h1` y `z1` (MED-1a T0), `--semilla=N` sustituye a las
 // selladas: es como se elige otra cuando una envejece (`arnes/siembra.mjs`).
 // `msg --semilla=azar` (o `--semilla=N`) es EXPLORACIÓN: juega otra población
 // de manos y anota la semilla en el JSON. No es la vara: la vara son las
@@ -477,10 +477,13 @@ if (!MODOS_DSK.includes(MODE)) {
   await fallarInstrumento(new ErrorInstrumento(`modo desconocido: «${MODE}». Los modos son: ${MODOS_DSK.join(', ')}`))
 }
 // ARN-3c · D7 · `--semilla` se valida ANTES de levantar nada (un preview compila).
-if (MSG_SEMILLA_ARG && (!['msg', 'apu', 'u3', 'vuelo'].includes(MODE) || MSG_SEMILLA_ARG.modo === 'invalida')) {
-  await fallarInstrumento(new ErrorInstrumento(`--semilla solo vale en «msg», «apu», «u3» y «vuelo», y como «azar» o un entero (recibido: ${JSON.stringify(MSG_SEMILLA_ARG)})`))
+if (MSG_SEMILLA_ARG && (!['msg', 'apu', 'u3', 'vuelo', 'h1', 'z1'].includes(MODE) || MSG_SEMILLA_ARG.modo === 'invalida')) {
+  await fallarInstrumento(new ErrorInstrumento(`--semilla solo vale en «msg», «apu», «u3», «vuelo», «h1» y «z1», y como «azar» o un entero (recibido: ${JSON.stringify(MSG_SEMILLA_ARG)})`))
 }
 const semillaDe = (sellada) => (MODE !== 'msg' && MSG_SEMILLA_ARG ? MSG_SEMILLA_ARG.base : sellada)
+// MED-1a T0-c · `h1` y `z1`: una semilla por vara (`comun`) y, solo si una celda no da
+// su caso con ella, la suya con la clave «<mesa> <ancho>x<alto>».
+const semillaDeCelda = (mapa, n, vp) => semillaDe(mapa[`${n} ${vp.w}x${vp.h}`] ?? mapa.comun)
 
 // ── Metadatos del instrumento (ARN-1) ────────────────────────────────────────
 // Se vuelcan en cada JSON de salida. Un número de esta tanda que no aparezca
@@ -5030,6 +5033,11 @@ const h1Delta = (a, b, keys = H1_ANCHORS, derecha = []) => {
   return { max: Math.round(max * 100) / 100, who }
 }
 
+// MED-1a T0-c · el azar va sembrado (INV-82). Sin semilla, T5 1920×937 salía roja
+// alguna vez porque la mano acababa sin pasar por «sin rol» (línea base de
+// `b9474c7`, frames=194). Si una semilla deja de dar el ciclo, la celda sale «sin
+// cobertura · re-elegir semilla», no roja: se elige otra con `h1 --semilla=N`.
+const H1_SEMILLAS = { comun: 1 }
 async function runH1(browser) {
   const out = []
   const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
@@ -5038,6 +5046,8 @@ async function runH1(browser) {
     if (tblFilter && n !== tblFilter) continue
     if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
     const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    const semilla = semillaDeCelda(H1_SEMILLAS, n, vp)
+    await sembrarAzar(page, semilla)
     await gotoMesa(page, n); await installProbes(page)
     await page.waitForTimeout(300); await page.mouse.move(5, 5)
 
@@ -5173,12 +5183,19 @@ async function runH1(browser) {
 
     // D8 · el turno fantasma es una invariante: si se rompe, es rojo.
     const sinFantasma = juego.fantasmas.length === 0
+    // MED-1a T0-c · las puertas de COBERTURA (turno visto on y off, el ciclo de roles,
+    // el Pie en las cabeceras) salen de `passed` y deciden el `estado` (ARN-3b D4): con
+    // la semilla fija, un ciclo que no se dio es «re-elegir semilla», no un rojo. La
+    // geometría y el fantasma siguen siendo puerta.
+    const cubierta = sawTurnOn && sawTurnOff && roleCycleOk && headSawPie
     const passed = nameReserved && numRightFixed && growsLeft && mesaAligned && !!mesaBelow &&
-      sepGone && fichasGone && saldoBlockFixed && cycleStable && sawTurnOn && sawTurnOff && overflowOk &&
-      roleCycleOk && headsStable && headSawPie &&
-      (!ovalGated || ovalStable) && sinFantasma
+      sepGone && fichasGone && saldoBlockFixed && cycleStable && overflowOk &&
+      headsStable && (!ovalGated || ovalStable) && sinFantasma
+    const motivoCobertura = cubierta ? null
+      : `la semilla ${semilla} no dio el ciclo (turno ${sawTurnOn}/${sawTurnOff}, Mano ${sawMano}, Pie ${sawPie}, sin rol ${sawNoRole}, Pie en cabecera ${headSawPie}): ${AVISO_SEMILLA}`
 
     out.push({
+      estado: estadoCelda({ cubierta }), motivoCobertura, semilla,
       juego: resumenJuego(juego), sinFantasma,
       table: n, vp, route,
       routeCommon: route.playerZone && route.playerBar &&
@@ -5195,7 +5212,7 @@ async function runH1(browser) {
       passed,
     })
     // ARN-4d · una línea por celda: sin ella, un log cortado no distingue lenta de colgada.
-    console.log(`h1 T${n} ${vp.w}x${vp.h} · frames=${states.length} · ${passed ? 'OK' : 'ROJO'}`)
+    console.log(`h1 T${n} ${vp.w}x${vp.h} · semilla=${semilla} · frames=${states.length} · roles=${rolesSeen.join('/')}${sawNoRole ? '/sin rol' : ''} · cabeceras Δmáx=${headWorst.max}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'ROJO'}`)
     await page.close()
   }
   return out
@@ -6124,6 +6141,11 @@ const z1Delta = (a, b) => {
   return { max: round(max), who }
 }
 
+// MED-1a T0-c · el azar va sembrado (INV-82). Sin semilla, T5 1920×937 se quedaba
+// alguna vez sin cartas de cara (la mano no cerró con una IA pensando; línea base
+// de `b9474c7`). Si una semilla deja de dar el pago con cartas de cara, la celda sale
+// «sin cobertura · re-elegir semilla»: se elige otra con `z1 --semilla=N`.
+const Z1_SEMILLAS = { comun: 1 }
 async function runZ1(browser) {
   const out = []
   const tblFilter = process.argv[3] ? Number(process.argv[3]) : null
@@ -6132,6 +6154,8 @@ async function runZ1(browser) {
     if (tblFilter && n !== tblFilter) continue
     if (vpFilter && `${vp.w}x${vp.h}` !== vpFilter) continue
     const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h } })
+    const semilla = semillaDeCelda(Z1_SEMILLAS, n, vp)
+    await sembrarAzar(page, semilla)
     await gotoMesa(page, n); await installProbes(page); await z1Install(page)
     await page.waitForTimeout(300); await page.mouse.move(5, 5)
     const tok = await page.evaluate(() => window.__z1tokens())
@@ -6241,12 +6265,13 @@ async function runZ1(browser) {
     const sinFantasma = juego.fantasmas.length === 0
     const passed = checks.every(c => c.ok) && (!choreo || (choreo.completed && choreo.hoverSuppressed)) && sinFantasma
     out.push({
-      estado: estadoCelda({ cubierta }), motivoCobertura: cubierta ? null : 'ninguna mano llegó al pago con cartas de cara',
+      estado: estadoCelda({ cubierta }), semilla,
+      motivoCobertura: cubierta ? null : `la semilla ${semilla}: ninguna mano llegó al pago con cartas de cara: ${AVISO_SEMILLA}`,
       juego: resumenJuego(juego), sinFantasma,
       table: n, vp, tokens: tok, cards: cards.length, checks, choreo, passed,
     })
     const bad = checks.filter(c => !c.ok)
-    console.log(`T${n} ${vp.w}x${vp.h} · cartas=${cards.length} · escala=${[...new Set(checks.map(c => c.scaleW))].join('/')} (tok ${tok.scale}) · ancla Δmáx=${round(Math.max(0, ...checks.map(c => c.anchorDrift)))} · resto Δmáx=${round(Math.max(0, ...checks.map(c => c.delta.max)))} · nombre ok=${checks.every(c => c.nameOk)} · coreo=${choreo ? (choreo.completed ? 'completa' : 'ROTA') + '/' + (choreo.hoverSuppressed ? 'suprimido' : 'NO-SUPR') : 'n/a'}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'FAIL' + (bad.length ? ' [' + bad.slice(0, 2).map(b => `${b.seat}#${b.idx}${b.encima ? ' bajo ' + b.encima : ''}`).join(',') + ']' : '')}`)
+    console.log(`T${n} ${vp.w}x${vp.h} · semilla=${semilla} · manos=${juego.manos} · cartas=${cards.length} · escala=${[...new Set(checks.map(c => c.scaleW))].join('/')} (tok ${tok.scale}) · ancla Δmáx=${round(Math.max(0, ...checks.map(c => c.anchorDrift)))} · resto Δmáx=${round(Math.max(0, ...checks.map(c => c.delta.max)))} · nombre ok=${checks.every(c => c.nameOk)} · coreo=${choreo ? (choreo.completed ? 'completa' : 'ROTA') + '/' + (choreo.hoverSuppressed ? 'suprimido' : 'NO-SUPR') : 'n/a'}${notaJuego(juego)}${cubierta ? '' : ' · SIN COBERTURA'} · ${passed ? 'OK' : 'FAIL' + (bad.length ? ' [' + bad.slice(0, 2).map(b => `${b.seat}#${b.idx}${b.encima ? ' bajo ' + b.encima : ''}`).join(',') + ']' : '')}`)
   }
   return out
 }
