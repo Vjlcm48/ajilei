@@ -1,4 +1,4 @@
-# AJILEI · MOT-1 · Contrato del árbitro · v1.5
+# AJILEI · MOT-1 · Contrato del árbitro · v1.6
 
 - **Normativo de MOT-1.** Las fichas 1b–1f se escriben contra este documento: lo que no esté aquí no se construye.
 - **Base:** `main` en `1f5cb14`. Toda cita `archivo:líneas` es de ese árbol.
@@ -15,6 +15,7 @@
 - **Al día con MES-PvP, sub-tanda 5b (2026-11-12):** v1.4, la del árbitro que se despliega con ella (solo la función `partida`, sin migración). Recoge la **reposición uno a uno** de las Reglas de APU-1 v1.11 §8.7: el árbitro espera lo que dura en el cliente, según el ritmo (§6, «Los vencimientos», «La reposición uno a uno», «El ritmo» y «Las esperas base»); la vista no cambia (§4). Las cifras salen del informe de la Fase 0 de la sub-tanda 5 (§B). Las citas de lo nuevo son del árbol del STOP-C de la 5b.
 - **Al día con MES-PvP, sub-tanda 8 (2026-11-14):** v1.5, la del árbitro que se despliega con ella (la función `partida`) y la migración `sub8`. Recoge la **pausa de anuncio** de las Reglas de APU-1 v1.12 §8.6 (después de las manos 7, 15, 22, 30, 37…, hasta 30 s; §6), los **puntos contra humanos encendidos**, **«Mano actual» entre personas**, `partida_asientos.manos` y el **tope de las sentadas** (§7), y cierra las filas de la 7a, la 7b y la 8 (§9). Diseño: el informe de la Fase 0 de la sub-tanda 8 (`docs/reportes/AJILEI_MES-PvP_Sub8_Fase0_Informe_v1.0.md`). Las citas de lo nuevo son del árbol del STOP-C de la 8.
 - **Al día con MES-PvP, sub-tanda 9 (2026-11-15):** sin versión nueva, porque el árbitro no cambia. El §9 cierra `vuelo` sin semilla.
+- **Al día con MED-1a, tanda 1 (2026-11-16):** v1.6, la del árbitro que se despliega con ella (la función `partida`) **después** de la migración `med1a`. La pausa de anuncio se **mide**, sin cambiar: tres efectos sin dinero, `anuncio_inicio`, `anuncio_omitido` y `anuncio_vuelto` (§2 `volver_anuncio`, §6 «Publicidad», §7 «Los efectos de medición»). **Regla nueva: la medición nunca tumba la mesa.** Diseño: el informe de la Fase 0 de MED-1a (`docs/reportes/AJILEI_MED-1a_Fase0_Informe_v1.0.md`, §B.2). Las Reglas de APU-1 no cambian (v1.12). Las citas de lo nuevo son del árbol del STOP-C de la T1.
 
 **Abreviaturas de migraciones** (`supabase/migrations/`):
 
@@ -36,6 +37,7 @@
 | `v13_recarga` | `20261108120000_mespvp_v13_recarga.sql` |
 | `sub7a` | `20261113150000_mespvp_sub7a_duracion_sala.sql` |
 | `sub8` | `20261114120000_mespvp_sub8_consulta_pvp_manos.sql` |
+| `med1a` | `20261116120000_med1a_eventos.sql` |
 
 ---
 
@@ -162,7 +164,7 @@ El abandono por regla de una partida por cuenta no pasa por esta acción: lo mar
 |---|---|
 | **Campos** | `mano`: el `handCount` de la mano que acaba de cerrar |
 | **Precondiciones** | Pausa de anuncio abierta (§6) · `mano` es la de la pausa · el asiento está en `enAnuncio` |
-| **Efecto** | Saca el asiento de `enAnuncio` y pone a 0 su cuenta de ausencia (§6). Si no queda nadie en anuncio, cierra la pausa y arranca la mano |
+| **Efecto** | Saca el asiento de `enAnuncio` y pone a 0 su cuenta de ausencia (§6). Si no queda nadie en anuncio, cierra la pausa y arranca la mano. **v1.6:** emite `anuncio_omitido { asiento, mano, ms }` (§7, «Los efectos de medición»); un rechazo no emite nada |
 | **Motivos** | `fase` · `no_participa` · `ya_volvio` |
 
 ### `recargar` (v1.3)
@@ -482,6 +484,7 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 | Quien no cubre el ante | Cobra al abrirse la pausa (§7). v1.3 · con la recarga encendida, no: decide durante la pausa (arriba, «La recarga») |
 | Fin de la pausa | Todos volvieron (`volver_anuncio`), vencen los 30 s (`PAUSA_ANUNCIO_MS`, `esperas.js:74`; v1.5), o quedan ≤1 que sigan porque los demás abandonaron. Entonces sale `enAnuncio` de todos y se llama a `startHand` |
 | Quien sigue en su anuncio al arrancar la mano | Nada especial: su ante se cobra y sus relojes corren, como los de cualquiera |
+| Lo que se mide (v1.6) | Al abrirse, un `anuncio_inicio` por asiento que ve el anuncio. Al pulsar «Omitir», `anuncio_omitido` con los ms desde la apertura. Al cerrarse, un `anuncio_vuelto` por quien seguía en el anuncio: `como = 'tope'` si vencieron los 30 s, `'mesa'` si quedaron ≤1 que sigan. Quien abandona dentro de la pausa no emite vuelta. Los ms los pone el árbitro con su reloj: la pausa abrió en `vencimiento.hora − 30 s` (`partida.js:328`). **El anuncio es simulado: no existe «visto entero».** Cuando haya una red de anuncios, `volver_anuncio` llevará un campo `visto` (otro Contrato) |
 
 ---
 
@@ -511,6 +514,20 @@ Las pantallas y los textos están en Tienda §10.1. Lo que el árbitro manda:
 | El resultado de la pantalla final, v1.3 | `cobrado − (entrada + recargas)`, con `entrada` **la de la mesa** (la de la sala, `vistaAMesa.js:88`) y `recargas` de la vista privada (`vistaAMesa.js:100`, `vozHumanos.js:135`). La base sube `partida_asientos.entrada` con cada recarga: usar esa contaría lo recargado dos veces |
 | Ni tope ni válvula, v1.3 | `limite_dinero()` no encaja (lee `auth.uid()`, y las RPC del árbitro no lo leen); el freno lo da el árbitro: un pedido por pausa y nunca por encima de la entrada. La válvula de ECO-1 no aplica a PvP |
 | `partida_asientos.manos`, v1.5 | Cada `mano_cerrada` suma 1 a los asientos sin cobrar (`aplicar_efectos`, `sub8`). Todos arrancan juntos y en la mano 1 nadie está sentado fuera: dos asientos con `manos ≥ 1` en la misma sala jugaron juntos al menos una mano (AMI-1). Quien se sienta fuera de una mano también la suma |
+
+### Los efectos de medición (v1.6)
+
+Sin dinero: ninguno toca `pila`, `pozo`, `saldo` ni `neto_mesa`, y `mesa_cuadra` corre como con cualquier jugada con efectos. `aplicar_efectos` los anota en `eventos`, con la cuenta del asiento (`partida_asientos.uid`; nula si la cuenta se borró) y `datos = { sala, mano, asiento[, ms, como] }` (`med1a`).
+
+| Efecto | Campos | Cuándo (árbitro) |
+|---|---|---|
+| `anuncio_inicio` | `asiento`, `mano` | Se abre la pausa: uno por asiento que ve el anuncio (`trasManoSiguiente`, `partida.js:346`) |
+| `anuncio_omitido` | `asiento`, `mano`, `ms` | `volver_anuncio` aceptado (`volverAnuncio`, `partida.js:518`) |
+| `anuncio_vuelto` | `asiento`, `mano`, `ms`, `como` (`'tope'` · `'mesa'`) | Se cierra la pausa con el asiento aún en el anuncio (`cerrarPausa`, `partida.js:358`; `'tope'` desde el vencimiento, `'mesa'` desde `seguirPausa`, también al abandonar) |
+
+`mano` es el `handCount` de la mano que acaba de cerrar, la misma que lleva `volver_anuncio`. `ms` es un entero ≥ 0 desde la apertura; si dos instancias de la función discrepan de reloj, el árbitro lo deja en 0, nunca negativo.
+
+**La medición nunca tumba la mesa.** Un `anuncio_*` que la base no entiende (asiento fuera de la mesa, sin `mano`, `ms` que falta o es negativo, `como` desconocido, números que no son números) no lanza `estado_incoherente`: queda en `eventos` como `medicion_invalida` (`jugador_id` nulo, `datos = { sala, efecto }` con el efecto en bruto) y la jugada se aplica. Los efectos de dinero y el tipo desconocido siguen lanzando, como antes. Por eso el orden del despliegue es: primero la migración, después la función.
 
 ### Qué debe cumplir la 1d-ii
 
@@ -635,6 +652,7 @@ Regla de ECO-1, en todos los modos. Todo esto va a la 1d-ii.
 | Las cifras provisionales del §6 | `src/config/esperas.js` | La ola 0, con los teléfonos (P-6 de la 8) |
 | Modo guion | `gameEngine.js:560` · `deck.js:59` · `repartoGanador.js:143, :235-244` | Sin edición del motor; TUT-1/GUI-1 |
 | `vuelo` sin semilla | `diagDSK.mjs`, modo `vuelo` | Hecho: MES-PvP 9 (`VUELO_SEMILLAS`, INV-82) |
+| **Medir la pausa de anuncio** (v1.6): `anuncio_inicio`, `anuncio_omitido`, `anuncio_vuelto` en `eventos`, y la regla «la medición nunca tumba la mesa» | `partida.js` · `med1a` | Hecho: MED-1a, tanda 1 (migración antes del deploy) |
 | Reglas v1.4: motivos con otro nombre y «`pozos.js` no protegido» | Reglas v1.4 `:143` | Hecho: Reglas v1.5, MES-PvP 0 |
 | Protegidos §7.1, fila E-4: dice que el pozo deja de ser escalar | Protegidos §7.1 · `pozos.js:243` | Hecho: MES-PvP 0 |
 | **La reposición uno a uno** (árbitro y cliente), con Rápido ×0,5 en todo, y la mudanza de las `D_*` a `esperas.js` | `reloj.js` · `lib/reposicionCore.js` · `GameTable.jsx` | Hecho: MES-PvP 5b (Contrato v1.4), con su deploy y el control de las IAS |
