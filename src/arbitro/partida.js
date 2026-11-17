@@ -12,6 +12,9 @@
 //   · `salida`            `liberacion_pvp` de un asiento, una sola vez. Con monto 0 no
 //                         hay movimiento (`eco1a:181`).
 //   · `partida_terminada` el motor llegó a `GAME_OVER`.
+//   · `anuncio_inicio`, `anuncio_omitido`, `anuncio_vuelto` (v1.6, MED-1a): la pausa de anuncio,
+//                         medida. Sin dinero: la base los anota en `eventos`, y uno mal formado
+//                         queda como `medicion_invalida` sin tumbar la jugada.
 //
 // Quien sale se lleva su pila: al emitir `salida`, `players[i].chips` queda en 0 y el
 // monto pasa a `asientos[i].cobrado`. Pilas + pozo + cobrado es constante, y la pila
@@ -319,6 +322,16 @@ const veAnuncio = (estado, i) => sigue(estado, i) && !estado.asientos[i].sinAnun
 
 const pausaAbierta = ({ vencimiento }) => vencimiento?.clase === CLASES.PAUSA_ANUNCIO
 
+// v1.6 (MED-1a) · la pausa, medida. Sin dinero. Los ms van desde la apertura con el reloj del
+// árbitro: el tope es constante, así que la pausa abrió en `vencimiento.hora − 30 s`. A cero
+// como mínimo: dos instancias de la función pueden discrepar unos ms de reloj.
+const msDePausa = (estado, ahora) => Math.max(0, Math.round(ahora - (estado.vencimiento.hora - ESPERA_PAUSA_ANUNCIO_MS)))
+
+// Quien seguía en el anuncio cuando la pausa se cierra: por el tope o porque la mesa se vació.
+const anunciosVueltos = (estado, ahora, como) => (!pausaAbierta(estado) ? [] : estado.asientos.flatMap((a, i) => (
+  a.enAnuncio ? [{ tipo: 'anuncio_vuelto', asiento: i, mano: estado.motor.handCount, ms: msDePausa(estado, ahora), como }] : []
+)))
+
 function trasManoSiguiente(estado, ahora) {
   const { motor } = estado
   const hayPausa = llevaAnuncio(motor.handCount)
@@ -329,19 +342,24 @@ function trasManoSiguiente(estado, ahora) {
   // v1.3 · la oferta sigue viva en la pausa de anuncio (D7): quien decide no sale aquí.
   const noCubre = (a, i) => !motor.players[i].eliminated && motor.players[i].chips < motor.unit && fueraDe(a) === null
   const { estado: liquidado, efectos } = liquidar(estado, noCubre)
+  const asientos = liquidado.asientos.map((a, i) => ({ ...a, enAnuncio: veAnuncio(estado, i) }))
+  const inicios = asientos.flatMap((a, i) => (a.enAnuncio ? [{ tipo: 'anuncio_inicio', asiento: i, mano: motor.handCount }] : []))
   return {
     estado: {
       ...liquidado,
-      asientos: liquidado.asientos.map((a, i) => ({ ...a, enAnuncio: veAnuncio(estado, i) })),
+      asientos,
       vencimiento: en(CLASES.PAUSA_ANUNCIO, ahora + ESPERA_PAUSA_ANUNCIO_MS),
     },
-    efectos,
+    efectos: [...efectos, ...inicios],
   }
 }
 
-function cerrarPausa(estado, ahora) {
+// `como`: 'tope' si vencen los 30 s, 'mesa' si se cierra sola (`seguirPausa`).
+function cerrarPausa(estado, ahora, como) {
+  const vueltos = anunciosVueltos(estado, ahora, como)
   const asientos = estado.asientos.map((a) => ({ ...a, enAnuncio: false }))
-  return resolverOfertas({ ...estado, asientos }, ahora)
+  const sigue = resolverOfertas({ ...estado, asientos }, ahora)
+  return vueltos.length === 0 ? sigue : { estado: sigue.estado, efectos: [...vueltos, ...sigue.efectos] }
 }
 
 // v1.3 · D8 · vence la pausa entre manos (o la de anuncio) con alguien decidiendo.
@@ -372,10 +390,11 @@ function resolverOfertas(estado, ahora) {
 const retencionResuelta = (estado) => estado.vencimiento?.clase === CLASES.OFERTA_RECARGA
   && (indecisos(estado).length === 0 || cuantosSiguen(estado) >= 2)
 
-// Se acaba sola cuando ya no queda a quién esperar, o nadie con quien jugar.
+// Se acaba sola cuando ya no queda a quién esperar, o nadie con quien jugar. En el segundo caso,
+// quien seguía en el anuncio vuelve «por la mesa» (v1.6).
 function seguirPausa(estado, ahora) {
   const nadieEnAnuncio = !estado.asientos.some((a) => a.enAnuncio)
-  return nadieEnAnuncio || cuantosSiguen(estado) <= 1 ? cerrarPausa(estado, ahora) : { estado, efectos: [] }
+  return nadieEnAnuncio || cuantosSiguen(estado) <= 1 ? cerrarPausa(estado, ahora, 'mesa') : { estado, efectos: [] }
 }
 
 // ── El descarte ─────────────────────────────────────────────────────────────
@@ -500,7 +519,10 @@ function volverAnuncio(estado, asiento, peticion, ahora) {
   if (!pausaAbierta(estado) || peticion.mano !== estado.motor.handCount) return M.FASE
   if (!estado.asientos[asiento].enAnuncio) return veAnuncio(estado, asiento) ? M.YA_VOLVIO : M.NO_PARTICIPA
   const asientos = estado.asientos.map((a, i) => (i === asiento ? { ...a, enAnuncio: false } : a))
-  return seguirPausa({ ...estado, asientos }, ahora)
+  // v1.6 · pulsó «Omitir»: solo aquí, que es cuando estaba en el anuncio (lo de arriba rechaza).
+  const omitido = { tipo: 'anuncio_omitido', asiento, mano: estado.motor.handCount, ms: msDePausa(estado, ahora) }
+  const sigue = seguirPausa({ ...estado, asientos }, ahora)
+  return { estado: sigue.estado, efectos: [omitido, ...sigue.efectos] }
 }
 
 // v1.3 · D3 · en la pausa entre manos, con la oferta o la voluntaria, se aplica en el acto.
@@ -612,7 +634,7 @@ function reclamarVencimiento(estado, _asiento, _peticion, ahora) {
     case CLASES.MANO_SIGUIENTE:
       return trasManoSiguiente(estado, ahora)
     case CLASES.PAUSA_ANUNCIO:
-      return cerrarPausa(estado, ahora)
+      return cerrarPausa(estado, ahora, 'tope')
     case CLASES.OFERTA_RECARGA:
       // No cuenta para la ausencia (D7): quien no decidió sale con su residuo.
       return resolverOfertas(estado, ahora)

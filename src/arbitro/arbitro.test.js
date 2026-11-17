@@ -134,6 +134,12 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
 
   const clasesVistas = new Set()
   let recargas = 0
+  const anunciosVistos = new Set()
+  const CAMPOS_ANUNCIO = {
+    anuncio_inicio: ['asiento', 'mano', 'tipo'],
+    anuncio_omitido: ['asiento', 'mano', 'ms', 'tipo'],
+    anuncio_vuelto: ['asiento', 'como', 'mano', 'ms', 'tipo'],
+  }
 
   for (const n of [2, 3, 4, 5]) {
     it(`mesa de ${n}: dinero, versión, rechazos y secretos en cada paso, y siempre termina`, () => {
@@ -145,6 +151,7 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
         let total = sumaDinero(e)
         let ahora = 0
         const cobros = new Map()
+        const abiertos = new Set()
         let pasos = 0
         let manos = 0
         const sinReclamante = () => e.asientos.every((a) => a.abandonado)
@@ -199,6 +206,25 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
             expect(r.estado.asientos[ef.asiento].cobrado).toBe(ef.monto)
             cobros.set(ef.asiento, ef.monto)
           }
+          // v1.6 (MED-1a) · lo que mide la pausa sale siempre con la forma que la base entiende (si
+          // no, quedaría como `medicion_invalida`), sin campos de dinero, y cada cierre (omitido o
+          // vuelto) después de su apertura y una sola vez.
+          for (const ef of r.efectos) {
+            if (!ef.tipo.startsWith('anuncio_')) continue
+            anunciosVistos.add(ef.tipo)
+            expect(Object.keys(ef).sort()).toEqual(CAMPOS_ANUNCIO[ef.tipo])
+            expect(Number.isInteger(ef.asiento) && ef.asiento >= 0 && ef.asiento < n, 'asiento').toBe(true)
+            expect(Number.isInteger(ef.mano) && ef.mano >= 1, 'mano').toBe(true)
+            const clave = `${ef.asiento}:${ef.mano}`
+            if (ef.tipo === 'anuncio_inicio') {
+              expect(abiertos.has(clave), 'dos aperturas').toBe(false)
+              abiertos.add(clave)
+              continue
+            }
+            expect(Number.isInteger(ef.ms) && ef.ms >= 0, 'ms').toBe(true)
+            if (ef.tipo === 'anuncio_vuelto') expect(['tope', 'mesa']).toContain(ef.como)
+            expect(abiertos.delete(clave), 'un cierre sin su apertura, o dos').toBe(true)
+          }
           // Con la ausencia en 3, el azar abandona a casi todos antes de arruinar a nadie:
           // esta semilla juega sin ella, para que la bancarrota y su aviso sigan pasando por aquí.
           e = s === 37 ? aCero(r.estado) : r.estado
@@ -231,6 +257,8 @@ describe('MOT-1 1b · propiedad: partidas completas con acciones al azar', () =>
     expect([...clasesVistas].sort()).toEqual(Object.values(CLASES).sort())
     // v1.3 · y recargó de verdad.
     expect(recargas).toBeGreaterThan(0)
+    // v1.6 · y midió la pausa: apertura, «Omitir» y vuelta (la vuelta «por la mesa», en su prueba).
+    expect([...anunciosVistos].sort()).toEqual(['anuncio_inicio', 'anuncio_omitido', 'anuncio_vuelto'])
   })
 
   it('es puro y nadie del cliente lo importa', () => {
@@ -938,7 +966,12 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(sumaDinero(e)).toBe(total)
 
       const r = pide(e, 0, 'reclamar_vencimiento')
-      expect(r.efectos).toEqual([{ tipo: 'salida', asiento: 1, monto: 50 }])
+      // v1.6 · y la apertura de la pausa, medida: solo los dos que la ven.
+      expect(r.efectos).toEqual([
+        { tipo: 'salida', asiento: 1, monto: 50 },
+        { tipo: 'anuncio_inicio', asiento: 0, mano: 7 },
+        { tipo: 'anuncio_inicio', asiento: 2, mano: 7 },
+      ])
       expect(enPausa(r.estado)).toBe(true)
       expect(r.estado.asientos[1].cobrado).toBe(50)
       expect(r.estado.motor.players[1].chips).toBe(0)
@@ -1069,6 +1102,83 @@ describe('MES-PvP 1 · el árbitro v1.1', () => {
       expect(reclama(conPremium).asientos.map((a) => a.enAnuncio)).toEqual([false, true, true])
       const todos = { ...tres, asientos: tres.asientos.map((a) => ({ ...a, sinAnuncio: true })) }
       expect(reclama(todos).motor.handCount).toBe(8)
+    })
+  })
+
+  // Contrato v1.6 · §2 `volver_anuncio`, §6 «Publicidad», §7. Los ms, con el reloj del árbitro y
+  // desde la apertura (`vencimiento.hora − 30 s`). Ninguno lleva dinero.
+  describe('MED-1a · la pausa medida (Contrato v1.6)', () => {
+    const anuncios = (r) => r.efectos.filter((x) => x.tipo.startsWith('anuncio_'))
+    const abreEn = (e) => e.vencimiento.hora - 30000
+    const omite = (e, i, ms) => pide(e, i, 'volver_anuncio', { mano: e.motor.handCount }, abreEn(e) + ms)
+    const antesDeLaPausa = (n, mano) => jugarHasta(crearLlena(n), (x) => x.motor.handCount === mano && x.vencimiento?.clase === CLASES.MANO_SIGUIENTE)
+
+    it('al abrirse: un anuncio_inicio por asiento que ve el anuncio, con la mano; el Premium no, y sin pausa nada', () => {
+      const tres = antesDeLaPausa(3, 7)
+      const conPremium = { ...tres, asientos: tres.asientos.map((a, i) => ({ ...a, sinAnuncio: i === 1 })) }
+      const r = pide(conPremium, 0, 'reclamar_vencimiento')
+      expect(enPausa(r.estado)).toBe(true)
+      expect(r.efectos).toEqual([
+        { tipo: 'anuncio_inicio', asiento: 0, mano: 7 },
+        { tipo: 'anuncio_inicio', asiento: 2, mano: 7 },
+      ])
+      expect(anuncios(pide(antesDeLaPausa(3, 6), 0, 'reclamar_vencimiento'))).toEqual([])
+    })
+
+    it('«Omitir» a los 5.012 ms: anuncio_omitido con sus ms; la segunda pulsación y quien no estaba no emiten', () => {
+      const e = pausaDeLaMano(crearLlena(3), 7)
+      const r = omite(e, 0, 5012)
+      expect(r.respuesta.ok).toBe(true)
+      expect(r.efectos).toEqual([{ tipo: 'anuncio_omitido', asiento: 0, mano: 7, ms: 5012 }])
+      const otra = omite(r.estado, 0, 6000)
+      expect(otra.respuesta.motivo).toBe(M.YA_VOLVIO)
+      expect(otra.efectos).toEqual([])
+      const premium = { ...e, asientos: e.asientos.map((a, i) => (i === 1 ? { ...a, enAnuncio: false, sinAnuncio: true } : a)) }
+      const nada = omite(premium, 1, 1000)
+      expect(nada.respuesta.motivo).toBe(M.NO_PARTICIPA)
+      expect(nada.efectos).toEqual([])
+    })
+
+    it('el último que vuelve cierra la pausa sin anuncio_vuelto: ya no queda nadie en el anuncio', () => {
+      const e = pausaDeLaMano(crearLlena(2), 7)
+      const uno = omite(e, 0, 3000)
+      const dos = omite(uno.estado, 1, 4000)
+      expect(dos.estado.motor.handCount).toBe(8)
+      expect(anuncios(dos)).toEqual([{ tipo: 'anuncio_omitido', asiento: 1, mano: 7, ms: 4000 }])
+    })
+
+    it('vencen los 30 s: anuncio_vuelto «tope» a los 30.000 ms por quien seguía; el dinero no se mueve; volver tarde no emite', () => {
+      const e = pausaDeLaMano(crearLlena(3), 7)
+      const total = sumaDinero(e)
+      const uno = omite(e, 1, 5000)
+      const r = pide(uno.estado, 0, 'reclamar_vencimiento', {}, e.vencimiento.hora)
+      expect(r.estado.motor.handCount).toBe(8)
+      expect(anuncios(r)).toEqual([
+        { tipo: 'anuncio_vuelto', asiento: 0, mano: 7, ms: 30000, como: 'tope' },
+        { tipo: 'anuncio_vuelto', asiento: 2, mano: 7, ms: 30000, como: 'tope' },
+      ])
+      expect(sumaDinero(r.estado)).toBe(total)
+      const tarde = pide(r.estado, 2, 'volver_anuncio', { mano: 7 }, e.vencimiento.hora + 1000)
+      expect(tarde.respuesta.motivo).toBe(M.FASE)
+      expect(tarde.efectos).toEqual([])
+    })
+
+    it('la mesa se vacía: quien seguía vuelve «por la mesa» con sus ms; quien abandona no emite, y con dos que siguen no se cierra', () => {
+      const dos = pausaDeLaMano(crearLlena(2), 7)
+      const r = pide(dos, 1, 'abandonar', {}, abreEn(dos) + 12000)
+      expect(anuncios(r)).toEqual([{ tipo: 'anuncio_vuelto', asiento: 0, mano: 7, ms: 12000, como: 'mesa' }])
+      expect(r.efectos.at(-1).tipo).toBe('partida_terminada')
+      expect(cobrado(r.estado)).toBe(sumaDinero(dos))
+
+      const tres = pausaDeLaMano(crearLlena(3), 7)
+      const sale = pide(tres, 1, 'abandonar', {}, abreEn(tres) + 2000)
+      expect(enPausa(sale.estado)).toBe(true)
+      expect(anuncios(sale)).toEqual([])
+    })
+
+    it('un reloj que llega unos ms antes que la apertura da 0, nunca un negativo (la base lo anotaría como medicion_invalida)', () => {
+      const e = pausaDeLaMano(crearLlena(2), 7)
+      expect(omite(e, 0, -40).efectos).toEqual([{ tipo: 'anuncio_omitido', asiento: 0, mano: 7, ms: 0 }])
     })
   })
 
@@ -1782,7 +1892,11 @@ describe('v1.3-b · la recarga PvP', () => {
     const anuncio = pide(r.estado, 1, 'reclamar_vencimiento')
     const e = anuncio.estado
     expect(e.vencimiento.clase).toBe(CLASES.PAUSA_ANUNCIO)
-    expect(anuncio.efectos).toEqual([])
+    // Sin salida: solo la apertura medida (v1.6) de quienes ven el anuncio, no la del que decide.
+    expect(anuncio.efectos).toEqual([
+      { tipo: 'anuncio_inicio', asiento: 1, mano: 7 },
+      { tipo: 'anuncio_inicio', asiento: 2, mano: 7 },
+    ])
     expect(e.asientos[0]).toMatchObject({ fuera: 'oferta', enAnuncio: false, cobrado: null })
     expect(vistaDe(e, 1).players[0].recarga).toBe('decide')
     // Recarga dentro de la pausa de anuncio, que sigue.
