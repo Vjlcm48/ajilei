@@ -62,7 +62,10 @@ import { AJILEI_CONFIG } from './config/ajileiConfig'
 // `AUTH_BYPASS` sale del import con LOB-1: su único consumidor aquí era
 // `cuentaLobby`, que protegía a la Bienvenida y se retiró con ella. La constante
 // sigue viva y exportada en el hook, que es donde trabaja.
-import { useAuth, CARGANDO, SIN_SESION, SESION_SIN_PERFIL, COMPLETO, SIN_RED } from './hooks/useAuth'
+// MED-1a T2 · vuelve: es la guardia de la medición, la misma que apaga el alta
+// del perfil.
+import { useAuth, AUTH_BYPASS, CARGANDO, SIN_SESION, SESION_SIN_PERFIL, COMPLETO, SIN_RED } from './hooks/useAuth'
+import { useLatidoSesion } from './hooks/useLatidoSesion'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
 import { creaPantallaCompleta } from './lib/pantallaCompletaCore'
@@ -567,6 +570,11 @@ function App() {
   // TIE-1 1a · al entrar con sesión, el inventario del servidor (INV-76). Otra
   // cuenta en la misma carga de página relee el suyo.
   useEffect(() => { if (uidCompleto) tapetes.refrescar() }, [tapetes, uidCompleto])
+
+  // MED-1a T2 · el latido de sesión, con la condición de `marcar_ingreso` (la
+  // cuenta con perfil y billetera). Con el bypass, y con él la simulación, no
+  // sale: ninguna vara de 5173 lo ve.
+  useLatidoSesion(AUTH_BYPASS ? null : uidCompleto)
 
   const arranqueMesa = useRef(null)
   useEffect(() => {
