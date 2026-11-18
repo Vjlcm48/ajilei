@@ -23,6 +23,7 @@
 import { MOTIVOS as M } from '../arbitro/motivos.js'
 import { esClaveMensaje } from '../config/mensajes.js'
 import { marcar } from '../dev/medirArranque.js'
+import { registrarEvento } from './eventos.js'
 
 export const FUNCION_PARTIDA = 'partida'
 // Literales de contrato, sin importarlos: `supabase/functions/partida/nucleo.js` y
@@ -78,7 +79,7 @@ export const desfaseDe = (muestras) => (
 
 // ── El cliente ──────────────────────────────────────────────────────────────
 /**
- * @param {{ cliente: object, mesa: string, ahora?: () => number, documento?: object|null }} partes
+ * @param {{ cliente: object, mesa: string, ahora?: () => number, documento?: object|null, medir?: boolean }} partes
  * @returns {{
  *   iniciar: () => Promise<void>, parar: () => void, revisar: () => void,
  *   enviar: (accion: string, campos?: object) => Promise<object>, releer: () => Promise<void>,
@@ -86,7 +87,12 @@ export const desfaseDe = (muestras) => (
  *   mensajes: { lista: () => object[], enviar: (clave: string) => Promise<object>, suscribir: Function },
  * }}
  */
-export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento = globalThis.document ?? null }) {
+// MED-1a T2 · `medir`: la reconexión se anota (`lib/eventos`). Apagado con el bypass, como el
+// alta del perfil; las pruebas lo encienden a mano.
+export function crearClientePartida({
+  cliente, mesa, ahora = Date.now, documento = globalThis.document ?? null,
+  medir = !(import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS),
+}) {
   let foto = Object.freeze({
     vista: null, version: null, canal: 'SIN_ABRIR', avisos: 0,
     msAccion: null, msAviso: null, msEco: null, rechazo: null, desfase: 0, muerta: false,
@@ -292,6 +298,11 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
       // entrar: la política de `realtime.messages` mira `auth.uid()`.
       await cliente.realtime.setAuth(session.access_token)
       if (yo !== generacion) return
+      // MED-1a T2 · el canal que se perdió y vuelve es una reconexión
+      // (`pvp_reconexion`, vía `canal`). La primera suscripción no cuenta, y
+      // cada `iniciar` (el doble montaje de StrictMode también) empieza de cero.
+      let estuvo = false
+      let perdido = false
       canal = cliente
         .channel(`partida:${mesa}`, { config: { private: true } })
         .on('broadcast', { event: EVENTO_AVISO }, ({ payload }) => alAviso(payload?.version))
@@ -300,8 +311,12 @@ export function crearClientePartida({ cliente, mesa, ahora = Date.now, documento
           if (yo !== generacion) return
           if (error) console.warn('MOT-1 1f: el canal —', estado, String(error?.message ?? error))
           poner({ canal: estado })
+          if (estado !== 'SUBSCRIBED') { perdido = estuvo; return }
+          if (perdido && medir) registrarEvento(cliente, 'pvp_reconexion', { via: 'canal', sala: mesa })
+          estuvo = true
+          perdido = false
           // Lo que pasó antes de quedar suscrito no avisó a nadie.
-          if (estado === 'SUBSCRIBED') leer()
+          leer()
         })
     } catch (e) {
       console.warn('MOT-1 1f: no se pudo abrir el canal —', String(e?.message ?? e))

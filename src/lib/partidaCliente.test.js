@@ -741,3 +741,70 @@ describe('v1.3-a · los mensajes de la mesa', () => {
     c.parar()
   })
 })
+
+// ── MED-1a T2 · `pvp_reconexion` por el canal ───────────────────────────────
+describe('MED-1a T2 · el canal que vuelve anota `pvp_reconexion`', () => {
+  async function conMedicion(medir = true) {
+    const d = doble({ fila: filaDe(1, { clase: 'turno', hora: Date.now() + 60_000 }) })
+    d.cliente.rpc = vi.fn(() => Promise.resolve({ data: true, error: null }))
+    const c = crearClientePartida({ cliente: d.cliente, mesa: MESA, documento: null, medir })
+    await c.iniciar()
+    await reposar()
+    return { d, c }
+  }
+  const reconexiones = (d) => d.cliente.rpc.mock.calls.filter(([n]) => n === 'registrar_evento')
+
+  it('la primera suscripción no cuenta', async () => {
+    const { d, c } = await conMedicion()
+    d.alEstado('SUBSCRIBED')
+    await reposar()
+    expect(reconexiones(d)).toEqual([])
+    c.parar()
+  })
+
+  it.each([['CHANNEL_ERROR'], ['CLOSED'], ['TIMED_OUT']])('perdido (%s) y de vuelta: una fila `via: canal` con la sala', async (estado) => {
+    const { d, c } = await conMedicion()
+    d.alEstado('SUBSCRIBED')
+    d.alEstado(estado)
+    d.alEstado(estado)
+    d.alEstado('SUBSCRIBED')
+    await reposar()
+    expect(reconexiones(d)).toEqual([['registrar_evento', { p_tipo: 'pvp_reconexion', p_datos: { via: 'canal', sala: MESA } }]])
+    d.alEstado('SUBSCRIBED')
+    expect(reconexiones(d)).toHaveLength(1)
+    d.alEstado('CHANNEL_ERROR')
+    d.alEstado('SUBSCRIBED')
+    expect(reconexiones(d)).toHaveLength(2)
+    c.parar()
+  })
+
+  it('errores antes de la primera suscripción no son una reconexión', async () => {
+    const { d, c } = await conMedicion()
+    d.alEstado('TIMED_OUT')
+    d.alEstado('CHANNEL_ERROR')
+    d.alEstado('SUBSCRIBED')
+    expect(reconexiones(d)).toEqual([])
+    c.parar()
+  })
+
+  it('con la medición apagada (el bypass), nada; y un `rpc` que falla o falta no rompe el canal', async () => {
+    const apagada = await conMedicion(false)
+    apagada.d.alEstado('SUBSCRIBED'); apagada.d.alEstado('CLOSED'); apagada.d.alEstado('SUBSCRIBED')
+    expect(reconexiones(apagada.d)).toEqual([])
+    apagada.c.parar()
+
+    const { d, c } = await conMedicion()
+    d.cliente.rpc = vi.fn(() => Promise.reject(new Error('Failed to fetch')))
+    d.alEstado('SUBSCRIBED'); d.alEstado('CLOSED')
+    expect(() => d.alEstado('SUBSCRIBED')).not.toThrow()
+    delete d.cliente.rpc
+    d.alEstado('CLOSED')
+    expect(() => d.alEstado('SUBSCRIBED')).not.toThrow()
+    await reposar()
+    d.maybeSingle.mockClear()
+    d.alEstado('CLOSED'); d.alEstado('SUBSCRIBED')
+    await reposar()
+    expect(d.maybeSingle).toHaveBeenCalled()
+    c.parar()
+  })
+})

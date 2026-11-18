@@ -66,6 +66,8 @@ import { AJILEI_CONFIG } from './config/ajileiConfig'
 // del perfil.
 import { useAuth, AUTH_BYPASS, CARGANDO, SIN_SESION, SESION_SIN_PERFIL, COMPLETO, SIN_RED } from './hooks/useAuth'
 import { useLatidoSesion } from './hooks/useLatidoSesion'
+import { reconexionAlArrancar } from './lib/eventos'
+import { supabase } from './lib/supabase'
 import { precargarSonidos, SONIDOS_MESA } from './hooks/useSounds'
 import { precargarBaraja } from './lib/precargaBaraja'
 import { creaPantallaCompleta } from './lib/pantallaCompletaCore'
@@ -635,6 +637,10 @@ function App() {
       if (esMesa(data)) {
         // (1) · ya sentado. El codigo pendiente, si lo habia, se descarta.
         setInvitacion(null)
+        // MED-1a T2 · con la partida viva, recargo o reabrio a media partida:
+        // `pvp_reconexion` (`lib/eventos`). El paso normal desde `SalaEspera`
+        // no pasa por este arranque. Apagado con el bypass.
+        if (!AUTH_BYPASS) reconexionAlArrancar(supabase, data)
         entrarSala(data)
         return
       }
