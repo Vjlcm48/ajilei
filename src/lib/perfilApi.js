@@ -45,7 +45,8 @@ export function crearPerfilApi(cliente = supabase) {
   const tabla = () => cliente.from('profiles')
   return {
     leer: (uid) => tabla().select(COLUMNAS_PERFIL).eq('id', uid).maybeSingle(),
-    crear: (uid, username) => tabla().insert({ id: uid, username }).select(COLUMNAS_PERFIL).single(),
+    /** MED-1a T2 · `medicion` = `{ origen, origen_datos }` (`lib/origen`), o nada. Se escriben una vez: el `grant update` no las incluye. */
+    crear: (uid, username, medicion = null) => tabla().insert({ id: uid, username, ...(medicion ?? {}) }).select(COLUMNAS_PERFIL).single(),
     /** `campos` ⊂ { username, pais, estado }: las tres columnas del `grant`. */
     actualizar: (uid, campos) => tabla().update(campos).eq('id', uid).select(COLUMNAS_PERFIL).single(),
     nombreLibre: (nombre) => cliente.rpc('nombre_libre', { p: nombre }),

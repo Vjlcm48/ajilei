@@ -28,6 +28,12 @@ import EsperaDiferida from './components/EsperaDiferida'
 import { decidirFalloChunk } from './lib/cargarMesa'
 import { origenFalloChunk } from './lib/trozos'
 import { arrancarHowler } from './lib/motorHowler'
+import { recogerOrigen } from './lib/origen'
+
+// MED-1a T2 · de dónde vino (`lib/origen`), ANTES de montar `App`: `App` limpia
+// `?sala=` de la barra en su primer render. Apagado con el bypass, como el
+// alta del perfil: el bypass no tiene cuenta que bautizar.
+if (!(import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS)) recogerOrigen(window.location.search, Date.now())
 
 // ── ARN-3d §2.4 (D11) · un chunk que ya no está: recargar UNA vez ───────────
 // PES-1 · vale para todos los trozos (`lib/trozos`), no solo para la mesa.

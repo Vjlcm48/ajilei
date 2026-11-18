@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { TOPE_ESPERA_MS, conTope } from '../lib/red'
 import { ESPERAS_RED_MS } from '../lib/esperasRed'
 import { perfilApi, traducirPerfilPropio, fechaDelServidor, fechaDelFreno } from '../lib/perfilApi'
+import { origenParaPerfil, olvidarOrigen } from '../lib/origen'
 
 // ── SUP-2b · La puerta: fuente única del estado de sesión ────────────────────
 // Documento rector: docs/AJILEI_SUP-2b_Puerta_v1.0.md §1.1 y §1.2, con la
@@ -120,6 +121,17 @@ export function traducirErrorUsername(error) {
     case '23505': return 'Ese nombre ya está tomado'
     default:      return 'No se pudo guardar el nombre — inténtalo de nuevo'
   }
+}
+
+// ── MED-1a T2 · el alta, con `origen` ───────────────────────────────────────
+// `origen` y `origen_datos` (`lib/origen`) viajan en el mismo `insert` del
+// Bautizo. Si la base rechaza un check (23514), se repite UNA vez sin ellos:
+// el Bautizo nunca se pierde por la medición. Si el rechazo era del nombre, el
+// segundo intento lo repite y se traduce como siempre. Sin jsdom: se sella
+// esta regla, no el hook.
+export async function insertarPerfil(api, uid, username, medicion) {
+  const r = await api.crear(uid, username, medicion)
+  return r.error?.code === '23514' && medicion ? api.crear(uid, username) : r
 }
 
 // ── CFG-1 1b · el perfil por su capa, y lo que se añade ─────────────────────
@@ -365,14 +377,16 @@ export function useAuth({ api = perfilApi } = {}) {
     // (23505, «ya está tomado»): ante un fallo de red o un 23505 se relee el
     // perfil, y si ya es suyo, está hecho.
     const trabajo = (async () => {
-      const { data, error } = await api.crear(uid, username)
+      const { data, error } = await insertarPerfil(api, uid, username, origenParaPerfil())
       if (!error) {
+        olvidarOrigen()
         setCargaPerfil({ uid, perfil: traducirPerfilPropio(data) })
         return { ok: true }
       }
       if (esFalloDeRed(error) || error.code === '23505') {
         const leido = await api.leer(uid)
         if (leido.data) {
+          olvidarOrigen()
           setCargaPerfil({ uid, perfil: traducirPerfilPropio(leido.data) })
           return { ok: true }
         }
