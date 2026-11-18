@@ -21,7 +21,11 @@
 //      PASA (la lista y las filas, en `eco/guionesCore.mjs`);
 //   4. lo corre otra vez sin su `begin/rollback` y comprueba, comparando el
 //      contenido de todas las tablas, que ninguna de las dos pasadas deja rastro;
-//   5. sale con 0 / 1 / 2, como el resto del arnés.
+//   5. pasada `med_consultas` (MED-1a T3): ejecuta cada consulta de
+//      `supabase/consultas/` en una transacción de solo lectura, exige las
+//      columnas que promete su cabecera y prueba la 11 y la 13 con filas
+//      fabricadas que se deshacen (la lista, en `eco/consultasCore.mjs`);
+//   6. sale con 0 / 1 / 2, como el resto del arnés.
 //
 // ── LO QUE NO ES ───────────────────────────────────────────────────────────
 // No sustituye la corrida en el SQL Editor contra la base real, que es la que
@@ -45,9 +49,13 @@ import {
   SEMBRAR_ANTES_DE, CUENTAS_PREVIAS, POSTGRES_SUPABASE,
   clasificarGuiones, sinTransaccion, traeTransaccion, veredictoGuion, rastro,
 } from './eco/guionesCore.mjs'
+import {
+  PRUEBAS_CON_DATOS, clasificarConsultas, leerCabecera, fallosDeCabecera, fallosDeColumnas,
+} from './eco/consultasCore.mjs'
 
 const MIGRACIONES = join(RAIZ, 'supabase/migrations')
 const PRUEBAS = join(RAIZ, 'supabase/pruebas')
+const CONSULTAS = join(RAIZ, 'supabase/consultas')
 const leer = (ruta) => readFileSync(ruta, 'utf8')
 const t0 = Date.now()
 
@@ -64,6 +72,9 @@ if (!migraciones.includes(SEMBRAR_ANTES_DE)) instrumento(`falta la migración ${
 if (guiones.sinDeclarar.length) instrumento(`guiones sin declarar en scripts/eco/guionesCore.mjs (vigente o retirado): ${guiones.sinDeclarar.join(', ')}`)
 if (guiones.faltan.length) instrumento(`guiones vigentes que no están en supabase/pruebas/: ${guiones.faltan.join(', ')}`)
 if (!guiones.vigentes.length) instrumento('no hay ningún guion vigente que correr')
+const consultas = clasificarConsultas(existsSync(CONSULTAS) ? readdirSync(CONSULTAS).filter((f) => f.endsWith('.sql')) : [])
+if (consultas.sinDeclarar.length) instrumento(`consultas sin declarar en scripts/eco/consultasCore.mjs: ${consultas.sinDeclarar.join(', ')}`)
+if (consultas.faltan.length) instrumento(`consultas declaradas que no están en supabase/consultas/: ${consultas.faltan.join(', ')}`)
 
 // ── 1 · el banco ────────────────────────────────────────────────────────────
 let PGlite, versionPglite
@@ -97,7 +108,8 @@ grant usage on schema public to anon, authenticated, service_role;
 create table auth.users (
   id uuid primary key, instance_id uuid, aud text, role text, email text,
   encrypted_password text, created_at timestamptz, updated_at timestamptz,
-  raw_app_meta_data jsonb, raw_user_meta_data jsonb, last_sign_in_at timestamptz);
+  raw_app_meta_data jsonb, raw_user_meta_data jsonb, last_sign_in_at timestamptz,
+  email_confirmed_at timestamptz);
 create function auth.uid() returns uuid language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
                   (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid $$;
@@ -196,8 +208,55 @@ if (seguir) {
 }
 for (const g of guiones.retirados) console.log(`   · ${g.archivo} — RETIRADO desde ${g.desde}: ${g.motivo}`)
 
+// ── 5 · MED-1a T3 · `med_consultas` ─────────────────────────────────────────
+// Cada consulta va en una transacción de solo lectura: un `select` puro la pasa
+// y cualquier escritura revienta. `db.query` admite UNA sentencia por archivo.
+async function correrConsulta(sql, siembra = null) {
+  await ejecutar('begin')
+  try {
+    if (siembra) await ejecutar(siembra)
+    await ejecutar('set transaction read only')
+    return await consultar(sql)
+  } finally {
+    await db.exec('rollback').catch(() => {})
+  }
+}
+
+let consultasVerdes = 0
+if (seguir) {
+  console.log('   · med_consultas · supabase/consultas/, de solo lectura')
+  const antes = await foto()
+  for (const c of consultas.vigentes) {
+    const sql = leer(join(CONSULTAS, c.archivo))
+    const cabecera = leerCabecera(sql)
+    const fallos = fallosDeCabecera(c, cabecera)
+    let filas = 0
+    try {
+      const r = await correrConsulta(sql)
+      filas = r.rows.length
+      fallos.push(...fallosDeColumnas(cabecera, r.fields))
+      const prueba = PRUEBAS_CON_DATOS.find((p) => p.archivo === c.archivo)
+      if (prueba) {
+        const conDatos = await correrConsulta(sql, prueba.siembra)
+        fallos.push(...prueba.comprobar(conDatos.rows).map((f) => `con filas fabricadas · ${f}`))
+      }
+    } catch (e) {
+      fallos.push(`reventó: ${e.message}`)
+    }
+    console.log(`   ${fallos.length ? '✗' : '✓'} ${c.archivo} — ${cabecera.columnas.length} columnas · ${filas} filas${PRUEBAS_CON_DATOS.some((p) => p.archivo === c.archivo) ? ' · con filas fabricadas' : ''}`)
+    for (const f of fallos) console.log(`       ${f}`)
+    if (!fallos.length) consultasVerdes += 1
+    veredictos.push(fallos.length ? 'rojo' : 'verde')
+  }
+  const huellas = rastro(antes, await foto())
+  if (huellas.length) {
+    console.log(`   ✗ med_consultas DEJA RASTRO en ${huellas.join(', ')}`)
+    veredictos.push('rojo')
+  }
+}
+
 await db.close().catch(() => {})
 const codigo = codigoDeSalida(veredictos)
 const palabra = codigo === CODIGO.VERDE ? 'VERDE' : codigo === CODIGO.ROJO ? 'ROJO' : 'ERROR DE INSTRUMENTO'
-console.log(`── guiones · ${palabra} · ${migraciones.length} migraciones · ${guiones.vigentes.length} guiones × 2 pasadas · ${((Date.now() - t0) / 1000).toFixed(1)} s → código ${codigo}`)
+console.log(`── guiones · ${palabra} · ${migraciones.length} migraciones · ${guiones.vigentes.length} guiones × 2 pasadas · med_consultas ${consultasVerdes}/${consultas.vigentes.length} · ${((Date.now() - t0) / 1000).toFixed(1)} s → código ${codigo}`)
 process.exit(codigo)
