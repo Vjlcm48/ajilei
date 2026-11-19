@@ -214,6 +214,7 @@ export const VEREDICTO_DSK = Object.freeze({
   cfg: ARRIBA('verde'),         // CFG-1 1a · la hoja del ⚙, el ojito y los tocables de 44 fuera de la mesa
   tienda: ARRIBA('verde'),      // TIE-1 1a · la tienda, la vitrina (Δ = 0, INV-77) y la ventana de compra
   pvp: ARRIBA('verde'),         // MES-PvP 3 · la mesa contra personas sobre el árbitro imitado
+  lec: ARRIBA('verde'),         // LEC-1 1-c · los pisos de la letra (`lec.mapa`)
   // `matrixOk`
   gate: ARRIBA('matrixOk'),
   // booleanos por celda (diagnósticos de DSK que nunca juntaron un `passed`)
@@ -228,7 +229,7 @@ export const VEREDICTO_DSK = Object.freeze({
 export const MODOS_DSK = Object.freeze([
   'humo', 'd1d2', 'd3', 'bug', 'shots', 'gate', 'lob', 'retar', 'apu', 'b1', 'tactil', 'p1', 'p2',
   'r1', 'r2', 'o1', 'h1', 'm1', 'a1', 'f1', 'z1', 'o2', 'a2', 'u1', 'menu-movil', 'u2', 'u3',
-  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo', 'mesaia', 'revive', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk', 'suma', 'cfg', 'tienda', 'pvp',
+  'vc', 'msg', 'tapetes', 'vuelo', 'luz', 'rev', 'rec', 'congelado', 'saldo', 'mesaia', 'revive', 'constancia', 'video', 'tam', 'webkit', 'tab', 'rnk', 'suma', 'cfg', 'tienda', 'pvp', 'lec',
 ])
 const CLAVES_META = new Set(['mode', 'ts', 'commit', 'arnes', 'error', 'veredicto', 'codigo'])
 

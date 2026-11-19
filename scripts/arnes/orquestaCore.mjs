@@ -77,6 +77,9 @@ const PVP = [
   diag('diagDSK', 'pvp.lm', 'pvp', 15, ['lm']),
 ]
 
+// LEC-1 1-c · los pisos de la letra (`scripts/lec/lec.mjs`): unos 40 s, en `commit`.
+const LEC = diag('diagDSK', 'lec.mapa', 'lec', 5)
+
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
   diag('diagSAL', 'sal', 'sal', 15),
@@ -115,8 +118,8 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
-  commit: [...BASE, PESO, PUE_ESPERA, ...PVP, HUMO],
-  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
+  commit: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, HUMO],
+  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]

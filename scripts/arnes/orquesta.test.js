@@ -67,9 +67,9 @@ describe('A4 · el contrato: ningún modo sin declarar', () => {
 })
 
 describe('A4 · los perfiles', () => {
-  it('`rapido` son las cuatro varas de la ficha, y `commit` añade el peso, la espera, `pvp` (MES-PvP 3, en dos desde la 5a) y humo', () => {
+  it('`rapido` son las cuatro varas de la ficha, y `commit` añade el peso, la espera, `pvp` (MES-PvP 3, en dos desde la 5a), `lec.mapa` (LEC-1) y humo', () => {
     expect(ids(rapido)).toEqual(['eslint', 'vitest', 'build', 'guiones'])
-    expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'pue.espera', 'pvp.mesa', 'pvp.lm', 'humo'])
+    expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'pue.espera', 'pvp.mesa', 'pvp.lm', 'lec.mapa', 'humo'])
     expect(ids(completo)).toContain('1.8b')
   })
   it('vitest pasa por el lanzador', () => {

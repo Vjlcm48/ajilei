@@ -51,6 +51,9 @@
 //            cfg.eliminar.ventana, cfg.eliminar.mesa, cfg.eliminar.ok,
 //            cfg.salir.reinicia; CFG-1 1d: cfg.correo) y la consola.
 //            Contra el bundle real y el banco imitado. Ver `scripts/cfg/cfg.mjs`.
+//   lec    → LEC-1 1-c: la vara `lec.mapa`. Los pisos de la letra que LEC-1 subió (LEC_PISOS),
+//            lo que no subió con su cifra (LEC_EXCEPCIONES) y nada bajo 9 px fuera de ellas,
+//            en 360×640, 390×844, 640×360 y la mesa en 1920×1080. Ver `scripts/lec/lec.mjs`.
 //   tienda → TIE-1 1a: la tienda (estantes, lista, vitrina, ventana de compra)
 //            en seis tamaños, la puerta vitrina ↔ mesa (9 valores × 11 casos),
 //            los cuatro estados de la ventana, «No te alcanza», el ojito y lo
@@ -354,6 +357,7 @@ import { runCfg } from './cfg/cfg.mjs'
 import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TEXTOS, asentar as tintaAsentar, tintaConRepeticion, peorFondo as tintaPeor } from './arnes/tinta.mjs'
 import { runTienda } from './tie/tienda.mjs'
 import { PARTES_PVP, runPvp } from './pvp/pvp.mjs'
+import { runLec } from './lec/lec.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -15546,6 +15550,12 @@ try {
     const arg = process.argv[3]
     const parte = PARTES_PVP.includes(arg) ? { partes: [arg] } : arg ? { mesas: [Number(arg)] } : {}
     report.pvp = await runPvp(browser, { base: BASE, ...parte })
+  }
+  // LEC-1 1-c · `lec`: los pisos de la letra en el mapa de la Fase 0 (T1, T2, T3 y la mesa en
+  // T6), las excepciones con su cifra y nada bajo 9 px fuera de ellas (`scripts/lec/lec.mjs`).
+  // Contra 5173 (`?sal=`, `?pvp=`). La vara es `lec.mapa`.
+  if (MODE === 'lec') {
+    report.lec = await runLec(browser, { base: BASE })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)
