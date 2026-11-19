@@ -17,9 +17,13 @@ import { decideCelebracion, sonidoDe, duracionDe, llevaViaje, esperaPrecedente }
 // la guardia de id que ya existían cubren la ESPERA sin una sola línea nueva —
 // la secuencia entera se corta desde cualquier punto, que es lo pedido.
 //
-// La geometría se mide al DISPARAR y no al dibujar: el tablero no se mueve
-// entre ambos instantes (la fase de pago está quieta) y un resize, que sí lo
-// movería, corta la celebración entera.
+// La geometría se mide al DISPARAR y no al dibujar, y un resize, que movería
+// el tablero, corta la celebración entera. Entre medir y dibujar la barra
+// propia SÍ cambia: desde VIS-3c, al armarse `activa` la cifra del ganador pasa
+// de la final a la retenida, y si pierde un dígito (1250 → 500) la barra, que
+// va a la derecha, corría la moneda destino. Por eso, mientras dura la
+// retención, la cifra reserva el ancho de la final (LEC-1 2-a, GameTable.jsx y
+// celebracion.css): lo medido aquí es donde la moneda está de verdad.
 
 export function useCelebracion({ enabled, phase, winner, humanCards, ruleN, play, geometria, precedente }) {
   const [activa, setActiva] = useState(null)   // {id, nivel, desde, hasta, esperando}

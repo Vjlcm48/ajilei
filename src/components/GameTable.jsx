@@ -2925,7 +2925,13 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               {/* VIS-3a · DESTINO del vuelo cuando gana el humano. El índice es el
                   del MOTOR (0 = humano), el mismo que `game.winner`, nunca una
                   posición ni un orden DOM. */}
-              <span className="pbr-chips" data-coin-target="0"><BalanceDisplay chips={saldoMostrado(0, human.chips)} size="full" /> <span className="pbr-fichas-word">Heptacoins</span></span>
+              {/* LEC-1 2-a · mientras el humano retiene su saldo, la cifra
+                  conserva el ancho de la FINAL (regla en celebracion.css). La
+                  barra va a la derecha: sin la reserva, 1250 → 500 corría la
+                  moneda un dígito después de medir el destino del vuelo. */}
+              <span className="pbr-chips" data-coin-target="0"
+                data-reserva-cifra={retencion?.winner === 0 ? '' : undefined}
+                style={retencion?.winner === 0 ? { '--cifra-final': JSON.stringify(String(human.chips)) } : undefined}><BalanceDisplay chips={saldoMostrado(0, human.chips)} size="full" /> <span className="pbr-fichas-word">Heptacoins</span></span>
               <span className="pbr-sep"> · </span>
               <span className="pbr-mesa">Mesa {unit}</span>
             </span>

@@ -12467,8 +12467,9 @@ async function runTapetes(browser) {
 // del tope. Si una semilla deja de dar su escenario, la celda sale «sin
 // cobertura» y no roja: se elige otra con `vuelo --semilla=N`.
 // La 1 da la victoria humana en la mano 7 y la de la IA (la 4) en la 1.
-// ROJO CONOCIDO (INV-82, excepción de MES-PvP 9): `vuelo humano` cae en
-// `septimaEnDestino` por 10,44 px en x. Es del producto, no de la semilla.
+// LEC-1 2-a · se retiró el rojo conocido de MES-PvP 9 (`septimaEnDestino` a
+// 10,44 px en x: la cifra retenida perdía un dígito y corría la moneda). Desde
+// aquí, un rojo de `vuelo humano` es rojo.
 const VUELO_SEMILLAS = { humano: 1, ia: 1 }
 async function runVuelo(browser) {
   const { VIAJE_N } = await import('../src/hooks/celebracionCore.js')

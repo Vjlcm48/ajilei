@@ -752,3 +752,28 @@ h1.cel-ajilei {
 @media (prefers-reduced-motion: reduce) {
   .cel-saldo-moneda[data-posada="si"] { animation: none; }
 }
+
+/* ── LEC-1 2-a · La cifra retenida conserva el ancho de la final ────────────
+   Mientras dura la retención de VIS-3c, la barra propia enseña el saldo de
+   ANTES (500) y el motor ya pagó (1250). La barra va alineada a la derecha y
+   la moneda está a la izquierda de la cifra: con un dígito menos, la moneda se
+   corría un dígito justo después de que `useCelebracion` midiera el destino
+   del vuelo (10,19 px en T1, 13,25 en T6) y saltaba al subir la cifra.
+   `GameTable.jsx` pone `data-reserva-cifra` y `--cifra-final` (la cifra final,
+   como cadena) solo durante la retención del humano. La caja de la cifra lleva
+   una copia invisible y sin alto de la final, así que mide lo mismo que medirá
+   al aterrizar. Un mínimo en `ch` dejaba 0,74 px (T1) y 0,95 (T6): «1250» no
+   mide 4 ch en Arial negrita, y en el teléfono la fuente es otra. La regla no
+   toca la alineación: en T3, a la izquierda, la cifra no se mueve. Es O1
+   aplicada a la cifra: la caja se reserva, el contenido cambia. */
+.pbr-chips[data-reserva-cifra] .bd-num {
+  display: flex;
+  flex-direction: column;
+}
+
+.pbr-chips[data-reserva-cifra] .bd-num::before {
+  content: var(--cifra-final);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
