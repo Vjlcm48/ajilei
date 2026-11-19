@@ -194,3 +194,26 @@ main.lobby > .lob-top { z-index: 2; }
     bottom: calc(min(0px, calc(100% - 44px)) + 3.25px);
   }
 }
+
+
+/* ══ 7 · LEC-1 1-b · LAS ZONAS DE 44 EN EL ACOSTADO DEL TELÉFONO ═══════════════
+   Rector: AJILEI_LEC-1_T1_v1.0.md §2; Fase 0 §A.1, fila 1. En 640×360 la barra
+   (`.lob-top`, z 3) corta por arriba la zona de la flecha y de la casa (MEDIDO:
+   44,8 × 41,8), y la del ⚙, con `left: 0` (§6 b), solo tiene 8 px hasta el borde
+   (MEDIDO: 40,1 × 44,8). Mismo camino Z: no se mueve nada a la vista.
+   · Flecha y casa: crecen como mucho 4 px hacia arriba y el resto hacia abajo,
+     donde en Salas, Retar y Armar mesa solo está el título del bloque. Rankings
+     no entra: allí las pestañas empiezan 6,5 px por debajo y la zona se las comería.
+   · ⚙: como mucho 5 px hacia la izquierda (con 4 llegaba a 43,1, MEDIDO). Fuera
+     de Rankings también: allí su zona ya se cruza con la de la casa y crecería.
+   Solo bajo 860 de ancho: en 915×412 las tres ya miden 44 (MEDIDO) y su roce con
+   la casa (§6 a) queda como estaba. */
+@media (orientation: landscape) and (max-height: 599.98px) and (max-width: 859.98px) {
+  .sal.es-anclada:not([data-ranking]) .sal-cab :is(.sal-volver, .sal-casa)::after {
+    top: max(-4px, min(0px, calc(50% - 22px)));
+    bottom: calc(min(0px, calc(100% - 44px)) - max(-4px, min(0px, calc(50% - 22px))));
+  }
+  .sal.es-anclada:not([data-ranking]) > .lob-top .lob-ajustes::after {
+    left: max(-5px, min(0px, calc(50% - 22px)));
+  }
+}
