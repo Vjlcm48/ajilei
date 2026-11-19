@@ -1,0 +1,56 @@
+/* LEC-1 · letra legible: letra más grande con la misma caja, valores medidos y aprobados en la lámina.
+   Regla: solo `font-size`, interlineado fijo donde hace falta para que la caja no crezca, nunca `!important`; gana a gameTable.css por especificidad, como escala.css.
+   Los pisos los vigila `diagDSK lec.mapa` (LEC_PISOS); lo que no subió está en LEC_EXCEPCIONES. */
+
+/* ── Pantallas previas, en el teléfono (`--u` < 6) ──────────────────────────── */
+@media (max-width: 599.98px), (max-height: 599.98px) {
+  main.lobby .lob-nav-btn,
+  .sal .sal-vacio,
+  .sal .sal-esp-espera,
+  .sal .rnk-medalla,
+  .sal .rnk-pos { font-size: calc(var(--u) * 3.58) }
+  :is(.lobby, .sal) .lob-fila .tie-cfg-txt small { font-size: calc(var(--u) * 2.96); line-height: 1.103 }
+  .sal .sal-bloque h2 { font-size: calc(var(--u) * 3.11); line-height: 1.1 }
+  .sal .sal-mesa .sal-mesa-l2 { font-size: calc(var(--u) * 3.05); line-height: 1.141 }
+  .sal .sal-mesa .sal-unir { font-size: calc(var(--u) * 3.58); line-height: 0.894; padding-inline: calc(var(--u) * 2.858) }
+  .sal .sal-esp-compartir { font-size: calc(var(--u) * 3.58); line-height: 0.894; padding-inline: calc(var(--u) * 2.28) }
+  .sal .sal-esp-salir { font-size: calc(var(--u) * 3.58); line-height: 0.894; padding-inline: calc(var(--u) * 2.588) }
+  .sal .rnk-cab-lista { font-size: calc(var(--u) * 3.88) }
+  .sal .rnk-fin,
+  .sal .rnk-lugar { font-size: calc(var(--u) * 3.05); line-height: 1.102 }
+  .sal .rnk-sub { font-size: calc(var(--u) * 3.38); line-height: 1.101 }
+  .sal .rnk-tu-l { font-size: calc(var(--u) * 3.16); line-height: 1.101 }
+  /* Sala de espera: «Tú» de la silla; la silla se mueve 1,5–1,8 px (aprobado). */
+  .sal .sal-esp-tag { font-size: calc(var(--u) * 2.56) }
+}
+@media (orientation: landscape) and (max-height: 599.98px) {
+  main.lobby .lob-top .cst-ficha { font-size: calc(var(--u) * 3.61) }
+  .sal .sal-caja { font-size: calc(var(--u) * 3.19) }
+  .sal .sal-modo .sal-modo-d { font-size: calc(var(--u) * 3.55); line-height: 1.103 }
+}
+@media (orientation: portrait) and (max-width: 599.98px) {
+  .sal .sal-modo .sal-modo-d { font-size: calc(var(--u) * 3.19); line-height: 1.227 }
+}
+
+/* ── La mesa, en el teléfono (sin `data-escala`). La cabecera y la barra propia
+   se mueven hasta 4 px; el óvalo, 0 (lo vigilan las varas de TAB). ─────────── */
+@media (orientation: portrait) and (max-width: 599.98px) {
+  html:not([data-escala]) .game-table-screen span.hand-badge { font-size: 10.9px }
+  html:not([data-escala]) .game-table-screen .player-bar .seat-badge { font-size: 11px }
+  html:not([data-escala]) .game-table-screen .player-bar .pbr-mesa { font-size: 12px }
+}
+@media (orientation: portrait) and (max-height: 772px) {
+  html:not([data-escala]) .game-table-screen .game-table .comodin-note { font-size: 9px }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  html:not([data-escala]) .game-table-screen .action-area .btn:not(.btn-mult) { font-size: 12.5px; line-height: 12px; padding-inline: 3px }
+  html:not([data-escala]) .game-table-screen .mult-row .btn.btn-mult { font-size: 12.5px }
+  html:not([data-escala]) .game-table-screen .game-table .discard-hint { font-size: 12.5px; line-height: 13.75px }
+  html:not([data-escala]) .game-table-screen span.hand-badge { font-size: 10.9px }
+  html:not([data-escala]) .game-table-screen .player-bar .pbr-mesa { font-size: 12px }
+  html:not([data-escala]) .game-table-screen :is(.table-wide, .table-four, .table-three) .game-message:not(.msg-action):not(:has(> .voz2-texto)) { font-size: 10px }
+  html:not([data-escala]) .game-table-screen :is(.table-wide, .table-four, .table-three) .game-message:not(.msg-action):has(> .voz2-texto) { font-size: 11px }
+}
+
+/* ── La mesa en `h`: con factor 1, 10,9; con factor > 1 se queda el piso de escala.css. */
+html[data-escala="h"] .game-table-screen span.hand-badge { font-size: max(10px, calc(10.9px / var(--escala))) }

@@ -122,9 +122,9 @@ export const TEXTOS_ES = {
   // el latido, no el dato.
   'sal.opciones.mesa.estado':     '{x}/{n} sentados',
   'sal.opciones.mesa.unirme':     'Unirme',
-  'sal.opciones.mesa.faltan':     'Te faltan {hc} HC',
+  'sal.opciones.mesa.faltan':     'Faltan {hc}',
   // MES-PvP 7b · el rótulo de una mesa Llena en la tarjeta; las Corta no llevan nada.
-  'sal.opciones.mesa.entrada':    'Entrada {hc} HC',
+  'sal.opciones.mesa.entrada':    'Entrada {hc}',
   'sal.opciones.mesas.vacio':     'Nadie está armando mesa ahora',
   'sal.opciones.mesas.vacio.sub': 'Arma la tuya y comparte el código',
   'sal.opciones.armar':           'Armar una mesa',

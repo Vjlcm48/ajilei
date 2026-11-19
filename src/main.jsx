@@ -22,6 +22,9 @@ import './styles/menuMovil.css'
 // ojito de la píldora. Global porque cruza siete pantallas que no comparten
 // árbol; gana por especificidad, no por orden de carga (ver su cabecera).
 import './styles/tactilLobby.css'
+// LEC-1 · la letra legible. Global porque cruza todas las pantallas; gana por
+// especificidad, no por orden de carga (ver su cabecera).
+import './styles/letra.css'
 import App from './App.jsx'
 import { SoundProvider } from './context/SoundContext.jsx'
 import EsperaDiferida from './components/EsperaDiferida'
