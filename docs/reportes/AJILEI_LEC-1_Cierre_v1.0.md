@@ -3,7 +3,7 @@
 **Fecha:** 2026-11-19.
 **Ficha:** `AJILEI_LEC-1_T2_v1.0.md` (la tanda 2).
 **Base:** `main` local con los commits de las tandas 1 y 2 sobre `origin/main` = `295ab7f`; respaldo en `respaldo-lec-1`. Los informes son los `AJILEI_LEC-1_*` de `docs/reportes/`.
-**Para qué sirve:** es el punto de partida de las campañas que heredan de LEC-1. Las reglas viven en el registro de invariantes (INV-04, INV-82 e INV-88), en la cabecera de `src/styles/letra.css` y en `scripts/lec/lec.mjs`. Aquí queda la historia: qué hizo cada tanda, qué cambió en pantalla, qué se decidió y qué hereda cada campaña.
+**Para qué sirve:** es el punto de partida de las campañas que heredan de LEC-1. Las reglas viven en el registro de invariantes (INV-04, INV-57, INV-61, INV-82 e INV-88), en la cabecera de `src/styles/letra.css` y en `scripts/lec/lec.mjs`. Aquí queda la historia: qué hizo cada tanda, qué cambió en pantalla, qué se decidió y qué hereda cada campaña.
 
 ---
 
@@ -16,7 +16,8 @@ Ninguna está todavía en `origin/main`. `main` lo sube Victor después del cont
 | **Fase 0** | 2026-11-18 | La sonda: cuánto mide cada letra, qué cabe, qué es protegido y la causa de `vuelo humano` | — (su informe entró en el 1-d) |
 | **L** (lámina) | 2026-11-18 | Las variantes A y B, por elemento y en seis tamaños, sobre la app real, con el mando `?lec=` | — (sin commits: el mando nunca llegó a `main`) |
 | **T1** | 2026-11-19 | `letra.css` con lo que eligió Victor, las zonas de 44 del acostado y la vara `lec.mapa` | `9f0d5c1` · `d2e0e31` · `c38cdce` · `d8285b1` |
-| **T2** | 2026-11-19 | `vuelo humano` en verde, las Invariantes y este cierre | Dos commits, `2-a` (`vuelo humano`) y `2-b` (documentos); sus SHA van en el chat |
+| **T2** | 2026-11-19 | `vuelo humano` en verde, las Invariantes y este cierre | `f9ed5fc` (`2-a`, `vuelo humano`) · `aa9cdb6` (`2-b`, documentos) |
+| **2-c** | 2026-11-19 | Tras el control de las IAS (18/19, `tab.resto` rojo): `diagDSK tab` compara la matriz T3 y la frontera con la letra de LEC-1, con el control `TAB_CONTROL=sin-lec` (informe de la tanda 2, §4) | Un commit; su SHA va en el chat y es el tercero de la ceremonia, en lugar de `aa9cdb6` |
 
 ---
 
@@ -105,6 +106,7 @@ En px visibles, el mínimo de cada pantalla, en T1 (360×640) · T2 (390×844) �
 - **La letra dentro del óvalo del teléfono puede subir si el óvalo no cambia** (Δ = 0, INV-04).
 - **Quien baje una letra del mapa la pone roja** (INV-88). La arregla o escribe la excepción en `LEC_EXCEPCIONES`, con su cifra y su condición de retirada.
 - **Una cifra que cambia de valor durante un vuelo reserva el ancho de la final.** Lo que se mide antes del cambio tiene que seguir siendo cierto después (O1 aplicada a la cifra).
+- **Lección: una campaña que toque el CSS del teléfono sin atributo corre `tab` antes del STOP-C.** INV-57 vigila ese teléfono byte a byte. LEC-1 no lo corrió en ninguna de sus dos tandas, y lo vio el control de las IAS: `tab.resto` salió rojo, con V-cel a 0/88 y V-frontera a 5/16, por la letra que la campaña subió a propósito. Se arregló en la 2-c sin resellar: la vara traduce la fila de antes con la cifra de `LEC_PISOS`, y el óvalo sigue byte a byte. Quien vuelva a cambiar esa letra pone al día `LEC_PISOS`, y la vara lo sigue sola.
 
 ---
 
@@ -123,7 +125,7 @@ En px visibles, el mínimo de cada pantalla, en T1 (360×640) · T2 (390×844) �
 
 ## 6 · Lo que falta para cerrar del todo
 
-1. **El control de las IAS** (Victor, ventana oculta): las 19 varas con `pvp.mesa` y `pvp.lm`, unas 2 h, con `node` directo y los veredictos en archivo.
+1. **El control de las IAS** (Victor, ventana oculta): las 19 varas con `pvp.mesa` y `pvp.lm`, unas 2 h, con `node` directo y los veredictos en archivo. La primera corrida, sobre `aa9cdb6`, salió 18/19; la 2-c arregla `tab.resto`, y el verde de esa vara está en el informe de la tanda 2, §4.
 2. **El push de `main`** con los tres SHA, y después borrar `respaldo-lec-1`.
 3. **La comprobación de Victor en ajilei.io con el S25:** lobby, Salas, la mesa de 5 acostada y el resultado. Lo que ve tiene que ser lo de la lámina.
 4. **`completo`** (Victor, ventana oculta, unas 6 h 25 min) como segunda línea base. `vuelo humano` tiene que salir verde ahí, sin excepción.

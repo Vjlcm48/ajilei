@@ -15,7 +15,8 @@
 //            0 px distintos, ruido 0, y ningún intento de escribir el atributo
 //            o la variable en toda la visita; (b) las 88 celdas de celular de
 //            `ref/t3_matriz.csv` (la matriz de la Fase 0, medida en `9fef917`),
-//            BYTE A BYTE, con la sonda de entonces
+//            BYTE A BYTE, con la sonda de entonces, salvo la letra de LEC-1
+//            (`filaEsperadaLec`: cuatro letras de `LEC_PISOS` y el pie ≤ 0,6 px)
 //   V-tv     tableta y toda ventana vertical de lado corto ≥ 600: cabe sin
 //            desplazar, las P con su semáforo frente al S25 sin ningún rojo,
 //            zona táctil ≥ 44 y el factor de la fórmula
@@ -43,7 +44,7 @@
 //            ≥ 10 en las mesas 3–5 y ≥ 12 en la de 2, O1 al byte, la crónica
 //            dentro del óvalo y deriva 0 frente a B fuera de la frase
 //   V-frontera (TAB-2) los 16 casos de la doble llave en su clase; los que
-//            quedan sin atributo, byte a byte como hoy
+//            quedan sin atributo, byte a byte como hoy, salvo la letra de LEC-1
 //
 //   V-frase  (TAB-3) en el pago, la frase del óvalo tiene caja y se lee: el
 //            sujeto entero y no menos letras que el 360×640 de la misma corrida
@@ -53,7 +54,7 @@
 //
 // `diagDSK tab [cel] [tv] [h] [vuelo] [fuera] [giro] [borde] [hb] [frontera]
 // [frase]` corre solo esas varas (`frase` = V-frase y V-óvalo-fases).
-// `TAB_CONTROL=sin-m2b|frase12|sin-frase` es un control rojo.
+// `TAB_CONTROL=sin-m2b|frase12|sin-frase|sin-lec` es un control rojo.
 //
 // UN VERDE MIDE LO QUE DICE. Una celda que no llegó a su estado sale «no
 // medida» y la vara no es verde. Las fotos se toman con TODAS las animaciones
@@ -70,6 +71,7 @@ import { irA } from '../ios/tam.mjs'
 import * as V from '../voz2/voz2Mesa.mjs'
 import { escalaDe, RESERVA_PIE_FS, MEDIA_RATON } from '../../src/lib/escala.js'
 import { anchoCapa, colocaCapa } from '../../src/hooks/voz2Core.js'
+import { LEC_PISOS } from '../lec/lec.mjs'
 
 export const VARAS_TAB = Object.freeze(['cel', 'tv', 'h', 'vuelo', 'fuera', 'giro', 'borde', 'hb', 'frontera', 'frase'])
 export const RUTA_T3 = new URL('./ref/t3_matriz.csv', import.meta.url)
@@ -477,6 +479,71 @@ export function leerT3(ruta = RUTA_T3) {
   }
   return filas
 }
+
+// ── LEC-1 2-c · la letra de LEC-1 sobre la fila sellada ─────────────────────
+// Las dos referencias (`ref/t3_matriz.csv`, de `9fef917`, y las filas de la
+// frontera en `ref/t2_geometria.json`, de `abc2ebc`) son anteriores a LEC-1, y
+// `letra.css` sube a propósito cuatro letras del teléfono sin atributo con el
+// óvalo a Δ = 0. NO se resellan (se perdería la geometría vieja): la fila
+// sellada se traduce a la esperada cambiando SOLO esas cuatro columnas, con la
+// cifra de `LEC_PISOS` (vertical = T1, acostado = T3; cada cifra vive allí,
+// INV-88), y el pie de la barra propia, que baja con «Mesa N», tiene una
+// tolerancia escrita: [viejo, viejo + 0,6] y `cabe_pie` True. Todo lo demás,
+// el óvalo incluido (`oval_w`, `oval_h`), sigue byte a byte contra la fila
+// vieja. Quitar una regla de `letra.css` vuelve a rojo (`TAB_CONTROL=sin-lec`).
+export const COLUMNAS_T3 = Object.freeze(('tam,W,H,clase,orient,traje,mesa,estado,cartaJ_w,cartaJ_h,cartaIA_w,cartaIA_h,'
+  + 'f_msg,f_nombre,f_estado,f_mano,f_saldo,f_mesa,f_boton,f_timer,h_boton,h_chip,cabe_iniciar,cabe_acciones,cabe_chips,'
+  + 'cabe_pie,pie_bajo,desplaza,desplaza_doc,ancho,occ,caja_w,caja_h,oval_w,oval_h,fuera,solapes').split(','))
+const COL = Object.fromEntries(COLUMNAS_T3.map((k, i) => [k, i]))
+const LETRA_LEC = Object.freeze([
+  { col: 'f_mano', clase: '.game-table-screen .hand-badge', aplica: () => true },
+  { col: 'f_mesa', clase: '.game-table-screen .player-bar .pbr-mesa', aplica: () => true },
+  { col: 'f_boton', clase: '.game-table-screen .action-area .btn:not(.btn-mult)', aplica: (c) => c[COL.orient] === 'h' },
+  // `:is(.table-wide, .table-four, .table-three)`: las mesas 3–5.
+  { col: 'f_msg', clase: '.game-table-screen .game-message:not(.msg-action):not(:has(> .voz2-texto))', aplica: (c) => c[COL.orient] === 'h' && ['3', '4', '5'].includes(c[COL.mesa]) },
+])
+export const PIE_LEC = 0.6
+// Parte una fila como la escribe `celdaCsv` (comillas dobles, `""` dentro).
+function partirCsv(l) {
+  const out = []
+  let c = '', q = false
+  for (let i = 0; i < l.length; i++) {
+    const ch = l[i]
+    if (q) { if (ch !== '"') c += ch; else if (l[i + 1] === '"') { c += '"'; i++ } else q = false } else if (ch === '"') q = true
+    else if (ch === ',') { out.push(c); c = '' } else c += ch
+  }
+  out.push(c)
+  return out
+}
+/** La fila sellada con la letra de LEC-1: solo las columnas de `LETRA_LEC` que la celda tiene. */
+export function filaEsperadaLec(linea) {
+  const c = partirCsv(linea)
+  const tam = c[COL.orient] === 'h' ? 'T3' : 'T1'
+  for (const x of LETRA_LEC) {
+    if (c[COL[x.col]] === '' || !x.aplica(c)) continue
+    const piso = LEC_PISOS[x.clase]?.[tam]
+    if (piso === undefined) throw new Error(`LEC_PISOS no tiene ${x.clase} en ${tam}`)
+    c[COL[x.col]] = String(piso)
+  }
+  return c.map(celdaCsv).join(',')
+}
+/** Las diferencias entre la fila medida y la esperada (vacío = igual). */
+export function juzgarFilaLec(antes, ahora) {
+  const e = partirCsv(filaEsperadaLec(antes)), a = partirCsv(ahora)
+  if (e.length !== a.length) return [`${a.length} columnas, no ${e.length}`]
+  const malas = []
+  for (let i = 0; i < e.length; i++) {
+    if (a[i] === e[i]) continue
+    if (i === COL.pie_bajo && e[i] !== '' && a[i] !== '') {
+      const d = Number(a[i]) - Number(e[i])
+      if (d >= -1e-6 && d <= PIE_LEC + 1e-6 && a[COL.cabe_pie] === 'True') continue
+      malas.push(`pie_bajo ${a[i]} fuera de [${e[i]}, ${e[i]} + ${PIE_LEC}]`)
+      continue
+    }
+    malas.push(`${COLUMNAS_T3[i]} ${e[i] || '∅'} → ${a[i] || '∅'}`)
+  }
+  return malas
+}
 // Una tarea de la sonda de la Fase 0: un contexto, un grupo de tamaños, reposo y turno.
 async function tareaT3(browser, base, n, tamanos) {
   const out = []
@@ -486,6 +553,7 @@ async function tareaT3(browser, base, n, tamanos) {
     await page.goto(base, { waitUntil: 'networkidle' })
     await recorrerRuta(page, n, 'basico', 0, 'medio')
     await page.waitForSelector('button:has-text("Iniciar mano")', { timeout: 20000 })
+    await ponerControlLec(page)
     await page.mouse.move(2, 2)
     for (const s of tamanos) {
       await page.setViewportSize({ width: s.w, height: s.h })
@@ -545,8 +613,9 @@ async function varaCel(browser, base, ref) {
     if (!m || m.noMedida || m.error) { t3.noMedidas.push(k); continue }
     if (m.huella.attr || m.huella.zoom !== '1') t3.conEscala.push(k)
     const nueva = filaT3(m)
-    if (nueva === linea) t3.iguales++
-    else t3.distintas.push({ celda: k, antes: linea, ahora: nueva })
+    const dif = juzgarFilaLec(linea, nueva)
+    if (!dif.length) t3.iguales++
+    else t3.distintas.push({ celda: k, dif, antes: linea, ahora: nueva })
   }
   const paresMal = pares.filter((p) => !p.medida || !(p.distintos === 0 || p.equivalente) || !(p.ruido === 0 || p.ruidoEquivalente) || p.huella?.attr || p.huella?.f || p.huella?.escrituras !== 0 || p.huella?.zoom !== '1')
   const ok = paresMal.length === 0 && t3.iguales === t3.celdas && !t3.conEscala.length
@@ -909,6 +978,28 @@ const CSS_CONTROL = {
 async function ponerControl(page) {
   if (CONTROL && CSS_CONTROL[CONTROL]) { await page.addStyleTag({ content: CSS_CONTROL[CONTROL] }); await raf2(page) }
 }
+// LEC-1 2-c · `sin-lec` QUITA de la hoja viva las dos reglas de «Mesa N» de
+// `letra.css` (vertical y acostado), en la matriz T3 de V-cel y en V-frontera:
+// las dos tienen que ponerse rojas. Si no encuentra exactamente las dos, no mide.
+const QUITAR_MESA_LEC = () => {
+  let n = 0
+  const barrer = (duena, lista) => {
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const r = lista[i]
+      if (r instanceof CSSStyleRule) {
+        if (r.selectorText.includes(':not([data-escala])') && r.selectorText.includes('.pbr-mesa')) { duena.deleteRule(i); n++ }
+      } else if (r.cssRules) barrer(r, r.cssRules)
+    }
+  }
+  for (const s of document.styleSheets) { let rs = null; try { rs = s.cssRules } catch { /* hoja ajena */ } if (rs) barrer(s, rs) }
+  return n
+}
+async function ponerControlLec(page) {
+  if (CONTROL !== 'sin-lec') return
+  const n = await page.evaluate(QUITAR_MESA_LEC)
+  if (n !== 2) throw new Error(`control sin-lec: ${n} reglas de «Mesa N» quitadas, no 2`)
+  await raf2(page)
+}
 
 // Las celdas. `movil: false` = ratón (`hover: hover`, `pointer: fine`).
 export const BORDE = Object.freeze({
@@ -1163,6 +1254,7 @@ async function filaFrontera(browser, base, t) {
   const { ctx, page, errores } = await abrirMesaT2(browser, base, t, 5, 'verde', { contar: true })
   try {
     await mesaQuieta(page, 3000)
+    await ponerControlLec(page)
     const huella = await page.evaluate(HUELLA_ESCALA)
     const raton = await page.evaluate((q) => matchMedia(q).matches, MEDIA_RATON)
     const fila = filaT3({ tam: t.id, n: 5, estado: 'reposo', ...(await medirT3Estable(page)) })
@@ -1183,9 +1275,10 @@ async function varaFrontera(browser, base) {
       if (t.attr === null) {
         if (r.huella.f || r.huella.zoom !== '1' || r.huella.escrituras !== 0) motivos.push(`huella ${JSON.stringify(r.huella)}`)
         const antes = ref?.frontera?.[t.id]
-        igual = antes ? antes === r.fila : null
+        const dif = antes ? juzgarFilaLec(antes, r.fila) : null
+        igual = dif ? dif.length === 0 : null
         if (igual === null) motivos.push('sin referencia sellada')
-        else if (!igual) motivos.push(`distinta de hoy:\n        antes ${antes}\n        ahora ${r.fila}`)
+        else if (!igual) motivos.push(`distinta de hoy con la letra de LEC-1: ${dif.join(' · ')}\n        antes ${antes}\n        ahora ${r.fila}`)
       }
       if (r.errores.length) motivos.push(`errores: ${r.errores.slice(0, 2).join(' · ')}`)
       return { ...c, medida: true, ok: motivos.length === 0, motivos, attr: r.huella.attr, raton: r.raton, igual }
@@ -1421,9 +1514,9 @@ export async function runTab(browser, { base, ref = null, varas = VARAS_TAB } = 
   console.log(`── TAB · ${resumen}`)
   if (out.cel) {
     const c = out.cel
-    console.log(`   V-cel   pares ${c.pares - c.paresMal.length}/${c.pares} bien (${c.identicos} idénticos al píxel, el resto equivalentes con la vara de cap) frente a ${c.contra} · t3 ${c.t3.iguales}/${c.t3.celdas} byte a byte${c.t3.noMedidas.length ? ` · ${c.t3.noMedidas.length} sin medir` : ''}${c.t3.conEscala.length ? ` · ${c.t3.conEscala.length} con escala` : ''}`)
+    console.log(`   V-cel   pares ${c.pares - c.paresMal.length}/${c.pares} bien (${c.identicos} idénticos al píxel, el resto equivalentes con la vara de cap) frente a ${c.contra} · t3 ${c.t3.iguales}/${c.t3.celdas} byte a byte con la letra de LEC-1${c.t3.noMedidas.length ? ` · ${c.t3.noMedidas.length} sin medir` : ''}${c.t3.conEscala.length ? ` · ${c.t3.conEscala.length} con escala` : ''}`)
     for (const m of c.paresMal.slice(0, 6)) console.log(`     ✗ ${m}`)
-    for (const d of c.t3.distintas.slice(0, 6)) console.log(`     ✗ ${d.celda}\n        antes ${d.antes}\n        ahora ${d.ahora}`)
+    for (const d of c.t3.distintas) console.log(`     ✗ ${d.celda}: ${d.dif.join(' · ')}`)
   }
   for (const k of ['tv', 'h']) if (out[k]) {
     const malas = out[k].celdas.filter((c) => !c.medida || !c.ok)
