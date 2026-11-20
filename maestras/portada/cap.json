@@ -1,6 +1,6 @@
 {
   "campana": "CAP-1",
-  "generado": "2026-11-03T09:33:48.114Z",
+  "generado": "2026-11-20T12:43:54.999Z",
   "edge": "151.0.7922.34",
   "semilla": 5,
   "prng": "mulberry32 sobre Math.random (addInitScript); crypto sin tocar",
@@ -23,12 +23,12 @@
         1080,
         2112
       ],
-      "bytes": 1170259,
-      "sha256": "8bc8d158ff7140296559a19c034ee9fda4b877d47d8eec97e1579c2dda00dad7",
+      "bytes": 1171229,
+      "sha256": "597cb34db64998b802173ade696ad9d2d954354a27e1d59095d3e2bce50d925d",
       "estable": {
-        "fraccionDeltaFino": 0.9997921927609428,
-        "deltaMax": 30,
-        "distintos": 733836
+        "fraccionDeltaFino": 1,
+        "deltaMax": 0,
+        "distintos": 0
       }
     },
     "mesah.png": {
@@ -42,8 +42,8 @@
         2058,
         1080
       ],
-      "bytes": 1097975,
-      "sha256": "034c7bf65e762cf14f25fb009c7be50f435245629ae89af15eac0e4655fc6cb3",
+      "bytes": 1101128,
+      "sha256": "fa76ef0242aaa96d3dc238a0fa94059daaa1d92b81ae0829c6825dc3fed05879",
       "estable": {
         "fraccionDeltaFino": 1,
         "deltaMax": 0,
@@ -73,8 +73,8 @@
         2732,
         1536
       ],
-      "bytes": 1758006,
-      "sha256": "b236d148f37080ef5b63086e23a98861fb0c6120279483ffdc7f3092226288a9",
+      "bytes": 1759807,
+      "sha256": "2828d444f3a1b1f802c4f571fa44a380c71f1b87218fb7afe58508728a24e815",
       "estable": {
         "fraccionDeltaFino": 1,
         "deltaMax": 0,

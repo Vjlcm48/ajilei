@@ -9,7 +9,7 @@
 
 ## 1 · Las tandas, con sus SHA
 
-Ninguna está todavía en `origin/main`. `main` lo sube Victor después del control de las IAS, con los tres SHA.
+Las tandas 1 y 2 y la 2-c se publicaron el 2026-11-19 tras el control de las IAS, con los tres SHA (`295ab7f..0db1005`), y `respaldo-lec-1` se borró. La 2-d va después.
 
 | Tanda | Fecha | Qué hizo, en una línea | Commits |
 |---|---|---|---|
@@ -17,7 +17,8 @@ Ninguna está todavía en `origin/main`. `main` lo sube Victor después del cont
 | **L** (lámina) | 2026-11-18 | Las variantes A y B, por elemento y en seis tamaños, sobre la app real, con el mando `?lec=` | — (sin commits: el mando nunca llegó a `main`) |
 | **T1** | 2026-11-19 | `letra.css` con lo que eligió Victor, las zonas de 44 del acostado y la vara `lec.mapa` | `9f0d5c1` · `d2e0e31` · `c38cdce` · `d8285b1` |
 | **T2** | 2026-11-19 | `vuelo humano` en verde, las Invariantes y este cierre | `f9ed5fc` (`2-a`, `vuelo humano`) · `aa9cdb6` (`2-b`, documentos) |
-| **2-c** | 2026-11-19 | Tras el control de las IAS (18/19, `tab.resto` rojo): `diagDSK tab` compara la matriz T3 y la frontera con la letra de LEC-1, con el control `TAB_CONTROL=sin-lec` (informe de la tanda 2, §4) | Un commit; su SHA va en el chat y es el tercero de la ceremonia, en lugar de `aa9cdb6` |
+| **2-c** | 2026-11-19 | Tras el control de las IAS (18/19, `tab.resto` rojo): `diagDSK tab` compara la matriz T3 y la frontera con la letra de LEC-1, con el control `TAB_CONTROL=sin-lec` (informe de la tanda 2, §4) | `0db1005` (publicada con la tanda: `295ab7f..0db1005`) |
+| **2-d** | 2026-11-20 | Los cinco rojos de la segunda `completo`. `msg` es la excepción conocida de INV-22. `cap`, `vc` y `sal` eran instrumento: maestras re-selladas, la reserva de la cifra en `vc·jugado` y el texto nuevo de la Llena importado en `sal`. **`tam` es producto:** `.sal-modo-d` desborda Armar mesa en la ventana baja de un portátil (informe de la 2-d) | Un commit; su SHA va en el chat |
 
 ---
 
@@ -107,6 +108,8 @@ En px visibles, el mínimo de cada pantalla, en T1 (360×640) · T2 (390×844) �
 - **Quien baje una letra del mapa la pone roja** (INV-88). La arregla o escribe la excepción en `LEC_EXCEPCIONES`, con su cifra y su condición de retirada.
 - **Una cifra que cambia de valor durante un vuelo reserva el ancho de la final.** Lo que se mide antes del cambio tiene que seguir siendo cierto después (O1 aplicada a la cifra).
 - **Lección: una campaña que toque el CSS del teléfono sin atributo corre `tab` antes del STOP-C.** INV-57 vigila ese teléfono byte a byte. LEC-1 no lo corrió en ninguna de sus dos tandas, y lo vio el control de las IAS: `tab.resto` salió rojo, con V-cel a 0/88 y V-frontera a 5/16, por la letra que la campaña subió a propósito. Se arregló en la 2-c sin resellar: la vara traduce la fila de antes con la cifra de `LEC_PISOS`, y el óvalo sigue byte a byte. Quien vuelva a cambiar esa letra pone al día `LEC_PISOS`, y la vara lo sigue sola.
+- **Lección: una campaña que toque el CSS de varias pantallas corre, antes del push, las varas de las pantallas que tocó** (`sal`, `tam`, `vc`, `cap`, `tab`), además del control de las IAS si toca la mesa. La forma de saber cuáles es buscar en `scripts/` las clases que cambió. LEC-1 no lo hizo, y la segunda `completo` dio cinco rojos. Cuatro eran la vara midiendo lo viejo (`msg`, `cap`, `vc`, `sal`), y uno era un defecto (`tam`: la media del teléfono, `max-height: 599.98px`, también alcanza la ventana baja de un portátil).
+- **La línea base.** La segunda `completo` es la del 2026-11-20 sobre `0db1005`, más las cinco repetidas sobre la 2-d (informe de la 2-d, §2).
 
 ---
 
@@ -128,4 +131,5 @@ En px visibles, el mínimo de cada pantalla, en T1 (360×640) · T2 (390×844) �
 1. **El control de las IAS** (Victor, ventana oculta): las 19 varas con `pvp.mesa` y `pvp.lm`, unas 2 h, con `node` directo y los veredictos en archivo. La primera corrida, sobre `aa9cdb6`, salió 18/19; la 2-c arregla `tab.resto`, y el verde de esa vara está en el informe de la tanda 2, §4.
 2. **El push de `main`** con los tres SHA, y después borrar `respaldo-lec-1`.
 3. **La comprobación de Victor en ajilei.io con el S25:** lobby, Salas, la mesa de 5 acostada y el resultado. Lo que ve tiene que ser lo de la lámina.
-4. **`completo`** (Victor, ventana oculta, unas 6 h 25 min) como segunda línea base. `vuelo humano` tiene que salir verde ahí, sin excepción.
+4. **`completo`** (Victor, ventana oculta, unas 6 h 25 min) como segunda línea base. `vuelo humano` tiene que salir verde ahí, sin excepción. Corrió el 2026-11-20 sobre `0db1005` y dio 69 de 74; la 2-d resolvió cuatro de los cinco rojos.
+5. **`tam` en Armar mesa** (2-d, producto): a 1366 o 1280 de ancho y entre 521 y 541 de alto, `.sal-modo-d` hace desbordar las filas entre 2 y 7 px, y el botón anclado sube entre 2 y 6 px con el gesto. El arreglo está en `src/styles/letra.css` y necesita otro control de las IAS.

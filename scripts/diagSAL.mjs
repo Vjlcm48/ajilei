@@ -57,6 +57,15 @@ import {
   ErrorInstrumento, codigoDeSalida,
 } from './arnes/comun.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
+// LEC-1 2-d · la línea 2 de la Llena sale de las claves del producto, importadas:
+// LEC-1 1-a la acortó («Faltan 5.000 · Entrada 10.000», sin «Te» ni «HC»).
+import { TEXTOS_ES } from '../src/config/textos.es.js'
+// `SAL_CONTROL=llena-vieja` es el control rojo: la vara espera el texto de antes.
+const VIEJOS = { 'sal.opciones.mesa.faltan': 'Te faltan {hc} HC', 'sal.opciones.mesa.entrada': 'Entrada {hc} HC' }
+const DICC_LLENA = process.env.SAL_CONTROL === 'llena-vieja' ? { ...TEXTOS_ES, ...VIEJOS } : TEXTOS_ES
+const texto = (k, v) => DICC_LLENA[k].replace(/\{(\w+)\}/g, (_, n) => v[n])
+const ENTRADA = (hc) => ` · ${texto('sal.opciones.mesa.entrada', { hc })}`
+const FALTAN = (hc) => texto('sal.opciones.mesa.faltan', { hc })
 
 // ARN-1 · el instrumento se autoetiqueta. `playwright-core` va pineado exacto en
 // devDependencies porque los píxeles cambian entre versiones. Desde ARN-3a el
@@ -463,8 +472,8 @@ async function medirEstado(page, estado) {
 
     case 'opciones-llena': {
       // MES-PvP 7b · saldo 5.000. La Llena de 4×100 pide 5.000 y alcanza. La de
-      // 3×200 pide 10.000: atenuada y «Te faltan 5.000 HC» (con la regla de la
-      // Corta estaría viva). La de 5×5.000 pide 250.000: «Te faltan 245.000 HC»,
+      // 3×200 pide 10.000: atenuada y «Faltan 5.000» (con la regla de la
+      // Corta estaría viva). La de 5×5.000 pide 250.000: «Faltan 245.000»,
       // el peor caso de la línea. La Corta no dice nada. Las cuatro miden lo
       // mismo (O1), las de fuera van al final y ninguna línea se corta: la que
       // no cabe se aprieta (`letra` es su tamaño entre el de la Corta).
@@ -497,10 +506,10 @@ async function medirEstado(page, estado) {
       return {
         ...r,
         ok: r.l2.length === 4 && !!m4 && !!m3 && !!m5 && !!m2
-          && m4.l2 === '2/4 sentados · Entrada 5.000 HC' && m4.viva && !m4.fuera
+          && m4.l2 === `2/4 sentados${ENTRADA('5.000')}` && m4.viva && !m4.fuera
           && m2.l2 === '1/2 sentados' && m2.viva && !m2.fuera
-          && m3.l2 === 'Te faltan 5.000 HC · Entrada 10.000 HC' && !m3.viva && m3.fuera
-          && m5.l2 === 'Te faltan 245.000 HC · Entrada 250.000 HC' && !m5.viva && m5.fuera
+          && m3.l2 === `${FALTAN('5.000')}${ENTRADA('10.000')}` && !m3.viva && m3.fuera
+          && m5.l2 === `${FALTAN('245.000')}${ENTRADA('250.000')}` && !m5.viva && m5.fuera
           && Math.min(m3.i, m5.i) > Math.max(m4.i, m2.i)
           && r.cortadas === 0
           && Math.max(...r.alturas) - Math.min(...r.alturas) <= 1,
@@ -1190,7 +1199,7 @@ try {
   // Una línea por celda, con los puntos que fallan nombrados. Un arnés que sólo
   // dice «rojo» obliga a abrir el JSON de 3.000 líneas para saber por dónde.
   const verdes = celdas.filter((c) => c.ok).length
-  console.log(`\n── sal · las salas PvP ── ${verdes}/${celdas.length} celdas`)
+  console.log(`\n── sal · las salas PvP ── ${process.env.SAL_CONTROL ? `CONTROL ${process.env.SAL_CONTROL} (no es la vara) · ` : ''}${verdes}/${celdas.length} celdas`)
   let estadoActual = null
   for (const c of celdas) {
     if (c.estado !== estadoActual) {

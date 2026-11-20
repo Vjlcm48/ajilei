@@ -451,6 +451,14 @@ const VC_RETRASO_ROCE_MS = (() => {
   const v = Number(process.argv.splice(i, 1)[0].slice('--retrasa-roce='.length))
   return Number.isFinite(v) && v > 0 ? v : 0
 })()
+// LEC-1 2-d · `vc --sin-reserva` quita de la hoja viva las dos reglas de la reserva
+// de la cifra (celebracion.css, LEC-1 2-a): es el control rojo de vc·jugado.
+const VC_SIN_RESERVA = (() => {
+  const i = process.argv.indexOf('--sin-reserva')
+  if (i < 0) return false
+  process.argv.splice(i, 1)
+  return true
+})()
 // ECO-1b · `saldo` también: mide la billetera que la API REAL lee del arnés.
 // ECO-1c · y `mesaia`: la mesa contra las IAS contra el servidor imitado.
 // ECO-1d · y `constancia`: la constancia, los límites y la válvula, también ahí.
@@ -9914,6 +9922,13 @@ async function vcInstall(page) {
       return out
     }
     window.__vcTextos = (sel) => textos(sel).map(n => n.nodeValue)
+    // LEC-1 2-a · mientras retiene, `.pbr-chips` lleva `data-reserva-cifra` y la
+    // cifra final en `--cifra-final` (cadena JSON): su caja ya mide la final.
+    window.__vcReserva = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el || !el.hasAttribute('data-reserva-cifra')) return null
+      try { return JSON.parse(getComputedStyle(el).getPropertyValue('--cifra-final').trim()) } catch { return null }
+    }
     window.__vcSnapIgualado = (sel, antes) => {
       const nodos = textos(sel)
       const ahora = nodos.map(n => n.nodeValue)
@@ -10243,6 +10258,20 @@ async function runVC(browser) {
       }
       await gotoMesaVC(page, n)
       await vcInstall(page)
+      if (VC_SIN_RESERVA) {
+        const quitadas = await page.evaluate(() => {
+          let k = 0
+          const barrer = (duena, lista) => {
+            for (let i = lista.length - 1; i >= 0; i--) {
+              const x = lista[i]
+              if (x instanceof CSSStyleRule) { if (x.selectorText.includes('[data-reserva-cifra]')) { duena.deleteRule(i); k++ } } else if (x.cssRules) barrer(x, x.cssRules)
+            }
+          }
+          for (const s of document.styleSheets) { let rs = null; try { rs = s.cssRules } catch { /* hoja ajena */ } if (rs) barrer(s, rs) }
+          return k
+        })
+        if (quitadas !== 2) throw new Error(`control --sin-reserva: ${quitadas} reglas de la reserva quitadas, no 2`)
+      }
       const manos = await vcHastaVictoria(page)
       r.manos = manos
       if (manos == null) {
@@ -10289,6 +10318,7 @@ async function runVC(browser) {
       const audio = await page.evaluate(() => window.__vcAudio())
       const durante = await page.evaluate(() => window.__vcSnap())
       const textosDurante = await page.evaluate(() => window.__vcTextos('.pbr-chips'))
+      const reservaDurante = await page.evaluate(() => window.__vcReserva('.pbr-chips'))
       // El roce entra cuando el volteo ya se calló: nunca solapados.
       r.p11 = antes.capa === false && antes.sonando.includes('showdown.mp3') &&
         !antes.sonando.includes('chips-collect.mp3') &&
@@ -10320,11 +10350,21 @@ async function runVC(browser) {
       // vivo y otra tras cortarlo. Contra el estado de espera se mediría el
       // reparto de la mano —165px de diferencia legítima— y no el overlay.
       // ARN-3d §1.3 · la segunda toma, con el texto de `.pbr-chips` de la primera.
-      const igualada = await page.evaluate((t) => window.__vcSnapIgualado('.pbr-chips', t), textosDurante)
+      // LEC-1 2-d · salvo si en la primera la cifra RESERVABA la final (2-a) y la
+      // final es la que hay ahora: entonces la caja de «durante» ya medía la de
+      // «después», y la comparación honesta es contra la segunda toma tal cual.
+      // Igualar el texto ahí quitaría la reserva y fabricaría el salto que la 2-a
+      // arregló (10,19 px a 1366×768). Una reserva con otra cifra iguala como antes.
+      const real = await page.evaluate(() => ({ snap: window.__vcSnap(), textos: window.__vcTextos('.pbr-chips') }))
+      const cifraDespues = real.textos.join('').replace(/\D/g, '')
+      const conReserva = reservaDurante != null && reservaDurante === cifraDespues
+      const igualada = conReserva
+        ? { snap: real.snap, ahora: real.textos, iguala: true, nodos: real.textos.length }
+        : await page.evaluate((t) => window.__vcSnapIgualado('.pbr-chips', t), textosDurante)
       const despues = igualada.snap
       r.pbrIgualado = {
         iguala: igualada.iguala, durante: textosDurante.join('').trim(), despues: igualada.ahora.join('').trim(),
-        nodos: `${textosDurante.length}/${igualada.nodos}`,
+        nodos: `${textosDurante.length}/${igualada.nodos}`, reserva: reservaDurante, conReserva,
       }
       const dmax = (a, b) => {
         let m = 0, quien = null
@@ -10354,7 +10394,7 @@ async function runVC(browser) {
     r.ok = !!(r.p1 && r.p2 && r.p4 && r.p11 && (!VC_EXIGE_ROCE_CARGADO || r.p12))
     jugado.push(r)
     console.log(`vc·jugado m${n} · ${r.ok ? 'OK' : 'FALLA'} manos=${r.manos} viva=${JSON.stringify(r.viva)} sonando=${JSON.stringify(r.sonando)}${r.sonandoAjeno?.length ? ` AJENO=${JSON.stringify(r.sonandoAjeno)}` : ''} Δ=${r.dOverlay} (${r.dQuien}) toque=${r.p4} · secuencia=${r.p11} antes=${JSON.stringify(r.antes)} espera=${r.esperaMs}ms${r.error ? ' · ' + r.error : ''}`)
-    if (r.pbrIgualado) console.log(`  vc·jugado · .pbr-chips medido con el texto de «durante» (${r.pbrIgualado.durante} → ${r.pbrIgualado.despues}${r.pbrIgualado.iguala ? '' : ` · NO SE PUDO IGUALAR: nodos ${r.pbrIgualado.nodos}`}) · 13 anclas a 0,02 px`)
+    if (r.pbrIgualado) console.log(`  vc·jugado · .pbr-chips ${r.pbrIgualado.conReserva ? `con la reserva de la cifra final «${r.pbrIgualado.reserva}» (LEC-1 2-a): «durante» contra «después» tal cual` : 'medido con el texto de «durante»'} (${r.pbrIgualado.durante} → ${r.pbrIgualado.despues}${r.pbrIgualado.iguala ? '' : ` · NO SE PUDO IGUALAR: nodos ${r.pbrIgualado.nodos}`}) · 13 anclas a 0,02 px${VC_SIN_RESERVA ? ' · CONTROL --sin-reserva (no es la vara)' : ''}`)
     if (r.manos != null) console.log(`  vc·jugado · ${vcMolde(r.manos)}${r.retrasoRoceMs ? ` · chips-collect.mp3 retrasado ${r.retrasoRoceMs} ms` : ''}`)
     if (r.roce) console.log(`  vc·jugado · roce: ${r.roce.length} play(s) ${r.roce.map(x => `${x.estado}@${x.t}`).join(' · ') || '(ninguno)'} · sonando a los ${r.roceSonoTrasMs ?? `>${VC_ROCE_TECHO_MS}`} ms de ver la capa (techo ${VC_ROCE_TECHO_MS}) · puerta «loaded» ${VC_EXIGE_ROCE_CARGADO ? (r.p12 ? 'VERDE' : 'ROJA') : 'apagada'}${r.conocidos ? ` · ${r.conocidos.join(' · ')}` : ''}`)
     await page.close()
