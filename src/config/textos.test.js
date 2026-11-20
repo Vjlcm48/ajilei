@@ -11,6 +11,7 @@ import {
 } from './textos.js'
 import { TEXTOS_ES } from './textos.es.js'
 import { TEXTOS_PVP_ES } from './textos.pvp.es.js'
+import { TEXTOS_TUT_ES } from './textos.tut.es.js'
 
 // ── IDI-0 · Contrato del diccionario ────────────────────────────────────────
 // Documento rector: AJILEI_LOB1_Fase1_v1.1.md §2.4.
@@ -100,7 +101,11 @@ describe('IDI-0 · diccionario es', () => {
     //
     // TIE-1 1a es la novena: `tie.*` es la tienda (estantes, vitrina, ventana
     // de compra) y la fila «Tapetes» del ⚙.
-    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.', 'tie.']
+    //
+    // TUT-1 tanda 1 es la décima: `mesa.*` son los literales de la mesa que el
+    // tutorial nombra («Pasar», «Iniciar mano», «Pozo»…), al byte. No pisan a
+    // `ia.*`: sirven igual a la mesa contra las IAS y a la de personas.
+    const PREFIJOS = ['lob.', 'sal.', 'ia.', 'app.', 'aviso.', 'video.', 'rnk.', 'perfil.', 'tie.', 'mesa.']
     for (const clave of clavesDe('es')) {
       expect(PREFIJOS.some((p) => clave.startsWith(p))).toBe(true)
     }
@@ -456,5 +461,38 @@ describe('MES-PvP 3 · los textos que viajan con la partida (INV-84)', () => {
 
   it('el sorteo ya no vive en el diccionario: sus textos son los de `TEXTOS_SORTEO` (L-M tanda 2)', () => {
     expect(Object.keys(TEXTOS_PVP_ES).filter((c) => c.startsWith('pvp.sorteo.'))).toEqual([])
+  })
+})
+
+describe('TUT-1 tanda 1 · los textos del tutorial viajan con su trozo (INV-84)', () => {
+  it('todos son `tut.`, en minúscula, sin vacíos y no están también en la entrada', () => {
+    for (const [clave, valor] of Object.entries(TEXTOS_TUT_ES)) {
+      expect(clave, clave).toMatch(/^tut\.[a-z0-9.]+$/)
+      expect(typeof valor === 'string' && valor.length > 0, clave).toBe(true)
+      expect(TEXTOS_ES[clave], clave).toBeUndefined()
+    }
+  })
+
+  it('ningún texto repetido entre ellos', () => {
+    const valores = Object.values(TEXTOS_TUT_ES)
+    expect(valores.length).toBe(new Set(valores).size)
+  })
+
+  it('las negritas van por pares (`**`): ningún rótulo deja una abierta', () => {
+    for (const [clave, valor] of Object.entries(TEXTOS_TUT_ES)) {
+      expect((valor.match(/\*\*/g) ?? []).length % 2, clave).toBe(0)
+    }
+  })
+
+  it('sin sumar no existen (⟦⟧); sumados, `t()` los resuelve con sus huecos', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(t('tut.ctl.paso', { n: 1, m: 6 })).toBe('⟦tut.ctl.paso⟧')
+    sumarTextos('es', TEXTOS_TUT_ES)
+    expect(t('tut.ctl.paso', { n: 1, m: 6 })).toBe('Paso 1 de 6')
+    expect(clavesDe('es').some((c) => c.startsWith('tut.'))).toBe(false)
+  })
+
+  it('el capítulo 5 dice los multiplicadores de verdad (normativo v1.0, hallazgo 2 de la lámina)', () => {
+    expect(TEXTOS_TUT_ES['tut.cap5.p2']).toContain('×1, ×2, ×5 y ×10')
   })
 })

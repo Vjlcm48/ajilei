@@ -721,6 +721,30 @@ export const TEXTOS_ES = {
   'tie.cfg.valor':          '{nombre} · {tono}',
   // MES-PvP 7a · INV-76 · la fila «Tapetes» del ⚙ dentro de la sala de espera.
   'tie.cfg.fuera':          'Disponible fuera de la mesa',
+
+  // ══ TUT-1 tanda 1 · Los literales de la mesa que el tutorial nombra ══════
+  // Rector: AJILEI_TUT-1_T1_v1.0.md §1.3. El texto es el de `GameTable.jsx`
+  // AL BYTE: ningún cambio de redacción. La capa de señalización y el guion
+  // dicen «toca **Pasar**»: el botón y el rótulo leen la misma clave.
+  'mesa.pasar':               'Pasar',
+  'mesa.apostar':             'Apostar {n}',
+  'mesa.igualar':             'Igualar ({n})',
+  'mesa.subir':               'Subir a {n}',
+  'mesa.retirarse':           'Retirarse',
+  'mesa.iniciar':             'Iniciar mano',
+  'mesa.siguiente':           'Siguiente mano',
+  'mesa.descartar':           'Descartar {n}',
+  'mesa.sindescartar':        'Sin descartar',
+  'mesa.descarte.pista':      'Pulsa las cartas a descartar (máx. {max}) o continúa sin descartar.',
+  // La misma pista en dos líneas (móvil, C4.2.6): el salto de línea va entre las dos.
+  'mesa.descarte.pista.uno':  'Pulsa las cartas a descartar.',
+  'mesa.descarte.pista.dos':  '(máx. {max}). Continúa sin descartar.',
+  'mesa.descarte.de':         '{n} de {max} seleccionada(s).',
+  'mesa.descarte.cartas':     '{n} carta(s) seleccionada(s).',
+  'mesa.pozo':                'Pozo',
+  'mesa.aigualar':            'A igualar',
+  'mesa.barajando':           'Barajando…',
+  'mesa.repartiendo':         'Repartiendo cartas…',
 }
 
 export default TEXTOS_ES

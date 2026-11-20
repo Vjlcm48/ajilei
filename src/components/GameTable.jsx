@@ -138,6 +138,16 @@ const REVEAL_CHOREO = {
   SCALE_MS: 200,    // recogida 1.6→1 y crecimiento 1→1.6 (solo transform)
   GROW_AT: 0.6,     // la entrante arranca al 60% de la recogida de la saliente
 }
+// TUT-1 1-b · el texto de `t()` en los MISMOS trozos que el JSX de antes. «Apostar {betAmount}»
+// eran dos nodos de texto («Apostar » y la cifra), y uno solo coloca los glifos medio píxel
+// distinto: `diagPUE cap` (cap.regresion) lo vio en «Apostar 2000». Aquí el texto sale de la
+// clave y cada variable vuelve a ser su propio nodo, como siempre.
+const MARCA_TROZO = '\u0000'
+function tTrozos(clave, vars) {
+  const marcadas = Object.fromEntries(Object.keys(vars).map((k) => [k, `${MARCA_TROZO}${k}${MARCA_TROZO}`]))
+  return t(clave, marcadas).split(MARCA_TROZO).map((p, i) => (i % 2 ? vars[p] : p)).filter((p) => p !== '')
+}
+
 function useMediaQueryMatch(query) {
   const [matches, setMatches] = useState(
     () => window.matchMedia(query).matches
@@ -2380,7 +2390,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 exactamente 1 en las 11 celdas medidas), así que los dos lo llevan
                 y el selector sigue devolviendo una sola moneda. */}
             <div className="pot-box" data-coin-source="pot" data-ancla="pozo">
-              <span className="pot-label">Pozo</span>
+              <span className="pot-label">{t('mesa.pozo')}</span>
               <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
                 <ChipToken size="compact" />
                 {pozoMostrado}
@@ -2388,7 +2398,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
             </div>
             <div className="call-box" data-ancla="a-igualar" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
-              <span className="pot-label">A igualar</span>
+              <span className="pot-label">{t('mesa.aigualar')}</span>
               <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
             </div>
             {/* key cambia solo en acciones → reproduce el pop sin animar mensajes neutros de fase/reparto */}
@@ -2447,7 +2457,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           {/* VIS-3a · el mismo origen por la vía de los dos óvalos (mesa 2
               landscape móvil). Ver la nota de renderCenterZone. */}
           <div className="pot-box" data-coin-source="pot" data-ancla="pozo">
-            <span className="pot-label">Pozo</span>
+            <span className="pot-label">{t('mesa.pozo')}</span>
             <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
               <ChipToken size="compact" />
               {pozoMostrado}
@@ -2455,7 +2465,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
           </div>
           <div className="call-box" data-ancla="a-igualar" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
-            <span className="pot-label">A igualar</span>
+            <span className="pot-label">{t('mesa.aigualar')}</span>
             <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
           </div>
         </section>
@@ -2702,7 +2712,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                     reentrarPantallaCompleta(document, window)
                     beginHand()
                   }}>
-                    Iniciar mano
+                    {t('mesa.iniciar')}
                   </SoundButton>
                 </div>
               )}
@@ -2712,15 +2722,15 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   saltaba al llegar la primera mano. Se reserva la de «Barajando…», la que monta la
                   primera mano, oculta. 'SORTEO' es literal de contrato (`partidaCliente.FASE_SORTEO`). */}
               {partida && phase === 'SORTEO' && (
-                <div className="action-area thinking" aria-hidden="true" style={{ visibility: 'hidden' }}>Barajando…</div>
+                <div className="action-area thinking" aria-hidden="true" style={{ visibility: 'hidden' }}>{t('mesa.barajando')}</div>
               )}
 
               {isShuffling && (
-                <div className="action-area thinking">Barajando…</div>
+                <div className="action-area thinking">{t('mesa.barajando')}</div>
               )}
 
               {isDealPhase && !isShuffling && (
-                <div className="action-area thinking">Repartiendo cartas…</div>
+                <div className="action-area thinking">{t('mesa.repartiendo')}</div>
               )}
 
               {/* §4.3 · EL HUMANO EN ALL-IN TAMBIÉN VA MARCADO, y su marca no es un
@@ -2773,17 +2783,17 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                     ))}
                   </div>
                   <div className="action-buttons" data-ancla="fila-acciones">
-                    {puedeHacer('pasar')   && <SoundButton className="btn btn-pass"  data-accion="pasar"   onClick={() => act('pasar')}>Pasar</SoundButton>}
-                    {puedeHacer('apostar') && <SoundButton className="btn btn-bet"   data-accion="apostar" onClick={() => act('apostar')}>Apostar {betAmount}</SoundButton>}
-                    {puedeHacer('igualar') && <SoundButton className="btn btn-call"  data-accion="igualar" onClick={() => act('igualar')}>Igualar ({toCall})</SoundButton>}
+                    {puedeHacer('pasar')   && <SoundButton className="btn btn-pass"  data-accion="pasar"   onClick={() => act('pasar')}>{t('mesa.pasar')}</SoundButton>}
+                    {puedeHacer('apostar') && <SoundButton className="btn btn-bet"   data-accion="apostar" onClick={() => act('apostar')}>{tTrozos('mesa.apostar', { n: betAmount })}</SoundButton>}
+                    {puedeHacer('igualar') && <SoundButton className="btn btn-call"  data-accion="igualar" onClick={() => act('igualar')}>{tTrozos('mesa.igualar', { n: toCall })}</SoundButton>}
                     {/* §4.1 · EN EL SITIO DE «Igualar», y no al lado. Es el botón de
                         PAGAR cuando la pila no llega: hereda `btn-call` —el verde
                         del pago, y con él el `order: -1` que gameTable.css le da en
                         las mesas anchas— y añade lo suyo en `apu.css`, que es hoja
                         nueva. Ninguna regla se escribe en la protegida. */}
                     {puedeHacer('allIn')   && <SoundButton className="btn btn-call btn-allin" data-accion="allin" onClick={() => act('allIn')}>{t('ia.mesa.allin', { hc: costoAccion('allIn') })}</SoundButton>}
-                    {puedeHacer('subir')   && <SoundButton className="btn btn-raise" data-accion="subir"   onClick={() => act('subir')}>Subir a {raiseTo}</SoundButton>}
-                    {puedeHacer('retirarse') && <SoundButton className="btn btn-fold" data-accion="retirarse" onClick={() => act('retirarse')}>Retirarse</SoundButton>}
+                    {puedeHacer('subir')   && <SoundButton className="btn btn-raise" data-accion="subir"   onClick={() => act('subir')}>{tTrozos('mesa.subir', { n: raiseTo })}</SoundButton>}
+                    {puedeHacer('retirarse') && <SoundButton className="btn btn-fold" data-accion="retirarse" onClick={() => act('retirarse')}>{t('mesa.retirarse')}</SoundButton>}
                   </div>
                 </div>
               )}
@@ -2815,10 +2825,10 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                               muestra 2 líneas con salto FIJO para que el mazo horizontal
                               no tape el mensaje. CSS alterna ambas por media query. */}
                           <span className="discard-hint-1l">
-                            Pulsa las cartas a descartar (máx. {game.handRules.maxDiscard}) o continúa sin descartar.
+                            {tTrozos('mesa.descarte.pista', { max: game.handRules.maxDiscard })}
                           </span>
                           <span className="discard-hint-2l">
-                            Pulsa las cartas a descartar.<br />(máx. {game.handRules.maxDiscard}). Continúa sin descartar.
+                            {t('mesa.descarte.pista.uno')}<br />{tTrozos('mesa.descarte.pista.dos', { max: game.handRules.maxDiscard })}
                           </span>
                         </>
                       )
@@ -2827,11 +2837,11 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                          del snapshot: con `aliveN === 5` la frase dependía del
                          recuento vivo, no de las reglas de la mano. */
                       : game.handRules.maxDiscard < AJILEI_CONFIG.game.handSize
-                        ? `${game.selectedDiscards.length} de ${game.handRules.maxDiscard} seleccionada(s).`
-                        : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
+                        ? t('mesa.descarte.de', { n: game.selectedDiscards.length, max: game.handRules.maxDiscard })
+                        : t('mesa.descarte.cartas', { n: game.selectedDiscards.length })}
                   </p>
                   <SoundButton className="btn btn-primary" data-accion="descartar" onClick={handleDiscard}>
-                    {game.selectedDiscards.length > 0 ? `Descartar ${game.selectedDiscards.length}` : 'Sin descartar'}
+                    {game.selectedDiscards.length > 0 ? t('mesa.descartar', { n: game.selectedDiscards.length }) : t('mesa.sindescartar')}
                   </SoundButton>
                 </div>
               )}
@@ -2877,7 +2887,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                       sigue()
                     }, esperaSiguienteMano())  // L-M 3 · §2 · la recogida (300 ms hasta hoy)
                   }}>
-                    Siguiente mano
+                    {t('mesa.siguiente')}
                   </SoundButton>
                   {/* §5.1 · la VOLUNTARIA: «el jugador la pide entre manos, cuando
                       quiera». Sólo se monta cuando de verdad hay algo que
