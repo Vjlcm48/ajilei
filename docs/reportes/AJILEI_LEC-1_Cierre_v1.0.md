@@ -9,7 +9,7 @@
 
 ## 1 · Las tandas, con sus SHA
 
-Las tandas 1 y 2 y la 2-c se publicaron el 2026-11-19 tras el control de las IAS, con los tres SHA (`295ab7f..0db1005`), y `respaldo-lec-1` se borró. La 2-d va después.
+Las tandas 1 y 2 y la 2-c se publicaron el 2026-11-19 tras el control de las IAS, con los tres SHA (`295ab7f..0db1005`), y `respaldo-lec-1` se borró. La 2-d y la 2-e se publicaron juntas el 2026-11-20, sin otro control de las IAS por decisión del rector.
 
 | Tanda | Fecha | Qué hizo, en una línea | Commits |
 |---|---|---|---|
@@ -18,7 +18,8 @@ Las tandas 1 y 2 y la 2-c se publicaron el 2026-11-19 tras el control de las IAS
 | **T1** | 2026-11-19 | `letra.css` con lo que eligió Victor, las zonas de 44 del acostado y la vara `lec.mapa` | `9f0d5c1` · `d2e0e31` · `c38cdce` · `d8285b1` |
 | **T2** | 2026-11-19 | `vuelo humano` en verde, las Invariantes y este cierre | `f9ed5fc` (`2-a`, `vuelo humano`) · `aa9cdb6` (`2-b`, documentos) |
 | **2-c** | 2026-11-19 | Tras el control de las IAS (18/19, `tab.resto` rojo): `diagDSK tab` compara la matriz T3 y la frontera con la letra de LEC-1, con el control `TAB_CONTROL=sin-lec` (informe de la tanda 2, §4) | `0db1005` (publicada con la tanda: `295ab7f..0db1005`) |
-| **2-d** | 2026-11-20 | Los cinco rojos de la segunda `completo`. `msg` es la excepción conocida de INV-22. `cap`, `vc` y `sal` eran instrumento: maestras re-selladas, la reserva de la cifra en `vc·jugado` y el texto nuevo de la Llena importado en `sal`. **`tam` es producto:** `.sal-modo-d` desborda Armar mesa en la ventana baja de un portátil (informe de la 2-d) | Un commit; su SHA va en el chat |
+| **2-d** | 2026-11-20 | Los cinco rojos de la segunda `completo`. `msg` es la excepción conocida de INV-22. `cap`, `vc` y `sal` eran instrumento: maestras re-selladas, la reserva de la cifra en `vc·jugado` y el texto nuevo de la Llena importado en `sal`. **`tam` es producto:** `.sal-modo-d` desborda Armar mesa en la ventana baja de un portátil (informe de la 2-d) | `b5d997a` |
+| **2-e** | 2026-11-20 | `.sal-modo-d` acotada al teléfono acostado (`max-width: 1023.98px`, la frontera de TAB): Armar mesa ya no desborda en el portátil bajo, y `tam` vuelve a verde (informe de la 2-d, §4) | Un commit; su SHA va en el chat |
 
 ---
 
@@ -132,4 +133,4 @@ En px visibles, el mínimo de cada pantalla, en T1 (360×640) · T2 (390×844) �
 2. **El push de `main`** con los tres SHA, y después borrar `respaldo-lec-1`.
 3. **La comprobación de Victor en ajilei.io con el S25:** lobby, Salas, la mesa de 5 acostada y el resultado. Lo que ve tiene que ser lo de la lámina.
 4. **`completo`** (Victor, ventana oculta, unas 6 h 25 min) como segunda línea base. `vuelo humano` tiene que salir verde ahí, sin excepción. Corrió el 2026-11-20 sobre `0db1005` y dio 69 de 74; la 2-d resolvió cuatro de los cinco rojos.
-5. **`tam` en Armar mesa** (2-d, producto): a 1366 o 1280 de ancho y entre 521 y 541 de alto, `.sal-modo-d` hace desbordar las filas entre 2 y 7 px, y el botón anclado sube entre 2 y 6 px con el gesto. El arreglo está en `src/styles/letra.css` y necesita otro control de las IAS.
+5. **`tam` en Armar mesa** (2-d, producto): a 1366 o 1280 de ancho y entre 521 y 541 de alto, `.sal-modo-d` hace desbordar las filas entre 2 y 7 px, y el botón anclado sube entre 2 y 6 px con el gesto. El arreglo está en `src/styles/letra.css`. **Arreglado en la 2-e:** la regla solo alcanza a anchos menores que 1024. El rector decidió que no hace falta otro control de las IAS, porque `tam`, `sal` y `lec.mapa` ya corrieron verdes.

@@ -26,6 +26,11 @@
 @media (orientation: landscape) and (max-height: 599.98px) {
   main.lobby .lob-top .cst-ficha { font-size: calc(var(--u) * 3.61) }
   .sal .sal-caja { font-size: calc(var(--u) * 3.19) }
+}
+/* LEC-1 2-e · solo el teléfono acostado: ancho < 1024, la frontera de TAB (ANCHO_HB en
+   src/lib/escala.js). En una ventana baja de portátil o tableta (1366 o 1280 × 521–541)
+   desbordaba Armar mesa 2–7 px y el botón anclado subía con el gesto (INV-55, `diagDSK tam`). */
+@media (orientation: landscape) and (max-height: 599.98px) and (max-width: 1023.98px) {
   .sal .sal-modo .sal-modo-d { font-size: calc(var(--u) * 3.55); line-height: 1.103 }
 }
 @media (orientation: portrait) and (max-width: 599.98px) {

@@ -154,3 +154,69 @@ Las cuatro varas de instrumento se repitieron enteras, sobre el árbol de la 2-d
 - **Documentos:** Invariantes §6 (la nota y el pendiente de `diagPUE cap`), este informe y el cierre de LEC-1.
 
 **Lo que no entra:** nada de `src/`. El defecto de `tam` espera la decisión de Victor y del rector.
+
+La 2-d entró como `b5d997a`, en `respaldo-lec-1`.
+
+## 4 · La tanda 2-e: `.sal-modo-d` solo en el teléfono acostado
+
+**La orden** (Victor, tras el STOP-C de la 2-d): acotar a la banda del teléfono la regla del bloque acostado de `letra.css` que desbordaba Armar mesa (§1, `tam`). Nada más cambia.
+
+**El cambio** (`src/styles/letra.css`). `.sal .sal-modo .sal-modo-d` sale del bloque `(orientation: landscape) and (max-height: 599.98px)` a uno propio. Ese bloque nuevo suma el límite de ancho de la frontera de TAB, que es `ANCHO_HB = 1024` en `src/lib/escala.js`:
+
+```css
+@media (orientation: landscape) and (max-height: 599.98px) and (max-width: 1023.98px) {
+  .sal .sal-modo .sal-modo-d { font-size: calc(var(--u) * 3.55); line-height: 1.103 }
+}
+```
+
+- **La regla es la misma, con la misma cifra.** Las otras dos del bloque acostado (`.cst-ficha` y `.sal-caja`) no se tocan.
+- **Dónde deja de aplicar:** en la ventana baja de un portátil o de una tableta, de 1024 o más de ancho. Ahí la descripción del modo vuelve a la letra de antes de LEC-1.
+- **Dónde sigue:** en los teléfonos acostados, todos por debajo de 1024. El más ancho medido es el Z Flip 6, a 1006.
+
+**El control rojo,** sin correrlo roto: es la línea de `tam` de la segunda `completo` sobre `0db1005`, con la regla sin acotar (§1):
+
+```text
+── TAM · ROJO · tam.1 ✓ · tam.2 ✓ · tam.3 ✗ (6) · tam.4 ✓ · tam.5 ✓ · tam.6 ✗ (6) · … · 301 de 301 celdas
+   tam.3 ✗ laptop armar 521 · laptop armar 531 · laptop armar 541 · tableta armar 521 · tableta armar 531 · tableta armar 541
+   tam.6 ✗ laptop armar 521 · laptop armar 531 · laptop armar 541 · tableta armar 521 · tableta armar 531 · tableta armar 541
+```
+
+**Las comprobaciones:**
+
+Todas sobre `b5d997a` con el cambio de la 2-e:
+
+```text
+── TAM · VERDE · tam.1 ✓ · tam.2 ✓ · tam.3 ✓ · tam.4 ✓ · tam.5 ✓ · tam.6 ✓ · tam.7 ✓ · tam.8 ✓ · tam.9 ✓ · tam.10 ✓ · tam.11 ✓ · tam.12 ✓ · matriz ✓ · consola ✓ · 448 puntos de barrido (75 con filas recorridas) · 301 de 301 celdas
+── diagDSK tam · tam verde · aislamiento verde → código 0
+  lec.mapa · VERDE · 29 pisos, 19 excepciones, 4 tamaños · 42 s
+── sal · las salas PvP ── 114/114 celdas · verde → código 0
+```
+
+**Armar mesa, con la misma sonda de la §1:**
+
+| Perfil | Alto | Filas que no caben | Botón tras el gesto |
+|---|---|---|---|
+| laptop 1366 (rueda) | 521 · 531 · 541 | 0 · 0 · 0 | 460,5 → 460,5 · 470,3 → 470,3 · 479,3 → 479,3 |
+| tableta 1280 (arrastre) | 521 · 531 · 541 | 0 · 0 · 0 | 460,5 → 460,5 · 470,3 → 470,3 · 479,3 → 479,3 |
+
+El botón queda en la misma posición que daba la sonda sin las reglas de Salas (§1).
+
+**`lec.mapa`, `.sal-modo-d`:**
+
+| Tamaño | Mide | Piso |
+|---|---|---|
+| T3 (640×360) | 12,78 px | 12,8 (margen −0,25) |
+| T1 | 11,48 px | 11,5 |
+| T2 | 12,44 px | 12,4 |
+
+El teléfono conserva la letra aprobada.
+
+**`npm run varas -- --solo eslint,vitest,build,guiones,1.8b`:** las cinco con código 0:
+- eslint: 0 errores y 0 avisos;
+- vitest: 113/113 archivos, 3063 pruebas;
+- build y guiones: verdes;
+- **`1.8b`: 179,4 KiB** (CSS 22,0).
+
+**Lo que entra:** `src/styles/letra.css`, este informe y el cierre de LEC-1.
+
+**El push de `main`:** la 2-e toca `src/`, pero el rector decidió (2026-11-20) que no hace falta otro control de las IAS. La regla solo alcanza a Armar mesa (`.sal`), y `tam`, `sal` y `lec.mapa` ya corrieron verdes sobre este árbol. La 2-d y la 2-e se publican juntas.
