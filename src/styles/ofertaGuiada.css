@@ -1,0 +1,84 @@
+/* ── GUI-1 · La oferta del primer login (`components/OfertaGuiada.jsx`) ──────
+   Normativo: AJILEI_Tutorial_v1.0.md §1.2; la forma, la variante a de la lámina
+   (centrada sobre el lobby atenuado). Hoja nueva y aditiva (INV-03).
+   Mismo piso que la capa: z-index 40 (ver la cabecera de `senal.css`). El lobby
+   no se mueve: todo es `fixed` y vive en `body`. */
+
+.ofg-raiz {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  font-family: var(--font-base);
+  color: var(--text-primary);
+}
+.ofg-velo {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 10, 6, 0.35);
+  pointer-events: auto;
+}
+
+.ofg-tarjeta {
+  position: fixed;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px));
+  padding: 18px 18px 16px;
+  background: rgba(9, 23, 14, 0.97);
+  border: 1.5px solid rgba(var(--gold-brand-rgb), 0.7);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  text-align: center;
+}
+/* Centrada sobre el velo. */
+.ofg-tarjeta {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ofg-titulo {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.ofg-texto {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+.ofg-botones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Piso táctil de 44 (INV-07, el del lobby). El principal es el oro del lobby
+   («Jugar contra las IAS»): la misma rampa de las tres paradas del mismo oro. */
+.ofg-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 23px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ofg-btn--pri {
+  background: linear-gradient(180deg, var(--gold-hover) 0%, var(--gold-brand) 55%, var(--gold-brand-deep) 100%);
+  color: var(--text-dark);
+}
+.ofg-btn--sec {
+  background: transparent;
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--gold-brand-rgb), 0.6);
+}
+.ofg-btn:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+@media (min-width: 600px) and (min-height: 600px) {
+  .ofg-titulo { font-size: 20px; }
+  .ofg-texto { font-size: 16px; }
+}

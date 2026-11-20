@@ -66,7 +66,8 @@ export default function OpponentPanel({
   // (desktopHeader es false fuera del gate → headerLetter === letterBadges).
   const headerLetter = letterBadges || desktopHeader
   return (
-    <div className={`opp-panel opp-${seatPos}${stateClasses}${revealAnimClass ? ` ${revealAnimClass}` : ''}`}>
+    // TUT-1 · el ancla del rival para la capa de señalización: solo atributo (INV-89).
+    <div className={`opp-panel opp-${seatPos}${stateClasses}${revealAnimClass ? ` ${revealAnimClass}` : ''}`} data-ancla="rival" data-asiento={playerIndex}>
       {/* opp-topline: por defecto display:contents (transparente) → identidad y saldo
           se apilan como siempre (3/4/5/portrait/escritorio sin cambios). Solo en la
           mesa de 2 landscape se vuelve una fila space-between (fusión en una línea). */}

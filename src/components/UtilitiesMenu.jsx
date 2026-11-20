@@ -88,6 +88,7 @@ export function UtilitiesTrigger({ open, onToggle, registerTrigger }) {
     <button
       ref={registerTrigger}
       className={`mute-button utilities-trigger${open ? ' is-open' : ''}`}
+      data-ancla="menu"
       onClick={onToggle}
       aria-haspopup="menu"
       aria-expanded={open}

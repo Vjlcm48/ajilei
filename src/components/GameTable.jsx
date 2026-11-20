@@ -2095,14 +2095,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         } else {
           content = <PlayingCard card={oldCard} />   // aún en mano, no ha volado
         }
-        return <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper">{content}</div>
+        return <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper" data-ancla="carta" data-i={i}>{content}</div>
       }
-      if (inReset) return <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper"><PlayingCard /></div>
+      if (inReset) return <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper" data-ancla="carta" data-i={i}><PlayingCard /></div>
       const card    = game.players[0].cards[i]
       const visible = i < visFor(0)
       if (phase === PHASES.DEAL_3 && i >= 2 && visible && card) {
         return (
-          <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper">
+          <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper" data-ancla="carta" data-i={i}>
             {deal3FaceUp.has(i)
               ? <PlayingCard key={`d3rev-${i}`} card={card} animClass="card-flip-anim" />
               : <PlayingCard faceDown />}
@@ -2110,7 +2110,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         )
       }
       return (
-        <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper">
+        <div key={`ps-${i}`} ref={ref} className="card-slot-wrapper" data-ancla="carta" data-i={i}>
           {!visible || !card
             ? <PlayingCard />
             : <PlayingCard
@@ -2135,7 +2135,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const rival = game.players[seat]
     const rivalWon = showdownWinnerSeat === seat
     return (
-      <section className={`ai-zone${turnSeat === seat ? ' turn-active' : ''}${turnSeat === 0 ? ' turn-dimmed' : ''}${openChipSeat === seat ? ' chip-open' : ''}`}>
+      <section className={`ai-zone${turnSeat === seat ? ' turn-active' : ''}${turnSeat === 0 ? ' turn-dimmed' : ''}${openChipSeat === seat ? ' chip-open' : ''}`} data-ancla="rival" data-asiento={seat}>
         {/* M2-1 · Header rediseñado SOLO portrait (este render legacy también
             sirve al escritorio, que conserva palabra completa y línea de
             saldo): badges a letra única (patrón seat-badge-letter de 3/4/5) y
@@ -2365,7 +2365,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     const actionKind = resultado ? null : messageActionKind(centerMsg)
     const msgClass   = claseDelMensaje(resultado, centerMsg)
     return (
-      <section className="center-zone" onClick={toqueOvaloVoz2}>
+      <section className="center-zone" data-ancla="ovalo" onClick={toqueOvaloVoz2}>
         {/* C4.5.2: mientras hay aviso de reducción, REEMPLAZA el contenido del óvalo
             (pozo/estado/comodín) por el aviso EN FLUJO, centrado y con wrap. Al
             limpiarse elimNotice (lo hace runEliminationCeremony tras ELIM_NOTICE_MS),
@@ -2379,7 +2379,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 alternativas de la misma zona; nunca coexisten (censo de Fase 0:
                 exactamente 1 en las 11 celdas medidas), así que los dos lo llevan
                 y el selector sigue devolviendo una sola moneda. */}
-            <div className="pot-box" data-coin-source="pot">
+            <div className="pot-box" data-coin-source="pot" data-ancla="pozo">
               <span className="pot-label">Pozo</span>
               <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
                 <ChipToken size="compact" />
@@ -2387,7 +2387,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               </strong>
               {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
             </div>
-            <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
+            <div className="call-box" data-ancla="a-igualar" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
               <span className="pot-label">A igualar</span>
               <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
             </div>
@@ -2406,6 +2406,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               <span
                 key={noteFlash}
                 className={`comodin-note${noteFlash > 0 ? ' comodin-note-flash' : ''}`}
+                data-ancla="comodin"
               >
                 {comodinNote}
               </span>
@@ -2445,7 +2446,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         <section className="felt-oval oval-left">
           {/* VIS-3a · el mismo origen por la vía de los dos óvalos (mesa 2
               landscape móvil). Ver la nota de renderCenterZone. */}
-          <div className="pot-box" data-coin-source="pot">
+          <div className="pot-box" data-coin-source="pot" data-ancla="pozo">
             <span className="pot-label">Pozo</span>
             <strong className={`pot-value${potAnim ? ' pot-value-pulse' : ''}`} key={potAnim ? `pv-${potAnim.id}` : 'pv'}>
               <ChipToken size="compact" />
@@ -2453,12 +2454,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             </strong>
             {potAnim && <span key={`pf-${potAnim.id}`} className="pot-float">+{potAnim.delta}</span>}
           </div>
-          <div className="call-box" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
+          <div className="call-box" data-ancla="a-igualar" style={{ visibility: currentBet > 0 && isBetPhase ? 'visible' : 'hidden' }}>
             <span className="pot-label">A igualar</span>
             <strong className="call-value">{toCall > 0 ? toCall : '—'}</strong>
           </div>
         </section>
-        <section className="felt-oval oval-right" onClick={toqueOvaloVoz2}>
+        <section className="felt-oval oval-right" data-ancla="ovalo" onClick={toqueOvaloVoz2}>
           <p className={`game-message${msgClass}`} data-tono={resultado?.tono ?? ''} data-capas={capasPozo.length} key={actionKind ? centerMsg : 'msg'}>
             {contenidoFrase(centerMsg)}
           </p>
@@ -2649,7 +2650,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           </div>
 
           {/* Barra única: Tú+badges (izq) · acciones del turno (centro) · saldo (der) */}
-          <div className="player-bar">
+          <div className="player-bar" data-ancla="barra-propia">
             <strong className="player-bar-left">
               {/* Orden DOM conservado → escritorio sigue en línea ("Tú Mano Pie
                   Turno"). El grid de gameTable.css recoloca por orientación:
@@ -2697,7 +2698,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                 <div className="action-area">
                   {/* PAN-1 1c · R4: dentro de la mesa, la pantalla completa solo
                       vuelve aquí y en «Siguiente mano», síncrona y lo primero. */}
-                  <SoundButton className="btn btn-primary" onClick={() => {
+                  <SoundButton className="btn btn-primary" data-accion="iniciar-mano" onClick={() => {
                     reentrarPantallaCompleta(document, window)
                     beginHand()
                   }}>
@@ -2761,6 +2762,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                     {mults.map((m) => (
                       <SoundButton
                         key={m.k}
+                        data-accion="mult"
+                        data-k={m.k}
                         className={`btn btn-mult${betAmount === m.monto ? ' btn-mult-active' : ''}`}
                         onClick={() => setBetAmount(m.monto)}
                         disabled={!m.disponible}
@@ -2769,7 +2772,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                       </SoundButton>
                     ))}
                   </div>
-                  <div className="action-buttons">
+                  <div className="action-buttons" data-ancla="fila-acciones">
                     {puedeHacer('pasar')   && <SoundButton className="btn btn-pass"  data-accion="pasar"   onClick={() => act('pasar')}>Pasar</SoundButton>}
                     {puedeHacer('apostar') && <SoundButton className="btn btn-bet"   data-accion="apostar" onClick={() => act('apostar')}>Apostar {betAmount}</SoundButton>}
                     {puedeHacer('igualar') && <SoundButton className="btn btn-call"  data-accion="igualar" onClick={() => act('igualar')}>Igualar ({toCall})</SoundButton>}
@@ -2827,7 +2830,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                         ? `${game.selectedDiscards.length} de ${game.handRules.maxDiscard} seleccionada(s).`
                         : `${game.selectedDiscards.length} carta(s) seleccionada(s).`}
                   </p>
-                  <SoundButton className="btn btn-primary" onClick={handleDiscard}>
+                  <SoundButton className="btn btn-primary" data-accion="descartar" onClick={handleDiscard}>
                     {game.selectedDiscards.length > 0 ? `Descartar ${game.selectedDiscards.length}` : 'Sin descartar'}
                   </SoundButton>
                 </div>
@@ -2860,7 +2863,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                       Solo alcanzable ocultándose dentro de los 300 ms
                       siguientes al clic; se guarda igual porque la ventana
                       existe. */}
-                  <SoundButton className="btn btn-primary" onClick={() => {
+                  <SoundButton className="btn btn-primary" data-accion="siguiente-mano" onClick={() => {
                     reentrarPantallaCompleta(document, window)  // PAN-1 1c · R4
                     setIsClearing(true)
                     setGame(prev => ({ ...prev, message: '', winner: null }))
