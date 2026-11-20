@@ -54,6 +54,12 @@
 //   lec    → LEC-1 1-c: la vara `lec.mapa`. Los pisos de la letra que LEC-1 subió (LEC_PISOS),
 //            lo que no subió con su cifra (LEC_EXCEPCIONES) y nada bajo 9 px fuera de ellas,
 //            en 360×640, 390×844, 640×360 y la mesa en 1920×1080. Ver `scripts/lec/lec.mjs`.
+//   tut    → TUT-1 tanda 1: la capa de señalización REAL sobre la mesa quieta del árbitro
+//            imitado (`?pvp=turno-propio&n=3`) en 360×640, 640×360 y 1920×1080: Δ 0 de todas
+//            las cajas de `#root` (INV-89), el hueco sin velo y el toque real que pasa por él,
+//            los botones de 44, el contraste del rótulo, la tarjeta de respaldo y las dos líneas
+//            (tut.delta, tut.hueco, tut.toque, tut.44, tut.contraste, tut.respaldo, tut.lineas). `TUT_CONTROL=sin-hueco`, el control
+//            rojo. Ver `scripts/tut/tut.mjs`.
 //   tienda → TIE-1 1a: la tienda (estantes, lista, vitrina, ventana de compra)
 //            en seis tamaños, la puerta vitrina ↔ mesa (9 valores × 11 casos),
 //            los cuatro estados de la ventana, «No te alcanza», el ojito y lo
@@ -358,6 +364,7 @@ import { PISO_WCAG as TINTA_PISO, QUIETA_CSS as TINTA_QUIETA, TEXTOS as TINTA_TE
 import { runTienda } from './tie/tienda.mjs'
 import { PARTES_PVP, runPvp } from './pvp/pvp.mjs'
 import { runLec } from './lec/lec.mjs'
+import { runTut } from './tut/tut.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -15597,6 +15604,11 @@ try {
   // Contra 5173 (`?sal=`, `?pvp=`). La vara es `lec.mapa`.
   if (MODE === 'lec') {
     report.lec = await runLec(browser, { base: BASE })
+  }
+  // TUT-1 tanda 1 · `tut`: la capa de señalización sobre la mesa quieta de `?pvp=` (INV-89).
+  // Contra 5173 (DEV y bypass): la capa se monta con `scripts/tut/montaCapa.mjs`.
+  if (MODE === 'tut') {
+    report.tut = await runTut(browser, { base: BASE })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

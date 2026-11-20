@@ -17,6 +17,7 @@
 // como LEGADO: lo comprado vive en el servidor (INV-76) y la clave sólo se nombra para borrarla: 18 claves.
 // MES-PvP 5a añade `ajilei.medir` (sesión), el mando `?medir=arranque`, solo de desarrollo: 19 claves.
 // MED-1a T2 añade `ajilei.origen` (local), de dónde vino la cuenta, hasta el Bautizo: 20 claves, 16 accesores.
+// TUT-1 tanda 1 añade `ajilei.guia` (local), las marcas del tutorial en el aparato: 21 claves, 17 accesores.
 // Fuera de alcance: la sesión de Supabase (`sb-…-auth-token`), que la escribe
 // la biblioteca y no el código de `src/`.
 import { describe, it, expect } from 'vitest'
@@ -43,6 +44,7 @@ const CLAVES = [
   { clave: 'ajilei.medir', almacen: 'session', fuente: 'MES-PvP Sub5a §A3 · medirArranque.js · el mando `?medir=arranque` sobrevive al inicio de sesión; solo de desarrollo, no llega a dist/' },
   { clave: 'ajilei.consultaConfirmada', almacen: 'session', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §3 · consultaConfirmada.js · el primer cobro de Mano actual ya se confirmó en esta sesión' },
   { clave: 'ajilei.origen', almacen: 'local', fuente: 'MED-1a T2 §2 · origen.js · de dónde vino, primer toque y 30 días; se borra tras el Bautizo (INV-87)' },
+  { clave: 'ajilei.guia', almacen: 'local', fuente: 'TUT-1 T1 §1.4 · Tutorial_v1.0 §1.2, §1.4 y §2.1 · guia.js · ofrecida, hecha, las señales y los capítulos vistos, en el aparato' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.
@@ -62,6 +64,7 @@ const ACCESORES = [
   'src/lib/consultaConfirmada.js', // ajilei.consultaConfirmada (CFG-1 1e, sessionStorage)
   'src/dev/medirArranque.js',      // ajilei.medir (MES-PvP 5a, sessionStorage, solo de desarrollo)
   'src/lib/origen.js',             // ajilei.origen (MED-1a T2)
+  'src/lib/guia.js',               // ajilei.guia (TUT-1 tanda 1)
   'src/lib/limpiarAparato.js',     // CFG-1 1c: borra TODAS las ajilei.* y vacía sessionStorage al eliminar la cuenta (no escribe ninguna)
 ]
 

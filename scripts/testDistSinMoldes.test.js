@@ -79,6 +79,27 @@ const PROHIBIDAS = [
   // MES-PvP 7b · A2 · la puerta `?ritmo=rapido` de `salasApi.crearSala` (5b) se retiró: la
   // fila Ritmo de Armar mesa la sustituye y `p_ritmo` va ya de verdad (en OBLIGATORIAS).
   'ritmo=rapido',
+  // TUT-1 tanda 1 · el mando `?tut=` de la lámina se retiró (`src/dev/laminaTut.js`,
+  // `LaminaTut.jsx` y `montarLaminaTut.js`, con sus tres enganches): su marca, el id de su
+  // raíz y sus funciones no vuelven a producción nunca.
+  'TUT-1 · lámina',
+  'tut-lamina',
+  'montarLaminaTut',
+  'relojQuietoTut',
+  'mesaTut',
+]
+
+// TUT-1 tanda 1 · las otras seis marcas que la lámina buscó en `dist/`: las de la capa, la
+// oferta y sus textos. Hoy no las monta nadie y no pueden llegar; NO son para siempre: la
+// tanda que monte cada pieza saca su marca de aquí en el mismo commit (la capa y `unico`, la
+// tanda 2; la oferta, la 3; el capítulo 5, la 4). Una que llegue antes es un montaje sin ficha.
+const PROHIBIDAS_HASTA_MONTAR = [
+  'tut-capa',
+  'data-tut-unico',
+  'ofg-tarjeta',
+  'tut.oferta',
+  'Aprendemos',
+  'tut.cap5',
 ]
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las
@@ -134,6 +155,13 @@ describe('ECO-1b · la guardia sobre dist/', () => {
 
   for (const huella of PROHIBIDAS) {
     it(`no aparece «${huella}»`, () => {
+      const donde = textos.filter((a) => a.texto.includes(huella)).map((a) => a.ruta)
+      expect(donde).toEqual([])
+    })
+  }
+
+  for (const huella of PROHIBIDAS_HASTA_MONTAR) {
+    it(`no aparece «${huella}» (TUT-1: hasta que una tanda la monte)`, () => {
       const donde = textos.filter((a) => a.texto.includes(huella)).map((a) => a.ruta)
       expect(donde).toEqual([])
     })

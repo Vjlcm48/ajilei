@@ -2,7 +2,8 @@
 // Rector: AJILEI_CFG-1_Fase1c_v1.0.md §0 y §2.2.
 //
 // Borra TODAS las claves `ajilei.*` de `localStorage` recorriéndolas, sin lista
-// fija: una clave que nazca mañana tampoco se queda. Y vacía `sessionStorage`
+// fija: una clave que nazca mañana tampoco se queda (TUT-1: `ajilei.guia`, las
+// marcas del tutorial, se va así con las demás). Y vacía `sessionStorage`
 // entero (hoy sólo guarda `ajilei.recargaPorChunk`). La sesión de Supabase
 // (`sb-…-auth-token`) no es suya: la quita `signOut`, que va justo después.
 //
