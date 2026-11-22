@@ -1,5 +1,5 @@
 /* ── TUT-1 · La capa de señalización (`components/CapaSenal.jsx`) ────────────
-   Rector: AJILEI_TUT-1_T1_v1.0.md §0 y §1.1; normativo AJILEI_Tutorial_v1.0.md.
+   Rector: AJILEI_TUT-1_T1_v1.0.md §0 y §1.1; normativo AJILEI_Tutorial_v1.3.md.
    Hoja NUEVA y ADITIVA (INV-03): ni una regla en `gameTable.css` ni en ningún
    protegido, ningún `!important`. La capa nunca mueve una caja (INV-89).
 
@@ -188,9 +188,37 @@
 }
 .tut-btn:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
 
+/* ── «Salir» (normativo v1.3 §1.1) ────────────────────────────────────────────
+   Arriba a la derecha, aparte de «Siguiente», relleno vinotinto (#7c1d30, la cifra
+   del normativo) y borde de oro; en los capítulos el mismo botón dice «Cerrar».
+   Fijo y por encima de las bandas del velo (recibe el toque siempre). La burbuja,
+   la tarjeta y la barra no lo pisan (`CapaSenal`, `techo`). Piso de 44 (INV-07). */
+.tut-salir {
+  --tut-salir: #7c1d30;
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 1;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 2px solid var(--gold-brand);
+  border-radius: 22px;
+  background: var(--tut-salir);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+.tut-salir:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+
 /* ── `unico`: el resto de controles, en gris ───────────────────────────────────
    Sólo opacidad: ni caja ni flujo (INV-05). El ancla lleva `data-tut-activo` y
    queda como está; los botones de la capa no se tocan. */
-html[data-tut-unico] :is(button, .btn):not([data-tut-activo]):not(.tut-btn) {
+html[data-tut-unico] :is(button, .btn):not([data-tut-activo]):not(.tut-btn):not(.tut-salir) {
   opacity: 0.4;
 }

@@ -90,12 +90,12 @@ const PROHIBIDAS = [
 ]
 
 // TUT-1 tanda 1 · las otras seis marcas que la lámina buscó en `dist/`: las de la capa, la
-// oferta y sus textos. Hoy no las monta nadie y no pueden llegar; NO son para siempre: la
-// tanda que monte cada pieza saca su marca de aquí en el mismo commit (la capa y `unico`, la
-// tanda 2; la oferta, la 3; el capítulo 5, la 4). Una que llegue antes es un montaje sin ficha.
+// oferta y sus textos. NO son para siempre: la tanda que monte cada pieza saca su marca de
+// aquí en el mismo commit (la capa y `unico`, la tanda 2; la oferta, la 3; el capítulo 5, la
+// 4). Una que llegue antes es un montaje sin ficha.
+// TUT-1 tanda 2 · salen `tut-capa` y `data-tut-unico`: la partida guiada monta la capa (su
+// trozo, `screens/Guiada.jsx`), y entran en las que SÍ tienen que estar, abajo.
 const PROHIBIDAS_HASTA_MONTAR = [
-  'tut-capa',
-  'data-tut-unico',
   'ofg-tarjeta',
   'tut.oferta',
   'Aprendemos',
@@ -115,6 +115,8 @@ const OBLIGATORIAS = [
   'sumamente_promo_es.mp4',
   // MES-PvP 7b · A2 · `crearSala` manda siempre el ritmo y la entrada.
   'p_ritmo', 'p_entrada',
+  // TUT-1 tanda 2 · la capa de la partida guiada, montada (salen de «hasta montar»).
+  'tut-capa', 'data-tut-unico',
 ]
 
 let carpeta = null

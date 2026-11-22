@@ -30,6 +30,8 @@ export const trozos = Object.freeze({
   capasVideo: trozo(() => import('../components/CapasVideo')),
   hoja: trozo(() => import('../components/HojaContenido')),
   controlMesa: trozo(() => import('./controlMesaIA')),
+  // TUT-1 T2 · la partida guiada: su mesa, su capa y sus textos.
+  guiada: trozo(() => import('../screens/Guiada')),
 })
 
 // §3-B · lo que se abre desde el lobby, en el mismo momento que la mesa. Las

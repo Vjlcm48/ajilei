@@ -1,0 +1,76 @@
+/* ── GUI-1 · La partida guiada (`components/GuiaControl.jsx`, `screens/CierreGuiada.jsx`) ──
+   Rector: AJILEI_TUT-1_T2_v1.0.md §1.3. Hoja NUEVA y ADITIVA (INV-03): ni una regla
+   en `gameTable.css` ni en ningún protegido, ningún `!important`. Los botones son
+   los de la capa (`.tut-btn`, `senal.css`).
+
+   ── ENTRE PASOS ──────────────────────────────────────────────────────────────
+   Mientras la mesa reparte, repone o celebra no se ve ningún paso y nada responde:
+   una capa transparente a la altura de la de señalización (40) recibe el toque, y
+   sólo queda «Salir», arriba a la derecha, donde la capa lo pone (`.tut-salir`,
+   `senal.css`). Sin velo: la mesa se mueve a la vista. */
+.guia-espera {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: auto;
+  background: transparent;
+}
+
+/* ── El cierre ────────────────────────────────────────────────────────────────
+   Una pantalla, no una capa: el verde del `body` y una tarjeta centrada con la
+   forma del rótulo de la capa (oscura, borde de oro). */
+.guia-cierre {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: radial-gradient(ellipse at 50% 35%, rgba(26, 74, 44, 0.9) 0%, rgba(6, 18, 11, 1) 75%);
+  color: var(--text-primary);
+}
+.guia-cierre-tarjeta {
+  box-sizing: border-box;
+  width: min(420px, 100%);
+  padding: 28px 22px 22px;
+  background: rgba(9, 23, 14, 0.96);
+  border: 1.5px solid rgba(var(--gold-brand-rgb), 0.7);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.guia-cierre-titulo {
+  margin: 0 0 10px;
+  font-size: 26px;
+  line-height: 1.2;
+  color: var(--gold-hover);
+}
+.guia-cierre-texto {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+/* Tanda 3 · el hueco de la recompensa (§1.5): vacío no ocupa alto. */
+.guia-cierre-recompensa:empty { display: none; }
+.guia-cierre-botones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 22px;
+}
+.guia-cierre-botones .tut-btn { width: 100%; }
+
+/* ── La palabra quieta (v1.3, ajuste de Victor) ───────────────────────────────
+   En la mesa guiada la palabra AJILEI de la última mano no se desvanece: su
+   animación (`vcAjilei`, 2 s) y la del velo (`vcAjileiVelo`, `celebracion.css`)
+   corren sólo hasta el 75 %, antes de su salida (hacia el 80 %), y se quedan ahí
+   (`both`). Al acabar la celebración, `GuiaControl` monta una copia con las mismas
+   clases ya en ese fotograma (retraso negativo: llega terminada) y la sostiene
+   hasta el cierre: un segundo después de que acabe el sonido. */
+html[data-guiada] .vc-ajilei,
+html[data-guiada] .vc-ajilei-capa {
+  animation-iteration-count: 0.75;
+}
+html[data-guiada] .guia-ajilei-quieta,
+html[data-guiada] .guia-ajilei-quieta .vc-ajilei {
+  animation-delay: -1.5s;
+}

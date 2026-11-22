@@ -77,7 +77,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // CFG-1 1a · en la hoja ya sólo dicen «Pronto» Idioma y Eliminar cuenta, y lo
 // dicen con el aviso de la hoja (`HojaConfiguracion`), no con éste.
 
-export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onRankings, onTienda, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onRankings, onTienda, onReglas, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -255,7 +255,8 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
       {/* ── Barra inferior ─────────────────────────────────────────────── */}
       <nav className="lob-nav" aria-label={t('lob.cfg.titulo')}>
         {/* RNK-1c · Rankings ya lleva a su pantalla. TIE-1 1a · la Tienda,
-            también (en Tapetes, V1-A); «Cómo se juega» sigue diciendo «Pronto». */}
+            también (en Tapetes, V1-A). TUT-1 T2 · «Cómo se juega» abre la partida
+            guiada (entrada provisional: la tanda 4 la cambia por el índice). */}
         <SoundButton className="lob-nav-btn" data-accion="rankings" onClick={() => onRankings?.()}>
           <IconoTrofeo /><span>{t('lob.nav.rankings')}</span>
         </SoundButton>
@@ -264,7 +265,7 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
         <SoundButton className="lob-nav-btn lob-nav-tienda" data-accion="tienda" onClick={onTienda ?? pronto}>
           <IconoTienda /><span>{t('lob.nav.tienda')}</span>
         </SoundButton>
-        <SoundButton className="lob-nav-btn" data-accion="reglas" onClick={pronto}>
+        <SoundButton className="lob-nav-btn" data-accion="reglas" onClick={onReglas ?? pronto}>
           <IconoLibro /><span>{t('lob.nav.reglas')}</span>
         </SoundButton>
       </nav>

@@ -90,6 +90,7 @@ const IntersticialSumaMente = lazy(trozos.sumamente.fabrica)
 const Perfil = lazy(trozos.perfil.fabrica)
 const Rankings = lazy(trozos.rankings.fabrica)
 const Tienda = lazy(trozos.tienda.fabrica)
+const Guiada = lazy(trozos.guiada.fabrica)
 // ECO-1d · aplica `f` a la ficha de la constancia guardada como `{ uid, ficha }`.
 const conFicha = (f) => (c) => (c ? { ...c, ficha: f(c.ficha) } : c)
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
@@ -1192,6 +1193,18 @@ function App() {
     )
   }
 
+  // ── TUT-1 T2 · La partida guiada (GUI-1) ───────────────────────────────
+  // La mesa de siempre con un guion y SIN servidor: ni `retar` ni `sentarse_ia`,
+  // ni `control`, `apiRanking` o `apiConsulta` (excepción escrita a INV-47). Sin
+  // el marco del video, como la mesa. Su cierre vive en el mismo trozo.
+  if (screen === 'guiada') {
+    return (
+      <PantallaDiferida trozo={trozos.guiada} familia="abismo">
+        <Guiada onLobby={() => setScreen('lobby')} onJugar={() => setScreen('retar-ias')} />
+      </PantallaDiferida>
+    )
+  }
+
   // La caída de la cascada sigue siendo el destino de `COMPLETO`. Las props son
   // las de la cuenta, la billetera, los avisos y a dónde lleva cada botón: el lobby
   // sigue sin conocer `screen`, ni Supabase, ni la mesa.
@@ -1206,6 +1219,7 @@ function App() {
       onJugarPvP={() => setScreen('sala-opciones')}
       onRankings={entrarRankings}
       onTienda={() => abrirTienda('tapetes')}
+      onReglas={() => setScreen('guiada')}
       onCerrarSesion={cerrarSesion}
     />,
   )

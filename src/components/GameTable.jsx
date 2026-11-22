@@ -48,7 +48,7 @@ import { aPropios, escalaActual } from '../lib/escala'
 import { reentrar as reentrarPantallaCompleta } from '../lib/pantallaCompletaCore'
 import { hayManoConsultable, desglosarPalos, etiquetaConsulta } from '../hooks/consultasCore'
 import { VIVAS_ESCRITORIO, VIVAS_MOVIL, presentesDe, filasDelPanel } from '../config/menuEntradas'
-import { partidaRapida, factorDeMano } from '../lib/partidaRapida'
+import { partidaRapida, factorDeMano, FACTOR_RAPIDA } from '../lib/partidaRapida'
 import { getBestSuitScore } from '../engine/handEvaluator'
 import { useSounds } from '../hooks/useSounds'
 import BalanceDisplay from './BalanceDisplay'
@@ -90,6 +90,8 @@ import '../styles/tactil.css'
 import '../styles/escala.css'
 
 const WARNING_AT = 5
+// TUT-1 T2 · la caja que se reserva sin pintarse (el reloj de la guiada).
+const OCULTO = { visibility: 'hidden' }
 
 // Tanda C3.1: factor único de ritmo de las IAs (+25%) — multiplica TODAS las
 // pausas asociadas a acciones de IA (pensar antes de actuar, gaps entre
@@ -344,7 +346,12 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, 
 // siempre con `game`. Con ella la mesa no mueve el motor: pinta la vista del servidor y
 // manda las jugadas por `enviar`. Cada guarda dice `partida` y, contra las IAS, es falsa:
 // ningún hook cambia de sitio y ninguna tirada cambia (Fase 0 de MES-PvP, §B.1-B.2).
-export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null, contraIAS = false, apiConsulta = null, onSaldo = null, tapetes = null, partida = null }) {
+// TUT-1 T2 · `guion`: la partida guiada (GUI-1), `null` en toda otra mesa. Lo arma
+// `screens/Guiada.jsx` con `lib/guiaManos`: su lista de asientos, el mazo dado de cada
+// mano (`armar`), la decisión de los rivales (`decidir`) y su capa (`Control`). Con él
+// la mesa no tiene reloj de turno, ni recarga, ni puntos, ni «Siguiente mano» tras la
+// última. Como `partida`, cada guarda lo dice en su sitio y, sin él, no cambia nada.
+export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null, onLeave, cuenta, saldo = 0, control = null, apiRanking = null, contraIAS = false, apiConsulta = null, onSaldo = null, tapetes = null, partida = null, guion = null }) {
   // NIV-UI · PASAJERO `nivelIA` (rector §2.2, vía C). Se cuelga aquí, en la
   // creación del estado, que es el único punto donde se escribe: nace con la
   // mesa y muere con este componente, así que D-7 —nivel congelado durante toda
@@ -368,6 +375,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   const [motor, setMotor] = useState(() => {
     // MES-PvP 3 · contra personas no hay motor local: ni mesa que crear ni tirada.
     if (partida) return { game: null, cronica: '' }
+    // TUT-1 T2 · la guiada nace con SU lista (tres de 10.000) y sin moldes de desarrollo.
+    if (guion) { const g = guion.estadoInicial(); return { game: g, cronica: componeCronica(null, g) } }
     // CEL-0 · `siembraCEL` es la IDENTIDAD salvo en desarrollo y con `?cel` en
     // la URL; ahí siembra a los rivales sin fichas para que la mesa cierre en
     // el primer "Iniciar mano". No hay rama de render ni condición nueva: lo
@@ -539,7 +548,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     () => (phase === PHASES.PAYOUT ? finDeMano(game) : null),
     [phase, game.handCount], // eslint-disable-line react-hooks/exhaustive-deps
   )
-  const puntosMano = puntosDelFin({ fin: finMano, nivel: game.nivelIA, contraHumanos: !!partida })
+  // TUT-1 T2 · la guiada no da puntos (no hay `informar_pila` ni sesión que contar).
+  const puntosMano = guion ? 0 : puntosDelFin({ fin: finMano, nivel: game.nivelIA, contraHumanos: !!partida })
 
   // ── APU-1 1e · SALIR DEVUELVE LAS FICHAS ─────────────────────────────────
   // Rector 1e §2.3. `onLeave` recibe con cuántas fichas se levanta el humano,
@@ -934,6 +944,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   useEffect(() => {
     // MES-PvP 3 · contra personas el reloj lo cuenta y lo resuelve el servidor.
     if (partida) return
+    // TUT-1 T2 · en la guiada el jugador tiene todo el tiempo: el reloj no corre.
+    if (guion) return
     if (congelado) return
     if (!isPlayerTurnEarly && !isDiscardTimerActive) return
     if (timeLeft <= 0) return
@@ -1196,7 +1208,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       // tiradas y podría aplicar una acción DISTINTA de la que se cronometró.
       // Así se consume exactamente una, la misma que consumía antes.
       const seat = game.activePlayerIndex
-      const decision = decidirIA(game, seat)
+      // TUT-1 T2 · en la guiada decide el guion (pasar o igualar ×1), con la misma espera.
+      const decision = guion ? guion.decidir(game, seat) : decidirIA(game, seat)
       const t = setTimeout(() => {
         const prev = gameRef.current
         // La mesa pudo moverse mientras se esperaba (una mano nueva, un
@@ -1330,7 +1343,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // la pila, el techo de la mesa y el bolsillo. La pantalla no vuelve a decidir
   // nada: pinta lo que esa función dice y cobra por `aplicarRecarga`.
   // MES-PvP 3 · la recarga es solo contra las IAS (Reglas v1.5 §5).
-  const motivoRec  = partida ? RECARGA.NINGUNA : pideRecarga(game, saldo)
+  // TUT-1 T2 · ni en la guiada: no se alcanza por pilas (10.000) y aun así no existe.
+  const motivoRec  = partida || guion ? RECARGA.NINGUNA : pideRecarga(game, saldo)
   // REC-2 · la tarjeta ENTERA sale del núcleo: qué caso es (fila, «todo» o sin
   // saldo), qué montos se pintan y cuál nace elegido. El monto elegido es
   // `null` en el caso 3 y nunca 0: aquí no se rellena ningún hueco.
@@ -1757,6 +1771,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
 
   const isDiscardPhase = phase === PHASES.DISCARD
   const isPayoutPhase  = phase === PHASES.PAYOUT
+  // TUT-1 T2 · el pago de la última mano guiada: no hay «Siguiente mano», va al cierre.
+  const finGuion = !!guion && isPayoutPhase && game.handCount >= guion.manos
 
   // ── APU-1 §4.2 · LAS CAPAS DEL POZO, Y LA FRASE QUE LAS CUENTA ─────────
   // Sólo en el pago: durante la mano el pozo se enseña entero, que es como se
@@ -1993,6 +2009,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   function beginHand() {
     setLastActions({})
     const prev = gameRef.current
+    // TUT-1 T2 · el mazo dado de la mano que va a empezar (se consume en este barajado).
+    guion?.armar(prev)
     const next = startHand(prev)
     if (next.phase === PHASES.GAME_OVER) {
       setGame(next)
@@ -2048,7 +2066,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     // (no del estado del ⋮, que puede ir por delante), y queda congelada en el
     // ref para toda la mano. El barajado de abajo no la mira: sus 1950 ms van
     // sincronizados con `gameTable.css` (protegido) y no cambian.
-    factorManoRef.current = factorDeMano(contraIAS, partidaRapida.leer())
+    // TUT-1 T2 · la guiada va siempre a ritmo Rápido.
+    factorManoRef.current = guion ? FACTOR_RAPIDA : factorDeMano(contraIAS, partidaRapida.leer())
     setGame(next)            // cobro del ante visible (saldos descontados, pozo armado)
     setIsShuffling(true)     // baraja sobre el estado ya cobrado
     clearTimeout(barajaTimerRef.current)
@@ -2760,7 +2779,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
               {isPlayerTurn && (
                 <div className="action-area action-col">
                   <div className="mult-row">
-                    <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
+                    <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`} style={guion ? OCULTO : undefined}>
                       {timeLeft}s
                     </div>
                     {/* §3.1 · el gris del multiplicador también lo dice el árbitro.
@@ -2804,7 +2823,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
 
               {isDiscardPhase && !discardAnim && !human.folded && !yaDescarte && (
                 <div className="action-area discard-area">
-                  <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`}>
+                  <div className={`timer-display${timeLeft <= WARNING_AT ? ' timer-warning' : ''}`} style={guion ? OCULTO : undefined}>
                     {timeLeft}s
                   </div>
                   {/* DSK-U0 · HR-1 en la capa de presentación. El tope se lee del
@@ -2864,7 +2883,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   el normativo, y no es un detalle de cortesía: la recarga sólo
                   existe ENTRE manos, así que dejar el botón vivo mientras la
                   pregunta está abierta es ofrecer la única acción que la anula. */}
-              {!partida && isPayoutPhase && !isClearing && !isShuffling && !ceremony && !recarga && (
+              {!partida && isPayoutPhase && !isClearing && !isShuffling && !ceremony && !recarga && !finGuion && (
                 <div className="action-area">
                   {/* FRZ-1 §2.4 · El otro extremo del arranque de mano. Handle
                       para poder cancelarlo, y si al vencer estamos a oscuras la
@@ -2914,7 +2933,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
                   ceremonia de eliminación, con un caso más. MES-PvP 5a · D.1 · y
                   entre personas en todo el pago: allí «Siguiente mano» no se monta
                   (`!partida`) y la caja de «Tú» saltaba al entrar en el pago. */}
-              {((isPayoutPhase && (isClearing || !!partida)) || ceremony || !!recarga) && (
+              {((isPayoutPhase && (isClearing || !!partida || finGuion)) || ceremony || !!recarga) && (
                 <div className="action-area rec-ranura">
                   {/* REC-1 · la burbuja vive DENTRO de la ranura que O1 ya
                       reservaba, en absoluto (rec.css): la ranura no cambia de
@@ -3086,6 +3105,19 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       <TransicionMano game={game} recoger={!partida && isPayoutPhase && isClearing} recogerA={partida ? recogerEnPvP(game.vencimiento, partida.desfase ?? 0) : null} />
       <CelebracionMesa activa={celebracion.activa} />
       <AjileiOverlay activa={celebracion.activa} />
+      {/* TUT-1 T2 · la capa de la partida guiada: el paso vigente y «Salir». Lee la mesa;
+          no la toca (lo que hace un paso lo hace el toque del jugador). */}
+      {guion && (
+        <guion.Control
+          guion={guion}
+          game={game}
+          vista={{
+            barajando: isShuffling, repartiendo: isDealPhase, reponiendo: !!discardAnim, turno: isPlayerTurn,
+            descarte: isDiscardTimerActive, recogiendo: isClearing, celebrando: !!celebracion.activa, fin: finGuion,
+            sonidoCelebracion: celebracion.sonido,
+          }}
+        />
+      )}
 
       {/* Confirmación abandonar mesa */}
       {confirmLeave && (

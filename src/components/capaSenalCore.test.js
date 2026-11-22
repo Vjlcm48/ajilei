@@ -169,6 +169,12 @@ describe('TUT-1 · la burbuja y su respaldo', () => {
     expect(colocarBarra({ tam: { w: 200, h: 56 }, evitar: [caja(0, 0, 50, 50)], vista: T1 })).toEqual(caja(80, 572, 200, 56))
     expect(colocarBarra({ tam: { w: 200, h: 56 }, evitar: [caja(0, 560, 360, 80)], vista: T1 })).toEqual(caja(80, BORDE, 200, 56))
   })
+
+  it('arriba, la tarjeta y la barra se quedan bajo «Salir» (`techo`, v1.3 §1.1)', () => {
+    const hueco = caja(10, 560, 340, 70)
+    expect(colocarRespaldo({ tam: { w: 336, h: 120 }, huecos: [hueco], vista: T1, techo: 62 })).toEqual(caja(BORDE, 62, 336, 120))
+    expect(colocarBarra({ tam: { w: 200, h: 56 }, evitar: [hueco], vista: T1, techo: 62 })).toEqual(caja(80, 62, 200, 56))
+  })
 })
 
 describe('TUT-1 · la señal libre, la flecha y el rótulo', () => {

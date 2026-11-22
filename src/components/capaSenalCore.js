@@ -1,6 +1,6 @@
 // ── TUT-1 · La geometría de la capa de señalización, pura ───────────────────
 // Rector: AJILEI_TUT-1_T1_v1.0.md §1.1 (forma elegida en la lámina, normativo
-// `AJILEI_Tutorial_v1.0.md`). Molde de `miniPerfilCore.js` y de `colocaCapa`
+// `AJILEI_Tutorial_v1.3.md`). Molde de `miniPerfilCore.js` y de `colocaCapa`
 // (VOZ-2): las cuentas viven aquí, sin React ni DOM, para que Vitest las pruebe
 // sin jsdom (que este proyecto no tiene, hallazgo de FRZ-1). `CapaSenal.jsx`
 // mide con `getBoundingClientRect` y le pasa cajas planas.
@@ -183,24 +183,25 @@ export function burbujaCabe({ caja: c, huecos, vista, lineas, maxLineas = MAX_LI
 
 /**
  * La TARJETA DE RESPALDO, fija: abajo y centrada; si pisa un hueco, arriba. Lleva
- * dentro el «paso n de m» y los botones (sin barra aparte).
+ * dentro el «paso n de m» y los botones (sin barra aparte). `techo`: lo más
+ * arriba que puede ir (bajo «Salir», que vive arriba a la derecha).
  */
-export function colocarRespaldo({ tam, huecos, vista }) {
+export function colocarRespaldo({ tam, huecos, vista, techo = BORDE }) {
   const left = encajar((vista.w - tam.w) / 2, BORDE, vista.w - BORDE - tam.w)
   const abajo = caja(left, Math.max(BORDE, vista.h - BORDE - tam.h), tam.w, tam.h)
   if (!(huecos ?? []).some((h) => solape(abajo, h) > 0)) return abajo
-  return caja(left, BORDE, tam.w, tam.h)
+  return caja(left, Math.max(BORDE, techo), tam.w, tam.h)
 }
 
 /**
  * La barra de controles de la burbuja: abajo, salvo que pise un hueco o la
- * burbuja; entonces arriba.
+ * burbuja; entonces arriba (no más arriba que `techo`).
  */
-export function colocarBarra({ tam, evitar, vista }) {
+export function colocarBarra({ tam, evitar, vista, techo = BORDE }) {
   const left = encajar((vista.w - tam.w) / 2, BORDE, vista.w - BORDE - tam.w)
   const abajo = caja(left, vista.h - BORDE - tam.h, tam.w, tam.h)
   if (!(evitar ?? []).some((c) => solape(abajo, c) > 0)) return abajo
-  return caja(left, BORDE, tam.w, tam.h)
+  return caja(left, Math.max(BORDE, techo), tam.w, tam.h)
 }
 
 /**

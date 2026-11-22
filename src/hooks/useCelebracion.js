@@ -29,6 +29,9 @@ export function useCelebracion({ enabled, phase, winner, humanCards, ruleN, play
   const [activa, setActiva] = useState(null)   // {id, nivel, desde, hasta, esperando}
   const timerRef = useRef(null)
   const audioRef = useRef(null)
+  // TUT-1 T2 · el sonido de la ÚLTIMA celebración, que el reloj de muerte no suelta: la
+  // guiada espera a que termine antes de su cierre (`GuiaControl`). Sólo se lee.
+  const ultimoAudioRef = useRef(null)
   const esperaRef = useRef(null)
   const seqRef = useRef(0)
   const faseAnteriorRef = useRef(phase)
@@ -103,6 +106,7 @@ export function useCelebracion({ enabled, phase, winner, humanCards, ruleN, play
 
       const s = sonidoDe(nivel)
       audioRef.current = s ? play(s) : null
+      ultimoAudioRef.current = audioRef.current
 
       // Guardia de id (molde potFloat): un temporizador viejo jamás mata una
       // celebración más nueva.
@@ -140,5 +144,8 @@ export function useCelebracion({ enabled, phase, winner, humanCards, ruleN, play
 
   useEffect(() => () => { clearTimeout(timerRef.current); soltarEspera() }, [soltarEspera])
 
-  return { activa, cortar }
+  // `{ sound, id }` de Howler o null (mudo, sin sonido propio). Identidad estable.
+  const sonido = useCallback(() => ultimoAudioRef.current, [])
+
+  return { activa, cortar, sonido }
 }
