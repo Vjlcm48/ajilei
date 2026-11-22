@@ -2,14 +2,18 @@ import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import '../styles/ofertaGuiada.css'
 import { t } from '../config/textos'
+import { montoTexto } from '../config/tapetes'
 import { SoundButton } from './SoundButton'
+import { trozosRotulo } from './capaSenalCore'
 
 // ── GUI-1 · La oferta del primer login ──────────────────────────────────────
-// Normativo: AJILEI_Tutorial_v1.3.md §1.2. Una tarjeta pequeña, no una
-// pantalla: «¿Aprendemos en dos minutos?». La forma la eligió Victor en la
+// Normativo: AJILEI_Tutorial_v1.4.md §1.2. Una tarjeta pequeña, no una
+// pantalla: «Aprende en dos minutos». La forma la eligió Victor en la
 // lámina (2026-11-20): CENTRADA SOBRE EL LOBBY ATENUADO (la variante a; la b,
 // anclada abajo, tapaba la entrada a jugar y dejaba dos oros sólidos a la vista).
-// En esta tanda no la monta nadie: la monta la tanda 3.
+// TUT-1 T3 · la monta el lobby por su trozo (`PuertaGuiada`), con la cifra que
+// devolvió el servidor (`premio_guiada_estado`): la tarjeta nunca promete lo que no
+// se va a pagar. «antes de jugar tu primera mano» solo con el tramo `limpio`.
 //
 // Portal a `body` y `fixed` (molde de `AvisoSaldo`): el lobby no se mueve ni un
 // píxel (INV-05) y la tarjeta no toca la píldora de saldo, que vive arriba.
@@ -18,10 +22,12 @@ import { SoundButton } from './SoundButton'
 
 /**
  * @param {object} p
+ * @param {number} p.monto        la cifra del servidor
+ * @param {boolean} [p.limpio]    tramo `limpio`: el texto de «antes de tu primera mano»
  * @param {Function} p.onJugar
  * @param {Function} p.onAhoraNo
  */
-export default function OfertaGuiada({ onJugar, onAhoraNo }) {
+export default function OfertaGuiada({ monto, limpio = false, onJugar, onAhoraNo }) {
   const idTitulo = useId()
   const idTexto = useId()
   const tarjetaRef = useRef(null)
@@ -57,7 +63,10 @@ export default function OfertaGuiada({ onJugar, onAhoraNo }) {
         aria-describedby={idTexto}
       >
         <h2 id={idTitulo} className="ofg-titulo">{t('tut.oferta.titulo')}</h2>
-        <p id={idTexto} className="ofg-texto">{t('tut.oferta.texto')}</p>
+        <p id={idTexto} className="ofg-texto">
+          {trozosRotulo(t(limpio ? 'tut.oferta.texto.limpio' : 'tut.oferta.texto', { monto: montoTexto(monto) }))
+            .map((tr, i) => (tr.fuerte ? <strong key={i}>{tr.texto}</strong> : <span key={i}>{tr.texto}</span>))}
+        </p>
         <div className="ofg-botones">
           <SoundButton type="button" className="ofg-btn ofg-btn--pri" data-accion="guiada-jugar" onClick={onJugar}>
             {t('tut.oferta.jugar')}

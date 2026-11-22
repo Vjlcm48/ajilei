@@ -1774,6 +1774,21 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // TUT-1 T2 · el pago de la última mano guiada: no hay «Siguiente mano», va al cierre.
   const finGuion = !!guion && isPayoutPhase && game.handCount >= guion.manos
 
+  // ── TUT-1 T3 · Las señales de primera vez (normativo v1.4 §1.6) ──────────
+  // Sólo en la mesa real contra las IAS (con `control`, sin `guion` ni `partida`). La
+  // capa, sus textos y las marcas llegan con el trozo de la guiada (`screens/Guiada.jsx`
+  // las reexporta; el lobby ya lo pidió al aterrizar): no viajan con la mesa, y la pista
+  // ya vista no se pinta (`SenalesPrimeraVez` lee la marca). Sin red, no hay señales y la
+  // mesa sigue.
+  const conSenales = !guion && !partida && !!control
+  const [Senales, setSenales] = useState(null)
+  useEffect(() => {
+    if (!conSenales) return undefined
+    let vivo = true
+    import('../screens/Guiada').then((m) => { if (vivo) setSenales(() => m.SenalesPrimeraVez) }).catch(() => {})
+    return () => { vivo = false }
+  }, [conSenales])
+
   // ── APU-1 §4.2 · LAS CAPAS DEL POZO, Y LA FRASE QUE LAS CUENTA ─────────
   // Sólo en el pago: durante la mano el pozo se enseña entero, que es como se
   // apuesta. `capasDe` lee `contribMano`, que el motor NO resetea al pagar —se
@@ -3116,6 +3131,16 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
             descarte: isDiscardTimerActive, recogiendo: isClearing, celebrando: !!celebracion.activa, fin: finGuion,
             sonidoCelebracion: celebracion.sonido,
           }}
+        />
+      )}
+
+      {/* TUT-1 T3 · las tres pistas de primera vez: sin velo, el reloj sigue corriendo. */}
+      {conSenales && Senales && (
+        <Senales
+          iniciable={phase === PHASES.WAITING && !isShuffling && !recarga}
+          turno={isPlayerTurn}
+          descarte={isDiscardTimerActive}
+          segundos={TURN_TIME}
         />
       )}
 

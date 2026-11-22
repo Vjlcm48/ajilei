@@ -31,6 +31,12 @@ export const trozos = Object.freeze({
   hoja: trozo(() => import('../components/HojaContenido')),
   controlMesa: trozo(() => import('./controlMesaIA')),
   // TUT-1 T2 · la partida guiada: su mesa, su capa y sus textos.
+  // TUT-1 T3 · y TODO el tutorial de la tanda 3 en el mismo trozo (`screens/Guiada.jsx` lo
+  // reexporta): «Cómo se juega», la puerta del lobby (el reintento del premio y la oferta) y
+  // las señales de primera vez de la mesa. Comparten la capa, los textos, las marcas y la API
+  // del premio: en trozos aparte, cada pieza compartida sería un nombre más en la tabla de la
+  // entrada (`1.8b`, medido: +0,3 KiB). Así el lobby lo pide al aterrizar y la guiada, la
+  // pantalla de las tres tarjetas y la primera mesa real lo encuentran ya en la caché.
   guiada: trozo(() => import('../screens/Guiada')),
 })
 

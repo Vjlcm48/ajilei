@@ -95,9 +95,10 @@ const PROHIBIDAS = [
 // 4). Una que llegue antes es un montaje sin ficha.
 // TUT-1 tanda 2 · salen `tut-capa` y `data-tut-unico`: la partida guiada monta la capa (su
 // trozo, `screens/Guiada.jsx`), y entran en las que SÍ tienen que estar, abajo.
+// TUT-1 tanda 3 · salen las de la oferta (`ofg-tarjeta`, `tut.oferta`): el lobby la monta
+// (su trozo, `components/PuertaGuiada.jsx`). «Aprendemos» era su título de la lámina y ya no
+// existe en el repo; se queda prohibida para que no vuelva. Queda el capítulo 5 (tanda 4).
 const PROHIBIDAS_HASTA_MONTAR = [
-  'ofg-tarjeta',
-  'tut.oferta',
   'Aprendemos',
   'tut.cap5',
 ]
@@ -117,6 +118,8 @@ const OBLIGATORIAS = [
   'p_ritmo', 'p_entrada',
   // TUT-1 tanda 2 · la capa de la partida guiada, montada (salen de «hasta montar»).
   'tut-capa', 'data-tut-unico',
+  // TUT-1 tanda 3 · la oferta montada, y el premio de la guiada de verdad (las dos funciones).
+  'ofg-tarjeta', 'tut.oferta', 'premio_guiada_estado', 'cobrar_guiada',
 ]
 
 let carpeta = null

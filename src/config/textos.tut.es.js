@@ -1,5 +1,5 @@
 // ── TUT-1 · Los textos del tutorial ─────────────────────────────────────────
-// Normativo: AJILEI_Tutorial_v1.3.md (§1.2, §1.4, §2.2 y §3). Viajan con su
+// Normativo: AJILEI_Tutorial_v1.4.md (§1.2, §1.4, §1.6, §2.1, §2.2 y §3). Viajan con su
 // trozo, no en la entrada (INV-84, molde de `textos.pvp.es.js`): quien monta la
 // capa los suma con `textos.sumarTextos` al cargarse. En la tanda 1 no los suma
 // nadie; desde la tanda 2 los suma la partida guiada (`screens/Guiada.jsx`).
@@ -11,7 +11,8 @@
 // `diagDSK tut`).
 //
 // Tanda 1: las claves de la lámina (la oferta, las señales y el capítulo 5) y las
-// comunes de la capa. Tanda 2: la partida guiada (las tres manos y el cierre). El
+// comunes de la capa. Tanda 2: la partida guiada (las tres manos y el cierre). Tanda 3:
+// la oferta con la cifra, las tres señales, «Cómo se juega» y el premio del cierre. El
 // resto del guion entra con las tandas que lo construyen.
 //
 // TANDA 2 · POR PIEZAS. Cada pieza suma SOLO sus grupos, y los que no importa nadie
@@ -35,18 +36,36 @@ export const TEXTOS_TUT_COMUNES = {
   'tut.indice.visto':  'Visto',
 }
 
-// ── GUI-1 §1.2 · La oferta del primer login ──
+// ── GUI-1 §1.2 · La oferta del primer login (v1.4: la cifra la dice el servidor) ──
+// `{monto}` es lo que devolvió `premio_guiada_estado`, ya con sus puntos de miles.
+// «antes de jugar tu primera mano» solo para quien no jugó ninguna (tramo `limpio`).
 export const TEXTOS_TUT_OFERTA = {
-  'tut.oferta.titulo':  '¿Aprendemos en dos minutos?',
-  'tut.oferta.texto':   'Una partida guiada. No gastas monedas.',
+  'tut.oferta.titulo':  'Aprende en dos minutos',
+  'tut.oferta.texto.limpio': 'Completa la partida guiada antes de jugar tu primera mano y recibe **{monto} HC**.',
+  'tut.oferta.texto':   'Completa la partida guiada y recibe **{monto} HC**.',
   'tut.oferta.jugar':   'Jugar la guiada',
   'tut.oferta.ahorano': 'Ahora no',
 }
 
-// ── GUI-1 §1.4 · Las señales de primera vez ──
+// ── GUI-1 §1.6 · Las señales de primera vez (en la mesa real contra las IAS) ──
 export const TEXTOS_TUT_SENALES = {
   'tut.senal.iniciar': 'Toca **Iniciar mano** cuando estés listo.',
-  'tut.senal.turno':   'Tu turno. **Pasar** no cuesta; **Apostar** mete monedas al pozo.',
+  'tut.senal.turno':   'Tu turno. Palos distintos: **Pasar**. Mismo palo: **Apostar**. Te apuestan: **Igualar**.',
+  'tut.senal.descartar': 'Toca las cartas que no suman y luego **Descartar**. Tienes {s} segundos.',
+}
+
+// ── TUT-1 §2.1 (v1.4) · La pantalla «Cómo se juega»: tres tarjetas ──
+// El título de la pantalla es `tut.capa.aria` y el de la primera tarjeta, `tut.guiada.nombre`
+// (la prueba de textos no admite dos claves con el mismo texto).
+export const TEXTOS_TUT_HUB = {
+  'tut.hub.guiada.sub':    '3 manos · 2 min',
+  'tut.hub.guiada.premio': 'Gana {monto} HC',
+  'tut.hub.guiada.hecha':  '✓ Hecha',
+  'tut.hub.temas.titulo':  'Aprender por tema',
+  'tut.hub.temas.sub':     'Los 10 temas del juego',
+  'tut.hub.mia.titulo':    'Pregúntale a Mia',
+  'tut.hub.mia.sub':       'Tus dudas, al momento',
+  'tut.hub.pronto':        'Pronto',
 }
 
 // ── TUT-1 §2.2 · Capítulo 5 · Apostar, pasar, retirarse ──
@@ -114,4 +133,4 @@ export const TEXTOS_TUT_GUIADA = {
 // `@__PURE__`: sin nadie que la importe en la app, el empaquetador la quita y con ella los
 // grupos que ninguna pieza montada pide (con un objeto `{ ...a, ...b }` no se atrevía).
 export const TEXTOS_TUT_ES = /* @__PURE__ */ Object.assign({},
-  TEXTOS_TUT_COMUNES, TEXTOS_TUT_OFERTA, TEXTOS_TUT_SENALES, TEXTOS_TUT_CAP5, TEXTOS_TUT_GUIADA)
+  TEXTOS_TUT_COMUNES, TEXTOS_TUT_OFERTA, TEXTOS_TUT_SENALES, TEXTOS_TUT_HUB, TEXTOS_TUT_CAP5, TEXTOS_TUT_GUIADA)

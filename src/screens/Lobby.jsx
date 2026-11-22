@@ -77,7 +77,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // CFG-1 1a · en la hoja ya sólo dicen «Pronto» Idioma y Eliminar cuenta, y lo
 // dicen con el aviso de la hoja (`HojaConfiguracion`), no con éste.
 
-export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, guiada = null, onJugarIA, onJugarPvP, onRankings, onTienda, onReglas, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, guiada = null, onJugarIA, onJugarPvP, onRankings, onTienda, onReglas, onGuiada, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -110,9 +110,10 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
   // menos de uno.
   // PES-1 §3-B · y, en el mismo momento, lo que se abre desde aquí.
   useEffect(() => { precargarMesa(); precargarDelLobby() }, [])
-  // TUT-1 T3 · la puerta de la guiada (el reintento del premio) viaja en el trozo de la
-  // guiada, pedido al aterrizar: la entrada sólo lleva esta ranura.
-  // Sin el trozo (sin red) no hay reintento, y el lobby sigue igual.
+  // TUT-1 T3 · la puerta de la guiada (el reintento del premio y la oferta del primer
+  // login) viaja en el trozo de la guiada, pedido al aterrizar: la entrada sólo lleva
+  // esta ranura.
+  // Sin el trozo (sin red) no hay oferta, y el lobby sigue igual.
   const [Puerta, setPuerta] = useState(null)
   useEffect(() => {
     let vivo = true
@@ -264,8 +265,9 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
       {/* ── Barra inferior ─────────────────────────────────────────────── */}
       <nav className="lob-nav" aria-label={t('lob.cfg.titulo')}>
         {/* RNK-1c · Rankings ya lleva a su pantalla. TIE-1 1a · la Tienda,
-            también (en Tapetes, V1-A). TUT-1 T2 · «Cómo se juega» abre la partida
-            guiada (entrada provisional: la tanda 4 la cambia por el índice). */}
+            también (en Tapetes, V1-A). TUT-1 T3 · «Cómo se juega» abre su pantalla
+            de tres tarjetas (la guiada, los temas y Mia), que sustituye a la entrada
+            directa a la guiada de la tanda 2. */}
         <SoundButton className="lob-nav-btn" data-accion="rankings" onClick={() => onRankings?.()}>
           <IconoTrofeo /><span>{t('lob.nav.rankings')}</span>
         </SoundButton>
@@ -296,7 +298,7 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
       <div className={`lob-toast${toastVivo ? ' is-on' : ''}`} role="status" aria-live="polite">
         {t('lob.toast.pronto')}
       </div>
-      {Puerta && <Puerta {...guiada} />}
+      {Puerta && <Puerta {...guiada} onJugar={onGuiada} />}
     </main>
   )
 }

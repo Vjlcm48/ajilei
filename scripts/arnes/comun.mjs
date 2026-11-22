@@ -394,6 +394,27 @@ export function escalaReal(real = true) { escalaDelArnes = real ? 'real' : 'forz
 /** Fuerza la escala 1 en un contexto concreto (V-cel la compara con la real). */
 export async function forzarEscala1(ctx) { await ctx.addInitScript(ESCALA_1); ctx.__escala = 'forzada' }
 
+// ── TUT-1 T3 · la guía del tutorial, ya vista ────────────────────────────────
+// Desde la tanda 3, un aparato sin `ajilei.guia` ve la tarjeta del primer login
+// centrada sobre el lobby atenuado (se come el clic en «Jugar contra las IAS») y,
+// en su primera mesa contra las IAS, las tres señales de primera vez. Es el
+// producto, y un contexto del arnés nace siempre como un aparato nuevo. Como con
+// la escala (arriba), TODO contexto nace con la guía ya vista —la oferta ofrecida
+// y las tres señales marcadas—, así que el lobby y la mesa quedan como antes de la
+// tanda 3. Solo si el aparato no tiene la clave: una vara que la escriba con su
+// propio guion de inicio (que corre después de este) manda. `diagDSK tut puerta`,
+// que mide justo la oferta y las señales, la pide real con `guiaReal()`.
+export const GUIA_VISTA = () => {
+  try {
+    if (localStorage.getItem('ajilei.guia') === null) {
+      localStorage.setItem('ajilei.guia', JSON.stringify({ ofrecida: true, senales: { iniciar: true, apostar: true, descartar: true } }))
+    }
+  } catch { /* sin almacenamiento: nada que marcar */ }
+}
+let guiaDelArnes = 'vista'
+/** `diagDSK tut puerta` (y solo él) ve la guía como un aparato nuevo. */
+export function guiaReal(real = true) { guiaDelArnes = real ? 'real' : 'vista' }
+
 /**
  * Engancha el aislamiento en TODO contexto que abra este navegador. Se aplica
  * solo en `navegadorArnes()`; un navegador lanzado aparte (el WebKit de
@@ -407,6 +428,7 @@ export function aislarNavegador(browser) {
     await aislarContexto(ctx)
     if (escalaDelArnes === 'forzada') await forzarEscala1(ctx)
     else ctx.__escala = 'real'
+    if (guiaDelArnes === 'vista') await ctx.addInitScript(GUIA_VISTA)
     return ctx
   }
   browser.__aislado = true

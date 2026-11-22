@@ -91,6 +91,8 @@ const Perfil = lazy(trozos.perfil.fabrica)
 const Rankings = lazy(trozos.rankings.fabrica)
 const Tienda = lazy(trozos.tienda.fabrica)
 const Guiada = lazy(trozos.guiada.fabrica)
+// TUT-1 T3 · «Cómo se juega» viaja en el trozo de la guiada (`lib/trozos`), que la reexporta.
+const ComoSeJuega = lazy(() => Promise.resolve(trozos.guiada.fabrica()).then((m) => ({ default: m.ComoSeJuega })))
 // ECO-1d · aplica `f` a la ficha de la constancia guardada como `{ uid, ficha }`.
 const conFicha = (f) => (c) => (c ? { ...c, ficha: f(c.ficha) } : c)
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
@@ -1206,6 +1208,22 @@ function App() {
     )
   }
 
+  // ── TUT-1 T3 · «Cómo se juega»: las tres tarjetas ───────────────────────
+  // Pantalla con barra: con el marco del video, como Rankings. Flecha y casa vuelven al lobby.
+  if (screen === 'como-se-juega') {
+    return diferida(trozos.guiada,
+      <ComoSeJuega
+        cuenta={cuenta}
+        billetera={billetera}
+        aviso={avisoSaldo}
+        onAvisoFin={finAviso}
+        onVolver={() => setScreen('lobby')}
+        onLobby={() => setScreen('lobby')}
+        onGuiada={() => setScreen('guiada')}
+      />,
+    )
+  }
+
   // La caída de la cascada sigue siendo el destino de `COMPLETO`. Las props son
   // las de la cuenta, la billetera, los avisos y a dónde lleva cada botón: el lobby
   // sigue sin conocer `screen`, ni Supabase, ni la mesa.
@@ -1220,11 +1238,12 @@ function App() {
       onJugarPvP={() => setScreen('sala-opciones')}
       onRankings={entrarRankings}
       onTienda={() => abrirTienda('tapetes')}
-      onReglas={() => setScreen('guiada')}
-      // TUT-1 T3 · la puerta de la guiada: el reintento del premio que el cierre no pudo
-      // confirmar. El premio lo pide cada trozo con su API (`lib/guiadaApi`); la entrada
-      // no la lleva.
-      guiada={{ onSaldo: billetera.tomar }}
+      onReglas={() => setScreen('como-se-juega')}
+      // TUT-1 T3 · la puerta de la guiada: el reintento del premio y la oferta del primer
+      // login (que no sale si se llegó con una invitación pendiente). El premio lo pide
+      // cada trozo con su API (`lib/guiadaApi`); la entrada no la lleva.
+      guiada={{ salaPendiente: !!invitacion, onSaldo: billetera.tomar }}
+      onGuiada={() => setScreen('guiada')}
       onCerrarSesion={cerrarSesion}
     />,
   )

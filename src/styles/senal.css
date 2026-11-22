@@ -134,6 +134,9 @@
 @media (min-width: 600px) and (min-height: 600px) {
   .tut-rotulo-texto { font-size: 16px; }
   .tut-rotulo--burbuja { max-width: min(380px, calc(100vw - 24px)); }
+  /* TUT-1 T3 · las señales de primera vez: con la letra de 16, el ancho de la burbuja (en 300
+     la del turno y la del descarte caían en tres líneas en la PC). */
+  .tut-rotulo--libre { max-width: min(380px, calc(100vw - 24px)); }
 }
 
 /* ── Los controles ──────────────────────────────────────────────────────────── */

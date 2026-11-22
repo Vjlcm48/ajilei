@@ -31,9 +31,11 @@ const GameTable = lazy(fabricaMesa)
 // el cierre, desmontar la pantalla—, se haya consumido o no.
 sumarTextos('es', { ...TEXTOS_TUT_COMUNES, ...TEXTOS_TUT_GUIADA })
 
-// TUT-1 T3 · la puerta del lobby (el reintento del premio) viaja en ESTE trozo
-// (`lib/trozos.guiada`).
+// TUT-1 T3 · el resto del tutorial viaja en ESTE trozo (`lib/trozos.guiada`): «Cómo se
+// juega», la puerta del lobby y las señales de primera vez de la mesa.
+export { default as ComoSeJuega } from './ComoSeJuega'
 export { default as PuertaGuiada } from '../components/PuertaGuiada'
+export { default as SenalesPrimeraVez } from '../components/SenalesPrimeraVez'
 
 export default function Guiada({ onLobby, onJugar, onSaldo }) {
   const [fase, setFase] = useState('mesa')
