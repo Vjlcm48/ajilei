@@ -54,7 +54,12 @@
 // de dos del mismo) y las de menos puntos primero, y el resto de la baraja —de
 // donde salen sus descartes— va intercalado por palo.
 
-import { createDeck, setRng, resetRng, PALOS } from '../engine/deck.js'
+import { createDeck, PALOS } from '../engine/deck.js'
+// TUT-1 T2 · `tiradasPara` y `armarOrden` viven en `lib/mazoDado.js` (la partida
+// guiada los usa en la build); aquí se importan, sin copia.
+import { tiradasPara, armarOrden } from '../lib/mazoDado.js'
+
+export { tiradasPara }
 
 const N_CARTAS = 40
 // Los cinco «diez» de Copas que no son As ni 7 ni 6, y los dos de reserva.
@@ -132,25 +137,6 @@ export function ordenGanador(n) {
     T[i] = c.id
   }
   return T
-}
-
-/**
- * Las 39 tiradas que hacen que el barajado de `deck.js` (Fisher-Yates de atrás
- * adelante, `j = floor(rng() * (i + 1))`) devuelva exactamente `orden`. Puro.
- * @param {string[]} orden
- * @returns {number[]}
- */
-export function tiradasPara(orden) {
-  const cur = createDeck().map((c) => c.id)
-  const tiradas = []
-  for (let i = cur.length - 1; i > 0; i--) {
-    const j = cur.indexOf(orden[i])
-    if (j < 0 || j > i) throw new Error(`tiradasPara: ${orden[i]} fuera de alcance en i=${i}`)
-    // El centro del intervalo [j, j+1) / (i+1): sin riesgo de redondeo.
-    tiradas.push((j + 0.5) / (i + 1))
-    ;[cur[i], cur[j]] = [cur[j], cur[i]]
-  }
-  return tiradas
 }
 
 /**
@@ -236,12 +222,3 @@ export function armarRepartoAllin(n, espejo = false) {
   armarOrden(espejo ? ordenAllinEspejo(n) : ordenAllin(n))
 }
 
-function armarOrden(orden) {
-  const tiradas = tiradasPara(orden)
-  let k = 0
-  setRng(() => {
-    const v = tiradas[k++]
-    if (k >= tiradas.length) resetRng()
-    return v
-  })
-}
