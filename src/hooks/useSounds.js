@@ -137,17 +137,24 @@ export function precargarSonidos(nombres) {
 }
 
 // ── Recorte del rasgueo, en reproducción ────────────────────────────────────
-// ajilei-strum.mp3 trae 3,657s de archivo y 2,8s útiles, con DOS rasgueos: uno
-// en 0,21 y un segundo racimo en 1,59/1,72/1,84 (medido decodificando el mp3 —
-// scripts/_vc2audio.mjs). El diseño sellado pide UNO solo y ≤2s, así que el
-// segundo sobra.
+// ajilei-strum.mp3 trae 3,657s de archivo y 2,8s útiles. DSK-VC2 leyó DOS
+// rasgueos (0,21 y un «segundo racimo» en 1,59/1,72/1,84); TUT-1 2-d lo midió
+// otra vez y es uno solo con su caída (aquí abajo). El diseño pide un rasgueo
+// y ≤2,5 s (Victory_Celebration v1.0 §7.1, v1.1b): la cola larga se apaga a tiempo.
 //
 // Se recorta al REPRODUCIR, no en el archivo: es el molde que cardShuffle ya
 // usa aquí abajo desde su tanda, no requiere herramienta externa (no hay ffmpeg
 // en el entorno) y deja el archivo licenciado exactamente como Pixabay lo
 // distribuye — que para una licencia es lo preferible, no un mal menor.
-export const STRUM_CORTE_MS = 1300   // antes del segundo rasgueo (1,59s)
-export const STRUM_FADE_MS  = 130    // misma cortina que cardShuffle
+//
+// TUT-1 2-d · LA COLA (2026-11-21, decisión de Victor). La cortina era la de
+// cardShuffle (130 ms) y el rasgueo se oía cortado en seco. Ahora se apaga en
+// 1000 ms desde los 1300: termina a los 2,3 s, bajo el techo de 2,5 s (Victory_Celebration v1.0 §7.1, v1.1b).
+// Medido otra vez decodificando el mp3 (flujo espectral): el archivo trae UN solo
+// rasgueo —ataques en 0,17/0,23/0,35 s— y lo que sigue es su caída; el «segundo
+// racimo» de 1,59/1,72/1,84 era el rizado de esa cola, no un ataque.
+export const STRUM_CORTE_MS = 1300   // empieza el desvanecido
+export const STRUM_FADE_MS  = 1000   // cola: corte + cola = 2300 ms ≤ 2500
 
 // ── GT-HIG · handle para los cuatro relojes del recorte ─────────────────────
 // Los dos relojes de cada recorte —la espera hasta el corte y el apagado tras
@@ -159,9 +166,8 @@ export const STRUM_FADE_MS  = 130    // misma cortina que cardShuffle
 // disparar el mismo sonido antes de que venza su recorte anterior.
 //
 // Y al cancelar se para la instancia anterior EN EL MISMO GESTO. Cancelar el
-// reloj a secas dejaría a la anterior sonando entera —el segundo racimo del
-// rasgueo en 1,59 s—, que es exactamente el defecto que el recorte existe para
-// quitar. Cancelar sin parar no sería higiene: sería devolver el defecto.
+// reloj a secas dejaría a la anterior sonando entera —la cola del rasgueo
+// hasta los 2,8 s—, que es exactamente lo que el recorte existe para quitar. Cancelar sin parar no sería higiene: sería devolver el defecto.
 //
 // En el juego los dos sonidos no se solapan (el barajado va uno por mano, el
 // rasgueo uno por celebración), así que este camino no se recorre hoy: lo que

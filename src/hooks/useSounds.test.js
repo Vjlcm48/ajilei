@@ -74,7 +74,9 @@ describe('BIE-1 · reproducir', () => {
     expect(reproducir('noExiste', true, () => null)).toBe(null)
   })
 
-  test('el rasgueo conserva su recorte: cortina a los 1300 ms y parada tras 130', () => {
+  test('el rasgueo conserva su recorte: cortina a los 1300 ms y parada a los 2300, bajo el techo de 2,5 s (TUT-1 2-d)', () => {
+    expect(STRUM_CORTE_MS + STRUM_FADE_MS).toBe(2300)
+    expect(STRUM_CORTE_MS + STRUM_FADE_MS).toBeLessThanOrEqual(2500)
     const s = sonidoFalso()
     reproducir('ajileiStrum', true, () => s)
     vi.advanceTimersByTime(STRUM_CORTE_MS - 1)

@@ -777,3 +777,28 @@ h1.cel-ajilei {
   overflow: hidden;
   visibility: hidden;
 }
+
+/* ── TUT-1 2-d · El velo de AJILEI ──────────────────────────────────────────
+   Decisión de Victor tras probar la guiada en el S25: mientras la palabra AJILEI
+   de una mano está en pantalla, todo lo que hay detrás se oscurece para que
+   resalte. Antes no había nada: la capa (`.vc-ajilei-capa`, `fixed`, z 32, sin
+   toque) era transparente y sólo la sombra de la palabra (negro al 55 %) la
+   separaba del tapete. Ahora la capa lleva un velo negro al 55 %: la MISMA cifra
+   de esa sombra, no una nueva.
+
+   El velo acompasa a la palabra: entra con ella, se sostiene y sale con ella.
+   La palabra anima `vcAjilei` en 2 s (AJILEI_MS, `celebracionCore.js`) y su
+   salida empieza hacia el 80 %; el velo usa la misma duración y las mismas
+   mesetas (10 %–80 %). Las dos mesas —contra las IAS y contra personas— montan
+   la misma capa (`AjileiOverlay`, `GameTable.jsx`), así que vale en las dos.
+
+   Sólo fondo: ni caja, ni z, ni toque. `:root` delante para no depender del
+   orden de carga frente a la regla original de la capa (hoja protegida). */
+:root .vc-ajilei-capa {
+  --vc-ajilei-velo: rgba(0, 0, 0, 0.55);
+  animation: vcAjileiVelo 2s ease-out both;
+}
+@keyframes vcAjileiVelo {
+  0%, 100% { background-color: rgba(0, 0, 0, 0); }
+  10%, 80% { background-color: var(--vc-ajilei-velo); }
+}

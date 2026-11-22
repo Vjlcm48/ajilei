@@ -2,7 +2,7 @@
 
 **Estado:** Especificación sellada e implementada. **Vigente en v1.1** — este archivo lleva sus
 versiones dentro (§10), como ya hacía con v1.0b; no se abre uno nuevo por enmienda.
-**Fecha:** 2026-08-08 · **última enmienda 2026-08-21 (v1.1, VIS-3)**.
+**Fecha:** 2026-08-08 · **última enmienda 2026-11-21 (v1.1b, TUT-1 2-d)**.
 **Base de código:** HEAD `973e94d` (PWA-M1). Implementado en la tanda **DSK-VC2**, sobre el
 diagnóstico read-only **DSK-VC1**. Enmendado en **VIS-3** sobre HEAD `9f7dd13`.
 **Autoridad visual:** `AJILEI_Sistema_Diseno_v1.2.md`.
@@ -342,7 +342,7 @@ el **dibujo**.
 | Archivo | Licencia | Medido | Volumen |
 |---|---|---|---|
 | `chips-collect.mp3` | Pixabay Content License · ID **96121** | 0,967 s · 2 ataques | 0,7 |
-| `ajilei-strum.mp3` | Pixabay Content License · ID **504874** | 3,657 s · **2 rasgueos** | 0,8 |
+| `ajilei-strum.mp3` | Pixabay Content License · ID **504874** | 3,657 s · **1 rasgueo** (v1.1b, §7.1) | 0,8 |
 | `table-knock.mp3` | Pixabay Content License · ID **85867** | 1,896 s · **2 golpes** ✓ | 0,6 |
 
 Volúmenes elegidos contra el **pico medido** de cada archivo, no a ojo: el knock es el más fuerte
@@ -360,6 +360,18 @@ el archivo licenciado **exactamente como Pixabay lo distribuye** — que para un
 preferible, no un mal menor.
 
 El `table-knock` **ya venía con dos golpes**: no se toca.
+
+> **Enmienda v1.1b — 2026-11-21, decisión de Victor (TUT-1 2-d).** El rasgueo dura **≤ 2,5 s**, no
+> ≤2 s: el desvanecido empieza a los **1300 ms** como antes y dura **1000 ms** (antes 130), así que
+> termina a los **2,3 s**, bajo el techo de 2,5 s de §1. Con 130 ms se oía cortado en seco.
+> `STRUM_CORTE_MS` 1300 · `STRUM_FADE_MS` 1000 en `useSounds.js`, en todas las mesas.
+>
+> **Corrección de la medida de arriba.** Decodificado otra vez (`decodeAudioData`, flujo espectral
+> con STFT de 2048 y salto de 5 ms), el archivo trae **un solo rasgueo**: ataques en 0,17, 0,23 y
+> 0,35 s, y después la caída continua de ese rasgueo hasta ~2,8 s. En 1,59/1,72/1,84 el flujo es el
+> del ruido de la cola (9–14 % del máximo, sin pico): el «segundo racimo» era el rizado de la caída
+> leído por un detector de subidas de energía. Como no hay un segundo ataque, el desvanecido no
+> tapa nada.
 
 ### 7.2 `win.mp3` sale de servicio
 
@@ -529,3 +541,10 @@ por esa pista. Es una pista al compositor, no una cuestión de corrección —la
   construcción. Modo **`vuelo`** permanente del arnés, que JUEGA en vez de construir (§8.0), y
   reparación de dos memorias del modo `vc` (§8.1b). 4 pruebas nuevas de Vitest y reescritura del
   bloque del decisor.
+- **v1.1b** — 2026-11-21 (**TUT-1 2-d**, decisión de Victor, HEAD de partida `45e61d6`). **El
+  rasgueo, ≤ 2,5 s:** desvanecido de 1000 ms desde los 1300 (termina a los 2,3 s); la medida del
+  archivo se corrige a **un** rasgueo (§7, §7.1). **El velo de AJILEI:** mientras la palabra está en
+  pantalla, todo lo que hay detrás se oscurece con un negro al 55 % (la cifra de la sombra de la
+  palabra), que entra, se sostiene y sale con ella (`vcAjileiVelo`, 2 s, `celebracion.css`; §3.3
+  y §3.4 no cambian de caja ni de capa). Las dos mesas, IAS y personas. Las varas `celebracion`,
+  `vuelo`, `pvp.mesa` y `cap` siguen verdes sin resellar.
