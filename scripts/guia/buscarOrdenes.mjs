@@ -1,5 +1,5 @@
 // ── GUI-1 · El buscador de los órdenes de baraja de la partida guiada ────────
-// Rector: AJILEI_TUT-1_T2_v1.0.md §1.2; normativo AJILEI_Tutorial_v1.3.md §1.3 y §1.4.
+// Rector: AJILEI_TUT-1_T2_v1.0.md §1.2; normativo AJILEI_Tutorial_v1.4.md §1.3 y §1.4.
 //
 //   node scripts/guia/buscarOrdenes.mjs            → busca y PEGA en src/lib/guiaManos.js
 //   node scripts/guia/buscarOrdenes.mjs --seco     → busca y sólo lo cuenta

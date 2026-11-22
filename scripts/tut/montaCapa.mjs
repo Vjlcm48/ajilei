@@ -35,13 +35,13 @@ export function desmontar() {
   document.getElementById(ID)?.remove()
 }
 
-/** Las claves de los rótulos (lo que pinta la capa, no los botones, la oferta ni el cierre). */
+/** Las claves de los rótulos (lo que pinta la capa, no los botones, la oferta, «Cómo se juega» ni el cierre). */
 export function rotulos() {
-  return Object.keys(TEXTOS_TUT_ES).filter((k) => !/^tut\.(ctl|capa|oferta|indice|cierre)\./.test(k) && !/\.(titulo|nombre)$/.test(k))
+  return Object.keys(TEXTOS_TUT_ES).filter((k) => !/^tut\.(ctl|capa|oferta|indice|cierre|hub)\./.test(k) && !/\.(titulo|nombre)$/.test(k))
 }
 
 // TUT-1 T2 · lo más largo que la guiada puede poner en cada hueco: el rival, el palo y el pozo.
-const PEOR = { rival: 'IA 2', palo: 'Espadas', pozo: 9900 }
+const PEOR = { rival: 'IA 2', palo: 'Espadas', pozo: 9900, s: 20 }
 
 /** Las variables de un rótulo, rellenas con lo más largo posible (`{n}` → 99). */
 export function varsDe(clave) {

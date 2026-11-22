@@ -59,7 +59,9 @@
 //            las cajas de `#root` (INV-89), el hueco sin velo y el toque real que pasa por él,
 //            los botones de 44, el contraste del rótulo, la tarjeta de respaldo y las dos líneas
 //            (tut.delta, tut.hueco, tut.toque, tut.44, tut.contraste, tut.respaldo, tut.lineas). `TUT_CONTROL=sin-hueco`, el control
-//            rojo. Ver `scripts/tut/tut.mjs`.
+//            rojo. Ver `scripts/tut/tut.mjs`. `tut guiada` (T2): la partida guiada entera
+//            (`scripts/tut/guiada.mjs`). `tut puerta` (T3): la oferta del primer login, «Cómo se
+//            juega» y las señales de primera vez (tut.oferta, tut.hub, tut.senales; `scripts/tut/puerta.mjs`).
 //   tienda → TIE-1 1a: la tienda (estantes, lista, vitrina, ventana de compra)
 //            en seis tamaños, la puerta vitrina ↔ mesa (9 valores × 11 casos),
 //            los cuatro estados de la ventana, «No te alcanza», el ojito y lo
@@ -366,6 +368,7 @@ import { PARTES_PVP, runPvp } from './pvp/pvp.mjs'
 import { runLec } from './lec/lec.mjs'
 import { runTut } from './tut/tut.mjs'
 import { runTutGuiada } from './tut/guiada.mjs'
+import { runTutPuerta } from './tut/puerta.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -15611,7 +15614,10 @@ try {
   // TUT-1 tanda 2 · `tut guiada`: la partida guiada entera desde el lobby (`scripts/tut/guiada.mjs`),
   // aparte porque pasa del minuto: corre en `completo` y `tut` a secas sigue en `commit`.
   if (MODE === 'tut') {
-    report.tut = process.argv[3] === 'guiada' ? await runTutGuiada(browser, { base: BASE }) : await runTut(browser, { base: BASE })
+    const sub = process.argv[3]
+    report.tut = sub === 'guiada' ? await runTutGuiada(browser, { base: BASE })
+      : sub === 'puerta' ? await runTutPuerta(browser, { base: BASE })
+        : await runTut(browser, { base: BASE })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

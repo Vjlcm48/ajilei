@@ -9,7 +9,7 @@ import {
 } from './capaSenalCore'
 
 // ── TUT-1 · La capa de señalización ─────────────────────────────────────────
-// Rector: AJILEI_TUT-1_T1_v1.0.md §0 y §1.1; normativo `AJILEI_Tutorial_v1.3.md`
+// Rector: AJILEI_TUT-1_T1_v1.0.md §0 y §1.1; normativo `AJILEI_Tutorial_v1.4.md`
 // («La forma elegida en la lámina»). UNA capa para las tres piezas: la partida
 // guiada (GUI-1), las señales de primera vez y los capítulos de la serie (TUT-1).
 // En esta tanda no la monta nadie: la montan las tandas 2 a 5.

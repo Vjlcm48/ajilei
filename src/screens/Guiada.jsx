@@ -13,7 +13,7 @@ import { fabricaMesa, trozoMesa } from '../lib/cargarMesa'
 const GameTable = lazy(fabricaMesa)
 
 // ── GUI-1 · La partida guiada ────────────────────────────────────────────────
-// Rector: AJILEI_TUT-1_T2_v1.0.md §1.3 y §1.4; normativo AJILEI_Tutorial_v1.3.md
+// Rector: AJILEI_TUT-1_T2_v1.0.md §1.3 y §1.4; normativo AJILEI_Tutorial_v1.4.md
 // §1. Pantalla diferida (INV-84, `lib/trozos.guiada`): la entrada sólo lleva la
 // rama de `App` y el `onClick` del lobby; esto, la capa y sus textos viajan aquí.
 //

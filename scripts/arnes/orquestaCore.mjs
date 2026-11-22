@@ -86,6 +86,10 @@ const TUT = diag('diagDSK', 'tut', 'tut', 5)
 // TUT-1 tanda 2 · la partida guiada entera desde el lobby (`scripts/tut/guiada.mjs`): pasa del
 // minuto (≈ 85 s), así que va aparte y en `completo` (ficha T2 §1.6); `tut` sigue en `commit`.
 const TUT_GUIADA = diag('diagDSK', 'tut.guiada', 'tut', 10, ['guiada'])
+// TUT-1 tanda 3 · lo que rodea a la guiada (`scripts/tut/puerta.mjs`): la oferta del primer
+// login, «Cómo se juega» y las señales de primera vez en una mesa real (una mano y media).
+// Pasa del minuto como la guiada: en `completo`.
+const TUT_PUERTA = diag('diagDSK', 'tut.puerta', 'tut', 10, ['puerta'])
 
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
@@ -126,7 +130,7 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
   commit: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, HUMO],
-  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, TUT_GUIADA, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
+  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, TUT_GUIADA, TUT_PUERTA, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]

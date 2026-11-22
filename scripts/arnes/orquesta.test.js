@@ -74,6 +74,9 @@ describe('A4 · los perfiles', () => {
     // TUT-1 tanda 2 · la guiada entera pasa del minuto: en `completo`, no en `commit`.
     expect(ids(completo)).toContain('tut.guiada')
     expect(ids(commit)).not.toContain('tut.guiada')
+    // TUT-1 tanda 3 · la puerta (oferta, «Cómo se juega» y señales) también pasa del minuto.
+    expect(ids(completo)).toContain('tut.puerta')
+    expect(ids(commit)).not.toContain('tut.puerta')
   })
   it('vitest pasa por el lanzador', () => {
     expect(rapido.find((v) => v.id === 'vitest').args[0]).toBe('scripts/arnes/vitest.mjs')

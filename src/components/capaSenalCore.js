@@ -1,6 +1,6 @@
 // ── TUT-1 · La geometría de la capa de señalización, pura ───────────────────
 // Rector: AJILEI_TUT-1_T1_v1.0.md §1.1 (forma elegida en la lámina, normativo
-// `AJILEI_Tutorial_v1.3.md`). Molde de `miniPerfilCore.js` y de `colocaCapa`
+// `AJILEI_Tutorial_v1.4.md`). Molde de `miniPerfilCore.js` y de `colocaCapa`
 // (VOZ-2): las cuentas viven aquí, sin React ni DOM, para que Vitest las pruebe
 // sin jsdom (que este proyecto no tiene, hallazgo de FRZ-1). `CapaSenal.jsx`
 // mide con `getBoundingClientRect` y le pasa cajas planas.

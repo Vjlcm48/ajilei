@@ -1,17 +1,22 @@
 // ── TUT-1 tanda 2 · `diagDSK tut guiada` · la partida guiada, jugada entera ──────────
-// Ficha: AJILEI_TUT-1_T2_v1.0.md §1.6. Contra 5173 con bypass: el lobby real, «Cómo se
-// juega» y la guiada de verdad (`screens/Guiada.jsx`), tocando en cada paso el control
-// único con el dedo (en móvil) o el ratón, por el hueco de la capa.
+// Ficha: AJILEI_TUT-1_T2_v1.0.md §1.6 y AJILEI_TUT-1_T3_v1.0.md §3. Contra 5173 con bypass:
+// el lobby real, «Cómo se juega» (las tres tarjetas, tanda 3) y la guiada de verdad
+// (`screens/Guiada.jsx`), tocando en cada paso el control único con el dedo (en móvil) o el
+// ratón, por el hueco de la capa. La oferta del primer login se da por contestada (la mira
+// `tut puerta`).
 //
 // En 360×640, 640×360 y 1920×1080:
 //   · tut.guiada  llega al cierre («¡Ya sabes jugar!») habiendo visto la celebración de
-//                 AJILEI, y `ajilei.guia` queda con `hecha`; en cada paso el toque del
-//                 control único avanza el paso;
-//   · tut.red     durante la guiada NADIE llama a `sentarse_ia`, `informar_pila`,
-//                 `recargar_ia`, `salir_ia`, `mi_consulta`, `consultar_mano` ni
-//                 `mini_perfil` (ni al banco imitado ni a la red; el latido y la
-//                 constancia son de la app y quedan fuera), y la píldora del lobby dice lo
-//                 mismo antes y después (INV-47, su excepción escrita);
+//                 AJILEI y la del premio («+2.000 HC», el banco recién nacido es limpio), y
+//                 `ajilei.guia` queda sin `pendientePago`; en cada paso el toque del control
+//                 único avanza el paso;
+//   · tut.red     durante la guiada NO HAY NINGUNA LLAMADA AL SERVIDOR SALVO UNA
+//                 `cobrar_guiada` AL LLEGAR AL CIERRE (tanda 3): nadie llama a `sentarse_ia`,
+//                 `informar_pila`, `recargar_ia`, `salir_ia`, `mi_consulta`,
+//                 `consultar_mano`, `mini_perfil` ni `premio_guiada_estado` (ni al banco
+//                 imitado ni a la red; el latido y la constancia son de la app y quedan
+//                 fuera), y la píldora del lobby sube EXACTAMENTE lo que el cobro devolvió
+//                 (INV-47, su excepción escrita);
 //   · tut.salir   «Salir» está en cada paso y entre pasos, arriba a la derecha, vinotinto
 //                 (#7c1d30) con borde de oro, sin pisar el rótulo ni la barra (v1.3 §1.1);
 //   · tut.delta   Δ 0 de todas las cajas de `#root` con la capa y sin ella, en cada paso de
@@ -29,7 +34,7 @@ const T = {
   T3: { w: 640, h: 360, movil: true },
   T6: { w: 1920, h: 1080, movil: false },
 }
-const PROHIBIDAS = ['sentarse_ia', 'informar_pila', 'recargar_ia', 'salir_ia', 'mi_consulta', 'consultar_mano', 'mini_perfil']
+const PROHIBIDAS = ['sentarse_ia', 'informar_pila', 'recargar_ia', 'salir_ia', 'mi_consulta', 'consultar_mano', 'mini_perfil', 'premio_guiada_estado']
 const PAUSA = '*,*::before,*::after{animation-play-state:paused!important;transition:none!important;caret-color:transparent!important}'
 const TOPE_PASOS = 60
 const ESPERA_PASO_MS = 30000
@@ -146,13 +151,24 @@ async function celda(page, base, tam, vp, progreso) {
     await tocar(p)
   }
   const saldo = async () => (await page.waitForFunction(SALDO, null, { timeout: 15000 })).jsonValue()
+  const cifra = (txt) => Number(String(txt).replace(/\D/g, ''))
+  // TUT-1 T3 · «Cómo se juega» abre las tres tarjetas; la guiada, desde la suya.
+  const abrirGuiada = async () => {
+    await tocarSel('[data-accion="reglas"]')
+    await page.waitForSelector('[data-accion="csj-guiada"]', { timeout: 15000 })
+    await tocarSel('[data-accion="csj-guiada"]')
+  }
 
   await page.goto(`${base}/`, { waitUntil: 'networkidle' })
   await page.waitForSelector('main.lobby [data-accion="reglas"]', { timeout: 20000 })
   await page.evaluate(ESPIA, PROHIBIDAS)
   const antes = await saldo()
-  page.on('request', (r) => red.push(r.url()))
   await tocarSel('[data-accion="reglas"]')
+  await page.waitForSelector('[data-accion="csj-guiada"]', { timeout: 15000 })
+  // Desde aquí, la guiada: lo que se llame antes es de «Cómo se juega» (su cifra).
+  const desde = await page.evaluate(() => window.__guia.llamadas.length)
+  page.on('request', (r) => red.push(r.url()))
+  await tocarSel('[data-accion="csj-guiada"]')
 
   // ── La guiada, paso a paso ──
   let fin = false
@@ -229,14 +245,29 @@ async function celda(page, base, tam, vp, progreso) {
     if (!hay) sinSalir++
   }
   if (!fin) falla('tut.guiada', `no llegó al cierre (${out.pasos.length} pasos)`)
+  // El premio: el cierre lo pide al montarse y lo celebra cuando el servidor contesta.
+  if (fin) await page.waitForFunction(() => document.querySelector('[data-guia-premio]')?.dataset.guiaPremio !== 'pidiendo', null, { timeout: 10000 }).catch(() => {})
   const g = await page.evaluate(() => {
-    let hecha = null
-    try { hecha = JSON.parse(localStorage.getItem('ajilei.guia') ?? 'null')?.hecha ?? null } catch { /* nada */ }
-    return { ajilei: window.__guia.ajilei, llamadas: window.__guia.llamadas, hecha, titulo: document.querySelector('.guia-cierre-titulo')?.textContent ?? null }
+    let marca = null
+    try { marca = JSON.parse(localStorage.getItem('ajilei.guia') ?? 'null') } catch { /* nada */ }
+    const premio = document.querySelector('.guia-premio')
+    return {
+      ajilei: window.__guia.ajilei, llamadas: window.__guia.llamadas, marca,
+      titulo: document.querySelector('.guia-cierre-titulo')?.textContent ?? null,
+      fase: document.querySelector('[data-guia-premio]')?.dataset.guiaPremio ?? null,
+      cifra: document.querySelector('.guia-premio-cifra')?.textContent ?? null,
+      visible: premio ? getComputedStyle(premio).visibility === 'visible' : false,
+      moneda: !!premio?.querySelector('.chip-token'),
+      cobrado: window.__ajileiBancoImitado?.banco?.premioGuiada ?? null,
+    }
   })
-  out.cierre = { titulo: g.titulo, ajilei: g.ajilei, hecha: g.hecha, pasos: out.pasos.length }
+  out.cierre = { titulo: g.titulo, ajilei: g.ajilei, fase: g.fase, cifra: g.cifra, pendiente: g.marca?.pendientePago ?? null, pasos: out.pasos.length }
   if (fin && !g.ajilei) falla('tut.guiada', 'llegó al cierre sin la celebración de AJILEI')
-  if (fin && g.hecha !== true) falla('tut.guiada', `ajilei.guia sin «hecha» (${g.hecha})`)
+  if (fin && (g.fase !== 'pagado' || g.cifra !== '+2.000 HC' || !g.visible || !g.moneda)) {
+    falla('tut.guiada', `el premio del cierre: fase ${g.fase} · «${g.cifra}» · visible ${g.visible} · moneda ${g.moneda}`)
+  }
+  if (fin && g.marca?.pendientePago !== false) falla('tut.guiada', `ajilei.guia con pendientePago ${g.marca?.pendientePago}`)
+  if (fin && g.marca && 'hecha' in g.marca) falla('tut.guiada', 'ajilei.guia lleva «hecha»: la guiada hecha vive en el servidor')
   pasa('tut.guiada')
   if (sinSalir) falla('tut.salir', `${sinSalir} momentos sin «Salir» en su sitio`)
   else pasa('tut.salir')
@@ -244,20 +275,26 @@ async function celda(page, base, tam, vp, progreso) {
   // ── El dinero: nadie llamó y la píldora no cambió ──
   if (fin) await tocarSel('[data-accion="guia-lobby"]')
   await page.waitForSelector('main.lobby', { timeout: 15000 })
+  // La píldora toma el saldo del cobro: se espera a que lo pinte (su contador sube).
+  const monto = g.cobrado?.monto ?? 0
+  await page.waitForFunction(({ s }) => { const p = document.querySelector('.lob-pildora'); return p && Number(p.textContent.replace(/\D/g, '')) === s }, { s: cifra(antes) + monto }, { timeout: 8000 }).catch(() => {})
   const despues = await saldo()
-  const llamadas = g.llamadas.filter((x) => PROHIBIDAS.includes(x))
-  const porRed = red.filter((u) => PROHIBIDAS.some((p) => u.includes(p)))
-  out.dinero = { antes, despues, llamadas: [...new Set(g.llamadas)], prohibidas: llamadas, porRed }
+  const durante = g.llamadas.slice(desde)
+  const llamadas = durante.filter((x) => PROHIBIDAS.includes(x))
+  const cobros = durante.filter((x) => x === 'cobrar_guiada').length
+  const porRed = red.filter((u) => PROHIBIDAS.some((p) => u.includes(p)) || u.includes('cobrar_guiada'))
+  out.dinero = { antes, despues, monto, durante: [...new Set(durante)], cobros, prohibidas: llamadas, porRed }
   if (llamadas.length) falla('tut.red', `llamadas durante la guiada: ${[...new Set(llamadas)].join(', ')}`)
+  if (fin && cobros !== 1) falla('tut.red', `cobrar_guiada ${cobros} veces durante la guiada (debe ser una)`)
   if (porRed.length) falla('tut.red', `por la red: ${porRed.slice(0, 3).join(' | ')}`)
-  if (antes !== despues) falla('tut.red', `la píldora cambió: ${antes} → ${despues}`)
+  if (fin && (monto !== 2000 || cifra(despues) !== cifra(antes) + monto)) falla('tut.red', `la píldora: ${antes} → ${despues} con un cobro de ${monto}`)
   pasa('tut.red')
   pasa('tut.delta')
   pasa('tut.lineas')
 
   // ── R-2: «Salir» en el paso 1 y una mesa real de 3 contra las IAS ──
   if (tam === 'T1') {
-    await tocarSel('[data-accion="reglas"]')
+    await abrirGuiada()
     await page.waitForSelector('.tut-capa[data-listo] [data-accion="tut-salir"]', { timeout: ESPERA_PASO_MS })
     await tocarSel('.tut-capa [data-accion="tut-salir"]')
     await page.waitForSelector('main.lobby [data-accion="jugar-ia"]', { timeout: 15000 })
@@ -295,6 +332,8 @@ export async function runTutGuiada(browser, { base }) {
   const fallos = []
   await Promise.all(Object.entries(T).map(async ([tam, vp]) => {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, ...(vp.movil ? { hasTouch: true, isMobile: true } : {}), deviceScaleFactor: 1 })
+    // TUT-1 T3 · la oferta del primer login, contestada: aquí se mide la guiada (la oferta, en `tut puerta`).
+    await ctx.addInitScript(() => { try { if (localStorage.getItem('ajilei.guia') === null) localStorage.setItem('ajilei.guia', '{"ofrecida":true}') } catch { /* nada */ } })
     const page = await ctx.newPage()
     const progreso = {}
     try {

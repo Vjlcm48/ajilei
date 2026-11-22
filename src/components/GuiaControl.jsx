@@ -7,7 +7,7 @@ import { RED_REVELACION_MS } from '../hooks/mesaCore'
 import '../styles/guiada.css'
 
 // ── GUI-1 · El controlador de la partida guiada ─────────────────────────────
-// Rector: AJILEI_TUT-1_T2_v1.0.md §1.3; normativo AJILEI_Tutorial_v1.3.md §1.1 y §1.4.
+// Rector: AJILEI_TUT-1_T2_v1.0.md §1.3; normativo AJILEI_Tutorial_v1.4.md §1.1 y §1.4.
 // Lo monta `GameTable` cuando lleva `guion` (y sólo entonces). LEE la mesa —la
 // fase, de quién es el turno, si reparte, si repone, si celebra— y decide qué
 // paso de `lib/guiaManos.PASOS` toca; NO la toca: lo que hace cada paso lo hace
