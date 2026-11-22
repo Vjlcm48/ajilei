@@ -49,8 +49,45 @@
   font-size: 16px;
   line-height: 1.4;
 }
-/* Tanda 3 · el hueco de la recompensa (§1.5): vacío no ocupa alto. */
-.guia-cierre-recompensa:empty { display: none; }
+/* ── Tanda 3 · el premio (§1.5) ───────────────────────────────────────────────
+   La ranura tiene su alto desde el primer pintado (O1): la cifra o el aviso entran
+   dentro y los botones no se mueven. La celebración: la cifra con la moneda, grande,
+   crece y brilla en 1,5 s y se QUEDA a la vista (nunca escondida). */
+.guia-cierre-recompensa {
+  display: grid;
+  place-items: center;
+  min-height: 64px;
+  margin-top: 16px;
+}
+.guia-premio {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--gold-brand-hi);
+  text-shadow: 0 0 14px rgba(var(--gold-brand-hi-rgb), 0.45);
+  font-variant-numeric: tabular-nums;
+}
+.guia-premio .chip-token { width: 40px; height: 40px; }
+.is-pagado .guia-premio { animation: guiaPremio 1.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.guia-premio-aviso {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+@keyframes guiaPremio {
+  0%   { opacity: 0; transform: scale(0.55); filter: drop-shadow(0 0 0 rgba(var(--gold-brand-hi-rgb), 0)); }
+  35%  { opacity: 1; transform: scale(1.14); filter: drop-shadow(0 0 18px rgba(var(--gold-brand-hi-rgb), 0.9)); }
+  60%  { transform: scale(0.97); }
+  100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 6px rgba(var(--gold-brand-hi-rgb), 0.35)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-pagado .guia-premio { animation: none; }
+}
 .guia-cierre-botones {
   display: flex;
   flex-direction: column;

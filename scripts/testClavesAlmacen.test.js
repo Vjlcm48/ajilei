@@ -44,7 +44,7 @@ const CLAVES = [
   { clave: 'ajilei.medir', almacen: 'session', fuente: 'MES-PvP Sub5a §A3 · medirArranque.js · el mando `?medir=arranque` sobrevive al inicio de sesión; solo de desarrollo, no llega a dist/' },
   { clave: 'ajilei.consultaConfirmada', almacen: 'session', fuente: 'CFG-1 Fase 1e · Menu_Utilidades_v1.6 §3 · consultaConfirmada.js · el primer cobro de Mano actual ya se confirmó en esta sesión' },
   { clave: 'ajilei.origen', almacen: 'local', fuente: 'MED-1a T2 §2 · origen.js · de dónde vino, primer toque y 30 días; se borra tras el Bautizo (INV-87)' },
-  { clave: 'ajilei.guia', almacen: 'local', fuente: 'TUT-1 T1 §1.4 · Tutorial_v1.3 §1.2, §1.4 y §2.1 · guia.js · ofrecida, hecha, las señales y los capítulos vistos, en el aparato' },
+  { clave: 'ajilei.guia', almacen: 'local', fuente: 'TUT-1 T1 §1.4 y T3 §2.1 · Tutorial_v1.4 §1.2, §1.6 y §2.1 · guia.js · ofrecida, pendientePago, las señales y los capítulos vistos, en el aparato (la guiada hecha vive en el servidor)' },
 ]
 
 // Los únicos módulos que tocan el almacenamiento del navegador.

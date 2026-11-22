@@ -38,6 +38,7 @@ export const trozos = Object.freeze({
 // salas y el intersticial no: se piden al tocarlos. La Portada no monta el lobby,
 // así que no paga nada de esto. `controlMesa` va con ellos porque `retar` lo
 // espera antes de sentarse.
+// La guiada no va aquí: el lobby ya la pide al montarse (lleva su puerta, TUT-1 T3).
 const DEL_LOBBY = [trozos.tienda, trozos.perfil, trozos.rankings, trozos.hoja, trozos.retar, trozos.controlMesa]
 
 export function precargarDelLobby() {

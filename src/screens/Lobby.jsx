@@ -34,7 +34,7 @@ import ChipToken from '../components/ChipToken'
 import { useIdioma } from '../hooks/useIdioma'
 import { useSounds, precargarSonidos, SONIDOS_LOBBY } from '../hooks/useSounds'
 import { precargarMesa } from '../lib/cargarMesa'
-import { precargarDelLobby } from '../lib/trozos'
+import { precargarDelLobby, trozos } from '../lib/trozos'
 import { saldoOculto as ojitoGuardado } from '../lib/saldoOculto'
 
 // ── El isotipo del lobby ────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ import isotipoUrl from '../assets/ajilei-isotipo.svg?no-inline'
 // CFG-1 1a · en la hoja ya sólo dicen «Pronto» Idioma y Eliminar cuenta, y lo
 // dicen con el aviso de la hoja (`HojaConfiguracion`), no con éste.
 
-export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, onJugarIA, onJugarPvP, onRankings, onTienda, onReglas, onCerrarSesion }) {
+export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoFin, constancia = null, guiada = null, onJugarIA, onJugarPvP, onRankings, onTienda, onReglas, onCerrarSesion }) {
   const { t } = useIdioma()
   const { play } = useSounds()
 
@@ -110,6 +110,15 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
   // menos de uno.
   // PES-1 §3-B · y, en el mismo momento, lo que se abre desde aquí.
   useEffect(() => { precargarMesa(); precargarDelLobby() }, [])
+  // TUT-1 T3 · la puerta de la guiada (el reintento del premio) viaja en el trozo de la
+  // guiada, pedido al aterrizar: la entrada sólo lleva esta ranura.
+  // Sin el trozo (sin red) no hay reintento, y el lobby sigue igual.
+  const [Puerta, setPuerta] = useState(null)
+  useEffect(() => {
+    let vivo = true
+    trozos.guiada.cargar().then((m) => { if (vivo) setPuerta(() => m.PuertaGuiada) }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
 
   // ── La jaula de 1126px se EXCEPCIONA, no se demuele ───────────────────────
   // Molde EXACTO de `Portada.jsx:217-223`: `index.css` es andamiaje de Vite y
@@ -287,6 +296,7 @@ export default function Lobby({ cuenta, billetera = null, aviso = null, onAvisoF
       <div className={`lob-toast${toastVivo ? ' is-on' : ''}`} role="status" aria-live="polite">
         {t('lob.toast.pronto')}
       </div>
+      {Puerta && <Puerta {...guiada} />}
     </main>
   )
 }

@@ -21,7 +21,9 @@ const GameTable = lazy(fabricaMesa)
 // `control`, `apiRanking` ni `apiConsulta`: no pasa por `retar` ni por
 // `sentarse_ia`, no cobra entrada, no mueve el saldo, no da puntos, no avisa
 // pila (excepción escrita a INV-47; la vigila `diagDSK tut`, puerta
-// `tut.guiada`). Tres manos con mazo dado; los rivales, de guion.
+// `tut.guiada`). Tres manos con mazo dado; los rivales, de guion. La ÚNICA
+// llamada al servidor de toda la guiada es la del cierre: `cobrar_guiada()`
+// (tanda 3, `CierreGuiada`), una vez.
 //
 // R-2 DE LA FASE 0: EL GUION NUNCA LLEGA A UNA MESA DE VERDAD. Cada mano arma su
 // orden justo antes de barajar y el barajado lo consume; aun así, `soltarMazo`
@@ -29,11 +31,15 @@ const GameTable = lazy(fabricaMesa)
 // el cierre, desmontar la pantalla—, se haya consumido o no.
 sumarTextos('es', { ...TEXTOS_TUT_COMUNES, ...TEXTOS_TUT_GUIADA })
 
-export default function Guiada({ onLobby, onJugar }) {
+// TUT-1 T3 · la puerta del lobby (el reintento del premio) viaja en ESTE trozo
+// (`lib/trozos.guiada`).
+export { default as PuertaGuiada } from '../components/PuertaGuiada'
+
+export default function Guiada({ onLobby, onJugar, onSaldo }) {
   const [fase, setFase] = useState('mesa')
   // Los de `App` cambian en cada render; el guion es uno para toda la mesa.
-  const salidas = useRef({ onLobby, onJugar })
-  useEffect(() => { salidas.current = { onLobby, onJugar } })
+  const salidas = useRef({ onLobby, onJugar, onSaldo })
+  useEffect(() => { salidas.current = { onLobby, onJugar, onSaldo } })
 
   useEffect(() => {
     if (fase !== 'mesa') soltarMazo()
@@ -61,7 +67,10 @@ export default function Guiada({ onLobby, onJugar }) {
   }), [])
 
   if (fase === 'cierre') {
-    return <CierreGuiada onJugar={() => salidas.current.onJugar?.()} onLobby={() => salidas.current.onLobby?.()} />
+    return (
+      <CierreGuiada onSaldo={(saldo) => salidas.current.onSaldo?.(saldo)}
+        onJugar={() => salidas.current.onJugar?.()} onLobby={() => salidas.current.onLobby?.()} />
+    )
   }
   return (
     <PantallaDiferida trozo={trozoMesa} familia="abismo">

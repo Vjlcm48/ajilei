@@ -101,11 +101,14 @@ export const TEXTOS_TUT_GUIADA = {
   'tut.g3.p7': 'Ya tienes AJILEI. No cambies nada.',
   'tut.g3.p8': 'Otra vez a lo grande: **×10**.',
   'tut.g3.p9': '**Apostar**.',
-  // El cierre (paso 11 de la mano 3). La recompensa (§1.5) entra con la tanda 3.
+  // El cierre (paso 11 de la mano 3), con la celebración del premio (§1.5, tanda 3).
   'tut.cierre.titulo': '¡Ya sabes jugar!',
   'tut.cierre.texto': 'Palos distintos: pasa. Te apuestan: iguala. Mismo palo: apuesta. Cuantas más del palo, más fuerte. AJILEI: a lo grande.',
   'tut.cierre.jugar': 'Jugar de verdad',
   'tut.cierre.lobby': 'Volver al lobby',
+  'tut.cierre.premio': '+{monto} HC',
+  'tut.cierre.premio.aria': 'Recibiste {monto} Heptacoins',
+  'tut.cierre.sinred': 'Te lo acreditamos en cuanto vuelva la conexión.',
 }
 
 // `@__PURE__`: sin nadie que la importe en la app, el empaquetador la quita y con ella los

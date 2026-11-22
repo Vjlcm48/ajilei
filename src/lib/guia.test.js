@@ -18,7 +18,7 @@ describe('TUT-1 · guia', () => {
   it('un aparato nuevo no ha visto nada', () => {
     expect(crearGuia(() => almacenFalso()).leer()).toEqual({
       ofrecida: false,
-      hecha: false,
+      pendientePago: false,
       senales: { iniciar: false, apostar: false, descartar: false },
       vistos: [],
     })
@@ -38,16 +38,24 @@ describe('TUT-1 · guia', () => {
     const a = almacenFalso()
     const g = crearGuia(() => a)
     g.marcarOfrecida()
-    g.marcarHecha()
+    g.marcarPendiente()
     g.marcarSenal('apostar')
     g.marcarVisto(5)
     g.marcarVisto(2)
     expect(g.leer()).toEqual({
       ofrecida: true,
-      hecha: true,
+      pendientePago: true,
       senales: { iniciar: false, apostar: true, descartar: false },
       vistos: [2, 5],
     })
+    g.quitarPendiente()
+    expect(g.leer().pendientePago).toBe(false)
+  })
+
+  it('T3 · la «hecha» de la tanda 2 no se lee: la marca de guiada hecha vive en el servidor', () => {
+    const g = crearGuia(() => almacenFalso({ 'ajilei.guia': '{"ofrecida":true,"hecha":true}' }))
+    expect(g.leer()).toEqual({ ...estadoVacio(), ofrecida: true })
+    expect('hecha' in g.leer()).toBe(false)
   })
 
   it('un capítulo visto dos veces cuenta una; uno que no existe no entra', () => {
@@ -74,14 +82,14 @@ describe('TUT-1 · guia', () => {
     for (const crudo of ['no-es-json', '[]', 'null', '42', '"hecha"']) {
       expect(crearGuia(() => almacenFalso({ 'ajilei.guia': crudo })).leer(), crudo).toEqual(estadoVacio())
     }
-    expect(normalizar({ ofrecida: 'si', hecha: 1, senales: { iniciar: 'true', descartar: true }, vistos: [10, 1, 1, 'x', 12] }))
-      .toEqual({ ofrecida: false, hecha: false, senales: { iniciar: false, apostar: false, descartar: true }, vistos: [1, 10] })
+    expect(normalizar({ ofrecida: 'si', pendientePago: 1, senales: { iniciar: 'true', descartar: true }, vistos: [10, 1, 1, 'x', 12] }))
+      .toEqual({ ofrecida: false, pendientePago: false, senales: { iniciar: false, apostar: false, descartar: true }, vistos: [1, 10] })
   })
 
   it('un almacén que falla se lee vacío y marcar no lanza', () => {
     const g = crearGuia(() => roto)
     expect(g.leer()).toEqual(estadoVacio())
-    expect(() => { g.marcarHecha(); g.marcarSenal('iniciar'); g.marcarVisto(1) }).not.toThrow()
+    expect(() => { g.marcarPendiente(); g.quitarPendiente(); g.marcarSenal('iniciar'); g.marcarVisto(1) }).not.toThrow()
     expect(crearGuia(() => null).leer()).toEqual(estadoVacio())
   })
 

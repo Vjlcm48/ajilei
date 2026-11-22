@@ -1196,11 +1196,12 @@ function App() {
   // ── TUT-1 T2 · La partida guiada (GUI-1) ───────────────────────────────
   // La mesa de siempre con un guion y SIN servidor: ni `retar` ni `sentarse_ia`,
   // ni `control`, `apiRanking` o `apiConsulta` (excepción escrita a INV-47). Sin
-  // el marco del video, como la mesa. Su cierre vive en el mismo trozo.
+  // el marco del video, como la mesa. Su cierre vive en el mismo trozo y es lo
+  // ÚNICO que llama al servidor: `cobrar_guiada()` (tanda 3), cuyo saldo toma la píldora.
   if (screen === 'guiada') {
     return (
       <PantallaDiferida trozo={trozos.guiada} familia="abismo">
-        <Guiada onLobby={() => setScreen('lobby')} onJugar={() => setScreen('retar-ias')} />
+        <Guiada onLobby={() => setScreen('lobby')} onJugar={() => setScreen('retar-ias')} onSaldo={billetera.tomar} />
       </PantallaDiferida>
     )
   }
@@ -1220,6 +1221,10 @@ function App() {
       onRankings={entrarRankings}
       onTienda={() => abrirTienda('tapetes')}
       onReglas={() => setScreen('guiada')}
+      // TUT-1 T3 · la puerta de la guiada: el reintento del premio que el cierre no pudo
+      // confirmar. El premio lo pide cada trozo con su API (`lib/guiadaApi`); la entrada
+      // no la lleva.
+      guiada={{ onSaldo: billetera.tomar }}
       onCerrarSesion={cerrarSesion}
     />,
   )
