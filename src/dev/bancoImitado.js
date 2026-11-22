@@ -29,6 +29,9 @@
 // TIE-1 1a le suma la `20261031150000_tie1a_inventario.sql`: la tabla
 // `inventario` de la cuenta y `comprar_articulo`, `usar_articulo`,
 // `elegir_tono` y `mi_inventario`, con el catálogo cerrado en SQL.
+// TUT-1 T3 le suma la `20261121150000_tut1_guiada.sql`: el premio de la guiada
+// (`premio_guiada_estado` y `cobrar_guiada`), con su tramo decidido aquí y la
+// marca por correo que el borrado de la cuenta no se lleva.
 // `rpc(nombre, params)` devuelve `{ data, error }` con la forma
 // de PostgREST: el compuesto `mesa_ia_resultado` llega como objeto con las
 // claves en snake_case, y `mi_mesa_ia` y las lecturas del ranking como lista.
@@ -61,7 +64,11 @@ export const LIMITES_SQL = /* @__PURE__ */ Object.freeze({
   sentarse_ia: 10, recargar_ia: 20, salir_ia: 30, recoger_mesa_ia: 10, marcar_ingreso: 6,
   crear_sala: 10, unirse_sala: 10, consultar_mano: 30, comprar_articulo: 30,
   pedir_boleto: 10, cobrar_boleto: 20,
+  // TUT-1 T3 · la `20261121150000_tut1_guiada.sql` la redefine con el cobro de la guiada.
+  cobrar_guiada: 5,
 })
+// TUT-1 T3 · `premio_guiada_hc(tramo)`. El espejo lo lee de la migración.
+export const PREMIO_GUIADA_SQL = /* @__PURE__ */ Object.freeze({ limpio: 2000, jugado: 1000, invitado: 1000 })
 export const BONO_CONSTANCIA_SQL = 500
 // CFG-1 1e · Mano actual de pago: `consultas_gratis()`, `precio_consulta(text)`
 // y el tope por minuto de `consultar_mano`, la misma cifra que ya da `limite_dinero`
@@ -220,6 +227,11 @@ export function crearBanco({
     consultas: null,           // { usadas, ultimaMesa, ultimaMano }
     // TIE-1 1a · las filas de `inventario` de la cuenta (el gratis no tiene)
     inventario: [],            // { tipo, articulo, tono, en_uso, adquirido_en }
+    // TUT-1 T3 · la fila de `premios_guiada` de este correo, o ninguna; y lo que el
+    // banco no modela por sí solo: manos cerradas entre personas y el premio del invitado.
+    premioGuiada: null,        // { monto, tramo }
+    manosPvp: 0,               // `partida_asientos.manos` de la cuenta (el banco no tiene salas)
+    invitacion: false,         // `guiada_premio_invitacion`: hoy siempre no (GEN-1)
   }
 
   // ── El libro (1a): una línea por cambio, clave única ─────────────────────
@@ -877,6 +889,34 @@ export function crearBanco({
       .map((f) => ({ jugador_id: b.perfil.id, ...f }))
   }
 
+  // ── TUT-1 T3 · el premio de la guiada ────────────────────────────────────
+  // `guiada_tramo`: el invitado manda; después, alguna mano cerrada (contra las
+  // IAS, `mano_informada >= 1`; entre personas, el mando `manosPvp`).
+  function tramoGuiada() {
+    if (b.invitacion) return 'invitado'
+    const jugo = [...b.mesas.values()].some((m) => m.mano_informada >= 1) || b.manosPvp >= 1
+    return jugo ? 'jugado' : 'limpio'
+  }
+
+  function premioGuiadaEstado() {
+    if (b.premioGuiada) return { estado: 'cobrado', monto: b.premioGuiada.monto, tramo: b.premioGuiada.tramo }
+    const tramo = tramoGuiada()
+    return { estado: 'disponible', monto: PREMIO_GUIADA_SQL[tramo], tramo }
+  }
+
+  // El orden del SQL: límite (que anota también el que corta), la marca, el tramo
+  // recalculado aquí y el dinero con `clave_idem = 'guiada:<huella>'`.
+  function cobrarGuiada() {
+    if (!cabe('cobrar_guiada')) return { estado: 'limite', monto: 0, tramo: null, saldo: b.saldo }
+    if (b.premioGuiada) return { estado: 'cobrado', monto: b.premioGuiada.monto, tramo: b.premioGuiada.tramo, saldo: b.saldo }
+    const tramo = tramoGuiada()
+    const monto = PREMIO_GUIADA_SQL[tramo]
+    const r = aplicar('premio_guiada', monto, `guiada:${correo}`, 'premios_guiada')
+    if (!r.aplicado) return { estado: 'error', monto: 0, tramo: null, saldo: b.saldo }
+    b.premioGuiada = { monto, tramo }
+    return { estado: 'pagado', monto, tramo, saldo: b.saldo }
+  }
+
   const RPC = {
     mi_billetera: () => b.saldo,
     marcar_ingreso: marcarIngreso,
@@ -900,6 +940,8 @@ export function crearBanco({
     usar_articulo: usarArticulo,
     elegir_tono: elegirTono,
     mi_inventario: miInventario,
+    premio_guiada_estado: premioGuiadaEstado,
+    cobrar_guiada: cobrarGuiada,
   }
 
   return {
@@ -1046,6 +1088,18 @@ export function crearBanco({
       o.total = { ...t, puntos: t.puntos + n, manos: t.manos + 1, actualizado_en: ahora() }
       return true
     },
+    // ── TUT-1 T3 · el premio de la guiada ──────────────────────────────────
+    get premioGuiada() { return b.premioGuiada ? { ...b.premioGuiada } : null },
+    /** La marca de un cobro anterior de este correo (el guion, B8; el mando `?tut=`), sin mover dinero. */
+    sembrarPremioGuiada(tramo = 'limpio') {
+      if (!(tramo in PREMIO_GUIADA_SQL)) return false
+      b.premioGuiada = { monto: PREMIO_GUIADA_SQL[tramo], tramo }
+      return true
+    },
+    /** Lo que el árbitro escribe en `partida_asientos.manos` al cerrar una mano entre personas. */
+    cerrarManoPvp() { b.manosPvp += 1 },
+    /** El premio del invitado de GEN-1, que hoy ninguna fila puede llevar. */
+    marcarInvitacion() { b.invitacion = true },
     // ── ECO-1g · el video ──────────────────────────────────────────────────
     get boletos() { return b.boletos.map((x) => ({ ...x })) },
     /** Lo que el guion hace con `update boletos_video set emitido_en = … - n s`:

@@ -25,6 +25,7 @@ export const GUIONES_VIGENTES = Object.freeze([
   Object.freeze({ archivo: 'arn4c_verificacion.sql', filas: 7, migracion: '20261103150000_arn4c_profiles_columnas.sql' }),
   Object.freeze({ archivo: 'mespvp8_verificacion.sql', filas: 14, migracion: '20261114120000_mespvp_sub8_consulta_pvp_manos.sql' }),
   Object.freeze({ archivo: 'med1a_verificacion.sql', filas: 36, migracion: '20261116120000_med1a_eventos.sql' }),
+  Object.freeze({ archivo: 'tut1_verificacion.sql', filas: 23, migracion: '20261121150000_tut1_guiada.sql' }),
 ])
 
 /**

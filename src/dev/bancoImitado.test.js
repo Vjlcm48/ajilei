@@ -10,6 +10,7 @@ import {
   FRENO_NOMBRE_MS_SQL, ESTADOS_VE_SQL, normalizarUsernameSQL,
   CONSULTAS_GRATIS_SQL, PRECIOS_CONSULTA_SQL, LIMITE_CONSULTA_SQL,
   OTP_EXP_S_PANEL, INTERVALO_ENVIO_S_PANEL, CODIGO_ACTUAL_IMITADO, CODIGO_NUEVO_IMITADO,
+  PREMIO_GUIADA_SQL,
 } from './bancoImitado'
 import { OTP_EXP_S, INTERVALO_ENVIO_S } from '../lib/correoCore'
 import { CONSULTAS_GRATIS, PRECIOS_CONSULTA } from '../config/consultas'
@@ -1217,5 +1218,76 @@ describe('CFG-1 1d · banco imitado · el cambio de correo (GoTrue v2.197.0)', (
     expect(b.correoUsuario().new_email).toBe(NUEVO)
     b.forzarCorreo('codigo_mal')
     expect(b.correoVerificar(ACTUAL, CODIGO_ACTUAL_IMITADO).status).toBe(403)
+  })
+})
+
+// ── TUT-1 T3 · el premio de la guiada cumple el contrato del SQL ────────────
+// Los casos son los del Grupo B de `supabase/pruebas/tut1_verificacion.sql`
+// (B1–B7 y B13), con las mismas cifras. El banco es de UNA cuenta: B8 (borrar y
+// volver con otro alias) es aquí la marca sembrada, que el banco conserva.
+describe('TUT-1 T3 · banco imitado · el premio de la guiada', () => {
+  const dir = join(process.cwd(), 'supabase', 'migrations')
+  const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.includes('tut1_guiada'))), 'utf8')
+
+  it('premio_guiada_hc: SQL = modelo (limpio 2.000, jugado e invitado 1.000)', () => {
+    const bloque = /function public\.premio_guiada_hc[\s\S]*?\$fn\$;/.exec(sql)[0]
+    const enSql = Object.fromEntries([...bloque.matchAll(/when '(\w+)'\s+then (\d+)/g)].map((m) => [m[1], Number(m[2])]))
+    expect(enSql).toEqual({ ...PREMIO_GUIADA_SQL })
+  })
+
+  it('B1–B4 · limpia: disponible 2.000; cobra una vez con la clave del correo; después, cobrado', () => {
+    const { b, ll } = banco()
+    expect(ll('premio_guiada_estado')).toEqual({ estado: 'disponible', monto: 2000, tramo: 'limpio' })
+    expect(ll('cobrar_guiada')).toEqual({ estado: 'pagado', monto: 2000, tramo: 'limpio', saldo: 4500 })
+    expect(ll('cobrar_guiada')).toEqual({ estado: 'cobrado', monto: 2000, tramo: 'limpio', saldo: 4500 })
+    expect(ll('premio_guiada_estado')).toEqual({ estado: 'cobrado', monto: 2000, tramo: 'limpio' })
+    const lineas = b.libro.filter((l) => l.tipo === 'premio_guiada')
+    expect(lineas).toEqual([{ tipo: 'premio_guiada', monto: 2000, saldo_tras: 4500, clave: 'guiada:devlocal@ajilei.test', ref: 'premios_guiada' }])
+  })
+
+  it('B5 · sentarse sin cerrar una mano no es jugar: sigue en 2.000', () => {
+    const { ll } = banco()
+    expect(sentar(ll, 'basico', 2, 50, 500, T('s')).codigo).toBe('ok')
+    expect(ll('premio_guiada_estado')).toEqual({ estado: 'disponible', monto: 2000, tramo: 'limpio' })
+  })
+
+  it('B6 · una mano cerrada contra las IAS: 1.000 jugado', () => {
+    const { ll } = banco()
+    const m = sentar(ll, 'basico', 2, 50, 500, T('j')).mesa_id
+    expect(ll('informar_pila', { p_mesa: m, p_seq: 1, p_pila: 500, p_fin_vivos: 2, p_fin_gano: true, p_fin_mano: 1, p_fin_ajilei: 0 }).codigo).toBe('ok')
+    expect(ll('premio_guiada_estado')).toEqual({ estado: 'disponible', monto: 1000, tramo: 'jugado' })
+    expect(ll('cobrar_guiada')).toMatchObject({ estado: 'pagado', monto: 1000, tramo: 'jugado' })
+  })
+
+  it('B7 · una mano cerrada entre personas: 1.000 jugado; y el invitado manda sobre la mano', () => {
+    const { b, ll } = banco()
+    b.cerrarManoPvp()
+    expect(ll('premio_guiada_estado')).toEqual({ estado: 'disponible', monto: 1000, tramo: 'jugado' })
+    b.marcarInvitacion()
+    expect(ll('premio_guiada_estado')).toEqual({ estado: 'disponible', monto: 1000, tramo: 'invitado' })
+  })
+
+  it('B8 · la marca de un cobro anterior del mismo correo: cobrado, sin un HC más', () => {
+    const { b, ll } = banco()
+    b.sembrarPremioGuiada('limpio')
+    expect(ll('premio_guiada_estado')).toEqual({ estado: 'cobrado', monto: 2000, tramo: 'limpio' })
+    expect(ll('cobrar_guiada')).toEqual({ estado: 'cobrado', monto: 2000, tramo: 'limpio', saldo: 2500 })
+    expect(b.libro.some((l) => l.tipo === 'premio_guiada')).toBe(false)
+  })
+
+  it('B13 · límite: cinco cobros por minuto contestan, el sexto dice limite, y un minuto después vuelve', () => {
+    const { b, ll } = banco()
+    expect(ll('cobrar_guiada').estado).toBe('pagado')
+    for (let i = 0; i < 4; i++) expect(ll('cobrar_guiada').estado).toBe('cobrado')
+    expect(ll('cobrar_guiada')).toEqual({ estado: 'limite', monto: 0, tramo: null, saldo: 4500 })
+    expect(b.intentos.filter((x) => x.funcion === 'cobrar_guiada')).toHaveLength(6)
+    b.envejecerIntentos(61_000)
+    expect(ll('cobrar_guiada').estado).toBe('cobrado')
+    expect(b.libro.filter((l) => l.tipo === 'premio_guiada')).toHaveLength(1)
+  })
+
+  it('rpc: las dos llegan con la forma de PostgREST (un objeto jsonb)', async () => {
+    const { b } = banco()
+    expect(await b.rpc('premio_guiada_estado')).toEqual({ data: { estado: 'disponible', monto: 2000, tramo: 'limpio' }, error: null })
   })
 })

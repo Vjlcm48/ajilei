@@ -141,7 +141,9 @@ declare
                                  'salida_ia', 'abandono_ia', 'compra', 'ajuste_admin', 'garantia_pvp',
                                  'liberacion_pvp', 'resultado_pvp', 'consulta',
                                  -- MES-PvP v1.3-b · la recarga PvP (`20261108120000_mespvp_v13_recarga.sql`).
-                                 'recarga_pvp'];
+                                 'recarga_pvp',
+                                 -- TUT-1 T3 · el premio de la guiada (`20261121150000_tut1_guiada.sql`).
+                                 'premio_guiada'];
 
   v_o integer[] := '{}';
   v_p text[]    := '{}';
@@ -189,9 +191,9 @@ begin
      where conrelid = 'public.movimientos'::regclass and conname = 'movimientos_tipo_chk';
     select count(*) into n1 from unnest(TIPOS) as x(tipo) where t1 like '%''' || x.tipo || '''%';
     select count(*) into n2 from regexp_matches(coalesce(t1, ''), '''[a-z_]+''', 'g');
-    v_o := v_o || 2; v_p := v_p || 'A2 · movimientos_tipo_chk: los 12 tipos de antes, consulta y recarga_pvp (v1.3), ninguno más'::text;
-    v_r := v_r || case when n1 = 14 and n2 = 14 then 'PASA' else 'FALLA' end;
-    v_d := v_d || format('de la lista=%s de 14 · literales en la restricción=%s', n1, n2);
+    v_o := v_o || 2; v_p := v_p || 'A2 · movimientos_tipo_chk: los 12 tipos de antes, consulta, recarga_pvp (v1.3) y premio_guiada (TUT-1), ninguno más'::text;
+    v_r := v_r || case when n1 = 15 and n2 = 15 then 'PASA' else 'FALLA' end;
+    v_d := v_d || format('de la lista=%s de 15 · literales en la restricción=%s', n1, n2);
 
     -- ── A3 · las cifras ──────────────────────────────────────────────────
     t1 := public.precio_consulta('basico') || '/' || public.precio_consulta('avanzado') || '/'
