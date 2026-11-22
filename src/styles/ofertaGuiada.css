@@ -1,5 +1,5 @@
 /* ── GUI-1 · La oferta del primer login (`components/OfertaGuiada.jsx`) ──────
-   Normativo: AJILEI_Tutorial_v1.0.md §1.2; la forma, la variante a de la lámina
+   Normativo: AJILEI_Tutorial_v1.3.md §1.2; la forma, la variante a de la lámina
    (centrada sobre el lobby atenuado). Hoja nueva y aditiva (INV-03).
    Mismo piso que la capa: z-index 40 (ver la cabecera de `senal.css`). El lobby
    no se mueve: todo es `fixed` y vive en `body`. */

@@ -5,7 +5,7 @@ import { t } from '../config/textos'
 import { SoundButton } from './SoundButton'
 
 // ── GUI-1 · La oferta del primer login ──────────────────────────────────────
-// Normativo: AJILEI_Tutorial_v1.0.md §1.2. Una tarjeta pequeña, no una
+// Normativo: AJILEI_Tutorial_v1.3.md §1.2. Una tarjeta pequeña, no una
 // pantalla: «¿Aprendemos en dos minutos?». La forma la eligió Victor en la
 // lámina (2026-11-20): CENTRADA SOBRE EL LOBBY ATENUADO (la variante a; la b,
 // anclada abajo, tapaba la entrada a jugar y dejaba dos oros sólidos a la vista).

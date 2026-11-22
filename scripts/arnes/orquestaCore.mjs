@@ -83,6 +83,9 @@ const LEC = diag('diagDSK', 'lec.mapa', 'lec', 5)
 // TUT-1 tanda 1 · la capa de señalización sobre la mesa (`scripts/tut/tut.mjs`): menos de un
 // minuto, en `commit`.
 const TUT = diag('diagDSK', 'tut', 'tut', 5)
+// TUT-1 tanda 2 · la partida guiada entera desde el lobby (`scripts/tut/guiada.mjs`): pasa del
+// minuto (≈ 85 s), así que va aparte y en `completo` (ficha T2 §1.6); `tut` sigue en `commit`.
+const TUT_GUIADA = diag('diagDSK', 'tut.guiada', 'tut', 10, ['guiada'])
 
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
@@ -123,7 +126,7 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
   commit: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, HUMO],
-  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
+  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, TUT_GUIADA, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]

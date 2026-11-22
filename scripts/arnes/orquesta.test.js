@@ -71,6 +71,9 @@ describe('A4 · los perfiles', () => {
     expect(ids(rapido)).toEqual(['eslint', 'vitest', 'build', 'guiones'])
     expect(ids(commit)).toEqual([...ids(rapido), '1.8b', 'pue.espera', 'pvp.mesa', 'pvp.lm', 'lec.mapa', 'tut', 'humo'])
     expect(ids(completo)).toContain('1.8b')
+    // TUT-1 tanda 2 · la guiada entera pasa del minuto: en `completo`, no en `commit`.
+    expect(ids(completo)).toContain('tut.guiada')
+    expect(ids(commit)).not.toContain('tut.guiada')
   })
   it('vitest pasa por el lanzador', () => {
     expect(rapido.find((v) => v.id === 'vitest').args[0]).toBe('scripts/arnes/vitest.mjs')

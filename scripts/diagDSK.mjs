@@ -365,6 +365,7 @@ import { runTienda } from './tie/tienda.mjs'
 import { PARTES_PVP, runPvp } from './pvp/pvp.mjs'
 import { runLec } from './lec/lec.mjs'
 import { runTut } from './tut/tut.mjs'
+import { runTutGuiada } from './tut/guiada.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -15607,8 +15608,10 @@ try {
   }
   // TUT-1 tanda 1 · `tut`: la capa de señalización sobre la mesa quieta de `?pvp=` (INV-89).
   // Contra 5173 (DEV y bypass): la capa se monta con `scripts/tut/montaCapa.mjs`.
+  // TUT-1 tanda 2 · `tut guiada`: la partida guiada entera desde el lobby (`scripts/tut/guiada.mjs`),
+  // aparte porque pasa del minuto: corre en `completo` y `tut` a secas sigue en `commit`.
   if (MODE === 'tut') {
-    report.tut = await runTut(browser, { base: BASE })
+    report.tut = process.argv[3] === 'guiada' ? await runTutGuiada(browser, { base: BASE }) : await runTut(browser, { base: BASE })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)
