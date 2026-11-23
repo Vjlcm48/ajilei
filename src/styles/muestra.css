@@ -1,0 +1,87 @@
+/* ── TUT-1 T4 · La muestra de cartas (P-4) ──────────────────────────────────
+   Rector: AJILEI_TUT-1_T4_v1.0.md §1.2. Hoja aditiva y propia: los componentes son
+   los de la mesa (sus clases vienen de sus hojas); aquí sólo la caja que los sostiene
+   en el centro de la mesa congelada, bajo la capa (z 39; la capa va en 40) y sin
+   recibir toques. Ninguna regla se escribe en una hoja protegida. */
+.muestra {
+  /* Por el ancho y por el alto: acostado (640×360) el empate son dos filas de cartas. */
+  --card-w: clamp(28px, min(12vw, 10vh), 72px);
+  --card-h: calc(var(--card-w) * 1.413);
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  z-index: 39;
+  pointer-events: none;
+  box-sizing: border-box;
+  max-width: calc(100vw - 24px);
+  padding: min(12px, 2.5vh) 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--gold-brand-rgb), 0.55);
+  background: var(--green-deep);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-base);
+  color: var(--text-primary);
+}
+/* ── TRES TAMAÑOS según cuántas cartas enseña (STOP-T, Victor; `tamanoMuestra`) ──
+   · grande (una carta: el As, el 7 de Oro): 110 px en teléfono, 162 en escritorio;
+   · media (dos: el 6 y el 7, las del mismo palo): 94 px en 360×640;
+   · chica (más de dos): lo más grande que quepa en su fila sin tocar la burbuja, la barra
+     ni los aros (`tut.solape`). En vertical, de seis cartas arriba, dos filas (4 y 3). */
+.muestra--grande { --card-w: clamp(84px, min(30vw, 30vh), 160px); }
+.muestra--media { --card-w: clamp(56px, min(26vw, 24vh), 120px); }
+.muestra--media .muestra-fila { gap: 14px; }
+.muestra--chica {
+  --cols: var(--n, 7);
+  /* El ancho de la ventana (hasta 1100), menos el margen y el marco (54), los huecos de 6 entre
+     columnas y lo que la carta pinta más allá de `--card-w` (~2 por carta: 16 en total). */
+  --card-w: clamp(28px, calc((min(100vw, 1100px) - 70px - (var(--cols) - 1) * 6px) / var(--cols)), 120px);
+}
+@media (orientation: portrait) {
+  .muestra--chica.muestra--dos-filas { --cols: 4; }
+  /* Cuatro por fila: el ancho de cuatro cartas con su sobra (4 px) y tres huecos; la quinta baja. */
+  .muestra--chica.muestra--dos-filas .muestra-fila { flex-wrap: wrap; width: calc((var(--card-w) + 4px) * 4 + 18px); row-gap: 10px; }
+}
+/* Acostado bajo (la barra en columna arriba a la izquierda): una fila, limitada también por el
+   alto, y centrada en lo que queda bajo la burbuja (12 + 96 de burbuja + 10 + 6 del aro arriba;
+   18 abajo). */
+@media (orientation: landscape) and (max-height: 599px) {
+  .muestra--chica {
+    --card-w: clamp(28px, min(calc((100vw - 70px - (var(--cols) - 1) * 6px) / var(--cols)), calc((100vh - 190px) / 1.413)), 120px);
+    top: calc(50vh + 53px);
+  }
+}
+
+.muestra-fila { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap; }
+.muestra-carta { position: relative; display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
+.muestra-valor { font-size: 15px; font-weight: 700; color: var(--gold-brand); line-height: 1; }
+.muestra-suma { margin-left: 6px; }
+
+/* Las que no suman (capítulo 2, paso 4; tamaño `media`): un aspa fina y clara que no tapa
+   la carta: dos trazos de 2 px, translúcidos, que no llegan a las esquinas (ahí van el número
+   y el palo). */
+.muestra-carta.es-tachada::before,
+.muestra-carta.es-tachada::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: calc(var(--card-h) / 2);
+  width: calc(var(--card-w) * 1.15);
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 120, 105, 0.85);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.3);
+}
+.muestra-carta.es-tachada::before { transform: translate(-50%, -50%) rotate(55deg); }
+.muestra-carta.es-tachada::after  { transform: translate(-50%, -50%) rotate(-55deg); }
+
+/* El empate: dos filas frente a frente, la marca de Mano en la primera. */
+.muestra-empate { display: flex; flex-direction: column; gap: min(10px, 2vh); }
+.muestra-jugador { display: grid; grid-template-columns: 5.5em auto auto; align-items: center; gap: 8px; }
+.muestra-nombre { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; font-weight: 700; }
+
+/* Los botones de la fila, en su estado, sin el reloj de la mesa. */
+.muestra-mults, .muestra-acciones { display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap; }
+
+.muestra-pozos { display: flex; gap: 12px; justify-content: center; align-items: stretch; flex-wrap: wrap; }
+.muestra-pozo { min-width: 7.5em; }

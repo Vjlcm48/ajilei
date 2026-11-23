@@ -152,15 +152,20 @@ export const pozoDeMano = (game) => game.players.reduce((s, p) => s + (p.contrib
  * `armar(orden)` prepara el barajado (`mazoDado.armarOrden`): se inyecta para
  * que este módulo no toque el generador por su cuenta.
  * Devuelve el pago y lo que cada paso del normativo necesita ver.
+ *
+ * TUT-1 T4 · `parar(g, r)`, opcional: se pregunta antes de cada jugada y, si dice
+ * que sí, la mano se queda ahí y `r.momento` es ese estado (el «momento» de un
+ * capítulo, `guia/momento.js`). Sin él, la mano se juega entera como siempre.
  */
-export function jugarMano(previo, mano, orden, armar) {
+export function jugarMano(previo, mano, orden, armar, parar = null) {
   armar(orden)
   let g = startHand(previo)
   const r = {
     mano, manoIndex: g.manoIndex, fases: [], turnos: { BET_1: 0, BET_2: 0, BET_3: 0 }, jugadas: [],
-    dos: null, cinco: null, antes: null, despues: null, pozoEnDescarte: null,
+    dos: null, cinco: null, antes: null, despues: null, pozoEnDescarte: null, momento: null,
   }
   for (let paso = 0; paso < 200 && g.phase !== PHASES.PAYOUT && g.phase !== PHASES.GAME_OVER; paso++) {
+    if (parar && parar(g, r)) { r.momento = g; return r }
     if (!r.fases.includes(g.phase)) r.fases.push(g.phase)
     if (g.phase === PHASES.DEAL_2 || g.phase === PHASES.DEAL_3) {
       g = advanceFromDeal(g)
@@ -314,3 +319,35 @@ export const PASOS = Object.freeze([
 
 /** Cuántos pasos tiene cada mano (para «Paso n de m»). */
 export const pasosDeMano = (mano) => PASOS.filter((p) => p.mano === mano).length
+
+// ── TUT-1 T4 · Dónde se para la mano para el paso n (el «momento» de un capítulo) ──
+// Sale de los PASOS de arriba, no de una tabla aparte: si la guiada cambia, el
+// momento cambia con ella.
+const TERMINAN_TURNO = new Set([A.pasar, A.igualar, A.apostar])
+const terminaTurno = (p) => p.avanza === 'toque' && TERMINAN_TURNO.has(p.toque ?? p.ancla()[0])
+
+/**
+ * La parada del paso `paso` (1…) de la mano `mano`, en términos de la mesa:
+ *   · `{ fase: 'WAITING' }`: antes de «Iniciar mano»;
+ *   · `{ fase: 'BET_k', turno: t }`: el turno `t` del humano en esa ronda (en la
+ *     última ronda de la mano 1 hay dos: pasar, y luego igualar el ×1 de IA 1);
+ *   · `{ fase: 'DISCARD', seleccion }`: el descarte; con `seleccion(g)` si un paso
+ *     anterior de la mano ya eligió las cartas (el paso de «Descartar»);
+ *   · `{ fase: 'PAYOUT' }`: el pago.
+ * Pura. Lanza si el paso no existe.
+ */
+export function paradaDePaso(mano, paso) {
+  const deMano = PASOS.filter((p) => p.mano === mano)
+  const p = deMano[paso - 1]
+  if (!p) throw new Error(`paradaDePaso: la mano ${mano} no tiene paso ${paso}`)
+  const antes = deMano.slice(0, paso - 1)
+  switch (p.cuando) {
+    case 'inicio': return { fase: 'WAITING' }
+    case 'turno': return { fase: p.fase, turno: 1 + antes.filter((q) => q.cuando === 'turno' && q.fase === p.fase && terminaTurno(q)).length }
+    case 'descarte': {
+      const sel = antes.find((q) => q.cuando === 'descarte' && q.avanza === 'seleccion')
+      return { fase: 'DISCARD', seleccion: sel ? sel.objetivo : null }
+    }
+    default: return { fase: 'PAYOUT' }
+  }
+}

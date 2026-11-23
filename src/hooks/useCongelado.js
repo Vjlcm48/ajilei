@@ -47,6 +47,11 @@ const EN_DEV = import.meta.env?.DEV ?? true
 // `celebracionCore`/`useCelebracion`—: el núcleo se prueba, el hook solo ejecuta.
 export function creaCongelador(audio = Howler) {
   let oculto = false
+  // TUT-1 T4 · la PAUSA del tutorial (P-1): un capítulo abierto desde el ⋮ congela la
+  // máquina de turnos igual que ocultarse, pero NO toca el audio —los botones de la
+  // capa suenan— ni la memoria del volumen. Congelado = oculto o pausado; el slot
+  // corre cuando no queda ninguna de las dos.
+  let pausado = false
   let volumenPrevio = null
   let diferido = null
   let avisa = () => {}
@@ -60,7 +65,7 @@ export function creaCongelador(audio = Howler) {
     oculto = true
     volumenPrevio = typeof audio.volume === 'function' ? audio.volume() : null
     if (typeof audio.volume === 'function') audio.volume(0)
-    avisa(true)
+    if (!pausado) avisa(true)
   }
 
   const restauraVolumen = () => {
@@ -78,10 +83,25 @@ export function creaCongelador(audio = Howler) {
     if (!oculto) return
     oculto = false
     restauraVolumen()
+    if (pausado) return
     avisa(false)
+    sigue()
+  }
+
+  const sigue = () => {
     const fn = diferido
     diferido = null
     if (fn) fn()
+  }
+
+  // La pausa del tutorial: sólo el estado y el slot, en el mismo orden que la vuelta.
+  const pausar = (v) => {
+    const nuevo = v === true
+    if (nuevo === pausado) return
+    pausado = nuevo
+    if (oculto) return
+    avisa(pausado)
+    if (!pausado) sigue()
   }
 
   const diferir = (fn) => {
@@ -98,16 +118,19 @@ export function creaCongelador(audio = Howler) {
   const suelta = () => {
     restauraVolumen()
     oculto = false
+    pausado = false
     diferido = null
   }
 
   return {
     ocultar,
     mostrar,
+    pausar,
     diferir,
     suelta,
     alCambiar: (fn) => { avisa = typeof fn === 'function' ? fn : () => {} },
     estaOculto: () => oculto,
+    estaPausado: () => pausado,
     hayDiferido: () => diferido !== null,
   }
 }
@@ -144,7 +167,10 @@ export function enganchaVisibilidad(ctrl, doc, win) {
 // del controlador en un estado (para las dependencias de los efectos que tienen
 // que rearmarse) y en una ref (para leerla DENTRO de un timer o un manejador,
 // donde un `congelado` capturado sería el de otro render).
-export function useCongelado() {
+//
+// TUT-1 T4 · `pausa`: con `true`, la mesa se congela aunque esté a la vista (el capítulo
+// del ⋮ abierto, P-1 de la ficha). El audio no se toca.
+export function useCongelado(pausa = false) {
   const [congelado, setCongelado] = useState(() => (typeof document !== 'undefined' && document.hidden === true))
   const congeladoRef = useRef(congelado)
 
@@ -163,6 +189,9 @@ export function useCongelado() {
       ctrl.suelta()
     }
   }, [ctrl])
+
+  // Después del enganche (los efectos corren en orden): el aviso ya llega al espejo.
+  useEffect(() => { ctrl.pausar(pausa) }, [ctrl, pausa])
 
   const diferir = useCallback((fn) => ctrl.diferir(fn), [ctrl])
 
