@@ -90,6 +90,11 @@ const TUT_GUIADA = diag('diagDSK', 'tut.guiada', 'tut', 10, ['guiada'])
 // login, «Cómo se juega» y las señales de primera vez en una mesa real (una mano y media).
 // Pasa del minuto como la guiada: en `completo`.
 const TUT_PUERTA = diag('diagDSK', 'tut.puerta', 'tut', 10, ['puerta'])
+// TUT-1 tanda 4 · «Aprender por tema» (`scripts/tut/temas.mjs`: el índice y los capítulos 1–6
+// sobre la mesa de la guiada congelada) y la fila «Cómo se juega» del ⋮ en una mesa real
+// contra las IAS (`scripts/tut/menu.mjs`). Las dos en `completo`, como las de la tanda 3.
+const TUT_TEMAS = diag('diagDSK', 'tut.temas', 'tut', 10, ['temas'])
+const TUT_MENU = diag('diagDSK', 'tut.menu', 'tut', 10, ['menu'])
 
 const OTRAS = Object.freeze([
   diag('diagCEL0', 'celebracion', 'celebracion', 20),
@@ -130,7 +135,7 @@ const sueltos = (arnes, mapa) => Object.entries(mapa).map(([m, tope]) => diag(ar
 export const PERFILES = Object.freeze({
   rapido: [...BASE],
   commit: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, HUMO],
-  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, TUT_GUIADA, TUT_PUERTA, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
+  completo: [...BASE, PESO, PUE_ESPERA, ...PVP, LEC, TUT, TUT_GUIADA, TUT_PUERTA, TUT_TEMAS, TUT_MENU, HUMO, ...sueltos('diagDSK', SUELTOS_DSK), ...PARTIDOS, ...APU, ...TAB, ...sueltos('diagPUE', SUELTOS_PUE), PUE_CONTRASTE, ...OTRAS],
 })
 
 const unica = (lista) => [...new Map(lista.map((v) => [v.id, v])).values()]

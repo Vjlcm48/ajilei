@@ -62,6 +62,9 @@
 //            rojo. Ver `scripts/tut/tut.mjs`. `tut guiada` (T2): la partida guiada entera
 //            (`scripts/tut/guiada.mjs`). `tut puerta` (T3): la oferta del primer login, «Cómo se
 //            juega» y las señales de primera vez (tut.oferta, tut.hub, tut.senales; `scripts/tut/puerta.mjs`).
+//            `tut temas` (T4): el índice de «Aprender por tema» y los capítulos 1–6 sobre la mesa
+//            congelada (`scripts/tut/temas.mjs`). `tut menu` (T4): la fila «Cómo se juega» del ⋮
+//            en una mesa real contra las IAS, por fases, con la pausa (`scripts/tut/menu.mjs`).
 //   tienda → TIE-1 1a: la tienda (estantes, lista, vitrina, ventana de compra)
 //            en seis tamaños, la puerta vitrina ↔ mesa (9 valores × 11 casos),
 //            los cuatro estados de la ventana, «No te alcanza», el ojito y lo
@@ -369,6 +372,8 @@ import { runLec } from './lec/lec.mjs'
 import { runTut } from './tut/tut.mjs'
 import { runTutGuiada } from './tut/guiada.mjs'
 import { runTutPuerta } from './tut/puerta.mjs'
+import { runTutTemas } from './tut/temas.mjs'
+import { runTutMenu } from './tut/menu.mjs'
 import { sembrarAzar, AVISO_SEMILLA } from './arnes/siembra.mjs'
 import { commitDelArbol } from './arnes/fuente.mjs'
 // ARN-3b · D2 · el bucle de autojuego es uno solo, en el terreno común.
@@ -15620,7 +15625,9 @@ try {
     const sub = process.argv[3]
     report.tut = sub === 'guiada' ? await runTutGuiada(browser, { base: BASE })
       : sub === 'puerta' ? await runTutPuerta(browser, { base: BASE })
-        : await runTut(browser, { base: BASE })
+        : sub === 'temas' ? await runTutTemas(browser, { base: BASE })
+          : sub === 'menu' ? await runTutMenu(browser, { base: BASE })
+            : await runTut(browser, { base: BASE })
   }
 } catch (e) {
   report.error = String(e && e.stack || e)

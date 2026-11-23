@@ -77,6 +77,11 @@ describe('A4 · los perfiles', () => {
     // TUT-1 tanda 3 · la puerta (oferta, «Cómo se juega» y señales) también pasa del minuto.
     expect(ids(completo)).toContain('tut.puerta')
     expect(ids(commit)).not.toContain('tut.puerta')
+    // TUT-1 T4 · «Aprender por tema» y la fila del ⋮, también en `completo` y fuera de `commit`.
+    for (const v of ['tut.temas', 'tut.menu']) {
+      expect(ids(completo)).toContain(v)
+      expect(ids(commit)).not.toContain(v)
+    }
   })
   it('vitest pasa por el lanzador', () => {
     expect(rapido.find((v) => v.id === 'vitest').args[0]).toBe('scripts/arnes/vitest.mjs')

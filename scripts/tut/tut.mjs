@@ -23,6 +23,13 @@
 //
 // Control rojo: `TUT_CONTROL=sin-hueco` cierra los agujeros de la máscara del velo y le deja
 // recibir el toque: tut.hueco y tut.toque tienen que salir rojos.
+//
+// TUT-1 T4 · y también SOBRE LA MESA DE LA GUIADA congelada (un capítulo de «Aprender por
+// tema», el 5 en su paso 1: la mano 1 en tu primer turno, `guia/momento.js`):
+//   · tut.mesa      Δ 0 de todas las cajas de `#root` con la capa y sin ella, en los tres
+//                   tamaños (la capa y la muestra pintan encima de la mesa congelada).
+// Control rojo: `TUT_CONTROL=caja-movida` mueve la caja del pozo 3 px mientras se mide «con
+// capa» (una mesa con una caja movida): tut.mesa tiene que salir roja.
 import process from 'node:process'
 
 const T = {
@@ -34,7 +41,10 @@ const MESA = '/?pvp=turno-propio&n=3'
 const PAUSA = '*,*::before,*::after{animation-play-state:paused!important;transition:none!important;caret-color:transparent!important}'
 const CONTROLES = {
   'sin-hueco': '.tut-velo .tut-velo-hueco { fill: white } .tut-velo { pointer-events: auto } .tut-velo .tut-velo-fondo { pointer-events: all }',
+  // T4 · sólo lo usa `tut.mesa`: la caja del pozo, 3 px a la derecha, durante la foto «con capa».
+  'caja-movida': '',
 }
+const CAJA_MOVIDA = 'html[data-tut-control] [data-ancla="pozo"] { margin-left: 3px !important }'
 const PASO_2 = {
   ancla: ['[data-accion="apostar"]', '[data-accion="mult"]'],
   rotulo: 'tut.cap5.p2',
@@ -303,25 +313,84 @@ async function celda(page, base, tam, vp, control) {
   return out
 }
 
+// ── T4 · la mesa de la guiada congelada, bajo un capítulo ───────────────────
+async function celdaMesa(page, base, tam, vp, control) {
+  const out = { fallos: [] }
+  const tocar = async (sel) => {
+    const p = await page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 } }, sel)
+    if (!p) throw new Error(`no está «${sel}»`)
+    if (vp.movil) await page.touchscreen.tap(p.x, p.y)
+    else await page.mouse.click(p.x, p.y)
+  }
+  await page.goto(`${base}/`, { waitUntil: 'networkidle' })
+  await page.waitForSelector('main.lobby [data-accion="reglas"]', { timeout: 20000 })
+  await tocar('[data-accion="reglas"]')
+  await page.waitForSelector('[data-accion="csj-temas"]', { timeout: 15000 })
+  await tocar('[data-accion="csj-temas"]')
+  await page.waitForSelector('.tem-fila[data-capitulo="5"]', { timeout: 15000 })
+  await tocar('.tem-fila[data-capitulo="5"]')
+  await page.waitForSelector('.tut-capa[data-listo]', { timeout: 20000 })
+  if (control === 'caja-movida') await page.addStyleTag({ content: CAJA_MOVIDA })
+  if (!vp.movil) await page.mouse.move(1, 1)
+  const estilo = await page.addStyleTag({ content: PAUSA })
+  let d = null
+  for (let k = 0; k < 6 && !d; k++) {
+    const sin = async () => {
+      const o = await page.addStyleTag({ content: '.tut-capa, .tut-capa *, .muestra, .muestra * { visibility: hidden !important }' })
+      const c = await page.evaluate(CAJAS)
+      await o.evaluate((e) => e.remove())
+      return c
+    }
+    const s1 = await sin()
+    if (control === 'caja-movida') await page.evaluate(() => { document.documentElement.dataset.tutControl = '' })
+    const con = await page.evaluate(CAJAS)
+    await page.evaluate(() => { delete document.documentElement.dataset.tutControl })
+    const s2 = await sin()
+    if (deltaCajas(s1, s2).max === 0) d = { ...deltaCajas(s2, con), n: con.length }
+    else await page.waitForTimeout(250)
+  }
+  await estilo.evaluate((e) => e.remove())
+  out.delta = d
+  if (!d) out.fallos.push(`${tam} tut.mesa: la mesa congelada no se quedó quieta para medir`)
+  else if (d.max !== 0) out.fallos.push(`${tam} tut.mesa: Δ ${d.max} sobre ${d.n} cajas`)
+  return out
+}
+
+function deltaCajas(a, b) {
+  if (a.length !== b.length) return { max: Infinity }
+  let max = 0
+  a.forEach((c, i) => c.forEach((v, k) => { max = Math.max(max, Math.abs(v - b[i][k])) }))
+  return { max: +max.toFixed(2) }
+}
+
 export async function runTut(browser, { base }) {
   const t0 = Date.now()
   const control = process.env.TUT_CONTROL || null
-  if (control && !CONTROLES[control]) throw new Error(`TUT_CONTROL=${control}: vale «${Object.keys(CONTROLES).join('», «')}»`)
+  if (control && !(control in CONTROLES)) throw new Error(`TUT_CONTROL=${control}: vale «${Object.keys(CONTROLES).join('», «')}»`)
   const celdas = {}
   const fallos = []
   await Promise.all(Object.entries(T).map(async ([tam, vp]) => {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, ...(vp.movil ? { hasTouch: true, isMobile: true } : {}), deviceScaleFactor: 1 })
     const page = await ctx.newPage()
     try {
-      celdas[tam] = await celda(page, base, tam, vp, control)
+      celdas[tam] = await celda(page, base, tam, vp, control === 'caja-movida' ? null : control)
       fallos.push(...celdas[tam].fallos)
     } catch (e) {
       fallos.push(`${tam}: el recorrido se cortó: ${String(e?.message || e).split('\n')[0].slice(0, 160)}`)
+    }
+    // T4 · la mesa de la guiada congelada, en una página nueva del mismo aparato.
+    try {
+      const otra = await ctx.newPage()
+      const m = await celdaMesa(otra, base, tam, vp, control)
+      if (celdas[tam]) celdas[tam].mesa = m.delta
+      fallos.push(...m.fallos)
+    } catch (e) {
+      fallos.push(`${tam} tut.mesa: el recorrido se cortó: ${String(e?.message || e).split('\n')[0].slice(0, 160)}`)
     } finally { await ctx.close() }
   }))
   const verde = fallos.length === 0 && Object.keys(celdas).length === Object.keys(T).length
   const ms = Date.now() - t0
-  const resumen = Object.entries(celdas).map(([tam, c]) => `${tam} Δ ${c.delta?.conCapa.max} sobre ${c.delta?.conCapa.n}`).join(' · ')
+  const resumen = Object.entries(celdas).map(([tam, c]) => `${tam} Δ ${c.delta?.conCapa.max} sobre ${c.delta?.conCapa.n} · mesa Δ ${c.mesa?.max} sobre ${c.mesa?.n}`).join(' · ')
   console.log(`  tut · ${verde ? 'VERDE' : 'ROJO'} · ${resumen} · ${(ms / 1000).toFixed(0)} s${control ? ` · CONTROL ${control}` : ''}`)
   for (const f of fallos) console.log(`    ✗ ${f}`)
   return { verde, ms, control, fallos, celdas }
