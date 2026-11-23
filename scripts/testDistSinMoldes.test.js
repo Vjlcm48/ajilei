@@ -87,6 +87,9 @@ const PROHIBIDAS = [
   'montarLaminaTut',
   'relojQuietoTut',
   'mesaTut',
+  // TUT-1 tanda 4 · «Aprendemos», el título de la oferta en la lámina: ya no existe en el
+  // repo y se queda prohibido para que no vuelva (estaba en la lista de abajo).
+  'Aprendemos',
 ]
 
 // TUT-1 tanda 1 · las otras seis marcas que la lámina buscó en `dist/`: las de la capa, la
@@ -98,10 +101,10 @@ const PROHIBIDAS = [
 // TUT-1 tanda 3 · salen las de la oferta (`ofg-tarjeta`, `tut.oferta`): el lobby la monta
 // (su trozo, `components/PuertaGuiada.jsx`). «Aprendemos» era su título de la lámina y ya no
 // existe en el repo; se queda prohibida para que no vuelva. Queda el capítulo 5 (tanda 4).
-const PROHIBIDAS_HASTA_MONTAR = [
-  'Aprendemos',
-  'tut.cap5',
-]
+// TUT-1 tanda 4 · sale `tut.cap5`: «Aprender por tema» monta sus capítulos (el trozo del
+// tutorial, `guia/Capitulo.jsx`). «Aprendemos» pasa a las de siempre, arriba. La lista
+// queda vacía de marcas del tutorial.
+const PROHIBIDAS_HASTA_MONTAR = []
 
 // Y las que SÍ tienen que estar: la lectura de verdad y, desde ECO-1c, las
 // funciones de mesa de verdad (la falsa no puede ser la única que llega).

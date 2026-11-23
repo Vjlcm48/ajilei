@@ -153,6 +153,9 @@
 /* En la burbuja, el «paso n de m» va dentro y la barra lleva sólo botones: así
    cabe en una línea a 360 de ancho y se queda abajo (lámina §5-b). */
 .tut-paso--burbuja { display: block; margin-top: 6px; text-align: right; }
+/* TUT-1 T4 · la línea pequeña bajo el rótulo (la suma; «Tu reloj sigue corriendo» entre
+   personas, P-1). Fuera del techo de dos líneas: lo mide la `p`, no esto. */
+.tut-nota { display: block; margin-top: 4px; font-size: 13px; color: var(--gold-brand); }
 .tut-controles-botones { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; }
 .tut-barra {
   position: fixed;
@@ -166,6 +169,15 @@
   pointer-events: auto;
 }
 .tut-barra .tut-controles { margin-top: 0; }
+/* TUT-1 T4 · la barra fija de los capítulos, acostado bajo: en columna, arriba a la
+   izquierda («Siguiente» o «Terminar» arriba, «Volver» debajo; mismo ancho). */
+.tut-barra--columna .tut-controles-botones { flex-direction: column-reverse; align-items: stretch; flex-wrap: nowrap; }
+/* Su tarjeta no lleva botones: el texto y el «paso n de m» en una fila si caben, para que
+   quepa acostado entre dos huecos (la mano revelada y las cartas propias, capítulo 4). */
+.tut-rotulo--fila { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; max-width: min(520px, calc(100vw - 24px)); }
+.tut-rotulo--fila .tut-rotulo-texto { flex: 1 1 auto; }
+.tut-rotulo--fila .tut-nota { flex-basis: 100%; }
+.tut-rotulo--fila .tut-paso--burbuja { margin: 0 0 0 auto; }
 
 /* Piso táctil de 44 (INV-07), como el lobby y el menú. */
 .tut-btn {

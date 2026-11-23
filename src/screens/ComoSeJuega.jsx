@@ -5,6 +5,8 @@ import { sumarTextos, t } from '../config/textos'
 import { TEXTOS_TUT_COMUNES, TEXTOS_TUT_HUB } from '../config/textos.tut.es'
 import { montoTexto } from '../config/tapetes'
 import { crearGuiadaApi, premioDisponible } from '../lib/guiadaApi'
+import IndiceTemas from './IndiceTemas'
+import { tomarVuelta } from '../guia/vuelta'
 import '../styles/comoSeJuega.css'
 
 // ── TUT-1 T3 · La pantalla «Cómo se juega» ─────────────────────────────────
@@ -18,7 +20,9 @@ import '../styles/comoSeJuega.css'
 //   1. «Partida guiada» · «3 manos · 2 min» · la cifra del servidor («Gana 2.000 HC»)
 //      o «✓ Hecha». Toca → la mesa guiada (la rama `guiada` de la tanda 2). Es la única
 //      con el oro sólido (regla del oro único).
-//   2. «Aprender por tema» · «Pronto» (los diez capítulos, tanda 4).
+//   2. «Aprender por tema» · los diez capítulos (tanda 4): abre el índice (`IndiceTemas`),
+//      una vista de ESTA pantalla —su flecha vuelve a las tarjetas—, y un capítulo vuelve
+//      aquí, al índice (`guia/vuelta.js`). Así `App` no lleva una rama más (`1.8b`).
 //   3. «Pregúntale a Mia» · «Pronto» (ASI-1).
 // Lo que aún no existe dice «Pronto» en la tarjeta y con el toast del lobby al tocarla.
 //
@@ -27,8 +31,9 @@ import '../styles/comoSeJuega.css'
 
 sumarTextos('es', { ...TEXTOS_TUT_COMUNES, ...TEXTOS_TUT_HUB })
 
-export default function ComoSeJuega({ cliente = null, cuenta, billetera, aviso, onAvisoFin, onVolver, onLobby, onGuiada }) {
+export default function ComoSeJuega({ cliente = null, cuenta, billetera, aviso, onAvisoFin, onVolver, onLobby, onGuiada, onCapitulo }) {
   const api = useMemo(() => crearGuiadaApi(cliente ?? undefined), [cliente])
+  const [temas, setTemas] = useState(tomarVuelta)
   const [estado, setEstado] = useState(null)
   const carcasa = useRef(null)
 
@@ -39,6 +44,12 @@ export default function ComoSeJuega({ cliente = null, cuenta, billetera, aviso, 
   }, [api])
 
   const pronto = () => carcasa.current?.avisar('lob.toast.pronto')
+  if (temas) {
+    return (
+      <IndiceTemas cuenta={cuenta} billetera={billetera} aviso={aviso} onAvisoFin={onAvisoFin}
+        onVolver={() => setTemas(false)} onLobby={onLobby} onCapitulo={onCapitulo} />
+    )
+  }
   const premio = premioDisponible(estado)
     ? t('tut.hub.guiada.premio', { monto: montoTexto(estado.monto) })
     : estado?.estado === 'cobrado' ? t('tut.hub.guiada.hecha') : null
@@ -72,12 +83,11 @@ export default function ComoSeJuega({ cliente = null, cuenta, billetera, aviso, 
           </button>
         </li>
         <li>
-          <button type="button" className="csj-tarjeta" data-accion="csj-temas" onClick={pronto}>
+          <button type="button" className="csj-tarjeta" data-accion="csj-temas" onClick={() => setTemas(true)}>
             <IconoLibro className="csj-ico" />
             <span className="csj-tarjeta-txt">
               <span className="csj-tarjeta-titulo">{t('tut.hub.temas.titulo')}</span>
               <span className="csj-tarjeta-sub">{t('tut.hub.temas.sub')}</span>
-              <span className="csj-pronto">{t('tut.hub.pronto')}</span>
             </span>
           </button>
         </li>

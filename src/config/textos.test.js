@@ -493,6 +493,7 @@ describe('TUT-1 tanda 1 · los textos del tutorial viajan con su trozo (INV-84)'
   })
 
   it('el capítulo 5 dice los multiplicadores de verdad (normativo v1.0, hallazgo 2 de la lámina)', () => {
-    expect(TEXTOS_TUT_ES['tut.cap5.p2']).toContain('×1, ×2, ×5 y ×10')
+    // v1.5 (TUT-1 T4, STOP-T): el paso de la v1.4 se partió en dos; los multiplicadores, en el 3.
+    expect(TEXTOS_TUT_ES['tut.cap5.p3']).toContain('×1, ×2, ×5 y ×10')
   })
 })

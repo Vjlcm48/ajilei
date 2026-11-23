@@ -346,6 +346,10 @@ function FlyingCard({ fromX, fromY, toX, toY, w, h, duration = VUELO_REPARTO_S, 
 // siempre con `game`. Con ella la mesa no mueve el motor: pinta la vista del servidor y
 // manda las jugadas por `enviar`. Cada guarda dice `partida` y, contra las IAS, es falsa:
 // ningún hook cambia de sitio y ninguna tirada cambia (Fase 0 de MES-PvP, §B.1-B.2).
+// TUT-1 T4 · la muestra de cartas de los capítulos (P-4) viaja en ESTE trozo, con
+// `PlayingCard`: el capítulo la pide por `lib/cargarMesa` (`guia/Capitulo.jsx`).
+export { default as MuestraCartas } from '../guia/MuestraCartas'
+
 // TUT-1 T2 · `guion`: la partida guiada (GUI-1), `null` en toda otra mesa. Lo arma
 // `screens/Guiada.jsx` con `lib/guiaManos`: su lista de asientos, el mazo dado de cada
 // mano (`armar`), la decisión de los rivales (`decidir`) y su capa (`Control`). Con él
@@ -455,7 +459,14 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // `congelado` es para las DEPENDENCIAS de los efectos que deben rearmarse al
   // volver; `congeladoRef` es para leer la verdad DENTRO de un timer o un
   // manejador, donde el valor capturado sería el de otro render.
-  const { congelado, congeladoRef, diferir } = useCongelado()
+  // TUT-1 T4 · «Cómo se juega» desde el ⋮ (P-1, P-2): `{ fase, barajando }` del momento en
+  // que se tocó la fila (el trozo del tutorial decide si es un capítulo o el índice);
+  // `null`, nada abierto. Contra las IAS
+  // la máquina de turnos se PAUSA mientras está abierto (la IA no juega, el reloj no
+  // corre); entre personas el reloj es del servidor y no espera. La mesa de un capítulo
+  // (`guion.pausa`) nace en pausa y así se queda.
+  const [tutorial, setTutorial] = useState(null)
+  const { congelado, congeladoRef, diferir } = useCongelado(!!guion?.pausa || (!!tutorial && !partida))
   // TAB-1 · la escala vive SOLO mientras la mesa está montada (src/lib/escala.js).
   useEscalaMesa()
 
@@ -612,7 +623,7 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
   // sin una línea nueva: girar el teléfono cierra el panel.
   // CFG-1 1e · el alto del panel sale de las filas que montan (5 contra las
   // IAS, 4 sin «Partida rápida»): de ahí sale la pinza.
-  const utilMenu = useUtilitiesMenu(true, filasDelPanel(contraIAS))
+  const utilMenu = useUtilitiesMenu(true, filasDelPanel(contraIAS, !guion))
   // SUP-2b dejaba aquí el panel de Cuenta y el Bautizo en edición. CFG-1 1e los
   // retira de la mesa: el perfil tiene sus tres puertas desde la 1b (P-1).
   //
@@ -1788,6 +1799,21 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
     import('../screens/Guiada').then((m) => { if (vivo) setSenales(() => m.SenalesPrimeraVez) }).catch(() => {})
     return () => { vivo = false }
   }, [conSenales])
+
+  // ── TUT-1 T4 · La fila «Cómo se juega» del ⋮ ───────────────────────────────
+  // El capítulo y el índice viajan en el trozo del tutorial (el de la guiada), como las
+  // señales: se piden al tocar la fila (el lobby ya los trajo al aterrizar). La fase se
+  // lee al tocar: reparto → 3 · apuesta → 5 · descarte → 3 en su paso · revelación → 4;
+  // fuera de ellas, el índice (`capituloDeFase`). Sin red, la fila no abre nada.
+  const [TutorialMesa, setTutorialMesa] = useState(null)
+  const abrirTutorial = () => {
+    const abierto = { fase: gameRef.current?.phase ?? phase, barajando: isShuffling }
+    import('../screens/Guiada').then((m) => {
+      setTutorialMesa(() => m.TutorialMesa)
+      setTutorial(abierto)
+    }).catch(() => {})
+  }
+  const cerrarTutorial = () => setTutorial(null)
 
   // ── APU-1 §4.2 · LAS CAPAS DEL POZO, Y LA FRASE QUE LAS CUENTA ─────────
   // Sólo en el pago: durante la mano el pozo se enseña entero, que es como se
@@ -3058,7 +3084,8 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
         // abre este archivo en su hook de orientación—, así que la ausencia de
         // «Partida rápida» contra humanos se decide aquí (CFG-1 1e, INV-70).
         // `null` = montan todas.
-        presentes={presentesDe(contraIAS)}
+        presentes={presentesDe(contraIAS, !guion)}
+        onTutorial={abrirTutorial}
       />
 
       {/* DSK-U3 · popup del valor de "Mano actual". Vive AQUÍ y no dentro del
@@ -3135,7 +3162,12 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
       )}
 
       {/* TUT-1 T3 · las tres pistas de primera vez: sin velo, el reloj sigue corriendo. */}
-      {conSenales && Senales && (
+      {/* TUT-1 T4 · el capítulo de la fase, sobre esta mesa viva, o el índice entre manos. */}
+      {tutorial && TutorialMesa && (
+        <TutorialMesa fase={tutorial.fase} barajando={tutorial.barajando} game={game} pvp={!!partida} onCerrar={cerrarTutorial} />
+      )}
+
+      {conSenales && Senales && !tutorial && (
         <Senales
           iniciable={phase === PHASES.WAITING && !isShuffling && !recarga}
           turno={isPlayerTurn}

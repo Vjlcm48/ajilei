@@ -36,6 +36,9 @@ sumarTextos('es', { ...TEXTOS_TUT_COMUNES, ...TEXTOS_TUT_GUIADA })
 export { default as ComoSeJuega } from './ComoSeJuega'
 export { default as PuertaGuiada } from '../components/PuertaGuiada'
 export { default as SenalesPrimeraVez } from '../components/SenalesPrimeraVez'
+// TUT-1 T4 · «Aprender por tema»: el índice, los capítulos y lo que abre la fila del ⋮.
+export { default as Capitulo } from '../guia/Capitulo'
+export { default as TutorialMesa } from '../guia/TutorialMesa'
 
 export default function Guiada({ onLobby, onJugar, onSaldo }) {
   const [fase, setFase] = useState('mesa')

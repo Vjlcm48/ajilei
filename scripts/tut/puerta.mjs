@@ -7,10 +7,10 @@
 //                  una mano jugada, sin esa frase); no sale tras «Ahora no» (ni al recargar),
 //                  ni con el premio cobrado, ni con sala pendiente; Δ 0 del lobby; los dos
 //                  botones con piso de 44; el texto, en dos líneas como mucho.
-//   · tut.hub      «Cómo se juega»: las tres tarjetas (guiada, temas, Mia), «Pronto» en las
-//                  dos que no existen (y su aviso al tocarlas), la cifra del servidor o «✓
-//                  Hecha», el piso de 44, una por fila en el teléfono vertical y en fila en la
-//                  PC, y la guiada se abre desde su tarjeta.
+//   · tut.hub      «Cómo se juega»: las tres tarjetas (guiada, temas, Mia), «Pronto» sólo en
+//                  la de Mia (y su aviso al tocarla; T4: «Aprender por tema» abre el índice), la
+//                  cifra del servidor o «✓ Hecha», el piso de 44, una por fila en el teléfono
+//                  vertical y en fila en la PC, y la guiada se abre desde su tarjeta.
 //   · tut.senales  en una mesa real de 3 contra las IAS: cada pista (iniciar, turno de apuesta,
 //                  descarte) sale una vez, se apaga con su acción y no vuelve en la mano
 //                  siguiente; Δ 0 de `#root` con la pista; no tapa el reloj de turno, que
@@ -232,7 +232,8 @@ async function celda(browser, base, tam, vp) {
     if (hub.length !== 3 || g?.accion !== 'csj-guiada' || temas?.accion !== 'csj-temas' || mia?.accion !== 'csj-mia') falla('tut.hub', `tarjetas ${JSON.stringify(hub.map((x) => x.accion))}`)
     else {
       if (g.premio !== premioEsperado || !g.premioVisible) falla('tut.hub', `la guiada dice «${g.premio}» (visible ${g.premioVisible}); se esperaba «${premioEsperado}»`)
-      if (!temas.pronto || !mia.pronto || g.pronto) falla('tut.hub', '«Pronto» fuera de su sitio')
+      // TUT-1 T4 · «Aprender por tema» ya existe: sólo Mia dice «Pronto».
+      if (temas.pronto || !mia.pronto || g.pronto) falla('tut.hub', '«Pronto» fuera de su sitio')
       if (!g.oro || temas.oro || mia.oro) falla('tut.hub', 'el oro sólido no es sólo el de la guiada')
       const chicas = hub.filter((x) => x.h < 44 || x.w < 44)
       if (chicas.length) falla('tut.hub', `bajo el piso de 44: ${chicas.map((x) => `${x.accion} ${x.w}×${x.h}`).join(', ')}`)
@@ -245,9 +246,17 @@ async function celda(browser, base, tam, vp) {
     }
     if (!query) {
       await page.evaluate(() => document.querySelectorAll('style').forEach((s) => { if (s.textContent.includes('animation-play-state:paused')) s.remove() }))
-      await tocar('[data-accion="csj-temas"]')
+      await tocar('[data-accion="csj-mia"]')
       const aviso = await page.waitForFunction(() => document.querySelector('.sal-toast.is-on')?.textContent.trim() ?? null, null, { timeout: 3000 }).then((x) => x.jsonValue()).catch(() => null)
-      if (!aviso) falla('tut.hub', '«Aprender por tema» no avisó «Pronto»')
+      if (!aviso) falla('tut.hub', '«Pregúntale a Mia» no avisó «Pronto»')
+      // T4 · «Aprender por tema» abre el índice (lo recorre `tut temas`); de vuelta, la guiada.
+      await tocar('[data-accion="csj-temas"]')
+      const indice = await page.waitForSelector('.tem-fila[data-capitulo="1"]', { timeout: 15000 }).catch(() => null)
+      if (!indice) falla('tut.hub', '«Aprender por tema» no abrió el índice')
+      else {
+        await tocar('[data-accion="volver"]')
+        await page.waitForSelector('[data-accion="csj-guiada"]', { timeout: 15000 })
+      }
       await tocar('[data-accion="csj-guiada"]')
       const capa = await page.waitForSelector('.tut-capa[data-listo]', { timeout: 20000 }).catch(() => null)
       if (!capa) falla('tut.hub', 'la tarjeta de la guiada no abrió la guiada')

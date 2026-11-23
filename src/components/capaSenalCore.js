@@ -157,11 +157,12 @@ export function lineasDe(alto, linea) {
  * @param {object} hueco             lo que señala (la unión de sus huecos)
  * @returns {{caja:object, lado:'arriba'|'abajo', picoX:number}}
  */
-export function colocarBurbuja({ tam, hueco, vista, radio = 12 }) {
+export function colocarBurbuja({ tam, hueco, vista, radio = 12, lado = null }) {
   const cx = hueco.left + hueco.width / 2
   const left = encajar(cx - tam.w / 2, BORDE, vista.w - BORDE - tam.w)
   const arriba = hueco.top - SEPARACION - tam.h
-  const cabeArriba = arriba >= BORDE
+  // `lado` (TUT-1 T4, barra fija): el otro lado, cuando el primero pisa la barra.
+  const cabeArriba = lado ? lado === 'arriba' : arriba >= BORDE
   const top = cabeArriba ? arriba : Math.min(hueco.bottom + SEPARACION, vista.h - BORDE - tam.h)
   const picoX = encajar(cx - left, radio + 8, tam.w - radio - 8)
   return { caja: caja(left, top, tam.w, tam.h), lado: cabeArriba ? 'arriba' : 'abajo', picoX }
@@ -191,6 +192,42 @@ export function colocarRespaldo({ tam, huecos, vista, techo = BORDE }) {
   const abajo = caja(left, Math.max(BORDE, vista.h - BORDE - tam.h), tam.w, tam.h)
   if (!(huecos ?? []).some((h) => solape(abajo, h) > 0)) return abajo
   return caja(left, Math.max(BORDE, techo), tam.w, tam.h)
+}
+
+// ── TUT-1 T4 · LA BARRA FIJA de los capítulos (STOP-T, Victor en el S25) ──────
+// La barra es un obstáculo para la burbuja, como el reloj para las señales: nunca se
+// pisan. Su sitio depende SÓLO de la ventana, así que no se mueve de paso en paso:
+//   · acostado bajo (más ancho que alto y menos de 600 de alto): en columna, arriba a
+//     la izquierda (sobre la marca; abajo están la pila, las cartas y la fila);
+//   · en el resto: en fila, abajo a la izquierda (abajo a la derecha está la pila).
+// Si la burbuja no tiene sitio, cae a la tarjeta fija (`colocarTarjeta`) y la barra se queda.
+export const ALTO_ACOSTADO = 600
+export const barraEnColumna = (vista) => vista.w > vista.h && vista.h < ALTO_ACOSTADO
+
+/** El sitio de la barra fija: sólo de la ventana y de su tamaño. */
+export function colocarBarraFija({ tam, vista }) {
+  if (barraEnColumna(vista)) return caja(BORDE, BORDE, tam.w, tam.h)
+  return caja(BORDE, Math.max(BORDE, vista.h - BORDE - tam.h), tam.w, tam.h)
+}
+
+/**
+ * La tarjeta fija con barra fija: abajo y centrada; si pisa algo (los huecos, la barra,
+ * «Cerrar»), arriba bajo `techo`; si tampoco, la primera altura libre de abajo arriba;
+ * si no hay ninguna, la que menos pisa.
+ */
+export function colocarTarjeta({ tam, obstaculos, vista, techo = BORDE }) {
+  const left = encajar((vista.w - tam.w) / 2, BORDE, vista.w - BORDE - tam.w)
+  const bajo = Math.max(BORDE, vista.h - BORDE - tam.h)
+  const alturas = [bajo, Math.max(BORDE, techo)]
+  for (let y = bajo; y >= BORDE; y -= 4) alturas.push(y)
+  let mejor = null
+  for (const top of alturas) {
+    const c = caja(left, top, tam.w, tam.h)
+    const pisa = (obstaculos ?? []).reduce((s, o) => s + solape(c, o), 0)
+    if (pisa === 0) return c
+    if (!mejor || pisa < mejor.pisa) mejor = { c, pisa }
+  }
+  return mejor.c
 }
 
 /**

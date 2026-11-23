@@ -29,6 +29,8 @@ export const TEXTOS_TUT_COMUNES = {
   // «Salir» (v1.3 §1.1): arriba a la derecha, aparte; en los capítulos el mismo botón dice «Cerrar».
   'tut.ctl.salir':     'Salir',
   'tut.ctl.paso':      'Paso {n} de {m}',
+  // TUT-1 T4 · el último paso de un capítulo (P-5): pone el ✓; «Cerrar» no.
+  'tut.ctl.terminar':  'Terminar',
   'tut.capa.aria':     'Cómo se juega',
   'tut.guiada.nombre': 'Partida guiada',
   // La primera fila del índice de «Cómo se juega» (§1.2) y la marca de visto (§2.1).
@@ -72,15 +74,94 @@ export const TEXTOS_TUT_HUB = {
 export const TEXTOS_TUT_CAP5 = {
   'tut.cap5.titulo': 'Apostar, pasar, retirarse',
   'tut.cap5.p1': '**Pasar** no cuesta: dejas que sigan los demás.',
-  // v1.0 del normativo: los multiplicadores de verdad (la lámina decía «×2, ×3…», hallazgo 2).
-  'tut.cap5.p2': '**Apostar** mete monedas al pozo. ×1, ×2, ×5 y ×10 son cuántas apuestas pones.',
-  'tut.cap5.p3': 'Si alguien apostó, **Igualar** es pagar lo mismo para seguir.',
+  // v1.5 · partido en dos pasos en la tanda 4 (STOP-T: los dos aros se montaban). v1.4, un paso:
+  // «**Apostar** mete monedas al pozo. ×1, ×2, ×5 y ×10 son cuántas apuestas pones.» El capítulo
+  // queda de 7 pasos. Los multiplicadores, los de verdad (normativo v1.0, hallazgo 2 de la lámina).
+  'tut.cap5.p2': '**Apostar** mete monedas al pozo.',
+  'tut.cap5.p3': '**×1, ×2, ×5 y ×10** son cuántas apuestas pones.',
+  'tut.cap5.p4': 'Si alguien apostó, **Igualar** es pagar lo mismo para seguir.',
   // Cuando el botón no está montado (no hay apuesta que igualar), el paso señala el hueco de la fila.
-  'tut.cap5.p3.hueco': 'Cuando alguien apuesta, aquí sale **Igualar**: pagar lo mismo para seguir.',
-  'tut.cap5.p4': '**Subir** es pagar más y obligar a los demás a decidir.',
-  'tut.cap5.p4.hueco': 'Cuando alguien apuesta, aquí sale **Subir**: pagar más y obligar a los demás a decidir.',
-  'tut.cap5.p5': '**Retirarse** es salir de la mano. Pierdes lo que ya pusiste, no más.',
-  'tut.cap5.p6': 'Lo que está en gris no te alcanza o no se puede ahora.',
+  'tut.cap5.p4.hueco': 'Cuando alguien apuesta, aquí sale **Igualar**: pagar lo mismo para seguir.',
+  'tut.cap5.p5': '**Subir** es pagar más y obligar a los demás a decidir.',
+  'tut.cap5.p5.hueco': 'Cuando alguien apuesta, aquí sale **Subir**: pagar más y obligar a los demás a decidir.',
+  'tut.cap5.p6': '**Retirarse** es salir de la mano. Pierdes lo que ya pusiste, no más.',
+  'tut.cap5.p7': 'Lo que está en gris no te alcanza o no se puede ahora.',
+}
+
+// ── TUT-1 T4 · «Aprender por tema»: el índice y los capítulos 1 a 6 (normativo §2.2) ──
+// Los rótulos, tal cual el normativo. Los títulos de los diez van aquí (el índice los
+// lista todos); los pasos de 7 a 10, con la tanda 5. El capítulo 5 sigue en su grupo.
+export const TEXTOS_TUT_TEMAS = {
+  'tut.temas.pista.a': 'El juego',
+  'tut.temas.pista.b': 'Apostar',
+  'tut.temas.pista.c': 'La app',
+  'tut.temas.cap':     'Capítulo {n}',
+  // Las dos líneas pequeñas bajo el rótulo (`nota` de la capa).
+  'tut.temas.suma':    'Suma: {n}',
+  'tut.temas.reloj':   'Tu reloj sigue corriendo.',
+
+  'tut.cap1.titulo': '¿Qué es AJILEI?',
+  'tut.cap1.p1': 'Esto es un AJILEI: 51 puntos. La jugada que gana en seco.',
+  'tut.cap1.p2': 'Baraja española: 40 cartas. Oros, copas, espadas y bastos.',
+  'tut.cap1.p3': 'Se juega de 2 a 5. Contra las IAS o con otras personas.',
+  'tut.cap1.p4': 'Se apuesta con Heptacoins. Nunca con dinero real.',
+
+  'tut.cap2.titulo': 'Cuánto vale cada carta',
+  // v1.5 · reescritos en la tanda 4 (STOP-T, Victor). v1.4: «El As vale 11.» y «El 6 vale 6 y el
+  // 7 vale 7.»
+  'tut.cap2.p1': 'El As, de cualquier palo, vale **11**.',
+  'tut.cap2.p2': 'El 6 vale **6** y el 7 vale **7**, de cualquier palo.',
+  'tut.cap2.p3': 'Todo lo demás vale **10**: las figuras y también el 2, el 3, el 4 y el 5.',
+  'tut.cap2.p4': '**Solo suman las del mismo palo.**',
+  'tut.cap2.p5': 'Tu suma es la del mejor palo que tengas. Cuantas más cartas del palo, más sumas.',
+  // v1.5 · partido en dos pasos en la tanda 4 (STOP-T, Victor: el texto completo, dos líneas cada
+  // uno; antes se acortó a «Con 4 y 5, el 7 de Oro es comodín…»). v1.4, un paso: «En las mesas de
+  // 4 y 5, el 7 de Oro es comodín: se junta con cualquier palo. Vale 10 con 4 y 11 con 5.» El
+  // capítulo queda de 7 pasos.
+  'tut.cap2.p6': '**En mesas de 4 y 5 jugadores**, el 7 de Oro es comodín de cualquier palo.',
+  // «10 puntos» y «11 puntos» con espacio duro: la cifra no se queda sola al final de una línea.
+  'tut.cap2.p7': 'Vale **10\u00a0puntos** con 4 jugadores y **11\u00a0puntos** con 5.',
+
+  'tut.cap3.titulo': 'Cómo va una mano',
+  'tut.cap3.p1': 'Primero recibes dos.',
+  'tut.cap3.p2': 'Se apuesta.',
+  'tut.cap3.p3': 'Llegan tres más. Se apuesta otra vez.',
+  'tut.cap3.p4': '**Quédate con tu mejor palo** y cambia el resto. Puedes cambiar hasta {tope}.',
+  'tut.cap3.p5': 'Tocas las que cambias y luego **Descartar**. Te reponen una a una.',
+  'tut.cap3.p6': 'Se apuesta por última vez.',
+  'tut.cap3.p7': 'Se muestran las cartas. Gana la suma más alta.',
+
+  'tut.cap4.titulo': 'Cómo se gana y cómo se pierde',
+  'tut.cap4.p1': '**AJILEI**: As y cuatro de diez del mismo palo, 51 puntos.',
+  // v1.5 · acortado (tres líneas): sale «Solo hay uno.».
+  'tut.cap4.p2': 'En la mesa de 5, As, tres de diez y el 7 de Oro suman **52**. Nadie lo iguala.',
+  'tut.cap4.p3': 'Sin AJILEI, gana la suma más alta del mejor palo.',
+  'tut.cap4.p4': 'Si empatan, gana **la Mano**; si la Mano no empató, el que está más cerca de ella.',
+  // v1.5 · acortado (tres líneas). v1.4: «Pierdes cuando tu pila se queda en cero. Contra las IAS puedes
+  // recargar; entre personas, hasta la entrada.»
+  'tut.cap4.p5': 'Sin pila, pierdes. Recargas contra las IAS; entre personas, hasta la entrada.',
+
+  'tut.cap6.titulo': 'All-in y pozos',
+  // v1.5 · acortados (tres líneas). v1.4: «Si te piden más de lo que tienes, puedes ir…» y «Con all-in
+  // solo puedes ganar lo que igualaste…».
+  'tut.cap6.p1': 'Si no te alcanza, puedes ir **all-in**: pones toda tu pila y tus cartas siguen jugando.',
+  'tut.cap6.p2': 'Con all-in solo ganas lo que igualaste. El resto es otro pozo para los demás.',
+  'tut.cap6.p3': 'Lo que nadie iguala, se devuelve.',
+  // v1.5 · acortado (tres líneas). v1.4: «Con la pila baja, puedes recargar. Contra las IAS, ellas se
+  // nivelan contigo; entre personas, hasta la entrada.»
+  'tut.cap6.p4': 'Con poca pila, **recarga**: las IAS se nivelan contigo; entre personas, hasta la entrada.',
+
+  'tut.cap7.titulo':  'Jugar contra las IAS',
+  'tut.cap8.titulo':  'Jugar con otras personas',
+  'tut.cap9.titulo':  'El menú y los ajustes',
+  'tut.cap10.titulo': 'Consejos',
+
+  // La muestra de cartas (P-4): las palabras que pinta junto a los componentes reales.
+  'tut.muestra.mano':     'Mano',
+  'tut.muestra.tu':       'Tú',
+  'tut.muestra.rival':    'IA 1',
+  'tut.muestra.pozo2':    'Otro pozo',
+  'tut.muestra.vuelve':   'Vuelve a ti',
 }
 
 // ── GUI-1 §1.4 · La partida guiada (normativo v1.3, la escalera) ──
@@ -133,4 +214,4 @@ export const TEXTOS_TUT_GUIADA = {
 // `@__PURE__`: sin nadie que la importe en la app, el empaquetador la quita y con ella los
 // grupos que ninguna pieza montada pide (con un objeto `{ ...a, ...b }` no se atrevía).
 export const TEXTOS_TUT_ES = /* @__PURE__ */ Object.assign({},
-  TEXTOS_TUT_COMUNES, TEXTOS_TUT_OFERTA, TEXTOS_TUT_SENALES, TEXTOS_TUT_HUB, TEXTOS_TUT_CAP5, TEXTOS_TUT_GUIADA)
+  TEXTOS_TUT_COMUNES, TEXTOS_TUT_OFERTA, TEXTOS_TUT_SENALES, TEXTOS_TUT_HUB, TEXTOS_TUT_CAP5, TEXTOS_TUT_TEMAS, TEXTOS_TUT_GUIADA)

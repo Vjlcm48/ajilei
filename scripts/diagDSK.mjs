@@ -7147,7 +7147,9 @@ const U1_ITEM_MIN = 44
 //   · `idsOk`              la lista de IDs pierde TAPETES (sale de menuEntradas)
 //   · la celda «Tapetes» de menu-movil sella ahora su AUSENCIA (sinTapetes)
 // Contabilidad: viejo 5 entradas · nuevo 4 entradas · movedor TIE-1 1a.
-const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Partida rápida', 'Mano actual']
+// TUT-1 T4 · y «Cómo se juega» (la fila del tutorial; su nombre, el del lobby), antes de
+// «Mano actual», que sigue siendo la última (EMB-2).
+const U1_ENTRADAS = ['Sonido', 'Reacciones', 'Partida rápida', 'Cómo se juega', 'Mano actual']
 const U1_ENTRADAS_H = U1_ENTRADAS
 const entradasSelladas = (vp) => (vp.w > vp.h && vp.h <= 600 ? U1_ENTRADAS_H : U1_ENTRADAS)
 
@@ -7717,7 +7719,8 @@ const MOVMENU_TAP = 44
 // orientación se sella contra la suya.
 // CFG-1 1e · cinco filas en las dos orientaciones: 244 y 244.
 // TIE-1 1a · cuatro (sale Tapetes): 200 y 200.
-const MOVMENU_PANEL = { w: 64, h: 200, hHorizontal: 200 }
+// TUT-1 T4 · cinco otra vez (entra «Cómo se juega»): 244 y 244.
+const MOVMENU_PANEL = { w: 64, h: 244, hHorizontal: 244 }
 const altoSellado = (vp) => (vp.w > vp.h && vp.h <= 600 ? MOVMENU_PANEL.hHorizontal : MOVMENU_PANEL.h)
 const MOVMENU_MARGIN = 8
 const MOVMENU_ITEM = { w: 62, h: 44 }
@@ -7982,7 +7985,7 @@ async function runMenuMovil(browser) {
       // lista de IDs se filtra por la misma piel que la de leyendas, para que las
       // dos no puedan discrepar.
       const IDS_SELLADOS = [
-        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.MANO,
+        ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.TUTORIAL, ENTRADA.MANO,
       ]
       c.idsOk = JSON.stringify(abierto.entradas.map(e => e.id)) === JSON.stringify(IDS_SELLADOS)
       c.badgeOk = abierto.badge === 0

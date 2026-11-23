@@ -69,6 +69,18 @@
   color: var(--text-secondary);
 }
 
+/* ── Cómo se juega (TUT-1 T4) ───────────────────────────────────────────────
+   El «?» de la fila del tutorial, del mismo molde que el de Partida rápida: 18
+   de lado. Sin tamaño, el SVG tomaba el ancho de la fila (62×62) y desbordaba 9
+   px por arriba y por abajo: le robaba toques a «Partida rápida» (35 de alto,
+   bajo el piso de 44; lo vio `diagDSK u1`). */
+.util-ico-tutorial {
+  width: 18px;
+  height: 18px;
+  display: block;
+  color: var(--text-primary);
+}
+
 /* ── La confirmación del primer cobro ───────────────────────────────────────
    La tarjeta y el velo son los de «Eliminar cuenta» (`eliminarCuenta.css`):
    esto sólo pone el texto y el botón de consultar, SIN EL ROJO de borrar. El

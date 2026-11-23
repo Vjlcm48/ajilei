@@ -92,7 +92,10 @@ const Rankings = lazy(trozos.rankings.fabrica)
 const Tienda = lazy(trozos.tienda.fabrica)
 const Guiada = lazy(trozos.guiada.fabrica)
 // TUT-1 T3 · «Cómo se juega» viaja en el trozo de la guiada (`lib/trozos`), que la reexporta.
-const ComoSeJuega = lazy(() => Promise.resolve(trozos.guiada.fabrica()).then((m) => ({ default: m.ComoSeJuega })))
+// T4 · y con ella los capítulos de «Aprender por tema» (el índice es una vista de «Cómo se juega»).
+const delTutorial = (nombre) => lazy(() => Promise.resolve(trozos.guiada.fabrica()).then((m) => ({ default: m[nombre] })))
+const ComoSeJuega = delTutorial('ComoSeJuega')
+const Capitulo = delTutorial('Capitulo')
 // ECO-1d · aplica `f` a la ficha de la constancia guardada como `{ uid, ficha }`.
 const conFicha = (f) => (c) => (c ? { ...c, ficha: f(c.ficha) } : c)
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
@@ -249,6 +252,8 @@ function App() {
   // arnes reproduce la secuencia exacta del Motorola.
   const [intentarInvitacion, setIntentarInvitacion] = useState(() => Boolean(simulacion?.codigo))
 
+  // TUT-1 T4 · el capítulo de «Aprender por tema» que se está viendo.
+  const [capitulo, setCapitulo] = useState(1)
   const [screen, setScreen] = useState(() => {
     // MES-PvP 3 · `?pvp=<escena>` abre la partida con el árbitro imitado (`PartidaPvP` lo monta),
     // detrás de la misma puerta doble que `?sal=`. En producción la condición es constante.
@@ -1220,7 +1225,20 @@ function App() {
         onVolver={() => setScreen('lobby')}
         onLobby={() => setScreen('lobby')}
         onGuiada={() => setScreen('guiada')}
+        onCapitulo={(n) => { setCapitulo(n); setScreen('capitulo') }}
       />,
+    )
+  }
+
+  // ── TUT-1 T4 · Un capítulo de «Aprender por tema» ─────────────────────
+  // Sin marco, sobre la mesa de la guiada congelada (como la guiada). «Cerrar» y «Terminar»
+  // vuelven a «Cómo se juega», que abre su índice (`guia/vuelta.js`).
+  if (screen === 'capitulo') {
+    const alIndice = () => setScreen('como-se-juega')
+    return (
+      <PantallaDiferida trozo={trozos.guiada} familia="abismo">
+        <Capitulo n={capitulo} onCerrar={alIndice} onTerminar={alIndice} />
+      </PantallaDiferida>
     )
   }
 

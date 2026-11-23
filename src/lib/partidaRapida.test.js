@@ -86,19 +86,28 @@ describe('CFG-1 1e · consultaApi', () => {
 describe('CFG-1 1e · las entradas del ⋮', () => {
   it('salen Cuenta y Saldo; entra Partida rápida; los IDs retirados no vuelven', () => {
     // TIE-1 1a · sale también Tapetes: el tapete se elige en la tienda.
-    expect(ENTRADAS_PANEL).toEqual(['sonido', 'reacciones', 'rapida', 'mano'])
+    // TUT-1 T4 · y entra «Cómo se juega», antes de «Mano actual» (que sigue última, EMB-2).
+    expect(ENTRADAS_PANEL).toEqual(['sonido', 'reacciones', 'rapida', 'tutorial', 'mano'])
     expect(Object.values(ENTRADA)).not.toContain('saldo')
     expect(Object.values(ENTRADA)).not.toContain('cuenta')
     expect(Object.values(ENTRADA)).not.toContain('tapetes')
     expect(VIVAS_ESCRITORIO).toContain(ENTRADA.RAPIDA)
     expect(VIVAS_MOVIL).toContain(ENTRADA.RAPIDA)
+    expect(VIVAS_ESCRITORIO).toContain(ENTRADA.TUTORIAL)
+    expect(VIVAS_MOVIL).toContain(ENTRADA.TUTORIAL)
   })
   it('Partida rápida sólo monta contra las IAS, y el panel mide sus filas', () => {
     expect(presentesDe(true)).toBe(null)
-    expect(presentesDe(false)).toEqual(['sonido', 'reacciones', 'mano'])
-    expect(filasDelPanel(true)).toBe(4)
-    expect(filasDelPanel(false)).toBe(3)
+    expect(presentesDe(false)).toEqual(['sonido', 'reacciones', 'tutorial', 'mano'])
+    expect(filasDelPanel(true)).toBe(5)
+    expect(filasDelPanel(false)).toBe(4)
     expect(altoPanel(4)).toBe(200)
     expect(altoPanel(3)).toBe(156)
+  })
+  it('TUT-1 T4 · «Cómo se juega» no monta en la mesa del tutorial (guiada y capítulos)', () => {
+    expect(presentesDe(true, false)).toEqual(['sonido', 'reacciones', 'rapida', 'mano'])
+    expect(presentesDe(false, false)).toEqual(['sonido', 'reacciones', 'mano'])
+    expect(filasDelPanel(true, false)).toBe(4)
+    expect(altoPanel(filasDelPanel(true))).toBe(244)
   })
 })

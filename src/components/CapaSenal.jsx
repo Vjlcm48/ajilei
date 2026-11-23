@@ -5,7 +5,7 @@ import { t } from '../config/textos'
 import { SoundButton } from './SoundButton'
 import {
   union, huecosDe, bandas, radioDe, lineasDe, colocarBurbuja, burbujaCabe, colocarRespaldo, colocarBarra,
-  colocarLibre, flechaEntre, trozosRotulo, SEPARACION,
+  colocarLibre, flechaEntre, trozosRotulo, SEPARACION, colocarBarraFija, colocarTarjeta, barraEnColumna,
 } from './capaSenalCore'
 
 // ── TUT-1 · La capa de señalización ─────────────────────────────────────────
@@ -63,17 +63,31 @@ import {
  * @param {boolean} [p.aro]           anillo dorado con pulso alrededor de cada hueco
  * @param {'burbuja'|'libre'} [p.colocacion]
  * @param {{selector:string, peso?:number}[]} [p.evita]  (libre) lo que el rótulo no debe tapar
- * @param {{siguiente?:boolean, volver?:boolean, cerrar?:boolean, salir?:boolean|'cerrar', paso?:{n:number,m:number}}} [p.controles]
+ * @param {{siguiente?:boolean, volver?:boolean, cerrar?:boolean, terminar?:boolean, salir?:boolean|'cerrar', paso?:{n:number,m:number}}} [p.controles]
+ *   `terminar` (TUT-1 T4, P-5): en el último paso, «Terminar» en vez de «Cerrar» en la barra
+ * @param {string}  [p.nota]          (T4) clave de `t()` de una línea pequeña bajo el rótulo, fuera del techo de dos
+ * @param {object}  [p.varsNota]      variables de la nota
  * @param {boolean} [p.unico]         apaga a la vista el resto de controles y deja pasar sólo el ancla
  * @param {string|string[]} [p.alTocar]  selector(es) cuyo toque llama a `onAncla` (la señal se apaga)
  * @param {string}  [p.aria]          clave de `t()` del nombre accesible de la capa
  * @param {Function} [p.onSiguiente] @param {Function} [p.onVolver] @param {Function} [p.onCerrar]
  * @param {Function} [p.onSalir]     @param {Function} [p.onAncla]
+ * @param {Function} [p.onTerminar]  (T4) «Terminar»
+ * @param {Function} [p.onFondo]     (T4) un toque sobre el velo, fuera de la burbuja y de los botones
+ *
+ * @param {boolean} [p.sinAncla]    (T4) qué hacer si ningún selector casa: con `true`, la tarjeta
+ * @param {boolean} [p.barraFija]   (T4, STOP-T) la barra en su sitio fijo (`colocarBarraFija`), también
+ *                                  con la tarjeta; la burbuja y la tarjeta no la pisan nunca
+ *
+ * TUT-1 T4 · SIN ANCLA EN PANTALLA. Con `sinAncla` (los capítulos), si ningún selector
+ * casa —un paso que habla de algo que la mesa viva no enseña, P-2—, el velo cubre todo
+ * y el rótulo va en la tarjeta fija de respaldo, sin flecha. Sin él (la guiada), la
+ * capa espera a que el ancla nazca, como siempre.
  */
 export default function CapaSenal({
   ancla, rotulo, vars, velo = false, pasa, aro = true, colocacion = 'burbuja', evita = [], controles = {},
-  unico = false, alTocar = null, aria = 'tut.capa.aria',
-  onSiguiente, onVolver, onCerrar, onSalir, onAncla,
+  unico = false, alTocar = null, aria = 'tut.capa.aria', nota = null, varsNota, sinAncla = false, barraFija = false,
+  onSiguiente, onVolver, onCerrar, onSalir, onAncla, onTerminar, onFondo,
 }) {
   const idRotulo = useId()
   const raizRef = useRef(null)
@@ -109,8 +123,17 @@ export default function CapaSenal({
     let lado = null
     let picoX = null
     let fl = null
-    let barra = null
-    if (envolvente && libre && rv) {
+    // La barra fija va PRIMERO: su sitio no depende del paso, y es obstáculo de los demás.
+    const fija = barraFija && conBotones && barraRef.current && !libre ? colocarBarraFija({ tam: tamDe(barraRef.current), vista }) : null
+    let barra = fija
+    const obst = (hs) => [...hs, ...salir, ...(fija ? [fija] : [])]
+    if (!envolvente && !libre && rv && sinAncla) {
+      // Nada que señalar: la tarjeta fija, sin flecha.
+      modo = 'tarjeta'
+      if (rv.dataset.modo === 'tarjeta') {
+        rot = fija ? colocarTarjeta({ tam: tamDe(rv), obstaculos: obst([]), vista, techo }) : colocarRespaldo({ tam: tamDe(rv), huecos: [], vista, techo })
+      }
+    } else if (envolvente && libre && rv) {
       const obst = evita.flatMap((o) => [...document.querySelectorAll(o.selector)]
         .map((e) => ({ caja: e.getBoundingClientRect(), peso: o.peso ?? 1 })))
       rot = colocarLibre({ tam: tamDe(rv), ancla: envolvente, obstaculos: obst, vista }).caja
@@ -120,24 +143,30 @@ export default function CapaSenal({
       const m = medidaRef.current
       const p = m.querySelector('p')
       const lineas = p ? lineasDe(p.getBoundingClientRect().height, parseFloat(getComputedStyle(p).lineHeight)) : 0
-      const b = colocarBurbuja({ tam: tamDe(m), hueco: envolvente, vista })
-      if (burbujaCabe({ caja: b.caja, huecos: [...huecos, ...salir], vista, lineas })) {
+      let b = colocarBurbuja({ tam: tamDe(m), hueco: envolvente, vista })
+      let cabe = burbujaCabe({ caja: b.caja, huecos: obst(huecos), vista, lineas })
+      // Con la barra fija, si un lado la pisa, el otro lado del ancla.
+      if (!cabe && fija) {
+        const otro = colocarBurbuja({ tam: tamDe(m), hueco: envolvente, vista, lado: b.lado === 'arriba' ? 'abajo' : 'arriba' })
+        if (burbujaCabe({ caja: otro.caja, huecos: obst(huecos), vista, lineas })) { b = otro; cabe = true }
+      }
+      if (cabe) {
         rot = b.caja; lado = b.lado; picoX = b.picoX
         const br = barraRef.current
-        if (conBotones && br) barra = colocarBarra({ tam: tamDe(br), evitar: [...huecos, rot], vista, techo })
+        if (conBotones && br && !fija) barra = colocarBarra({ tam: tamDe(br), evitar: [...huecos, rot], vista, techo })
       } else {
         modo = 'tarjeta'
         // La tarjeta se coloca con SU tamaño: si el rótulo aún se pinta como burbuja,
         // se espera al siguiente render (el efecto de diseño vuelve a medir).
         if (rv && rv.dataset.modo === 'tarjeta') {
-          rot = colocarRespaldo({ tam: tamDe(rv), huecos, vista, techo })
+          rot = fija ? colocarTarjeta({ tam: tamDe(rv), obstaculos: obst(huecos), vista, techo }) : colocarRespaldo({ tam: tamDe(rv), huecos, vista, techo })
           fl = flechaEntre(rot, envolvente)
         }
       }
     }
     const nuevo = { vista, huecos, modo, rot, lado, picoX, fl, barra, n: els.length }
     setGeo((viejo) => (igual(viejo, nuevo) ? viejo : nuevo))
-  }, [clave, libre, conBotones, evita]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clave, libre, conBotones, evita, sinAncla, barraFija]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Antes de pintar, y otra vez tras cada render (el rótulo cambia de forma o de texto).
   useLayoutEffect(() => { medir() })
@@ -222,9 +251,13 @@ export default function CapaSenal({
 
   const modo = geo?.modo ?? (libre ? 'libre' : 'burbuja')
   const huecos = geo?.huecos ?? []
-  const listo = !!(geo?.rot && (modo !== 'burbuja' || !conBotones || geo.barra))
+  // Con la barra fija, la barra va en todos los modos (la tarjeta no lleva botones).
+  const conBarra = conBotones && !libre && (modo === 'burbuja' || barraFija)
+  const listo = !!(geo?.rot && (!conBarra || geo.barra))
+  const columna = barraFija && barraEnColumna(geo?.vista ?? { w: window.innerWidth, h: window.innerHeight })
   const texto = trozosRotulo(t(rotulo, vars)).map((tr, i) => (tr.fuerte ? <strong key={i}>{tr.texto}</strong> : <span key={i}>{tr.texto}</span>))
   const paso = controles.paso ? <span className="tut-paso tut-paso--burbuja">{t('tut.ctl.paso', controles.paso)}</span> : null
+  const linea = nota ? <span className="tut-nota">{t(nota, varsNota)}</span> : null
   const oculto = { left: 0, top: 0, visibility: 'hidden' }
 
   return createPortal(
@@ -238,7 +271,7 @@ export default function CapaSenal({
       data-listo={listo ? '' : undefined}
       data-modo={modo}
     >
-      {velo && geo && huecos.length > 0 && (
+      {velo && geo && (
         <>
           {/* Lo que se VE: la ventana velada, con la máscara agujereada en cada hueco. */}
           <svg className="tut-velo" width={geo.vista.w} height={geo.vista.h} aria-hidden="true">
@@ -253,11 +286,11 @@ export default function CapaSenal({
             <rect className="tut-velo-fondo" width={geo.vista.w} height={geo.vista.h} mask={`url(#${idRotulo}-velo)`} />
           </svg>
           {/* Lo que RECIBE el toque: las bandas alrededor; los huecos, libres (o tapados). */}
-          {bandas(huecos, geo.vista).map((b, i) => <div key={`b${i}`} className="tut-banda" style={estiloCaja(b)} aria-hidden="true" />)}
-          {!dejaPasar && huecos.map((h, i) => <div key={`h${i}`} className="tut-banda" style={estiloCaja(h)} aria-hidden="true" />)}
+          {bandas(huecos, geo.vista).map((b, i) => <div key={`b${i}`} className="tut-banda" style={estiloCaja(b)} aria-hidden="true" onClick={onFondo} />)}
+          {!dejaPasar && huecos.map((h, i) => <div key={`h${i}`} className="tut-banda" style={estiloCaja(h)} aria-hidden="true" onClick={onFondo} />)}
         </>
       )}
-      {velo && (!geo || huecos.length === 0) && <div className="tut-banda tut-banda--entera" aria-hidden="true" />}
+      {velo && !geo && <div className="tut-banda tut-banda--entera" aria-hidden="true" />}
       {aro && huecos.map((h, i) => <div key={`a${i}`} className="tut-aro" style={estiloCaja(h)} aria-hidden="true" />)}
       {geo?.fl && (
         <svg className="tut-flecha" width={geo.vista.w} height={geo.vista.h} aria-hidden="true">
@@ -273,24 +306,27 @@ export default function CapaSenal({
       {!libre && (
         <div ref={medidaRef} className="tut-rotulo tut-rotulo--burbuja tut-rotulo--medida" aria-hidden="true">
           <p className="tut-rotulo-texto">{texto}</p>
+          {linea}
           {paso}
         </div>
       )}
       <div
         ref={rotuloRef}
-        className={`tut-rotulo tut-rotulo--${modo}${modo === 'burbuja' && geo?.lado ? ` lado-${geo.lado}` : ''}`}
+        className={`tut-rotulo tut-rotulo--${modo}${modo === 'burbuja' && geo?.lado ? ` lado-${geo.lado}` : ''}${modo === 'tarjeta' && barraFija && conBotones ? ' tut-rotulo--fila' : ''}`}
         data-modo={modo}
         style={geo?.rot ? { left: geo.rot.left, top: geo.rot.top, '--pico-x': `${geo.picoX ?? 0}px` } : oculto}
       >
         <p id={idRotulo} className="tut-rotulo-texto">{texto}</p>
-        {modo === 'burbuja' && paso}
-        {modo !== 'burbuja' && hayControles(controles) && (
-          <Controles c={controles} onSiguiente={onSiguiente} onVolver={onVolver} onCerrar={onCerrar} />
+        {linea}
+        {(modo === 'burbuja' || (barraFija && conBotones)) && paso}
+        {modo !== 'burbuja' && !(barraFija && conBotones) && hayControles(controles) && (
+          <Controles c={controles} onSiguiente={onSiguiente} onVolver={onVolver} onCerrar={onCerrar} onTerminar={onTerminar} />
         )}
       </div>
-      {modo === 'burbuja' && conBotones && (
-        <div ref={barraRef} className="tut-barra" style={geo?.barra ? { left: geo.barra.left, top: geo.barra.top } : oculto}>
-          <Controles c={{ ...controles, paso: null }} onSiguiente={onSiguiente} onVolver={onVolver} onCerrar={onCerrar} />
+      {conBarra && (
+        <div ref={barraRef} className={`tut-barra${barraFija ? ' tut-barra--fija' : ''}${columna ? ' tut-barra--columna' : ''}`}
+          style={geo?.barra ? { left: geo.barra.left, top: geo.barra.top } : oculto}>
+          <Controles c={{ ...controles, paso: null }} onSiguiente={onSiguiente} onVolver={onVolver} onCerrar={onCerrar} onTerminar={onTerminar} />
         </div>
       )}
       {controles.salir && <BotonSalir ref={salirRef} cerrar={controles.salir === 'cerrar'} onClick={onSalir} />}
@@ -311,9 +347,10 @@ export function BotonSalir({ ref, cerrar = false, onClick }) {
   )
 }
 
-function Controles({ c, onSiguiente, onVolver, onCerrar }) {
+function Controles({ c, onSiguiente, onVolver, onCerrar, onTerminar }) {
   const ultimo = c.paso && c.paso.n >= c.paso.m
   const cerrarEsPrincipal = ultimo || !c.siguiente
+  const terminar = !!c.terminar && (ultimo || !c.siguiente)
   return (
     <div className="tut-controles">
       {c.paso && <span className="tut-paso">{t('tut.ctl.paso', { n: c.paso.n, m: c.paso.m })}</span>}
@@ -326,6 +363,9 @@ function Controles({ c, onSiguiente, onVolver, onCerrar }) {
         {c.siguiente && !ultimo && (
           <SoundButton type="button" className="tut-btn tut-btn--pri" data-accion="tut-siguiente" data-tut-primario="" onClick={onSiguiente}>{t('tut.ctl.siguiente')}</SoundButton>
         )}
+        {terminar && (
+          <SoundButton type="button" className="tut-btn tut-btn--pri" data-accion="tut-terminar" data-tut-primario="" onClick={onTerminar}>{t('tut.ctl.terminar')}</SoundButton>
+        )}
       </span>
     </div>
   )
@@ -335,7 +375,7 @@ function Controles({ c, onSiguiente, onVolver, onCerrar }) {
 const CONTROLES = 'button, a[href], input, select, textarea, [role="button"], [data-accion]'
 
 // «Salir» no cuenta: va aparte, arriba a la derecha.
-const hayBotones = (c) => !!(c && (c.siguiente || c.volver || c.cerrar))
+const hayBotones = (c) => !!(c && (c.siguiente || c.volver || c.cerrar || c.terminar))
 const hayControles = (c) => hayBotones(c) || !!c?.paso
 const estiloCaja = (c) => ({ left: c.left, top: c.top, width: c.width, height: c.height })
 

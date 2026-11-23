@@ -27,6 +27,10 @@ export const ENTRADA = {
   // y 'cuenta' (la figurita de SUP-2b, P-1): sus IDs quedan RETIRADOS y no se
   // reutilizan para otra cosa, que es el contrato que abre este archivo.
   RAPIDA: 'rapida',
+  // TUT-1 T4 · «Cómo se juega» (el «?» de la mesa, Fase 0 §P): abre el capítulo de la
+  // fase en curso sobre la mesa viva, o el índice entre manos. ID NUEVO, justo antes de
+  // «Mano actual», que sigue siendo la última (EMB-2: la premium cierra el panel).
+  TUTORIAL: 'tutorial',
   // El BADGE de consultas gratis. No es una entrada del panel: es un control
   // propio, con su propia superficie flotante, alojado DENTRO de la entrada
   // "Mano actual". Tiene ID propio porque puede estar vivo o no con
@@ -41,7 +45,7 @@ export const ENTRADA = {
 // Sonido, Reacciones, Partida rápida y Mano actual.
 export const VIVAS_ESCRITORIO = [
   ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA,
-  ENTRADA.MANO, ENTRADA.CONTADOR,
+  ENTRADA.TUTORIAL, ENTRADA.MANO, ENTRADA.CONTADOR,
 ]
 
 // Móvil, a MOV-1b-c. Queda UNA sola ausencia, y por su superficie, no por su
@@ -55,7 +59,7 @@ export const VIVAS_ESCRITORIO = [
 // desplazamiento (242×186, lámina aprobada por Victor), que es la misma rejilla
 // gobernada por `--dsk-u2-cols` con una sola columna.
 export const VIVAS_MOVIL = [
-  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.MANO,
+  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.TUTORIAL, ENTRADA.MANO,
 ]
 
 // ── Qué entradas MONTAN ─────────────────────────────────────────────────────
@@ -73,12 +77,21 @@ export const VIVAS_MOVIL = [
 //
 // `null` en el consumidor significa "todas".
 // TIE-1 1a · sin Tapetes: cuatro contra las IAS, tres contra humanos.
+// TUT-1 T4 · y «Cómo se juega», antes de «Mano actual», en las dos: cinco contra las IAS,
+// cuatro contra humanos. En la mesa de la guiada (y en la de un capítulo) no monta: ya es
+// el tutorial.
 export const ENTRADAS_PANEL = Object.freeze([
-  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.MANO,
+  ENTRADA.SONIDO, ENTRADA.REACCIONES, ENTRADA.RAPIDA, ENTRADA.TUTORIAL, ENTRADA.MANO,
 ])
 
-/** Las entradas que montan: todas contra las IAS (`null`), sin «Partida rápida» contra humanos. */
-export const presentesDe = (contraIAS) => (contraIAS ? null : ENTRADAS_PANEL.filter((id) => id !== ENTRADA.RAPIDA))
+/**
+ * Las entradas que montan: todas contra las IAS (`null`), sin «Partida rápida» contra
+ * humanos; sin «Cómo se juega» en la mesa del tutorial (`tutorial = false`).
+ */
+export const presentesDe = (contraIAS, tutorial = true) => {
+  if (contraIAS && tutorial) return null
+  return ENTRADAS_PANEL.filter((id) => (contraIAS || id !== ENTRADA.RAPIDA) && (tutorial || id !== ENTRADA.TUTORIAL))
+}
 
 /**
  * El alto del panel: filas × 44 + 6 (el filete que separa "Mano actual") +
@@ -87,5 +100,5 @@ export const presentesDe = (contraIAS) => (contraIAS ? null : ENTRADAS_PANEL.fil
  */
 export const altoPanel = (filas) => filas * 44 + 24
 
-/** Cuántas filas tiene el panel: 4 contra las IAS, 3 contra humanos (TIE-1 1a). */
-export const filasDelPanel = (contraIAS) => (presentesDe(contraIAS) ?? ENTRADAS_PANEL).length
+/** Cuántas filas tiene el panel: 5 contra las IAS, 4 contra humanos (TUT-1 T4). */
+export const filasDelPanel = (contraIAS, tutorial = true) => (presentesDe(contraIAS, tutorial) ?? ENTRADAS_PANEL).length

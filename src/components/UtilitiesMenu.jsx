@@ -68,6 +68,17 @@ function RapidaIcon() {
   )
 }
 
+// TUT-1 T4 · el «?» de «Cómo se juega»: mismo molde (SVG en línea, trazo en `currentColor`).
+function TutorialIcon() {
+  return (
+    <svg className="util-ico util-ico-tutorial" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <circle cx="12" cy="16.6" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
 // CFG-1 1e · Lo que la entrada "Mano actual" dice de sí misma
 // (`etiquetaConsulta`, consultasCore): el texto largo para el nombre accesible y
 // el popup del badge, y la parte corta para la pastilla —la cifra de gratis, el
@@ -106,7 +117,7 @@ export function UtilitiesTrigger({ open, onToggle, registerTrigger }) {
 export function UtilitiesPanel({
   anchor, onClose, onReacciones, reaccionesBloqueadas,
   etiquetaMano = null, manoDisponible, onManoActual,
-  rapida = false, onRapida,
+  rapida = false, onRapida, onTutorial,
   vivas = VIVAS_ESCRITORIO, presentes = null,
 }) {
   const { t } = useIdioma()
@@ -232,6 +243,27 @@ export function UtilitiesPanel({
           </button>
         )}
 
+        {/* TUT-1 T4 · «Cómo se juega» (Fase 0 §P: el «?» de la mesa), antes de «Mano actual»,
+            que sigue siendo la última (EMB-2). Cierra al
+            ejecutar, como sus hermanas: el capítulo de la fase toma el relevo sobre la mesa
+            viva (o el índice entre manos). No monta en la mesa del tutorial (`presentes`). */}
+        {presente(ENTRADA.TUTORIAL) && (
+          <button
+            type="button"
+            role="menuitem"
+            className={`util-item util-item-tutorial${viva(ENTRADA.TUTORIAL) ? '' : ' is-disabled'}`}
+            data-entrada={ENTRADA.TUTORIAL}
+            data-accion="tut-menu"
+            onClick={() => { onClose(); onTutorial?.() }}
+            disabled={!viva(ENTRADA.TUTORIAL)}
+            // El nombre es el del botón del lobby (`lob.nav.reglas`): la misma puerta.
+            aria-label={t('lob.nav.reglas')}
+            title={t('lob.nav.reglas')}
+          >
+            <TutorialIcon />
+          </button>
+        )}
+
         {/* "Mano actual" · última y separada por el filete del sistema: es la
             entrada premium y no pertenece al grupo de las tres.
             Va en <div>, no en <button>: un botón deshabilitado bloquea los
@@ -310,6 +342,7 @@ export function UtilitiesPanel({
             </span>
           )}
         </div>
+
       </div>
 
       {popup && (

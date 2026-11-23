@@ -1,0 +1,84 @@
+/* ── TUT-1 T4 · «Aprender por tema»: el índice (`guia/ListaTemas.jsx`) ─────────
+   Normativo: AJILEI_Tutorial_v1.4.md §2.1. Hoja nueva y aditiva (INV-03). Letra con
+   los pisos de LEC-1 (títulos de pista 15, filas 16); piso táctil de 44 de sobra: cada
+   fila es un botón entero. En la pantalla cuelga de `.sal-cuerpo.es-tem` (la carcasa
+   de Rankings); sobre la mesa, de `.tem-capa`. */
+
+.sal-cuerpo.es-tem { align-content: start; }
+
+.tem-lista { display: grid; gap: 16px; }
+.tem-pista-titulo {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold-brand);
+}
+.tem-filas { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+
+.tem-fila {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 28px 1.4em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+  background: rgba(9, 23, 14, 0.92);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--gold-brand-rgb), 0.45);
+}
+.tem-fila:focus-visible { outline: 2px solid var(--gold-brand-hi); outline-offset: 3px; }
+.tem-fila.es-pronto { color: var(--text-secondary); box-shadow: inset 0 0 0 1px rgba(var(--gold-brand-rgb), 0.25); }
+
+.tem-ico { width: 28px; height: 28px; color: var(--gold-brand); }
+.tem-fila.es-pronto .tem-ico { opacity: 0.6; }
+.tem-num { font-weight: 700; color: var(--gold-brand); text-align: right; }
+.tem-titulo { font-weight: 600; line-height: 1.25; }
+.tem-visto { font-size: 18px; font-weight: 700; color: var(--gold-brand); }
+.tem-pronto {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px rgba(var(--gold-brand-rgb), 0.5);
+}
+
+/* Las pistas en columnas cuando caben (la PC); en el teléfono, acostado o no, una debajo
+   de otra: el cuerpo de la carcasa no pasa de unos 400 de ancho. */
+.tem-lista { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+
+/* ── Sobre la mesa (la fila del ⋮ entre manos) ── */
+.tem-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 56px 12px 12px;
+  box-sizing: border-box;
+  background: rgba(4, 10, 6, 0.6);
+  font-family: var(--font-base);
+  color: var(--text-primary);
+}
+.tem-capa-caja {
+  box-sizing: border-box;
+  width: min(100%, 920px);
+  max-height: 100%;
+  overflow: auto;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--green-darkest);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--gold-brand-rgb), 0.55), 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.tem-capa-titulo { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
