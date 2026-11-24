@@ -5,7 +5,7 @@ import { TEXTOS_TUT_COMUNES, TEXTOS_TUT_SENALES } from '../config/textos.tut.es'
 import { guia } from '../lib/guia'
 
 // ── TUT-1 T3 · Las señales de primera vez ───────────────────────────────────
-// Rector: AJILEI_TUT-1_T3_v1.0.md §2.4; normativo AJILEI_Tutorial_v1.4.md §1.6.
+// Rector: AJILEI_TUT-1_T3_v1.0.md §2.4; normativo AJILEI_Tutorial_v1.5.md §1.6.
 // Tres pistas, en la mesa REAL contra las IAS (con `control` y sin `guion` ni
 // `partida`: contra personas no hay señales en esta tanda). La monta `GameTable`
 // desde el trozo de la guiada (`screens/Guiada.jsx` la reexporta): la capa y sus

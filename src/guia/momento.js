@@ -1,5 +1,5 @@
 // ── TUT-1 T4 · El momento de un capítulo ────────────────────────────────────
-// Rector: AJILEI_TUT-1_T4_v1.0.md §1.1; normativo AJILEI_Tutorial_v1.4.md §2.1
+// Rector: AJILEI_TUT-1_T4_v1.0.md §1.1; normativo AJILEI_Tutorial_v1.5.md §2.1
 // («Capítulos de mesa (1–6): sobre el modo guion, con la mesa de la guiada
 // congelada en el momento del paso»). Módulo PURO, sin React ni DOM.
 //

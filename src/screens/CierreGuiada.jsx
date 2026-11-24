@@ -11,7 +11,7 @@ import '../styles/guiada.css'
 
 // ── GUI-1 · El cierre de la partida guiada ──────────────────────────────────
 // Rector: AJILEI_TUT-1_T2_v1.0.md §1.3 y AJILEI_TUT-1_T3_v1.0.md §2.1; normativo
-// AJILEI_Tutorial_v1.4.md §1.4 (mano 3, paso 11) y §1.5. Viaja en el trozo de la
+// AJILEI_Tutorial_v1.5.md §1.4 (mano 3, paso 11) y §1.5. Viaja en el trozo de la
 // guiada (`screens/Guiada.jsx`), diferido como ella.
 //
 // AL MONTARSE PIDE EL PREMIO (`cobrar_guiada()`), y lo pide UNA vez aunque el modo

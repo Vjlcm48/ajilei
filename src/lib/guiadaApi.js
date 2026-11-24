@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { clienteGuiadaDev } from '../dev/guiadaFalsa'
 
 // ── TUT-1 T3 · La puerta del cliente al premio de la guiada ─────────────────
-// Rector: AJILEI_TUT-1_T3_v1.0.md §2.1–§2.3; normativo AJILEI_Tutorial_v1.4.md
+// Rector: AJILEI_TUT-1_T3_v1.0.md §2.1–§2.3; normativo AJILEI_Tutorial_v1.5.md
 // §1.5. Molde de `constanciaApi.js`: envoltorio delgado, sin estado y sin reglas.
 // Llama a `premio_guiada_estado()` y `cobrar_guiada()` (migración
 // `20261121150000_tut1_guiada.sql`), que devuelven un objeto `jsonb`.

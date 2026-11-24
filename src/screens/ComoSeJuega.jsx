@@ -10,7 +10,7 @@ import { tomarVuelta } from '../guia/vuelta'
 import '../styles/comoSeJuega.css'
 
 // ── TUT-1 T3 · La pantalla «Cómo se juega» ─────────────────────────────────
-// Rector: AJILEI_TUT-1_T3_v1.0.md §2.2; normativo AJILEI_Tutorial_v1.4.md §2.1.
+// Rector: AJILEI_TUT-1_T3_v1.0.md §2.2; normativo AJILEI_Tutorial_v1.5.md §2.1.
 // Pantalla diferida (viaja en el trozo de la guiada, `lib/trozos.guiada`), con la carcasa de Rankings
 // (`PantallaChips` sin botón dorado): la barra, el ⚙, la flecha y la casa.
 // Sustituye la entrada directa a la guiada de la tanda 2: el botón del lobby abre esto.

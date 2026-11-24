@@ -1,6 +1,6 @@
 // ── TUT-1 · Las marcas del tutorial, en el aparato ──────────────────────────
 // Rector: AJILEI_TUT-1_T1_v1.0.md §1.4 y AJILEI_TUT-1_T3_v1.0.md §2.1; normativo
-// AJILEI_Tutorial_v1.4.md §1.2, §1.5, §1.6 y §2.1. Molde de `partidaRapida.js`:
+// AJILEI_Tutorial_v1.5.md §1.2, §1.5, §1.6 y §2.1. Molde de `partidaRapida.js`:
 // almacén inyectable, todo con `try`.
 //
 // UNA clave, `ajilei.guia`, con un objeto pequeño:

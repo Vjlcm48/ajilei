@@ -1,5 +1,5 @@
 // ── GUI-1 · Las tres manos de la partida guiada ─────────────────────────────
-// Rector: AJILEI_TUT-1_T2_v1.0.md §0 y §1.2; normativo AJILEI_Tutorial_v1.4.md
+// Rector: AJILEI_TUT-1_T2_v1.0.md §0 y §1.2; normativo AJILEI_Tutorial_v1.5.md
 // §1.1, §1.3 (la escalera) y §1.4 (el contrato de las tres manos). Módulo PURO,
 // sin React ni DOM: lo leen la mesa guiada (`components/GuiaControl.jsx`), el
 // buscador de órdenes (`scripts/guia/buscarOrdenes.mjs`) y su prueba

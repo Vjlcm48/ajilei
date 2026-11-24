@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- AJILEI · TUT-1 · tanda 3 — Verificación: el premio de la partida guiada
 -- ═══════════════════════════════════════════════════════════════════════════
--- Ficha AJILEI_TUT-1_T3_v1.0.md §1.1. Normativo: docs/AJILEI_Tutorial_v1.4.md §1.5.
+-- Ficha AJILEI_TUT-1_T3_v1.0.md §1.1. Normativo: docs/AJILEI_Tutorial_v1.5.md §1.5.
 -- Migración que verifica: supabase/migrations/20261121150000_tut1_guiada.sql.
 --
 -- CÓMO SE USA: `npm run guiones` lo corre entero contra un Postgres en memoria antes del push.
