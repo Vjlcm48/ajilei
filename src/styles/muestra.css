@@ -85,3 +85,34 @@
 
 .muestra-pozos { display: flex; gap: 12px; justify-content: center; align-items: stretch; flex-wrap: wrap; }
 .muestra-pozo { min-width: 7.5em; }
+
+/* ── T5 · P-3 · la escalera de la apuesta (capítulo 10, paso 1) ─────────────────
+   Seis filas y dos columnas, en la caja de la muestra (el marco de oro del cierre de la
+   guiada). Lo que haces, en oro y en negrita: es la lección. En el acostado bajo, la letra
+   y el aire se aprietan por el alto (la burbuja va encima y la barra a la izquierda). */
+.muestra--escalera {
+  /* Fija y con `left: 50%`, la caja encogería a media ventana: ancho propio, hasta el borde. */
+  width: max-content;
+  padding: 10px 12px;
+}
+/* En el teléfono vertical la letra baja un punto (14 en 360) para que cada fila sea una línea. */
+.muestra-escalera { border-collapse: collapse; font-size: clamp(13px, 3.9vw, 15px); line-height: 1.25; }
+.muestra-escalera th, .muestra-escalera td { white-space: nowrap; }
+.muestra-escalera th {
+  padding: 0 10px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  text-align: left;
+}
+.muestra-escalera td { padding: 5px 10px; border-top: 1px solid rgba(var(--gold-brand-rgb), 0.22); text-align: left; }
+.muestra-escalera td + td, .muestra-escalera th + th { text-align: right; }
+.muestra-escalera td + td { font-weight: 700; color: var(--gold-hover); white-space: nowrap; }
+@media (orientation: landscape) and (max-height: 599px) {
+  .muestra--escalera { top: calc(50vh + 40px); padding: 6px 12px; }
+  .muestra-escalera { font-size: 13px; line-height: 1.2; }
+  .muestra-escalera th { padding-bottom: 3px; font-size: 11px; }
+  .muestra-escalera td { padding: 3px 12px; }
+}

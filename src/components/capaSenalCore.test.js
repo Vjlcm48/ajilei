@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   BORDE, MARGEN_HUECO, MAX_LINEAS, SEPARACION, FLECHA_DESDE,
   union, huecoDe, huecosDe, destapa, solape, bandas, radioDe, lineasDe, colocarBurbuja, burbujaCabe, colocarRespaldo,
-  colocarBarra, colocarLibre, flechaEntre, trozosRotulo,
+  colocarBarra, colocarLibre, flechaEntre, trozosRotulo, colocarBarraFija, desvioSalir, colocarPaso,
 } from './capaSenalCore'
 
 // ── TUT-1 tanda 1 · la geometría pura de la capa de señalización ────────────
@@ -209,5 +209,96 @@ describe('TUT-1 · la señal libre, la flecha y el rótulo', () => {
     ])
     expect(trozosRotulo('**Pasar** no cuesta')).toEqual([{ texto: 'Pasar', fuerte: true }, { texto: ' no cuesta', fuerte: false }])
     expect(trozosRotulo(undefined)).toEqual([])
+  })
+})
+
+// ── TUT-1 tanda 5 · la Pista C: la barra fija y «Cerrar» no tapan el ancla ───
+describe('T5 · la barra fija prueba su esquina alterna sólo si pisa un hueco', () => {
+  const tam = { w: 190, h: 52 }
+  it('sin huecos donde va, se queda: abajo a la izquierda en vertical, arriba en el acostado bajo', () => {
+    expect(colocarBarraFija({ tam, vista: T1 })).toMatchObject({ left: BORDE, top: 640 - BORDE - 52 })
+    expect(colocarBarraFija({ tam, vista: { w: 640, h: 360 } })).toMatchObject({ left: BORDE, top: BORDE })
+    expect(colocarBarraFija({ tam, vista: T1, huecos: [caja(100, 300, 160, 60)] })).toMatchObject({ top: 640 - BORDE - 52 })
+  })
+  it('con el botón anclado al pie bajo ella, va arriba (vertical) o abajo (acostado)', () => {
+    expect(colocarBarraFija({ tam, vista: T1, huecos: [caja(50, 580, 260, 50)] })).toMatchObject({ left: BORDE, top: BORDE })
+    expect(colocarBarraFija({ tam: { w: 110, h: 60 }, vista: { w: 640, h: 360 }, huecos: [caja(100, 10, 120, 40)] }))
+      .toMatchObject({ left: BORDE, top: 360 - BORDE - 60 })
+  })
+  it('si las dos esquinas pisan, la suya', () => {
+    expect(colocarBarraFija({ tam, vista: T1, huecos: [caja(0, 0, 360, 640)] })).toMatchObject({ top: 640 - BORDE - 52 })
+  })
+})
+
+describe('T5 · «Cerrar» se corre a la izquierda del ancla que tapa, en su fila; nunca baja', () => {
+  const natural = caja(270, 8, 82, 44)
+  it('sin hueco debajo, no se mueve', () => {
+    expect(desvioSalir({ natural, huecos: [caja(10, 200, 100, 50)] })).toEqual({ x: 0, y: 0 })
+  })
+  it('sobre el ⚙, a su izquierda con la separación', () => {
+    const d = desvioSalir({ natural, huecos: [caja(318, 10, 36, 36)] })
+    expect(d.y).toBe(0)
+    expect(natural.left + natural.width + d.x).toBe(318 - SEPARACION)
+  })
+  it('si a la izquierda pisa otro hueco o se sale, se queda', () => {
+    expect(desvioSalir({ natural, huecos: [caja(318, 10, 36, 36), caja(200, 10, 100, 36)] })).toEqual({ x: 0, y: 0 })
+    expect(desvioSalir({ natural, huecos: [caja(60, 0, 300, 200)] })).toEqual({ x: 0, y: 0 })
+  })
+})
+
+// ── TUT-1 T5 · STOP-T · la colocación de un paso: entradas fijas, una salida ──
+describe('T5 · colocarPaso: barra → «Cerrar» → burbuja, desde el ancla y la ventana', () => {
+  // El 9.2 del S25: el ⚙ arriba a la derecha, donde vive «Cerrar»; la barra abajo a la izquierda.
+  const S25 = { w: 412, h: 915 }
+  const entrada = {
+    anclas: [caja(362, 14, 36, 36)],
+    vista: S25,
+    barra: { w: 186, h: 56 },
+    salir: caja(320, 8, 84, 44),
+    burbuja: { w: 320, h: 92 },
+    lineas: 2,
+    tarjeta: { w: 388, h: 70 },
+  }
+
+  it('el mismo paso da siempre las mismas tres posiciones (nada lee lo que escribió)', () => {
+    const a = colocarPaso(entrada)
+    const b = colocarPaso({ ...entrada })
+    expect(b).toEqual(a)
+  })
+
+  it('en el 9.2: la barra en su esquina, «Cerrar» a la izquierda del ⚙, la burbuja debajo', () => {
+    const r = colocarPaso(entrada)
+    expect(r.barra).toMatchObject({ left: BORDE, top: 915 - BORDE - 56 })
+    expect(r.desvio.y).toBe(0)
+    expect(entrada.salir.left + entrada.salir.width + r.desvio.x).toBeLessThan(r.huecos[0].left)
+    expect(r.modo).toBe('burbuja')
+    expect(r.lado).toBe('abajo')
+    const salirFinal = caja(entrada.salir.left + r.desvio.x, entrada.salir.top, entrada.salir.width, entrada.salir.height)
+    expect(solape(r.rot, salirFinal)).toBe(0)
+    expect(solape(r.rot, r.barra)).toBe(0)
+  })
+
+  it('con el ancla al pie (el botón anclado), la barra arriba y la burbuja encima del ancla', () => {
+    const r = colocarPaso({ ...entrada, anclas: [caja(60, 840, 290, 54)] })
+    expect(r.barra).toMatchObject({ left: BORDE, top: BORDE })
+    expect(r.desvio).toEqual({ x: 0, y: 0 })
+    expect(r.modo).toBe('burbuja')
+    expect(r.lado).toBe('arriba')
+  })
+
+  it('sin anclas: con `sinAncla`, la tarjeta sin flecha; sin él, espera (sin rótulo)', () => {
+    const t = colocarPaso({ ...entrada, anclas: [], sinAncla: true })
+    expect(t.modo).toBe('tarjeta')
+    expect(t.rot).not.toBeNull()
+    expect(t.fl).toBeNull()
+    expect(solape(t.rot, t.barra)).toBe(0)
+    expect(colocarPaso({ ...entrada, anclas: [] }).rot).toBeNull()
+  })
+
+  it('si la burbuja no cabe a ningún lado, la tarjeta (colocada con el tamaño de su copia)', () => {
+    const r = colocarPaso({ ...entrada, vista: { w: 412, h: 260 }, anclas: [caja(100, 70, 200, 80)] })
+    expect(r.modo).toBe('tarjeta')
+    expect(r.rot).toMatchObject({ width: 388, height: 70 })
+    expect(colocarPaso({ ...entrada, vista: { w: 412, h: 260 }, anclas: [caja(100, 70, 200, 80)] })).toEqual(r)
   })
 })

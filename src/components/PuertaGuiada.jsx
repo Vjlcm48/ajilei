@@ -4,9 +4,10 @@ import { sumarTextos } from '../config/textos'
 import { TEXTOS_TUT_OFERTA } from '../config/textos.tut.es'
 import { guia } from '../lib/guia'
 import { crearGuiadaApi, premioDisponible } from '../lib/guiadaApi'
+import { hayCapitulo } from '../guia/vuelta'
 
 // ── TUT-1 T3 · La puerta de la guiada en el lobby ───────────────────────────
-// Rector: AJILEI_TUT-1_T3_v1.0.md §2.1 y §2.3; normativo AJILEI_Tutorial_v1.4.md
+// Rector: AJILEI_TUT-1_T3_v1.0.md §2.1 y §2.3; normativo AJILEI_Tutorial_v1.5.md
 // §1.2 y §1.5. Viaja en el trozo de la guiada (`lib/trozos.guiada`), que el lobby pide
 // al aterrizar: la entrada sólo lleva el `import()` y una ranura; la oferta, sus textos, la API
 // del premio y las marcas viajan aquí (`1.8b`, Fase 0 §C.5). No pinta nada propio.
@@ -42,6 +43,8 @@ export default function PuertaGuiada({ cliente = null, salaPendiente = false, on
   useEffect(() => {
     let vivo = true
     ;(async () => {
+      // TUT-1 T5 · el lobby bajo un capítulo (8 y 9): nada escribe ni se ofrece.
+      if (hayCapitulo()) return
       if (guia.leer().pendientePago) {
         const r = await api.cobrar()
         if (r.estado === 'pagado' || r.estado === 'cobrado') guia.quitarPendiente()

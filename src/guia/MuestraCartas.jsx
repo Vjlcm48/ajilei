@@ -30,9 +30,13 @@ const puntos = (id) => carta(id).points
 // Las medidas viven en `muestra.css`; el paso no elige tamaño.
 const tamanoMuestra = (n) => (n <= 1 ? 'grande' : n === 2 ? 'media' : 'chica')
 
+// T5 · P-3 · la escalera de la apuesta (normativo §1.3): seis filas, lo que tienes → lo que
+// haces. El texto es el del normativo; la caja, la de la muestra (el marco de oro del cierre).
+const ESCALERA = [1, 2, 3, 4, 5, 6]
+
 /**
  * @param {object} p
- * @param {'cartas'|'empate'|'mults'|'allin'|'pozos'|'sobrante'} p.tipo
+ * @param {'cartas'|'empate'|'mults'|'allin'|'pozos'|'sobrante'|'escalera'} p.tipo
  * @param {string[]} [p.cartas]   ids del motor (`1-Copas`…), en `cartas`
  * @param {boolean}  [p.valores]  el valor de cada carta debajo
  * @param {boolean}  [p.tachadas] cada carta con su aspa (no suman)
@@ -82,6 +86,18 @@ export default function MuestraCartas({ tipo, cartas = [], valores = false, tach
           <Pozo etiqueta={t('mesa.pozo')} monto={1500} />
           <Pozo etiqueta={t('tut.muestra.pozo2')} monto={800} />
         </div>
+      )}
+      {tipo === 'escalera' && (
+        <table className="muestra-escalera">
+          <thead>
+            <tr><th scope="col">{t('tut.escalera.tienes')}</th><th scope="col">{t('tut.escalera.haces')}</th></tr>
+          </thead>
+          <tbody>
+            {ESCALERA.map((k) => (
+              <tr key={k}><td>{t(`tut.escalera.${k}.a`)}</td><td>{t(`tut.escalera.${k}.b`)}</td></tr>
+            ))}
+          </tbody>
+        </table>
       )}
       {tipo === 'sobrante' && (
         <div className="muestra-pozos">

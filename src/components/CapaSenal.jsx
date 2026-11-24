@@ -5,11 +5,11 @@ import { t } from '../config/textos'
 import { SoundButton } from './SoundButton'
 import {
   union, huecosDe, bandas, radioDe, lineasDe, colocarBurbuja, burbujaCabe, colocarRespaldo, colocarBarra,
-  colocarLibre, flechaEntre, trozosRotulo, SEPARACION, colocarBarraFija, colocarTarjeta, barraEnColumna,
+  colocarLibre, flechaEntre, trozosRotulo, SEPARACION, colocarTarjeta, barraEnColumna, colocarPaso,
 } from './capaSenalCore'
 
 // ── TUT-1 · La capa de señalización ─────────────────────────────────────────
-// Rector: AJILEI_TUT-1_T1_v1.0.md §0 y §1.1; normativo `AJILEI_Tutorial_v1.4.md`
+// Rector: AJILEI_TUT-1_T1_v1.0.md §0 y §1.1; normativo `AJILEI_Tutorial_v1.5.md`
 // («La forma elegida en la lámina»). UNA capa para las tres piezas: la partida
 // guiada (GUI-1), las señales de primera vez y los capítulos de la serie (TUT-1).
 // En esta tanda no la monta nadie: la montan las tandas 2 a 5.
@@ -95,12 +95,18 @@ export default function CapaSenal({
   const medidaRef = useRef(null)
   const barraRef = useRef(null)
   const salirRef = useRef(null)
+  // T5 · la copia invisible de la TARJETA (capítulos): su tamaño sin colocarla.
+  const tarjetaRef = useRef(null)
   const [geo, setGeo] = useState(null)
   const selectores = Array.isArray(ancla) ? ancla : [ancla]
   const clave = selectores.join('|')
   const dejaPasar = pasa ?? unico
   const conBotones = hayBotones(controles)
   const libre = colocacion === 'libre'
+  // T5 · STOP-T · los capítulos (barra fija y velo): la colocación sale de `colocarPaso`, con
+  // entradas fijas, y se mide sólo al cambiar de paso o cuando algo de FUERA cambia (React #185
+  // en el S25: medir tras cada render y leer lo propio la hacía alternar sin fin).
+  const fijo = barraFija && velo && !libre
 
   // ── Medir ────────────────────────────────────────────────────────────────
   const medir = useCallback(() => {
@@ -110,6 +116,29 @@ export default function CapaSenal({
     const evitar = [...document.querySelectorAll(CONTROLES)]
       .filter((e) => !raizRef.current?.contains(e) && !els.some((a) => a === e || a.contains(e) || e.contains(a)))
       .map((e) => e.getBoundingClientRect())
+    const tamDe = (el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height } }
+    if (fijo) {
+      // Sólo TAMAÑOS de lo propio; el sitio de «Cerrar», de su CSS (nunca de donde quedó).
+      const se = salirRef.current
+      const cs = se ? getComputedStyle(se) : null
+      const salir = se ? { left: vista.w - parseFloat(cs.right) - se.offsetWidth, top: parseFloat(cs.top), width: se.offsetWidth, height: se.offsetHeight } : null
+      const m = medidaRef.current
+      const p = m?.querySelector('p')
+      const r = colocarPaso({
+        anclas: els.map((e) => e.getBoundingClientRect()),
+        evitar,
+        vista,
+        barra: conBotones && barraRef.current ? tamDe(barraRef.current) : null,
+        salir,
+        burbuja: m ? tamDe(m) : null,
+        lineas: p ? lineasDe(p.getBoundingClientRect().height, parseFloat(getComputedStyle(p).lineHeight)) : 0,
+        tarjeta: tarjetaRef.current ? tamDe(tarjetaRef.current) : null,
+        sinAncla,
+      })
+      const nuevo = { vista, ...r, n: els.length }
+      setGeo((viejo) => (igual(viejo, nuevo) ? viejo : nuevo))
+      return
+    }
     const huecos = huecosDe(els.map((e) => e.getBoundingClientRect()), vista, { evitar })
     const envolvente = union(huecos)
     const rv = rotuloRef.current
@@ -117,16 +146,15 @@ export default function CapaSenal({
     const sr = salirRef.current?.getBoundingClientRect()
     const salir = sr ? [{ left: sr.left, top: sr.top, width: sr.width, height: sr.height }] : []
     const techo = sr ? sr.bottom + SEPARACION : undefined
-    const tamDe = (el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height } }
     let modo = libre ? 'libre' : 'burbuja'
     let rot = null
     let lado = null
     let picoX = null
     let fl = null
-    // La barra fija va PRIMERO: su sitio no depende del paso, y es obstáculo de los demás.
-    const fija = barraFija && conBotones && barraRef.current && !libre ? colocarBarraFija({ tam: tamDe(barraRef.current), vista }) : null
-    let barra = fija
-    const obst = (hs) => [...hs, ...salir, ...(fija ? [fija] : [])]
+    // Sin barra fija (la guiada y las señales; la de los capítulos va por `colocarPaso`).
+    const fija = null
+    let barra = null
+    const obst = (hs) => [...hs, ...salir]
     if (!envolvente && !libre && rv && sinAncla) {
       // Nada que señalar: la tarjeta fija, sin flecha.
       modo = 'tarjeta'
@@ -166,10 +194,16 @@ export default function CapaSenal({
     }
     const nuevo = { vista, huecos, modo, rot, lado, picoX, fl, barra, n: els.length }
     setGeo((viejo) => (igual(viejo, nuevo) ? viejo : nuevo))
-  }, [clave, libre, conBotones, evita, sinAncla, barraFija]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clave, libre, conBotones, evita, sinAncla, fijo]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Antes de pintar, y otra vez tras cada render (el rótulo cambia de forma o de texto).
-  useLayoutEffect(() => { medir() })
+  // Antes de pintar, y otra vez tras cada render (el rótulo cambia de forma o de texto)…
+  useLayoutEffect(() => { if (!fijo) medir() })
+  // …salvo en los capítulos: una vez por paso (y por texto); lo demás lo piden los cambios de fuera.
+  const textoClave = `${rotulo}|${JSON.stringify(vars ?? null)}|${nota ?? ''}|${JSON.stringify(varsNota ?? null)}`
+  useLayoutEffect(() => { if (fijo) medir() }, [fijo, medir, textoClave])
+  // TUT-1 T5 · sólo en desarrollo: cuántas veces se pinta la capa (la vara `tut.app` lo cuenta
+  // por paso; un bucle de medidas es rojo). Fuera de DEV no existe.
+  useLayoutEffect(() => { if (import.meta.env.DEV) window.__tutPintadas = (window.__tutPintadas ?? 0) + 1 })
 
   useEffect(() => {
     let cuadro = 0
@@ -184,8 +218,14 @@ export default function CapaSenal({
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(pedir) : null
     ro?.observe(document.documentElement)
     selectores.forEach((s) => document.querySelectorAll(s).forEach((e) => ro?.observe(e)))
+    // T5 · en los capítulos, los TAMAÑOS de lo propio (las copias y la barra) sí cuentan.
+    if (fijo) [medidaRef.current, tarjetaRef.current, barraRef.current, salirRef.current].forEach((e) => e && ro?.observe(e))
     // El ancla puede nacer, morir o moverse con el DOM (la fila de acciones aparece en el turno).
-    const mo = new MutationObserver(pedir)
+    // T5 · en los capítulos, lo que la capa escribe en sí misma no vuelve a pedir medida.
+    const mo = new MutationObserver((registros) => {
+      if (fijo && registros.every((r) => raizRef.current?.contains(r.target))) return
+      pedir()
+    })
     mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'disabled'] })
     return () => {
       if (cuadro) cancelAnimationFrame(cuadro)
@@ -310,6 +350,14 @@ export default function CapaSenal({
           {paso}
         </div>
       )}
+      {/* T5 · y la de la tarjeta de los capítulos: su tamaño sin colocarla (nada se lee de la pintada). */}
+      {fijo && (
+        <div ref={tarjetaRef} className={`tut-rotulo tut-rotulo--tarjeta${conBotones ? ' tut-rotulo--fila' : ''} tut-rotulo--medida`} aria-hidden="true">
+          <p className="tut-rotulo-texto">{texto}</p>
+          {linea}
+          {paso}
+        </div>
+      )}
       <div
         ref={rotuloRef}
         className={`tut-rotulo tut-rotulo--${modo}${modo === 'burbuja' && geo?.lado ? ` lado-${geo.lado}` : ''}${modo === 'tarjeta' && barraFija && conBotones ? ' tut-rotulo--fila' : ''}`}
@@ -329,7 +377,7 @@ export default function CapaSenal({
           <Controles c={{ ...controles, paso: null }} onSiguiente={onSiguiente} onVolver={onVolver} onCerrar={onCerrar} onTerminar={onTerminar} />
         </div>
       )}
-      {controles.salir && <BotonSalir ref={salirRef} cerrar={controles.salir === 'cerrar'} onClick={onSalir} />}
+      {controles.salir && <BotonSalir ref={salirRef} cerrar={controles.salir === 'cerrar'} onClick={onSalir} desvio={geo?.desvio} />}
     </div>,
     document.body,
   )
@@ -339,9 +387,12 @@ export default function CapaSenal({
  * «Salir» (guiada) o «Cerrar» (capítulos): arriba a la derecha, fijo, fuera de la
  * barra. Lo usa también la espera de la guiada entre pasos (`GuiaControl`).
  */
-export function BotonSalir({ ref, cerrar = false, onClick }) {
+export function BotonSalir({ ref, cerrar = false, onClick, desvio = null }) {
+  const corrido = desvio && (desvio.x || desvio.y)
   return (
-    <SoundButton ref={ref} type="button" className="tut-salir" data-accion="tut-salir" onClick={onClick}>
+    <SoundButton ref={ref} type="button" className="tut-salir" data-accion="tut-salir" onClick={onClick}
+      style={corrido ? { transform: `translate(${desvio.x}px, ${desvio.y}px)` } : undefined}
+      data-dx={corrido ? desvio.x : undefined} data-dy={corrido ? desvio.y : undefined}>
       {t(cerrar ? 'tut.ctl.cerrar' : 'tut.ctl.salir')}
     </SoundButton>
   )

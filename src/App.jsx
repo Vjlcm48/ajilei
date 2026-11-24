@@ -252,8 +252,8 @@ function App() {
   // arnes reproduce la secuencia exacta del Motorola.
   const [intentarInvitacion, setIntentarInvitacion] = useState(() => Boolean(simulacion?.codigo))
 
-  // TUT-1 T4 · el capítulo de «Aprender por tema» que se está viendo.
-  const [capitulo, setCapitulo] = useState(1)
+  // TUT-1 T4 · el capítulo de «Aprender por tema» que se está viendo (T5: `null`, ninguno).
+  const [capitulo, setCapitulo] = useState(null)
   const [screen, setScreen] = useState(() => {
     // MES-PvP 3 · `?pvp=<escena>` abre la partida con el árbitro imitado (`PartidaPvP` lo monta),
     // detrás de la misma puerta doble que `?sal=`. En producción la condición es constante.
@@ -980,8 +980,15 @@ function App() {
   //
   // `avisoEnCurso`: la celebración del video espera a que la fila de avisos de
   // saldo quede vacía; nunca los dos a la vez sobre la píldora.
+  // TUT-1 T5 · un capítulo de la Pista C va ENCIMA de la pantalla viva (lobby, Retar, Salas,
+  // Armar mesa): la navega con `setScreen` y no escribe nada (`guia/Capitulo.jsx`). Sin espera
+  // propia: todo capítulo empieza en la rama `capitulo`, que ya resolvió el `lazy` (`1.8b`).
+  const finCapitulo = () => { setCapitulo(null); setScreen('como-se-juega') }
   const conVideo = (pantalla) => (
-    <MarcoVideo control={video} avisoEnCurso={filaAvisos.length > 0} onMonedas={() => abrirTienda('monedas')}>{pantalla}</MarcoVideo>
+    <MarcoVideo control={video} avisoEnCurso={filaAvisos.length > 0} onMonedas={() => abrirTienda('monedas')}>
+      {pantalla}
+      {capitulo && <Capitulo key="capitulo" n={capitulo} enApp onPantalla={setScreen} onCerrar={finCapitulo} />}
+    </MarcoVideo>
   )
   // PES-1 §3-B · la misma forma, con la espera de su trozo. La `key` es la pantalla:
   // sin ella, React reutilizaría el `llegado` de la anterior al pasar de una a otra.
@@ -1232,12 +1239,12 @@ function App() {
 
   // ── TUT-1 T4 · Un capítulo de «Aprender por tema» ─────────────────────
   // Sin marco, sobre la mesa de la guiada congelada (como la guiada). «Cerrar» y «Terminar»
-  // vuelven a «Cómo se juega», que abre su índice (`guia/vuelta.js`).
+  // vuelven a «Cómo se juega», que abre su índice (`guia/vuelta.js`). T5 · un paso de la
+  // Pista C lleva a su pantalla (`onPantalla`), y el capítulo sigue encima (`conVideo`).
   if (screen === 'capitulo') {
-    const alIndice = () => setScreen('como-se-juega')
     return (
       <PantallaDiferida trozo={trozos.guiada} familia="abismo">
-        <Capitulo n={capitulo} onCerrar={alIndice} onTerminar={alIndice} />
+        <Capitulo n={capitulo} onPantalla={setScreen} onCerrar={finCapitulo} />
       </PantallaDiferida>
     )
   }

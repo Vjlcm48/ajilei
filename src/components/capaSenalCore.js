@@ -1,6 +1,6 @@
 // ── TUT-1 · La geometría de la capa de señalización, pura ───────────────────
 // Rector: AJILEI_TUT-1_T1_v1.0.md §1.1 (forma elegida en la lámina, normativo
-// `AJILEI_Tutorial_v1.4.md`). Molde de `miniPerfilCore.js` y de `colocaCapa`
+// `AJILEI_Tutorial_v1.5.md`). Molde de `miniPerfilCore.js` y de `colocaCapa`
 // (VOZ-2): las cuentas viven aquí, sin React ni DOM, para que Vitest las pruebe
 // sin jsdom (que este proyecto no tiene, hallazgo de FRZ-1). `CapaSenal.jsx`
 // mide con `getBoundingClientRect` y le pasa cajas planas.
@@ -201,13 +201,38 @@ export function colocarRespaldo({ tam, huecos, vista, techo = BORDE }) {
 //     la izquierda (sobre la marca; abajo están la pila, las cartas y la fila);
 //   · en el resto: en fila, abajo a la izquierda (abajo a la derecha está la pila).
 // Si la burbuja no tiene sitio, cae a la tarjeta fija (`colocarTarjeta`) y la barra se queda.
+// T5 · SU ESQUINA ALTERNA. En las pantallas de la app (Pista C) el ancla puede estar en el
+// sitio de la barra (el botón anclado al pie, la barra del lobby; la píldora arriba en el
+// acostado): sólo entonces la barra va a su otra esquina del mismo lado (en fila, arriba a la
+// izquierda; en columna, abajo a la izquierda). Sobre la mesa ningún hueco la toca (lo mide
+// `tut.solape`), así que en los capítulos 1–6 y 10 no se mueve nunca.
 export const ALTO_ACOSTADO = 600
 export const barraEnColumna = (vista) => vista.w > vista.h && vista.h < ALTO_ACOSTADO
 
-/** El sitio de la barra fija: sólo de la ventana y de su tamaño. */
-export function colocarBarraFija({ tam, vista }) {
-  if (barraEnColumna(vista)) return caja(BORDE, BORDE, tam.w, tam.h)
-  return caja(BORDE, Math.max(BORDE, vista.h - BORDE - tam.h), tam.w, tam.h)
+/**
+ * T5 · «Cerrar» no tapa el ancla. Vive arriba a la derecha, donde el lobby y las pantallas con
+ * barra tienen el ⚙ (capítulo 9, paso 2) y la mesa su ⋮ (9.5). Si su sitio pisa un hueco, se
+ * corre a la izquierda de ese hueco, en la misma fila; si ahí no cabe o pisa otro, se queda (no
+ * baja nunca: abajo están el rótulo y la muestra). Devuelve el desvío `{ x, y }` sobre su sitio
+ * de siempre (`natural`, la caja sin desvío).
+ */
+export function desvioSalir({ natural, huecos = [] }) {
+  const pisado = huecos.find((h) => solape(natural, h) > 0)
+  if (!pisado) return { x: 0, y: 0 }
+  const x = pisado.left - SEPARACION - (natural.left + natural.width)
+  const izq = caja(natural.left + x, natural.top, natural.width, natural.height)
+  if (izq.left >= BORDE && !huecos.some((h) => solape(izq, h) > 0)) return { x, y: 0 }
+  return { x: 0, y: 0 }
+}
+
+/** El sitio de la barra fija: de la ventana y de su tamaño; la esquina alterna si pisa un hueco. */
+export function colocarBarraFija({ tam, vista, huecos = [] }) {
+  const bajo = Math.max(BORDE, vista.h - BORDE - tam.h)
+  const columna = barraEnColumna(vista)
+  const propia = caja(BORDE, columna ? BORDE : bajo, tam.w, tam.h)
+  if (!huecos.some((h) => solape(propia, h) > 0)) return propia
+  const otra = caja(BORDE, columna ? bajo : BORDE, tam.w, tam.h)
+  return huecos.some((h) => solape(otra, h) > 0) ? propia : otra
 }
 
 /**
@@ -300,4 +325,58 @@ export function flechaEntre(tarjeta, hueco) {
  */
 export function trozosRotulo(texto) {
   return String(texto ?? '').split('**').map((t, i) => ({ texto: t, fuerte: i % 2 === 1 })).filter((t) => t.texto !== '')
+}
+
+// ── TUT-1 T5 · STOP-T · LA COLOCACIÓN DE UN PASO, UNA VEZ Y DESDE FUERA ──────
+// En el S25 (React #185, «Maximum update depth») la capa se medía tras CADA render y leía en
+// el DOM lo que ella misma acababa de escribir (el desvío de «Cerrar», el tamaño del rótulo ya
+// colocado): con el lobby de una cuenta real, dos resultados se alternaban sin fin. La regla:
+// la colocación de un paso de capítulo sale de ENTRADAS FIJAS —las cajas de las anclas, la
+// ventana, los controles de la pantalla que un hueco no puede destapar, y el TAMAÑO (nunca la
+// posición) de la barra, de «Cerrar» en su sitio de siempre y de las copias invisibles de la
+// burbuja y de la tarjeta—, en un orden sin vuelta atrás: barra → «Cerrar» → burbuja o
+// tarjeta. Ninguna pieza lee la posición que otra acaba de escribir. Misma entrada, misma
+// salida: medir dos veces no cambia nada, y el estado sólo se escribe si el resultado cambió.
+
+/**
+ * Las tres posiciones de un paso de capítulo (con barra fija).
+ * @param {object} p
+ * @param {object[]} p.anclas      las cajas de las anclas (vacío: ninguna en pantalla)
+ * @param {object[]} [p.evitar]    los demás controles de la pantalla (para fundir huecos)
+ * @param {{w:number,h:number}} p.vista
+ * @param {{w:number,h:number}|null} p.barra     el tamaño de la barra (sin botones, `null`)
+ * @param {object|null} p.salir   «Cerrar» en su sitio de siempre (de su CSS, sin desvío)
+ * @param {{w:number,h:number}|null} p.burbuja   el tamaño de la copia de la burbuja
+ * @param {number} [p.lineas]     las líneas del rótulo en esa copia
+ * @param {{w:number,h:number}|null} p.tarjeta   el tamaño de la copia de la tarjeta
+ * @param {boolean} [p.sinAncla]  sin anclas en pantalla, la tarjeta (si no, esperar)
+ */
+export function colocarPaso({ anclas, evitar = [], vista, barra = null, salir = null, burbuja = null, lineas = 0, tarjeta = null, sinAncla = false }) {
+  const huecos = huecosDe(anclas, vista, { evitar })
+  const envolvente = union(huecos)
+  // 1 · la barra: su esquina, o la alterna si pisa un hueco.
+  const fija = barra ? colocarBarraFija({ tam: barra, vista, huecos }) : null
+  // 2 · «Cerrar»: su sitio, o a la izquierda del hueco que tapa.
+  const desvio = salir ? desvioSalir({ natural: salir, huecos }) : { x: 0, y: 0 }
+  const sr = salir ? caja(salir.left + desvio.x, salir.top + desvio.y, salir.width, salir.height) : null
+  const techo = sr ? sr.top + sr.height + SEPARACION : undefined
+  const obst = [...huecos, ...(sr ? [sr] : []), ...(fija ? [fija] : [])]
+  const base = { huecos, barra: fija, desvio, lado: null, picoX: null, fl: null }
+  // 3 · el rótulo.
+  if (!envolvente) {
+    if (!sinAncla || !tarjeta) return { ...base, modo: 'burbuja', rot: null }
+    return { ...base, modo: 'tarjeta', rot: colocarTarjeta({ tam: tarjeta, obstaculos: obst, vista, techo }) }
+  }
+  if (burbuja) {
+    let b = colocarBurbuja({ tam: burbuja, hueco: envolvente, vista })
+    let cabe = burbujaCabe({ caja: b.caja, huecos: obst, vista, lineas })
+    if (!cabe && fija) {
+      const otro = colocarBurbuja({ tam: burbuja, hueco: envolvente, vista, lado: b.lado === 'arriba' ? 'abajo' : 'arriba' })
+      if (burbujaCabe({ caja: otro.caja, huecos: obst, vista, lineas })) { b = otro; cabe = true }
+    }
+    if (cabe) return { ...base, modo: 'burbuja', rot: b.caja, lado: b.lado, picoX: b.picoX }
+  }
+  if (!tarjeta) return { ...base, modo: 'tarjeta', rot: null }
+  const rot = colocarTarjeta({ tam: tarjeta, obstaculos: obst, vista, techo })
+  return { ...base, modo: 'tarjeta', rot, fl: flechaEntre(rot, envolvente) }
 }

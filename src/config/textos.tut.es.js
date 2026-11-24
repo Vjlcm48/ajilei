@@ -1,5 +1,5 @@
 // ── TUT-1 · Los textos del tutorial ─────────────────────────────────────────
-// Normativo: AJILEI_Tutorial_v1.4.md (§1.2, §1.4, §1.6, §2.1, §2.2 y §3). Viajan con su
+// Normativo: AJILEI_Tutorial_v1.5.md (§1.2, §1.4, §1.6, §2.1, §2.2 y §3). Viajan con su
 // trozo, no en la entrada (INV-84, molde de `textos.pvp.es.js`): quien monta la
 // capa los suma con `textos.sumarTextos` al cargarse. En la tanda 1 no los suma
 // nadie; desde la tanda 2 los suma la partida guiada (`screens/Guiada.jsx`).
@@ -99,6 +99,8 @@ export const TEXTOS_TUT_TEMAS = {
   // Las dos líneas pequeñas bajo el rótulo (`nota` de la capa).
   'tut.temas.suma':    'Suma: {n}',
   'tut.temas.reloj':   'Tu reloj sigue corriendo.',
+  // T5 · en la capa del ⋮, los capítulos que navegan por la app (7, 8 y 9) no se abren.
+  'tut.temas.enlobby': 'En el lobby',
 
   'tut.cap1.titulo': '¿Qué es AJILEI?',
   'tut.cap1.p1': 'Esto es un AJILEI: 51 puntos. La jugada que gana en seco.',
@@ -151,10 +153,52 @@ export const TEXTOS_TUT_TEMAS = {
   // nivelan contigo; entre personas, hasta la entrada.»
   'tut.cap6.p4': 'Con poca pila, **recarga**: las IAS se nivelan contigo; entre personas, hasta la entrada.',
 
+  // ── Pista C · la app (T5; normativo v1.5 §2.2) ──
   'tut.cap7.titulo':  'Jugar contra las IAS',
+  'tut.cap7.p1': 'Elige el nivel. Básico para empezar.',
+  'tut.cap7.p2': 'Elige la apuesta. Lo que se juega en cada mano.',
+  'tut.cap7.p3': 'La entrada es lo que llevas a la mesa. Se cobra al sentarte.',
+  'tut.cap7.p4': 'Cuando quieras jugar de verdad, toca aquí.',
+
   'tut.cap8.titulo':  'Jugar con otras personas',
+  'tut.cap8.p1': 'Aquí se juega con gente de verdad.',
+  'tut.cap8.p2': 'Armas una mesa y eliges cuántos, la apuesta y el ritmo.',
+  // v1.5 · partido en dos pasos en la tanda 5 (STOP-T, Victor: en el acostado los tres mandos no
+  // caben juntos). Antes, un paso: «Cuántos juegan, cuánto se apuesta y el ritmo.»
+  'tut.cap8.p3': 'Cuántos juegan y cuánto se apuesta.',
+  'tut.cap8.p4': 'Y el ritmo: Normal o Rápido.',
+  'tut.cap8.p5': 'Al armarla recibes un código y un enlace para WhatsApp.',
+  'tut.cap8.p6': 'Si te invitaron, pega aquí el código.',
+
   'tut.cap9.titulo':  'El menú y los ajustes',
+  'tut.cap9.p1': 'Tu saldo. Toca para ver tus monedas.',
+  'tut.cap9.p2': 'Ajustes: sonido, idioma, perfil, eliminar cuenta.',
+  'tut.cap9.p3': 'Los grandes maestros, por puntos. Las grandes fortunas, por saldo.',
+  'tut.cap9.p4': 'Tapetes, avatares y monedas.',
+  'tut.cap9.p5': 'Dentro de la mesa, el ⋮ tiene el sonido, las reacciones y este tutorial.',
+
   'tut.cap10.titulo': 'Consejos',
+  'tut.cap10.p1': '**La escalera de la apuesta.**',
+  'tut.cap10.p2': 'El pez grande se come al chico: si tienes mucha pila, aprieta.',
+  'tut.cap10.p3': 'Retirarse a tiempo también es ganar.',
+  'tut.cap10.p4': 'Mira el pozo antes de igualar: ¿vale lo que te piden?',
+  'tut.cap10.p5': 'Un AJILEI se apuesta a lo grande. Siempre.',
+
+  // La escalera de la apuesta (P-3, normativo §1.3): la muestra del capítulo 10, paso 1.
+  'tut.escalera.tienes': 'Lo que tienes',
+  'tut.escalera.haces':  'Lo que haces',
+  'tut.escalera.1.a': 'Dos palos distintos',
+  'tut.escalera.1.b': 'Pasar',
+  'tut.escalera.2.a': 'Te apuestan y tienes algo',
+  'tut.escalera.2.b': 'Igualar',
+  'tut.escalera.3.a': 'Dos del mismo palo',
+  'tut.escalera.3.b': 'Apostar ×1',
+  'tut.escalera.4.a': 'Cuatro del mismo palo',
+  'tut.escalera.4.b': '×2',
+  'tut.escalera.5.a': 'Cinco del mismo palo',
+  'tut.escalera.5.b': '×5',
+  'tut.escalera.6.a': 'AJILEI',
+  'tut.escalera.6.b': '×10',
 
   // La muestra de cartas (P-4): las palabras que pinta junto a los componentes reales.
   'tut.muestra.mano':     'Mano',

@@ -244,7 +244,8 @@ export default function SalaOpciones({
       }}
     >
       {/* ── Bloque 1 · ¿Te invitaron? ──────────────────────────────────── */}
-      <section className="sal-bloque">
+      {/* TUT-1 T5 · el ancla del capítulo 8, paso 6 («Entrar por código»). */}
+      <section className="sal-bloque" data-ancla="codigo">
         <h2>{t('sal.opciones.codigo.titulo')}</h2>
         <div className="sal-codigo">
           <label className="sal-campo">

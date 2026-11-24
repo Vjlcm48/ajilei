@@ -43,8 +43,10 @@ export default function FilaChips({
   const primeraApagada = opciones.find((o) => o.disabled && o.aviso) ?? null
   const textoAviso = nota ?? elegida?.aviso ?? primeraApagada?.aviso ?? null
 
+  // TUT-1 T5 · `data-ancla`: la fila entera es el ancla de un paso de los capítulos 7 y 8
+  // (INV-89: un atributo, sin CSS).
   return (
-    <section className="sal-bloque">
+    <section className="sal-bloque" data-ancla={accion}>
       <h2>{titulo}</h2>
 
       <div className={`sal-chips${claseChips ? ` ${claseChips}` : ''}`} role="group" aria-label={titulo}>

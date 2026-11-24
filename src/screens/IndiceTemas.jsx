@@ -5,12 +5,12 @@ import { t } from '../config/textos'
 import { guia } from '../lib/guia'
 
 // ── TUT-1 T4 · «Aprender por tema»: el índice ───────────────────────────────
-// Rector: AJILEI_TUT-1_T4_v1.0.md §1.4; normativo AJILEI_Tutorial_v1.4.md §2.1.
+// Rector: AJILEI_TUT-1_T4_v1.0.md §1.4; normativo AJILEI_Tutorial_v1.5.md §2.1.
 // Una vista de «Cómo se juega» (la monta `ComoSeJuega`, en el trozo del tutorial), con
 // su carcasa (`PantallaChips`, sin botón dorado): la barra, el ⚙, la flecha (vuelve a
 // las tres tarjetas) y la casa (al lobby), como en Retar.
-// Las filas 7–10 dicen «Pronto» y, al tocarlas, el toast del lobby (`lob.toast.pronto`).
-// Al terminar un capítulo (P-5) se vuelve aquí, con su ✓.
+// Las filas 7–10 dijeron «Pronto» hasta la tanda 5; ya abren las diez (`onPronto` queda
+// para lo que un día vuelva a faltar). Al terminar un capítulo (P-5) se vuelve aquí, con su ✓.
 export default function IndiceTemas({ cuenta, billetera, aviso, onAvisoFin, onVolver, onLobby, onCapitulo }) {
   const carcasa = useRef(null)
   // Se lee al montar: volver de un capítulo terminado monta la pantalla otra vez.

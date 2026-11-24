@@ -1,12 +1,17 @@
 // ── TUT-1 T4 · Los capítulos de «Aprender por tema», en datos ────────────────
-// Rector: AJILEI_TUT-1_T4_v1.0.md §1.3 (el mapa de momentos) y §P; normativo
-// AJILEI_Tutorial_v1.4.md §2.2 (los rótulos) y §2.1 (la forma). Módulo PURO, sin
-// React ni DOM: lo leen `Capitulo.jsx`, el índice, la fila del ⋮ y las varas.
+// Rector: AJILEI_TUT-1_T4_v1.0.md §1.3 (el mapa de momentos) y §P; T5 (capítulos 7 a
+// 10): AJILEI_TUT-1_T5_v1.0.md §1.1 y P-1 a P-4; normativo AJILEI_Tutorial_v1.5.md
+// §2.2 (los rótulos) y §2.1 (la forma). Módulo PURO, sin React ni DOM: lo leen
+// `Capitulo.jsx`, el índice, la fila del ⋮ y las varas.
 //
 // POR PASO:
 //   · `momento`: `[mano, paso]` de la partida guiada sobre el que se posa el paso
 //     (`guia/momento.js`). Desde el ⋮ (P-2) no se usa: el paso corre sobre la mesa
 //     viva y el aro va al ancla que exista en ese instante;
+//   · `pantalla` (T5, la Pista C): en lugar de un momento, la pantalla VIVA de la app
+//     a la que el capítulo navega (el nombre de `screen` en `App`: `lobby`,
+//     `retar-ias`, `sala-opciones`, `armar-mesa`). Navegar no escribe nada; el paso
+//     señala el botón que escribe («Sentarme a la mesa», «Armar la mesa») sin tocarlo;
 //   · `ancla`: selectores (o una función de la mesa que los da), de las anclas de la
 //     tanda 1 (`data-ancla`, `data-accion`) más el mazo y la pila; `[]` = ninguna;
 //   · `clave`: el rótulo en `t()`; `vars(game)` sus variables;
@@ -45,7 +50,36 @@ const S = {
   descartar: '[data-accion="descartar"]',
   mults: '[data-accion="mult"]',
   muestra: '[data-muestra]',
+  // T5 · las anclas de la app: `data-ancla` donde la pantalla no tenía nombre propio (las
+  // filas de `FilaChips`, el bloque del código), `data-accion` o su clase donde ya lo tenía
+  // (la píldora es `.lob-pildora`: un atributo más en la barra pesaría en la entrada, `1.8b`).
+  // Cada una, dentro de SU pantalla: las filas de Retar y de Armar mesa se llaman igual.
+  retar: (f) => `.sal-cuerpo.es-retar [data-ancla="${f}"]`,
+  sentarme: '.sal-cuerpo.es-retar .sal-cta',
+  armar: (f) => `.sal-cuerpo.es-armar [data-ancla="${f}"]`,
+  armarLa: '.sal-cuerpo.es-armar .sal-cta',
+  armarMesa: 'main.sal [data-accion="armar"]',
+  codigo: 'main.sal [data-ancla="codigo"]',
+  pvp: 'main.lobby [data-accion="jugar-pvp"]',
+  saldo: 'main.lobby .lob-pildora',
+  ajustes: 'main.lobby [data-accion="ajustes"]',
+  rankings: 'main.lobby [data-accion="rankings"]',
+  tienda: 'main.lobby .lob-nav [data-accion="tienda"]',
+  // El ⋮ de la mesa, cerrado (P-4): el de la mesa guiada congelada.
+  menu: '[data-ancla="menu"]',
 }
+
+/**
+ * T5 · la marca de cada pantalla de la Pista C: está montada cuando esto existe. Con la
+ * pantalla montada y sin el ancla del paso, el paso cae a la tarjeta sin flecha (nunca se
+ * queda esperando con la pantalla velada); la vara lo marca rojo (`tut.app`).
+ */
+export const PANTALLAS = Object.freeze({
+  lobby: 'main.lobby',
+  'retar-ias': '.sal-cuerpo.es-retar',
+  'sala-opciones': 'main.sal [data-accion="armar"]',
+  'armar-mesa': '.sal-cuerpo.es-armar',
+})
 const CINCO = [0, 1, 2, 3, 4].map(S.carta)
 const DOS = [0, 1].map(S.carta)
 const delPalo = (g) => indicesDelPalo(g?.players?.[0]?.cards ?? []).map(S.carta)
@@ -57,10 +91,12 @@ export const PISTAS = Object.freeze([
   { id: 'c', clave: 'tut.temas.pista.c', capitulos: [7, 8, 9, 10] },
 ])
 
-/** Los que ya tienen pasos (1–6); 7–10, con la tanda 5. */
-export const CONSTRUIDOS = Object.freeze([1, 2, 3, 4, 5, 6])
+/** Los que tienen pasos: los diez desde la tanda 5. */
+export const CONSTRUIDOS = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
 const m = (mano, paso) => [mano, paso]
+// T5 · un paso sobre una pantalla viva de la app (sin momento).
+const en = (pantalla, ancla, clave) => ({ pantalla, ancla, clave })
 
 export const CAPITULOS = Object.freeze({
   1: {
@@ -141,11 +177,58 @@ export const CAPITULOS = Object.freeze({
       { momento: m(1, 10), ancla: [S.pila], clave: 'tut.cap6.p4' },
     ],
   },
-  7: { titulo: 'tut.cap7.titulo', icono: 'ias', pasos: [] },
-  8: { titulo: 'tut.cap8.titulo', icono: 'personas', pasos: [] },
-  9: { titulo: 'tut.cap9.titulo', icono: 'ajustes', pasos: [] },
-  10: { titulo: 'tut.cap10.titulo', icono: 'consejos', pasos: [] },
+  // ── Pista C · la app (T5) ──
+  // En Retar las filas y el botón anclado al pie, en una columna o en las dos de INV-55.
+  7: {
+    titulo: 'tut.cap7.titulo', icono: 'ias',
+    pasos: [
+      en('retar-ias', [S.retar('reto')], 'tut.cap7.p1'),
+      en('retar-ias', [S.retar('apuesta')], 'tut.cap7.p2'),
+      en('retar-ias', [S.retar('entrada')], 'tut.cap7.p3'),
+      // Señalado, nunca tocado: el hueco no deja pasar el toque (P-2) y aquí se termina.
+      en('retar-ias', [S.sentarme], 'tut.cap7.p4'),
+    ],
+  },
+  // P-1 · sin sala de espera: mostrarla obligaría a armar una mesa de verdad.
+  // STOP-T (Victor): el paso 3 de la v1.5 se parte en dos —en el acostado los tres mandos no
+  // caben juntos—: cuántos y la apuesta, y después el ritmo. Seis pasos (v1.5).
+  8: {
+    titulo: 'tut.cap8.titulo', icono: 'personas',
+    pasos: [
+      en('lobby', [S.pvp], 'tut.cap8.p1'),
+      en('sala-opciones', [S.armarMesa], 'tut.cap8.p2'),
+      en('armar-mesa', [S.armar('jugadores'), S.armar('apuesta')], 'tut.cap8.p3'),
+      en('armar-mesa', [S.armar('ritmo')], 'tut.cap8.p4'),
+      en('armar-mesa', [S.armarLa], 'tut.cap8.p5'),
+      en('sala-opciones', [S.codigo], 'tut.cap8.p6'),
+    ],
+  },
+  9: {
+    titulo: 'tut.cap9.titulo', icono: 'ajustes',
+    pasos: [
+      en('lobby', [S.saldo], 'tut.cap9.p1'),
+      en('lobby', [S.ajustes], 'tut.cap9.p2'),
+      en('lobby', [S.rankings], 'tut.cap9.p3'),
+      en('lobby', [S.tienda], 'tut.cap9.p4'),
+      // P-4 · el ⋮ de la mesa guiada congelada, señalado y cerrado: nada se abre.
+      { momento: m(3, 3), ancla: [S.menu], clave: 'tut.cap9.p5' },
+    ],
+  },
+  // P-3 · la escalera es una muestra (seis filas); los otros cuatro consejos, tarjeta sin ancla.
+  10: {
+    titulo: 'tut.cap10.titulo', icono: 'consejos',
+    pasos: [
+      { momento: m(3, 3), muestra: { tipo: 'escalera' }, clave: 'tut.cap10.p1' },
+      { momento: m(3, 3), ancla: [], clave: 'tut.cap10.p2' },
+      { momento: m(3, 3), ancla: [], clave: 'tut.cap10.p3' },
+      { momento: m(3, 3), ancla: [], clave: 'tut.cap10.p4' },
+      { momento: m(3, 3), ancla: [], clave: 'tut.cap10.p5' },
+    ],
+  },
 })
+
+/** T5 · los capítulos que navegan por la app: desde el ⋮ de una mesa no se abren. */
+export const DE_LA_APP = Object.freeze(Object.keys(CAPITULOS).map(Number).filter((n) => CAPITULOS[n].pasos.some((p) => p.pantalla)))
 
 /** Las anclas de un paso sobre una mesa (con la muestra, la muestra). */
 export function anclasDe(paso, game) {

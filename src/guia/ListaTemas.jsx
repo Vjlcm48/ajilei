@@ -5,24 +5,27 @@ import { TEXTOS_TUT_COMUNES, TEXTOS_TUT_HUB, TEXTOS_TUT_TEMAS } from '../config/
 import { guia } from '../lib/guia'
 import { BotonSalir } from '../components/CapaSenal'
 import IconoTema from './IconosTemas'
-import { CAPITULOS, CONSTRUIDOS, PISTAS } from './capitulos'
+import { CAPITULOS, CONSTRUIDOS, DE_LA_APP, PISTAS } from './capitulos'
 import '../styles/temas.css'
 
 sumarTextos('es', { ...TEXTOS_TUT_COMUNES, ...TEXTOS_TUT_HUB, ...TEXTOS_TUT_TEMAS })
 
 // ── TUT-1 T4 · Las diez filas de «Aprender por tema» ────────────────────────
-// Rector: AJILEI_TUT-1_T4_v1.0.md §1.4; normativo AJILEI_Tutorial_v1.4.md §2.1 y §2.2.
+// Rector: AJILEI_TUT-1_T4_v1.0.md §1.4; normativo AJILEI_Tutorial_v1.5.md §2.1 y §2.2.
 // Tres pistas con su título y diez filas: icono, número, título y el ✓ de `vistos`. Las
-// que aún no existen (7–10, tanda 5) dicen «Pronto». Piso táctil 44, letra con los pisos
+// que aún no existían dijeron «Pronto» hasta la tanda 5. Piso táctil 44, letra con los pisos
 // de LEC-1. La usan la pantalla del índice y la capa del ⋮ (entre manos).
+// T5 · en la capa del ⋮ los capítulos que navegan por la app (7, 8 y 9, `DE_LA_APP`) no se
+// abren: saldrían de la mesa. Dicen «En el lobby» en el sitio del ✓ y no responden.
 
 /**
  * @param {object} p
  * @param {number[]} p.vistos       los capítulos con ✓
  * @param {(n:number) => void} p.onElegir
  * @param {() => void} [p.onPronto] tocar una fila que aún no existe
+ * @param {boolean} [p.enMesa]      (T5) la capa del ⋮: los capítulos de la app no se abren
  */
-export default function ListaTemas({ vistos, onElegir, onPronto }) {
+export default function ListaTemas({ vistos, onElegir, onPronto, enMesa = false }) {
   return (
     <div className="tem-lista">
       {PISTAS.map((pista) => (
@@ -30,7 +33,8 @@ export default function ListaTemas({ vistos, onElegir, onPronto }) {
           <h2 className="tem-pista-titulo">{t(pista.clave)}</h2>
           <ul className="tem-filas">
             {pista.capitulos.map((n) => {
-              const listo = CONSTRUIDOS.includes(n)
+              const fuera = enMesa && DE_LA_APP.includes(n)
+              const listo = CONSTRUIDOS.includes(n) && !fuera
               const visto = vistos.includes(n)
               return (
                 <li key={n}>
@@ -48,7 +52,7 @@ export default function ListaTemas({ vistos, onElegir, onPronto }) {
                     <span className="tem-titulo">{t(CAPITULOS[n].titulo)}</span>
                     {listo
                       ? <span className="tem-visto" aria-hidden="true" style={visto ? undefined : { visibility: 'hidden' }}>✓</span>
-                      : <span className="tem-pronto">{t('tut.hub.pronto')}</span>}
+                      : <span className="tem-pronto">{t(fuera ? 'tut.temas.enlobby' : 'tut.hub.pronto')}</span>}
                   </button>
                 </li>
               )
@@ -75,7 +79,7 @@ export function IndiceCapa({ onElegir, onCerrar }) {
     <div className="tem-capa" role="dialog" aria-modal="true" aria-label={t('tut.hub.temas.titulo')} data-tem-capa="">
       <div className="tem-capa-caja">
         <h1 className="tem-capa-titulo">{t('tut.hub.temas.titulo')}</h1>
-        <ListaTemas vistos={vistos} onElegir={onElegir} />
+        <ListaTemas vistos={vistos} onElegir={onElegir} enMesa />
       </div>
       <BotonSalir cerrar onClick={onCerrar} />
     </div>,
