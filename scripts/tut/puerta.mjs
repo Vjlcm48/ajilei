@@ -318,9 +318,13 @@ async function celda(browser, base, tam, vp) {
       const ok = await page.waitForFunction(() => !document.querySelector('.tut-capa--libre'), null, { timeout: 8000 }).then(() => true).catch(() => false)
       if (!ok) falla('tut.senales', `«${clave}» no se apagó con su acción`)
     }
-    // Lo que se toca en un turno: pasar si se puede; si no, igualar (nunca retirarse: hace falta el descarte).
+    // Lo que se toca en un turno: pasar si se puede; si no, igualar (nunca retirarse antes del
+    // descarte: hace falta verlo). T5 · tras el descarte, retirarse antes que el all-in: un
+    // all-in perdido deja la pila en cero y la mesa vuelve a Retar sin «Siguiente mano» (el rojo
+    // de la serie de la tanda 5, que dependía del barajado).
     const jugarTurno = async () => {
-      const sel = await page.evaluate(() => ['pasar', 'igualar', 'allin', 'retirarse'].map((a) => `[data-ancla="fila-acciones"] [data-accion="${a}"]`).find((s) => document.querySelector(s)))
+      const orden = vistoDescarte ? ['pasar', 'igualar', 'retirarse', 'allin'] : ['pasar', 'igualar', 'allin', 'retirarse']
+      const sel = await page.evaluate((o) => o.map((a) => `[data-ancla="fila-acciones"] [data-accion="${a}"]`).find((s) => document.querySelector(s)), orden)
       if (!sel) throw new Error('sin acción en la fila')
       await tocar(sel)
     }

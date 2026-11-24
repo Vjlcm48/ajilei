@@ -93,6 +93,9 @@ const TUT_PUERTA = diag('diagDSK', 'tut.puerta', 'tut', 10, ['puerta'])
 // TUT-1 tanda 4 · «Aprender por tema» (`scripts/tut/temas.mjs`: el índice y los capítulos 1–6
 // sobre la mesa de la guiada congelada) y la fila «Cómo se juega» del ⋮ en una mesa real
 // contra las IAS (`scripts/tut/menu.mjs`). Las dos en `completo`, como las de la tanda 3.
+// TUT-1 tanda 5 · `tut.temas` recorre los diez capítulos, y lleva dentro la puerta `tut.app`
+// (la Pista C sobre Retar, Salas, Armar mesa y el lobby: el hueco no deja pasar el toque, nada
+// escribe, se vuelve al lobby): una corrida, no dos (≈ 50 s).
 const TUT_TEMAS = diag('diagDSK', 'tut.temas', 'tut', 10, ['temas'])
 const TUT_MENU = diag('diagDSK', 'tut.menu', 'tut', 10, ['menu'])
 

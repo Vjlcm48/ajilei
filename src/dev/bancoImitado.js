@@ -197,6 +197,8 @@ export function crearBanco({
   saldo = 5000, ahora = () => Date.now(), entradaDeMolde = false, limites = true,
   videoMinimoS = VIDEO_MINIMO_S_SQL, usuario = 'test1976', sembrados = [],
   correo = 'devlocal@ajilei.test',
+  // TUT-1 T5 · una cuenta con historia: la fila de `constancia` y el país del perfil al nacer.
+  constancia = null, pais = null,
 } = {}) {
   const nace = ahora()
   const b = {
@@ -209,7 +211,7 @@ export function crearBanco({
     // ECO-1d
     intentos: [],              // { funcion, en } — `intentos_dinero`
     forzados: {},              // funcion → cuántas respuestas `limite` quedan (mando del arnés)
-    constancia: null,          // { racha, ultimo_dia } — la fila de `constancia`, o ninguna
+    constancia,                // { racha, ultimo_dia } — la fila de `constancia`, o ninguna
     tope: null,                // `ajustes_economia.tope_diario_ia` (null = apagada)
     cambiosValvula: [],        // `valvula_cambios`
     // ECO-1g
@@ -222,7 +224,7 @@ export function crearBanco({
     // CFG-1 1d · la fila propia de `auth.users` en lo que toca al correo
     correoAuth: { email: correo, nuevo: null, enviadoEn: null, confirmados: 0, codigos: {}, forzar: null },
     // CFG-1 1b · la fila propia de `profiles` (el nombre es `usuario`)
-    perfil: { id: '00000000-0000-4000-8000-000000000000', pais: null, estado: null, cambiadoEn: null, forzar: null },
+    perfil: { id: '00000000-0000-4000-8000-000000000000', pais, estado: null, cambiadoEn: null, forzar: null },
     // CFG-1 1e · la fila de `consultas`, o ninguna (nace en la primera consulta)
     consultas: null,           // { usadas, ultimaMesa, ultimaMano }
     // TIE-1 1a · las filas de `inventario` de la cuenta (el gratis no tiene)

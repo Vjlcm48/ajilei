@@ -123,6 +123,9 @@ const OBLIGATORIAS = [
   'tut-capa', 'data-tut-unico',
   // TUT-1 tanda 3 · la oferta montada, y el premio de la guiada de verdad (las dos funciones).
   'ofg-tarjeta', 'tut.oferta', 'premio_guiada_estado', 'cobrar_guiada',
+  // TUT-1 tanda 5 · los capítulos de la app (7 a 10) montados: un rótulo de la Pista C, la
+  // escalera del 10 y el ancla del código de Salas.
+  'tut.cap7.p1', 'tut.escalera.1.a', 'data-ancla="codigo"',
 ]
 
 let carpeta = null

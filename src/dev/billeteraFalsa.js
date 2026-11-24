@@ -49,7 +49,7 @@ import { crearPerfilApi } from '../lib/perfilApi'
 import { crearConsultaApi } from '../lib/consultaApi'
 import { crearTiendaApi } from '../lib/tiendaApi'
 import { saldoOculto } from '../lib/saldoOculto'
-import { crearBanco, VIDEO_MINIMO_S_SQL } from './bancoImitado'
+import { crearBanco, VIDEO_MINIMO_S_SQL, diaChicagoSQL, sumarDias } from './bancoImitado'
 import { sembradosRanking, PUNTOS_DEL_BYPASS } from './sembradosRanking'
 import { siembraAPU, entradaSembradaAPU, videoSembradoAPU } from './siembraAPU'
 import { AJILEI_CONFIG } from '../config/ajileiConfig'
@@ -59,6 +59,20 @@ import { AJILEI_CONFIG } from '../config/ajileiConfig'
 export const MARCA_BILLETERA_FALSA = 'ajilei:billetera-falsa'
 
 let banco = null
+
+// ── TUT-1 T5 · `?lobby=cuenta`: el lobby de una cuenta con historia ──────────
+// Lo que vio el S25 en el STOP-T de la tanda 5 (la celda S25 de `diagDSK tut temas`): la
+// constancia de ayer en racha 3, que al llegar marca el día 1 del ciclo (la ficha «1/3»), un
+// saldo de cinco cifras (20.900), un nombre de 15 letras (truncado en la barra) y el país del
+// perfil. El saldo recordado lo siembra la vara (`ajilei.saldoVisto`).
+export const LOBBY_PARAM = 'lobby'
+
+function cuentaConHistoria() {
+  let mando = null
+  try { mando = new URLSearchParams(window.location.search).get(LOBBY_PARAM) } catch { /* sin URL, sin mando */ }
+  if (mando !== 'cuenta') return {}
+  return { constancia: { racha: 3, ultimo_dia: sumarDias(diaChicagoSQL(Date.now()), -1) }, pais: 'VE', saldo: 20900, usuario: 'Maximilianoruiz' }
+}
 
 /** El banco imitado del bypass, uno por carga de página, o `null` fuera de él. */
 export function bancoDelBypass() {
@@ -80,6 +94,7 @@ export function bancoDelBypass() {
       // jugadores sembrados la pantalla sale llena, como en la lámina.
       usuario: 'DevLocal',
       sembrados: sembradosRanking(),
+      ...cuentaConHistoria(),
     })
     // …y con sus puntos queda en el puesto 7 de Maestros (banda y «· tú» a la vez).
     banco.sumarPuntos('DevLocal', PUNTOS_DEL_BYPASS)
