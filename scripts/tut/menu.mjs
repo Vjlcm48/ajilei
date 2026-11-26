@@ -14,7 +14,19 @@
 //                     abierto mientras piensa una IA, la IA no juega (y al cerrar, juega);
 //   · tut.menu.mazo   al cerrar, el barajado está en el azar (R-2: la mesa no reparte nunca
 //                     el orden de la guiada);
+//   · tut.menu.vacio  (T7, AJILEI_TUT-1_T7_v1.0.md §2; v1.6 §2.1) antes de la primera mano,
+//                     desde el índice del ⋮, los capítulos 1, 4 y 3 paso a paso: ningún aro
+//                     sobre huecos de carta vacíos (un aro que es el hueco de una o varias zonas
+//                     de cartas sin cartas); el 1.1 y el 4.1 pintan la muestra del AJILEI (cinco
+//                     cartas, `chica`, con el aro y la burbuja); el 1.2–1.4 y el 4.5 señalan lo
+//                     que existe (mazo, asientos, pila); el 4.3 y los pasos de cartas del 3, en
+//                     la tarjeta sin flecha. Después, «Iniciar mano» reparte normal;
 //   · tut.consola     sin errores de página.
+//
+// Control rojo (T7): `TUT_CONTROL=aro-vacio` hace pasar los huecos vacíos por cartas antes de
+// abrir los capítulos (les quita `card-empty`: `anclaVacia` ya no ve ninguno vacío; la vara los
+// sigue reconociendo por la marca `tut-control-vacio`): el aro vuelve a los huecos y
+// `tut.menu.vacio` sale roja.
 import process from 'node:process'
 
 const T = {
@@ -59,6 +71,71 @@ const PANEL = () => {
     dentro: r.top >= 0 && r.bottom <= window.innerHeight,
   }
 }
+// T7 · un paso de capítulo sobre la mesa viva: sus aros, su muestra y los aros que son el hueco
+// de zonas de cartas vacías (el hueco del ancla más su margen de 6 px, con 3 px de tolerancia;
+// cinco huecos pegados se funden en uno, así que se compara con la unión de los que encierra).
+// Un aro alrededor de un panel de rival (el 1.3) encierra sus huecos pero no es su hueco.
+const PASO_VIVO = () => {
+  const capa = document.querySelector('.tut-capa[data-listo]')
+  if (!capa) return null
+  const t = capa.querySelector('.tut-paso')?.textContent ?? ''
+  const m = t.match(/(\d+)\D+(\d+)/)
+  const caja = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom } }
+  const centro = (a, c) => { const x = (c.l + c.r) / 2; const y = (c.t + c.b) / 2; return x > a.l && x < a.r && y > a.t && y < a.b }
+  const MARGEN = 6
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const vacias = [...document.querySelectorAll('[data-ancla="carta"], .opp-card-slot, .card-slot-wrapper')]
+    .filter((e) => e.getBoundingClientRect().width > 0 && !e.closest('.muestra')
+      && ![...e.querySelectorAll('.playing-card')].some((c) => !c.classList.contains('card-empty') && !c.classList.contains('tut-control-vacio')))
+    .map(caja)
+  const aros = [...capa.querySelectorAll('.tut-aro')].map(caja)
+  const sobreVacios = aros.filter((a) => {
+    const dentro = vacias.filter((z) => centro(a, z))
+    if (!dentro.length) return false
+    const u = {
+      l: Math.max(0, Math.min(...dentro.map((z) => z.l)) - MARGEN), t: Math.max(0, Math.min(...dentro.map((z) => z.t)) - MARGEN),
+      r: Math.min(vw, Math.max(...dentro.map((z) => z.r)) + MARGEN), b: Math.min(vh, Math.max(...dentro.map((z) => z.b)) + MARGEN),
+    }
+    return Math.abs(u.l - a.l) <= 3 && Math.abs(u.t - a.t) <= 3 && Math.abs(u.r - a.r) <= 3 && Math.abs(u.b - a.b) <= 3
+  }).length
+  const mu = document.querySelector('[data-muestra]')
+  return {
+    n: m ? Number(m[1]) : null,
+    m: m ? Number(m[2]) : null,
+    modo: capa.dataset.modo,
+    texto: capa.querySelector('.tut-rotulo:not(.tut-rotulo--medida) .tut-rotulo-texto')?.textContent ?? '',
+    aros: aros.length,
+    sobreVacios,
+    flecha: !!capa.querySelector('.tut-flecha'),
+    muestra: mu ? {
+      tipo: mu.dataset.muestra,
+      conjunto: mu.dataset.conjunto ?? null,
+      tamano: mu.dataset.tamano ?? null,
+      cartas: mu.querySelectorAll('.playing-card:not(.card-empty)').length,
+      conAro: aros.some((a) => centro(a, caja(mu))),
+    } : null,
+  }
+}
+// Lo que cada paso debe enseñar antes de la primera mano (los pasos de 1 en adelante).
+//   ajilei: la muestra del AJILEI con su aro y la burbuja · existe: al menos un aro (mazo,
+//   asientos, pila) · tarjeta: sin aro y sin flecha · libre: sólo la regla (ningún aro sobre huecos).
+const VACIO = {
+  1: ['ajilei', 'existe', 'existe', 'existe'],
+  4: ['ajilei', 'libre', 'tarjeta', 'libre', 'existe'],
+  3: ['tarjeta', 'libre', 'tarjeta', 'tarjeta', 'libre', 'libre', 'tarjeta'],
+}
+const LISTO_VIVO = (que) => {
+  const capa = document.querySelector('.tut-capa[data-listo]')
+  if (!capa) return false
+  const aros = capa.querySelectorAll('.tut-aro').length
+  const mu = document.querySelector('[data-muestra]')
+  if (que === 'ajilei') return !!mu && aros > 0 && capa.dataset.modo === 'burbuja'
+  if (que === 'existe') return aros > 0
+  if (que === 'tarjeta') return capa.dataset.modo === 'tarjeta'
+  return true
+}
+
 // Los títulos de los capítulos, por su clave (la capa lleva el título como nombre accesible).
 const TITULOS = { 3: 'Cómo va una mano', 4: 'Cómo se gana y cómo se pierde', 5: 'Apostar, pasar, retirarse' }
 
@@ -126,6 +203,43 @@ async function celda(page, base, tam, vp, rastro = {}) {
     esperado('espera', abierto, null)
     await cerrar()
   }
+  // 1b · T7 · los capítulos 1, 4 y 3 desde el índice del ⋮, con la mano sin cartas.
+  etapa('capítulos sin cartas')
+  if (process.env.TUT_CONTROL === 'aro-vacio') {
+    await page.evaluate(() => document.querySelectorAll('.playing-card.card-empty').forEach((e) => { e.classList.remove('card-empty'); e.classList.add('tut-control-vacio') }))
+  }
+  out.vacio = {}
+  for (const [n, esperados] of Object.entries(VACIO)) {
+    const { abierto } = await abrirFila()
+    if (abierto?.que !== 'indice') { falla('tut.menu.vacio', `cap ${n}: el ⋮ abrió ${JSON.stringify(abierto)} (se esperaba el índice)`); await cerrar(); continue }
+    await tocar(`.tem-fila[data-capitulo="${n}"]`)
+    out.vacio[n] = []
+    for (let k = 1; k <= esperados.length; k++) {
+      const que = esperados[k - 1]
+      etapa(`capítulos sin cartas · ${n}.${k}`)
+      await page.waitForFunction((x) => new RegExp(`^\\D*${x}\\D`).test(document.querySelector('.tut-capa[data-listo] .tut-paso')?.textContent ?? ''), k, { timeout: 8000 })
+      // Lo que el paso debe enseñar, cuando llega (la muestra viaja por su trozo); si no llega, se lee igual.
+      await page.waitForFunction(LISTO_VIVO, que, { timeout: 4000 }).catch(() => {})
+      await page.waitForTimeout(250)
+      const p = await page.evaluate(PASO_VIVO)
+      out.vacio[n].push({ que, ...p })
+      const yo = `${n}.${k}`
+      if (!p || p.n !== k || p.m !== esperados.length) { falla('tut.menu.vacio', `${yo}: el paso no es el ${k} de ${esperados.length} (${JSON.stringify(p)})`); break }
+      if (p.sobreVacios > 0) falla('tut.menu.vacio', `${yo}: ${p.sobreVacios} aro(s) sobre huecos de carta vacíos`)
+      if (que === 'ajilei') {
+        const mu = p.muestra
+        if (!mu || mu.tipo !== 'cartas' || mu.conjunto !== 'ajilei' || mu.cartas !== 5 || mu.tamano !== 'chica') falla('tut.menu.vacio', `${yo}: sin la muestra del AJILEI (${JSON.stringify(mu)})`)
+        else if (!mu.conAro) falla('tut.menu.vacio', `${yo}: la muestra del AJILEI sin aro`)
+        if (p.modo !== 'burbuja') falla('tut.menu.vacio', `${yo}: el rótulo en ${p.modo}, no en la burbuja sobre la muestra`)
+        if (!/AJILEI/.test(p.texto)) falla('tut.menu.vacio', `${yo}: el rótulo no nombra el AJILEI («${p.texto}»)`)
+      } else if (p.muestra?.conjunto) falla('tut.menu.vacio', `${yo}: la muestra del AJILEI fuera del 1.1 y el 4.1`)
+      if (que === 'existe' && p.aros === 0) falla('tut.menu.vacio', `${yo}: sin aro (su ancla existe antes de la primera mano)`)
+      if (que === 'tarjeta' && (p.modo !== 'tarjeta' || p.aros > 0 || p.flecha)) falla('tut.menu.vacio', `${yo}: se esperaba la tarjeta sin aro ni flecha (${p.modo}, ${p.aros} aros${p.flecha ? ', flecha' : ''})`)
+      if (k < esperados.length) await tocar('.tut-capa [data-accion="tut-siguiente"]')
+    }
+    await cerrar()
+  }
+  pasa('tut.menu.vacio')
   // 2 · El reparto: el capítulo 3, desde su primer paso.
   etapa('el reparto')
   await tocar('[data-accion="iniciar-mano"]')
