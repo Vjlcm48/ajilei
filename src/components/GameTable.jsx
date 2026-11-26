@@ -3143,8 +3143,9 @@ export default function GameTable({ stake, numPlayers = 2, nivel, entrada = null
           utilidades y las burbujas: overlays puros `fixed`, jamás dentro de un
           panel. Δ=0 por construcción — no ocupan una celda del flujo. */}
       {/* L-M 3 · §2 · la transición entre manos, en las dos mesas: contra las IAS, al pulsar
-          «Siguiente mano»; contra personas, al final de la pausa entre manos. */}
-      <TransicionMano game={game} recoger={!partida && isPayoutPhase && isClearing} recogerA={partida ? recogerEnPvP(game.vencimiento, partida.desfase ?? 0) : null} />
+          «Siguiente mano»; contra personas, al final de la pausa entre manos. TUT-1 T6 · en la
+          guiada, la pastilla la arma el guion (v1.6); `undefined` en toda otra mesa. */}
+      <TransicionMano game={game} recoger={!partida && isPayoutPhase && isClearing} recogerA={partida ? recogerEnPvP(game.vencimiento, partida.desfase ?? 0) : null} texto={guion?.pastilla} />
       <CelebracionMesa activa={celebracion.activa} />
       <AjileiOverlay activa={celebracion.activa} />
       {/* TUT-1 T2 · la capa de la partida guiada: el paso vigente y «Salir». Lee la mesa;

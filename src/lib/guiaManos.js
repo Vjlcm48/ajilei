@@ -47,6 +47,21 @@ export const JUGADORES = Object.freeze([
   { isHuman: false, chips: PILA, name: 'IA 2' },
 ])
 
+/**
+ * TUT-1 T6 · v1.6 · la pastilla entre manos de la guiada: cuenta el camino («Mano 1 de 3 ·
+ * Eres Mano», «Mano 2 de 3 · Es Mano IA 1», «Última mano · Es Mano IA 2»). Recibe `t` para
+ * seguir puro (el buscador de órdenes lo importa desde Node). Desde la mano 1: la mesa real
+ * empieza en la 2. `null` si la mesa no tiene mano todavía.
+ */
+export function pastillaGuiada(game, t) {
+  const n = game?.handCount
+  const quien = game?.players?.[game?.manoIndex]
+  if (!(n >= 1) || !quien) return null
+  const cuenta = n >= MANOS ? t('tut.pastilla.ultima') : t('tut.pastilla.mano', { n, total: MANOS })
+  const mano = game.manoIndex === 0 ? t('tut.pastilla.eres') : t('tut.pastilla.es', { nombre: quien.name })
+  return `${cuenta} · ${mano}`
+}
+
 /** El estado con el que nace la mesa guiada (el mismo para la mesa y el buscador). */
 export const estadoInicial = () => conNivel(createInitialState(APUESTA, JUGADORES.map((j) => ({ ...j }))), NIVEL)
 

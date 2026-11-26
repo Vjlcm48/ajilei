@@ -2,10 +2,10 @@ import { lazy, useEffect, useMemo, useRef, useState } from 'react'
 import PantallaDiferida from '../components/PantallaDiferida'
 import GuiaControl from '../components/GuiaControl'
 import CierreGuiada from './CierreGuiada'
-import { sumarTextos } from '../config/textos'
+import { sumarTextos, t } from '../config/textos'
 import { TEXTOS_TUT_COMUNES, TEXTOS_TUT_GUIADA } from '../config/textos.tut.es'
 import { armarOrden, soltarMazo } from '../lib/mazoDado'
-import { ORDENES, MANOS, APUESTA, ASIENTOS, NIVEL, estadoInicial, decidirRival } from '../lib/guiaManos'
+import { ORDENES, MANOS, APUESTA, ASIENTOS, NIVEL, estadoInicial, decidirRival, pastillaGuiada } from '../lib/guiaManos'
 import { fabricaMesa, trozoMesa } from '../lib/cargarMesa'
 
 // La mesa, por su trozo (INV-29, ARN-3d): nadie la importa de forma estática. Con la precarga
@@ -39,6 +39,8 @@ export { default as SenalesPrimeraVez } from '../components/SenalesPrimeraVez'
 // TUT-1 T4 · «Aprender por tema»: el índice, los capítulos y lo que abre la fila del ⋮.
 export { default as Capitulo } from '../guia/Capitulo'
 export { default as TutorialMesa } from '../guia/TutorialMesa'
+// TUT-1 T6 · la ruta de la primera vez (intro → capítulo 2 → puente → esta mesa).
+export { default as Ruta } from '../guia/Ruta'
 
 export default function Guiada({ onLobby, onJugar, onSaldo }) {
   const [fase, setFase] = useState('mesa')
@@ -66,6 +68,8 @@ export default function Guiada({ onLobby, onJugar, onSaldo }) {
     // La mano que va a empezar es la siguiente a la del estado previo.
     armar: (previo) => { const orden = ORDENES[previo.handCount]; if (orden) armarOrden(orden) },
     decidir: decidirRival,
+    // T6 · v1.6 · la pastilla entre manos cuenta el camino (`TransicionMano`, prop `texto`).
+    pastilla: (game) => pastillaGuiada(game, t),
     Control: GuiaControl,
     alTerminar: () => setFase('cierre'),
     alSalir: () => { soltarMazo(); salidas.current.onLobby?.() },

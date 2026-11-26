@@ -27,6 +27,8 @@ const CLAVE = 'ajilei.guia'
 export const SENALES = Object.freeze(['iniciar', 'apostar', 'descartar'])
 /** Los capítulos de la serie (normativo §2.2). */
 export const CAPITULOS = 10
+/** TUT-1 T6 · el capítulo que la ruta de la primera vez enseña antes de la guiada (§1.2.1). */
+export const CAPITULO_DE_LA_RUTA = 2
 
 /** El estado de un aparato que nunca vio el tutorial. */
 export const estadoVacio = () => ({
@@ -79,6 +81,11 @@ export function crearGuia(almacen = almacenDelNavegador) {
     marcarSenal: (senal) => cambiar((e) => { if (SENALES.includes(senal)) e.senales[senal] = true }),
     /** Un capítulo se vio entero (1 a 10). */
     marcarVisto: (n) => cambiar((e) => { if (esCapitulo(n) && !e.vistos.includes(n)) e.vistos.push(n) }),
+    /**
+     * TUT-1 T6 · ¿«Jugar la guiada» pasa antes por la ruta de la primera vez (v1.5 §1.2.1)?
+     * Sí mientras este aparato no tenga el ✓ del capítulo 2 («Cuánto vale cada carta»).
+     */
+    rutaPendiente: () => !leer().vistos.includes(CAPITULO_DE_LA_RUTA),
   }
 }
 

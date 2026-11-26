@@ -93,6 +93,19 @@ describe('TUT-1 · guia', () => {
     expect(crearGuia(() => null).leer()).toEqual(estadoVacio())
   })
 
+  it('T6 · la ruta de la primera vez corre hasta que el capítulo 2 tiene su ✓', () => {
+    const a = almacenFalso()
+    const g = crearGuia(() => a)
+    expect(g.rutaPendiente()).toBe(true)
+    g.marcarOfrecida()
+    g.marcarVisto(3)
+    expect(g.rutaPendiente()).toBe(true)
+    g.marcarVisto(2)
+    expect(g.rutaPendiente()).toBe(false)
+    // Un almacén que falla se lee vacío: la ruta, pendiente (nunca se salta por un error).
+    expect(crearGuia(() => { throw new Error('sin almacén') }).rutaPendiente()).toBe(true)
+  })
+
   it('al eliminar la cuenta se va con las demás ajilei.* (limpiarAparato)', () => {
     const datos = new Map([['ajilei.guia', '{"hecha":true}'], ['otra.cosa', '1']])
     const local = {

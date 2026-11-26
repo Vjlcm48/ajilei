@@ -63,8 +63,9 @@ import {
  * @param {boolean} [p.aro]           anillo dorado con pulso alrededor de cada hueco
  * @param {'burbuja'|'libre'} [p.colocacion]
  * @param {{selector:string, peso?:number}[]} [p.evita]  (libre) lo que el rótulo no debe tapar
- * @param {{siguiente?:boolean, volver?:boolean, cerrar?:boolean, terminar?:boolean, salir?:boolean|'cerrar', paso?:{n:number,m:number}}} [p.controles]
- *   `terminar` (TUT-1 T4, P-5): en el último paso, «Terminar» en vez de «Cerrar» en la barra
+ * @param {{siguiente?:boolean, volver?:boolean, cerrar?:boolean, terminar?:boolean|string, salir?:boolean|'cerrar', paso?:{n:number,m:number}}} [p.controles]
+ *   `terminar` (TUT-1 T4, P-5): en el último paso, «Terminar» en vez de «Cerrar» en la barra;
+ *   T6 · una clave de `t()` en lugar de `true` cambia su rótulo (la ruta de la primera vez: «Siguiente»)
  * @param {string}  [p.nota]          (T4) clave de `t()` de una línea pequeña bajo el rótulo, fuera del techo de dos
  * @param {object}  [p.varsNota]      variables de la nota
  * @param {boolean} [p.unico]         apaga a la vista el resto de controles y deja pasar sólo el ancla
@@ -415,7 +416,7 @@ function Controles({ c, onSiguiente, onVolver, onCerrar, onTerminar }) {
           <SoundButton type="button" className="tut-btn tut-btn--pri" data-accion="tut-siguiente" data-tut-primario="" onClick={onSiguiente}>{t('tut.ctl.siguiente')}</SoundButton>
         )}
         {terminar && (
-          <SoundButton type="button" className="tut-btn tut-btn--pri" data-accion="tut-terminar" data-tut-primario="" onClick={onTerminar}>{t('tut.ctl.terminar')}</SoundButton>
+          <SoundButton type="button" className="tut-btn tut-btn--pri" data-accion="tut-terminar" data-tut-primario="" onClick={onTerminar}>{t(typeof c.terminar === 'string' ? c.terminar : 'tut.ctl.terminar')}</SoundButton>
         )}
       </span>
     </div>

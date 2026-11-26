@@ -96,6 +96,7 @@ const Guiada = lazy(trozos.guiada.fabrica)
 const delTutorial = (nombre) => lazy(() => Promise.resolve(trozos.guiada.fabrica()).then((m) => ({ default: m[nombre] })))
 const ComoSeJuega = delTutorial('ComoSeJuega')
 const Capitulo = delTutorial('Capitulo')
+const Ruta = delTutorial('Ruta')
 // ECO-1d · aplica `f` a la ficha de la constancia guardada como `{ uid, ficha }`.
 const conFicha = (f) => (c) => (c ? { ...c, ficha: f(c.ficha) } : c)
 // SAL-A la recogía; SAL-B1 la CONSUME (rector SAL-B1 §5.2), y el Ajuste A1 fija
@@ -1220,6 +1221,18 @@ function App() {
     )
   }
 
+  // ── TUT-1 T6 · La ruta de la primera vez ───────────────────────────────
+  // «Jugar la guiada» (la oferta y la tarjeta del hub) llega aquí: sin el ✓ del capítulo 2,
+  // intro → capítulo 2 → puente → la mesa guiada; con él, directo a la mesa (`guia/Ruta.jsx`,
+  // que lo decide en su trozo). Sin marco, como la guiada.
+  if (screen === 'ruta') {
+    return (
+      <PantallaDiferida trozo={trozos.guiada} familia="abismo">
+        <Ruta onMesa={() => setScreen('guiada')} onLobby={() => setScreen('lobby')} />
+      </PantallaDiferida>
+    )
+  }
+
   // ── TUT-1 T3 · «Cómo se juega»: las tres tarjetas ───────────────────────
   // Pantalla con barra: con el marco del video, como Rankings. Flecha y casa vuelven al lobby.
   if (screen === 'como-se-juega') {
@@ -1231,7 +1244,7 @@ function App() {
         onAvisoFin={finAviso}
         onVolver={() => setScreen('lobby')}
         onLobby={() => setScreen('lobby')}
-        onGuiada={() => setScreen('guiada')}
+        onGuiada={() => setScreen('ruta')}
         onCapitulo={(n) => { setCapitulo(n); setScreen('capitulo') }}
       />,
     )
@@ -1268,7 +1281,7 @@ function App() {
       // login (que no sale si se llegó con una invitación pendiente). El premio lo pide
       // cada trozo con su API (`lib/guiadaApi`); la entrada no la lleva.
       guiada={{ salaPendiente: !!invitacion, onSaldo: billetera.tomar }}
-      onGuiada={() => setScreen('guiada')}
+      onGuiada={() => setScreen('ruta')}
       onCerrarSesion={cerrarSesion}
     />,
   )

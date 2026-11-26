@@ -36,6 +36,29 @@ export const TEXTOS_TUT_COMUNES = {
   // La primera fila del índice de «Cómo se juega» (§1.2) y la marca de visto (§2.1).
   'tut.indice.guiada': 'Partida guiada · 2 min',
   'tut.indice.visto':  'Visto',
+  // TUT-1 T6 · los botones de la ruta de la primera vez (v1.5 §1.2.1).
+  'tut.ctl.empecemos': 'Empecemos',
+  'tut.ctl.jugar':     'Jugar',
+}
+
+// ── TUT-1 T6 · La ruta de la primera vez (v1.5 §1.2.1) ──────────────────────
+// Lo que ve quien toca «Jugar la guiada» sin el ✓ del capítulo 2: «¿En qué consiste el
+// juego?» → el capítulo 2 → «Ahora, a jugar» → la guiada. Techo de dos líneas en 360 × 640.
+export const TEXTOS_TUT_RUTA = {
+  'tut.ruta.intro.titulo': '¿En qué consiste el juego?',
+  // v1.6 · la frase entera de la v1.5 («**Reúne cartas del mismo palo** —oros, copas, espadas o
+  // bastos— **para sumar más que los demás.**») da tres líneas en 360, 640 y 780 de ancho: va
+  // partida como prevé la ficha T6 §1.1, los palos en la línea pequeña de debajo.
+  'tut.ruta.intro.frase':  '**Reúne cartas del mismo palo** para sumar más que los demás.',
+  'tut.ruta.intro.palos':  'Oros, copas, espadas o bastos.',
+  'tut.ruta.intro.dos':    'Te vamos a enseñar dos cosas:',
+  'tut.ruta.intro.uno':    '**Cuánto vale cada carta.**',
+  'tut.ruta.intro.otro':   '**Cómo se juega**, en una partida de 3 manos.',
+  'tut.ruta.puente.titulo': 'Ahora, a jugar',
+  // v1.6 · el texto de la v1.5, sin cambiar una palabra, en dos piezas: junto daba tres líneas
+  // en 360; la segunda frase va en la línea pequeña de debajo, como los palos de la intro.
+  'tut.ruta.puente.texto': '**Tres manos para que aprendas haciendo.**',
+  'tut.ruta.puente.nota':  'Tú solo tocas lo que se ilumina.',
 }
 
 // ── GUI-1 §1.2 · La oferta del primer login (v1.4: la cifra la dice el servidor) ──
@@ -253,9 +276,18 @@ export const TEXTOS_TUT_GUIADA = {
   'tut.cierre.premio': '+{monto} HC',
   'tut.cierre.premio.aria': 'Recibiste {monto} Heptacoins',
   'tut.cierre.sinred': 'Te lo acreditamos en cuanto vuelva la conexión.',
+  // v1.6 · la pastilla entre manos (STOP-T de la tanda 6, Victor): en la guiada cuenta el
+  // camino en vez de lo de la mesa real («Mano 3 · Es Mano IA 2»). «Mano 1 de 3 · Eres Mano»,
+  // «Mano 2 de 3 · Es Mano IA 1», «Última mano · Es Mano IA 2». Las piezas, unidas con « · »
+  // (`guiaManos.pastillaGuiada`); una línea en 360×640 (la vara `tut.guiada` lo afirma).
+  'tut.pastilla.mano': 'Mano {n} de {total}',
+  'tut.pastilla.ultima': 'Última mano',
+  'tut.pastilla.eres': 'Eres Mano',
+  'tut.pastilla.es': 'Es Mano {nombre}',
 }
 
 // `@__PURE__`: sin nadie que la importe en la app, el empaquetador la quita y con ella los
 // grupos que ninguna pieza montada pide (con un objeto `{ ...a, ...b }` no se atrevía).
 export const TEXTOS_TUT_ES = /* @__PURE__ */ Object.assign({},
-  TEXTOS_TUT_COMUNES, TEXTOS_TUT_OFERTA, TEXTOS_TUT_SENALES, TEXTOS_TUT_HUB, TEXTOS_TUT_CAP5, TEXTOS_TUT_TEMAS, TEXTOS_TUT_GUIADA)
+  TEXTOS_TUT_COMUNES, TEXTOS_TUT_OFERTA, TEXTOS_TUT_SENALES, TEXTOS_TUT_HUB, TEXTOS_TUT_CAP5, TEXTOS_TUT_TEMAS, TEXTOS_TUT_GUIADA,
+  TEXTOS_TUT_RUTA)

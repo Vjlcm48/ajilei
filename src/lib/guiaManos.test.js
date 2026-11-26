@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest'
 import {
   ORDENES, MANOS, ASIENTOS, PILA, APUESTA, PASOS, JUGADORES, ESCALERA, GUION_RIVALES, estadoInicial, jugarMano, decidirRival,
-  indiceSuelta, indicesSueltas, indicesDelPalo, sumaDe, pasosDeMano,
+  indiceSuelta, indicesSueltas, indicesDelPalo, sumaDe, pasosDeMano, pastillaGuiada,
 } from './guiaManos.js'
 import { armarOrden, soltarMazo } from './mazoDado.js'
 import { isAjilei } from '../engine/handEvaluator.js'
@@ -211,5 +211,20 @@ describe('GUI-1 · los pasos del normativo v1.3 §1.4', () => {
     const g2 = { players: [{ cards: R[1].cinco[0] }] }
     const p6b = PASOS.find((p) => p.rotulo === 'tut.g2.p6')
     expect(p6b.ancla(g2)).toEqual([`[data-ancla="carta"][data-i="${indiceSuelta(R[1].cinco[0])}"]`])
+  })
+})
+
+// T6 · v1.6 · la pastilla entre manos de la guiada cuenta el camino (Victor, STOP-T).
+describe('T6 · la pastilla entre manos de la guiada', () => {
+  const t = (k, v = {}) => TEXTOS_TUT_ES[k].replace(/\{(\w+)\}/g, (_, x) => String(v[x]))
+  it('mano 1 de 3, mano 2 de 3 y la última, con quien es Mano', () => {
+    const players = JUGADORES.map((j) => ({ ...j }))
+    expect(pastillaGuiada({ handCount: 1, manoIndex: 0, players }, t)).toBe('Mano 1 de 3 · Eres Mano')
+    expect(pastillaGuiada({ handCount: 2, manoIndex: 1, players }, t)).toBe('Mano 2 de 3 · Es Mano IA 1')
+    expect(pastillaGuiada({ handCount: 3, manoIndex: 2, players }, t)).toBe('Última mano · Es Mano IA 2')
+  })
+  it('sin mano todavía, nada', () => {
+    expect(pastillaGuiada({ handCount: 0, manoIndex: 0, players: JUGADORES }, t)).toBe(null)
+    expect(pastillaGuiada(null, t)).toBe(null)
   })
 })

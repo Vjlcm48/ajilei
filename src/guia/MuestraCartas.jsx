@@ -42,15 +42,17 @@ const ESCALERA = [1, 2, 3, 4, 5, 6]
  * @param {boolean}  [p.tachadas] cada carta con su aspa (no suman)
  * @param {number}   [p.suma]     la suma al lado
  * @param {number[]} [p.gris]     los multiplicadores apagados, en `mults`
+ * @param {boolean}  [p.enLinea]  (T6) en el flujo de su pantalla, sin portal ni caja fija: las
+ *   cinco cartas del palo de la intro de la ruta (`RutaIntro`), que pone su tamaño y su aro
  */
-export default function MuestraCartas({ tipo, cartas = [], valores = false, tachadas = false, suma = null, gris = [] }) {
+export default function MuestraCartas({ tipo, cartas = [], valores = false, tachadas = false, suma = null, gris = [], enLinea = false }) {
   // En `cartas`, el tamaño por la cuenta; `--n`, las columnas de la fila (la suma ocupa una);
   // de seis cartas arriba, en vertical van en dos filas (`muestra--dos-filas`).
   const tam = tipo === 'cartas' ? tamanoMuestra(cartas.length) : null
   const clase = tam ? ` muestra--${tam}${cartas.length > 5 ? ' muestra--dos-filas' : ''}` : ''
   const estilo = tam === 'chica' ? { '--n': cartas.length + (suma !== null ? 1 : 0) } : undefined
-  return createPortal(
-    <div className={`muestra muestra--${tipo}${clase}`} style={estilo} data-muestra={tipo} data-tamano={tam ?? undefined} aria-hidden="true">
+  const caja = (
+    <div className={`muestra muestra--${tipo}${clase}${enLinea ? ' muestra--enlinea' : ''}`} style={estilo} data-muestra={tipo} data-tamano={tam ?? undefined} aria-hidden="true">
       {tipo === 'cartas' && (
         <div className="muestra-fila">
           {cartas.map((id) => (
@@ -105,9 +107,9 @@ export default function MuestraCartas({ tipo, cartas = [], valores = false, tach
           <Pozo etiqueta={t('tut.muestra.vuelve')} monto={500} mas />
         </div>
       )}
-    </div>,
-    document.body,
+    </div>
   )
+  return enLinea ? caja : createPortal(caja, document.body)
 }
 
 function Jugador({ nombre, mano = false, cartas }) {

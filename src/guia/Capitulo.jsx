@@ -62,6 +62,9 @@ const PasoActual = createContext(null)
  * @param {(s:string) => void} [p.onPantalla]  (T5) navega a `screen` sin escribir nada
  * @param {Function} p.onCerrar    «Cerrar» (y Escape)
  * @param {Function} [p.onTerminar] «Terminar», ya con el ✓ puesto (sin él, `onCerrar`)
+ * @param {boolean} [p.enRuta]     (T6) dentro de la ruta de la primera vez (v1.5 §1.2.1): el
+ *   botón de arriba dice «Salir» (al lobby) y el último paso dice «Siguiente», que pone el ✓
+ *   igual que «Terminar»; ninguno de los dos vuelve al índice.
  */
 // ── T5 · STOP-T · NUNCA LA PANTALLA EN VERDE ──────────────────────────────────
 // En el S25, el capítulo 9 dejó una vez la app entera en verde al pasar del 1 al 2 (no se
@@ -124,7 +127,7 @@ function DiagSuspendio({ n }) {
 
 export default function Capitulo(props) {
   return (
-    <RedCapitulo onCerrar={props.onCerrar} n={props.n}>
+    <RedCapitulo onCerrar={props.onCerrar} n={props.n} enRuta={!!props.enRuta}>
       <Suspense fallback={DIAG ? <DiagSuspendio n={props.n} /> : null}>
         <CapituloDentro {...props} />
       </Suspense>
@@ -145,7 +148,7 @@ class RedCapitulo extends Component {
     console.error('[tut] el capítulo falló', error)
     soltarCapitulo()
     soltarMazo()
-    volverAlIndice()
+    if (!this.props.enRuta) volverAlIndice()
     this.props.onCerrar?.()
   }
 
@@ -154,11 +157,12 @@ class RedCapitulo extends Component {
   }
 }
 
-function CapituloDentro({ n, inicio = 0, vivo = null, pvp = false, enApp = false, onPantalla, onCerrar, onTerminar = onCerrar }) {
+function CapituloDentro({ n, inicio = 0, vivo = null, pvp = false, enApp = false, enRuta = false, onPantalla, onCerrar, onTerminar = onCerrar }) {
   const cap = CAPITULOS[n]
   const total = cap?.pasos.length ?? 0
   // Desde el índice, sigue por el paso en que iba el capítulo en la pantalla anterior (T5).
-  const [i, setI] = useState(() => Math.min(Math.max((vivo ? null : pasoEnCurso(n)) ?? inicio, 0), Math.max(total - 1, 0)))
+  // En la ruta (T6), siempre desde el principio.
+  const [i, setI] = useState(() => Math.min(Math.max((vivo || enRuta ? null : pasoEnCurso(n)) ?? inicio, 0), Math.max(total - 1, 0)))
   useEffect(() => {
     if (!DIAG) return
     oirErrores()
@@ -168,15 +172,17 @@ function CapituloDentro({ n, inicio = 0, vivo = null, pvp = false, enApp = false
   useEffect(() => soltarMazo, [])
   useEffect(() => { if (!vivo) anotarPaso(n, i) }, [n, i, vivo])
 
-  // Desde el índice, el capítulo vuelve al índice (P-5); desde el ⋮ no hay índice al que volver.
-  const cerrar = useCallback(() => { soltarCapitulo(); soltarMazo(); if (!vivo) volverAlIndice(); onCerrar?.() }, [onCerrar, vivo])
-  const terminar = useCallback(() => { guia.marcarVisto(n); soltarCapitulo(); soltarMazo(); if (!vivo) volverAlIndice(); onTerminar?.() }, [n, onTerminar, vivo])
+  // Desde el índice, el capítulo vuelve al índice (P-5); desde el ⋮ no hay índice al que volver,
+  // y desde la ruta (T6) tampoco: «Salir» va al lobby y «Siguiente» al puente.
+  const alIndice = !vivo && !enRuta
+  const cerrar = useCallback(() => { soltarCapitulo(); soltarMazo(); if (alIndice) volverAlIndice(); onCerrar?.() }, [onCerrar, alIndice])
+  const terminar = useCallback(() => { guia.marcarVisto(n); soltarCapitulo(); soltarMazo(); if (alIndice) volverAlIndice(); onTerminar?.() }, [n, onTerminar, alIndice])
   // El paso se anota ANTES de cambiar de pantalla: el `Capitulo` del otro sitio lo lee al montarse.
   const ir = useCallback((k) => { if (!vivo) anotarPaso(n, k); setI(k) }, [n, vivo])
   const volver = useCallback(() => ir(Math.max(0, i - 1)), [ir, i])
   const siguiente = useCallback(() => ir(Math.min(total - 1, i + 1)), [ir, i, total])
 
-  const ctx = { cap, n, i, total, pvp, vivo: !!vivo, volver, siguiente, terminar, cerrar }
+  const ctx = { cap, n, i, total, pvp, vivo: !!vivo, enRuta, volver, siguiente, terminar, cerrar }
 
   // T5 · dónde vive el paso: una pantalla de la app (`pantalla`) o la mesa congelada.
   const paso = cap?.pasos[i]
@@ -311,7 +317,7 @@ function useALaVista(paso) {
 }
 
 function PasoCapitulo({ ctx, game }) {
-  const { cap, n, i, total, pvp, vivo, volver, siguiente, terminar, cerrar } = ctx
+  const { cap, n, i, total, pvp, vivo, enRuta, volver, siguiente, terminar, cerrar } = ctx
   const paso = cap.pasos[i]
   const vistas = useALaVista(paso)
   let ancla = vistas ? vistas.ok : anclasDe(paso, game)
@@ -344,7 +350,7 @@ function PasoCapitulo({ ctx, game }) {
         barraFija
         colocacion="burbuja"
         aria={cap.titulo}
-        controles={{ volver: i > 0, siguiente: !ultimo, terminar: true, salir: 'cerrar', paso: { n: i + 1, m: total } }}
+        controles={{ volver: i > 0, siguiente: !ultimo, terminar: enRuta ? 'tut.ctl.siguiente' : true, salir: enRuta ? true : 'cerrar', paso: { n: i + 1, m: total } }}
         onVolver={volver}
         onSiguiente={siguiente}
         onTerminar={terminar}

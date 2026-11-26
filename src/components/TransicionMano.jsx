@@ -20,7 +20,9 @@ const caja = (el) => aPropios(el.getBoundingClientRect(), escalaActual())
 const centro = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
 const marca = (clase) => [...document.querySelectorAll(`.game-table-screen .${clase}`)].find(visible) ?? null
 
-export default function TransicionMano({ game, recoger = false, recogerA = null }) {
+// TUT-1 T6 · `texto`: quien arma la pastilla. La de siempre (`textoPastilla`, desde la mano 2)
+// en toda mesa; la guiada pasa la suya (`guion.pastilla`, desde la mano 1, v1.6).
+export default function TransicionMano({ game, recoger = false, recogerA = null, texto: textoDe = textoPastilla }) {
   const [pastilla, setPastilla] = useState(null)
   const antes = useRef(null)          // la marca de Mano antes de la mano nueva
   const animadas = useRef([])
@@ -72,7 +74,7 @@ export default function TransicionMano({ game, recoger = false, recogerA = null 
           { duration: DESLIZA_MS, easing: 'cubic-bezier(.2,.7,.2,1)' })
       }
     }
-    const texto = textoPastilla(game)
+    const texto = textoDe(game)
     const ovalo = marca('center-zone')
     // La mesa de 2 apaisada no tiene óvalo (`.center-zone`): la franja del pozo y la crónica.
     const franja = !ovalo && [marca('pot-box'), marca('game-message')].filter(Boolean).map(caja)
@@ -84,7 +86,7 @@ export default function TransicionMano({ game, recoger = false, recogerA = null 
       const y = o ? o.top + o.height * 0.25 : (Math.min(...franja.map((r) => r.top)) + Math.max(...franja.map((r) => r.bottom))) / 2
       requestAnimationFrame(() => setPastilla({ texto, x, y, id: hand }))
     }
-  }, [hand, game])
+  }, [hand, game, textoDe])
 
   useEffect(() => {
     if (!pastilla) return undefined
