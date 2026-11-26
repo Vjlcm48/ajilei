@@ -543,6 +543,16 @@ export async function runTutTemas(browser, { base }) {
   const fallos = []
   await Promise.all(Object.entries(T).map(async ([tam, vp]) => {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, ...(vp.movil ? { hasTouch: true, isMobile: true } : {}), deviceScaleFactor: 1 })
+    // TUT-1 T6 · el índice de un aparato nuevo, sin ningún ✓ (la guía del arnés trae el del
+    // capítulo 2, `GUIA_VISTA`): se escribe una vez por pestaña, antes de la primera carga; las
+    // recargas de la vara conservan los ✓ que van poniendo sus «Terminar».
+    await ctx.addInitScript(() => {
+      try {
+        if (sessionStorage.getItem('tut.temas.guia')) return
+        sessionStorage.setItem('tut.temas.guia', '1')
+        localStorage.setItem('ajilei.guia', JSON.stringify({ ofrecida: true, senales: { iniciar: true, apostar: true, descartar: true } }))
+      } catch { /* sin almacenamiento */ }
+    })
     const page = await ctx.newPage()
     try {
       celdas[tam] = await celda(page, base, tam, vp)

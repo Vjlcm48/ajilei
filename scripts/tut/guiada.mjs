@@ -22,6 +22,9 @@
 //   · tut.delta   Δ 0 de todas las cajas de `#root` con la capa y sin ella, en cada paso de
 //                 lectura (la capa pinta encima y nunca empuja, INV-89);
 //   · tut.lineas  ningún rótulo de la guiada pasa de dos líneas;
+//   · tut.pastilla (T6, v1.6) las tres pastillas entre manos cuentan el camino —«Mano 1 de 3 ·
+//                 Eres Mano», «Mano 2 de 3 · Es Mano IA 1», «Última mano · Es Mano IA 2»—, en
+//                 una línea y dentro de la pantalla;
 //   · tut.mazo    (solo 360×640) «Salir» en el paso 1 y después una mesa real de 3 contra
 //                 las IAS: tus dos cartas NO son las del guion (R-2, a nivel de instrumento;
 //                 la prueba de `mazoDado` lo cubre a nivel de módulo);
@@ -34,8 +37,10 @@ const T = {
   T3: { w: 640, h: 360, movil: true },
   T6: { w: 1920, h: 1080, movil: false },
 }
-const PROHIBIDAS = ['sentarse_ia', 'informar_pila', 'recargar_ia', 'salir_ia', 'mi_consulta', 'consultar_mano', 'mini_perfil', 'premio_guiada_estado']
-const PAUSA = '*,*::before,*::after{animation-play-state:paused!important;transition:none!important;caret-color:transparent!important}'
+export const PROHIBIDAS = ['sentarse_ia', 'informar_pila', 'recargar_ia', 'salir_ia', 'mi_consulta', 'consultar_mano', 'mini_perfil', 'premio_guiada_estado']
+export const PAUSA = '*,*::before,*::after{animation-play-state:paused!important;transition:none!important;caret-color:transparent!important}'
+// T6 · v1.6 · la pastilla entre manos de la guiada (Victor, STOP-T de la tanda 6).
+export const PASTILLAS = ['Mano 1 de 3 · Eres Mano', 'Mano 2 de 3 · Es Mano IA 1', 'Última mano · Es Mano IA 2']
 const TOPE_PASOS = 60
 const ESPERA_PASO_MS = 30000
 
@@ -45,7 +50,7 @@ const CAJAS = () => [...document.querySelectorAll('#root *')].map((e) => {
   return [r.left, r.top, r.width, r.height]
 })
 
-const ESPIA = (prohibidas) => {
+export const ESPIA = (prohibidas) => {
   window.__guia = { llamadas: [], ajilei: false }
   const b = window.__ajileiBancoImitado?.banco
   if (b) {
@@ -54,18 +59,34 @@ const ESPIA = (prohibidas) => {
       b[m] = (nombre, params) => { window.__guia.llamadas.push(nombre); return f(nombre, params) }
     }
   }
-  const mira = () => { if (document.querySelector('.vc-ajilei')) window.__guia.ajilei = true }
+  // T6 · v1.6 · las pastillas entre manos, una por mano: su texto, sus líneas y si cabe.
+  window.__guia.pastillas = []
+  const vistas = new Set()
+  const mira = () => {
+    if (document.querySelector('.vc-ajilei')) window.__guia.ajilei = true
+    const p = document.querySelector('.tm-pastilla')
+    if (p && !vistas.has(p)) {
+      vistas.add(p)
+      const rango = document.createRange()
+      rango.selectNodeContents(p)
+      const lineas = new Set([...rango.getClientRects()].map((r) => Math.round(r.top))).size
+      const r = p.getBoundingClientRect()
+      window.__guia.pastillas.push({
+        texto: p.textContent, lineas, cabe: r.left >= 0 && r.right <= window.innerWidth && p.scrollWidth <= p.clientWidth,
+      })
+    }
+  }
   new MutationObserver(mira).observe(document.body, { childList: true, subtree: true })
   window.__guia.prohibidas = prohibidas
 }
 
-const ESTADO = () => {
+export const ESTADO = () => {
   if (document.querySelector('[data-guia-cierre]')) return 'cierre'
   if (document.querySelector('.tut-capa[data-listo]')) return 'capa'
   return null
 }
 
-const LEE_PASO = () => {
+export const LEE_PASO = () => {
   const capa = document.querySelector('.tut-capa')
   const rot = capa?.querySelector('.tut-rotulo:not(.tut-rotulo--medida)')
   const p = rot?.querySelector('.tut-rotulo-texto')
@@ -104,7 +125,7 @@ const LEE_PASO = () => {
 }
 
 // El centro del control y si el dedo, ahí, cae en él (no en una banda del velo ni en la barra).
-const APUNTA = (sel) => {
+export const APUNTA = (sel) => {
   const e = document.querySelector(sel)
   if (!e) return null
   const r = e.getBoundingClientRect()
@@ -115,7 +136,7 @@ const APUNTA = (sel) => {
   return { x, y, libre, encima: encima ? `${encima.tagName.toLowerCase()}.${[...encima.classList].join('.')}` : null }
 }
 
-const SALDO = () => {
+export const SALDO = () => {
   const p = document.querySelector('.lob-pildora')
   return p && p.dataset.saldo === 'listo' ? p.textContent.trim() : null
 }
@@ -136,41 +157,11 @@ function delta(a, b) {
   return { max: +max.toFixed(2), quien }
 }
 
-async function celda(page, base, tam, vp, progreso) {
-  const out = { tam, puertas: {}, fallos: [], pasos: [], notas: [] }
-  progreso.out = out
-  const falla = (puerta, texto) => { out.fallos.push(`${tam} ${puerta}: ${texto}`); out.puertas[puerta] = false }
-  const pasa = (puerta) => { if (!(puerta in out.puertas)) out.puertas[puerta] = true }
-  const errores = []
-  const red = []
-  page.on('pageerror', (e) => errores.push(String(e?.message || e)))
+// T6 · la guiada paso a paso, desde su primera capa hasta el cierre: la juega `tut guiada` y,
+// tras la intro, el capítulo 2 y el puente, `tut ruta` (`scripts/tut/ruta.mjs`). Toca en cada
+// paso el control único por el hueco y mide «Salir», las líneas y Δ 0 en los de lectura.
+export async function jugarGuiada(page, { vp, tam, out, falla }) {
   const tocar = async (p) => (vp.movil ? page.touchscreen.tap(p.x, p.y) : page.mouse.click(p.x, p.y))
-  const tocarSel = async (sel) => {
-    const p = await page.evaluate((s) => { const r = document.querySelector(s)?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null }, sel)
-    if (!p) throw new Error(`no está «${sel}»`)
-    await tocar(p)
-  }
-  const saldo = async () => (await page.waitForFunction(SALDO, null, { timeout: 15000 })).jsonValue()
-  const cifra = (txt) => Number(String(txt).replace(/\D/g, ''))
-  // TUT-1 T3 · «Cómo se juega» abre las tres tarjetas; la guiada, desde la suya.
-  const abrirGuiada = async () => {
-    await tocarSel('[data-accion="reglas"]')
-    await page.waitForSelector('[data-accion="csj-guiada"]', { timeout: 15000 })
-    await tocarSel('[data-accion="csj-guiada"]')
-  }
-
-  await page.goto(`${base}/`, { waitUntil: 'networkidle' })
-  await page.waitForSelector('main.lobby [data-accion="reglas"]', { timeout: 20000 })
-  await page.evaluate(ESPIA, PROHIBIDAS)
-  const antes = await saldo()
-  await tocarSel('[data-accion="reglas"]')
-  await page.waitForSelector('[data-accion="csj-guiada"]', { timeout: 15000 })
-  // Desde aquí, la guiada: lo que se llame antes es de «Cómo se juega» (su cifra).
-  const desde = await page.evaluate(() => window.__guia.llamadas.length)
-  page.on('request', (r) => red.push(r.url()))
-  await tocarSel('[data-accion="csj-guiada"]')
-
-  // ── La guiada, paso a paso ──
   let fin = false
   let sinSalir = 0
   for (let n = 0; n < TOPE_PASOS && !fin; n++) {
@@ -244,6 +235,45 @@ async function celda(page, base, tam, vp, progreso) {
     const hay = await page.evaluate(() => !!document.querySelector('[data-accion="tut-salir"]'))
     if (!hay) sinSalir++
   }
+  return { fin, sinSalir }
+}
+
+async function celda(page, base, tam, vp, progreso) {
+  const out = { tam, puertas: {}, fallos: [], pasos: [], notas: [] }
+  progreso.out = out
+  const falla = (puerta, texto) => { out.fallos.push(`${tam} ${puerta}: ${texto}`); out.puertas[puerta] = false }
+  const pasa = (puerta) => { if (!(puerta in out.puertas)) out.puertas[puerta] = true }
+  const errores = []
+  const red = []
+  page.on('pageerror', (e) => errores.push(String(e?.message || e)))
+  const tocar = async (p) => (vp.movil ? page.touchscreen.tap(p.x, p.y) : page.mouse.click(p.x, p.y))
+  const tocarSel = async (sel) => {
+    const p = await page.evaluate((s) => { const r = document.querySelector(s)?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null }, sel)
+    if (!p) throw new Error(`no está «${sel}»`)
+    await tocar(p)
+  }
+  const saldo = async () => (await page.waitForFunction(SALDO, null, { timeout: 15000 })).jsonValue()
+  const cifra = (txt) => Number(String(txt).replace(/\D/g, ''))
+  // TUT-1 T3 · «Cómo se juega» abre las tres tarjetas; la guiada, desde la suya.
+  const abrirGuiada = async () => {
+    await tocarSel('[data-accion="reglas"]')
+    await page.waitForSelector('[data-accion="csj-guiada"]', { timeout: 15000 })
+    await tocarSel('[data-accion="csj-guiada"]')
+  }
+
+  await page.goto(`${base}/`, { waitUntil: 'networkidle' })
+  await page.waitForSelector('main.lobby [data-accion="reglas"]', { timeout: 20000 })
+  await page.evaluate(ESPIA, PROHIBIDAS)
+  const antes = await saldo()
+  await tocarSel('[data-accion="reglas"]')
+  await page.waitForSelector('[data-accion="csj-guiada"]', { timeout: 15000 })
+  // Desde aquí, la guiada: lo que se llame antes es de «Cómo se juega» (su cifra).
+  const desde = await page.evaluate(() => window.__guia.llamadas.length)
+  page.on('request', (r) => red.push(r.url()))
+  await tocarSel('[data-accion="csj-guiada"]')
+
+  // ── La guiada, paso a paso ──
+  const { fin, sinSalir } = await jugarGuiada(page, { vp, tam, out, falla })
   if (!fin) falla('tut.guiada', `no llegó al cierre (${out.pasos.length} pasos)`)
   // El premio: el cierre lo pide al montarse y lo celebra cuando el servidor contesta.
   if (fin) await page.waitForFunction(() => document.querySelector('[data-guia-premio]')?.dataset.guiaPremio !== 'pidiendo', null, { timeout: 10000 }).catch(() => {})
@@ -252,7 +282,7 @@ async function celda(page, base, tam, vp, progreso) {
     try { marca = JSON.parse(localStorage.getItem('ajilei.guia') ?? 'null') } catch { /* nada */ }
     const premio = document.querySelector('.guia-premio')
     return {
-      ajilei: window.__guia.ajilei, llamadas: window.__guia.llamadas, marca,
+      ajilei: window.__guia.ajilei, llamadas: window.__guia.llamadas, marca, pastillas: window.__guia.pastillas,
       titulo: document.querySelector('.guia-cierre-titulo')?.textContent ?? null,
       fase: document.querySelector('[data-guia-premio]')?.dataset.guiaPremio ?? null,
       cifra: document.querySelector('.guia-premio-cifra')?.textContent ?? null,
@@ -269,6 +299,14 @@ async function celda(page, base, tam, vp, progreso) {
   if (fin && g.marca?.pendientePago !== false) falla('tut.guiada', `ajilei.guia con pendientePago ${g.marca?.pendientePago}`)
   if (fin && g.marca && 'hecha' in g.marca) falla('tut.guiada', 'ajilei.guia lleva «hecha»: la guiada hecha vive en el servidor')
   pasa('tut.guiada')
+  // T6 · v1.6 · la pastilla entre manos cuenta el camino, en una línea y dentro de la pantalla.
+  out.pastillas = g.pastillas
+  if (fin) {
+    const textos = g.pastillas.map((p) => p.texto)
+    if (JSON.stringify(textos) !== JSON.stringify(PASTILLAS)) falla('tut.pastilla', `vistas ${JSON.stringify(textos)}; deben ser ${JSON.stringify(PASTILLAS)}`)
+    for (const p of g.pastillas) if (p.lineas !== 1 || !p.cabe) falla('tut.pastilla', `«${p.texto}»: ${p.lineas} líneas · cabe ${p.cabe}`)
+    pasa('tut.pastilla')
+  }
   if (sinSalir) falla('tut.salir', `${sinSalir} momentos sin «Salir» en su sitio`)
   else pasa('tut.salir')
 

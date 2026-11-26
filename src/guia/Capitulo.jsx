@@ -1,4 +1,4 @@
-import { Component, Suspense, createContext, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, Suspense, createContext, lazy, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import PantallaDiferida from '../components/PantallaDiferida'
 import CapaSenal from '../components/CapaSenal'
 import { CAPITULOS, PANTALLAS, anclasDe } from './capitulos'
@@ -72,63 +72,13 @@ const PasoActual = createContext(null)
 // capítulo desmontaría la app; algo que suspende dentro, el `Suspense` de la raíz la cambiaría
 // por su espera (verde). Por eso el capítulo lleva su propia red: un `Suspense` sin respaldo
 // (si algo suspende, sólo falta la capa un instante; la pantalla sigue) y un límite de error
-// que, si algo falla, cierra el capítulo y vuelve al índice.
-//
-// `VITE_TUT_DIAG` (SÓLO el build del túnel; fuera de él, este código no existe): un registro de
-// los últimos diez eventos del capítulo —milisegundo desde que se abrió, paso y qué pasó: cada
-// navegación, la espera del ancla y lo que tardó, el ancla perdida, el `Suspense` propio, los
-// errores atrapados y los de ventana o consola— en una caja que se QUEDA a la vista hasta su
-// «Cerrar», para fotografiarla en el aparato. Se pinta fuera de React (un nodo en `body`), para
-// que ningún montaje ni cambio de pantalla la borre.
-const DIAG = !!import.meta.env.VITE_TUT_DIAG
-const diagLista = []
-let diagT0 = 0
-let diagOyendo = false
-
-function diag(paso, texto) {
-  if (!DIAG) return
-  // El reloj de cada caja empieza con su primer evento.
-  if (!document.getElementById('tut-diag')) diagT0 = performance.now()
-  diagLista.push(`${String(Math.round(performance.now() - diagT0)).padStart(6)} ms · ${paso} · ${texto}`)
-  if (diagLista.length > 10) diagLista.shift()
-  let caja = document.getElementById('tut-diag')
-  if (!caja) {
-    caja = document.createElement('div')
-    caja.id = 'tut-diag'
-    caja.setAttribute('role', 'log')
-    caja.style.cssText = 'position:fixed;left:8px;right:8px;top:60px;z-index:2147483647;padding:8px 10px;border-radius:8px;background:#3a0d16;color:#fff;font:11px/1.35 monospace;white-space:pre-wrap;word-break:break-all'
-    const pre = document.createElement('div')
-    const cerrar = document.createElement('button')
-    cerrar.type = 'button'
-    cerrar.textContent = 'Cerrar'
-    cerrar.style.cssText = 'display:block;margin-top:6px;min-height:44px;padding:0 16px'
-    cerrar.addEventListener('click', (ev) => { ev.stopPropagation(); diagLista.length = 0; caja.remove() })
-    caja.append(pre, cerrar)
-    document.body.append(caja)
-  }
-  caja.firstChild.textContent = `[diag] ${diagLista.join('\n')}`
-}
-
-// Los errores que no pasan por el límite (los de la ventana y los que React cuenta por consola).
-function oirErrores() {
-  if (!DIAG || diagOyendo) return
-  diagOyendo = true
-  const corto = (x) => String(x?.message ?? x).slice(0, 160)
-  window.addEventListener('error', (ev) => diag('—', `error de ventana: ${corto(ev.error ?? ev.message)}`))
-  window.addEventListener('unhandledrejection', (ev) => diag('—', `promesa rechazada: ${corto(ev.reason)}`))
-  const original = console.error
-  console.error = (...args) => { diag('—', `consola: ${args.map(corto).join(' ').slice(0, 200)}`); original(...args) }
-}
-
-function DiagSuspendio({ n }) {
-  useEffect(() => { diag(`${n}`, 'el capítulo SUSPENDIÓ (su Suspense propio)') }, [n])
-  return null
-}
+// que, si algo falla, cierra el capítulo y vuelve al índice. T6 · 6-b · el registro del túnel
+// (`VITE_TUT_DIAG`) salió: las fotos del S25 no dieron ni un error ni un ancla perdida.
 
 export default function Capitulo(props) {
   return (
     <RedCapitulo onCerrar={props.onCerrar} n={props.n} enRuta={!!props.enRuta}>
-      <Suspense fallback={DIAG ? <DiagSuspendio n={props.n} /> : null}>
+      <Suspense fallback={null}>
         <CapituloDentro {...props} />
       </Suspense>
     </RedCapitulo>
@@ -144,7 +94,6 @@ class RedCapitulo extends Component {
   static getDerivedStateFromError(error) { return { error } }
 
   componentDidCatch(error) {
-    diag(`${this.props.n}`, `ERROR atrapado por el límite: ${String(error?.message ?? error).slice(0, 200)}`)
     console.error('[tut] el capítulo falló', error)
     soltarCapitulo()
     soltarMazo()
@@ -163,12 +112,6 @@ function CapituloDentro({ n, inicio = 0, vivo = null, pvp = false, enApp = false
   // Desde el índice, sigue por el paso en que iba el capítulo en la pantalla anterior (T5).
   // En la ruta (T6), siempre desde el principio.
   const [i, setI] = useState(() => Math.min(Math.max((vivo || enRuta ? null : pasoEnCurso(n)) ?? inicio, 0), Math.max(total - 1, 0)))
-  useEffect(() => {
-    if (!DIAG) return
-    oirErrores()
-    diag(`${n}.${i + 1}`, `monta el capítulo ${enApp ? 'sobre la pantalla' : vivo ? 'sobre la mesa viva' : 'en la rama de la mesa'}`)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- un registro por montaje
-
   useEffect(() => soltarMazo, [])
   useEffect(() => { if (!vivo) anotarPaso(n, i) }, [n, i, vivo])
 
@@ -189,11 +132,8 @@ function CapituloDentro({ n, inicio = 0, vivo = null, pvp = false, enApp = false
   const destino = paso?.pantalla ?? 'capitulo'
   const aqui = !!vivo || !paso || (paso.pantalla ? enApp : !enApp)
   useEffect(() => {
-    if (!vivo && paso && (paso.pantalla || !aqui)) {
-      if (DIAG && !aqui) diag(`${n}.${i + 1}`, `navega a «${destino}»`)
-      onPantalla?.(destino)
-    }
-  }, [vivo, paso, aqui, destino, onPantalla]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!vivo && paso && (paso.pantalla || !aqui)) onPantalla?.(destino)
+  }, [vivo, paso, aqui, destino, onPantalla])
 
   if (!cap || total === 0 || !aqui) return null
   if (vivo) return <PasoCapitulo ctx={ctx} game={vivo} />
@@ -203,23 +143,6 @@ function CapituloDentro({ n, inicio = 0, vivo = null, pvp = false, enApp = false
       <MesaDelMomento momento={cap.pasos[i].momento} onCerrar={cerrar} />
     </PasoActual.Provider>
   )
-}
-
-// DIAG · la espera del ancla de un paso de la Pista C: cuándo empieza, cuánto dura, si se pierde.
-function DiagAncla({ paso, def, esperando, perdida }) {
-  const desde = useRef(null)
-  useEffect(() => {
-    const pantalla = document.querySelector(PANTALLAS[def.pantalla]) ? 'montada' : 'sin montar'
-    if (perdida) diag(paso, `ANCLA PERDIDA (${(def.ancla ?? []).join(' · ')}) · pantalla ${pantalla}`)
-    else if (esperando) {
-      desde.current = performance.now()
-      diag(paso, `espera el ancla · pantalla ${pantalla}`)
-    } else if (desde.current !== null) {
-      diag(paso, `ancla a la vista tras ${Math.round(performance.now() - desde.current)} ms`)
-      desde.current = null
-    }
-  }, [paso, esperando, perdida]) // eslint-disable-line react-hooks/exhaustive-deps
-  return null
 }
 
 // La mesa de la guiada en un momento. Se rehace sólo cuando el momento cambia.
@@ -336,7 +259,6 @@ function PasoCapitulo({ ctx, game }) {
   return (
     <>
       {paso.muestra && <Suspense fallback={null}><MuestraCartas {...paso.muestra} /></Suspense>}
-      {DIAG && app && <DiagAncla paso={`${n}.${i + 1}`} def={paso} esperando={!perdida && ancla.length === 0} perdida={perdida} />}
       <CapaSenal
         key={`${n}-${i}`}
         ancla={ancla}

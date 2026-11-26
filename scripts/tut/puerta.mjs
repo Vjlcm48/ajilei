@@ -220,7 +220,9 @@ async function celda(browser, base, tam, vp) {
 
   // ══ tut.hub ═══════════════════════════════════════════════════════════════
   for (const [query, premioEsperado] of [['', 'Gana 2.000 HC'], ['?guia=cobrado', '✓ Hecha']]) {
-    const { ctx, page, tocar, lobby } = await abrir({ guia: { ofrecida: true } })
+    // T6 · con el ✓ del capítulo 2, la tarjeta de la guiada va directa a la mesa (sin él, a la
+    // ruta de la primera vez: la recorre `tut ruta`).
+    const { ctx, page, tocar, lobby } = await abrir({ guia: { ofrecida: true, vistos: [2] } })
     await lobby(query)
     await tocar('[data-accion="reglas"]')
     await page.waitForSelector('.csj-tarjeta[data-accion="csj-guiada"]', { timeout: 15000 })

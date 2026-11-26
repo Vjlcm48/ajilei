@@ -404,10 +404,13 @@ export async function forzarEscala1(ctx) { await ctx.addInitScript(ESCALA_1); ct
 // tanda 3. Solo si el aparato no tiene la clave: una vara que la escriba con su
 // propio guion de inicio (que corre después de este) manda. `diagDSK tut puerta`,
 // que mide justo la oferta y las señales, la pide real con `guiaReal()`.
+// TUT-1 T6 · y con el ✓ del capítulo 2: sin él, «Jugar la guiada» pasa antes por la ruta de
+// la primera vez (v1.5 §1.2.1). Así todo lo que entra por «Jugar la guiada» sigue yendo a la
+// mesa; `diagDSK tut ruta` pide su aparato sin el ✓ y `tut temas`, el índice sin ninguno.
 export const GUIA_VISTA = () => {
   try {
     if (localStorage.getItem('ajilei.guia') === null) {
-      localStorage.setItem('ajilei.guia', JSON.stringify({ ofrecida: true, senales: { iniciar: true, apostar: true, descartar: true } }))
+      localStorage.setItem('ajilei.guia', JSON.stringify({ ofrecida: true, senales: { iniciar: true, apostar: true, descartar: true }, vistos: [2] }))
     }
   } catch { /* sin almacenamiento: nada que marcar */ }
 }

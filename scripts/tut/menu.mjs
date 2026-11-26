@@ -62,8 +62,10 @@ const PANEL = () => {
 // Los títulos de los capítulos, por su clave (la capa lleva el título como nombre accesible).
 const TITULOS = { 3: 'Cómo va una mano', 4: 'Cómo se gana y cómo se pierde', 5: 'Apostar, pasar, retirarse' }
 
-async function celda(page, base, tam, vp) {
+async function celda(page, base, tam, vp, rastro = {}) {
   const out = { tam, puertas: {}, fallos: [], notas: [], fases: {} }
+  // T6 · la etapa en curso: si el recorrido se corta, el fallo dice dónde (y la fila de acciones).
+  const etapa = (e) => { rastro.etapa = e }
   const falla = (puerta, texto) => { out.fallos.push(`${tam} ${puerta}: ${texto}`); out.puertas[puerta] = false }
   const pasa = (puerta) => { if (!(puerta in out.puertas)) out.puertas[puerta] = true }
   const errores = []
@@ -101,6 +103,7 @@ async function celda(page, base, tam, vp) {
   }
 
   // ── La mesa de 3 contra las IAS ──
+  etapa('lobby y Retar')
   await page.goto(`${base}/`, { waitUntil: 'networkidle' })
   await page.waitForSelector('main.lobby [data-accion="jugar-ia"]', { timeout: ESPERA_MS })
   await tocar('[data-accion="jugar-ia"]')
@@ -113,6 +116,7 @@ async function celda(page, base, tam, vp) {
   await page.waitForSelector('[data-accion="iniciar-mano"]', { timeout: ESPERA_MS })
 
   // 1 · Antes de la primera mano: el índice, y el panel con sus cinco filas.
+  etapa('antes de la primera mano')
   {
     const { panel, abierto } = await abrirFila()
     out.panel = panel
@@ -123,6 +127,7 @@ async function celda(page, base, tam, vp) {
     await cerrar()
   }
   // 2 · El reparto: el capítulo 3, desde su primer paso.
+  etapa('el reparto')
   await tocar('[data-accion="iniciar-mano"]')
   {
     const { abierto } = await abrirFila()
@@ -130,6 +135,7 @@ async function celda(page, base, tam, vp) {
     await cerrar()
   }
   // 3 · Tu turno de apuesta: el 5, con el reloj quieto mientras está abierto.
+  etapa('tu turno de apuesta')
   await page.waitForSelector('[data-ancla="fila-acciones"]', { timeout: ESPERA_MS })
   {
     const { abierto } = await abrirFila()
@@ -145,6 +151,7 @@ async function celda(page, base, tam, vp) {
     else if (!(r2 < r1)) falla('tut.menu.pausa', `al cerrar, el reloj no siguió (${r1} → ${r2})`)
   }
   // 4 · Mientras piensa una IA: no juega con el capítulo abierto.
+  etapa('mientras piensa una IA')
   {
     const accion = (await punto('[data-accion="pasar"]')) ? '[data-accion="pasar"]' : '[data-accion="igualar"]'
     await tocar(accion)
@@ -167,9 +174,18 @@ async function celda(page, base, tam, vp) {
     }
   }
   // 5 · Hasta el descarte (pasando o igualando lo que haga falta): el 3, en su paso del descarte.
+  // T6 · si una IA apostó más que tu pila solo quedan «All-in» y «Retirarse»: antes del descarte,
+  // all-in (las cartas siguen jugando y se llega al descarte); después, retirarse (la mano acaba
+  // con «Siguiente mano»). Sin esto la vara no tocaba nada y el reloj cerraba la mano (un rojo
+  // de la serie de la tanda 6 que dependía del barajado).
+  const turno = async (resto) => {
+    for (const a of ['pasar', 'igualar', resto]) if (await punto(`[data-ancla="fila-acciones"] [data-accion="${a}"]`)) return `[data-ancla="fila-acciones"] [data-accion="${a}"]`
+    return null
+  }
+  etapa('hasta el descarte')
   for (let k = 0; k < 20; k++) {
     if (await punto('[data-accion="descartar"]')) break
-    const p = (await punto('[data-accion="pasar"]')) ? '[data-accion="pasar"]' : (await punto('[data-accion="igualar"]')) ? '[data-accion="igualar"]' : null
+    const p = await turno('allin')
     if (p) await tocar(p)
     await page.waitForTimeout(700)
   }
@@ -181,9 +197,10 @@ async function celda(page, base, tam, vp) {
   }
   await tocar('[data-accion="descartar"]')
   // 6 · Hasta la revelación: el 4.
+  etapa('hasta la revelación')
   for (let k = 0; k < 30; k++) {
     if (await punto('[data-accion="siguiente-mano"]')) break
-    const p = (await punto('[data-accion="pasar"]')) ? '[data-accion="pasar"]' : (await punto('[data-accion="igualar"]')) ? '[data-accion="igualar"]' : null
+    const p = await turno('retirarse')
     if (p) await tocar(p)
     await page.waitForTimeout(700)
   }
@@ -212,11 +229,15 @@ export async function runTutMenu(browser, { base }) {
   await Promise.all(Object.entries(T).map(async ([tam, vp]) => {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, ...(vp.movil ? { hasTouch: true, isMobile: true } : {}), deviceScaleFactor: 1 })
     const page = await ctx.newPage()
+    const rastro = {}
     try {
-      celdas[tam] = await celda(page, base, tam, vp)
+      celdas[tam] = await celda(page, base, tam, vp, rastro)
       fallos.push(...celdas[tam].fallos)
     } catch (e) {
-      fallos.push(`${tam}: el recorrido se cortó: ${String(e?.message || e).split('\n').slice(0, 2).join(' · ').slice(0, 300)}`)
+      const fila = await page.evaluate(() => [...document.querySelectorAll('[data-ancla="fila-acciones"] [data-accion]')]
+        .filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.dataset.accion).join(',')).catch(() => '?')
+      const mensaje = String(e?.message || e).split('\n').filter((l) => l.trim() && !/^Call log:/.test(l.trim())).slice(0, 2).join(' · ').slice(0, 300)
+      fallos.push(`${tam}: el recorrido se cortó en «${rastro.etapa ?? '?'}» (fila: ${fila || 'vacía'}): ${mensaje}`)
       if (process.env.TUT_FOTO) await page.screenshot({ path: `${process.env.TUT_FOTO}/menu-${tam}-corte.png` }).catch(() => {})
     } finally { await ctx.close() }
   }))

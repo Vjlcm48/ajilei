@@ -90,6 +90,9 @@ const PROHIBIDAS = [
   // TUT-1 tanda 4 · «Aprendemos», el título de la oferta en la lámina: ya no existe en el
   // repo y se queda prohibido para que no vuelva (estaba en la lista de abajo).
   'Aprendemos',
+  // TUT-1 tanda 6 · 6-b · la caja del registro de los capítulos (`VITE_TUT_DIAG`, del STOP-T de
+  // la tanda 5 al de la 6) salió del código: su id no vuelve a producción.
+  'tut-diag',
 ]
 
 // TUT-1 tanda 1 · las otras seis marcas que la lámina buscó en `dist/`: las de la capa, la
@@ -126,6 +129,8 @@ const OBLIGATORIAS = [
   // TUT-1 tanda 5 · los capítulos de la app (7 a 10) montados: un rótulo de la Pista C, la
   // escalera del 10 y el ancla del código de Salas.
   'tut.cap7.p1', 'tut.escalera.1.a', 'data-ancla="codigo"',
+  // TUT-1 tanda 6 · la ruta de la primera vez montada: la intro, el puente y su encadenado.
+  'tut.ruta.intro.titulo', 'tut.ruta.puente.titulo', 'ruta-empecemos',
 ]
 
 let carpeta = null
