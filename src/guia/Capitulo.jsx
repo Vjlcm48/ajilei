@@ -1,7 +1,8 @@
-import { Component, Suspense, createContext, lazy, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { Component, Suspense, createContext, lazy, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import PantallaDiferida from '../components/PantallaDiferida'
 import CapaSenal from '../components/CapaSenal'
-import { CAPITULOS, PANTALLAS, anclasDe } from './capitulos'
+import { anclaVacia } from '../components/capaSenalCore'
+import { CAPITULOS, PANTALLAS, MUESTRA_SI_VACIO, ANCLA_MUESTRA, anclasDe } from './capitulos'
 import { momentoGuiada } from './momento'
 import { guia } from '../lib/guia'
 import { volverAlIndice, pasoEnCurso, anotarPaso, soltarCapitulo } from './vuelta'
@@ -33,6 +34,8 @@ const MuestraCartas = lazy(() => Promise.resolve(fabricaMesa()).then((m) => ({ d
 //   · Desde el ⋮ de una mesa (P-2): sobre la mesa VIVA (`vivo`), sin segunda mesa ni
 //     segundo mazo; el aro va al ancla que exista y, si no hay ninguna, la tarjeta
 //     fija. Entre personas, el primer paso dice «Tu reloj sigue corriendo» (P-1).
+//     T7 · una zona de cartas sin cartas (antes de la primera mano) cuenta como ancla
+//     ausente (`useConCartas`); el 1.1 y el 4.1 pintan entonces la muestra del AJILEI.
 //   · T5 · la Pista C, sobre la PANTALLA VIVA de la app (`pantalla` en el paso): el
 //     capítulo navega con la ruta de `App` (`onPantalla`, sin escribir nada) y se posa
 //     sobre la pantalla que monta `App` (`enApp`: este componente va encima, en el marco
@@ -239,12 +242,40 @@ function useALaVista(paso) {
   return vistas?.paso === paso ? vistas : { ok: [], perdida: false }
 }
 
+// ── T7 · v1.6 §2.1 · un ancla de cartas sin cartas es un ancla ausente ───────
+// Desde el ⋮, los selectores del paso que tienen algo que señalar: los que casan con algún
+// elemento que no es una zona de cartas vacía (`anclaVacia`). La mesa sigue viva (un hueco se
+// llena al repartir), así que se relee con cada cambio del DOM (`useSyncExternalStore`); la foto
+// es una cadena, estable mientras no cambie. `null` (sobre la mesa congelada y en la app): todo.
+const SEP = '\n'
+const observarDom = (avisar) => {
+  const mo = new MutationObserver(avisar)
+  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+  return () => mo.disconnect()
+}
+
+function useConCartas(selectores) {
+  const clave = selectores ? selectores.join(SEP) : null
+  const leer = useCallback(() => (clave === null ? null
+    : clave.split(SEP).filter((s) => s && [...document.querySelectorAll(s)].some((e) => !anclaVacia(e))).join(SEP)), [clave])
+  const foto = useSyncExternalStore(observarDom, leer)
+  return foto === null ? null : foto ? foto.split(SEP) : []
+}
+
 function PasoCapitulo({ ctx, game }) {
   const { cap, n, i, total, pvp, vivo, enRuta, volver, siguiente, terminar, cerrar } = ctx
   const paso = cap.pasos[i]
   const vistas = useALaVista(paso)
-  let ancla = vistas ? vistas.ok : anclasDe(paso, game)
+  const base = vistas ? vistas.ok : anclasDe(paso, game)
+  const conCartas = useConCartas(vivo && !paso.muestra && !paso.pantalla ? base : null)
+  let ancla = conCartas ?? base
   let clave = paso.clave
+  let muestra = paso.muestra
+  // Sin nada que señalar, el paso que nombra el AJILEI lo pinta (y el aro va a la muestra).
+  if (conCartas?.length === 0 && paso.muestraSiVacio) {
+    muestra = MUESTRA_SI_VACIO[paso.muestraSiVacio]
+    ancla = ANCLA_MUESTRA
+  }
   // Desde el ⋮: si el botón del paso no está montado, su hueco en la fila (`hueco`).
   if (vivo && paso.hueco && !ancla.some((s) => document.querySelector(s))) {
     ancla = paso.hueco.ancla
@@ -258,7 +289,7 @@ function PasoCapitulo({ ctx, game }) {
   const perdida = !!vistas?.perdida
   return (
     <>
-      {paso.muestra && <Suspense fallback={null}><MuestraCartas {...paso.muestra} /></Suspense>}
+      {muestra && <Suspense fallback={null}><MuestraCartas {...muestra} /></Suspense>}
       <CapaSenal
         key={`${n}-${i}`}
         ancla={ancla}

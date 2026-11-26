@@ -19,8 +19,18 @@
 //   · `muestra`: lo que la guiada no reparte (P-4), pintado con los componentes reales
 //     en el centro de la mesa (`MuestraCartas`); el aro va a la muestra. Su tamaño lo da
 //     la cuenta de cartas (`tamanoMuestra`: una, grande; dos, media; más, chica);
-//   · `hueco` (desde el ⋮): si el ancla no está montada, `{ ancla, clave }` en su lugar.
+//   · `hueco` (desde el ⋮): si el ancla no está montada, `{ ancla, clave }` en su lugar;
+//   · `muestraSiVacio` (T7, desde el ⋮): el nombre de una muestra de `MUESTRA_SI_VACIO` que el
+//     paso pinta (con su aro) cuando la mesa viva no tiene sus cartas.
 // Las cartas de cada muestra se fijan aquí, nunca en el componente.
+//
+// T7 · v1.6 §2.1 · UN ANCLA DE CARTAS SIN CARTAS ES UN ANCLA AUSENTE. Desde el ⋮ (la mesa
+// viva), un paso cuya ancla es una zona de cartas en la que sólo hay huecos (antes de la
+// primera mano, entre manos) cae a la tarjeta sin flecha, como cuando el ancla no existe
+// (`anclaVacia`, en `capaSenalCore.js`): nunca un aro alrededor de huecos vacíos. El 1.1 y el
+// 4.1 nombran el AJILEI: lo enseñan aunque la mesa no lo tenga. Desde el índice del lobby (la
+// mesa congelada de la guiada) las cartas están y nada cambia. El índice del ⋮ tampoco cambia:
+// un capítulo abierto en el momento equivocado se lee en tarjetas; no se esconde.
 import { indicesDelPalo, sumaDe } from '../lib/guiaManos'
 
 const S = {
@@ -102,7 +112,7 @@ export const CAPITULOS = Object.freeze({
   1: {
     titulo: 'tut.cap1.titulo', icono: 'ajilei',
     pasos: [
-      { momento: m(3, 3), ancla: CINCO, clave: 'tut.cap1.p1' },
+      { momento: m(3, 3), ancla: CINCO, clave: 'tut.cap1.p1', muestraSiVacio: 'ajilei' },
       { momento: m(3, 3), ancla: [S.mazo], clave: 'tut.cap1.p2' },
       { momento: m(3, 3), ancla: [S.rivales], clave: 'tut.cap1.p3' },
       { momento: m(3, 3), ancla: [S.pila], clave: 'tut.cap1.p4' },
@@ -147,7 +157,7 @@ export const CAPITULOS = Object.freeze({
   4: {
     titulo: 'tut.cap4.titulo', icono: 'gana',
     pasos: [
-      { momento: m(3, 3), ancla: CINCO, clave: 'tut.cap4.p1' },
+      { momento: m(3, 3), ancla: CINCO, clave: 'tut.cap4.p1', muestraSiVacio: 'ajilei' },
       { momento: m(3, 3), muestra: { tipo: 'cartas', cartas: ['1-Copas', '10-Copas', '11-Copas', '12-Copas', '7-Oros'], suma: 52 }, clave: 'tut.cap4.p2' },
       { momento: m(1, 11), ancla: (g) => [...S.mano(g?.winner ?? 1), ...CINCO], clave: 'tut.cap4.p3' },
       { momento: m(1, 11), muestra: { tipo: 'empate' }, clave: 'tut.cap4.p4' },
@@ -229,6 +239,17 @@ export const CAPITULOS = Object.freeze({
 
 /** T5 · los capítulos que navegan por la app: desde el ⋮ de una mesa no se abren. */
 export const DE_LA_APP = Object.freeze(Object.keys(CAPITULOS).map(Number).filter((n) => CAPITULOS[n].pasos.some((p) => p.pantalla)))
+
+/**
+ * T7 · las muestras de los pasos con `muestraSiVacio`. El AJILEI: el As y cuatro de diez de un
+ * mismo palo, 51; las cinco de la mano 3 de la guiada (las que el índice enseña en el 1.1), en
+ * el orden en que se reparten. Cinco cartas: tamaño `chica` (`tamanoMuestra`).
+ */
+export const MUESTRA_SI_VACIO = Object.freeze({
+  ajilei: Object.freeze({ tipo: 'cartas', conjunto: 'ajilei', cartas: Object.freeze(['1-Bastos', '5-Bastos', '12-Bastos', '3-Bastos', '4-Bastos']) }),
+})
+/** T7 · el ancla de una muestra (la de `anclasDe`, para el paso que la pinta por `muestraSiVacio`). */
+export const ANCLA_MUESTRA = Object.freeze([S.muestra])
 
 /** Las anclas de un paso sobre una mesa (con la muestra, la muestra). */
 export function anclasDe(paso, game) {

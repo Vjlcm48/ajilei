@@ -284,6 +284,11 @@ export const TEXTOS_TUT_GUIADA = {
   'tut.pastilla.ultima': 'Última mano',
   'tut.pastilla.eres': 'Eres Mano',
   'tut.pastilla.es': 'Es Mano {nombre}',
+  // v1.6 §2.1 · el ancla de cartas sin cartas (tanda 7, Victor en ajilei.io): desde el ⋮ antes
+  // de la primera mano, una zona de cartas con solo huecos es un ancla ausente (tarjeta sin
+  // flecha, nunca un aro sobre huecos), y el 1.1 y el 4.1 pintan la muestra de un AJILEI de 51
+  // con su rótulo de siempre (`tut.cap1.p1`, `tut.cap4.p1`). Ningún texto nuevo; la regla, en
+  // `capitulos.js` y `capaSenalCore.anclaVacia`.
 }
 
 // `@__PURE__`: sin nadie que la importe en la app, el empaquetador la quita y con ella los

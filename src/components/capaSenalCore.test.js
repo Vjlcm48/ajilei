@@ -3,6 +3,7 @@ import {
   BORDE, MARGEN_HUECO, MAX_LINEAS, SEPARACION, FLECHA_DESDE,
   union, huecoDe, huecosDe, destapa, solape, bandas, radioDe, lineasDe, colocarBurbuja, burbujaCabe, colocarRespaldo,
   colocarBarra, colocarLibre, flechaEntre, trozosRotulo, colocarBarraFija, desvioSalir, colocarPaso,
+  anclaVacia, ZONA_CARTAS, CARTA_PINTADA,
 } from './capaSenalCore'
 
 // ── TUT-1 tanda 1 · la geometría pura de la capa de señalización ────────────
@@ -300,5 +301,39 @@ describe('T5 · colocarPaso: barra → «Cerrar» → burbuja, desde el ancla y 
     expect(r.modo).toBe('tarjeta')
     expect(r.rot).toMatchObject({ width: 388, height: 70 })
     expect(colocarPaso({ ...entrada, vista: { w: 412, h: 260 }, anclas: [caja(100, 70, 200, 80)] })).toEqual(r)
+  })
+})
+
+// ── TUT-1 T7 · un ancla de cartas sin cartas es un ancla ausente (v1.6 §2.1) ──
+// Un elemento plano: `zona` dice si casa con ZONA_CARTAS; `dentro`, las clases de sus
+// `.playing-card` (sin jsdom: sólo lo que `anclaVacia` lee).
+const el = ({ zona = true, dentro = [] } = {}) => ({
+  matches: (s) => (s === ZONA_CARTAS ? zona : false),
+  querySelector: (s) => {
+    if (s !== CARTA_PINTADA) throw new Error(`selector inesperado: ${s}`)
+    return dentro.find((c) => !c.split(' ').includes('card-empty')) ?? null
+  },
+})
+
+describe('TUT-1 T7 · anclaVacia', () => {
+  it('una zona de cartas con sólo huecos está vacía', () => {
+    expect(anclaVacia(el({ dentro: ['playing-card card-empty'] }))).toBe(true)
+    expect(anclaVacia(el({ dentro: [] }))).toBe(true)
+  })
+  it('con una carta de cara o boca abajo, no', () => {
+    expect(anclaVacia(el({ dentro: ['playing-card'] }))).toBe(false)
+    expect(anclaVacia(el({ dentro: ['playing-card card-back'] }))).toBe(false)
+    expect(anclaVacia(el({ dentro: ['playing-card card-empty', 'playing-card card-selected'] }))).toBe(false)
+  })
+  it('lo que no es zona de cartas (mazo, pila, panel, muestra) nunca está vacío', () => {
+    expect(anclaVacia(el({ zona: false, dentro: [] }))).toBe(false)
+    expect(anclaVacia(null)).toBe(false)
+    expect(anclaVacia({})).toBe(false)
+  })
+  it('la zona es la mano propia y los huecos de los rivales; la carta, la que no es hueco', () => {
+    expect(ZONA_CARTAS).toContain('[data-ancla="carta"]')
+    expect(ZONA_CARTAS).toContain('.opp-card-slot')
+    expect(ZONA_CARTAS).toContain('.card-slot-wrapper')
+    expect(CARTA_PINTADA).toBe('.playing-card:not(.card-empty)')
   })
 })

@@ -319,6 +319,28 @@ export function flechaEntre(tarjeta, hueco) {
   return { x1: a.x, y1: a.y, x2: b.x, y2: b.y }
 }
 
+// ── TUT-1 T7 · UN ANCLA DE CARTAS SIN CARTAS ES UN ANCLA AUSENTE (v1.6 §2.1) ──
+// Desde el ⋮ de una mesa antes de la primera mano (ajilei.io, Victor), el 1.1 y el 4.1 abrazaban
+// con el aro los cinco huecos vacíos de la mano mientras el rótulo hablaba de un AJILEI que no
+// se veía. Sobre la mesa viva, una zona de cartas (la mano propia, la de un rival, sus huecos)
+// en la que sólo hay huecos (`PlayingCard` sin carta: `.card-empty`) no se señala: el paso cae
+// a la tarjeta sin flecha, como cuando el ancla no existe. Una carta boca abajo SÍ es carta.
+
+/** Lo que es una zona de cartas: cada hueco de la mano propia y de las de los rivales. */
+export const ZONA_CARTAS = '[data-ancla="carta"], .opp-card-slot, .card-slot-wrapper'
+/** Una carta pintada dentro (de cara o boca abajo); el hueco vacío no cuenta. */
+export const CARTA_PINTADA = '.playing-card:not(.card-empty)'
+
+/**
+ * ¿Es `el` una zona de cartas sin ninguna carta dentro? Sólo lee el elemento (`matches` y
+ * `querySelector`), así que se prueba con objetos planos. Lo que no es zona de cartas (el mazo,
+ * la pila, un panel, la muestra) nunca está «vacío».
+ */
+export function anclaVacia(el) {
+  if (!el || typeof el.matches !== 'function') return false
+  return el.matches(ZONA_CARTAS) && !el.querySelector(CARTA_PINTADA)
+}
+
 /**
  * Un rótulo con `**negrita**` en trozos: `[{texto, fuerte}]`. El texto sigue
  * siendo UNO en el diccionario (IDI-1 lo traduce entero); aquí sólo se corta.
