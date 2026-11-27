@@ -32,6 +32,11 @@ import { decidirFalloChunk } from './lib/cargarMesa'
 import { origenFalloChunk } from './lib/trozos'
 import { arrancarHowler } from './lib/motorHowler'
 import { recogerOrigen } from './lib/origen'
+import { aplicarCover } from './lib/viewportCover'
+
+// PAN-2 · `viewport-fit=cover` solo en la app instalada de Android (nota bajo
+// INV-45), antes de pintar: sin él, Chrome 158 deja el margen de la cámara en blanco.
+aplicarCover(document, window)
 
 // MED-1a T2 · de dónde vino (`lib/origen`), ANTES de montar `App`: `App` limpia
 // `?sala=` de la barra en su primer render. Apagado con el bypass, como el
